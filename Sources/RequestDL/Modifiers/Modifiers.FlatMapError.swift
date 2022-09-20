@@ -30,4 +30,15 @@ extension Task {
     ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
         modify(Modifiers.FlatMapError(flatMapErrorHandler: flatMapErrorHandler))
     }
+
+    public func flatMapError<Failure: Error>(
+        _ type: Failure.Type,
+        _ flatMapErrorHandler: @escaping (Failure) throws -> Void
+    ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
+        flatMapError {
+            if let error = $0 as? Failure {
+                try flatMapErrorHandler(error)
+            }
+        }
+    }
 }
