@@ -27,7 +27,7 @@
 import Foundation
 
 // swiftlint:disable line_length
-public struct InterceptedTask<Middleware: MiddlewareType, Content: Task>: Task where Middleware.Element == Content.Element {
+public struct InterceptedTask<Middleware: TaskMiddleware, Content: Task>: Task where Middleware.Element == Content.Element {
 
     public typealias Element = Content.Element
 

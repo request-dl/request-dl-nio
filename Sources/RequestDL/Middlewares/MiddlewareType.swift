@@ -1,5 +1,5 @@
 //
-//  MiddlewareType.swift
+//  TaskMiddleware.swift
 //
 //  MIT License
 //
@@ -26,7 +26,7 @@
 
 import Foundation
 
-public protocol MiddlewareType {
+public protocol TaskMiddleware {
 
     associatedtype Element
 

@@ -28,7 +28,7 @@ import Foundation
 
 extension Middlewares {
 
-    public struct Detach<Element>: MiddlewareType {
+    public struct Detach<Element>: TaskMiddleware {
 
         let detachHandler: (Result<Element, Error>) -> Void
 

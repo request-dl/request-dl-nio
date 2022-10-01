@@ -43,7 +43,7 @@ public protocol Task {
 
 extension Task {
 
-    public func intercept<Middleware: MiddlewareType>(
+    public func intercept<Middleware: TaskMiddleware>(
         _ middleware: Middleware
     ) -> InterceptedTask<Middleware, Self> {
         InterceptedTask(self, middleware)

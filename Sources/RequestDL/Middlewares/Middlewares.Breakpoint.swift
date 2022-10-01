@@ -28,7 +28,7 @@ import Foundation
 
 extension Middlewares {
 
-    public struct Breakpoint<Element>: MiddlewareType {
+    public struct Breakpoint<Element>: TaskMiddleware {
 
         init() {}
 

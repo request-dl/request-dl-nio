@@ -28,7 +28,7 @@ import Foundation
 
 extension Middlewares {
 
-    public struct Logger: MiddlewareType {
+    public struct Logger: TaskMiddleware {
 
         let isLogActive: Bool
 
