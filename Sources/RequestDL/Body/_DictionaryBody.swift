@@ -1,5 +1,5 @@
 //
-//  TargetTaskType.swift
+//  _DictionaryBody.swift
 //
 //  MIT License
 //
@@ -26,13 +26,28 @@
 
 import Foundation
 
-@available(iOS, introduced: 1000, message: "This method and protocol will change")
-@available(macOS, introduced: 1000, message: "This method and protocol will change")
-@available(watchOS, introduced: 1000, message: "This method and protocol will change")
-@available(tvOS, introduced: 1000, message: "This method and protocol will change")
-public protocol TargetTaskType {
+// swiftlint:disable type_name
+public struct _DictionaryBody: BodyProvider {
 
-    associatedtype Element
+    private let dictionary: [String: Any]
+    private let options: JSONSerialization.WritingOptions
 
-    func response<Target: RequestDL.Target>(for target: Target) async throws -> Element
+    init(
+        _ dictionary: [String: Any],
+        options: JSONSerialization.WritingOptions
+    ) {
+        self.dictionary = dictionary
+        self.options = options
+    }
+
+    public var data: Data {
+        do {
+            return try JSONSerialization.data(
+                withJSONObject: dictionary,
+                options: options
+            )
+        } catch {
+            fatalError(error.localizedDescription)
+        }
+    }
 }

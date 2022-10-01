@@ -1,5 +1,5 @@
 //
-//  TargetTaskType.swift
+//  Timeout.Source.swift
 //
 //  MIT License
 //
@@ -26,13 +26,18 @@
 
 import Foundation
 
-@available(iOS, introduced: 1000, message: "This method and protocol will change")
-@available(macOS, introduced: 1000, message: "This method and protocol will change")
-@available(watchOS, introduced: 1000, message: "This method and protocol will change")
-@available(tvOS, introduced: 1000, message: "This method and protocol will change")
-public protocol TargetTaskType {
+extension Timeout {
 
-    associatedtype Element
+    public struct Source: OptionSet {
+        public static let request  = Source(rawValue: 1 << 0)
+        public static let resource = Source(rawValue: 1 << 1)
 
-    func response<Target: RequestDL.Target>(for target: Target) async throws -> Element
+        public static let all: Self = [.request, .resource]
+
+        public let rawValue: Int
+
+        public init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
+    }
 }

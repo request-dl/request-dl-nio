@@ -1,5 +1,5 @@
 //
-//  Form.swift
+//  HeaderGroup.swift
 //
 //  MIT License
 //
@@ -26,22 +26,7 @@
 
 import Foundation
 
-struct FormObject: NodeObject {
-
-    let type: FormType
-
-    init(_ type: FormType) {
-        self.type = type
-    }
-
-    func makeRequest(_ configuration: RequestConfiguration) {
-        let boundary = FormUtils.boundary
-        configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        configuration.request.httpBody = FormUtils.buildBody([type.data], with: boundary)
-    }
-}
-
-public struct Form<Content: Request>: Request {
+public struct HeaderGroup<Content: Request>: Request {
 
     public typealias Body = Never
 
@@ -55,7 +40,7 @@ public struct Form<Content: Request>: Request {
         Never.bodyException()
     }
 
-    public static func makeRequest(_ request: Form<Content>, _ context: Context) async {
+    public static func makeRequest(_ request: HeaderGroup<Content>, _ context: Context) async {
         let node = Node(
             root: context.root,
             object: EmptyObject(request),
@@ -65,9 +50,9 @@ public struct Form<Content: Request>: Request {
         let newContext = Context(node)
         await Content.makeRequest(request.parameter, newContext)
 
-        let parameters = newContext
-            .findCollection(FormObject.self)
-            .map(\.type)
+        let parameters = newContext.findCollection(Headers.Object.self).map {
+            ($0.key, $0.value)
+        }
 
         context.append(Node(
             root: context.root,
@@ -77,19 +62,31 @@ public struct Form<Content: Request>: Request {
     }
 }
 
-extension Form {
+extension HeaderGroup where Content == ForEach<[String: Any], Headers.`Any`> {
+
+    public init(_ dictionary: [String: Any]) {
+        self.init {
+            ForEach(dictionary) {
+                Headers.Any($0.value, forKey: $0.key)
+            }
+        }
+    }
+}
+
+extension HeaderGroup {
 
     struct Object: NodeObject {
-        private let types: [FormType]
 
-        init(_ types: [FormType]) {
-            self.types = types
+        private let parameters: [(String, Any)]
+
+        init(_ parameters: [(String, Any)]) {
+            self.parameters = parameters
         }
 
         func makeRequest(_ configuration: RequestConfiguration) {
-            let boundary = FormUtils.boundary
-            configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-            configuration.request.httpBody = FormUtils.buildBody(types.map(\.data), with: boundary)
+            for (key, value) in parameters {
+                configuration.request.setValue("\(value)", forHTTPHeaderField: key)
+            }
         }
     }
 }
