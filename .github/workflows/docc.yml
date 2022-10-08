@@ -1,4 +1,4 @@
-name: Tests
+name: DocC
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
      - main
 
 jobs:
-  tests:
+  docc:
     runs-on: macOS-12
     env:
         DEVELOPER_DIR: /Applications/Xcode_14.0.app/Contents/Developer
