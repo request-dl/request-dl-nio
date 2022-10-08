@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Run tests
+      - name: Run docc generate
         run: swift package --allow-writing-to-directory ./docs \
           generate-documentation --target RequestDL \
           --disable-indexing \
