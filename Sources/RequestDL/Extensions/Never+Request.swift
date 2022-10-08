@@ -36,6 +36,6 @@ extension Never: Request {
 extension Never {
 
     static func bodyException() -> Never {
-        fatalError("Body should not be called")
+        preconditionFailure("Body should not be called")
     }
 }
