@@ -1,35 +1,22 @@
 name: Tests
 
 on:
+  pull_request:
   push:
      branches:
      - main
 
 jobs:
-  lint:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: install swiftlint
-        run: >
-          if [[ ! -f "/usr/local/bin/swiftlint" ]]
-             then
-               brew install swiftlint
-             fi
-
-      - name: run swiftlint
-        run: swiftlint lint
-
   tests:
     runs-on: macOS-12
     env:
         DEVELOPER_DIR: /Applications/Xcode_14.0.app/Contents/Developer
+
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Build
-        run: swift build -v
-
       - name: Run tests
-        run: swift test -v
+        run: swift test --enable-code-coverage
+
+      - name: Test coverage
+        uses: maxep/spm-lcov-action@0.3.0
+        with:
+          output-file: ./coverage/lcov.info
