@@ -13,6 +13,8 @@ jobs:
         DEVELOPER_DIR: /Applications/Xcode_14.0.app/Contents/Developer
 
     steps:
+      - uses: actions/checkout@v3
+
       - name: Run tests
         run: swift test --enable-code-coverage
 
