@@ -1,3 +1,5 @@
+[![Tests](https://github.com/request-dl/request-dl/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/request-dl/request-dl/actions/workflows/tests.yml)
+
 # RequestDL
 
 This library came about through improvements in functionality 
