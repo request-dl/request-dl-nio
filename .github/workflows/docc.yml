@@ -16,10 +16,10 @@ jobs:
 
       - name: Run tests
         run: swift package --allow-writing-to-directory ./docs \
-          generate-documentation --target my-swift-package \
+          generate-documentation --target RequestDL \
           --disable-indexing \
           --transform-for-static-hosting \
-          --hosting-base-path my-swift-package \
+          --hosting-base-path RequestDL \
           --output-path ./docs
 
       - name: Create pull request
