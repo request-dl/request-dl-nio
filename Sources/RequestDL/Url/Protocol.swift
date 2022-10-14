@@ -34,9 +34,9 @@ import Foundation
  */
 public enum Protocol: String {
 
-    /// Used to make HTTP requests
+    /// Makes a HTTP requests
     case http
 
-    /// Used to make HTTPS requests
+    /// Makes a HTTPS requests
     case https
 }

@@ -30,12 +30,14 @@ import Foundation
  The Url is the only way to specify the request URL. We have some methods available
  to build the URL in the best way, according to the needs of each developer.
 
-     struct AppleDeveloperURL: Request {
+ ```swift
+ struct AppleDeveloperURL: Request {
 
-         var body: some Request {
-             Url("https://developer.apple.com")
-         }
+     var body: some Request {
+         Url("https://developer.apple.com")
      }
+ }
+ ```
  */
 public struct Url: Request {
 
@@ -56,12 +58,14 @@ public struct Url: Request {
 
      As per the example below:
 
-         struct AppleDeveloperURL: Request {
+     ```swift
+     struct AppleDeveloperURL: Request {
 
-             var body: some Request {
-                 Url("https://developer.apple.com")
-             }
+         var body: some Request {
+             Url("https://developer.apple.com")
          }
+     }
+     ```
      */
     public init(_ path: String) {
         self.protocol = nil
@@ -80,14 +84,16 @@ public struct Url: Request {
 
      As per the example below:
 
-         import RequestDL
+     ```swift
+     import RequestDL
 
-         struct AppleDeveloperURL: Request {
+     struct AppleDeveloperURL: Request {
 
-             var body: some Request {
-                 Url(.https, path: "developer.apple.com")
-             }
+         var body: some Request {
+             Url(.https, path: "developer.apple.com")
          }
+     }
+     ```
      */
     public init(_ `protocol`: Protocol, path: String) {
         self.protocol = `protocol`
@@ -122,30 +128,32 @@ extension Url {
 
  As example below:
 
-     import RequestDL
+ ```swift
+ import RequestDL
 
-     struct AppleDeveloper: Request {
+ struct AppleDeveloper: Request {
 
-         private let path: AppleDeveloperPath
+     private let path: AppleDeveloperPath
 
-         var body: some Request {
-             switch path {
-             case .wwdc22:
-                 baseURL + Url("/wwdc22")
-             case .swiftPlaygrounds:
-                 baseURL + Url("/swift-playgrounds")
-             case .appStore:
-                 baseURL + Url("/app-store/whats-new")
-             }
+     var body: some Request {
+         switch path {
+         case .wwdc22:
+             baseURL + Url("/wwdc22")
+         case .swiftPlaygrounds:
+             baseURL + Url("/swift-playgrounds")
+         case .appStore:
+             baseURL + Url("/app-store/whats-new")
          }
      }
+ }
 
-     extension AppleDeveloper {
+ extension AppleDeveloper {
 
-         var baseURL: Url {
-             Url(.https, path: "developer.apple.com")
-         }
+     var baseURL: Url {
+         Url(.https, path: "developer.apple.com")
      }
+ }
+ ```
  */
 public func + (_ lhs: Url, _ rhs: Url) -> Url {
     let combinedPath = lhs.path.appending(rhs.path)
@@ -174,14 +182,16 @@ public func + (_ lhs: Url, _ rhs: Url) -> Url {
 
  As an example:
 
-     import RequestDL
+ ```swift
+ import RequestDL
 
-     struct WWDC22Website: Request {
+ struct WWDC22Website: Request {
 
-         var body: some Request {
-             Url(.https, path: "developer.apple.com") + "/wwdc22"
-         }
+     var body: some Request {
+         Url(.https, path: "developer.apple.com") + "/wwdc22"
      }
+ }
+ ```
  */
 public func + (
     _ url: Url,

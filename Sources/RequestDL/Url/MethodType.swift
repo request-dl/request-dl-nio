@@ -27,16 +27,32 @@
 import Foundation
 
 /// Define constants for the action to be performed on the endpoint
-public enum MethodType: String {
+public enum MethodType: String, CaseIterable {
 
+    /// Defines a GET operation
     case get = "GET"
+
+    /// Defines an HEAD operation
     case head = "HEAD"
+
+    /// Defines a POST operation
     case post = "POST"
+
+    /// Defines a PUT operation
     case put = "PUT"
+
+    /// Defines a DELETE operation
     case delete = "DELETE"
 
+    /// Defines a CONNECT operation
     case connect = "CONNECT"
+
+    /// Defines a OPTIONS operation
     case options = "OPTIONS"
+
+    /// Defines a TRACE operation
     case trace = "TRACE"
+
+    /// Defines a PATCH operation
     case patch = "PATCH"
 }

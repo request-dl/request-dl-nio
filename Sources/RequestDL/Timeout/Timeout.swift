@@ -26,6 +26,21 @@
 
 import Foundation
 
+/**
+ Defines the request timeout for resource and request.
+
+ ```swift
+ extension ProductsAPI {
+
+     func get() -> DataTask {
+         DataTask {
+             Url("https://apple.com.br")
+             Timeout(40, for: .request)
+         }
+     }
+ }
+ ```
+ */
 public struct Timeout: Request {
 
     public typealias Body = Never
@@ -33,6 +48,27 @@ public struct Timeout: Request {
     let timeout: TimeInterval
     let source: Source
 
+    /**
+     Initializes with the time interval and which source to be limited
+
+     - Parameters:
+        - timeout: The time interval to be applied
+        - source: Specify the type of timeout
+
+     In the example below, a request is made to the Google's website with the timeout for all types .
+
+     ```swift
+     extension GoogleAPI {
+
+         func website() -> DataTask {
+             DataTask {
+                 Url(.https, path: "https://google.com")
+                 Timeout(60, for: .all)
+             }
+         }
+     }
+     ```
+     */
     public init(_ timeout: TimeInterval, for source: Source = .all) {
         self.timeout = timeout
         self.source = source

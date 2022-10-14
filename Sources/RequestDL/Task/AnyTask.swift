@@ -1,5 +1,5 @@
 //
-//  Timeout.Source.swift
+//  AnyTask.swift
 //
 //  MIT License
 //
@@ -26,29 +26,22 @@
 
 import Foundation
 
-extension Timeout {
+public struct AnyTask<Element>: Task {
 
-    /// Types of timeout available for each request
-    public struct Source: OptionSet {
+    private let wrapper: () async throws -> Element
 
-        /// The timeout interval for the request in seconds.
-        ///
-        /// The default value is 60s.
-        public static let request = Source(rawValue: 1 << 0)
+    init<T: Task>(_ task: T) where T.Element == Element {
+        wrapper = { try await task.response() }
+    }
 
-        /// The timeout interval for resource which determinate how long
-        /// to wait the resource to be transferred in seconds.
-        ///
-        /// The default value is 7 days.
-        public static let resource = Source(rawValue: 1 << 1)
+    public func response() async throws -> Element {
+        try await wrapper()
+    }
+}
 
-        /// Defines same timeout interval for ``request`` and ``resource``
-        public static let all: Self = [.request, .resource]
+extension Task {
 
-        public let rawValue: Int
-
-        public init(rawValue: Int) {
-            self.rawValue = rawValue
-        }
+    public func eraseToAnyTask() -> AnyTask<Element> {
+        .init(self)
     }
 }

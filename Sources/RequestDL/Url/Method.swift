@@ -29,16 +29,17 @@ import Foundation
 /**
  Defines the request method.
 
-     extension ProductsAPI {
+ ```swift
+ extension ProductsAPI {
 
-         func get() -> AnyTask<Error> {
-             Task {
-                 BaseUrl() + "/products"
-                 Method(.get)
-             }
-             .eraseToAnyTask()
+     func get() -> DataTask {
+         DataTask {
+             BaseUrl() + "/products"
+             Method(.get)
          }
      }
+ }
+ ```
  */
 public struct Method: Request {
 
@@ -54,16 +55,17 @@ public struct Method: Request {
 
      In the example below, a GET request is made to the Apple developers website.
 
-         extension AppleDevelopersAPI {
+     ```swift
+     extension AppleDevelopersAPI {
 
-             func get() -> AnyTask<Error> {
-                 Task {
-                     Url(.https, path: "developer.apple.com")
-                     Method(.get)
-                 }
-                 .eraseToAnyTask()
+         func get() -> DataTask {
+             DataTask {
+                 Url(.https, path: "developer.apple.com")
+                 Method(.get)
              }
          }
+     }
+     ```
      */
     public init(_ methodType: MethodType) {
         self.methodType = methodType
