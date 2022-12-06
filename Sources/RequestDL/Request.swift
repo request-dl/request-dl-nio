@@ -31,21 +31,23 @@ import Foundation
  that uses the opaque `some Request` return type. In this case, we can create new
  objects by combining the use of others to configure several properties of a request at once.
 
-     import RequestDL
+ ```swift
+ import RequestDL
 
-     struct DefaultHeaders: Request {
+ struct DefaultHeaders: Request {
 
-         let cache: Bool
+     let cache: Bool
 
-         var body: some Request {
-             Headers.ContentType(.json)
-             Headers.Accept(.json)
+     var body: some Request {
+         Headers.ContentType(.json)
+         Headers.Accept(.json)
 
-             if cache {
-                 Cache(.returnCacheDataElseLoad)
-             }
+         if cache {
+             Cache(.returnCacheDataElseLoad)
          }
      }
+ }
+ ```
 
  We can explore and use many different objects to meet some application business
  rule. An example where this approach is interesting is in the case of tokens that
@@ -65,14 +67,16 @@ public protocol Request {
      the Requests implemented by the RequestDL, as well as other Requests
      implemented by you.
 
-         import RequestDL
+     ```swift
+     import RequestDL
 
-         struct MyRequest: Request {
+     struct MyRequest: Request {
 
-             var body: some Request {
-                 Url("https://google.com")
-             }
+         var body: some Request {
+             Url("https://google.com")
          }
+     }
+     ```
      */
     @RequestBuilder
     var body: Body { get }
