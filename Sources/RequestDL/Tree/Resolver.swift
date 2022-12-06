@@ -51,7 +51,7 @@ struct Resolver<Content: Request> {
 
         let configuration = RequestConfiguration(
             request: URLRequest(url: object.url),
-            configuration: sessionObject?.configuration.sessionConfiguration ?? .default,
+            configuration: sessionObject?.configuration ?? .default,
             delegate: delegate
         )
 

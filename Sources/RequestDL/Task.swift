@@ -38,17 +38,20 @@ public protocol Task {
 
     associatedtype Element
 
+    /// Runs the task and gets the result asynchronously
     func response() async throws -> Element
 }
 
 extension Task {
 
+    /// Adds a Middleware to obtain the result of the call separately
     public func intercept<Middleware: TaskMiddleware>(
         _ middleware: Middleware
     ) -> InterceptedTask<Middleware, Self> {
         InterceptedTask(self, middleware)
     }
 
+    /// Adds a Modifier to process and change the result of the call
     public func modify<Modifier: TaskModifier>(
         _ modifier: Modifier
     ) -> ModifiedTask<Modifier> where Modifier.Body == Self {

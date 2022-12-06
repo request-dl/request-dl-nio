@@ -26,12 +26,15 @@
 
 import Foundation
 
+/**
+ The Adaptor is used in the AppDelegate to perform operations after the URLSession calls are finished
+ */
 @propertyWrapper
 public struct RequestBackgroundAdaptor {
 
     public init() {}
 
-    public var wrappedValue: () -> Void {
+    public var wrappedValue: (String) -> Void {
         get { fatalError("get not implemented") }
         set { BackgroundService.shared.completionHandler = newValue }
     }
@@ -41,5 +44,5 @@ class BackgroundService {
 
     static let shared = BackgroundService()
 
-    var completionHandler: (() -> Void)?
+    var completionHandler: ((String) -> Void)?
 }

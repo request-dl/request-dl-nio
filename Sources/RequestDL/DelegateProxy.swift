@@ -65,10 +65,12 @@ class DelegateProxy: NSObject {
 extension DelegateProxy: URLSessionDelegate {
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        DispatchQueue.main.async {
-            BackgroundService.shared.completionHandler?()
-            BackgroundService.shared.completionHandler = nil
+        guard let identifier = session.configuration.identifier else {
+            print("[Request]", "Missing identifier for a background session")
+            return
         }
+
+        BackgroundService.shared.completionHandler?(identifier)
     }
 }
 
