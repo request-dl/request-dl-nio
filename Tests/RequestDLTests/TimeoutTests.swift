@@ -29,71 +29,49 @@ import XCTest
 
 final class TimeoutTests: XCTestCase {
 
-    var delegate: DelegateProxy!
-
-    override func setUp() async throws {
-        delegate = .init()
-    }
-
-    override func tearDown() async throws {
-        delegate = nil
-    }
-
     func testTimeoutAll() async {
-        let sut = Group {
-            Url("https:///google.com")
-            Timeout(4, for: .all)
-        }
+        let sut = Test(Timeout(4, for: .all))
 
-        let (session, _) = await Resolver(sut).make(delegate)
+        let (session, _) = await resolve(sut)
 
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 4)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 4)
     }
 
     func testTimeoutAllSeparated() async {
-        let sut = Group {
-            Url("https:///google.com")
+        let sut = Test {
             Timeout(2, for: .request)
             Timeout(6, for: .resource)
         }
 
-        let (session, _) = await Resolver(sut).make(delegate)
+        let (session, _) = await resolve(sut)
 
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 2)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 6)
     }
 
     func testTimeoutForRequest() async {
-        let sut = Group {
-            Url("https:///google.com")
-            Timeout(1, for: .request)
-        }
+        let sut = Test(Timeout(1, for: .request))
 
-        let (session, _) = await Resolver(sut).make(delegate)
+        let (session, _) = await resolve(sut)
 
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 1)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 7 * 24 * 3600)
     }
 
     func testTimeoutForResource() async {
-        let sut = Group {
-            Url("https:///google.com")
-            Timeout(50, for: .resource)
-        }
+        let sut = Test(Timeout(50, for: .resource))
 
-        let (session, _) = await Resolver(sut).make(delegate)
+        let (session, _) = await resolve(sut)
 
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 60)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 50)
     }
 
     func testEmpty() async {
-        let sut = Group {
-            Url("https:///google.com")
-        }
+        let sut = Test(EmptyRequest())
 
-        let (session, _) = await Resolver(sut).make(delegate)
+        let (session, _) = await resolve(sut)
 
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 60)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 7 * 24 * 3600)

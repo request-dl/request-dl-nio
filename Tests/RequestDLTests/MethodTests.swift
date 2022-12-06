@@ -29,16 +29,6 @@ import XCTest
 
 final class MethodTests: XCTestCase {
 
-    var delegate: DelegateProxy!
-
-    override func setUp() async throws {
-        delegate = .init()
-    }
-
-    override func tearDown() async throws {
-        delegate = nil
-    }
-
     func testMethods() async {
         for method in MethodType.allCases {
             let sut = Group {
@@ -46,7 +36,7 @@ final class MethodTests: XCTestCase {
                 Method(method)
             }
 
-            let (_, request) = await Resolver(sut).make(delegate)
+            let (_, request) = await resolve(sut)
 
             XCTAssertEqual(request.httpMethod, method.rawValue)
         }

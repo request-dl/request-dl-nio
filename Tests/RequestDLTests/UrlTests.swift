@@ -44,9 +44,9 @@ final class UrlTests: XCTestCase {
         let sut2 = Url("https://www.apple.com/iphone")
         let sut3 = Url("http://account.microsoft.com/account/account?q=teste")
 
-        let (_, request1) = await Resolver(sut1).make(delegate)
-        let (_, request2) = await Resolver(sut2).make(delegate)
-        let (_, request3) = await Resolver(sut3).make(delegate)
+        let (_, request1) = await resolve(sut1)
+        let (_, request2) = await resolve(sut2)
+        let (_, request3) = await resolve(sut3)
 
         XCTAssertEqual(request1.url?.absoluteString, "https://google.com")
         XCTAssertEqual(request2.url?.absoluteString, "https://www.apple.com/iphone")
@@ -58,9 +58,9 @@ final class UrlTests: XCTestCase {
         let sut2 = Url(.https, path: "www.apple.com/iphone")
         let sut3 = Url(.http, path: "account.microsoft.com/account/account?q=teste")
 
-        let (_, request1) = await Resolver(sut1).make(delegate)
-        let (_, request2) = await Resolver(sut2).make(delegate)
-        let (_, request3) = await Resolver(sut3).make(delegate)
+        let (_, request1) = await resolve(sut1)
+        let (_, request2) = await resolve(sut2)
+        let (_, request3) = await resolve(sut3)
 
         XCTAssertEqual(request1.url?.absoluteString, "https://google.com")
         XCTAssertEqual(request2.url?.absoluteString, "https://www.apple.com/iphone")
@@ -77,7 +77,7 @@ final class UrlTests: XCTestCase {
 
         let sut = lhs + rhs
 
-        let (_, request) = await Resolver(sut).make(delegate)
+        let (_, request) = await resolve(sut)
 
         XCTAssertEqual(request.url?.absoluteString, "https://google.com/?q=apple")
     }
@@ -88,7 +88,7 @@ final class UrlTests: XCTestCase {
 
         let sut = lhs + rhs
 
-        let (_, request) = await Resolver(sut).make(delegate)
+        let (_, request) = await resolve(sut)
 
         XCTAssertEqual(request.url?.absoluteString, "http://account.microsoft.com/account\(rhs)")
     }
@@ -99,7 +99,7 @@ final class UrlTests: XCTestCase {
 
         let sut = lhs + rhs
 
-        let (_, request) = await Resolver(sut).make(delegate)
+        let (_, request) = await resolve(sut)
 
         XCTAssertEqual(request.url?.absoluteString, "https://apple.com/iphone")
     }

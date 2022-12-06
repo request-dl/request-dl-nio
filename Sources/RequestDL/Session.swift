@@ -97,12 +97,12 @@ extension Session {
         edit { $0.allowsCellularAccess = !isDisabled }
     }
 
-    /// default true
+    /// default false
     public func expensiveNetworkDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsExpensiveNetworkAccess = !isDisabled }
     }
 
-    /// default true
+    /// default false
     public func constrainedNetworkDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsConstrainedNetworkAccess = !isDisabled }
     }
@@ -165,6 +165,7 @@ extension Session {
         edit { $0.httpCookieAcceptPolicy = policy }
     }
 
+    /// default 6
     public func maximumConnectionsPerHost(_ maximum: Int) -> Self {
         edit { $0.httpMaximumConnectionsPerHost = maximum }
     }
