@@ -41,6 +41,7 @@ jobs:
         # uses: fwcd/swift-docc-action@3c0d98e9eb344aa66952020b4cecda0eb8b69858
         uses: fwcd/swift-docc-action@v1.0.2
         with:
+          target: RequestDL
           # The output folder.
           output: ./_site
           # The path at which the docs will be hosted.
