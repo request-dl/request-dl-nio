@@ -1,7 +1,7 @@
 [![Swift](https://img.shields.io/badge/Swift-5.7-blue.svg)](https://swift.org)
 [![MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/request-dl/request-dl/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/request-dl/request-dl/actions/workflows/tests.yml)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/2416463319c9fe0e9d49/test_coverage)](https://codeclimate.com/github/request-dl/request-dl/test_coverage)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/516f7228a532b73b5540/test_coverage)](https://codeclimate.com/github/brennobemoura/request-dl/test_coverage)
 
 # RequestDL
 
