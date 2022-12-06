@@ -45,7 +45,7 @@ jobs:
           # The output folder.
           output: ./_site
           # The path at which the docs will be hosted.
-           hosting-base-path: request-dl
+          hosting-base-path: request-dl
           # Whether to disable indexing.
           disable-indexing: 'true'
           transform-for-static-hosting: 'true'
