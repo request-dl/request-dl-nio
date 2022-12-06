@@ -66,8 +66,6 @@ final class SessionTests: XCTestCase {
         XCTAssertNil(configuration.sharedContainerIdentifier)
         XCTAssertFalse(configuration.sessionSendsLaunchEvents)
         XCTAssertNil(configuration.connectionProxyDictionary)
-        XCTAssertEqual(configuration.tlsMinimumSupportedProtocolVersion, .TLSv10)
-        XCTAssertEqual(configuration.tlsMaximumSupportedProtocolVersion, .TLSv13)
         XCTAssertFalse(configuration.httpShouldUsePipelining)
         XCTAssertTrue(configuration.httpShouldSetCookies)
         XCTAssertEqual(configuration.httpCookieAcceptPolicy, .onlyFromMainDocumentDomain)
