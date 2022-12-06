@@ -46,9 +46,8 @@ jobs:
           # The path at which the docs will be hosted.
           # hosting-base-path: # optional
           # Whether to disable indexing.
-          # disable-indexing: # optional
-          # Whether to generate documentation suitable for static hosting (e.g. on GitHub Pages).
-          # transform-for-static-hosting: # optional
+          disable-indexing: 'true'
+          transform-for-static-hosting: 'true'
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
