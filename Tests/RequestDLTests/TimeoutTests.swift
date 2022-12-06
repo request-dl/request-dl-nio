@@ -81,5 +81,3 @@ final class TimeoutTests: XCTestCase {
         XCTAssertTrue(Timeout.Body.self == Never.self)
     }
 }
-
-

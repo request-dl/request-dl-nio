@@ -89,7 +89,7 @@ extension Task where Element == TaskResult<Data> {
     }
 }
 
-fileprivate enum DecodeContentType {
+private enum DecodeContentType {
     case plain
     case array
     case dictionary

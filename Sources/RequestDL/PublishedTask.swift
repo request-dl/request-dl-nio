@@ -40,7 +40,7 @@ public struct PublishedTask<Output>: Publisher {
 
     public func receive<S>(
         subscriber: S
-    ) where S : Subscriber, Failure == S.Failure, Output == S.Input {
+    ) where S: Subscriber, Failure == S.Failure, Output == S.Input {
         let subscription = Subscription(wrapper: wrapper, subscriber: subscriber)
         subscriber.receive(subscription: subscription)
     }

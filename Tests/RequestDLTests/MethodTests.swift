@@ -58,5 +58,3 @@ final class MethodTests: XCTestCase {
         XCTAssertTrue(Method.Body.self == Never.self)
     }
 }
-
-
