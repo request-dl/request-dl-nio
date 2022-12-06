@@ -88,7 +88,10 @@ extension Form {
 
         func makeRequest(_ configuration: RequestConfiguration) {
             let boundary = FormUtils.boundary
-            configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            configuration.request.setValue(
+                "multipart/form-data; boundary=\(boundary)",
+                forHTTPHeaderField: "Content-Type"
+            )
             configuration.request.httpBody = FormUtils.buildBody(types.map(\.data), with: boundary)
         }
     }
