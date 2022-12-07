@@ -74,4 +74,228 @@ final class SessionTests: XCTestCase {
         XCTAssertNotNil(configuration.urlCredentialStorage)
         XCTAssertFalse(configuration.shouldUseExtendedBackgroundIdleMode)
     }
+
+    func testNetworkService() async {
+        for type in [.video, .background, .callSignaling] as [URLRequest.NetworkServiceType] {
+            let sut = Test {
+                Session(.default)
+                    .networkService(type)
+            }
+
+            let (session, _) = await resolve(sut)
+            let configuration = session.configuration
+
+            XCTAssertEqual(configuration.networkServiceType, type)
+        }
+    }
+
+    func testCellularAccess() async {
+        let sut1 = Test {
+            Session(.default)
+                .cellularAccessDisabled(false)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .cellularAccessDisabled(true)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .cellularAccessDisabled(true)
+                .cellularAccessDisabled(false)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertTrue(configuration1.allowsCellularAccess)
+        XCTAssertFalse(configuration2.allowsCellularAccess)
+        XCTAssertTrue(configuration3.allowsCellularAccess)
+    }
+
+    func testExpensiveNetworkAccess() async {
+        let sut1 = Test {
+            Session(.default)
+                .expensiveNetworkDisabled(false)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .expensiveNetworkDisabled(true)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .expensiveNetworkDisabled(true)
+                .expensiveNetworkDisabled(false)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertTrue(configuration1.allowsExpensiveNetworkAccess)
+        XCTAssertFalse(configuration2.allowsExpensiveNetworkAccess)
+        XCTAssertTrue(configuration3.allowsExpensiveNetworkAccess)
+    }
+
+    func testConstrainedNetworkAccess() async {
+        let sut1 = Test {
+            Session(.default)
+                .constrainedNetworkDisabled(false)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .constrainedNetworkDisabled(true)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .constrainedNetworkDisabled(true)
+                .constrainedNetworkDisabled(false)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertTrue(configuration1.allowsConstrainedNetworkAccess)
+        XCTAssertFalse(configuration2.allowsConstrainedNetworkAccess)
+        XCTAssertTrue(configuration3.allowsConstrainedNetworkAccess)
+    }
+
+    func testWaitsForConnectivity() async {
+        let sut1 = Test {
+            Session(.default)
+                .waitsForConnectivity(true)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .waitsForConnectivity(false)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .waitsForConnectivity(false)
+                .waitsForConnectivity(true)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertTrue(configuration1.waitsForConnectivity)
+        XCTAssertFalse(configuration2.waitsForConnectivity)
+        XCTAssertTrue(configuration3.waitsForConnectivity)
+    }
+
+    func testDiscretionary() async {
+        let sut1 = Test {
+            Session(.default)
+                .discretionary(true)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .discretionary(false)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .discretionary(false)
+                .discretionary(true)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertTrue(configuration1.isDiscretionary)
+        XCTAssertFalse(configuration2.isDiscretionary)
+        XCTAssertTrue(configuration3.isDiscretionary)
+    }
+
+    func testSharedContainerIdentifier() async {
+        let sut1 = Test {
+            Session(.default)
+                .sharedContainerIdentifier("test1")
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .sharedContainerIdentifier("test2")
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .sharedContainerIdentifier("test3")
+                .sharedContainerIdentifier("test4")
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertEqual(configuration1.sharedContainerIdentifier, "test1")
+        XCTAssertEqual(configuration2.sharedContainerIdentifier, "test2")
+        XCTAssertEqual(configuration3.sharedContainerIdentifier, "test4")
+    }
+
+    func testLaunchEvents() async {
+        let sut1 = Test {
+            Session(.default)
+                .sendsLaunchEvents(true)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .sendsLaunchEvents(false)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .sendsLaunchEvents(true)
+                .sendsLaunchEvents(false)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertTrue(configuration1.sessionSendsLaunchEvents)
+        XCTAssertFalse(configuration2.sessionSendsLaunchEvents)
+        XCTAssertFalse(configuration3.sessionSendsLaunchEvents)
+    }
 }
