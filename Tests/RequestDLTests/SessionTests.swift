@@ -298,4 +298,38 @@ final class SessionTests: XCTestCase {
         XCTAssertFalse(configuration2.sessionSendsLaunchEvents)
         XCTAssertFalse(configuration3.sessionSendsLaunchEvents)
     }
+
+    func testConnectionProxyDictionary() async {
+        let value1 = ["key1": 1]
+        let value2 = ["key2": 2]
+        let value3 = ["key4": 4, "key5": 5]
+
+        let sut1 = Test {
+            Session(.default)
+                .connectionProxyDictionary(value1)
+        }
+
+        let sut2 = Test {
+            Session(.default)
+                .connectionProxyDictionary(value2)
+        }
+
+        let sut3 = Test {
+            Session(.default)
+                .connectionProxyDictionary(["key3": 3])
+                .connectionProxyDictionary(value3)
+        }
+
+        let (session1, _) = await resolve(sut1)
+        let (session2, _) = await resolve(sut2)
+        let (session3, _) = await resolve(sut3)
+
+        let configuration1 = session1.configuration
+        let configuration2 = session2.configuration
+        let configuration3 = session3.configuration
+
+        XCTAssertEqual(configuration1.connectionProxyDictionary as? [String: Int], value1)
+        XCTAssertEqual(configuration2.connectionProxyDictionary as? [String: Int], value2)
+        XCTAssertEqual(configuration3.connectionProxyDictionary as? [String: Int], value3)
+    }
 }
