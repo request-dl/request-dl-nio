@@ -1,5 +1,5 @@
 //
-//  Middlewares.Breakpoint.swift
+//  Interceptors.Detach.swift
 //
 //  MIT License
 //
@@ -26,21 +26,27 @@
 
 import Foundation
 
-extension Middlewares {
+extension Interceptors {
 
-    public struct Breakpoint<Element>: TaskMiddleware {
+    public struct Detach<Element>: TaskInterceptor {
 
-        init() {}
+        let detachHandler: (Result<Element, Error>) -> Void
+
+        init(detachHandler: @escaping (Result<Element, Error>) -> Void) {
+            self.detachHandler = detachHandler
+        }
 
         public func received(_ result: Result<Element, Error>) {
-            raise(SIGTRAP)
+            detachHandler(result)
         }
     }
 }
 
 extension Task {
 
-    public func breakpoint() -> InterceptedTask<Middlewares.Breakpoint<Element>, Self> {
-        intercept(Middlewares.Breakpoint())
+    public func detach(
+        _ handler: @escaping (Result<Element, Error>) -> Void
+    ) -> InterceptedTask<Interceptors.Detach<Element>, Self> {
+        intercept(Interceptors.Detach(detachHandler: handler))
     }
 }

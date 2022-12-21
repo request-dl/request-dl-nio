@@ -1,5 +1,5 @@
 //
-//  Middlewares.swift
+//  TaskInterceptor.swift
 //
 //  MIT License
 //
@@ -26,4 +26,9 @@
 
 import Foundation
 
-public enum Middlewares {}
+public protocol TaskInterceptor {
+
+    associatedtype Element
+
+    func received(_ result: Result<Element, Error>)
+}

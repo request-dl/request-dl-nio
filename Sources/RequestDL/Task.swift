@@ -44,11 +44,11 @@ public protocol Task {
 
 extension Task {
 
-    /// Adds a Middleware to obtain the result of the call separately
-    public func intercept<Middleware: TaskMiddleware>(
-        _ middleware: Middleware
-    ) -> InterceptedTask<Middleware, Self> {
-        InterceptedTask(self, middleware)
+    /// Adds a Interceptor to obtain the result of the call separately
+    public func intercept<Interceptor: TaskInterceptor>(
+        _ interceptor: Interceptor
+    ) -> InterceptedTask<Interceptor, Self> {
+        InterceptedTask(self, interceptor)
     }
 
     /// Adds a Modifier to process and change the result of the call

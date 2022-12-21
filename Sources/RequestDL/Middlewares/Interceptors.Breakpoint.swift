@@ -1,5 +1,5 @@
 //
-//  TaskMiddleware.swift
+//  Interceptors.Breakpoint.swift
 //
 //  MIT License
 //
@@ -26,9 +26,21 @@
 
 import Foundation
 
-public protocol TaskMiddleware {
+extension Interceptors {
 
-    associatedtype Element
+    public struct Breakpoint<Element>: TaskInterceptor {
 
-    func received(_ result: Result<Element, Error>)
+        init() {}
+
+        public func received(_ result: Result<Element, Error>) {
+            raise(SIGTRAP)
+        }
+    }
+}
+
+extension Task {
+
+    public func breakpoint() -> InterceptedTask<Interceptors.Breakpoint<Element>, Self> {
+        intercept(Interceptors.Breakpoint())
+    }
 }

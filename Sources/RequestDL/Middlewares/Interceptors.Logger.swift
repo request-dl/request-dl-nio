@@ -1,5 +1,5 @@
 //
-//  Middlewares.Detach.swift
+//  Interceptors.Logger.swift
 //
 //  MIT License
 //
@@ -26,27 +26,35 @@
 
 import Foundation
 
-extension Middlewares {
+extension Interceptors {
 
-    public struct Detach<Element>: TaskMiddleware {
+    public struct Logger: TaskInterceptor {
 
-        let detachHandler: (Result<Element, Error>) -> Void
+        let isLogActive: Bool
 
-        init(detachHandler: @escaping (Result<Element, Error>) -> Void) {
-            self.detachHandler = detachHandler
+        init(_ isActive: Bool) {
+            isLogActive = isActive
         }
 
-        public func received(_ result: Result<Element, Error>) {
-            detachHandler(result)
+        public func received(_ result: Result<TaskResult<Data>, Error>) {
+            guard isLogActive else {
+                return
+            }
+
+            switch result {
+            case .failure(let error):
+                print("[REQUEST] Failure: \(error)")
+            case .success(let result):
+                print("[REQUEST] Success: \(result.response)")
+                print("[REQUEST] Data: \(String(data: result.data, encoding: .utf8) ?? "Couldn't decode using UTF8")")
+            }
         }
     }
 }
 
-extension Task {
+extension Task where Element == TaskResult<Data> {
 
-    public func detach(
-        _ handler: @escaping (Result<Element, Error>) -> Void
-    ) -> InterceptedTask<Middlewares.Detach<Element>, Self> {
-        intercept(Middlewares.Detach(detachHandler: handler))
+    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger, Self> {
+        intercept(Interceptors.Logger(isActive))
     }
 }

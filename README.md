@@ -11,7 +11,7 @@ and techniques of the library developed by Carson Katri called
 
 Some features have been removed and others improved in an effort 
 to make the code more declarative. In addition, we have gained in 
-the handling of the return through the TaskModifier and Middlewares 
+the handling of the return through the TaskModifier and TaskInterceptor 
 added in this version.
 
 ## Next steps
