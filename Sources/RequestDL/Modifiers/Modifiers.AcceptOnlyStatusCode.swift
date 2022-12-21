@@ -28,7 +28,7 @@ import Foundation
 
 extension Modifiers {
 
-    public struct StatusCode<Content: Task>: TaskModifier where Content.Element == TaskResult<Data> {
+    public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
 
         private let statusCodeValidation: StatusCodeValidation
 
@@ -36,14 +36,14 @@ extension Modifiers {
             self.statusCodeValidation = statusCodeValidation
         }
 
-        public func task(_ task: Content) async throws -> TaskResult<Data> {
+        public func task(_ task: Content) async throws -> Content.Element {
             let result = try await task.response()
 
             guard
                 let httpResponse = result.response as? HTTPURLResponse,
                 statusCodeValidation.validate(statusCode: httpResponse.statusCode)
             else {
-                throw StatusCodeValidationError(result: result)
+                throw StatusCodeValidationError<Content.Element>(data: result)
             }
 
             return result
@@ -51,9 +51,9 @@ extension Modifiers {
     }
 }
 
-extension Task where Element == TaskResult<Data> {
+extension Task where Element: TaskResultPrimitive {
 
-    public func statusCode(_ statusCodeValidation: StatusCodeValidation) -> ModifiedTask<Modifiers.StatusCode<Self>> {
-        modify(Modifiers.StatusCode(statusCodeValidation))
+    public func acceptOnlyStatusCode(_ validation: StatusCodeValidation) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
+        modify(Modifiers.AcceptOnlyStatusCode(validation))
     }
 }

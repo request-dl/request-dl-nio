@@ -26,7 +26,7 @@
 
 import Foundation
 
-public struct StatusCodeValidationError: Error {
+public struct StatusCodeValidationError<Element>: Error {
 
-    public let result: TaskResult<Data>
+    public let data: Element
 }
