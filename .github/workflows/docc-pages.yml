@@ -23,7 +23,7 @@ concurrency:
 jobs:
   # Build job
   build:
-    runs-on: macos-latest
+    runs-on: macOS-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
