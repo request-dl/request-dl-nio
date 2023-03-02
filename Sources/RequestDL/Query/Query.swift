@@ -58,7 +58,7 @@ extension Query: PrimitiveRequest {
         func makeRequest(_ configuration: RequestConfiguration) {
             guard
                 let url = configuration.request.url,
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
             else { return }
 
             let path = components.path
