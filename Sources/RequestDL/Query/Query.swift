@@ -58,15 +58,12 @@ extension Query: PrimitiveRequest {
         func makeRequest(_ configuration: RequestConfiguration) {
             guard
                 let url = configuration.request.url,
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
             else { return }
 
-            let path = components.path
             var queryItems = components.queryItems ?? []
 
             queryItems.append(.init(name: key, value: value))
-
-            components.path = path.last != "/" ? path.appending("/") : path
             components.queryItems = queryItems
 
             configuration.request.url = components.url ?? url

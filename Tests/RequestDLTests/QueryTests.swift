@@ -29,9 +29,9 @@ final class QueryTests: XCTestCase {
         let (_, request2) = await resolve(sut2)
         let (_, request3) = await resolve(sut3)
 
-        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com/?q=iphone")
-        XCTAssertEqual(request2.url?.absoluteString, "https://www.apple.com/?redirect=https://google.com")
-        XCTAssertEqual(request3.url?.absoluteString, "https://www.apple.com/?parameter=123")
+        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com?q=iphone")
+        XCTAssertEqual(request2.url?.absoluteString, "https://www.apple.com?redirect=https://google.com")
+        XCTAssertEqual(request3.url?.absoluteString, "https://www.apple.com?parameter=123")
     }
 
     func testMultipleQueries() async {
@@ -42,7 +42,7 @@ final class QueryTests: XCTestCase {
 
         let (_, request1) = await resolve(sut1)
 
-        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com/?q=iphone&redirect=https://google.com")
+        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com?q=iphone&redirect=https://google.com")
     }
 
     func testMultipleQueriesWithPath() async {
@@ -71,6 +71,6 @@ final class QueryTests: XCTestCase {
 
         let (_, request1) = await resolve(sut1)
 
-        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com/?number=1&string=test&double=1.0")
+        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com?number=1&string=test&double=1.0")
     }
 }
