@@ -18,10 +18,9 @@ added in this version.
 
 Here's the list of what's left to finish the first version of RequestDL.
 
-- Implement unit tests;
-- Implement support for Combine;
-- Document code;
-- Make the Targets available;
+- ✅ Implement support for Combine;
+- ⏳ Implement unit tests;
+- ⏳ Document code;
 
 Feel free to open PRs and implement these features. After the first 
 version becomes available, we will open to implement new features.
