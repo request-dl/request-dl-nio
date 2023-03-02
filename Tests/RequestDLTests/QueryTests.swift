@@ -55,7 +55,9 @@ final class QueryTests: XCTestCase {
 
         let (_, request1) = await resolve(sut1)
 
-        XCTAssertEqual(request1.url?.absoluteString, "https://www.apple.com/search/example?q=iphone&redirect=https://google.com")
+        XCTAssertEqual(request1.url?.absoluteString, """
+        https://www.apple.com/search/example?q=iphone&redirect=https://google.com
+        """)
     }
 
     func testQueryGroup() async {

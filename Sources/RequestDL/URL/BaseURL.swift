@@ -116,7 +116,6 @@ extension BaseURL {
     }
 }
 
-
 extension BaseURL: PrimitiveRequest {
 
     struct Object: NodeObject {

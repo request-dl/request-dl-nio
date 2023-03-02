@@ -46,22 +46,22 @@ public struct ServerTrust: Request {
 }
 
 extension ServerTrust: PrimitiveRequest {
-    
+
     struct Object: NodeObject {
-        
+
         private let certificates: [Certificate]
-        
+
         public init(_ certificates: [Certificate]) {
             self.certificates = certificates
         }
-        
+
         func makeRequest(_ configuration: RequestConfiguration) {
             configuration.delegate.onDidReceiveChallenge {
                 receivedChallenge($0)
             }
         }
     }
-    
+
     func makeObject() -> Object {
         Object(certificates)
     }

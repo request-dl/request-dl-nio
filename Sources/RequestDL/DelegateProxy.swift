@@ -83,7 +83,9 @@ extension DelegateProxy: URLSessionDataDelegate {
         completionHandler: @escaping (CachedURLResponse?) -> Void
     ) {
         #if DEBUG
-        print("[Request]", "If a bug is found in Cache, handle DelegateProxy._:dataTask:willCacheResponse:completionHandler:")
+        print("[Request]", """
+        If a bug is found in Cache, handle DelegateProxy._:dataTask:willCacheResponse:completionHandler:
+        """)
         #endif
         completionHandler(proposedResponse)
     }

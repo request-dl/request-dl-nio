@@ -30,6 +30,7 @@ extension Modifiers {
 
     public struct FlatMapError<Content: Task>: TaskModifier {
 
+        // swiftlint:disable nesting
         public typealias Element = Content.Element
 
         let flatMapErrorHandler: (Error) throws -> Void

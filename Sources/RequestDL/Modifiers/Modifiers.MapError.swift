@@ -30,6 +30,7 @@ extension Modifiers {
 
     public struct MapError<Content: Task>: TaskModifier {
 
+        // swiftlint:disable nesting
         public typealias Element = Content.Element
 
         let mapErrorHandler: (Error) throws -> Element

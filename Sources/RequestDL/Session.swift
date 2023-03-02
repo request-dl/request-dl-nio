@@ -107,12 +107,10 @@ extension Session {
         edit { $0.allowsConstrainedNetworkAccess = !isDisabled }
     }
 
-    /* Not available in GitHub Actions
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
     public func validatesDNSSec(_ flag: Bool) -> Self {
         edit { $0.requiresDNSSECValidation = flag }
     }
-     */
 
     /// default false
     public func waitsForConnectivity(_ flag: Bool) -> Self {

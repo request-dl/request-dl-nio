@@ -66,34 +66,38 @@ public struct PKCS12 {
                 return value
             }
 
-            if key == kSecImportItemLabel || key == kSecImportItemKeyID {
-                var cert: SecCertificate?
+            guard
+                key == kSecImportItemLabel || key == kSecImportItemKeyID,
+                let identity = item["identity"]
+            else { continue }
 
-                if let identity = item["identity"] {
-                    // swiftlint:disable force_cast
-                    let secIdentity = identity as! SecIdentity
-                    SecIdentityCopyCertificate(secIdentity, &cert)
+            var cert: SecCertificate?
 
-                    if let certData = cert {
-                        if key == kSecImportItemLabel {
-                            let summary = SecCertificateCopySubjectSummary(certData)
-                            if let summary = summary {
-                                return summary as? T
-                            }
-                        }
+            // swiftlint:disable force_cast
+            let secIdentity = identity as! SecIdentity
+            SecIdentityCopyCertificate(secIdentity, &cert)
 
-                        var key: SecKey?
-                        SecIdentityCopyPrivateKey(secIdentity, &key)
+            guard let certData = cert else {
+                continue
+            }
 
-                        if let keyData = key {
-                            let attributes = SecKeyCopyAttributes(keyData)
-                            if let attributes = attributes, let value = (attributes as NSDictionary)["v_Data"] as? NSData {
-                                return value as? T
-                            }
-                        }
-                    }
+            if key == kSecImportItemLabel {
+                let summary = SecCertificateCopySubjectSummary(certData)
+                if let summary = summary {
+                    return summary as? T
                 }
             }
+
+            var key: SecKey?
+            SecIdentityCopyPrivateKey(secIdentity, &key)
+
+            guard
+                let keyData = key,
+                let attributes = SecKeyCopyAttributes(keyData),
+                let value = (attributes as NSDictionary)["v_Data"] as? NSData
+            else { continue }
+
+            return value as? T
         }
 
         return nil

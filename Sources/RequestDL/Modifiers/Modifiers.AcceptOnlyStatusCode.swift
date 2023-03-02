@@ -53,7 +53,9 @@ extension Modifiers {
 
 extension Task where Element: TaskResultPrimitive {
 
-    public func acceptOnlyStatusCode(_ validation: StatusCodeValidation) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
+    public func acceptOnlyStatusCode(
+        _ validation: StatusCodeValidation
+    ) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
         modify(Modifiers.AcceptOnlyStatusCode(validation))
     }
 }
