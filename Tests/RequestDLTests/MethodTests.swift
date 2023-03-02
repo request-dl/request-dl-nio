@@ -32,7 +32,7 @@ final class MethodTests: XCTestCase {
     func testMethods() async {
         for method in MethodType.allCases {
             let sut = Group {
-                Url("https:///google.com")
+                BaseURL("google.com")
                 Method(method)
             }
 

@@ -1,5 +1,5 @@
 //
-//  Query.swift
+//  Path.swift
 //
 //  MIT License
 //
@@ -26,16 +26,48 @@
 
 import Foundation
 
-public struct Query: Request {
+/**
+ Use Path to specify the URL pathway.
+
+ You can have multiple Paths inside the body or @RequestBuilder results,
+ which will be combined in to a single Path appended at BaseURL.
+
+ ```swift
+ struct AppleDeveloperDefaultPaths: Request {
+
+     var body: some Request {
+         Path("api/v2/ios")
+     }
+ }
+ ```
+
+ Or multiple Paths:
+
+ ```swift
+ struct AppleDeveloperDefaultPaths: Request {
+
+     var body: some Request {
+         Path("api")
+         Path("v2")
+         Path("ios")
+     }
+ }
+ ```
+ */
+public struct Path: Request {
 
     public typealias Body = Never
 
-    let key: String
-    let value: Any
+    private let path: String
 
-    public init(_ value: Any, forKey key: String) {
-        self.key = key
-        self.value = "\(value)"
+    /**
+     Instantiate the Path with a string.
+
+     - Parameters:
+        - path: The string path.
+     */
+    public init(_ path: String) {
+        self.path = path
     }
 
     public var body: Never {
@@ -43,37 +75,31 @@ public struct Query: Request {
     }
 }
 
-extension Query: PrimitiveRequest {
+extension Path: PrimitiveRequest {
 
-    class Object: NodeObject {
+    struct Object: NodeObject {
 
-        let key: String
-        let value: String
+        let path: String
 
-        init(_ value: Any, forKey key: String) {
-            self.key = key
-            self.value = "\(value)"
+        init(_ path: String) {
+            self.path = path
         }
 
         func makeRequest(_ configuration: RequestConfiguration) {
-            guard
-                let url = configuration.request.url,
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-            else { return }
+            guard let url = configuration.request.url else {
+                return
+            }
 
-            let path = components.path
-            var queryItems = components.queryItems ?? []
-
-            queryItems.append(.init(name: key, value: value))
-
-            components.path = path.last != "/" ? path.appending("/") : path
-            components.queryItems = queryItems
-
-            configuration.request.url = components.url ?? url
+            configuration.request.url = url.appendingPathComponent(path)
         }
     }
 
     func makeObject() -> Object {
-        Object(value, forKey: key)
+        .init(
+            path
+                .split(separator: "/")
+                .filter { !$0.isEmpty }
+                .joined(separator: "/")
+        )
     }
 }

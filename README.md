@@ -70,7 +70,7 @@ in applications.
 ```swift
 func requestGoogle() async throws -> GoogleResponse {
     try await DataTask {
-        Url("https://google.com/")
+        BaseURL("google.com")
         
         HeaderGroup {
             Headers.Accept(.json)

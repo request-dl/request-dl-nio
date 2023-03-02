@@ -54,11 +54,11 @@ enum FormType {
 
     func reduce(_ formFile: FormFile) -> Data {
         guard
-            let fileData = formFile.fileManager.contents(atPath: formFile.path.absoluteString),
-            let fileName = formFile.path.absoluteString.split(separator: "/").last
+            let fileData = try? Data(contentsOf: formFile.url),
+            let fileName = formFile.url.absoluteString.split(separator: "/").last
         else {
             fatalError(
-                "\(formFile.path.absoluteString) is not a file or it doesn't contains a valid file name"
+                "\(formFile.url.absoluteString) is not a file or it doesn't contains a valid file name"
             )
         }
 

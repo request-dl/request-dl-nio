@@ -30,16 +30,12 @@ import SwiftUI
 @resultBuilder
 public struct RequestBuilder {
 
-    public static func buildBlock<Content: Request>(_ param: Content) -> Content {
-        param
-    }
-
     public static func buildBlock() -> EmptyRequest {
         EmptyRequest()
     }
 
-    public static func buildIf<Content: Request>(_ param: Content?) -> OptionalRequest<Content> {
-        OptionalRequest(param)
+    public static func buildBlock<Content: Request>(_ component: Content) -> Content {
+        component
     }
 
     public static func buildEither<

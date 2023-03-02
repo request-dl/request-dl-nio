@@ -73,7 +73,7 @@ public protocol Request {
      struct MyRequest: Request {
 
          var body: some Request {
-             Url("https://google.com")
+             BaseURL("google.com")
          }
      }
      ```

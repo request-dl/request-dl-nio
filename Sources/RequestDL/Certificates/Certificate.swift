@@ -28,26 +28,11 @@ import Foundation
 
 public struct Certificate {
 
-    let type: ValidationType
-    let hash: String
+    let name: String
+    let bundle: Bundle
 
-    public init(
-        _ type: ValidationType,
-        hash: String
-    ) {
-        self.hash = hash
-        self.type = type
-    }
-
-    public init(_ hash: String) {
-        self.init(.byPublicKey, hash: hash)
-    }
-}
-
-extension Certificate {
-
-    public enum ValidationType {
-        case byPublicKey
-        case byPrivateKey
+    public init(_ name: String, in bundle: Bundle) {
+        self.name = name
+        self.bundle = bundle
     }
 }

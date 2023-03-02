@@ -84,7 +84,22 @@ extension QueryGroup {
         }
 
         func makeRequest(_ configuration: RequestConfiguration) {
-            configuration.request.url = configuration.request.url?.append(parameters)
+            guard
+                let url = configuration.request.url,
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+            else { return }
+
+            let path = components.path
+            var queryItems = components.queryItems ?? []
+
+            for (key, value) in parameters {
+                queryItems.append(.init(name: key, value: value))
+            }
+
+            components.path = path.last != "/" ? path.appending("/") : path
+            components.queryItems = queryItems
+
+            configuration.request.url = components.url ?? url
         }
     }
 }

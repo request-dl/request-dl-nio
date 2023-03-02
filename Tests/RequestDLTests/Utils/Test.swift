@@ -21,6 +21,6 @@ struct Test<Content: Request>: Request {
 
     var body: some Request {
         content
-        Url("https://www.apple.com")
+        BaseURL("www.apple.com")
     }
 }

@@ -43,14 +43,14 @@ struct Resolver<Content: Request> {
     func make(_ delegate: DelegateProxy) async -> (URLSession, URLRequest) {
         let context = await resolve()
 
-        guard let object = context.find(Url.Object.self) else {
+        guard let object = context.find(BaseURL.Object.self) else {
             fatalError()
         }
 
         let sessionObject = context.find(Session.Object.self)
 
         let configuration = RequestConfiguration(
-            request: URLRequest(url: object.url),
+            request: URLRequest(url: object.baseURL),
             configuration: sessionObject?.configuration ?? .default,
             delegate: delegate
         )

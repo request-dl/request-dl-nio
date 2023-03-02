@@ -34,7 +34,7 @@ import Foundation
 
      func get() -> DataTask {
          DataTask {
-             Url("https://apple.com.br")
+             BaseURL("apple.com.br")
              Timeout(40, for: .request)
          }
      }
