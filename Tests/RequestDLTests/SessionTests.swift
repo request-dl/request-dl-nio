@@ -55,9 +55,11 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(configuration.allowsExpensiveNetworkAccess)
         XCTAssertTrue(configuration.allowsConstrainedNetworkAccess)
 
+        #if swift(>=5.7.2)
         if #available(iOS 16, macOS 13, watchOS 9, tvOS 16, *) {
             XCTAssertFalse(configuration.requiresDNSSECValidation)
         }
+        #endif
 
         XCTAssertFalse(configuration.waitsForConnectivity)
         XCTAssertFalse(configuration.isDiscretionary)

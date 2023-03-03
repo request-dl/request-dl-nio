@@ -134,6 +134,7 @@ extension Session {
         edit { $0.allowsConstrainedNetworkAccess = !isDisabled }
     }
 
+    #if swift(>=5.7.2)
     /**
      Set whether DNSSEC validation is required for the `URLSessionConfiguration`.
      - Parameter flag: `true` to require DNSSEC validation or `false` to not require it.
@@ -143,6 +144,7 @@ extension Session {
     public func validatesDNSSec(_ flag: Bool) -> Self {
         edit { $0.requiresDNSSECValidation = flag }
     }
+    #endif
 
     /**
      Set whether the session should wait for connectivity before making a request.
