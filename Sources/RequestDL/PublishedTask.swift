@@ -28,6 +28,9 @@ import Foundation
 import Combine
 import SwiftUI
 
+/**
+A publisher that wraps a Task instance and publishes its output asynchronously.
+*/
 public struct PublishedTask<Output>: Publisher {
 
     public typealias Failure = Error
@@ -38,6 +41,11 @@ public struct PublishedTask<Output>: Publisher {
         self.wrapper = { try await content.response() }
     }
 
+    /**
+     Subscribes the given `Subscriber` to this publisher.
+
+     - Parameter subscriber: The `Subscriber` to receive values and completion.
+     */
     public func receive<S>(
         subscriber: S
     ) where S: Subscriber, Failure == S.Failure, Output == S.Input {
@@ -87,6 +95,11 @@ extension PublishedTask {
 
 extension Task {
 
+    /**
+     Creates a `PublishedTask` publisher from the current `Task` instance.
+
+     - Returns: A `PublishedTask` publisher that emits the output of the current `Task` instance.
+     */
     public func publisher() -> PublishedTask<Element> {
         .init(self)
     }

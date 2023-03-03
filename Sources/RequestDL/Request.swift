@@ -27,66 +27,47 @@
 import Foundation
 
 /**
- The Request protocol is the basis of all other objects, with it we have the body property
- that uses the opaque `some Request` return type. In this case, we can create new
- objects by combining the use of others to configure several properties of a request at once.
+ The `Request` protocol is the foundation of all other objects in the RequestDL library.
+
+ The protocol provides a `body` property, which returns an opaque `some Request` type.
+ By combining multiple request objects, we can use the `body` property to configure
+ multiple request properties at once. This is demonstrated in the following example:
 
  ```swift
- import RequestDL
-
  struct DefaultHeaders: Request {
+    let cache: Bool
 
-     let cache: Bool
+    var body: some Request {
+        Headers.ContentType(.json)
+        Headers.Accept(.json)
 
-     var body: some Request {
-         Headers.ContentType(.json)
-         Headers.Accept(.json)
-
-         if cache {
-             Cache(.returnCacheDataElseLoad)
-         }
-     }
+        if cache {
+            Cache(.returnCacheDataElseLoad)
+        }
+    }
  }
  ```
 
- We can explore and use many different objects to meet some application business
- rule. An example where this approach is interesting is in the case of tokens that
- are stored in some data provider and we have to pass the request to have access
- to a certain feature of the backend API.
+ This `DefaultHeaders` struct conforms to the Request protocol and sets default
+ headers for all requests. We can use many different objects to configure requests in
+ order to meet specific application requirements.
  */
 public protocol Request {
 
-    /// The Request type representing the request body.
     associatedtype Body: Request
 
-    /**
-     Defines the properties of the request.
-
-     When you implement a custom Request, you need to implement the body
-     property to provide the request properties. Return a property by combining
-     the Requests implemented by the RequestDL, as well as other Requests
-     implemented by you.
-
-     ```swift
-     import RequestDL
-
-     struct MyRequest: Request {
-
-         var body: some Request {
-             BaseURL("google.com")
-         }
-     }
-     ```
-     */
+    /// An associated type that conforms to the Request protocol. This property
+    /// allows you to set multiple request properties at once.
     @RequestBuilder
     var body: Body { get }
 
-    /// Internal method
+    /// This method is used internally and should not be called directly.
     static func makeRequest(_ request: Self, _ context: Context) async
 }
 
 extension Request {
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: Self, _ context: Context) async {
         let node = Node(
             root: context.root,

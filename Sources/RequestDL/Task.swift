@@ -27,31 +27,58 @@
 import Foundation
 
 /**
- The Task defines the objects that make the request.
+ The Task protocol defines an object that makes a request and returns a response asynchronously.
 
- For the URLRequest, each request is considered as a URLSessionDownloadTask
- that allows the monitoring and cancellation of the request through it. In the case of
- the protocol, the concept of Task is used to assemble the request and execute it when
- the onResponse function is called.
+ For URLRequest-based requests, each request is considered as a URLSessionTask that allows the
+ monitoring and cancellation of the request through it. For requests using a custom protocol,
+ the concept of Task is used to assemble the request and execute it when the `response() function
+ is called.
+
+ The associatedtype `Element represents the type of the expected result of the task.
+
+ - Note: The Task protocol does not specify how the request is made or how the response is processed,
+ it only provides a way to execute a request and receive its result asynchronously.
  */
 public protocol Task {
 
     associatedtype Element
 
-    /// Runs the task and gets the result asynchronously
+    /**
+     Runs the task and gets the result asynchronously.
+
+     - Returns: The expected result of the task wrapped in an asynchronous task.
+
+     - Throws: If there was an error during the execution of the task.
+     */
     func response() async throws -> Element
 }
 
 extension Task {
 
-    /// Adds a Interceptor to obtain the result of the call separately
+    /**
+     Returns an `InterceptedTask` that executes the original task and intercepts
+     its result using the provided `TaskInterceptor`.
+
+     - Parameter interceptor: A `TaskInterceptor` that intercepts the result of the task.
+
+     - Returns: An `InterceptedTask` object that can be used to execute the original task
+     and intercept its result.
+     */
     public func intercept<Interceptor: TaskInterceptor>(
         _ interceptor: Interceptor
     ) -> InterceptedTask<Interceptor, Self> {
         InterceptedTask(self, interceptor)
     }
 
-    /// Adds a Modifier to process and change the result of the call
+    /**
+     Returns a `ModifiedTask` that executes the original task and modifies its result using
+     the provided `TaskModifier`.
+
+     - Parameter modifier: A `TaskModifier` that modifies the result of the task.
+
+     - Returns: A `ModifiedTask` object that can be used to execute the original task and
+     modify its result.
+     */
     public func modify<Modifier: TaskModifier>(
         _ modifier: Modifier
     ) -> ModifiedTask<Modifier> where Modifier.Body == Self {

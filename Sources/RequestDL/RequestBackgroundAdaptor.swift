@@ -27,13 +27,26 @@
 import Foundation
 
 /**
- The Adaptor is used in the AppDelegate to perform operations after the URLSession calls are finished
+ The RequestBackgroundAdaptor is a property wrapper used in the AppDelegate to
+ perform operations after the URLSession calls are finished.
+
+ Example usage:
+
+ ```swift
+ @RequestBackgroundAdaptor var backgroundAdaptor
+ ```
  */
 @propertyWrapper
 public struct RequestBackgroundAdaptor {
 
     public init() {}
 
+    /**
+     This property wrapper provides a wrappedValue property that takes a closure with a String
+     parameter and returns Void. The set method of the wrappedValue property sets the
+     completionHandler property to perform background tasks after the URLSession calls are
+     finished.
+     */
     public var wrappedValue: (String) -> Void {
         get { fatalError("get not implemented") }
         set { BackgroundService.shared.completionHandler = newValue }

@@ -27,16 +27,12 @@
 import Foundation
 
 /**
- Use the Session to set a series of properties related to the
- URLSessionConfiguration
+ The Session object is used to set various properties related to URLSessionConfiguration.
 
- The interesting thing about using this object is that it centralizes
- its creation to define a single type of session to be used in all calls.
- Like for example:
+ By using this object, we can centralize the creation of a single type of session to be used
+ in all requests. For example:
 
  ```swift
- import RequestDL
-
  struct MyAppConfiguration: Request {
 
      var body: some Request {
@@ -49,6 +45,13 @@ import Foundation
      }
  }
  ```
+
+ The Session object can be initialized with a Configuration object to specify the type of
+ session configuration to use. Additionally, an optional OperationQueue can be passed in
+ to specify the queue that will execute the requests.
+
+ - Note: If the queue parameter is not specified, the requests will be executed on the
+ main operation queue.
  */
 public struct Session: Request {
 
@@ -57,22 +60,36 @@ public struct Session: Request {
     private var configuration: URLSessionConfiguration
     private let queue: OperationQueue?
 
-    /// Specifies a session with the default configuration type
-    /// - Parameter configuration: what kind of session configuration
+    /**
+     Initializes a session with the specified configuration.
+
+     - Parameter configuration: The type of session configuration to use.
+     */
     public init(_ configuration: Configuration) {
         self.configuration = configuration.sessionConfiguration
         self.queue = nil
     }
 
-    /// Specifies the type of session and the queue that will execute the requests
-    /// - Parameters:
-    ///   - configuration: what kind of session configuration
-    ///   - queue: the execution queue
+    /**
+     Initializes a session with the specified configuration and operation queue.
+
+     - Parameters:
+        - configuration: The type of session configuration to use.
+        - queue: The operation queue that will execute the requests.
+    */
     public init(_ configuration: Configuration, queue: OperationQueue) {
         self.configuration = configuration.sessionConfiguration
         self.queue = queue
     }
 
+    /**
+     This computed property is used to satisfy the Request protocol and will never return.
+
+     - Note: This property is marked with the Never type because a Session object does
+     not have a request body.
+
+     - Returns: A Never type.
+     */
     public var body: Never {
         Never.bodyException()
     }
@@ -88,61 +105,124 @@ private extension Session {
 
 extension Session {
 
+    /**
+     Set the `networkServiceType` of the `URLSessionConfiguration`.
+     - Parameter type: The network service type.
+     - Returns: `Self` for chaining.
+     */
     public func networkService(_ type: URLRequest.NetworkServiceType) -> Self {
         edit { $0.networkServiceType = type }
     }
 
-    /// default false
+    /**
+     Disable or enable cellular access for the `URLSessionConfiguration`.
+     - Parameter isDisabled: `true` to disable or `false` to enable.
+     - Returns: `Self` for chaining.
+     */
     public func cellularAccessDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsCellularAccess = !isDisabled }
     }
 
-    /// default false
+    /**
+     Disable or enable expensive network access for the `URLSessionConfiguration`.
+     - Parameter isDisabled: `true` to disable or `false` to enable.
+     - Returns: `Self` for chaining.
+     */
     public func expensiveNetworkDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsExpensiveNetworkAccess = !isDisabled }
     }
 
-    /// default false
+    /**
+     Disable or enable constrained network access for the `URLSessionConfiguration`.
+     - Parameter isDisabled: `true` to disable or `false` to enable.
+     - Returns: `Self` for chaining.
+     */
     public func constrainedNetworkDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsConstrainedNetworkAccess = !isDisabled }
     }
 
+    /**
+     Set whether DNSSEC validation is required for the `URLSessionConfiguration`.
+     - Parameter flag: `true` to require DNSSEC validation or `false` to not require it.
+     - Returns: `Self` for chaining.
+     */
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
     public func validatesDNSSec(_ flag: Bool) -> Self {
         edit { $0.requiresDNSSECValidation = flag }
     }
 
-    /// default false
+    /**
+     Set whether the session should wait for connectivity before making a request.
+     - Parameter flag: `true` to wait for connectivity or `false` to not wait for it.
+     - Returns: `Self` for chaining.
+     */
     public func waitsForConnectivity(_ flag: Bool) -> Self {
         edit { $0.waitsForConnectivity = flag }
     }
 
-    /// default false
+    /**
+     Set whether the session is discretionary.
+     - Parameter flag: `true` to make the session discretionary or `false` to make it not discretionary.
+     - Returns: `Self` for chaining.
+     */
     public func discretionary(_ flag: Bool) -> Self {
         edit { $0.isDiscretionary = flag }
     }
 
+    /**
+     Set the shared container identifier of the `URLSessionConfiguration`.
+     - Parameter identifier: The shared container identifier.
+     - Returns: `Self` for chaining.
+     */
     public func sharedContainerIdentifier(_ identifier: String?) -> Self {
         edit { $0.sharedContainerIdentifier = identifier }
     }
 
-    /// default true
+    /**
+     Set whether the session sends launch events.
+     - Parameter flag: `true` to send launch events or `false` to not send them.
+     - Returns: `Self` for chaining.
+     */
     public func sendsLaunchEvents(_ flag: Bool) -> Self {
         edit { $0.sessionSendsLaunchEvents = flag }
     }
-
+    /**
+     Set the connection proxy dictionary of the `URLSessionConfiguration`.
+     - Parameter dictionary: The connection proxy dictionary.
+     - Returns: `Self` for chaining.
+     */
     public func connectionProxyDictionary(_ dictionary: [AnyHashable: Any]?) -> Self {
         edit { $0.connectionProxyDictionary = dictionary }
     }
 
+    /**
+     Configures the minimum supported TLS protocol version for the session.
+
+     - Parameter minimum: The minimum supported TLS protocol version.
+     - Returns: The session instance with the configured minimum TLS protocol version.
+     */
     public func tlsProtocolSupported(minimum: tls_protocol_version_t) -> Self {
         edit { $0.tlsMinimumSupportedProtocolVersion = minimum }
     }
 
+    /**
+     Configures the maximum supported TLS protocol version for the session.
+
+     - Parameter maximum: The maximum supported TLS protocol version.
+     - Returns: The session instance with the configured maximum TLS protocol version.
+     */
     public func tlsProtocolSupported(maximum: tls_protocol_version_t) -> Self {
         edit { $0.tlsMaximumSupportedProtocolVersion = maximum }
     }
 
+    /**
+     Configures the supported TLS protocol version range for the session.
+
+     - Parameters:
+     - minimum: The minimum supported TLS protocol version.
+     - maximum: The maximum supported TLS protocol version.
+     - Returns: The session instance with the configured TLS protocol version range.
+     */
     public func tlsProtocolSupported(
         minimum: tls_protocol_version_t,
         maximum: tls_protocol_version_t
@@ -151,34 +231,77 @@ extension Session {
             .tlsProtocolSupported(maximum: maximum)
     }
 
-    /// default true
+    /**
+     Disables or enables HTTP pipelining for the session.
+
+     - Parameter isDisabled: If `true`, disables pipelining. If `false`, enables pipelining.
+     - Returns: The session instance with pipelining enabled or disabled.
+     */
     public func pipeliningDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.httpShouldUsePipelining = !isDisabled }
     }
 
-    /// default false
+    /**
+     Disables or enables setting cookies for the session.
+
+     - Parameter isDisabled: If `true`, disables cookie setting. If `false`, enables cookie setting.
+     - Returns: The session instance with cookie setting enabled or disabled.
+     */
     public func setCookiesDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.httpShouldSetCookies = !isDisabled }
     }
 
+    /**
+     Configures the cookie accept policy for the session.
+
+     - Parameter policy: The cookie accept policy to use.
+     - Returns: The session instance with the configured cookie accept policy.
+     */
     public func cookieAcceptPolicy(_ policy: HTTPCookie.AcceptPolicy) -> Self {
         edit { $0.httpCookieAcceptPolicy = policy }
     }
 
-    /// default 6
+    /**
+     Configures the maximum number of connections per host for the session.
+
+     - Parameter maximum: The maximum number of connections per host.
+     - Returns: The session instance with the configured maximum connections per host.
+     */
     public func maximumConnectionsPerHost(_ maximum: Int) -> Self {
         edit { $0.httpMaximumConnectionsPerHost = maximum }
     }
 
+    /**
+     Configures the cookie storage for the session.
+
+     - Parameter storage: The cookie storage to use.
+     - Returns: The session instance with the configured cookie storage.
+     */
     public func cookieStorage(_ storage: HTTPCookieStorage?) -> Self {
         edit { $0.httpCookieStorage = storage }
     }
 
+    /**
+     Configures the URL credential storage for the session.
+
+     - Parameter storage: The URL credential storage to use.
+     - Returns: The session instance with the configured URL credential storage.
+     */
     public func credentialStorage(_ storage: URLCredentialStorage?) -> Self {
         edit { $0.urlCredentialStorage = storage }
     }
 
-    /// default true
+    /**
+     Sets whether the session should use extended background idle mode.
+
+     By default, this function sets the value of `shouldUseExtendedBackgroundIdleMode`
+     to the opposite of the `isDisabled` parameter.
+
+     - Parameter isDisabled: A boolean value that indicates whether the session should
+     use extended background idle mode.
+
+     - Returns: A reference to the current session instance.
+     */
     public func extendedBackgroundIdleModeDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.shouldUseExtendedBackgroundIdleMode = !isDisabled }
     }
@@ -186,13 +309,31 @@ extension Session {
 
 extension Session {
 
+    /**
+     A type that represents a configuration for a URLSession instance.
+     */
     public enum Configuration {
 
+        /// The default configuration for a URLSession.
         case `default`
+
+        /// A configuration for a URLSession that uses a private browsing session
+        /// that doesn’t persist the data longer than the process lifetime.
         case ephemeral
 
-        /// [BETA]: Report in case of errors
+        /**
+         A configuration for a URLSession that allows the application to perform
+         background downloads and uploads while the app is not running.
+
+         This configuration requires a unique identifier string that identifies the session
+         and allows the system to resume the session if necessary.
+
+         **This case is in beta and may change in future releases.**
+
+         - Parameter identifier: A unique identifier string that identifies the session.
+         */
         case background(String)
+
     }
 }
 
