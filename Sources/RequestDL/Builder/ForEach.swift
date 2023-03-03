@@ -36,6 +36,7 @@ public struct ForEach<Data: Collection, Content: Request>: Request {
         self.map = content
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         Never.bodyException()
     }

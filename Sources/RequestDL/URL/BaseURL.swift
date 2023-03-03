@@ -27,13 +27,32 @@
 import Foundation
 
 /**
- The BaseURL is the only way to specify the request's base URL.
+ The BaseURL struct defines the base URL for a request. It provides the
+ internet protocol and the host for the request.
+
+ To create a BaseURL object, you need to provide the internet protocol
+ and the string host. You can also set the internet protocol to HTTPS by
+ default if you only provide the host.
+
+ Example usage:
+
+ ```swift
+ import RequestDL
+
+ struct AppleDeveloperBaseURL: Request {
+     var body: some Request {
+         BaseURL(.https, host: "developer.apple.com")
+     }
+ }
+
+ ```
+
+ Or you can set the host without specifying the protocol type:
 
  ```swift
  struct AppleDeveloperBaseURL: Request {
-
      var body: some Request {
-         BaseURL(.https, host: "developer.apple.com")
+         BaseURL("developer.apple.com")
      }
  }
  ```
@@ -42,17 +61,17 @@ public struct BaseURL: Request {
 
     public typealias Body = Never
 
-    let `protocol`: Protocol
+    let internetProtocol: InternetProtocol
     let host: String
 
     /**
-     Creates a BaseURL by combining the communication protocol and the string host.
+     Creates a BaseURL by combining the internet protocol and the string host.
 
      - Parameters:
-        - protocol: The communication protocol chosen;
+        - internetProtocol: The internet protocol chosen.
         - path: The string host only.
 
-     See example below:
+     Example usage:
 
      ```swift
      import RequestDL
@@ -65,25 +84,22 @@ public struct BaseURL: Request {
      }
      ```
      */
-    public init(_ `protocol`: Protocol, host: String) {
-        self.protocol = `protocol`
+    public init(_ internetProtocol: InternetProtocol, host: String) {
+        self.internetProtocol = internetProtocol
         self.host = host
     }
 
     /**
-     Defines the base URL from host with default https protocol.
+     Defines the base URL from the host with the default HTTPS protocol.
 
      - Parameters:
-        - path: The String host.
+        - path: The string host only.
 
-     Use `BaseURL(_:)` when you want to set the host without
-     specifying the protocol type, which it'll be the HTTPS. But don't
-     try to force the http:// by using it inside the string. It may cause
-     a wrong request URL.
-
-     As the example below:
+     Example usage:
 
      ```swift
+     import RequestDL
+
      struct AppleDeveloperBaseURL: Request {
 
          var body: some Request {
@@ -96,7 +112,8 @@ public struct BaseURL: Request {
         self.init(.https, host: host)
     }
 
-    public var body: Body {
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
         Never.bodyException()
     }
 }
@@ -105,14 +122,14 @@ extension BaseURL {
 
     fileprivate var absoluteString: String {
         if host.contains("://") {
-            fatalError("Remove the protocol communication inside the host string")
+            fatalError("Invalid host string: The protocol communication should not be included.")
         }
 
         guard let host = host.split(separator: "/").first else {
-            fatalError("Found unexpected format for host string specified")
+            fatalError("Unexpected format for host string: Could not extract the host.")
         }
 
-        return "\(`protocol`.rawValue)://\(host)"
+        return "\(internetProtocol.rawValue)://\(host)"
     }
 }
 
@@ -131,7 +148,7 @@ extension BaseURL: PrimitiveRequest {
 
     func makeObject() -> Object {
         guard let baseURL = URL(string: absoluteString) else {
-            fatalError()
+            fatalError("Failed to create URL from absolute string: \(absoluteString)")
         }
 
         return .init(baseURL)

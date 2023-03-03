@@ -82,14 +82,7 @@ public struct Session: Request {
         self.queue = queue
     }
 
-    /**
-     This computed property is used to satisfy the Request protocol and will never return.
-
-     - Note: This property is marked with the Never type because a Session object does
-     not have a request body.
-
-     - Returns: A Never type.
-     */
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         Never.bodyException()
     }

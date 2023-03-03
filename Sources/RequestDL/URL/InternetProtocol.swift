@@ -1,5 +1,5 @@
 //
-//  Protocol.swift
+//  InternetProtocol.swift
 //
 //  MIT License
 //
@@ -27,16 +27,20 @@
 import Foundation
 
 /**
- Defines constants for the communication protocol.
+ Defines constants for the communication protocol used on the Internet.
 
- Constants are used in URL initialization to define which communication
- protocol will be used for transmission.
+ These constants are used in URL initialization to define which communication
+ protocol will be used for transmission. Possible protocols include HTTP, HTTPS,
+ FTP, SMTP, IMAP, POP, DNS, SSH, and Telnet.
  */
-public enum Protocol: String {
-
-    /// Makes a HTTP requests
+public enum InternetProtocol: String {
     case http
-
-    /// Makes a HTTPS requests
     case https
+    case ftp
+    case smtp
+    case imap
+    case pop
+    case dns
+    case ssh
+    case telnet
 }

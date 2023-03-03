@@ -27,19 +27,29 @@
 import Foundation
 
 /**
- Defines the request timeout for resource and request.
+ `Timeout` is a struct that defines the request timeout for a resource and request.
+
+ Usage:
+
+ To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
 
  ```swift
- extension ProductsAPI {
-
-     func get() -> DataTask {
-         DataTask {
-             BaseURL("apple.com.br")
-             Timeout(40, for: .request)
-         }
-     }
- }
+ Timeout(40, for: .request)
  ```
+
+ In the example below, a request is made to Google's website with the timeout for all types.
+
+ ```swift
+ DataTask {
+     BaseURL("google.com")
+     Timeout(60, for: .all)
+ }
+
+ ```
+
+ - Note: A request timeout is the amount of time a client will wait for a response from the server
+ before terminating the connection. The timeout parameter is the duration of time before the timeout
+ occurs, and the source parameter specifies the type of timeout to be applied
  */
 public struct Timeout: Request {
 
@@ -49,31 +59,23 @@ public struct Timeout: Request {
     let source: Source
 
     /**
-     Initializes with the time interval and which source to be limited
+     Initializes a new instance of `Timeout`.
 
      - Parameters:
-        - timeout: The time interval to be applied
-        - source: Specify the type of timeout
+        - timeout: The duration of time before the timeout occurs.
+        - source: The type of timeout to be applied.
 
-     In the example below, a request is made to the Google's website with the timeout for all types .
+     - Returns: A new instance of `Timeout`.
 
-     ```swift
-     extension GoogleAPI {
+     - Note: By default, the `source` parameter is set to `.all`.
 
-         func website() -> DataTask {
-             DataTask {
-                 Url(.https, path: "https://google.com")
-                 Timeout(60, for: .all)
-             }
-         }
-     }
-     ```
      */
     public init(_ timeout: TimeInterval, for source: Source = .all) {
         self.timeout = timeout
         self.source = source
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         Never.bodyException()
     }

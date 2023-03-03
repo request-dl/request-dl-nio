@@ -33,7 +33,8 @@ public protocol URLRequestRepresentable: Request where Body == Never {
 
 extension URLRequestRepresentable {
 
-    public var body: Body {
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
         Never.bodyException()
     }
 
