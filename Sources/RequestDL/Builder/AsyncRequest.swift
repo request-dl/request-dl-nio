@@ -35,7 +35,7 @@ public struct AsyncRequest<Content: Request>: Request {
     public init(@RequestBuilder content: @escaping () async -> Content) {
         self.content = content
     }
-    
+
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         Never.bodyException()

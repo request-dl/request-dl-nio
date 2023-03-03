@@ -42,7 +42,7 @@ extension Headers {
         public init<S: StringProtocol>(_ host: S) {
             self.value = host
         }
-        
+
         /// Returns an exception since `Never` is a type that can never be constructed.
         public var body: Never {
             Never.bodyException()

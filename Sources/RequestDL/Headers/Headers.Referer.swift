@@ -35,7 +35,7 @@ extension Headers {
         public init<S: StringProtocol>(_ url: S) {
             self.value = url
         }
-        
+
         /// Returns an exception since `Never` is a type that can never be constructed.
         public var body: Never {
             Never.bodyException()
