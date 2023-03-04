@@ -28,6 +28,22 @@ import Foundation
 
 extension Interceptors {
 
+    /**
+     An interceptor for logging task responses.
+
+     Use `logInConsole(_:)` method of the `Task` to add an instance of the `Interceptors.Logger` interceptor to log task responses.
+
+     Example:
+
+     ```swift
+     DataTask { ... }
+         .logInConsole(true)
+     ```
+
+     - Note: If `isActive` is `true`, it logs task responses in the console.
+
+     - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
+     */
     public struct Logger: TaskInterceptor {
 
         let isLogActive: Bool
@@ -36,6 +52,11 @@ extension Interceptors {
             isLogActive = isActive
         }
 
+        /**
+        Called when the task response is received.
+
+        - Parameter result: The result of the task execution.
+        */
         public func received(_ result: Result<TaskResult<Data>, Error>) {
             guard isLogActive else {
                 return
@@ -54,6 +75,12 @@ extension Interceptors {
 
 extension Task where Element == TaskResult<Data> {
 
+    /**
+     Add the `Interceptors.Logger` interceptor to log task responses.
+
+     - Parameter isActive: If `true`, the task responses will be logged in the console.
+     - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
+     */
     public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger, Self> {
         intercept(Interceptors.Logger(isActive))
     }
