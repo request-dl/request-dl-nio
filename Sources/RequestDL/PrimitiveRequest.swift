@@ -34,6 +34,7 @@ protocol PrimitiveRequest: Request {
 
 extension PrimitiveRequest {
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: Self, _ context: Context) async {
         let node = Node(
             root: context.root,

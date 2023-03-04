@@ -39,6 +39,7 @@ public struct OptionalRequest<Content: Request>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: OptionalRequest<Content>, _ context: Context) async {
         if let content = request.content {
             await Content.makeRequest(content, context)

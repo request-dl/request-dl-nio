@@ -41,6 +41,7 @@ public struct AsyncRequest<Content: Request>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: AsyncRequest<Content>, _ context: Context) async {
         await Content.makeRequest(request.content(), context)
     }

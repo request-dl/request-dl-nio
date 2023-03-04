@@ -41,6 +41,7 @@ public struct HeaderGroup<Content: Request>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: HeaderGroup<Content>, _ context: Context) async {
         let node = Node(
             root: context.root,

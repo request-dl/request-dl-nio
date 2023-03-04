@@ -26,8 +26,33 @@
 
 import Foundation
 
+/**
+ A type that can be represented as a `URLSessionConfiguration`.
+
+ Types that conform to the `URLSessionConfigurationRepresentable` protocol can update a `URLSessionConfiguration`
+ object with specific attributes.
+
+ To adopt this protocol, implement the `updateSessionConfiguration` method, which updates the session configuration
+ object passed in as an argument.
+
+ ```swift
+ struct MySessionConfiguration: URLSessionConfigurationRepresentable {
+
+     let timeoutIntervalForRequest: TimeInterval
+
+     func updateSessionConfiguration(_ sessionConfiguration: URLSessionConfiguration) {
+         sessionConfiguration.timeoutIntervalForRequest = timeoutIntervalForRequest
+     }
+ }
+ ```
+ */
 public protocol URLSessionConfigurationRepresentable: Request where Body == Never {
 
+    /**
+     Updates the session configuration object with specific attributes.
+
+     - Parameter sessionConfiguration: The `URLSessionConfiguration` object to be updated.
+     */
     func updateSessionConfiguration(_ sessionConfiguration: URLSessionConfiguration)
 }
 
@@ -38,6 +63,7 @@ extension URLSessionConfigurationRepresentable {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: Self, _ context: Context) async {
         let node = Node(
             root: context.root,

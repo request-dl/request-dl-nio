@@ -45,6 +45,7 @@ public struct ConditionalRequest<
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: ConditionalRequest<TrueRequest, FalseRequest>, _ context: Context) async {
         switch request.option {
         case .true(let request):

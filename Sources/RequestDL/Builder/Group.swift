@@ -39,6 +39,7 @@ public struct Group<Content: Request>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: Group<Content>, _ context: Context) async {
         await Content.makeRequest(request.content, context)
     }

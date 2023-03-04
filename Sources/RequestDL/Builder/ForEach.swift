@@ -41,6 +41,7 @@ public struct ForEach<Data: Collection, Content: Request>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: ForEach<Data, Content>, _ context: Context) async {
         for request in request.data.map(request.map) {
             await Content.makeRequest(request, context)

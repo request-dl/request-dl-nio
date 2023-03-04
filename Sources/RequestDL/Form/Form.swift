@@ -56,6 +56,7 @@ public struct Form<Content: Request>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: Form<Content>, _ context: Context) async {
         let node = Node(
             root: context.root,

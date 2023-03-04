@@ -26,8 +26,28 @@
 
 import Foundation
 
+/**
+ A type that represents an object that can update a URLRequest.
+
+ You can conform to this protocol to add or modify headers, set HTTP methods, and provide other customizations to the URLRequest for a network task.
+
+ Usage:
+
+ ```swift
+ struct CustomHeader: URLRequestRepresentable {
+     func updateRequest(_ request: inout URLRequest) {
+         request.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+     }
+ }
+ ```
+ */
 public protocol URLRequestRepresentable: Request where Body == Never {
 
+    /**
+     Update the URLRequest to be used in a network task.
+
+     - Parameter request: The `URLRequest` to be updated.
+     */
     func updateRequest(_ request: inout URLRequest)
 }
 
@@ -38,6 +58,7 @@ extension URLRequestRepresentable {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: Self, _ context: Context) async {
         let node = Node(
             root: context.root,

@@ -39,6 +39,7 @@ public struct TupleRequest<T>: Request {
         Never.bodyException()
     }
 
+    /// This method is used internally and should not be called directly.
     public static func makeRequest(_ request: TupleRequest<T>, _ context: Context) async {
         await request.transformHandler(context)
     }

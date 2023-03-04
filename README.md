@@ -9,6 +9,8 @@ This library came about through improvements in functionality
 and techniques of the library developed by Carson Katri called
 [Request](https://github.com/carson-katri/swift-request).
 
+[Documentation](https://brennobemoura.github.io/request-dl/documentation/requestdl/)
+
 Some features have been removed and others improved in an effort 
 to make the code more declarative. In addition, we have gained in 
 the handling of the return through the TaskModifier and TaskInterceptor 
