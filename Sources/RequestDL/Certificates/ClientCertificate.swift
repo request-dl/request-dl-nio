@@ -27,10 +27,12 @@
 import Foundation
 
 /**
-A representation of a client certificate that can be used in an HTTP request.
+ A representation of a client certificate that can be used in an HTTP request.
 
-This type conforms to the `Property` protocol, which means it can be used as a property in a `RequestBuilder`. It has two initializers, one that takes the certificate data and password as parameters, and another that takes the certificate name, bundle, and password.
-*/
+ This type conforms to the `Property` protocol, which means it can be used as a property in a
+ `RequestBuilder`. It has two initializers, one that takes the certificate data and password as parameters,
+ and another that takes the certificate name, bundle, and password.
+ */
 public struct ClientCertificate: Property {
 
     private let data: Data

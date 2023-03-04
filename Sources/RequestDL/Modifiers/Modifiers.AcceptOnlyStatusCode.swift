@@ -42,7 +42,8 @@ extension Modifiers {
 
          - Parameter task: The task to modify.
          - Returns: The modified task that accepts only the specified status codes.
-         - Throws: An `InvalidStatusCodeError` if the status code of the response is not included in the set of accepted status codes.
+         - Throws: An `InvalidStatusCodeError` if the status code of the response is not
+         included in the set of accepted status codes.
          */
         public func task(_ task: Content) async throws -> Content.Element {
             let result = try await task.response()

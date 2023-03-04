@@ -35,9 +35,11 @@ import Foundation
  let contentType: ContentType = .json
  ```
 
- - Note: For a complete list of the available types, please see the corresponding static properties.
+ - Note: For a complete list of the available types, please see the corresponding static
+ properties.
 
- - Important: The `.custom` static function should be used to specify a media type not included in the predefined static properties.
+ - Important: The `.custom` static function should be used to specify a media type not
+ included in the predefined static properties.
  */
 public struct ContentType {
 
@@ -78,8 +80,10 @@ extension ContentType {
     /**
      Content type for form data in the `x-www-form-urlencoded` format.
 
-     This type can be sent via URL parameters or in the body, but the correct submission format to the API must be verified as per `key1=value1&key2=value2`.
-     When using `Payload`, use init via String.
+     This type can be sent via URL parameters or in the body, but the correct submission format to
+     the API must be verified as per `key1=value1&key2=value2`.
+
+     - Warning: When using `Payload`, use init via String.
      */
     public static var formURLEncoded: ContentType {
         .init(rawValue: "application/x-www-form-urlencoded")
@@ -151,7 +155,6 @@ extension ContentType {
     }
 }
 
-
 extension ContentType {
 
     /// A collection of all available content types.
@@ -163,5 +166,16 @@ extension ContentType {
             .midi, .mpeg, .wav,
             .pdf
         ]
+    }
+}
+
+extension ContentType: Hashable {
+
+    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.rawValue == rhs.rawValue
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        rawValue.hash(into: &hasher)
     }
 }

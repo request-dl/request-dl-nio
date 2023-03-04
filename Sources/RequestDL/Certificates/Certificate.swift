@@ -27,13 +27,15 @@
 import Foundation
 
 /**
-A representation of a certificate that is loaded from a specified bundle.
+ A representation of a certificate that is loaded from a specified bundle.
 
-A certificate is a digital file used to establish a secure connection between two parties over the internet. This struct represents a certificate that is loaded from a specified bundle.
+ A certificate is a digital file used to establish a secure connection between two parties
+ over the internet. This struct represents a certificate that is loaded from a specified bundle.
 
-You can use this struct to create a secure connection with a server using SSL pinning. The certificate is used to verify that the server is legitimate and prevent man-in-the-middle attacks.
+ You can use this struct to create a secure connection with a server using SSL pinning.
+ The certificate is used to verify that the server is legitimate and prevent man-in-the-middle attacks.
 
-Example:
+ Example:
 
  ```swift
  let bundle = Bundle.main

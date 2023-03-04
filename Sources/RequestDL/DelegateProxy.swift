@@ -73,7 +73,7 @@ extension DelegateProxy: URLSessionDataDelegate {
     ) {
         #if DEBUG
         print("[RequestDL]", """
-        If a bug is found in Cache, handle DelegateProxy._:dataTask:willCacheResponse:completionHandler:
+        If a bug is found in Cache, handle urlSession(_:dataTask:willCacheResponse:completionHandler:)
         """)
         #endif
         completionHandler(proposedResponse)
@@ -86,7 +86,9 @@ extension DelegateProxy: URLSessionDataDelegate {
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
         #if DEBUG
-        print("[RequestDL]", "If a bug is found in Cache, handle DelegateProxy._:dataTask:didReceive:completionHandler:")
+        print("[RequestDL]", """
+        If a bug is found in Cache, handle urlSession(_:dataTask:didReceive:completionHandler:)
+        """)
         #endif
         completionHandler(.allow)
     }

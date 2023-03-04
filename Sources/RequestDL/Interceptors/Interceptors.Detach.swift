@@ -31,9 +31,11 @@ extension Interceptors {
     /**
      A task interceptor that detaches the task from its context and performs it on another closure.
 
-     - Important: If you don't retain the task returned by this function, the task will be immediately cancelled when it goes out of scope.
+     - Important: If you don't retain the task returned by this function, the task will be immediately
+     cancelled when it goes out of scope.
 
-     Use this interceptor allows you to perform operations on a separate closure without changing the behavior of the main `Task`.
+     Use this interceptor allows you to perform operations on a separate closure without changing
+     the behavior of the main `Task`.
 
      Usage:
 
@@ -55,7 +57,8 @@ extension Interceptors {
         /**
          A function called with the result of the task.
 
-         - Parameter result: A `Result` object containing either the task's `Element` or an `Error`.
+         - Parameter result: A `Result` object containing either the task's `Element`
+         or an `Error`.
          */
         public func received(_ result: Result<Element, Error>) {
             detachHandler(result)

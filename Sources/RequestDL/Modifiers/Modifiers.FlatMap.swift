@@ -90,7 +90,9 @@ private extension Modifiers.FlatMap {
 extension Task {
 
     /**
-     Returns a new instance of `ModifiedTask` that applies the `FlatMap` modifier to the original `Task`, applying a transformation on the task result by flat-mapping it to a new element.
+     Returns a new instance of `ModifiedTask` that applies the `FlatMap` modifier to the
+     original `Task`, applying a transformation on the task result by flat-mapping it to a new
+     element.
 
      - Parameters:
         - flatMapHandler: The flat-mapping closure to transform the result into a new element.

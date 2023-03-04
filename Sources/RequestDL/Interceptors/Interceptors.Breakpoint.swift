@@ -29,9 +29,11 @@ import Foundation
 extension Interceptors {
 
     /**
-     A `TaskInterceptor` that can be used to add a breakpoint to the task's response. The breakpoint will stop the task's execution and give control back to the debugger.
+     A `TaskInterceptor` that can be used to add a breakpoint to the task's response. The
+     breakpoint will stop the task's execution and give control back to the debugger.
 
-     - Note: This should only be used during development and debugging, and not in production code.
+     - Note: This should only be used during development and debugging, and not in production
+     code.
 
      Usage
 
@@ -51,8 +53,8 @@ extension Interceptors {
         /**
          Called when a response is received.
 
-         - Parameters:
-            - result: The `Result` object that represents the response. It contains either the response object or an error object.
+         - Parameter result: The `Result` object that represents the response. It contains
+         either the response object or an error object.
          */
         public func received(_ result: Result<Element, Error>) {
             raise(SIGTRAP)
@@ -63,9 +65,11 @@ extension Interceptors {
 extension Task {
 
     /**
-     Adds a breakpoint to the task's response. The breakpoint will stop the task's execution and give control back to the debugger.
+     Adds a breakpoint to the task's response. The breakpoint will stop the task's execution and
+     give control back to the debugger.
 
-     - Note: This should only be used during development and debugging, and not in production code.
+     - Note: This should only be used during development and debugging, and not in
+     production code.
 
      - Returns: An `InterceptedTask` object with the added breakpoint interceptor.
      */

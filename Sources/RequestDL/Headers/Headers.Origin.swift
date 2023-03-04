@@ -31,7 +31,10 @@ extension Headers {
     /**
      A representation of the `Origin` header field in an HTTP message.
 
-     The `Origin` header field indicates the origin of the request in terms of scheme, host, and port number. This header is mainly used in the context of CORS (Cross-Origin Resource Sharing) requests to ensure that a web application can only access resources from a different origin if the server explicitly allows it.
+     The `Origin` header field indicates the origin of the request in terms of scheme, host, and port
+     number. This header is mainly used in the context of CORS (Cross-Origin Resource Sharing)
+     requests to ensure that a web application can only access resources from a different origin if the server
+     explicitly allows it.
 
      Example usage:
 
@@ -45,7 +48,7 @@ extension Headers {
 
         /**
          Initializes an `Origin` header field with the given origin value.
-         
+
          - Parameter origin: The value of the `Origin` header field to be set.
          */
         public init<S: StringProtocol>(_ origin: S) {

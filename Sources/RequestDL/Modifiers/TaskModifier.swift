@@ -29,9 +29,11 @@ import Foundation
 /**
  A protocol for modifying tasks and returning an element of a specific type.
 
- The `TaskModifier` protocol has two associated types: `Body` and `Element`. `Body` is the type of the task being modified, and `Element` is the type of the returned value after the modification.
+ The `TaskModifier` protocol has two associated types: `Body` and `Element`. `Body`
+ is the type of the task being modified, and `Element` is the type of the returned value after the modification.
 
- The `task` function takes in a `Body` task and returns an `Element` value after applying the modification logic.
+ The `task` function takes in a `Body` task and returns an `Element` value after applying
+ the modification logic.
  */
 public protocol TaskModifier {
 

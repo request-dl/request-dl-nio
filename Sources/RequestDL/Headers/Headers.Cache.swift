@@ -303,7 +303,8 @@ extension Headers.Cache {
 extension Headers.Cache {
 
     /**
-     The `immutable()` function sets the cache's immutability flag to `true`, indicating that the cached response cannot be modified or updated by a server.
+     The `immutable()` function sets the cache's immutability flag to `true`, indicating that
+     he cached response cannot be modified or updated by a server.
 
      - Returns: The modified Cache object.
      */

@@ -31,7 +31,8 @@ import Foundation
 
  A `ModifiedTask` is a `Task` that is created by applying a `TaskModifier` to a base `Task`.
 
- - Note: The `Element` associated type of the `ModifiedTask` is determined by the `Element` associated type of the `TaskModifier`.
+ - Note: The `Element` associated type of the `ModifiedTask` is determined by the `Element`
+ associated type of the `TaskModifier`.
  */
 public struct ModifiedTask<Modifier: TaskModifier>: Task {
 

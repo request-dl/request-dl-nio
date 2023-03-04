@@ -27,11 +27,13 @@
 import Foundation
 
 /**
-A type representing an HTTP form with a list of content.
+ A type representing an HTTP form with a list of content.
 
-Use Form to represent an HTTP form with a list of content, which can be used in an HTTP request. This type conforms to Property, allowing it to be composed with other Property objects.
+ Use `Form` to represent an HTTP form with a list of content, which can be used in an HTTP request.
+ This type conforms to `Property`, allowing it to be composed with other `Property` objects.
 
-The content of the form is specified using a property builder syntax, allowing you to create a list of Parameter objects.
+ The content of the form is specified using a property builder syntax, allowing you to create a list of
+ properties objects.
 
  ```swift
  Form {

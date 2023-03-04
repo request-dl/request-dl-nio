@@ -41,7 +41,7 @@ public struct Authorization: Property {
         self.type = type
         self.token = token
     }
-    
+
     /// Creates an `Authorization` instance for basic authentication using the given username and password.
     ///
     /// - Parameters:

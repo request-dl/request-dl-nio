@@ -1,9 +1,14 @@
 opt_in_rules:
-  - force_unwrapping
-  - opening_brace
+    - force_unwrapping
+    - opening_brace
 
 force_unwrapping:
-  severity: error
+    severity: error
 
 trailing_whitespace:
-  severity: error
+    severity: error
+
+identifier_name:
+    excluded:
+        - id
+        - ok

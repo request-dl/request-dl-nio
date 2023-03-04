@@ -26,7 +26,7 @@
 
 import Foundation
 
-/// FormValue is a type of property that represents a single value in a multipart form-data request
+/// `FormValue` is a type of property that represents a single value in a multipart form-data request
 ///
 /// It can be used to represent simple values like strings and numbers.
 public struct FormValue: Property {
@@ -37,9 +37,10 @@ public struct FormValue: Property {
     let value: Any
 
     /**
-     Creates a new instance of FormValue to represent a value with a corresponding key in a form.
+     Creates a new instance of `FormValue` to represent a value with a corresponding key in a form.
 
-     The value parameter is the actual value to be sent, and key is the reference key used to identify the value when the form is submitted.
+     The value parameter is the actual value to be sent, and key is the reference key used to identify
+     the value when the form is submitted.
 
      - Parameters:
         - value: The value to be sent.

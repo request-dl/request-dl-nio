@@ -31,7 +31,8 @@ extension Interceptors {
     /**
      An interceptor for logging task responses.
 
-     Use `logInConsole(_:)` method of the `Task` to add an instance of the `Interceptors.Logger` interceptor to log task responses.
+     Use `logInConsole(_:)` method of the `Task` to add an instance of the
+     `Interceptors.Logger` interceptor to log task responses.
 
      Example:
 
