@@ -1,5 +1,5 @@
 //
-//  OptionalRequest.swift
+//  _TupleRequest.swift
 //
 //  MIT License
 //
@@ -26,12 +26,15 @@
 
 import Foundation
 
-public struct OptionalRequest<Content: Request>: Request {
+// swiftlint:disable type_name
+/// This struct is marked as internal and is not intended
+/// to be used directly by clients of this framework.
+public struct _TupleRequest<T>: Request {
 
-    let content: Content?
+    private let transformHandler: (Context) async -> Void
 
-    init(_ content: Content?) {
-        self.content = content
+    init(transform: @escaping (Context) async -> Void) {
+        self.transformHandler = transform
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -40,9 +43,7 @@ public struct OptionalRequest<Content: Request>: Request {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: OptionalRequest<Content>, _ context: Context) async {
-        if let content = request.content {
-            await Content.makeRequest(content, context)
-        }
+    public static func makeRequest(_ request: _TupleRequest<T>, _ context: Context) async {
+        await request.transformHandler(context)
     }
 }

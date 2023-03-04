@@ -30,10 +30,10 @@ import XCTest
 final class MethodTests: XCTestCase {
 
     func testMethods() async {
-        for method in MethodType.allCases {
+        for method in HTTPMethodType.allCases {
             let sut = Group {
                 BaseURL("google.com")
-                Method(method)
+                HTTPMethod(method)
             }
 
             let (_, request) = await resolve(sut)
@@ -43,18 +43,18 @@ final class MethodTests: XCTestCase {
     }
 
     func testMethodType() async {
-        XCTAssertEqual(MethodType.get.rawValue, "GET")
-        XCTAssertEqual(MethodType.head.rawValue, "HEAD")
-        XCTAssertEqual(MethodType.post.rawValue, "POST")
-        XCTAssertEqual(MethodType.put.rawValue, "PUT")
-        XCTAssertEqual(MethodType.delete.rawValue, "DELETE")
-        XCTAssertEqual(MethodType.connect.rawValue, "CONNECT")
-        XCTAssertEqual(MethodType.options.rawValue, "OPTIONS")
-        XCTAssertEqual(MethodType.trace.rawValue, "TRACE")
-        XCTAssertEqual(MethodType.patch.rawValue, "PATCH")
+        XCTAssertEqual(HTTPMethodType.get.rawValue, "GET")
+        XCTAssertEqual(HTTPMethodType.head.rawValue, "HEAD")
+        XCTAssertEqual(HTTPMethodType.post.rawValue, "POST")
+        XCTAssertEqual(HTTPMethodType.put.rawValue, "PUT")
+        XCTAssertEqual(HTTPMethodType.delete.rawValue, "DELETE")
+        XCTAssertEqual(HTTPMethodType.connect.rawValue, "CONNECT")
+        XCTAssertEqual(HTTPMethodType.options.rawValue, "OPTIONS")
+        XCTAssertEqual(HTTPMethodType.trace.rawValue, "TRACE")
+        XCTAssertEqual(HTTPMethodType.patch.rawValue, "PATCH")
     }
 
     func testNever() {
-        XCTAssertTrue(Method.Body.self == Never.self)
+        XCTAssertTrue(HTTPMethod.Body.self == Never.self)
     }
 }

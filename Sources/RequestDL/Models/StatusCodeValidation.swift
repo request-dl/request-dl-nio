@@ -26,18 +26,42 @@
 
 import Foundation
 
+/**
+ Enumeration for defining the types of HTTP status code validations.
+
+ Usage:
+
+ ```swift
+ // Example of validating success and redirection codes.
+ let validationType: StatusCodeValidation = .successAndRedirect
+
+ // Example of custom status code validation.
+ let validationType: StatusCodeValidation = .custom([400, 404, 422])
+ ```
+
+ The enumeration cases are:
+
+ - `none`: No validation. This means all HTTP status codes are considered valid.
+ - `success: Validates only success codes (2xx). Any other HTTP status code will be considered invalid.
+ - `successAndRedirect`: Validates success codes (2xx) and redirection codes (3xx).
+ - `custom: Validates only the status codes passed in the parameter. Any other HTTP status code will be considered invalid.
+
+ The `statusCodes` property returns the list of HTTP status codes that should be considered valid, based on the enumeration case.
+
+ The `validate(statusCode:)` method receives an HTTP status code and returns a boolean indicating whether it is considered valid, based on the validation type defined by the enumeration case.
+ */
 public enum StatusCodeValidation: Equatable {
 
-    /// No validation.
+    /// No validation. All HTTP status codes are considered valid.
     case none
 
-    /// Validate success codes (only 2xx).
+    /// Validates only success codes (2xx). Any other HTTP status code will be considered invalid.
     case success
 
-    /// Validate success codes and redirection codes (only 2xx and 3xx).
+    /// Validates success codes (2xx) and redirection codes (3xx). Any other HTTP status code will be considered invalid.
     case successAndRedirect
 
-    /// Validate only the given status codes.
+    /// Validates only the status codes passed in the parameter. Any other HTTP status code will be considered invalid.
     case custom([Int])
 
     /// The list of HTTP status codes to validate.
@@ -54,6 +78,14 @@ public enum StatusCodeValidation: Equatable {
         }
     }
 
+    /**
+     Validates an HTTP status code.
+
+     - Parameters:
+        - statusCode: The HTTP status code to be validated.
+
+     - Returns: `true` if the status code is valid based on the validation type defined by the enumeration case; `false` otherwise.
+     */
     public func validate(statusCode: Int) -> Bool {
         self == .none || statusCodes.contains(statusCode)
     }

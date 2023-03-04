@@ -26,14 +26,34 @@
 
 import Foundation
 
+/**
+A group of query parameters that can be used to compose a request.
+
+You can use this to group multiple query parameters together and pass them as a single argument to a request.
+
+Usage:
+
+ ```swift
+ QueryGroup {
+     Query("John", forKey: "name")
+     Query("Doe", forKey: "surname")
+     Query(30, forKey: "age")
+ }
+ ```
+ */
 public struct QueryGroup<Content: Request>: Request {
 
     public typealias Body = Never
 
-    let parameter: Content
+    let content: Content
 
-    public init(@RequestBuilder parameter: () -> Content) {
-        self.parameter = parameter()
+    /**
+     Creates a new query group from the content.
+
+     - Parameter content: A closure that returns the content of the query group.
+     */
+    public init(@RequestBuilder content: () -> Content) {
+        self.content = content()
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -50,7 +70,7 @@ public struct QueryGroup<Content: Request>: Request {
         )
 
         let newContext = Context(node)
-        await Content.makeRequest(request.parameter, newContext)
+        await Content.makeRequest(request.content, newContext)
 
         let parameters = newContext.findCollection(Query.Object.self).map {
             ($0.key, $0.value)

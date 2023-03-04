@@ -97,7 +97,7 @@ extension DownloadTask {
                         data: url
                     ))
                 } else {
-                    continuation.resume(throwing: TaskError.empty)
+                    continuation.resume(throwing: EmptyTaskResponseResult())
                 }
             }
 

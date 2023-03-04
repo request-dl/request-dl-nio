@@ -26,10 +26,34 @@
 
 import Foundation
 
+/**
+ A request that groups a set of requests together.
+
+ You can use this request to group requests that share common properties, such as base URL or headers.
+
+ Example:
+
+ ```swift
+ DataTask {
+     BaseURL("api.example.com")
+
+     Group {
+         Get("/users")
+         Post("/users", body: user)
+     }
+ }
+ ```
+ */
 public struct Group<Content: Request>: Request {
 
     private let content: Content
 
+    /**
+     Initializes the group request.
+
+     - Parameters:
+        - content: The closure that contains the requests to be grouped.
+     */
     public init(@RequestBuilder content: () -> Content) {
         self.content = content()
     }

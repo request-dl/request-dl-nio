@@ -26,12 +26,37 @@
 
 import Foundation
 
+/**
+ A type that represents an asynchronous request specification.
+
+ Usage example:
+
+ ```swift
+ DataTask {
+     BaseURL("example.com")
+     Path("api/users")
+     HTTPMethod(.get)
+
+     AsyncRequest {
+         if let id = await getCurrentUserID() {
+             Path("\(id)")
+         }
+     }
+ }
+ ```
+ */
 public struct AsyncRequest<Content: Request>: Request {
 
     public typealias Body = Never
 
     private let content: () async -> Content
 
+    /**
+     Initializes with an asynchronous content provided.
+
+     - Parameters:
+        - content: The content of the request to be built.
+     */
     public init(@RequestBuilder content: @escaping () async -> Content) {
         self.content = content
     }

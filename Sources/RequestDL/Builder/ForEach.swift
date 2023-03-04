@@ -26,12 +26,40 @@
 
 import Foundation
 
+/**
+ A request that iterates over a collection of data and creates a request for each element.
+
+ You can use this request to dynamically generate requests based on a collection of data.
+
+ Example:
+
+ ```swift
+ let paths = ["user", "search", "results"]
+
+ DataTask {
+     BaseURL("ecommerce.com")
+     ForEach(paths) {
+         Path($0)
+     }
+ }
+ ```
+ */
 public struct ForEach<Data: Collection, Content: Request>: Request {
 
     private let data: Data
     private let map: (Data.Element) -> Content
 
-    public init(_ data: Data, content: @escaping (Data.Element) -> Content) {
+    /**
+     Initializes the `ForEach` request with collection of data provided.
+
+     - Parameters:
+         - data: The collection of data to iterate over.
+         - content: A closure that creates a content for each element of the collection.
+     */
+    public init(
+        _ data: Data,
+        @RequestBuilder content: @escaping (Data.Element) -> Content
+    ) {
         self.data = data
         self.map = content
     }

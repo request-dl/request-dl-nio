@@ -1,5 +1,5 @@
 //
-//  Method.swift
+//  HTTPMethod.swift
 //
 //  MIT License
 //
@@ -27,48 +27,39 @@
 import Foundation
 
 /**
- Defines the request method.
+ Defines the HTTP request method.
+
+ Use `HTTPMethod` to specify the HTTP request method when creating requests.
 
  ```swift
- extension ProductsAPI {
-
-     func get() -> DataTask {
-         DataTask {
-             BaseUrl() + "/products"
-             Method(.get)
-         }
-     }
+ DataTask {
+     BaseURL("ecommerce.com")
+     Path("products")
+     HTTPMethod(.get)
  }
  ```
  */
-public struct Method: Request {
+public struct HTTPMethod: Request {
 
     public typealias Body = Never
 
-    let methodType: MethodType
+    let type: HTTPMethodType
 
     /**
-     Initializes with the type of request to be made
+     Initializes a `HTTPMethod` instance with the specified HTTP request method.
 
-     - Parameters:
-        - methodType: Requisition method
+     - Parameter type: The type of HTTP request method to use.
 
-     In the example below, a GET request is made to the Apple developers website.
+     In the following example, a GET request is made to the Apple developers website:
 
      ```swift
-     extension AppleDevelopersAPI {
-
-         func get() -> DataTask {
-             DataTask {
-                 Url(.https, path: "developer.apple.com")
-                 Method(.get)
-             }
-         }
+     DataTask {
+         BaseURL("developer.apple.com")
+         Method(.get)
      }
-     ```
      */
-    public init(_ methodType: MethodType) {
-        self.methodType = methodType
+    public init(_ type: HTTPMethodType) {
+        self.type = type
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -77,7 +68,7 @@ public struct Method: Request {
     }
 }
 
-extension Method: PrimitiveRequest {
+extension HTTPMethod: PrimitiveRequest {
 
     struct Object: NodeObject {
 
@@ -93,6 +84,6 @@ extension Method: PrimitiveRequest {
     }
 
     func makeObject() -> Object {
-        .init(methodType.rawValue)
+        .init(type.rawValue)
     }
 }

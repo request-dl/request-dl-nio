@@ -26,6 +26,14 @@
 
 import Foundation
 
-enum TaskError: Error {
-    case empty
+/**
+A struct representing an empty task response result. Conforms to the `LocalizedError` protocol.
+
+This struct can be used to represent a task response result that is empty.
+*/
+public struct EmptyTaskResponseResult: LocalizedError {
+
+    public var errorDescription: String? {
+        return "The response was empty."
+    }
 }

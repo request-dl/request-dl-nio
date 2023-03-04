@@ -26,12 +26,40 @@
 
 import Foundation
 
+/**
+ A representation of the HTTP body data in a request.
+
+ A `HTTPBody` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw `Data`.
+
+ The body data is used in HTTP requests with the purpose of carrying information. When making a HTTP request, the request body is used to send information to the server. The server reads the information and acts upon it, for example, by returning a specific response or by modifying its behavior.
+
+ To create a `HTTPBody`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
+
+ Example:
+
+ ```swift
+ let bodyDict = ["name": "John", "age": 28]
+
+ DataTask {
+     BaseURL("apple.com")
+     HTTPMethod(.post)
+     HTTPBody(bodyDict)
+ }
+ ```
+ */
 public struct HTTPBody<Provider: BodyProvider>: Request {
 
     public typealias Body = Never
 
     private let provider: Provider
 
+    /**
+     Initializes a `HTTPBody` with a dictionary.
+
+     - Parameters:
+        - dictionary: A dictionary to be serialized.
+        - options: Options for serializing the dictionary.
+     */
     public init(
         _ dictionary: [String: Any],
         options: JSONSerialization.WritingOptions = .prettyPrinted
@@ -39,6 +67,13 @@ public struct HTTPBody<Provider: BodyProvider>: Request {
         provider = _DictionaryBody(dictionary, options: options)
     }
 
+    /**
+     Initializes a `HTTPBody` with an encodable value.
+
+     - Parameters:
+        - value: An encodable value to be serialized.
+        - encoder: An encoder to use for the serialization.
+     */
     public init<T: Encodable>(
         _ value: T,
         encoder: JSONEncoder = .init()
@@ -46,6 +81,13 @@ public struct HTTPBody<Provider: BodyProvider>: Request {
         provider = _EncodableBody(value, encoder: encoder)
     }
 
+    /**
+     Initializes a `HTTPBody` with a string.
+
+     - Parameters:
+        - string: A string to be used as the body data.
+        - encoding: The encoding to use when converting the string to data.
+     */
     public init(
         _ string: String,
         using encoding: String.Encoding = .utf8
@@ -53,6 +95,12 @@ public struct HTTPBody<Provider: BodyProvider>: Request {
         provider = _StringBody(string, using: encoding)
     }
 
+    /**
+     Initializes a `HTTPBody` with raw `Data`.
+
+     - Parameters:
+        - data: The raw data to be used as the body.
+     */
     public init(_ data: Data) where Provider == _DataBody {
         provider = _DataBody(data)
     }

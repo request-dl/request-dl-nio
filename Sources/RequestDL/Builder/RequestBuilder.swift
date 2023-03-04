@@ -25,7 +25,6 @@
 //
 
 import Foundation
-import SwiftUI
 
 @resultBuilder
 public struct RequestBuilder {
@@ -38,18 +37,22 @@ public struct RequestBuilder {
         component
     }
 
-    public static func buildEither<
-        TrueRequest: Request,
-        FalseRequest: Request
-    >(first: TrueRequest) -> ConditionalRequest<TrueRequest, FalseRequest> {
-        ConditionalRequest(trueRequest: first)
+    public static func buildIf<Content: Request>(_ content: Content?) -> _OptionalRequest<Content> {
+        _OptionalRequest(content)
     }
 
     public static func buildEither<
         TrueRequest: Request,
         FalseRequest: Request
-    >(second: FalseRequest) -> ConditionalRequest<TrueRequest, FalseRequest> {
-        ConditionalRequest(falseRequest: second)
+    >(first: TrueRequest) -> _ConditionalRequest<TrueRequest, FalseRequest> {
+        _ConditionalRequest(trueRequest: first)
+    }
+
+    public static func buildEither<
+        TrueRequest: Request,
+        FalseRequest: Request
+    >(second: FalseRequest) -> _ConditionalRequest<TrueRequest, FalseRequest> {
+        _ConditionalRequest(falseRequest: second)
     }
 
     public static func buildLimitedAvailability<Content: Request>(_ component: Content) -> Content {
@@ -66,8 +69,8 @@ extension RequestBuilder {
     >(
         _ c0: C0,
         _ c1: C1
-    ) -> TupleRequest<(C0, C1)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
         }
@@ -81,8 +84,8 @@ extension RequestBuilder {
         _ c0: C0,
         _ c1: C1,
         _ c2: C2
-    ) -> TupleRequest<(C0, C1, C2)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1, C2)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
             await C2.makeRequest(c2, $0)
@@ -99,8 +102,8 @@ extension RequestBuilder {
         _ c1: C1,
         _ c2: C2,
         _ c3: C3
-    ) -> TupleRequest<(C0, C1, C2, C3)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1, C2, C3)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
             await C2.makeRequest(c2, $0)
@@ -120,8 +123,8 @@ extension RequestBuilder {
         _ c2: C2,
         _ c3: C3,
         _ c4: C4
-    ) -> TupleRequest<(C0, C1, C2, C3, C4)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1, C2, C3, C4)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
             await C2.makeRequest(c2, $0)
@@ -144,8 +147,8 @@ extension RequestBuilder {
         _ c3: C3,
         _ c4: C4,
         _ c5: C5
-    ) -> TupleRequest<(C0, C1, C2, C3, C4, C5)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1, C2, C3, C4, C5)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
             await C2.makeRequest(c2, $0)
@@ -171,8 +174,8 @@ extension RequestBuilder {
         _ c4: C4,
         _ c5: C5,
         _ c6: C6
-    ) -> TupleRequest<(C0, C1, C2, C3, C4, C5, C6)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1, C2, C3, C4, C5, C6)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
             await C2.makeRequest(c2, $0)
@@ -201,8 +204,8 @@ extension RequestBuilder {
         _ c5: C5,
         _ c6: C6,
         _ c7: C7
-    ) -> TupleRequest<(C0, C1, C2, C3, C4, C5, C6, C7)> {
-        TupleRequest {
+    ) -> _TupleRequest<(C0, C1, C2, C3, C4, C5, C6, C7)> {
+        _TupleRequest {
             await C0.makeRequest(c0, $0)
             await C1.makeRequest(c1, $0)
             await C2.makeRequest(c2, $0)

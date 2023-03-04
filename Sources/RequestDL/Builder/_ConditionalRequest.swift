@@ -1,5 +1,5 @@
 //
-//  MethodType.swift
+//  _ConditionalRequest.swift
 //
 //  MIT License
 //
@@ -26,33 +26,43 @@
 
 import Foundation
 
-/// Define constants for the action to be performed on the endpoint
-public enum MethodType: String, CaseIterable {
+// swiftlint:disable type_name
+/// This struct is marked as internal and is not intended
+/// to be used directly by clients of this framework.
+public struct _ConditionalRequest<
+    TrueRequest: Request,
+    FalseRequest: Request
+>: Request {
+    let option: Option
 
-    /// Defines a GET operation
-    case get = "GET"
+    init(trueRequest: TrueRequest) {
+        option = .true(trueRequest)
+    }
 
-    /// Defines an HEAD operation
-    case head = "HEAD"
+    init(falseRequest: FalseRequest) {
+        option = .false(falseRequest)
+    }
 
-    /// Defines a POST operation
-    case post = "POST"
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        Never.bodyException()
+    }
 
-    /// Defines a PUT operation
-    case put = "PUT"
+    /// This method is used internally and should not be called directly.
+    public static func makeRequest(_ request: _ConditionalRequest<TrueRequest, FalseRequest>, _ context: Context) async {
+        switch request.option {
+        case .true(let request):
+            await TrueRequest.makeRequest(request, context)
+        case .false(let request):
+            await FalseRequest.makeRequest(request, context)
+        }
+    }
+}
 
-    /// Defines a DELETE operation
-    case delete = "DELETE"
+extension _ConditionalRequest {
 
-    /// Defines a CONNECT operation
-    case connect = "CONNECT"
-
-    /// Defines a OPTIONS operation
-    case options = "OPTIONS"
-
-    /// Defines a TRACE operation
-    case trace = "TRACE"
-
-    /// Defines a PATCH operation
-    case patch = "PATCH"
+    enum Option {
+        case `true`(TrueRequest)
+        case `false`(FalseRequest)
+    }
 }

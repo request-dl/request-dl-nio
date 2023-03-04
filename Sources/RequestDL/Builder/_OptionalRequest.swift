@@ -1,5 +1,5 @@
 //
-//  ConditionalRequest.swift
+//  _OptionalRequest.swift
 //
 //  MIT License
 //
@@ -26,18 +26,15 @@
 
 import Foundation
 
-public struct ConditionalRequest<
-    TrueRequest: Request,
-    FalseRequest: Request
->: Request {
-    let option: Option
+// swiftlint:disable type_name
+/// This struct is marked as internal and is not intended
+/// to be used directly by clients of this framework.
+public struct _OptionalRequest<Content: Request>: Request {
 
-    init(trueRequest: TrueRequest) {
-        option = .true(trueRequest)
-    }
+    let content: Content?
 
-    init(falseRequest: FalseRequest) {
-        option = .false(falseRequest)
+    init(_ content: Content?) {
+        self.content = content
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -46,20 +43,9 @@ public struct ConditionalRequest<
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: ConditionalRequest<TrueRequest, FalseRequest>, _ context: Context) async {
-        switch request.option {
-        case .true(let request):
-            await TrueRequest.makeRequest(request, context)
-        case .false(let request):
-            await FalseRequest.makeRequest(request, context)
+    public static func makeRequest(_ request: _OptionalRequest<Content>, _ context: Context) async {
+        if let content = request.content {
+            await Content.makeRequest(content, context)
         }
-    }
-}
-
-extension ConditionalRequest {
-
-    enum Option {
-        case `true`(TrueRequest)
-        case `false`(FalseRequest)
     }
 }

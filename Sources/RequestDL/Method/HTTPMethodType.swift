@@ -1,5 +1,5 @@
 //
-//  TupleRequest.swift
+//  HTTPMethodType.swift
 //
 //  MIT License
 //
@@ -26,21 +26,33 @@
 
 import Foundation
 
-public struct TupleRequest<T>: Request {
+/// Define constants for the action to be performed on the endpoint
+public enum HTTPMethodType: String, CaseIterable {
 
-    private let transformHandler: (Context) async -> Void
+    /// Defines a GET operation
+    case get = "GET"
 
-    init(transform: @escaping (Context) async -> Void) {
-        self.transformHandler = transform
-    }
+    /// Defines an HEAD operation
+    case head = "HEAD"
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        Never.bodyException()
-    }
+    /// Defines a POST operation
+    case post = "POST"
 
-    /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: TupleRequest<T>, _ context: Context) async {
-        await request.transformHandler(context)
-    }
+    /// Defines a PUT operation
+    case put = "PUT"
+
+    /// Defines a DELETE operation
+    case delete = "DELETE"
+
+    /// Defines a CONNECT operation
+    case connect = "CONNECT"
+
+    /// Defines a OPTIONS operation
+    case options = "OPTIONS"
+
+    /// Defines a TRACE operation
+    case trace = "TRACE"
+
+    /// Defines a PATCH operation
+    case patch = "PATCH"
 }

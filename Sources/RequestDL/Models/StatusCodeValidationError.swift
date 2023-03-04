@@ -26,7 +26,26 @@
 
 import Foundation
 
+/**
+A custom error type representing a validation error due to an unexpected HTTP status code.
+
+Usage:
+
+ ```swift
+ do {
+     let result = try await DataTask {
+         BaseURL("apple.com")
+     }
+     .acceptOnlyStatusCode(.successAndRedirect)
+     .response()
+     // use validated result
+ } catch let error as StatusCodeValidationError<Data> {
+     // handle validation error
+ }
+ ```
+*/
 public struct StatusCodeValidationError<Element>: Error {
 
+    /// The data that caused the validation error.
     public let data: Element
 }

@@ -26,8 +26,10 @@
 
 import Foundation
 
+/// A struct representing an empty request.
 public struct EmptyRequest: Request {
 
+    /// Initializes an empty request.
     public init() {}
 
     /// Returns an exception since `Never` is a type that can never be constructed.
