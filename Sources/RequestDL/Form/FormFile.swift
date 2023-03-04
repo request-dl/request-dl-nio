@@ -26,6 +26,21 @@
 
 import Foundation
 
+/**
+ A property type for a file in a form data request.
+
+ `FormFile` can be used to include a file as part of a form data request.
+
+ You can initialize a `FormFile` object with a key, a file URL, and an content type.
+
+ ```swift
+ FormFile(
+     key: "my_file",
+     URL(fileURLWithPath: "/path/to/file"),
+     withType: .png
+ )
+ ```
+*/
 public struct FormFile: Property {
 
     public typealias Body = Never

@@ -26,29 +26,34 @@
 
 import Foundation
 
-struct FormObject: NodeObject {
+/**
+A type representing an HTTP form with a list of content.
 
-    let type: FormType
+Use Form to represent an HTTP form with a list of content, which can be used in an HTTP request. This type conforms to Property, allowing it to be composed with other Property objects.
 
-    init(_ type: FormType) {
-        self.type = type
-    }
+The content of the form is specified using a property builder syntax, allowing you to create a list of Parameter objects.
 
-    func makeProperty(_ configuration: MakeConfiguration) {
-        let boundary = FormUtils.boundary
-        configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        configuration.request.httpBody = FormUtils.buildBody([type.data], with: boundary)
-    }
-}
-
+ ```swift
+ Form {
+     FormValue("John", forKey: "name")
+     FormValue(25, forKey: "age")
+ }
+ ```
+ */
 public struct Form<Content: Property>: Property {
 
     public typealias Body = Never
 
-    let parameter: Content
+    let content: Content
 
-    public init(@PropertyBuilder parameter: () -> Content) {
-        self.parameter = parameter()
+    /**
+     Initializes a new instance of `Form` with the specified list of properties.
+
+     - Parameters:
+        - content: A property builder closure that creates a list of `Property` objects.
+     */
+    public init(@PropertyBuilder content: () -> Content) {
+        self.content = content()
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -68,7 +73,7 @@ public struct Form<Content: Property>: Property {
         )
 
         let newContext = Context(node)
-        await Content.makeProperty(property.parameter, newContext)
+        await Content.makeProperty(property.content, newContext)
 
         let parameters = newContext
             .findCollection(FormObject.self)

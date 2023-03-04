@@ -26,6 +26,7 @@
 
 import Foundation
 
+/// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
 public struct FormData: Property {
 
     public typealias Body = Never
@@ -35,6 +36,13 @@ public struct FormData: Property {
     let key: String?
     let contentType: ContentType
 
+    /// Creates a new `FormData` instance with the specified parameters.
+    ///
+    /// - Parameters:
+    ///   - key: The key to associate with the data. Defaults to an empty string.
+    ///   - name: The name to associate with the data.
+    ///   - type: The content type of the data.
+    ///   - data: The data to be sent.
     public init(
         key: String = "",
         name: String,
@@ -47,6 +55,12 @@ public struct FormData: Property {
         self.contentType = type
     }
 
+    /// Creates a new `FormData` instance by encoding a value as JSON data.
+    ///
+    /// - Parameters:
+    ///   - key: The key to associate with the data. Defaults to an empty string.
+    ///   - value: The value to be encoded as JSON data.
+    ///   - encoder: The `JSONEncoder` to use for encoding the value.
     public init<T: Encodable>(
         key: String = "",
         _ value: T,

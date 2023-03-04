@@ -27,7 +27,7 @@
 import Foundation
 
 /**
- A type that represents an asynchronous request specification.
+ A type that represents an asynchronous property specification.
 
  Usage example:
 
