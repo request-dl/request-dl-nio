@@ -5,84 +5,83 @@
 
 # RequestDL
 
-This library came about through improvements in functionality 
-and techniques of the library developed by Carson Katri called
-[Request](https://github.com/carson-katri/swift-request).
+RequestDL is a Swift package designed to simplify the process of performing network
+requests. It provides a set of tools, including the Task protocol, which supports
+different types of requests, including DataTask, DownloadTask, and BytesTask.
 
-[Documentation](https://brennobemoura.github.io/request-dl/documentation/requestdl/)
+One of the key features of RequestDL is its support for specifying properties of a
+URLRequest, such as Query, Payload, and Headers, among others. You can also use 
+TaskModifier and TaskInterceptor to process the response after the request is 
+complete, allowing for actions like decoding, mapping, error handling based on status
+codes, and logging responses in the console.
 
-Some features have been removed and others improved in an effort 
-to make the code more declarative. In addition, we have gained in 
-the handling of the return through the TaskModifier and TaskInterceptor 
-added in this version.
+RequestDL's Property protocol is another powerful feature that allows developers to
+implement custom properties to define various aspects of the URLRequest within a 
+struct specification or using the @PropertyBuilder. This makes it easy to customize 
+requests to meet specific needs.
 
-## Next steps
-
-Here's the list of what's left to finish the first version of RequestDL.
-
-- ✅ Implement support for Combine;
-- ⏳ Implement unit tests;
-- ⏳ Document code;
-
-Feel free to open PRs and implement these features. After the first 
-version becomes available, we will open to implement new features.
+- **[Documentation](https://brennobemoura.github.io/request-dl/documentation/requestdl/)**
 
 ## Installation
 
-This repository is distributed through SPM, being possible to use it 
-in two ways:
-
-1. Xcode
-
-In Xcode 14, go to `File > Packages > Add Package Dependency...`, then paste in 
-`https://github.com/request-dl/request-dl.git`
-
-2. Package.swift
+RequestDL can be installed using Swift Package Manager. To include it in your project,
+add the following dependency to your Package.swift file:
 
 ```swift
-// swift-tools-version:5.7
-import PackageDescription
-
-let package = Package(
-    name: "MyPackage",
-    products: [
-        .library(
-            name: "MyPackage",
-            targets: ["MyPackage"]
-        )
-    ],
-    dependencies: [
-        .package(url: "https://github.com/request-dl/request-dl.git", from: "1.0.0")
-    ],
-    targets: [
-        .target(
-            name: "MyPackage",
-            dependencies: ["RequestDL"]
-        )
-    ]
-)
+dependencies: [
+    .package(url: "https://github.com/username/RequestDL.git", from: "1.0.0")
+]
 ```
 
 ## Usage
 
-This is a preliminary example that shows how to use RequestDL 
-in applications.
+Using RequestDL is easy and intuitive. You can create network requests in a 
+declarative way, specifying the properties of the request through the use of 
+the Property protocol or using the @PropertyBuilder attribute.
+
+Here's an example of a simple DataTask that queries Google for the term "apple", 
+logs the response in the console, and ignores the URLResponse:
 
 ```swift
-func requestGoogle() async throws -> GoogleResponse {
-    try await DataTask {
-        BaseURL("google.com")
-        
-        HeaderGroup {
-            Headers.Accept(.json)
-            Headers.ContentType(.json)
-        }
-        
-        Query("apple", forKey: "q")
+try await DataTask {
+    BaseURL("google.com")
+    
+    HeaderGroup {
+        Headers.Accept(.json)
+        Headers.ContentType(.json)
     }
-    .logInConsole(true)
-    .decode(GoogleResponse.self)
-    .ignoreResponse()
-    .response()
+    
+    Query("apple", forKey: "q")
 }
+.logInConsole(true)
+.decode(GoogleResponse.self)
+.ignoreResponse()
+.response()
 ```
+
+This code creates a `DataTask` with the `BaseURL` set to "google.com", a `HeaderGroup`
+containing the "Accept" and "Content-Type" headers set to "application/json", and 
+a query parameter with the key "q" and the value "apple". It then sets the 
+`logInConsole` property to true, which will print the response in the console when
+the request is completed. It also decodes the response into an instance of 
+`GoogleResponse` and then ignores it.
+
+This is just a simple example of what RequestDL can do. Check out the documentation
+for more information on how to use it.
+
+## Contributing
+
+If you find a bug or have an idea for a new feature, please open an issue or 
+submit a pull request. We welcome contributions from the community!
+
+## Acknowledgments
+
+This library owes a lot to the work of Carson Katri and his Swift package 
+[Request](https://github.com/carson-katri/swift-request). Many of the core 
+concepts and techniques used in RequestDL were inspired by Carson's library, and 
+the original implementation of RequestDL even used a fork of Carson's library as
+its foundation. 
+
+Without Carson's work, this library would not exist in its current form. Thank you, 
+Carson, for your contributions to the Swift community and for inspiring the development 
+of RequestDL.
