@@ -39,12 +39,12 @@ Usage:
      .acceptOnlyStatusCode(.successAndRedirect)
      .response()
      // use validated result
- } catch let error as StatusCodeError<Data> {
+ } catch let error as InvalidStatusCodeError<Data> {
      // handle validation error
  }
  ```
 */
-public struct StatusCodeError<Element>: Error {
+public struct InvalidStatusCodeError<Element>: Error {
 
     /// The data that caused the validation error.
     public let data: Element

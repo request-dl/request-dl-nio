@@ -26,6 +26,13 @@
 
 import Foundation
 
+/**
+ A type that represents a task that has been modified by a `TaskModifier`.
+
+ A `ModifiedTask` is a `Task` that is created by applying a `TaskModifier` to a base `Task`.
+
+ - Note: The `Element` associated type of the `ModifiedTask` is determined by the `Element` associated type of the `TaskModifier`.
+ */
 public struct ModifiedTask<Modifier: TaskModifier>: Task {
 
     public typealias Element = Modifier.Element
@@ -40,8 +47,14 @@ public struct ModifiedTask<Modifier: TaskModifier>: Task {
 }
 
 extension ModifiedTask {
+    /**
+     Returns the response of the task.
 
-    public func response() async throws -> Modifier.Element {
+     - Throws: An error of type `Error` if the task could not be completed.
+
+     - Returns: An object of type `Element` with the response of the task.
+     */
+    public func response() async throws -> Element {
         try await modifier.task(task)
     }
 }

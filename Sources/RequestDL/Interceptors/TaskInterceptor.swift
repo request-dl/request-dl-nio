@@ -64,7 +64,7 @@ public protocol TaskInterceptor {
      The `received` method is called when the task completes, and receives a `Result` object containing either a successful `Element` result or an `Error`.
 
      - Parameters:
-        - result: A Result object containing either a successful Element result or an Error.
+        - result: A `Result` object containing either a successful `Element` result or an `Error`.
      */
     func received(_ result: Result<Element, Error>)
 }

@@ -31,7 +31,7 @@ A struct representing an empty task response result. Conforms to the `LocalizedE
 
 This struct can be used to represent a task response result that is empty.
 */
-public struct EmptyTaskResponseResult: LocalizedError {
+public struct EmptyResponseError: LocalizedError {
 
     public var errorDescription: String? {
         return "The response was empty."

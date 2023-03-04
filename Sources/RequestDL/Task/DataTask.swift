@@ -108,7 +108,7 @@ extension DataTask {
                 if let data = data, let response = response {
                     continuation.resume(returning: .init(response: response, data: data))
                 } else {
-                    continuation.resume(throwing: EmptyTaskResponseResult())
+                    continuation.resume(throwing: EmptyResponseError())
                 }
             }
 

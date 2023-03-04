@@ -28,6 +28,18 @@ import Foundation
 
 extension Modifiers {
 
+    /**
+     A `TaskModifier` that decodes the data returned by the `Task` into a specified type using a `JSONDecoder`.
+
+     Generic types:
+
+     - `Content`: The type of the original `Task` being modified.
+     - `Element`: The type to decode the response data into.
+
+     The `Decode` modifier can be used with any `Task` whose `Element` is of type `TaskResult<Data>`. It expects a `Decodable` type to be specified as the `Element` type it will decode the response data into.
+
+     The decoding operation is performed using a `JSONDecoder`. By default, the decoding is performed assuming that the data is in plain format, i.e., not an array or dictionary.
+     */
     public struct Decode<Content: Task, Element: Decodable>: TaskModifier where Content.Element == TaskResult<Data> {
 
         let type: Element.Type
@@ -40,6 +52,13 @@ extension Modifiers {
             self.contentType = contentType
         }
 
+        /**
+         Decodes the response data of the specified `Task` instance into an instance of the `Element` type specified during initialization.
+
+         - Parameter task: The `Task` instance whose response data is to be decoded.
+         - Returns: A `TaskResult` instance containing the decoded data.
+         - Throws: If the decoding operation fails.
+         */
         public func task(_ task: Content) async throws -> TaskResult<Element> {
             let result = try await task.response()
 
@@ -67,6 +86,14 @@ extension Modifiers.Decode {
 
 extension Task where Element == TaskResult<Data> {
 
+    /**
+     Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original `Task`.
+
+     - Parameters:
+        - type: The type to decode the response data into.
+        - decoder: The `JSONDecoder` instance to use for the decoding operation.
+     - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
+     */
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
@@ -74,6 +101,14 @@ extension Task where Element == TaskResult<Data> {
         modify(Modifiers.Decode(type, decoder: decoder, contentType: .plain))
     }
 
+    /**
+     Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original `Task`, assuming the response data is an array.
+
+     - Parameters:
+        - type: The type to decode the response data into.
+        - decoder: The `JSONDecoder` instance to use for the decoding operation.
+     - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
+     */
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
@@ -81,6 +116,14 @@ extension Task where Element == TaskResult<Data> {
         modify(Modifiers.Decode(type, decoder: decoder, contentType: .array))
     }
 
+    /**
+     Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original `Task`, assuming the response data is a dictionary.
+
+     - Parameters:
+        - type: The type to decode the response data into.
+        - decoder: The `JSONDecoder` instance to use for the decoding operation.
+     - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
+     */
     public func decode<Key: Decodable, Value: Decodable>(
         _ type: [Key: Value].Type,
         decoder: JSONDecoder = .init()

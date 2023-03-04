@@ -13,7 +13,6 @@ public struct StatusCodeSet: SetAlgebra {
 
     private var statusCodes: Set<StatusCode>
 
-
     private init(statusCodes: Set<StatusCode>) {
         self.statusCodes = statusCodes
     }
