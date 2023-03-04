@@ -38,8 +38,8 @@ import Foundation
      BaseURL("api.example.com")
 
      Group {
-         Get("/users")
-         Post("/users", body: user)
+         Path("users")
+         Query(user.id, forKey: "id")
      }
  }
  ```

@@ -26,7 +26,7 @@
 
 import Foundation
 
-public struct PKCS12 {
+struct PKCS12 {
 
     let label: String?
     let keyID: Data?
@@ -34,7 +34,7 @@ public struct PKCS12 {
     let certChain: [SecTrust]?
     let identity: SecIdentity?
 
-    public init?(_ data: Data, password: String) {
+    init?(_ data: Data, password: String) {
         let importPasswordOption = [kSecImportExportPassphrase as NSString: password]
         var items: CFArray?
         let secError = SecPKCS12Import(data as CFData, importPasswordOption as CFDictionary, &items)

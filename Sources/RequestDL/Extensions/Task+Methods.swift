@@ -28,6 +28,17 @@ import Foundation
 
 extension Task {
 
+    /**
+     A convenience method to send a simple ping request to the server and wait for the response.
+
+     - Parameters:
+        - times: Number of times the ping should be sent. Default value is 1.
+        - debug: A flag to indicate whether or not to print debug information. Default value is true.
+
+     - Throws: An error if the ping request fails.
+
+     - Returns: Nothing. This function only waits for the server to respond to the ping request.
+     */
     public func ping(_ times: Int = 1, debug: Bool = true) async throws {
         guard times > 0 else {
             fatalError()
