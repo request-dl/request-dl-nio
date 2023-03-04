@@ -26,10 +26,18 @@
 
 import Foundation
 
+/**
+ An enumeration that represents the type of token used for authorization.
+
+ - `basic`: Basic authorization token type.
+ - `bearer`: Bearer authorization token type.
+ */
 extension Authorization {
 
     public enum TokenType: String {
+        /// Basic authorization token type.
         case basic = "Basic"
+        /// Bearer authorization token type.
         case bearer = "Bearer"
     }
 }

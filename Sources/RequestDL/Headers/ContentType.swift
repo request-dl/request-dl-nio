@@ -26,53 +26,136 @@
 
 import Foundation
 
-public enum ContentType {
+/**
+ The ContentType struct is used to define the media type of the data in the HTTP request.
 
-    case json
-    case xml
+ Usage:
 
-    case formData
+ ```swift
+ let contentType: ContentType = .json
+ ```
 
-    /**
-     The `x-www-form-urlencoded` can be sent via URL parameters or in the body.
+ - Note: For a complete list of the available types, please see the corresponding static properties.
 
-     However, the correct submission format to the API must be verified as per `key1=value1&key2=value2`.
-     When using Body, use init via String.
-     */
-    case formURLEncoded
+ - Important: The `.custom` static function should be used to specify a media type not included in the predefined static properties.
+ */
+public struct ContentType {
 
-    case text
-    case html
-    case css
-    case javascript
+    let rawValue: String
 
-    case gif
-    case png
-    case jpeg
-    case bmp
-    case webp
-
-    case midi
-    case mpeg
-    case wav
-
-    case pdf
-
-    case custom(String)
-}
-
-extension ContentType: ExpressibleByStringLiteral {
-
-    public typealias StringLiteralType = String
-
-    public init(stringLiteral value: String) {
-        self = .custom(value)
+    init(rawValue: String) {
+        self.rawValue = rawValue
     }
 }
 
-extension ContentType: CaseIterable {
+extension ContentType {
 
-    public static var allCases: [ContentType] {
+    /// Creates a custom content type with the given raw value.
+    ///
+    /// - Parameter value: The raw value of the content type.
+    public static func custom(_ value: String) -> ContentType {
+        .init(rawValue: value)
+    }
+}
+
+extension ContentType {
+
+    /// Content type for JSON data.
+    public static var json: ContentType {
+        .init(rawValue: "application/json")
+    }
+
+    /// Content type for XML data.
+    public static var xml: ContentType {
+        .init(rawValue: "application/xml")
+    }
+
+    /// Content type for form data with files.
+    public static var formData: ContentType {
+        .init(rawValue: "form-data")
+    }
+
+    /**
+     Content type for form data in the `x-www-form-urlencoded` format.
+
+     This type can be sent via URL parameters or in the body, but the correct submission format to the API must be verified as per `key1=value1&key2=value2`.
+     When using `Payload`, use init via String.
+     */
+    public static var formURLEncoded: ContentType {
+        .init(rawValue: "application/x-www-form-urlencoded")
+    }
+
+    /// Content type for plain text data.
+    public static var text: ContentType {
+        .init(rawValue: "text/plain")
+    }
+
+    /// Content type for HTML data.
+    public static var html: ContentType {
+        .init(rawValue: "text/html")
+    }
+
+    /// Content type for CSS data.
+    public static var css: ContentType {
+        .init(rawValue: "text/css")
+    }
+
+    /// Content type for JavaScript data.
+    public static var javascript: ContentType {
+        .init(rawValue: "text/javascript")
+    }
+
+    /// Content type for GIF images.
+    public static var gif: ContentType {
+        .init(rawValue: "image/gif")
+    }
+
+    /// Content type for PNG images.
+    public static var png: ContentType {
+        .init(rawValue: "image/png")
+    }
+
+    /// Content type for JPEG images.
+    public static var jpeg: ContentType {
+        .init(rawValue: "image/jpeg")
+    }
+
+    /// Content type for BMP images.
+    public static var bmp: ContentType {
+        .init(rawValue: "image/bmp")
+    }
+
+    /// Content type for WebP images.
+    public static var webp: ContentType {
+        .init(rawValue: "image/webp")
+    }
+
+    /// Content type for MIDI audio.
+    public static var midi: ContentType {
+        .init(rawValue: "audio/midi")
+    }
+
+    /// Content type for MPEG audio.
+    public static var mpeg: ContentType {
+        .init(rawValue: "audio/mpeg")
+    }
+
+    /// Content type for WAV audio.
+    public static var wav: ContentType {
+        .init(rawValue: "audio/wav")
+    }
+
+    /// Content type for PDF files.
+    public static var pdf: ContentType {
+        .init(rawValue: "application/pdf")
+    }
+}
+
+
+extension ContentType {
+
+    /// A collection of all available content types.
+    static var allCases: [ContentType] {
         [
             .json, .xml, .formData, .formURLEncoded,
             .text, .html, .css, .javascript,
@@ -80,53 +163,5 @@ extension ContentType: CaseIterable {
             .midi, .mpeg, .wav,
             .pdf
         ]
-    }
-}
-
-extension ContentType {
-    public var rawValue: String {
-        switch self {
-        case .json:
-            return "application/json"
-        case .xml:
-            return "application/xml"
-        case .formData:
-            return "form-data"
-        case .formURLEncoded:
-            return "application/x-www-form-urlencoded"
-
-        case .text:
-            return "text/plain"
-        case .html:
-            return "text/html"
-        case .css:
-            return "text/css"
-        case .javascript:
-            return "text/javascript"
-
-        case .gif:
-            return "image/gif"
-        case .png:
-            return "image/png"
-        case .jpeg:
-            return "image/jpeg"
-        case .bmp:
-            return "image/bmp"
-        case .webp:
-            return "image/webp"
-
-        case .midi:
-            return "audio/midi"
-        case .mpeg:
-            return "audio/mpeg"
-        case .wav:
-            return "audio/wav"
-
-        case .pdf:
-            return "application/pdf"
-
-        case .custom(let string):
-            return string
-        }
     }
 }
