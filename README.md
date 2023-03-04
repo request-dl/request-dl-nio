@@ -55,7 +55,7 @@ try await DataTask {
 }
 .logInConsole(true)
 .decode(GoogleResponse.self)
-.ignoreResponse()
+.extractPayload()
 .response()
 ```
 

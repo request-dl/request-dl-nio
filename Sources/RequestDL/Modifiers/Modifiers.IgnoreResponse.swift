@@ -29,21 +29,31 @@ import Foundation
 extension Modifiers {
 
     /**
-     A task modifier that ignores the response data and only returns the data.
+     A task modifier that extracts only the payload from a task result.
 
-     This modifier can be useful in cases where the response is not needed, but
-     only the data.
+     This modifier can be useful in cases where only the payload data is required, and the
+     URLResponse is not needed.
+
+     - Note: This modifier is not appropriate when the payload type is `Void`.
+
+     ```
+     try await DataTask {
+         BaseURL("jsonplaceholder.typicode.com")
+         Path("todos/1")
+     }
+     .decode(Todo.self)
+     .extractPayload()
+     ```
      */
-    public struct IgnoreResponse<Content: Task, Element>: TaskModifier where Content.Element == TaskResult<Element> {
+    public struct ExtractPayload<Content: Task, Element>: TaskModifier where Content.Element == TaskResult<Element> {
 
         init() {}
 
         /**
-         Modifies the task to ignore the response and only return the data.
+         Modifies the task to extract only the payload from a task result.
 
          - Parameter task: The task to modify.
-
-         - Returns: A new instance of `Element` type that contains only the data.
+         - Returns: A new instance of `Payload` type that contains only the payload data.
          */
         public func task(_ task: Content) async throws -> Element {
             try await task.response().data
@@ -54,11 +64,11 @@ extension Modifiers {
 extension Task {
 
     /**
-     Modifies the task to ignore the response and only return the data.
+     Modifies the task to ignore the URLResponse and only return the data.
 
      - Returns: A new modified task that contains only the data.
      */
-    public func ignoreResponse<T>() -> ModifiedTask<Modifiers.IgnoreResponse<Self, T>> where Element == TaskResult<T> {
-        modify(Modifiers.IgnoreResponse())
+    public func extractPayload<T>() -> ModifiedTask<Modifiers.ExtractPayload<Self, T>> where Element == TaskResult<T> {
+        modify(Modifiers.ExtractPayload())
     }
 }
