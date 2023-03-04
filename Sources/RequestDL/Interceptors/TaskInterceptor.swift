@@ -57,7 +57,7 @@ import Foundation
  - Warning: It is the responsibility of the interceptor to handle errors that may occur
  during the task execution.
  */
-public protocol TaskInterceptor {
+public protocol TaskInterceptor<Element> {
 
     associatedtype Element
 

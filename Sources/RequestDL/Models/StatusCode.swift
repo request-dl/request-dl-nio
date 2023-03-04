@@ -7,279 +7,236 @@
 
 import Foundation
 
+/**
+ The HTTP status code for a response.
+
+ Usage:
+
+ ```swift
+ let statusCode: StatusCode = .continue
+ ```
+
+ - Note: For a complete list of the available status codes, please see the corresponding static
+ properties.
+
+ - Important: If the status code is not included in the predefined static properties, use
+ a integer literal to initialize an instance of StatusCode.
+
+ The StatusCode struct conforms to the `ExpressibleByIntegerLiteral` protocol, allowing
+ it to be initialized with a integer literal, like so:
+
+ ```swift
+ let customStatusCode: StatusCode = 99
+ ```
+*/
 public struct StatusCode {
 
     let rawValue: Int
 
-    init(rawValue: Int) {
+    /// Initializes a status code with the provided integer value.
+    ///
+    /// - Parameter rawValue: The integer value of the status code.
+    public init(_ rawValue: Int) {
         self.rawValue = rawValue
     }
 }
 
 extension StatusCode {
 
-    public static func custom(_ rawValue: Int) -> StatusCode {
-        .init(rawValue: rawValue)
-    }
+    /// The 101 Switching Continue status code.
+    public static let `continue`: StatusCode = 100
+
+    /// The 101 Switching Protocols status code.
+    public static let switchingProtocols: StatusCode = 101
+
+    /// The 102 Processing status code.
+    public static let processing: StatusCode = 102
 }
 
 extension StatusCode {
 
-    static var `continue`: StatusCode {
-        .init(rawValue: 100)
-    }
+    /// The 200 OK status code.
+    public static let ok: StatusCode = 200
 
-    static var switchingProtocols: StatusCode {
-        .init(rawValue: 101)
-    }
+    /// The 201 Created status code.
+    public static let created: StatusCode = 201
 
-    static var processing: StatusCode {
-        .init(rawValue: 102)
-    }
+    /// The 202 Accepted status code.
+    public static let accepted: StatusCode = 202
+
+    /// The 203 Non-Authoritative Information status code.
+    public static let nonAuthoritativeInformation: StatusCode = 203
+
+    /// The 204 No Content status code.
+    public static let noContent: StatusCode = 204
+
+    /// The 205 Reset Content status code.
+    public static let resetContent: StatusCode = 205
+
+    /// The 206 Partial Content status code.
+    public static let partialContent: StatusCode = 206
+
+    /// The 207 Multi-Status status code.
+    public static let multiStatus: StatusCode = 207
+
+    /// The 208 Already Reported status code.
+    public static let alreadyReported: StatusCode = 208
+
+    /// The 226 IM Used status code.
+    public static let imUsed: StatusCode = 226
 }
 
 extension StatusCode {
 
-    static var ok: StatusCode {
-        .init(rawValue: 200)
-    }
+    /// The 300 Multiple Choices status code.
+    public static let multipleChoices: StatusCode = 300
 
-    static var created: StatusCode {
-        .init(rawValue: 201)
-    }
+    /// The 301 Moved Permanently status code.
+    public static let movedPermanently: StatusCode = 301
 
-    static var accepted: StatusCode {
-        .init(rawValue: 202)
-    }
+    /// The 302 Found status code.
+    public static let found: StatusCode = 302
 
-    static var nonAuthoritativeInformation: StatusCode {
-        .init(rawValue: 203)
-    }
+    /// The 303 See Other status code.
+    public static let seeOther: StatusCode = 303
 
-    static var noContent: StatusCode {
-        .init(rawValue: 204)
-    }
+    /// The 304 Not Modified status code.
+    public static let notModified: StatusCode = 304
 
-    static var resetContent: StatusCode {
-        .init(rawValue: 205)
-    }
+    /// The 305 Use Proxy status code.
+    public static let useProxy: StatusCode = 305
 
-    static var partialContent: StatusCode {
-        .init(rawValue: 206)
-    }
+    /// The 307 Temporary Redirect status code.
+    public static let temporaryRedirect: StatusCode = 307
 
-    static var multiStatus: StatusCode {
-        .init(rawValue: 207)
-    }
-
-    static var alreadyReported: StatusCode {
-        .init(rawValue: 208)
-    }
-
-    static var imUsed: StatusCode {
-        .init(rawValue: 226)
-    }
+    /// The 308 Permanent Redirect status code.
+    public static let permanentRedirect: StatusCode = 308
 }
 
 extension StatusCode {
 
-    static var multipleChoices: StatusCode {
-        .init(rawValue: 300)
-    }
+    /// The 400 Bad Request status code.
+    public static let badRequest: StatusCode = 400
 
-    static var movedPermanently: StatusCode {
-        .init(rawValue: 301)
-    }
+    /// The 401 Unauthorized status code.
+    public static let unauthorized: StatusCode = 401
 
-    static var found: StatusCode {
-        .init(rawValue: 302)
-    }
+    /// The 402 Payment Required status code.
+    public static let paymentRequired: StatusCode = 402
 
-    static var seeOther: StatusCode {
-        .init(rawValue: 303)
-    }
+    /// The 403 Forbidden status code.
+    public static let forbidden: StatusCode = 403
 
-    static var notModified: StatusCode {
-        .init(rawValue: 304)
-    }
+    /// The 404 Not Found status code.
+    public static let notFound: StatusCode = 404
 
-    static var useProxy: StatusCode {
-        .init(rawValue: 305)
-    }
+    /// The 405 Method Not Allowed status code.
+    public static let methodNotAllowed: StatusCode = 405
 
-    static var temporaryRedirect: StatusCode {
-        .init(rawValue: 307)
-    }
+    /// The 406 Not Acceptable status code.
+    public static let notAcceptable: StatusCode = 406
 
-    static var permanentRedirect: StatusCode {
-        .init(rawValue: 308)
-    }
+    /// The 407 Proxy Authentication Required status code.
+    public static let proxyAuthenticationRequired: StatusCode = 407
+
+    /// The 408 Request Timeout status code.
+    public static let requestTimeout: StatusCode = 408
+
+    /// The 409 Conflict status code.
+    public static let conflict: StatusCode = 409
+
+    /// The 410 Gone status code.
+    public static let gone: StatusCode = 410
+
+    /// The 411 Length Required status code.
+    public static let lengthRequired: StatusCode = 411
+
+    /// The 412 Precondition Failed status code.
+    public static let preconditionFailed: StatusCode = 412
+
+    /// The 413 Payload Too Large status code.
+    public static let payloadTooLarge: StatusCode = 413
+
+    /// The 414 URI Too Long status code.
+    public static let uriTooLong: StatusCode = 414
+
+    /// The 415 Unsupported Media Type status code.
+    public static let unsupportedMediaType: StatusCode = 415
+
+    /// The 416 Range Not Satisfiable status code.
+    public static let rangeNotSatisfiable: StatusCode = 416
+
+    /// The 417 Expectation Failed status code.
+    public static let expectationFailed: StatusCode = 417
+
+    /// The 418 IM A Teapot status code.
+    public static let imATeapot: StatusCode = 418
+
+    /// The 421 Misdirected Request status code.
+    public static let misdirectedRequest: StatusCode = 421
+
+    /// The 422 Unprocessable Entity status code.
+    public static let unprocessableEntity: StatusCode = 422
+
+    /// The 423 Locked status code.
+    public static let locked: StatusCode = 423
+
+    /// The 424 Failed Dependency status code.
+    public static let failedDependency: StatusCode = 424
+
+    /// The 425 Too Early status code.
+    public static let tooEarly: StatusCode = 425
+
+    /// The 426 Upgrade Required status code.
+    public static let upgradeRequired: StatusCode = 426
+
+    /// The 428 Precondition Required status code.
+    public static let preconditionRequired: StatusCode = 428
+
+    /// The 429 Too Many Requests status code.
+    public static let tooManyRequests: StatusCode = 429
+
+    /// The 431 Request Header Fields Too Large status code.
+    public static let requestHeaderFieldsTooLarge: StatusCode = 431
+
+    /// The 451 Unavailable For Legal Reasons status code.
+    public static let unavailableForLegalReasons: StatusCode = 451
 }
 
 extension StatusCode {
 
-    static var badRequest: StatusCode {
-        .init(rawValue: 400)
-    }
+    /// The 500 Internal Server Error status code.
+    public static let internalServerError: StatusCode = 500
 
-    static var unauthorized: StatusCode {
-        .init(rawValue: 401)
-    }
+    /// The 501 Not Implemented status code.
+    public static let notImplemented: StatusCode = 501
 
-    static var paymentRequired: StatusCode {
-        .init(rawValue: 402)
-    }
+    /// The 502 Bad Gateway status code.
+    public static let badGateway: StatusCode = 502
 
-    static var forbidden: StatusCode {
-        .init(rawValue: 403)
-    }
+    /// The 503 Service Unavailable status code.
+    public static let serviceUnavailable: StatusCode = 503
 
-    static var notFound: StatusCode {
-        .init(rawValue: 404)
-    }
+    /// The 504 Gateway Timeout status code.
+    public static let gatewayTimeout: StatusCode = 504
 
-    static var methodNotAllowed: StatusCode {
-        .init(rawValue: 405)
-    }
+    /// The 505 HTTP Version Not Supported status code.
+    public static let httpVersionNotSupported: StatusCode = 505
 
-    static var notAcceptable: StatusCode {
-        .init(rawValue: 406)
-    }
+    /// The 506 Variant Also Negotiates status code.
+    public static let variantAlsoNegotiates: StatusCode = 506
 
-    static var proxyAuthenticationRequired: StatusCode {
-        .init(rawValue: 407)
-    }
+    /// The 507 Insufficient Storage status code.
+    public static let insufficientStorage: StatusCode = 507
 
-    static var requestTimeout: StatusCode {
-        .init(rawValue: 408)
-    }
+    /// The 508 Loop Detected status code.
+    public static let loopDetected: StatusCode = 508
 
-    static var conflict: StatusCode {
-        .init(rawValue: 409)
-    }
+    /// The 510 Not Extended status code.
+    public static let notExtended: StatusCode = 510
 
-    static var gone: StatusCode {
-        .init(rawValue: 410)
-    }
-
-    static var lengthRequired: StatusCode {
-        .init(rawValue: 411)
-    }
-
-    static var preconditionFailed: StatusCode {
-        .init(rawValue: 412)
-    }
-
-    static var payloadTooLarge: StatusCode {
-        .init(rawValue: 413)
-    }
-
-    static var uriTooLong: StatusCode {
-        .init(rawValue: 414)
-    }
-
-    static var unsupportedMediaType: StatusCode {
-        .init(rawValue: 415)
-    }
-
-    static var rangeNotSatisfiable: StatusCode {
-        .init(rawValue: 416)
-    }
-
-    static var expectationFailed: StatusCode {
-        .init(rawValue: 417)
-    }
-
-    static var iAmATeapot: StatusCode {
-        .init(rawValue: 418)
-    }
-
-    static var misdirectedRequest: StatusCode {
-        .init(rawValue: 421)
-    }
-
-    static var unprocessableEntity: StatusCode {
-        .init(rawValue: 422)
-    }
-
-    static var locked: StatusCode {
-        .init(rawValue: 423)
-    }
-
-    static var failedDependency: StatusCode {
-        .init(rawValue: 424)
-    }
-
-    static var tooEarly: StatusCode {
-        .init(rawValue: 425)
-    }
-
-    static var upgradeRequired: StatusCode {
-        .init(rawValue: 426)
-    }
-
-    static var preconditionRequired: StatusCode {
-        .init(rawValue: 428)
-    }
-
-    static var tooManyRequests: StatusCode {
-        .init(rawValue: 429)
-    }
-
-    static var requestHeaderFieldsTooLarge: StatusCode {
-        .init(rawValue: 431)
-    }
-
-    static var unavailableForLegalReasons: StatusCode {
-        .init(rawValue: 451)
-    }
-}
-
-extension StatusCode {
-
-    static var internalServerError: StatusCode {
-        .init(rawValue: 500)
-    }
-
-    static var notImplemented: StatusCode {
-        .init(rawValue: 501)
-    }
-
-    static var badGateway: StatusCode {
-        .init(rawValue: 502)
-    }
-
-    static var serviceUnavailable: StatusCode {
-        .init(rawValue: 503)
-    }
-
-    static var gatewayTimeout: StatusCode {
-        .init(rawValue: 504)
-    }
-
-    static var httpVersionNotSupported: StatusCode {
-        .init(rawValue: 505)
-    }
-
-    static var variantAlsoNegotiates: StatusCode {
-        .init(rawValue: 506)
-    }
-
-    static var insufficientStorage: StatusCode {
-        .init(rawValue: 507)
-    }
-
-    static var loopDetected: StatusCode {
-        .init(rawValue: 508)
-    }
-
-    static var notExtended: StatusCode {
-        .init(rawValue: 510)
-    }
-
-    static var networkAuthenticationRequired: StatusCode {
-        .init(rawValue: 511)
-    }
+    /// The 511 Network Authentication Required status code.
+    public static let networkAuthenticationRequired: StatusCode = 511
 }
 
 extension StatusCode: Hashable {
@@ -290,5 +247,22 @@ extension StatusCode: Hashable {
 
     public func hash(into hasher: inout Hasher) {
         rawValue.hash(into: &hasher)
+    }
+}
+
+extension StatusCode: ExpressibleByIntegerLiteral {
+
+    /// Creates a new `StatusCode` instance with the specified integer literal value.
+    ///
+    /// - Parameter value: The integer literal value.
+    public init(integerLiteral value: IntegerLiteralType) {
+        self.init(value)
+    }
+}
+
+extension StatusCode: Comparable {
+
+    public static func < (_ lhs: StatusCode, _ rhs: StatusCode) -> Bool {
+        lhs.rawValue < rhs.rawValue
     }
 }

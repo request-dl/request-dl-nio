@@ -26,21 +26,71 @@
 
 import Foundation
 
-/**
- Defines constants for the communication protocol used on the Internet.
+public struct InternetProtocol {
 
- These constants are used in URL initialization to define which communication
- protocol will be used for transmission. Possible protocols include HTTP, HTTPS,
- FTP, SMTP, IMAP, POP, DNS, SSH, and Telnet.
- */
-public enum InternetProtocol: String {
-    case http
-    case https
-    case ftp
-    case smtp
-    case imap
-    case pop
-    case dns
-    case ssh
-    case telnet
+    let rawValue: String
+
+    init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+}
+
+extension InternetProtocol {
+
+    public static var http: InternetProtocol {
+        .init(rawValue: "http")
+    }
+
+    public static var https: InternetProtocol {
+        .init(rawValue: "https")
+    }
+
+    public static var ftp: InternetProtocol {
+        .init(rawValue: "ftp")
+    }
+
+    public static var smtp: InternetProtocol {
+        .init(rawValue: "smtp")
+    }
+
+    public static var imap: InternetProtocol {
+        .init(rawValue: "imap")
+    }
+
+    public static var pop: InternetProtocol {
+        .init(rawValue: "pop")
+    }
+
+    public static var dns: InternetProtocol {
+        .init(rawValue: "dns")
+    }
+
+    public static var ssh: InternetProtocol {
+        .init(rawValue: "ssh")
+    }
+
+    public static var telnet: InternetProtocol {
+        .init(rawValue: "telnet")
+    }
+}
+
+extension InternetProtocol: Equatable {
+
+    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.rawValue == rhs.rawValue
+    }
+}
+
+extension InternetProtocol: Hashable {
+
+    public func hash(into hasher: inout Hasher) {
+        rawValue.hash(into: &hasher)
+    }
+}
+
+extension InternetProtocol: ExpressibleByStringLiteral {
+
+    public init(stringLiteral value: StringLiteralType) {
+        self.init(rawValue: value)
+    }
 }

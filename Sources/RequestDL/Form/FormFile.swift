@@ -72,13 +72,13 @@ public struct FormFile: Property {
         self.fileManager = fileManager
 
         guard let fileExtension = url.absoluteString.split(separator: ".").last else {
-            self.contentType = .custom("any")
+            self.contentType = "any"
             return
         }
 
         self.contentType = .allCases.first(where: {
             $0.rawValue.contains(fileExtension)
-        }) ?? .custom("\(fileExtension)")
+        }) ?? ContentType(fileExtension)
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.

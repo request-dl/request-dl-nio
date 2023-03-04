@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// A set of HTTP status codes.
 public struct StatusCodeSet: SetAlgebra {
 
     public typealias Element = StatusCode
@@ -17,6 +18,7 @@ public struct StatusCodeSet: SetAlgebra {
         self.statusCodes = statusCodes
     }
 
+    /// Creates an empty set
     public init() {
         self.init(statusCodes: [])
     }
@@ -26,6 +28,9 @@ public struct StatusCodeSet: SetAlgebra {
     ) where S.Element == StatusCode {
         self.init(statusCodes: .init(sequence))
     }
+}
+
+extension StatusCodeSet {
 
     public func union(_ other: __owned StatusCodeSet) -> StatusCodeSet {
         .init(statusCodes: statusCodes.union(other.statusCodes))
@@ -70,26 +75,15 @@ public struct StatusCodeSet: SetAlgebra {
     }
 }
 
-extension StatusCodeSet: ExpressibleByArrayLiteral {
-
-    public typealias ArrayLiteralElement = Element
-
-    public init(arrayLiteral elements: Element...) {
-        statusCodes = .init(elements)
-    }
-}
-
 extension StatusCodeSet {
 
-    public static var success: StatusCodeSet {
-        .init((200 ..< 300).map {
-            StatusCode.custom($0)
-        })
-    }
+    /// A set containing all HTTP status codes in the range of 200 to 299.
+    public static let success: StatusCodeSet = {
+        StatusCodeSet((200 ..< 300).map(StatusCode.init(_:)))
+    }()
 
-    public static var successAndRedirect: StatusCodeSet {
-        .init((200 ..< 400).map {
-            StatusCode.custom($0)
-        })
-    }
+    /// A set containing all HTTP status codes in the range of 200 to 399.
+    public static let successAndRedirect: StatusCodeSet = {
+        StatusCodeSet((200 ..< 400).map(StatusCode.init(_:)))
+    }()
 }

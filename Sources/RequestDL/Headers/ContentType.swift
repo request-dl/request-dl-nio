@@ -38,44 +38,40 @@ import Foundation
  - Note: For a complete list of the available types, please see the corresponding static
  properties.
 
- - Important: The `.custom` static function should be used to specify a media type not
- included in the predefined static properties.
+ - Important: If the media type is not included in the predefined static properties, use
+ a string literal to initialize an instance of ContentType.
+
+ The ContentType struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
+ it to be initialized with a string literal, like so:
+
+ ```swift
+ let customContentType: ContentType = "application/custom"
+ ```
  */
 public struct ContentType {
 
     let rawValue: String
 
-    init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-}
+    /**
+     Initializes a `ContentType` instance with a given string value.
 
-extension ContentType {
-
-    /// Creates a custom content type with the given raw value.
-    ///
-    /// - Parameter value: The raw value of the content type.
-    public static func custom(_ value: String) -> ContentType {
-        .init(rawValue: value)
+     - Parameter rawValue: The string value of the content type.
+     */
+    public init<S: StringProtocol>(_ rawValue: S) {
+        self.rawValue = String(rawValue)
     }
 }
 
 extension ContentType {
 
     /// Content type for JSON data.
-    public static var json: ContentType {
-        .init(rawValue: "application/json")
-    }
+    public static let json: ContentType = "application/json"
 
     /// Content type for XML data.
-    public static var xml: ContentType {
-        .init(rawValue: "application/xml")
-    }
+    public static let xml: ContentType = "application/xml"
 
     /// Content type for form data with files.
-    public static var formData: ContentType {
-        .init(rawValue: "form-data")
-    }
+    public static let formData: ContentType = "form-data"
 
     /**
      Content type for form data in the `x-www-form-urlencoded` format.
@@ -85,79 +81,50 @@ extension ContentType {
 
      - Warning: When using `Payload`, use init via String.
      */
-    public static var formURLEncoded: ContentType {
-        .init(rawValue: "application/x-www-form-urlencoded")
-    }
+    public static let formURLEncoded: ContentType = "application/x-www-form-urlencoded"
 
     /// Content type for plain text data.
-    public static var text: ContentType {
-        .init(rawValue: "text/plain")
-    }
+    public static let text: ContentType = "text/plain"
 
     /// Content type for HTML data.
-    public static var html: ContentType {
-        .init(rawValue: "text/html")
-    }
+    public static let html: ContentType = "text/html"
 
     /// Content type for CSS data.
-    public static var css: ContentType {
-        .init(rawValue: "text/css")
-    }
+    public static let css: ContentType = "text/css"
 
     /// Content type for JavaScript data.
-    public static var javascript: ContentType {
-        .init(rawValue: "text/javascript")
-    }
+    public static let javascript: ContentType = "text/javascript"
 
     /// Content type for GIF images.
-    public static var gif: ContentType {
-        .init(rawValue: "image/gif")
-    }
+    public static let gif: ContentType = "image/gif"
 
     /// Content type for PNG images.
-    public static var png: ContentType {
-        .init(rawValue: "image/png")
-    }
+    public static let png: ContentType = "image/png"
 
     /// Content type for JPEG images.
-    public static var jpeg: ContentType {
-        .init(rawValue: "image/jpeg")
-    }
+    public static let jpeg: ContentType = "image/jpeg"
 
     /// Content type for BMP images.
-    public static var bmp: ContentType {
-        .init(rawValue: "image/bmp")
-    }
+    public static let bmp: ContentType = "image/bmp"
 
     /// Content type for WebP images.
-    public static var webp: ContentType {
-        .init(rawValue: "image/webp")
-    }
+    public static let webp: ContentType = "image/webp"
 
     /// Content type for MIDI audio.
-    public static var midi: ContentType {
-        .init(rawValue: "audio/midi")
-    }
+    public static let midi: ContentType = "audio/midi"
 
     /// Content type for MPEG audio.
-    public static var mpeg: ContentType {
-        .init(rawValue: "audio/mpeg")
-    }
+    public static let mpeg: ContentType = "audio/mpeg"
 
     /// Content type for WAV audio.
-    public static var wav: ContentType {
-        .init(rawValue: "audio/wav")
-    }
+    public static let wav: ContentType = "audio/wav"
 
     /// Content type for PDF files.
-    public static var pdf: ContentType {
-        .init(rawValue: "application/pdf")
-    }
+    public static let pdf: ContentType = "application/pdf"
 }
 
 extension ContentType {
 
-    /// A collection of all available content types.
     static var allCases: [ContentType] {
         [
             .json, .xml, .formData, .formURLEncoded,
@@ -169,13 +136,31 @@ extension ContentType {
     }
 }
 
-extension ContentType: Hashable {
+extension ContentType: Equatable {
 
     public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         lhs.rawValue == rhs.rawValue
     }
+}
+
+extension ContentType: Hashable {
 
     public func hash(into hasher: inout Hasher) {
         rawValue.hash(into: &hasher)
+    }
+}
+
+extension ContentType: ExpressibleByStringLiteral {
+
+    /**
+     Initializes a `ContentType` instance using a string literal.
+
+     - Parameter value: A string literal representing the media type.
+     - Returns: An instance of `ContentType` with the specified media type.
+
+     - Note: Use this initializer to create a `ContentType` instance from a string literal.
+     */
+    public init(stringLiteral value: StringLiteralType) {
+        self.init(value)
     }
 }

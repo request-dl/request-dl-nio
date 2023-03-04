@@ -28,7 +28,21 @@ import Foundation
 
 extension Modifiers {
 
-    /// A modifier that applies a transformation on the task result by flat-mapping it to a new element.
+    /**
+     A modifier that allows flat-mapping the result of a `Task` to a new element type.
+
+     `Content` is the type of the original `Task`, and `NewElement` is the type of the new
+     element that the result will be flat-mapped to.
+
+     Example:
+
+     ```swift
+     DataTask { ... }
+         .flatMap { result in
+             // transform result to new element type
+         }
+     ```
+     */
     public struct FlatMap<Content: Task, NewElement>: TaskModifier {
 
         private let flatMapHandler: (Result<Content.Element, Error>) throws -> NewElement
@@ -38,9 +52,9 @@ extension Modifiers {
         }
 
         /**
-         Transforms the task result by flat-mapping it to a new element.
+         Transforms the result of a `Task` to a new element type.
 
-         - Parameter task: The task to modify.
+         - Parameter task: The original `Task`.
          - Throws: An error if the transformation fails.
          - Returns: The result of the transformation.
          */
@@ -90,13 +104,10 @@ private extension Modifiers.FlatMap {
 extension Task {
 
     /**
-     Returns a new instance of `ModifiedTask` that applies the `FlatMap` modifier to the
-     original `Task`, applying a transformation on the task result by flat-mapping it to a new
-     element.
+     Flat-maps the result of a `Task` to a new element type.
 
-     - Parameters:
-        - flatMapHandler: The flat-mapping closure to transform the result into a new element.
-     - Returns: A new instance of `ModifiedTask` with the `FlatMap` modifier applied.
+     - Parameters flatMapHandler: A closure that takes the result of the `Task` and transforms it to a new element type.
+     - Returns: A new `Task` that returns the flat-mapped element of type `NewElement`.
      */
     public func flatMap<NewElement>(
         _ flatMapHandler: @escaping (Result<Element, Error>) throws -> NewElement

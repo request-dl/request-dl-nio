@@ -35,7 +35,7 @@ import Foundation
  The `task` function takes in a `Body` task and returns an `Element` value after applying
  the modification logic.
  */
-public protocol TaskModifier {
+public protocol TaskModifier<Element> {
 
     /// The type of task being modified.
     associatedtype Body: Task

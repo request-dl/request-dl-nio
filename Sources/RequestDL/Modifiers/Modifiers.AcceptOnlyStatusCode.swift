@@ -50,7 +50,7 @@ extension Modifiers {
 
             guard
                 let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(.custom(httpResponse.statusCode))
+                statusCodes.isEmpty || statusCodes.contains(StatusCode(httpResponse.statusCode))
             else {
                 throw InvalidStatusCodeError<Content.Element>(data: result)
             }

@@ -28,10 +28,23 @@ import Foundation
 
 extension Modifiers {
 
+    /**
+     A task modifier that ignores the response data and only returns the data.
+
+     This modifier can be useful in cases where the response is not needed, but
+     only the data.
+     */
     public struct IgnoreResponse<Content: Task, Element>: TaskModifier where Content.Element == TaskResult<Element> {
 
         init() {}
 
+        /**
+         Modifies the task to ignore the response and only return the data.
+
+         - Parameter task: The task to modify.
+
+         - Returns: A new instance of `Element` type that contains only the data.
+         */
         public func task(_ task: Content) async throws -> Element {
             try await task.response().data
         }
@@ -40,6 +53,11 @@ extension Modifiers {
 
 extension Task {
 
+    /**
+     Modifies the task to ignore the response and only return the data.
+
+     - Returns: A new modified task that contains only the data.
+     */
     public func ignoreResponse<T>() -> ModifiedTask<Modifiers.IgnoreResponse<Self, T>> where Element == TaskResult<T> {
         modify(Modifiers.IgnoreResponse())
     }
