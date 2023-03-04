@@ -65,7 +65,9 @@ extension DataTask {
     /**
      Returns a task result that encapsulates the response data for a request.
 
-     The `response` function is used to get the response data from a `DataTask` object. The function returns a `TaskResult<Data>` object that encapsulates the response data or any error that occurred during the request execution.
+     The `response` function is used to get the response data from a `DataTask` object. The function returns
+     a `TaskResult<Data>` object that encapsulates the response data or any error that occurred during the
+     request execution.
 
      - Returns: A `TaskResult<Data>` object that encapsulates the response data for a request.
 

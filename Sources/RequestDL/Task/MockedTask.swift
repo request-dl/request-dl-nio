@@ -87,13 +87,13 @@ extension MockedTask {
             statusCode: statusCode,
             httpVersion: nil,
             headerFields: headers
-        ) else { throw FailedToCreateURLResponseErrorFromMockedRequest() }
+        ) else { throw FailedToCreateURLResponseError() }
 
         return .init(response: response, data: data)
     }
 }
 
-public struct FailedToCreateURLResponseErrorFromMockedRequest: LocalizedError {
+public struct FailedToCreateURLResponseError: LocalizedError {
 
     init() {}
 

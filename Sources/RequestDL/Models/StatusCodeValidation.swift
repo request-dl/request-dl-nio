@@ -42,13 +42,16 @@ import Foundation
  The enumeration cases are:
 
  - `none`: No validation. This means all HTTP status codes are considered valid.
- - `success: Validates only success codes (2xx). Any other HTTP status code will be considered invalid.
+ - `success`: Validates only success codes (2xx). Any other HTTP status code will be considered invalid.
  - `successAndRedirect`: Validates success codes (2xx) and redirection codes (3xx).
- - `custom: Validates only the status codes passed in the parameter. Any other HTTP status code will be considered invalid.
+ - `custom`: Validates only the status codes passed in the parameter. Any other HTTP
+ status code will be considered invalid.
 
- The `statusCodes` property returns the list of HTTP status codes that should be considered valid, based on the enumeration case.
+ The `statusCodes` property returns the list of HTTP status codes that should be considered valid, based on the
+ enumeration case.
 
- The `validate(statusCode:)` method receives an HTTP status code and returns a boolean indicating whether it is considered valid, based on the validation type defined by the enumeration case.
+ The `validate(statusCode:)` method receives an HTTP status code and returns a boolean indicating whether
+ it is considered valid, based on the validation type defined by the enumeration case.
  */
 public enum StatusCodeValidation: Equatable {
 
@@ -58,10 +61,12 @@ public enum StatusCodeValidation: Equatable {
     /// Validates only success codes (2xx). Any other HTTP status code will be considered invalid.
     case success
 
-    /// Validates success codes (2xx) and redirection codes (3xx). Any other HTTP status code will be considered invalid.
+    /// Validates success codes (2xx) and redirection codes (3xx). Any other HTTP status code will be considered
+    /// invalid.
     case successAndRedirect
 
-    /// Validates only the status codes passed in the parameter. Any other HTTP status code will be considered invalid.
+    /// Validates only the status codes passed in the parameter. Any other HTTP status code will be considered
+    /// invalid.
     case custom([Int])
 
     /// The list of HTTP status codes to validate.
@@ -84,7 +89,8 @@ public enum StatusCodeValidation: Equatable {
      - Parameters:
         - statusCode: The HTTP status code to be validated.
 
-     - Returns: `true` if the status code is valid based on the validation type defined by the enumeration case; `false` otherwise.
+     - Returns: `true` if the status code is valid based on the validation type defined by the enumeration case;
+     `false` otherwise.
      */
     public func validate(statusCode: Int) -> Bool {
         self == .none || statusCodes.contains(statusCode)

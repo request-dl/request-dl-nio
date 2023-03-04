@@ -49,7 +49,10 @@ public struct _ConditionalRequest<
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: _ConditionalRequest<TrueRequest, FalseRequest>, _ context: Context) async {
+    public static func makeRequest(
+        _ request: _ConditionalRequest<TrueRequest, FalseRequest>,
+        _ context: Context
+    ) async {
         switch request.option {
         case .true(let request):
             await TrueRequest.makeRequest(request, context)

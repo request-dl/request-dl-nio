@@ -29,9 +29,12 @@ import Foundation
 /**
  A representation of the HTTP body data in a request.
 
- A `HTTPBody` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw `Data`.
+ A `HTTPBody` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw
+ `Data`.
 
- The body data is used in HTTP requests with the purpose of carrying information. When making a HTTP request, the request body is used to send information to the server. The server reads the information and acts upon it, for example, by returning a specific response or by modifying its behavior.
+ The body data is used in HTTP requests with the purpose of carrying information. When making a HTTP request,
+ the request body is used to send information to the server. The server reads the information and acts upon it, for
+ example, by returning a specific response or by modifying its behavior.
 
  To create a `HTTPBody`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
 

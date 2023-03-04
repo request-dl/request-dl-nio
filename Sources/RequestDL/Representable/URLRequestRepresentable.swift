@@ -29,7 +29,8 @@ import Foundation
 /**
  A type that represents an object that can update a URLRequest.
 
- You can conform to this protocol to add or modify headers, set HTTP methods, and provide other customizations to the URLRequest for a network task.
+ You can conform to this protocol to add or modify headers, set HTTP methods, and provide other customizations
+ to the URLRequest for a network task.
 
  Usage:
 
