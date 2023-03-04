@@ -26,29 +26,42 @@
 
 import Foundation
 
+/**
+ A type that represents a data task request.
+
+ After constructing your download task, you can use the `response` function to receive the
+ temporary URL where the content was saved for you, which is the default behavior on Foundation.
+ */
 public struct DownloadTask<Content: Request>: Task {
 
-    private let save: (URL) -> Void
     private let content: Content
 
-    public init(
-        save: @escaping (URL) -> Void,
-        @RequestBuilder content: () -> Content
-    ) {
-        self.save = save
+    /**
+     Initializes a new `DownloadTask` with the specified request.
+
+     - Parameter content: The content of the request.
+     */
+    public init(@RequestBuilder content: () -> Content) {
         self.content = content()
     }
 }
 
 extension DownloadTask {
 
+    /**
+     Retrieves the result of the download task that encapsulates the location where
+     the download was saved.
+
+     - Returns: A `TaskResult` that encapsulates a `URL` representing the location
+     where the download was saved.
+
+     - Throws: `Error` if there is any problem during the download.
+     */
     public func response() async throws -> TaskResult<URL> {
         let delegate = DelegateProxy()
         let (session, request) = await Resolver(content).make(delegate)
 
         defer { session.finishTasksAndInvalidate() }
-
-        delegate.onDidFinishDownloadingToLocation(save)
 
         if #available(iOS 15, tvOS 15, watchOS 8, macOS 12, *) {
             let (data, response) = try await session.download(for: request, delegate: delegate)

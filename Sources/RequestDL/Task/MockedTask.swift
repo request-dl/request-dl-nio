@@ -26,45 +26,78 @@
 
 import Foundation
 
+/**
+ A task that returns mocked data with a specific status code and headers.
+
+ Usage:
+
+ ```swift
+ MockedTask(
+     statusCode: 200,
+     headers: ["Content-Type": "application/json"],
+     data: {
+         """
+         {
+             "id": 1,
+             "name": "John Doe",
+             "email": "johndoe@example.com"
+         }
+         """.data(using: .utf8)!
+     }
+ )
+ ```
+*/
 public struct MockedTask: Task {
 
     private let statusCode: Int
     private let headers: [String: String]?
-    private let string: String
+    private let data: Data
 
+    /**
+     Initializes a new `MockedTask` with the given status code, headers and closure that returns the mocked data.
+
+     - Parameters:
+        - statusCode: The HTTP status code for the mocked response.
+        - headers: The HTTP headers for the mocked response.
+        - data: The closure that returns the mocked data.
+    */
     public init(
         statusCode: Int = 200,
         headers: [String: String]? = nil,
-        _ string: () -> String
+        data: () -> Data
     ) {
         self.statusCode = statusCode
         self.headers = headers
-        self.string = string()
+        self.data = data()
     }
 }
 
 extension MockedTask {
 
-    public func response() async throws -> TaskResult<Data> {
-        guard let data = string.data(using: .utf8) else {
-            throw ErrorKeys.encoding
-        }
+    /**
+     Executes the mocked task and returns a `TaskResult` encapsulating the mock data.
 
+     - Returns: A `TaskResult` that encapsulates a Data object containing the mock data.
+     - Throws: `MockedTaskFailedToCreateURLResponseError` if a URL response could not be created
+     from the provided status code and headers.
+     */
+    public func response() async throws -> TaskResult<Data> {
         guard let response = HTTPURLResponse(
             url: FileManager.default.temporaryDirectory,
             statusCode: statusCode,
             httpVersion: nil,
             headerFields: headers
-        ) else { throw ErrorKeys.httpResponse }
+        ) else { throw FailedToCreateURLResponseErrorFromMockedRequest() }
 
         return .init(response: response, data: data)
     }
 }
 
-extension MockedTask {
+public struct FailedToCreateURLResponseErrorFromMockedRequest: LocalizedError {
 
-    enum ErrorKeys: Error {
-        case encoding
-        case httpResponse
+    init() {}
+
+    public var errorDescription: String? {
+        "Failed to create URL response for mocked task"
     }
 }

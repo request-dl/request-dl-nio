@@ -38,7 +38,6 @@ class DelegateProxy: NSObject {
     ) -> ChallengeCredential
 
     private var didReceiveChallengeHandler: ((URLAuthenticationChallenge) -> [ChallengeCredential])?
-    private var didFinishDownloadingToLocation: ((URL) -> Void)?
 
     override init() {}
 
@@ -48,16 +47,6 @@ class DelegateProxy: NSObject {
         let old = didReceiveChallengeHandler
         didReceiveChallengeHandler = {
             (old?($0) ?? []) + [challengeHandler($0)]
-        }
-    }
-
-    func onDidFinishDownloadingToLocation(
-        _ locationHandler: @escaping (URL) -> Void
-    ) {
-        let old = didFinishDownloadingToLocation
-        didFinishDownloadingToLocation = {
-            old?($0)
-            locationHandler($0)
         }
     }
 }
@@ -127,16 +116,5 @@ extension DelegateProxy: URLSessionTaskDelegate {
         }
 
         return completionHandler(.performDefaultHandling, nil)
-    }
-}
-
-extension DelegateProxy: URLSessionDownloadDelegate {
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) {
-        didFinishDownloadingToLocation?(location)
     }
 }
