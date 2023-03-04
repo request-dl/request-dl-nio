@@ -28,10 +28,24 @@ import Foundation
 
 extension Headers {
 
+    /**
+     A header that specifies the URL of a resource from which the requested resource was obtained.
+
+     Usage:
+
+     ```swift
+     Headers.Referer("https://www.example.com/")
+     ```
+     */
     public struct Referer: Property {
 
         private let value: Any
 
+        /**
+         Initialize the `Referer` header with a URL that specifies the resource from which the requested resource was obtained.
+         
+         - Parameter url: The URL of the resource.
+         */
         public init<S: StringProtocol>(_ url: S) {
             self.value = url
         }

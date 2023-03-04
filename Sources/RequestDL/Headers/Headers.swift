@@ -26,6 +26,7 @@
 
 import Foundation
 
+/// A namespace for common HTTP headers used in requests and responses.
 public enum Headers {}
 
 extension Headers {

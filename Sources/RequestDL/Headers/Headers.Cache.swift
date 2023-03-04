@@ -28,6 +28,18 @@ import Foundation
 
 extension Headers {
 
+    /**
+     Represents the Cache Headers property that can be set in a URLRequest.
+
+     Usage:
+
+     ```swift
+     Headers.Cache()
+         .maxAge(60)
+         .cached(true)
+         .stored(true)
+     ```
+     */
     public struct Cache: Property {
 
         private let policy: URLRequest.CachePolicy?
@@ -60,12 +72,23 @@ extension Headers {
 
         var isImmutable = false
 
+        /**
+         Initializes a Cache object with default values.
+         */
         public init() {
             memoryCapacity = nil
             diskCapacity = nil
             policy = nil
         }
 
+        /**
+         Initializes a Cache object with given values.
+
+         - Parameters:
+            - policy: The cache policy to be used.
+            - memoryCapacity: The maximum amount of memory to be used for caching in bytes.
+            - diskCapacity: The maximum amount of disk space to be used for caching in bytes.
+         */
         public init(
             _ policy: URLRequest.CachePolicy,
             memoryCapacity: Int = 10_000_000,
@@ -140,22 +163,57 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
+    /**
+     Sets the "no-cache" flag to the given value.
+
+     - Parameters:
+        - flag: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func cached(_ flag: Bool) -> Self {
         edit { $0.isCached = flag }
     }
 
+    /**
+     Sets the "no-store" flag to the given value.
+
+     - Parameters:
+        - flag: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func stored(_ flag: Bool) -> Self {
         edit { $0.isStored = flag }
     }
 
+    /**
+     Sets the "no-transform" flag to the given value.
+
+     - Parameters:
+        - flag: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func transformed(_ flag: Bool) -> Self {
         edit { $0.isTransformed = flag }
     }
 
+    /**
+     Sets the "only-if-cached" flag to the given value.
+
+     - Parameters:
+        - flag: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func onlyIfCached(_ flag: Bool) -> Self {
         edit { $0.isOnlyIfCached = flag }
     }
 
+    /**
+     Sets the "public" flag to the given value.
+
+     - Parameters:
+        - flag: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func `public`(_ flag: Bool) -> Self {
         edit { $0.isPublic = flag }
     }
@@ -163,10 +221,24 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
+    /**
+     Sets the "max-age" value to the given number of seconds.
+
+     - Parameters:
+        - seconds: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func maxAge(_ seconds: Int) -> Self {
         edit { $0.maxAge = seconds }
     }
 
+    /**
+     Sets the "s-maxage" value to the given number of seconds.
+
+     - Parameters:
+        - seconds: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func sharedMaxAge(_ seconds: Int) -> Self {
         edit { $0.sharedMaxAge = seconds }
     }
@@ -174,14 +246,34 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
+    /**
+     Sets the "max-stale" value to the given number of seconds.
+
+     - Parameters:
+        - seconds: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func maxStale(_ seconds: Int) -> Self {
         edit { $0.maxStale = seconds }
     }
 
+    /**
+     Sets the "stale-while-revalidate" value to the given number of seconds.
+
+     - Parameters:
+        - seconds: The value to be set.
+     - Returns: The modified Cache object.
+     */
     public func staleWhileRevalidate(_ seconds: Int) -> Self {
         edit { $0.staleWhileRevalidate = seconds }
     }
 
+    /**
+     A method to set the `staleIfError` property value of the receiver `Cache` object.
+
+     - Parameter seconds: An `Int` value representing the number of seconds to set for the `staleIfError` property.
+     - Returns: A `Cache` object with the `staleIfError` property set to the provided value.
+     */
     public func staleIfError(_ seconds: Int) -> Self {
         edit { $0.staleIfError = seconds }
     }
@@ -189,10 +281,20 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
+    /**
+     Sets the "must-revalidate" flag.
+
+     - Returns: The modified Cache object.
+     */
     public func mustRevalidate() -> Self {
         edit { $0.needsRevalidate = true }
     }
 
+    /**
+     Sets the "proxy-revalidate" flag.
+
+     - Returns: The modified Cache object.
+     */
     public func proxyRevalidate() -> Self {
         edit { $0.needsProxyRevalidate = true }
     }
@@ -200,6 +302,11 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
+    /**
+     The `immutable()` function sets the cache's immutability flag to `true`, indicating that the cached response cannot be modified or updated by a server.
+
+     - Returns: The modified Cache object.
+     */
     public func immutable() -> Self {
         edit { $0.isImmutable = true }
     }

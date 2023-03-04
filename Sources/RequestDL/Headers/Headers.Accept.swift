@@ -28,10 +28,18 @@ import Foundation
 
 extension Headers {
 
+    /**
+    A struct that represents the `Accept` header, used to specify the desired response content type for an HTTP request.
+    */
     public struct Accept: Property {
 
         private let type: RequestDL.ContentType
 
+        /**
+         Initializes a new instance of `Accept` header for the given `ContentType`.
+
+         - Parameter contentType: The content type to be accepted.
+         */
         public init(_ contentType: RequestDL.ContentType) {
             self.type = contentType
         }

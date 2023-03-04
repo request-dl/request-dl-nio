@@ -28,10 +28,16 @@ import Foundation
 
 extension Headers {
 
+    /// A property that sets the `Content-Type` header field in an HTTP request.
     public struct ContentType: Property {
 
         private let contentType: RequestDL.ContentType
 
+        /**
+         Initializes a `ContentType` property with the specified content type.
+         
+         - Parameter contentType: The content type to be set in the `Content-Type` header field.
+         */
         public init(_ contentType: RequestDL.ContentType) {
             self.contentType = contentType
         }

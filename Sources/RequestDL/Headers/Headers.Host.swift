@@ -28,10 +28,18 @@ import Foundation
 
 extension Headers {
 
+    /// A property that represents the host of a network request.
     public struct Host: Property {
 
         private let value: Any
 
+        /**
+         Initializes a `Host` property with the given `host` and `port`.
+
+         - Parameters:
+            - host: A `StringProtocol` representing the host.
+            - port: A `StringProtocol` representing the port.
+         */
         public init<Host, Port>(
             _ host: Host,
             port: Port
@@ -39,6 +47,12 @@ extension Headers {
             self.value = "\(host)\(port)"
         }
 
+        /**
+         Initializes a `Host` property with the given `host`.
+
+         - Parameters:
+            - host: A `StringProtocol` representing the host.
+         */
         public init<S: StringProtocol>(_ host: S) {
             self.value = host
         }
