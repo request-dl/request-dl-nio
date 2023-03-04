@@ -1,5 +1,5 @@
 //
-//  BodyProvider.swift
+//  RequestMethod.Post.swift
 //
 //  MIT License
 //
@@ -26,13 +26,14 @@
 
 import Foundation
 
-/**
- Protocol that defines the requirements for a body provider.
+extension RequestMethod {
 
- - Note: A body provider must provide the data that will be sent in the request body.
-*/
-public protocol BodyProvider {
+    public struct Post: RawRequestMethod {}
+}
 
-    /// The data that will be sent in the request body.
-    var data: Data { get }
+extension RawRequestMethod where Self == RequestMethod.Post {
+
+    public static var post: RequestMethod.Post {
+        RequestMethod.Post()
+    }
 }

@@ -1,5 +1,5 @@
 //
-//  _EncodableBody.swift
+//  RequestMethod.Trace.swift
 //
 //  MIT License
 //
@@ -26,25 +26,14 @@
 
 import Foundation
 
-// swiftlint:disable type_name
-public struct _EncodableBody<Object: Encodable>: BodyProvider {
+extension RequestMethod {
 
-    private let object: Object
-    private let encoder: JSONEncoder
+    public struct Trace: RawRequestMethod {}
+}
 
-    init(
-        _ object: Object,
-        encoder: JSONEncoder = .init()
-    ) {
-        self.object = object
-        self.encoder = encoder
-    }
+extension RawRequestMethod where Self == RequestMethod.Trace {
 
-    public var data: Data {
-        do {
-            return try encoder.encode(object)
-        } catch {
-            fatalError(error.localizedDescription)
-        }
+    public static var trace: RequestMethod.Trace {
+        RequestMethod.Trace()
     }
 }

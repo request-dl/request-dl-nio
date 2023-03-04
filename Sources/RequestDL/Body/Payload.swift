@@ -1,5 +1,5 @@
 //
-//  HTTPBody.swift
+//  Payload.swift
 //
 //  MIT License
 //
@@ -29,14 +29,14 @@ import Foundation
 /**
  A representation of the HTTP body data in a request.
 
- A `HTTPBody` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw
+ A `Payload` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw
  `Data`.
 
  The body data is used in HTTP requests with the purpose of carrying information. When making a HTTP request,
  the request body is used to send information to the server. The server reads the information and acts upon it, for
  example, by returning a specific response or by modifying its behavior.
 
- To create a `HTTPBody`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
+ To create a `Payload`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
 
  Example:
 
@@ -45,19 +45,19 @@ import Foundation
 
  DataTask {
      BaseURL("apple.com")
-     HTTPMethod(.post)
-     HTTPBody(bodyDict)
+     RequestMethod(.post)
+     Payload(bodyDict)
  }
  ```
  */
-public struct HTTPBody<Provider: BodyProvider>: Property {
+public struct Payload<Provider: PayloadProvider>: Property {
 
     public typealias Body = Never
 
     private let provider: Provider
 
     /**
-     Initializes a `HTTPBody` with a dictionary.
+     Initializes a `Payload` with a dictionary.
 
      - Parameters:
         - dictionary: A dictionary to be serialized.
@@ -66,12 +66,12 @@ public struct HTTPBody<Provider: BodyProvider>: Property {
     public init(
         _ dictionary: [String: Any],
         options: JSONSerialization.WritingOptions = .prettyPrinted
-    ) where Provider == _DictionaryBody {
-        provider = _DictionaryBody(dictionary, options: options)
+    ) where Provider == _DictionaryPayload {
+        provider = _DictionaryPayload(dictionary, options: options)
     }
 
     /**
-     Initializes a `HTTPBody` with an encodable value.
+     Initializes a `Payload` with an encodable value.
 
      - Parameters:
         - value: An encodable value to be serialized.
@@ -80,12 +80,12 @@ public struct HTTPBody<Provider: BodyProvider>: Property {
     public init<T: Encodable>(
         _ value: T,
         encoder: JSONEncoder = .init()
-    ) where Provider == _EncodableBody<T> {
-        provider = _EncodableBody(value, encoder: encoder)
+    ) where Provider == _EncodablePayload<T> {
+        provider = _EncodablePayload(value, encoder: encoder)
     }
 
     /**
-     Initializes a `HTTPBody` with a string.
+     Initializes a `Payload` with a string.
 
      - Parameters:
         - string: A string to be used as the body data.
@@ -94,18 +94,18 @@ public struct HTTPBody<Provider: BodyProvider>: Property {
     public init(
         _ string: String,
         using encoding: String.Encoding = .utf8
-    ) where Provider == _StringBody {
-        provider = _StringBody(string, using: encoding)
+    ) where Provider == _StringPayload {
+        provider = _StringPayload(string, using: encoding)
     }
 
     /**
-     Initializes a `HTTPBody` with raw `Data`.
+     Initializes a `Payload` with raw `Data`.
 
      - Parameters:
         - data: The raw data to be used as the body.
      */
-    public init(_ data: Data) where Provider == _DataBody {
-        provider = _DataBody(data)
+    public init(_ data: Data) where Provider == _DataPayload {
+        provider = _DataPayload(data)
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -114,7 +114,7 @@ public struct HTTPBody<Provider: BodyProvider>: Property {
     }
 }
 
-extension HTTPBody: PrimitiveProperty {
+extension Payload: PrimitiveProperty {
 
     struct Object: NodeObject {
 

@@ -1,5 +1,5 @@
 //
-//  HTTPMethodType.swift
+//  RequestMethod.Patch.swift
 //
 //  MIT License
 //
@@ -26,33 +26,14 @@
 
 import Foundation
 
-/// Define constants for the action to be performed on the endpoint
-public enum HTTPMethodType: String, CaseIterable {
+extension RequestMethod {
 
-    /// Defines a GET operation
-    case get = "GET"
+    public struct Patch: RawRequestMethod {}
+}
 
-    /// Defines an HEAD operation
-    case head = "HEAD"
+extension RawRequestMethod where Self == RequestMethod.Patch {
 
-    /// Defines a POST operation
-    case post = "POST"
-
-    /// Defines a PUT operation
-    case put = "PUT"
-
-    /// Defines a DELETE operation
-    case delete = "DELETE"
-
-    /// Defines a CONNECT operation
-    case connect = "CONNECT"
-
-    /// Defines a OPTIONS operation
-    case options = "OPTIONS"
-
-    /// Defines a TRACE operation
-    case trace = "TRACE"
-
-    /// Defines a PATCH operation
-    case patch = "PATCH"
+    public static var patch: RequestMethod.Patch {
+        RequestMethod.Patch()
+    }
 }

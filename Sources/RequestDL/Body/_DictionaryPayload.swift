@@ -1,5 +1,5 @@
 //
-//  Modifiers.StatusCode.swift
+//  _DictionaryPayload.swift
 //
 //  MIT License
 //
@@ -26,36 +26,28 @@
 
 import Foundation
 
-extension Modifiers {
+// swiftlint:disable type_name
+public struct _DictionaryPayload: PayloadProvider {
 
-    public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
+    private let dictionary: [String: Any]
+    private let options: JSONSerialization.WritingOptions
 
-        private let statusCodes: StatusCodeSet
-
-        init(_ statusCodes: StatusCodeSet) {
-            self.statusCodes = statusCodes
-        }
-
-        public func task(_ task: Content) async throws -> Content.Element {
-            let result = try await task.response()
-
-            guard
-                let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(.custom(httpResponse.statusCode))
-            else {
-                throw StatusCodeError<Content.Element>(data: result)
-            }
-
-            return result
-        }
+    init(
+        _ dictionary: [String: Any],
+        options: JSONSerialization.WritingOptions
+    ) {
+        self.dictionary = dictionary
+        self.options = options
     }
-}
 
-extension Task where Element: TaskResultPrimitive {
-
-    public func acceptOnlyStatusCode(
-        _ statusCodes: StatusCodeSet
-    ) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
-        modify(Modifiers.AcceptOnlyStatusCode(statusCodes))
+    public var data: Data {
+        do {
+            return try JSONSerialization.data(
+                withJSONObject: dictionary,
+                options: options
+            )
+        } catch {
+            fatalError(error.localizedDescription)
+        }
     }
 }

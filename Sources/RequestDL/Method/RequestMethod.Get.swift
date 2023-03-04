@@ -1,5 +1,5 @@
 //
-//  _DictionaryBody.swift
+//  RequestMethod.Get.swift
 //
 //  MIT License
 //
@@ -26,28 +26,14 @@
 
 import Foundation
 
-// swiftlint:disable type_name
-public struct _DictionaryBody: BodyProvider {
+extension RequestMethod {
 
-    private let dictionary: [String: Any]
-    private let options: JSONSerialization.WritingOptions
+    public struct Get: RawRequestMethod {}
+}
 
-    init(
-        _ dictionary: [String: Any],
-        options: JSONSerialization.WritingOptions
-    ) {
-        self.dictionary = dictionary
-        self.options = options
-    }
+extension RawRequestMethod where Self == RequestMethod.Get {
 
-    public var data: Data {
-        do {
-            return try JSONSerialization.data(
-                withJSONObject: dictionary,
-                options: options
-            )
-        } catch {
-            fatalError(error.localizedDescription)
-        }
+    public static var get: RequestMethod.Get {
+        RequestMethod.Get()
     }
 }

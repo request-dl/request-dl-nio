@@ -1,5 +1,5 @@
 //
-//  Modifiers.StatusCode.swift
+//  _EncodablePayload.swift
 //
 //  MIT License
 //
@@ -26,36 +26,25 @@
 
 import Foundation
 
-extension Modifiers {
+// swiftlint:disable type_name
+public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
 
-    public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
+    private let object: Object
+    private let encoder: JSONEncoder
 
-        private let statusCodes: StatusCodeSet
-
-        init(_ statusCodes: StatusCodeSet) {
-            self.statusCodes = statusCodes
-        }
-
-        public func task(_ task: Content) async throws -> Content.Element {
-            let result = try await task.response()
-
-            guard
-                let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(.custom(httpResponse.statusCode))
-            else {
-                throw StatusCodeError<Content.Element>(data: result)
-            }
-
-            return result
-        }
+    init(
+        _ object: Object,
+        encoder: JSONEncoder = .init()
+    ) {
+        self.object = object
+        self.encoder = encoder
     }
-}
 
-extension Task where Element: TaskResultPrimitive {
-
-    public func acceptOnlyStatusCode(
-        _ statusCodes: StatusCodeSet
-    ) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
-        modify(Modifiers.AcceptOnlyStatusCode(statusCodes))
+    public var data: Data {
+        do {
+            return try encoder.encode(object)
+        } catch {
+            fatalError(error.localizedDescription)
+        }
     }
 }

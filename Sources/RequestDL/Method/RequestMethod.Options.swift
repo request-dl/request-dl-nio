@@ -1,5 +1,5 @@
 //
-//  StatusCodeValidationError.swift
+//  RequestMethod.Options.swift
 //
 //  MIT License
 //
@@ -26,26 +26,14 @@
 
 import Foundation
 
-/**
-A custom error type representing a validation error due to an unexpected HTTP status code.
+extension RequestMethod {
 
-Usage:
+    public struct Options: RawRequestMethod {}
+}
 
- ```swift
- do {
-     let result = try await DataTask {
-         BaseURL("apple.com")
-     }
-     .acceptOnlyStatusCode(.successAndRedirect)
-     .response()
-     // use validated result
- } catch let error as StatusCodeValidationError<Data> {
-     // handle validation error
- }
- ```
-*/
-public struct StatusCodeValidationError<Element>: Error {
+extension RawRequestMethod where Self == RequestMethod.Options {
 
-    /// The data that caused the validation error.
-    public let data: Element
+    public static var options: RequestMethod.Options {
+        RequestMethod.Options()
+    }
 }

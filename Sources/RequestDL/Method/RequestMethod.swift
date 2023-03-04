@@ -1,5 +1,5 @@
 //
-//  HTTPMethod.swift
+//  RequestMethod.swift
 //
 //  MIT License
 //
@@ -29,21 +29,21 @@ import Foundation
 /**
  Defines the HTTP request method.
 
- Use `HTTPMethod` to specify the HTTP request method when creating requests.
+ Use `RequestMethod` to specify the HTTP request method when creating requests.
 
  ```swift
  DataTask {
      BaseURL("ecommerce.com")
      Path("products")
-     HTTPMethod(.get)
+     RequestMethod(.get)
  }
  ```
  */
-public struct HTTPMethod: Property {
+public struct RequestMethod: Property {
 
     public typealias Body = Never
 
-    let type: HTTPMethodType
+    let rawMethod: RawRequestMethod
 
     /**
      Initializes a `HTTPMethod` instance with the specified HTTP request method.
@@ -58,8 +58,8 @@ public struct HTTPMethod: Property {
          Method(.get)
      }
      */
-    public init(_ type: HTTPMethodType) {
-        self.type = type
+    public init<RawMethod: RawRequestMethod>(_ rawMethod: RawMethod) {
+        self.rawMethod = rawMethod
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -68,7 +68,7 @@ public struct HTTPMethod: Property {
     }
 }
 
-extension HTTPMethod: PrimitiveProperty {
+extension RequestMethod: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -84,6 +84,6 @@ extension HTTPMethod: PrimitiveProperty {
     }
 
     func makeObject() -> Object {
-        .init(type.rawValue)
+        .init(rawMethod.rawValue)
     }
 }

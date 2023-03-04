@@ -1,5 +1,5 @@
 //
-//  Modifiers.StatusCode.swift
+//  StatusCodeError.swift
 //
 //  MIT License
 //
@@ -26,36 +26,26 @@
 
 import Foundation
 
-extension Modifiers {
+/**
+A custom error type representing a validation error due to an unexpected HTTP status code.
 
-    public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
+Usage:
 
-        private let statusCodes: StatusCodeSet
+ ```swift
+ do {
+     let result = try await DataTask {
+         BaseURL("apple.com")
+     }
+     .acceptOnlyStatusCode(.successAndRedirect)
+     .response()
+     // use validated result
+ } catch let error as StatusCodeError<Data> {
+     // handle validation error
+ }
+ ```
+*/
+public struct StatusCodeError<Element>: Error {
 
-        init(_ statusCodes: StatusCodeSet) {
-            self.statusCodes = statusCodes
-        }
-
-        public func task(_ task: Content) async throws -> Content.Element {
-            let result = try await task.response()
-
-            guard
-                let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(.custom(httpResponse.statusCode))
-            else {
-                throw StatusCodeError<Content.Element>(data: result)
-            }
-
-            return result
-        }
-    }
-}
-
-extension Task where Element: TaskResultPrimitive {
-
-    public func acceptOnlyStatusCode(
-        _ statusCodes: StatusCodeSet
-    ) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
-        modify(Modifiers.AcceptOnlyStatusCode(statusCodes))
-    }
+    /// The data that caused the validation error.
+    public let data: Element
 }

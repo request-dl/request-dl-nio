@@ -1,5 +1,5 @@
 //
-//  MethodTests.swift
+//  RequestMethod.Head.swift
 //
 //  MIT License
 //
@@ -24,37 +24,16 @@
 //  SOFTWARE.
 //
 
-import XCTest
-@testable import RequestDL
+import Foundation
 
-final class MethodTests: XCTestCase {
+extension RequestMethod {
 
-    func testMethods() async {
-        for method in HTTPMethodType.allCases {
-            let sut = Group {
-                BaseURL("google.com")
-                HTTPMethod(method)
-            }
+    public struct Head: RawRequestMethod {}
+}
 
-            let (_, request) = await resolve(sut)
+extension RawRequestMethod where Self == RequestMethod.Head {
 
-            XCTAssertEqual(request.httpMethod, method.rawValue)
-        }
-    }
-
-    func testMethodType() async {
-        XCTAssertEqual(HTTPMethodType.get.rawValue, "GET")
-        XCTAssertEqual(HTTPMethodType.head.rawValue, "HEAD")
-        XCTAssertEqual(HTTPMethodType.post.rawValue, "POST")
-        XCTAssertEqual(HTTPMethodType.put.rawValue, "PUT")
-        XCTAssertEqual(HTTPMethodType.delete.rawValue, "DELETE")
-        XCTAssertEqual(HTTPMethodType.connect.rawValue, "CONNECT")
-        XCTAssertEqual(HTTPMethodType.options.rawValue, "OPTIONS")
-        XCTAssertEqual(HTTPMethodType.trace.rawValue, "TRACE")
-        XCTAssertEqual(HTTPMethodType.patch.rawValue, "PATCH")
-    }
-
-    func testNever() {
-        XCTAssertTrue(HTTPMethod.Body.self == Never.self)
+    public static var head: RequestMethod.Head {
+        RequestMethod.Head()
     }
 }

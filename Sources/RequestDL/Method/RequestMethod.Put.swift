@@ -1,5 +1,5 @@
 //
-//  _DataBody.swift
+//  RequestMethod.Put.swift
 //
 //  MIT License
 //
@@ -26,12 +26,14 @@
 
 import Foundation
 
-// swiftlint:disable type_name
-public struct _DataBody: BodyProvider {
+extension RequestMethod {
 
-    public let data: Data
+    public struct Put: RawRequestMethod {}
+}
 
-    init(_ data: Data) {
-        self.data = data
+extension RawRequestMethod where Self == RequestMethod.Put {
+
+    public static var put: RequestMethod.Put {
+        RequestMethod.Put()
     }
 }

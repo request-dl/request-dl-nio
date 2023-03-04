@@ -35,7 +35,7 @@ import Foundation
  DataTask {
      BaseURL("example.com")
      Path("api/users")
-     HTTPMethod(.get)
+     RequestMethod(.get)
 
      AsyncProperty {
          if let id = await getCurrentUserID() {

@@ -1,5 +1,5 @@
 //
-//  Modifiers.StatusCode.swift
+//  _DataPayload.swift
 //
 //  MIT License
 //
@@ -26,36 +26,12 @@
 
 import Foundation
 
-extension Modifiers {
+// swiftlint:disable type_name
+public struct _DataPayload: PayloadProvider {
 
-    public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
+    public let data: Data
 
-        private let statusCodes: StatusCodeSet
-
-        init(_ statusCodes: StatusCodeSet) {
-            self.statusCodes = statusCodes
-        }
-
-        public func task(_ task: Content) async throws -> Content.Element {
-            let result = try await task.response()
-
-            guard
-                let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(.custom(httpResponse.statusCode))
-            else {
-                throw StatusCodeError<Content.Element>(data: result)
-            }
-
-            return result
-        }
-    }
-}
-
-extension Task where Element: TaskResultPrimitive {
-
-    public func acceptOnlyStatusCode(
-        _ statusCodes: StatusCodeSet
-    ) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
-        modify(Modifiers.AcceptOnlyStatusCode(statusCodes))
+    init(_ data: Data) {
+        self.data = data
     }
 }

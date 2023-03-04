@@ -1,5 +1,5 @@
 //
-//  _StringBody.swift
+//  _StringPayload.swift
 //
 //  MIT License
 //
@@ -27,7 +27,7 @@
 import Foundation
 
 // swiftlint:disable type_name
-public struct _StringBody: BodyProvider {
+public struct _StringPayload: PayloadProvider {
 
     private let string: String
     private let encoding: String.Encoding
