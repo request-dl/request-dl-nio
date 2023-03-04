@@ -34,7 +34,7 @@ import Foundation
  the concept of Task is used to assemble the request and execute it when the `response() function
  is called.
 
- The associatedtype `Element represents the type of the expected result of the task.
+ The associatedtype `Element` represents the type of the expected result of the task.
 
  - Note: The Task protocol does not specify how the request is made or how the response is processed,
  it only provides a way to execute a request and receive its result asynchronously.

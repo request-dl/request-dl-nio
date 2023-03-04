@@ -28,7 +28,7 @@ import Foundation
 
 extension Headers {
 
-    public struct Origin: Request {
+    public struct Origin: Property {
 
         private let value: Any
 
@@ -43,7 +43,7 @@ extension Headers {
     }
 }
 
-extension Headers.Origin: PrimitiveRequest {
+extension Headers.Origin: PrimitiveProperty {
 
     func makeObject() -> Headers.Object {
         .init(value, forKey: "Origin")

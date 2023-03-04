@@ -1,5 +1,5 @@
 //
-//  RequestConfiguration.swift
+//  Never+Property.swift
 //
 //  MIT License
 //
@@ -26,19 +26,17 @@
 
 import Foundation
 
-class RequestConfiguration {
+extension Never: Property {
 
-    var request: URLRequest
-    let configuration: URLSessionConfiguration
-    let delegate: DelegateProxy
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        Never.bodyException()
+    }
+}
 
-    init(
-        request: URLRequest,
-        configuration: URLSessionConfiguration,
-        delegate: DelegateProxy
-    ) {
-        self.request = request
-        self.configuration = configuration
-        self.delegate = delegate
+extension Never {
+
+    static func bodyException() -> Never {
+        preconditionFailure("An unexpected attempt was made to access the property body.")
     }
 }

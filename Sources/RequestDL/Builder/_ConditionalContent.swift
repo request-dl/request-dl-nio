@@ -1,5 +1,5 @@
 //
-//  PrimitiveRequest.swift
+//  _ConditionalContent.swift
 //
 //  MIT License
 //
@@ -26,28 +26,47 @@
 
 import Foundation
 
-protocol PrimitiveRequest: Request {
+// swiftlint:disable type_name
+/// This struct is marked as internal and is not intended
+/// to be used directly by clients of this framework.
+public struct _ConditionalContent<
+    TrueProperty: Property,
+    FalseProperty: Property
+>: Property {
 
-    associatedtype Object: NodeObject
-    func makeObject() -> Object
-}
+    private let option: Option
 
-extension PrimitiveRequest {
+    init(first property: TrueProperty) {
+        option = .first(property)
+    }
+
+    init(second property: FalseProperty) {
+        option = .second(property)
+    }
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        Never.bodyException()
+    }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: Self, _ context: Context) async {
-        let node = Node(
-            root: context.root,
-            object: request.makeObject(),
-            children: []
-        )
-
-        let newContext = context.append(node)
-
-        guard Body.self != Never.self else {
-            return
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
+        switch property.option {
+        case .first(let property):
+            await TrueProperty.makeProperty(property, context)
+        case .second(let property):
+            await FalseProperty.makeProperty(property, context)
         }
+    }
+}
 
-        await Body.makeRequest(request.body, newContext)
+extension _ConditionalContent {
+
+    enum Option {
+        case first(TrueProperty)
+        case second(FalseProperty)
     }
 }

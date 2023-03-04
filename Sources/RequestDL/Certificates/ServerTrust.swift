@@ -28,7 +28,7 @@ import Foundation
 import Security
 import CommonCrypto
 
-public struct ServerTrust: Request {
+public struct ServerTrust: Property {
 
     private let certificates: [Certificate]
 
@@ -46,7 +46,7 @@ public struct ServerTrust: Request {
     }
 }
 
-extension ServerTrust: PrimitiveRequest {
+extension ServerTrust: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -56,7 +56,7 @@ extension ServerTrust: PrimitiveRequest {
             self.certificates = certificates
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             configuration.delegate.onDidReceiveChallenge {
                 receivedChallenge($0)
             }

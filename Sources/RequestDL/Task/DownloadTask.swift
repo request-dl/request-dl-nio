@@ -32,7 +32,7 @@ import Foundation
  After constructing your download task, you can use the `response` function to receive the
  temporary URL where the content was saved for you, which is the default behavior on Foundation.
  */
-public struct DownloadTask<Content: Request>: Task {
+public struct DownloadTask<Content: Property>: Task {
 
     private let content: Content
 
@@ -41,7 +41,7 @@ public struct DownloadTask<Content: Request>: Task {
 
      - Parameter content: The content of the request.
      */
-    public init(@RequestBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 }

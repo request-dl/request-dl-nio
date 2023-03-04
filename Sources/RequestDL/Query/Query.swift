@@ -27,7 +27,7 @@
 import Foundation
 
 /**
- A Request protocol conforming type that represents a query parameter in a URL request.
+ A Property protocol conforming type that represents a query parameter in a URL request.
 
  You can use it to build a URLRequest with query parameters.
 
@@ -42,7 +42,7 @@ import Foundation
  }.request()
  ```
 */
-public struct Query: Request {
+public struct Query: Property {
 
     public typealias Body = Never
 
@@ -67,7 +67,7 @@ public struct Query: Request {
     }
 }
 
-extension Query: PrimitiveRequest {
+extension Query: PrimitiveProperty {
 
     class Object: NodeObject {
 
@@ -79,7 +79,7 @@ extension Query: PrimitiveRequest {
             self.value = "\(value)"
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             guard
                 let url = configuration.request.url,
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: true)

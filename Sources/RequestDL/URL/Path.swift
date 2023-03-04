@@ -29,15 +29,15 @@ import Foundation
 /**
  Use Path to specify the URL pathway.
 
- You can have multiple Paths inside the body or @RequestBuilder results,
+ You can have multiple Paths inside the body or @PropertyBuilder results,
  which will be combined in to a single Path appended at BaseURL.
 
  Example of single path:
 
  ```swift
- struct AppleDeveloperDefaultPaths: Request {
+ struct AppleDeveloperDefaultPaths: Property {
 
-     var body: some Request {
+     var body: some Property {
          Path("api/v2/ios")
      }
  }
@@ -46,9 +46,9 @@ import Foundation
  Example of multiple paths:
 
  ```swift
- struct AppleDeveloperDefaultPaths: Request {
+ struct AppleDeveloperDefaultPaths: Property {
 
-     var body: some Request {
+     var body: some Property {
          Path("api")
          Path("v2")
          Path("ios")
@@ -62,9 +62,9 @@ import Foundation
  escape it using a backslash (\\).
 
  ```swift
- struct ExampleRequest: Request {
+ struct ExampleRequest: Property {
 
-     var body: some Request {
+     var body: some Property {
          Path("users")
          Path("1234")
          Path("\\/posts")
@@ -74,7 +74,7 @@ import Foundation
  The resulting URL of the above request would be `BaseURL/users/1234\/posts`.
  ```
  */
-public struct Path: Request {
+public struct Path: Property {
 
     public typealias Body = Never
 
@@ -97,7 +97,7 @@ public struct Path: Request {
     }
 }
 
-extension Path: PrimitiveRequest {
+extension Path: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -107,7 +107,7 @@ extension Path: PrimitiveRequest {
             self.path = path
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             guard let url = configuration.request.url else {
                 return
             }

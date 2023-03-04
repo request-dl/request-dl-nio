@@ -1,5 +1,5 @@
 //
-//  Empty.swift
+//  AsyncProperty.swift
 //
 //  MIT License
 //
@@ -26,26 +26,51 @@
 
 import Foundation
 
-/// A struct representing an empty request.
-public struct EmptyRequest: Request {
+/**
+ A type that represents an asynchronous request specification.
 
-    /// Initializes an empty request.
-    public init() {}
+ Usage example:
+
+ ```swift
+ DataTask {
+     BaseURL("example.com")
+     Path("api/users")
+     HTTPMethod(.get)
+
+     AsyncProperty {
+         if let id = await getCurrentUserID() {
+             Path("\(id)")
+         }
+     }
+ }
+ ```
+ */
+public struct AsyncProperty<Content: Property>: Property {
+
+    public typealias Body = Never
+
+    private let content: () async -> Content
+
+    /**
+     Initializes with an asynchronous content provided.
+
+     - Parameters:
+        - content: The content of the request to be built.
+     */
+    public init(@PropertyBuilder content: @escaping () async -> Content) {
+        self.content = content
+    }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         Never.bodyException()
     }
-}
 
-extension EmptyRequest: PrimitiveRequest {
-
-    struct Object: NodeObject {
-
-        func makeRequest(_ configuration: RequestConfiguration) {}
-    }
-
-    func makeObject() -> Object {
-        .init()
+    /// This method is used internally and should not be called directly.
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
+        await Content.makeProperty(property.content(), context)
     }
 }

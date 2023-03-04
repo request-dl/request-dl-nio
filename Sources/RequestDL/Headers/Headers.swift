@@ -41,9 +41,9 @@ extension Headers {
             self.next = next
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             configuration.request.setValue("\(value)", forHTTPHeaderField: key)
-            next?.makeRequest(configuration)
+            next?.makeProperty(configuration)
         }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  Never+Request.swift
+//  MakeConfiguration.swift
 //
 //  MIT License
 //
@@ -26,17 +26,19 @@
 
 import Foundation
 
-extension Never: Request {
+class MakeConfiguration {
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        Never.bodyException()
-    }
-}
+    var request: URLRequest
+    let configuration: URLSessionConfiguration
+    let delegate: DelegateProxy
 
-extension Never {
-
-    static func bodyException() -> Never {
-        preconditionFailure("Body should not be called")
+    init(
+        request: URLRequest,
+        configuration: URLSessionConfiguration,
+        delegate: DelegateProxy
+    ) {
+        self.request = request
+        self.configuration = configuration
+        self.delegate = delegate
     }
 }

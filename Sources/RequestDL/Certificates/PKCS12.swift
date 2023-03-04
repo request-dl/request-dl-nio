@@ -46,7 +46,7 @@ public struct PKCS12 {
         else {
             if secError == errSecAuthFailed {
                 #if DEBUG
-                print("[Request] - ERROR: SecPKCS12Import returned errSecAuthFailed. Incorrect password?")
+                print("[RequestDL] - ERROR: SecPKCS12Import returned errSecAuthFailed. Incorrect password?")
                 #endif
             }
 

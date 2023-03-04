@@ -26,13 +26,13 @@
 
 import Foundation
 
-public struct HeaderGroup<Content: Request>: Request {
+public struct HeaderGroup<Content: Property>: Property {
 
     public typealias Body = Never
 
     let parameter: Content
 
-    public init(@RequestBuilder parameter: () -> Content) {
+    public init(@PropertyBuilder parameter: () -> Content) {
         self.parameter = parameter()
     }
 
@@ -42,15 +42,18 @@ public struct HeaderGroup<Content: Request>: Request {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: HeaderGroup<Content>, _ context: Context) async {
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
         let node = Node(
             root: context.root,
-            object: EmptyObject(request),
+            object: EmptyObject(property),
             children: []
         )
 
         let newContext = Context(node)
-        await Content.makeRequest(request.parameter, newContext)
+        await Content.makeProperty(property.parameter, newContext)
 
         let parameters = newContext.findCollection(Headers.Object.self).map {
             ($0.key, $0.value)
@@ -85,7 +88,7 @@ extension HeaderGroup {
             self.parameters = parameters
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             for (key, value) in parameters {
                 configuration.request.setValue("\(value)", forHTTPHeaderField: key)
             }

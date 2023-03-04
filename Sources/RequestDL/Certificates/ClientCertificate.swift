@@ -26,7 +26,7 @@
 
 import Foundation
 
-public struct ClientCertificate: Request {
+public struct ClientCertificate: Property {
 
     private let data: Data
     private let password: String
@@ -38,8 +38,8 @@ public struct ClientCertificate: Request {
 
     public init(name: String, in bundle: Bundle, password: String) {
         guard
-            let path = bundle.path(forResource: name, ofType: "pfx"),
-            let data = FileManager.default.contents(atPath: path)
+            let url = bundle.url(forResource: name, withExtension: "pfx"),
+            let data = try? Data(contentsOf: url)
         else { fatalError() }
 
         self.init(data, password: password)
@@ -51,7 +51,7 @@ public struct ClientCertificate: Request {
     }
 }
 
-extension ClientCertificate: PrimitiveRequest {
+extension ClientCertificate: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -63,7 +63,7 @@ extension ClientCertificate: PrimitiveRequest {
             self.password = password
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             configuration.delegate.onDidReceiveChallenge {
                 receivedChallenge($0)
             }

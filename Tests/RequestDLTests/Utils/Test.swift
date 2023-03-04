@@ -7,7 +7,7 @@
 
 import RequestDL
 
-struct Test<Content: Request>: Request {
+struct Test<Content: Property>: Property {
 
     private let content: Content
 
@@ -15,11 +15,11 @@ struct Test<Content: Request>: Request {
         self.content = content
     }
 
-    init(@RequestBuilder _ content: () -> Content) {
+    init(@PropertyBuilder _ content: () -> Content) {
         self.content = content()
     }
 
-    var body: some Request {
+    var body: some Property {
         content
         BaseURL("www.apple.com")
     }

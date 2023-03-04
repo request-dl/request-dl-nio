@@ -69,7 +69,7 @@ final class TimeoutTests: XCTestCase {
     }
 
     func testEmpty() async {
-        let sut = Test(EmptyRequest())
+        let sut = Test(EmptyProperty())
 
         let (session, _) = await resolve(sut)
 

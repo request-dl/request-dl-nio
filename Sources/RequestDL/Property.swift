@@ -1,5 +1,5 @@
 //
-//  Request.swift
+//  Property.swift
 //
 //  MIT License
 //
@@ -27,17 +27,17 @@
 import Foundation
 
 /**
- The `Request` protocol is the foundation of all other objects in the RequestDL library.
+ The `Property` protocol is the foundation of all other objects in the RequestDL library.
 
- The protocol provides a `body` property, which returns an opaque `some Request` type.
+ The protocol provides a `body` property, which returns an opaque `some Property` type.
  By combining multiple request objects, we can use the `body` property to configure
  multiple request properties at once. This is demonstrated in the following example:
 
  ```swift
- struct DefaultHeaders: Request {
+ struct DefaultHeaders: Property {
     let cache: Bool
 
-    var body: some Request {
+    var body: some Property {
         Headers.ContentType(.json)
         Headers.Accept(.json)
 
@@ -48,34 +48,34 @@ import Foundation
  }
  ```
 
- This `DefaultHeaders` struct conforms to the Request protocol and sets default
+ This `DefaultHeaders` struct conforms to the Property protocol and sets default
  headers for all requests. We can use many different objects to configure requests in
  order to meet specific application requirements.
  */
-public protocol Request {
+public protocol Property {
 
-    associatedtype Body: Request
+    associatedtype Body: Property
 
-    /// An associated type that conforms to the Request protocol. This property
+    /// An associated type that conforms to the `Property` protocol. This property
     /// allows you to set multiple request properties at once.
-    @RequestBuilder
+    @PropertyBuilder
     var body: Body { get }
 
     /// This method is used internally and should not be called directly.
-    static func makeRequest(_ request: Self, _ context: Context) async
+    static func makeProperty(_ property: Self, _ context: Context) async
 }
 
-extension Request {
+extension Property {
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: Self, _ context: Context) async {
+    public static func makeProperty(_ property: Self, _ context: Context) async {
         let node = Node(
             root: context.root,
-            object: EmptyObject(request),
+            object: EmptyObject(property),
             children: []
         )
 
         let newContext = context.append(node)
-        await Body.makeRequest(request.body, newContext)
+        await Body.makeProperty(property.body, newContext)
     }
 }

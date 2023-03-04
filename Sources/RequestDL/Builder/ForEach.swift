@@ -44,7 +44,7 @@ import Foundation
  }
  ```
  */
-public struct ForEach<Data: Collection, Content: Request>: Request {
+public struct ForEach<Data: Collection, Content: Property>: Property {
 
     private let data: Data
     private let map: (Data.Element) -> Content
@@ -58,7 +58,7 @@ public struct ForEach<Data: Collection, Content: Request>: Request {
      */
     public init(
         _ data: Data,
-        @RequestBuilder content: @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @escaping (Data.Element) -> Content
     ) {
         self.data = data
         self.map = content
@@ -70,9 +70,12 @@ public struct ForEach<Data: Collection, Content: Request>: Request {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: ForEach<Data, Content>, _ context: Context) async {
-        for request in request.data.map(request.map) {
-            await Content.makeRequest(request, context)
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
+        for property in property.data.map(property.map) {
+            await Content.makeProperty(property, context)
         }
     }
 }

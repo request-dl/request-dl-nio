@@ -41,7 +41,7 @@ Usage:
  }
  ```
  */
-public struct QueryGroup<Content: Request>: Request {
+public struct QueryGroup<Content: Property>: Property {
 
     public typealias Body = Never
 
@@ -52,7 +52,7 @@ public struct QueryGroup<Content: Request>: Request {
 
      - Parameter content: A closure that returns the content of the query group.
      */
-    public init(@RequestBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 
@@ -62,15 +62,18 @@ public struct QueryGroup<Content: Request>: Request {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: QueryGroup<Content>, _ context: Context) async {
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
         let node = Node(
             root: context.root,
-            object: EmptyObject(request),
+            object: EmptyObject(property),
             children: []
         )
 
         let newContext = Context(node)
-        await Content.makeRequest(request.content, newContext)
+        await Content.makeProperty(property.content, newContext)
 
         let parameters = newContext.findCollection(Query.Object.self).map {
             ($0.key, $0.value)
@@ -105,7 +108,7 @@ extension QueryGroup {
             self.parameters = parameters
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             guard
                 let url = configuration.request.url,
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: true)

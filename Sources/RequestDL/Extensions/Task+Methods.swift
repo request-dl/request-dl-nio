@@ -35,7 +35,7 @@ extension Task {
 
         for index in 0 ..< times {
             if debug {
-                print("[Request] Pinging \(index + 1) started")
+                print("[RequestDL] Pinging \(index + 1) started")
             }
 
             let time = Date()
@@ -44,7 +44,7 @@ extension Task {
             if debug {
                 let interval = Date().timeIntervalSince(time)
 
-                print("[Request] Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
+                print("[RequestDL] Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
             }
         }
     }

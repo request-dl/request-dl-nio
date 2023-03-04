@@ -46,7 +46,7 @@ import Foundation
  }
  ```
  */
-public protocol URLSessionConfigurationRepresentable: Request where Body == Never {
+public protocol URLSessionConfigurationRepresentable: Property where Body == Never {
 
     /**
      Updates the session configuration object with specific attributes.
@@ -64,10 +64,13 @@ extension URLSessionConfigurationRepresentable {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: Self, _ context: Context) async {
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
         let node = Node(
             root: context.root,
-            object: URLSessionRepresentableObject(request.updateSessionConfiguration(_:)),
+            object: URLSessionRepresentableObject(property.updateSessionConfiguration(_:)),
             children: []
         )
 
@@ -83,7 +86,7 @@ struct URLSessionRepresentableObject: NodeObject {
         self.update = update
     }
 
-    func makeRequest(_ configuration: RequestConfiguration) {
+    func makeProperty(_ configuration: MakeConfiguration) {
         update(configuration.configuration)
     }
 }

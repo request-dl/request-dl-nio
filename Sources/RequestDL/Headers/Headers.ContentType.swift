@@ -28,7 +28,7 @@ import Foundation
 
 extension Headers {
 
-    public struct ContentType: Request {
+    public struct ContentType: Property {
 
         private let contentType: RequestDL.ContentType
 
@@ -43,7 +43,7 @@ extension Headers {
     }
 }
 
-extension Headers.ContentType: PrimitiveRequest {
+extension Headers.ContentType: PrimitiveProperty {
 
     func makeObject() -> Headers.Object {
         .init(contentType.rawValue, forKey: "Content-Type")

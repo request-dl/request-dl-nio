@@ -55,7 +55,7 @@ extension DelegateProxy: URLSessionDelegate {
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         guard let identifier = session.configuration.identifier else {
-            print("[Request]", "Missing identifier for a background session")
+            print("[RequestDL]", "Missing identifier for a background session")
             return
         }
 
@@ -72,7 +72,7 @@ extension DelegateProxy: URLSessionDataDelegate {
         completionHandler: @escaping (CachedURLResponse?) -> Void
     ) {
         #if DEBUG
-        print("[Request]", """
+        print("[RequestDL]", """
         If a bug is found in Cache, handle DelegateProxy._:dataTask:willCacheResponse:completionHandler:
         """)
         #endif
@@ -86,7 +86,7 @@ extension DelegateProxy: URLSessionDataDelegate {
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
         #if DEBUG
-        print("[Request]", "If a bug is found in Cache, handle DelegateProxy._:dataTask:didReceive:completionHandler:")
+        print("[RequestDL]", "If a bug is found in Cache, handle DelegateProxy._:dataTask:didReceive:completionHandler:")
         #endif
         completionHandler(.allow)
     }

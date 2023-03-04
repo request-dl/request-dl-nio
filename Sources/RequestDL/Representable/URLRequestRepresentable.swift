@@ -42,7 +42,7 @@ import Foundation
  }
  ```
  */
-public protocol URLRequestRepresentable: Request where Body == Never {
+public protocol URLRequestRepresentable: Property where Body == Never {
 
     /**
      Update the URLRequest to be used in a network task.
@@ -60,10 +60,13 @@ extension URLRequestRepresentable {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: Self, _ context: Context) async {
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
         let node = Node(
             root: context.root,
-            object: URLRequestRepresentableObject(request.updateRequest(_:)),
+            object: URLRequestRepresentableObject(property.updateRequest(_:)),
             children: []
         )
 
@@ -79,7 +82,7 @@ struct URLRequestRepresentableObject: NodeObject {
         self.update = update
     }
 
-    func makeRequest(_ configuration: RequestConfiguration) {
+    func makeProperty(_ configuration: MakeConfiguration) {
         update(&configuration.request)
     }
 }

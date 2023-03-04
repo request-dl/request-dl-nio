@@ -50,7 +50,7 @@ import Foundation
  }
  ```
  */
-public struct HTTPBody<Provider: BodyProvider>: Request {
+public struct HTTPBody<Provider: BodyProvider>: Property {
 
     public typealias Body = Never
 
@@ -114,7 +114,7 @@ public struct HTTPBody<Provider: BodyProvider>: Request {
     }
 }
 
-extension HTTPBody: PrimitiveRequest {
+extension HTTPBody: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -124,7 +124,7 @@ extension HTTPBody: PrimitiveRequest {
             self.provider = provider
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             configuration.request.httpBody = provider.data
         }
     }

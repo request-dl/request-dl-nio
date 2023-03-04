@@ -8,7 +8,7 @@
 import Foundation
 @testable import RequestDL
 
-func resolve<Content: Request>(
+func resolve<Content: Property>(
     _ content: Content,
     in delegate: DelegateProxy = .init()
 ) async -> (URLSession, URLRequest) {

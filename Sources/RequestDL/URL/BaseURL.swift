@@ -39,8 +39,8 @@ import Foundation
  ```swift
  import RequestDL
 
- struct AppleDeveloperBaseURL: Request {
-     var body: some Request {
+ struct AppleDeveloperBaseURL: Property {
+     var body: some Property {
          BaseURL(.https, host: "developer.apple.com")
      }
  }
@@ -50,14 +50,14 @@ import Foundation
  Or you can set the host without specifying the protocol type:
 
  ```swift
- struct AppleDeveloperBaseURL: Request {
-     var body: some Request {
+ struct AppleDeveloperBaseURL: Property {
+     var body: some Property {
          BaseURL("developer.apple.com")
      }
  }
  ```
  */
-public struct BaseURL: Request {
+public struct BaseURL: Property {
 
     public typealias Body = Never
 
@@ -76,9 +76,9 @@ public struct BaseURL: Request {
      ```swift
      import RequestDL
 
-     struct AppleDeveloperBaseURL: Request {
+     struct AppleDeveloperBaseURL: Property {
 
-         var body: some Request {
+         var body: some Property {
              BaseURL(.https, host: "developer.apple.com")
          }
      }
@@ -100,9 +100,9 @@ public struct BaseURL: Request {
      ```swift
      import RequestDL
 
-     struct AppleDeveloperBaseURL: Request {
+     struct AppleDeveloperBaseURL: Property {
 
-         var body: some Request {
+         var body: some Property {
              BaseURL("developer.apple.com")
          }
      }
@@ -133,7 +133,7 @@ extension BaseURL {
     }
 }
 
-extension BaseURL: PrimitiveRequest {
+extension BaseURL: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -143,7 +143,7 @@ extension BaseURL: PrimitiveRequest {
             self.baseURL = baseURL
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {}
+        func makeProperty(_ configuration: MakeConfiguration) {}
     }
 
     func makeObject() -> Object {

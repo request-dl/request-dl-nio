@@ -28,7 +28,7 @@ import Foundation
 
 extension Headers {
 
-    public struct Referer: Request {
+    public struct Referer: Property {
 
         private let value: Any
 
@@ -43,7 +43,7 @@ extension Headers {
     }
 }
 
-extension Headers.Referer: PrimitiveRequest {
+extension Headers.Referer: PrimitiveProperty {
 
     func makeObject() -> Headers.Object {
         .init(value, forKey: "Referer")

@@ -28,7 +28,7 @@ import Foundation
 
 extension Headers {
 
-    public struct `Any`: Request {
+    public struct `Any`: Property {
 
         let key: String
         let value: Any
@@ -45,7 +45,7 @@ extension Headers {
     }
 }
 
-extension Headers.`Any`: PrimitiveRequest {
+extension Headers.`Any`: PrimitiveProperty {
 
     func makeObject() -> Headers.Object {
         .init(value, forKey: key)

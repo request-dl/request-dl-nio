@@ -26,7 +26,7 @@
 
 import Foundation
 
-public struct Authorization: Request {
+public struct Authorization: Property {
 
     private let type: TokenType
     private let token: Any
@@ -50,7 +50,7 @@ public struct Authorization: Request {
     }
 }
 
-extension Authorization: PrimitiveRequest {
+extension Authorization: PrimitiveProperty {
 
     struct Object: NodeObject {
         let type: TokenType
@@ -61,7 +61,7 @@ extension Authorization: PrimitiveRequest {
             self.token = token
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             configuration.request.setValue("\(type.rawValue) \(token)", forHTTPHeaderField: "Authorization")
         }
     }

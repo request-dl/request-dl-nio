@@ -34,20 +34,20 @@ struct FormObject: NodeObject {
         self.type = type
     }
 
-    func makeRequest(_ configuration: RequestConfiguration) {
+    func makeProperty(_ configuration: MakeConfiguration) {
         let boundary = FormUtils.boundary
         configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         configuration.request.httpBody = FormUtils.buildBody([type.data], with: boundary)
     }
 }
 
-public struct Form<Content: Request>: Request {
+public struct Form<Content: Property>: Property {
 
     public typealias Body = Never
 
     let parameter: Content
 
-    public init(@RequestBuilder parameter: () -> Content) {
+    public init(@PropertyBuilder parameter: () -> Content) {
         self.parameter = parameter()
     }
 
@@ -57,15 +57,18 @@ public struct Form<Content: Request>: Request {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: Form<Content>, _ context: Context) async {
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
         let node = Node(
             root: context.root,
-            object: EmptyObject(request),
+            object: EmptyObject(property),
             children: []
         )
 
         let newContext = Context(node)
-        await Content.makeRequest(request.parameter, newContext)
+        await Content.makeProperty(property.parameter, newContext)
 
         let parameters = newContext
             .findCollection(FormObject.self)
@@ -88,7 +91,7 @@ extension Form {
             self.types = types
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             let boundary = FormUtils.boundary
             configuration.request.setValue(
                 "multipart/form-data; boundary=\(boundary)",

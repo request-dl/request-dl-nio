@@ -45,7 +45,7 @@ import Foundation
  - Note: Only available on iOS 15.0+, tvOS 15.0+, watchOS 15.0+, macOS 12.0+.
 */
 @available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
-public struct BytesTask<Content: Request>: Task {
+public struct BytesTask<Content: Property>: Task {
 
     private let content: Content
 
@@ -66,7 +66,7 @@ public struct BytesTask<Content: Request>: Task {
      }
      ```
      */
-    public init(@RequestBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 }

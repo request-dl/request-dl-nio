@@ -28,7 +28,7 @@ import Foundation
 
 extension Headers {
 
-    public struct Cache: Request {
+    public struct Cache: Property {
 
         private let policy: URLRequest.CachePolicy?
         private let memoryCapacity: Int?
@@ -83,7 +83,7 @@ extension Headers {
     }
 }
 
-extension Headers.Cache: PrimitiveRequest {
+extension Headers.Cache: PrimitiveProperty {
 
     struct CacheObject: NodeObject {
 
@@ -101,7 +101,7 @@ extension Headers.Cache: PrimitiveRequest {
             self.diskCapacity = diskCapacity
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             if let memoryCapacity = memoryCapacity, let diskCapacity = diskCapacity {
                 configuration.configuration.urlCache = URLCache(
                     memoryCapacity: memoryCapacity,

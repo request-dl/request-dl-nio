@@ -33,9 +33,9 @@ import Foundation
  in all requests. For example:
 
  ```swift
- struct MyAppConfiguration: Request {
+ struct MyAppConfiguration: Property {
 
-     var body: some Request {
+     var body: some Property {
          Session(.default)
              .cellularAccessDisabled(true)
              .waitsForConnectivity(true)
@@ -53,7 +53,7 @@ import Foundation
  - Note: If the queue parameter is not specified, the requests will be executed on the
  main operation queue.
  */
-public struct Session: Request {
+public struct Session: Property {
 
     public typealias Body = Never
 
@@ -346,7 +346,7 @@ extension Session.Configuration {
     }
 }
 
-extension Session: PrimitiveRequest {
+extension Session: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -358,7 +358,7 @@ extension Session: PrimitiveRequest {
             self.queue = queue
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {}
+        func makeProperty(_ configuration: MakeConfiguration) {}
     }
 
     func makeObject() -> Object {

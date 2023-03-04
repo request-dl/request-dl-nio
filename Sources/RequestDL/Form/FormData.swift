@@ -26,7 +26,7 @@
 
 import Foundation
 
-public struct FormData: Request {
+public struct FormData: Property {
 
     public typealias Body = Never
 
@@ -64,7 +64,7 @@ public struct FormData: Request {
     }
 }
 
-extension FormData: PrimitiveRequest {
+extension FormData: PrimitiveProperty {
 
     func makeObject() -> FormObject {
         .init(.data(self))

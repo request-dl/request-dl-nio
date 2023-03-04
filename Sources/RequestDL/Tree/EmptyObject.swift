@@ -26,7 +26,7 @@
 
 import Foundation
 
-struct EmptyObject<Content: Request>: NodeObject {
+struct EmptyObject<Content: Property>: NodeObject {
 
     private let content: Content
 
@@ -34,5 +34,5 @@ struct EmptyObject<Content: Request>: NodeObject {
         self.content = content
     }
 
-    func makeRequest(_ configuration: RequestConfiguration) {}
+    func makeProperty(_ configuration: MakeConfiguration) {}
 }

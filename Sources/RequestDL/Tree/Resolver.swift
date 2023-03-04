@@ -26,17 +26,17 @@
 
 import Foundation
 
-struct Resolver<Content: Request> {
+struct Resolver<Content: Property> {
 
-    private let request: Content
+    private let content: Content
 
-    init(_ request: Content) {
-        self.request = request
+    init(_ content: Content) {
+        self.content = content
     }
 
     private func resolve() async -> Context {
         let context = Context(RootNode())
-        await Content.makeRequest(request, context)
+        await Content.makeProperty(content, context)
         return context
     }
 
@@ -49,7 +49,7 @@ struct Resolver<Content: Request> {
 
         let sessionObject = context.find(Session.Object.self)
 
-        let configuration = RequestConfiguration(
+        let configuration = MakeConfiguration(
             request: URLRequest(url: object.baseURL),
             configuration: sessionObject?.configuration ?? .default,
             delegate: delegate

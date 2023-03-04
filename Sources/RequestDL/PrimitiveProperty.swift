@@ -1,5 +1,5 @@
 //
-//  AsyncRequest.swift
+//  PrimitiveProperty.swift
 //
 //  MIT License
 //
@@ -26,48 +26,31 @@
 
 import Foundation
 
-/**
- A type that represents an asynchronous request specification.
+protocol PrimitiveProperty: Property {
 
- Usage example:
+    associatedtype Object: NodeObject
+    func makeObject() -> Object
+}
 
- ```swift
- DataTask {
-     BaseURL("example.com")
-     Path("api/users")
-     HTTPMethod(.get)
-
-     AsyncRequest {
-         if let id = await getCurrentUserID() {
-             Path("\(id)")
-         }
-     }
- }
- ```
- */
-public struct AsyncRequest<Content: Request>: Request {
-
-    public typealias Body = Never
-
-    private let content: () async -> Content
-
-    /**
-     Initializes with an asynchronous content provided.
-
-     - Parameters:
-        - content: The content of the request to be built.
-     */
-    public init(@RequestBuilder content: @escaping () async -> Content) {
-        self.content = content
-    }
-
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        Never.bodyException()
-    }
+extension PrimitiveProperty {
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: AsyncRequest<Content>, _ context: Context) async {
-        await Content.makeRequest(request.content(), context)
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
+        let node = Node(
+            root: context.root,
+            object: property.makeObject(),
+            children: []
+        )
+
+        let newContext = context.append(node)
+
+        guard Body.self != Never.self else {
+            return
+        }
+
+        await Body.makeProperty(property.body, newContext)
     }
 }

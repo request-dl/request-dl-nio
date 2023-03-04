@@ -39,7 +39,7 @@ import Foundation
  }
  ```
  */
-public struct HTTPMethod: Request {
+public struct HTTPMethod: Property {
 
     public typealias Body = Never
 
@@ -68,7 +68,7 @@ public struct HTTPMethod: Request {
     }
 }
 
-extension HTTPMethod: PrimitiveRequest {
+extension HTTPMethod: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -78,7 +78,7 @@ extension HTTPMethod: PrimitiveRequest {
             self.httpMethod = httpMethod
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             configuration.request.httpMethod = httpMethod
         }
     }

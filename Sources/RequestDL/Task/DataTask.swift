@@ -42,11 +42,11 @@ import Foundation
      .response()
  }
  ```
- - Note: `DataTask` is a generic type that accepts a type that conforms to `Request` as its
- parameter. `Request` protocol contains information about the request such as its URL, headers,
+ - Note: `DataTask` is a generic type that accepts a type that conforms to `Property` as its
+ parameter. `Property` protocol contains information about the request such as its URL, headers,
  body and etc.
  */
-public struct DataTask<Content: Request>: Task {
+public struct DataTask<Content: Property>: Task {
 
     private let content: Content
 
@@ -55,7 +55,7 @@ public struct DataTask<Content: Request>: Task {
 
      - Parameter content: The content of the request.
      */
-    public init(@RequestBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 }

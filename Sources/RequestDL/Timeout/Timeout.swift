@@ -51,7 +51,7 @@ import Foundation
  before terminating the connection. The timeout parameter is the duration of time before the timeout
  occurs, and the source parameter specifies the type of timeout to be applied
  */
-public struct Timeout: Request {
+public struct Timeout: Property {
 
     public typealias Body = Never
 
@@ -81,7 +81,7 @@ public struct Timeout: Request {
     }
 }
 
-extension Timeout: PrimitiveRequest {
+extension Timeout: PrimitiveProperty {
 
     struct Object: NodeObject {
 
@@ -93,7 +93,7 @@ extension Timeout: PrimitiveRequest {
             self.source = source
         }
 
-        func makeRequest(_ configuration: RequestConfiguration) {
+        func makeProperty(_ configuration: MakeConfiguration) {
             if source.contains(.request) {
                 configuration.configuration.timeoutIntervalForRequest = timeout
             }

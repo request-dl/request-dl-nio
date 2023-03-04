@@ -28,7 +28,7 @@ import Foundation
 
 extension Headers {
 
-    public struct ContentLength: Request {
+    public struct ContentLength: Property {
 
         private let bytes: Int
 
@@ -43,7 +43,7 @@ extension Headers {
     }
 }
 
-extension Headers.ContentLength: PrimitiveRequest {
+extension Headers.ContentLength: PrimitiveProperty {
 
     func makeObject() -> Headers.Object {
         .init(bytes, forKey: "Content-Length")

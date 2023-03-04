@@ -44,7 +44,7 @@ import Foundation
  }
  ```
  */
-public struct Group<Content: Request>: Request {
+public struct Group<Content: Property>: Property {
 
     private let content: Content
 
@@ -54,7 +54,7 @@ public struct Group<Content: Request>: Request {
      - Parameters:
         - content: The closure that contains the requests to be grouped.
      */
-    public init(@RequestBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 
@@ -64,7 +64,10 @@ public struct Group<Content: Request>: Request {
     }
 
     /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: Group<Content>, _ context: Context) async {
-        await Content.makeRequest(request.content, context)
+    public static func makeProperty(
+        _ property: Self,
+        _ context: Context
+    ) async {
+        await Content.makeProperty(property.content, context)
     }
 }

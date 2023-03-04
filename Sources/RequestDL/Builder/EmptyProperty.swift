@@ -1,5 +1,5 @@
 //
-//  _TupleRequest.swift
+//  Empty.swift
 //
 //  MIT License
 //
@@ -26,24 +26,26 @@
 
 import Foundation
 
-// swiftlint:disable type_name
-/// This struct is marked as internal and is not intended
-/// to be used directly by clients of this framework.
-public struct _TupleRequest<T>: Request {
+/// A struct representing an empty request.
+public struct EmptyProperty: Property {
 
-    private let transformHandler: (Context) async -> Void
-
-    init(transform: @escaping (Context) async -> Void) {
-        self.transformHandler = transform
-    }
+    /// Initializes an empty request.
+    public init() {}
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         Never.bodyException()
     }
+}
 
-    /// This method is used internally and should not be called directly.
-    public static func makeRequest(_ request: _TupleRequest<T>, _ context: Context) async {
-        await request.transformHandler(context)
+extension EmptyProperty: PrimitiveProperty {
+
+    struct Object: NodeObject {
+
+        func makeProperty(_ configuration: MakeConfiguration) {}
+    }
+
+    func makeObject() -> Object {
+        .init()
     }
 }
