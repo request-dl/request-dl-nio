@@ -12,3 +12,13 @@ identifier_name:
     excluded:
         - id
         - ok
+
+type_name:
+    allowed_symbols:
+        - _TupleContent
+        - _OptionalContent
+        - _ConditionalContent
+        - _EncodablePayload
+        - _DataPayload
+        - _DictionaryPayload
+        - _StringPayload

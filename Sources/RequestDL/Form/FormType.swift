@@ -58,7 +58,9 @@ enum FormType {
             let fileName = formFile.url.absoluteString.split(separator: "/").last
         else {
             fatalError(
-                "\(formFile.url.absoluteString) is not a file or it doesn't contains a valid file name"
+                """
+                The file at \(formFile.url.absoluteString) is either not a file or does not contain a valid file name.
+                """
             )
         }
 

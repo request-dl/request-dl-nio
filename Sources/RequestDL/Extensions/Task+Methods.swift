@@ -41,7 +41,7 @@ extension Task {
      */
     public func ping(_ times: Int = 1, debug: Bool = true) async throws {
         guard times > 0 else {
-            fatalError()
+            fatalError("The 'times' parameter must be greater than 0.")
         }
 
         for index in 0 ..< times {

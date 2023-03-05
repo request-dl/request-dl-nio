@@ -48,7 +48,7 @@ public struct RequestBackgroundAdaptor {
      finished.
      */
     public var wrappedValue: (String) -> Void {
-        get { fatalError("get not implemented") }
+        get { fatalError("The 'get' operation for wrapped value is not implemented.") }
         set { BackgroundService.shared.completionHandler = newValue }
     }
 }

@@ -62,7 +62,13 @@ public struct ClientCertificate: Property {
         guard
             let url = bundle.url(forResource: name, withExtension: "pfx"),
             let data = try? Data(contentsOf: url)
-        else { fatalError() }
+        else {
+            fatalError(
+                """
+                Failed to initialize PKCS12 object with the provided name, bundle, and password.
+                """
+            )
+        }
 
         self.init(data, password: password)
     }
@@ -109,7 +115,7 @@ private extension ClientCertificate.Object {
             let thePKCS12 = PKCS12(data, password: password),
             let credentials = URLCredential(PKCS12: thePKCS12)
         else {
-            fatalError("SecPKCS12Import returned an error trying to import PKCS12 data")
+            fatalError("An error occurred while attempting to import the PKCS12 data using SecPKCS12Import.")
         }
 
         return (.useCredential, credentials)

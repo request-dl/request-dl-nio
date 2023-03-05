@@ -26,7 +26,6 @@
 
 import Foundation
 
-// swiftlint:disable type_name
 /// This struct is marked as internal and is not intended
 /// to be used directly by clients of this framework.
 public struct _ConditionalContent<

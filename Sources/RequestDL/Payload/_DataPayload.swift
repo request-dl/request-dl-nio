@@ -26,7 +26,6 @@
 
 import Foundation
 
-// swiftlint:disable type_name
 public struct _DataPayload: PayloadProvider {
 
     public let data: Data

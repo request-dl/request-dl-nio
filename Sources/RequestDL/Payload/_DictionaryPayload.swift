@@ -26,7 +26,6 @@
 
 import Foundation
 
-// swiftlint:disable type_name
 public struct _DictionaryPayload: PayloadProvider {
 
     private let dictionary: [String: Any]
@@ -47,7 +46,11 @@ public struct _DictionaryPayload: PayloadProvider {
                 options: options
             )
         } catch {
-            fatalError(error.localizedDescription)
+            fatalError(
+                """
+                An error occurred while trying to serialize JSON data: \(error.localizedDescription).
+                """
+            )
         }
     }
 }

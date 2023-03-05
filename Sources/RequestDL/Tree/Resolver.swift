@@ -44,7 +44,11 @@ struct Resolver<Content: Property> {
         let context = await resolve()
 
         guard let object = context.find(BaseURL.Object.self) else {
-            fatalError()
+            fatalError(
+                """
+                Failed to find the required BaseURL object in the context.
+                """
+            )
         }
 
         let sessionObject = context.find(Session.Object.self)

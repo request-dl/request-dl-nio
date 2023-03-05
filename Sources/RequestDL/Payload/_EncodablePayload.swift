@@ -26,7 +26,6 @@
 
 import Foundation
 
-// swiftlint:disable type_name
 public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
 
     private let object: Object
@@ -44,7 +43,11 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
         do {
             return try encoder.encode(object)
         } catch {
-            fatalError(error.localizedDescription)
+            fatalError(
+                """
+                An error occurred while trying to encode the object to data: \(error.localizedDescription).
+                """
+            )
         }
     }
 }
