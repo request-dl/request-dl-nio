@@ -29,7 +29,65 @@ import XCTest
 
 final class MultipartFormConstructorTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testSingleMultipartConstructor() async throws {
+        // Given
+        let value = "foo"
+        let form = PartFormRawValue(Data(value.utf8), forHeaders: [
+            "Content-Disposition": "form-data; name=\"string\""
+        ])
+
+        // When
+        let constructor = MultipartFormConstructor([form])
+        let reversed = ReverseFormData(constructor.body, boundary: constructor.boundary)
+
+        // Then
+        XCTAssertEqual(reversed.items.count, 1)
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Disposition"],
+            "form-data; name=\"string\""
+        )
+
+        XCTAssertEqual(reversed.items[0].data, value)
+    }
+
+    func testMultipleMultipartConstructor() async throws {
+        // Given
+        let value1 = "foo"
+        let form1 = PartFormRawValue(Data(value1.utf8), forHeaders: [
+            "Content-Disposition": "form-data; name=\"string\""
+        ])
+
+        let value2 = CharacterSet.alphanumerics.description
+        let form2 = PartFormRawValue(Data(value2.utf8), forHeaders: [
+            "Content-Disposition": "form-data; name=\"document\"; filename=\"document.pdf\"",
+            "Content-Type": ContentType.pdf
+        ])
+
+        // When
+        let constructor = MultipartFormConstructor([form1, form2])
+        let reversed = ReverseFormData(constructor.body, boundary: constructor.boundary)
+
+        // Then
+        XCTAssertEqual(reversed.items.count, 2)
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Disposition"],
+            "form-data; name=\"string\""
+        )
+
+        XCTAssertEqual(reversed.items[0].data, value1)
+
+        XCTAssertEqual(
+            reversed.items[1].headers?["Content-Disposition"],
+            "form-data; name=\"document\"; filename=\"document.pdf\""
+        )
+
+        XCTAssertEqual(
+            reversed.items[1].headers?["Content-Type"],
+            "application/pdf"
+        )
+
+        XCTAssertEqual(reversed.items[1].data, value2)
     }
 }

@@ -29,7 +29,27 @@ import XCTest
 
 final class FormValueTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testSingleForm() async {
+        // Given
+        let key = "title"
+        let value = "foo"
+        let property = FormValue(value, forKey: key)
+
+        // When
+        let (_, request) = await resolve(TestProperty(property))
+        let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
+        let boundary = ReverseFormData.extractBoundary(contentTypeHeader) ?? "nil"
+        let reversed = ReverseFormData(request.httpBody ?? Data(), boundary: boundary)
+
+        // Then
+        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
+        XCTAssertEqual(reversed.items.count, 1)
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Disposition"],
+            "form-data; name=\"\(key)\""
+        )
+
+        XCTAssertEqual(reversed.items[0].data, value)
     }
 }

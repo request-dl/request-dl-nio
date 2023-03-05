@@ -49,6 +49,7 @@ struct MultipartFormConstructor {
 
         for part in multipart {
             data.append(part)
+            data.append(Data("\(eol)".utf8))
         }
 
         data.append(Data("--\(boundary)--".utf8))
@@ -65,7 +66,8 @@ extension MultipartFormConstructor {
             .joined(separator: "\(eol)")
 
         var data = Data("\(headers)\(eol)".utf8)
-        data.append(data)
+        data.append(Data("\(eol)".utf8))
+        data.append(multipart.data)
         return data
     }
 }
