@@ -164,3 +164,10 @@ extension ContentType: ExpressibleByStringLiteral {
         self.init(value)
     }
 }
+
+extension ContentType: CustomStringConvertible {
+
+    public var description: String {
+        rawValue
+    }
+}

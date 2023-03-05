@@ -46,39 +46,37 @@ public struct FormFile: Property {
     public typealias Body = Never
 
     let url: URL
-    let key: String?
-    let fileManager: FileManager
+    let key: String
+    let fileName: String
     let contentType: ContentType
 
     public init(
-        key: String = "",
         _ url: URL,
-        withType contentType: ContentType,
-        _ fileManager: FileManager = .default
+        forKey key: String,
+        fileName: String?, // if nil, will get the file name from URL provided
+        type: ContentType? // if nil, will get the contentType from URL or use application/octet-stream if fails
     ) {
-        self.key = key.isEmpty ? nil : key
         self.url = url
-        self.fileManager = fileManager
-        self.contentType = contentType
-    }
+        self.key = key
+        self.fileName = fileName ?? {
+            let contents = url.lastPathComponent.split(separator: ".")
 
-    public init(
-        key: String = "",
-        _ url: URL,
-        _ fileManager: FileManager = .default
-    ) {
-        self.key = key.isEmpty ? nil : key
-        self.url = url
-        self.fileManager = fileManager
+            guard contents.count > 1 else {
+                return contents.joined(separator: ".")
+            }
 
-        guard let fileExtension = url.absoluteString.split(separator: ".").last else {
-            self.contentType = "any"
-            return
-        }
+            return contents.dropLast().joined(separator: ".")
+        }()
+        self.contentType = type ?? {
+            guard
+                !url.pathExtension.isEmpty,
+                let contentType = ContentType.allCases.first(where: {
+                    $0.rawValue.contains(url.pathExtension)
+                })
+            else { return "application/octet-stream" }
 
-        self.contentType = .allCases.first(where: {
-            $0.rawValue.contains(fileExtension)
-        }) ?? ContentType(fileExtension)
+            return contentType
+        }()
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -90,6 +88,13 @@ public struct FormFile: Property {
 extension FormFile: PrimitiveProperty {
 
     func makeObject() -> FormObject {
-        .init(.file(self))
+        FormObject {
+            let data = (try? Data(contentsOf: url)) ?? Data()
+
+            return PartFormRawValue(data, forHeaders: [
+                kContentDisposition: kContentDispositionValue(fileName, forKey: key),
+                "Content-Type": contentType
+            ])
+        }
     }
 }

@@ -28,15 +28,20 @@ import Foundation
 
 struct FormObject: NodeObject {
 
-    let type: FormType
+    let factory: () -> PartFormRawValue
 
-    init(_ type: FormType) {
-        self.type = type
+    init(_ factory: @escaping () -> PartFormRawValue) {
+        self.factory = factory
     }
 
     func makeProperty(_ configuration: MakeConfiguration) {
-        let boundary = FormUtils.boundary
-        configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        configuration.request.httpBody = FormUtils.buildBody([type.data], with: boundary)
+        let constructor = MultipartFormConstructor([factory()])
+
+        configuration.request.setValue(
+            "multipart/form-data; boundary=\"\(constructor.boundary)\"",
+            forHTTPHeaderField: "Content-Type"
+        )
+
+        configuration.request.httpBody = constructor.body
     }
 }

@@ -1,5 +1,5 @@
 //
-//  FormUtilsTests.swift
+//  Form.swift
 //
 //  MIT License
 //
@@ -27,7 +27,7 @@
 import XCTest
 @testable import RequestDL
 
-final class FormUtilsTests: XCTestCase {
+final class FormGroupTests: XCTestCase {
 
     func testHelloWorld() async throws {
         XCTAssertEqual("Hello World!", "Hello World!")

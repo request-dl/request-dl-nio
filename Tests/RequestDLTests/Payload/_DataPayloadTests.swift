@@ -29,7 +29,14 @@ import XCTest
 
 final class _DataPayloadTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testDataPayload() async throws {
+        // Given
+        let data = Data("foo".utf8)
+
+        // When
+        let payload = _DataPayload(data)
+
+        // Then
+        XCTAssertEqual(payload.data, data)
     }
 }

@@ -1,5 +1,5 @@
 //
-//  FormTests.swift
+//  PartFormRawValue.swift
 //
 //  MIT License
 //
@@ -27,7 +27,7 @@
 import XCTest
 @testable import RequestDL
 
-final class FormTests: XCTestCase {
+final class PartFormRawValueTests: XCTestCase {
 
     func testHelloWorld() async throws {
         XCTAssertEqual("Hello World!", "Hello World!")

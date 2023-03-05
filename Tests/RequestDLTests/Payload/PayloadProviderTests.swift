@@ -29,7 +29,22 @@ import XCTest
 
 final class PayloadProviderTests: XCTestCase {
 
+    struct PayloadProviderMock: PayloadProvider {
+        let data: Data
+
+        init(_ data: Data) {
+            self.data = data
+        }
+    }
+
     func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+        // Given
+        let data = Data("foo".utf8)
+
+        // When
+        let payload = PayloadProviderMock(data)
+
+        // Then
+        XCTAssertEqual(payload.data, data)
     }
 }

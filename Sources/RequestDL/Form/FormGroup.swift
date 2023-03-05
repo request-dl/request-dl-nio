@@ -29,20 +29,20 @@ import Foundation
 /**
  A type representing an HTTP form with a list of content.
 
- Use `Form` to represent an HTTP form with a list of content, which can be used in an HTTP request.
+ Use `FormGroup` to represent an HTTP form with a list of content, which can be used in an HTTP request.
  This type conforms to `Property`, allowing it to be composed with other `Property` objects.
 
  The content of the form is specified using a property builder syntax, allowing you to create a list of
  properties objects.
 
  ```swift
- Form {
+ FormGroup {
      FormValue("John", forKey: "name")
      FormValue(25, forKey: "age")
  }
  ```
  */
-public struct Form<Content: Property>: Property {
+public struct FormGroup<Content: Property>: Property {
 
     public typealias Body = Never
 
@@ -79,7 +79,7 @@ public struct Form<Content: Property>: Property {
 
         let parameters = newContext
             .findCollection(FormObject.self)
-            .map(\.type)
+            .map(\.factory)
 
         context.append(Node(
             root: context.root,
@@ -89,22 +89,26 @@ public struct Form<Content: Property>: Property {
     }
 }
 
-extension Form {
+extension FormGroup {
 
     struct Object: NodeObject {
-        private let types: [FormType]
+        private let multipart: [() -> PartFormRawValue]
 
-        init(_ types: [FormType]) {
-            self.types = types
+        init(_ multipart: [() -> PartFormRawValue]) {
+            self.multipart = multipart
         }
 
         func makeProperty(_ configuration: MakeConfiguration) {
-            let boundary = FormUtils.boundary
+            let multipart = multipart.map { $0() }
+
+            let constructor = MultipartFormConstructor(multipart)
+
             configuration.request.setValue(
-                "multipart/form-data; boundary=\(boundary)",
+                "multipart/form-data; boundary=\"\(constructor.body)\"",
                 forHTTPHeaderField: "Content-Type"
             )
-            configuration.request.httpBody = FormUtils.buildBody(types.map(\.data), with: boundary)
+
+            configuration.request.httpBody = constructor.body
         }
     }
 }
