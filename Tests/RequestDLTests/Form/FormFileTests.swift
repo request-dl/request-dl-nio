@@ -29,7 +29,143 @@ import XCTest
 
 final class FormFileTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testFileFormWithFileNameAndContentType() async throws {
+        // Given
+        let value = "foo"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bar")
+            .appendingPathExtension("pdf")
+
+        try Data(value.utf8).write(to: url)
+
+        let property = FormFile(
+            url,
+            forKey: "document",
+            fileName: "file.pdf",
+            type: .pdf
+        )
+
+        // When
+        let (_, request) = await resolve(TestProperty(property))
+        let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
+        let boundary = ReverseFormData.extractBoundary(contentTypeHeader) ?? "nil"
+        let reversed = ReverseFormData(request.httpBody ?? Data(), boundary: boundary)
+
+        // Then
+        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
+        XCTAssertEqual(reversed.items.count, 1)
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Disposition"],
+            "form-data; name=\"\(property.key)\"; filename=\"\(property.fileName)\""
+        )
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Type"],
+            property.contentType.rawValue
+        )
+
+        XCTAssertEqual(reversed.items[0].data, value)
+    }
+
+    func testEmptyFileName() async throws {
+        // Given
+        let value = "foo"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bar")
+            .appendingPathExtension("pdf")
+
+        try Data(value.utf8).write(to: url)
+
+        let property = FormFile(
+            url,
+            forKey: "document",
+            fileName: "",
+            type: .pdf
+        )
+
+        // When
+        let (_, request) = await resolve(TestProperty(property))
+        let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
+        let boundary = ReverseFormData.extractBoundary(contentTypeHeader) ?? "nil"
+        let reversed = ReverseFormData(request.httpBody ?? Data(), boundary: boundary)
+
+        // Then
+        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
+        XCTAssertEqual(reversed.items.count, 1)
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Disposition"],
+            "form-data; name=\"\(property.key)\"; filename=\"\""
+        )
+
+        XCTAssertEqual(
+            reversed.items[0].headers?["Content-Type"],
+            property.contentType.rawValue
+        )
+
+        XCTAssertEqual(reversed.items[0].data, value)
+    }
+
+    func testFileNameResolver() async throws {
+        // Given
+        let value = "foo"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bar")
+            .appendingPathExtension("pdf")
+
+        try Data(value.utf8).write(to: url)
+
+        // When
+        let fileName = FormFile(
+            url,
+            forKey: "document",
+            fileName: nil,
+            type: .pdf
+        ).fileName
+
+        // Then
+        XCTAssertEqual(fileName, "bar.pdf")
+    }
+
+    func testContentTypeResolver() async throws {
+        // Given
+        let value = "foo"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bar")
+            .appendingPathExtension("pdf")
+
+        try Data(value.utf8).write(to: url)
+
+        // When
+        let contentType = FormFile(
+            url,
+            forKey: "document",
+            fileName: nil,
+            type: nil
+        ).contentType
+
+        // Then
+        XCTAssertEqual(contentType, .pdf)
+    }
+
+    func testOctetStreamResolved() async throws {
+        // Given
+        let value = "foo"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bar")
+
+        try Data(value.utf8).write(to: url)
+
+        // When
+        let contentType = FormFile(
+            url,
+            forKey: "document",
+            fileName: nil,
+            type: nil
+        ).contentType
+
+        // Then
+        XCTAssertEqual(contentType, "application/octet-stream")
     }
 }

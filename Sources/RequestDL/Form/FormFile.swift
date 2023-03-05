@@ -59,13 +59,7 @@ public struct FormFile: Property {
         self.url = url
         self.key = key
         self.fileName = fileName ?? {
-            let contents = url.lastPathComponent.split(separator: ".")
-
-            guard contents.count > 1 else {
-                return contents.joined(separator: ".")
-            }
-
-            return contents.dropLast().joined(separator: ".")
+            url.lastPathComponent
         }()
         self.contentType = type ?? {
             guard
