@@ -29,7 +29,7 @@ add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/username/RequestDL.git", from: "1.0.0")
+    .package(url: "https://github.com/brennobemoura/request-dl.git", from: "1.0.0")
 ]
 ```
 
