@@ -101,7 +101,7 @@ extension Headers {
 
         /// Returns an exception since `Never` is a type that can never be constructed.
         public var body: Never {
-            Never.bodyException()
+            bodyException()
         }
     }
 }
@@ -134,7 +134,7 @@ extension Headers.Cache: PrimitiveProperty {
             }
 
             if let policy = policy {
-                configuration.request.cachePolicy = policy
+                configuration.configuration.requestCachePolicy = policy
             }
         }
     }
@@ -269,10 +269,10 @@ extension Headers.Cache {
     }
 
     /**
-     A method to set the `staleIfError` property value of the receiver `Cache` object.
+     Sets the `stale-if-error` value to the given number of seconds.
 
-     - Parameter seconds: An `Int` value representing the number of seconds to set for the `staleIfError` property.
-     - Returns: A `Cache` object with the `staleIfError` property set to the provided value.
+     - Parameter seconds: The value to be set.
+     - Returns: The modified Cache object.     
      */
     public func staleIfError(_ seconds: Int) -> Self {
         edit { $0.staleIfError = seconds }

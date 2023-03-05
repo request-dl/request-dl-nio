@@ -43,7 +43,10 @@ extension Headers {
         }
 
         func makeProperty(_ configuration: MakeConfiguration) {
-            configuration.request.setValue("\(value)", forHTTPHeaderField: key)
+            let value = "\(value)"
+            if !value.isEmpty {
+                configuration.request.setValue(value, forHTTPHeaderField: key)
+            }
             next?.makeProperty(configuration)
         }
     }

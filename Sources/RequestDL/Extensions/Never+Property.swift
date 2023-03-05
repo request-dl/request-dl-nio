@@ -28,15 +28,14 @@ import Foundation
 
 extension Never: Property {
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
-        Never.bodyException()
+        self
     }
 }
 
-extension Never {
-
-    static func bodyException() -> Never {
+extension Property {
+    
+    func bodyException() -> Never {
         preconditionFailure("An unexpected attempt was made to access the property body.")
     }
 }

@@ -47,9 +47,23 @@ extension Headers {
         private let value: Any
 
         /**
+         Initializes a `Origin` property with the given `host` and `port`.
+
+         - Parameters:
+            - host: A `StringProtocol` representing the host.
+            - port: A `StringProtocol` representing the port.
+         */
+        public init<Host, Port>(
+            _ host: Host,
+            port: Port
+        ) where Host: StringProtocol, Port: StringProtocol {
+            self.value = "\(host):\(port)"
+        }
+
+        /**
          Initializes an `Origin` header field with the given origin value.
 
-         - Parameter origin: The value of the `Origin` header field to be set.
+         - Parameter host: A `StringProtocol` representing the host.
          */
         public init<S: StringProtocol>(_ origin: S) {
             self.value = origin
@@ -57,7 +71,7 @@ extension Headers {
 
         /// Returns an exception since `Never` is a type that can never be constructed.
         public var body: Never {
-            Never.bodyException()
+            bodyException()
         }
     }
 }

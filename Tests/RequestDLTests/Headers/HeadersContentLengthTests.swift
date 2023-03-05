@@ -29,7 +29,9 @@ import XCTest
 
 final class HeadersContentLengthTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testContentLength() async throws {
+        let property = TestProperty(Headers.ContentLength(1_000_000))
+        let (_, request) = await resolve(property)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Length"), "1000000")
     }
 }

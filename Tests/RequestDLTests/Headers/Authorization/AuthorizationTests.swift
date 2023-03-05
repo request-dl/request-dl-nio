@@ -29,7 +29,26 @@ import XCTest
 
 final class AuthorizationTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testAuthorizationWithTypeAndToken() async {
+        // Given
+        let auth = Authorization(.bearer, token: "myToken")
+
+        // When
+        let (_, request) = await resolve(TestProperty(auth))
+
+        // Then
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer myToken")
     }
+
+    func testAuthorizationWithUsernameAndPassword() async {
+        let auth = Authorization(username: "myUser", password: "myPassword")
+
+        // When
+        let (_, request) = await resolve(TestProperty(auth))
+
+        // Then
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Basic bXlVc2VyOm15UGFzc3dvcmQ=")
+    }
+
+    
 }

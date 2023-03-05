@@ -29,7 +29,15 @@ import XCTest
 
 final class HeadersOriginTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testHost() async throws {
+        let property = TestProperty(Headers.Origin("google.com"))
+        let (_, request) = await resolve(property)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "google.com")
+    }
+
+    func testHostWithPort() async throws {
+        let property = TestProperty(Headers.Origin("google.com", port: "8080"))
+        let (_, request) = await resolve(property)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "google.com:8080")
     }
 }

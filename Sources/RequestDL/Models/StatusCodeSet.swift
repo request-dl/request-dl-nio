@@ -96,6 +96,13 @@ extension StatusCodeSet {
 
 extension StatusCodeSet {
 
+    public var count: Int {
+        statusCodes.count
+    }
+}
+
+extension StatusCodeSet {
+
     /// A set containing all HTTP status codes in the range of 200 to 299.
     public static let success: StatusCodeSet = {
         StatusCodeSet((200 ..< 300).map(StatusCode.init(_:)))

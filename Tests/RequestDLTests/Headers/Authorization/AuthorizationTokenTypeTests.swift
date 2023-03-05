@@ -29,7 +29,23 @@ import XCTest
 
 final class AuthorizationTokenTypeTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testInitRawValueBasic() {
+        let type = Authorization.TokenType(rawValue: "Basic")
+        XCTAssertEqual(type, .basic)
+    }
+    
+    func testInitRawValueBearer() {
+        let type = Authorization.TokenType(rawValue: "Bearer")
+        XCTAssertEqual(type, .bearer)
+    }
+    
+    func testRawValueBasic() {
+        let type = Authorization.TokenType.basic
+        XCTAssertEqual(type.rawValue, "Basic")
+    }
+    
+    func testRawValueBearer() {
+        let type = Authorization.TokenType.bearer
+        XCTAssertEqual(type.rawValue, "Bearer")
     }
 }
