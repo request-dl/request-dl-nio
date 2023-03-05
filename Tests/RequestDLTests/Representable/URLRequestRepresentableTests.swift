@@ -29,7 +29,21 @@ import XCTest
 
 final class URLRequestRepresentableTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    struct URLRequestMock: URLRequestRepresentable {
+
+        func updateRequest(_ request: inout URLRequest) {
+            request.setValue("password", forHTTPHeaderField: "api_key")
+        }
+    }
+
+    func testUpdateRequest() async throws {
+        // Given
+        let property = URLRequestMock()
+
+        // When
+        let (_, request) = await resolve(TestProperty(property))
+
+        // Then
+        XCTAssertEqual(request.value(forHTTPHeaderField: "api_key"), "password")
     }
 }

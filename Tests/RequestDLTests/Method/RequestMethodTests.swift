@@ -29,25 +29,6 @@ import XCTest
 
 final class RequestMethodTests: XCTestCase {
 
-    /**
-     Reference test case:
-
-         let property = TestProperty(RequestMethod(.get))
-         let (_, request) = await resolve(property)
-         XCTAssertEqual(request.httpMethod, "GET")
-
-     Other ways to initialize:
-
-         RequestMethod(.head) :: expects "HEAD"
-         RequestMethod(.post) :: expects "POST"
-         RequestMethod(.put) :: expects "PUT"
-         RequestMethod(.delete) :: expects "DELETE"
-         RequestMethod(.connect) :: expects "CONNECT"
-         RequestMethod(.options) :: expects "OPTIONS"
-         RequestMethod(.trace) :: expects "TRACE"
-         RequestMethod(.patch) :: expects "PATCH"
-     */
-
     func testGetHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.get))
         let (_, request) = await resolve(property)

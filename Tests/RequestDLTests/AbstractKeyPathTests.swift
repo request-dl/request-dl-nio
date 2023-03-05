@@ -29,7 +29,16 @@ import XCTest
 
 final class AbstractKeyPathTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testKeyPath() async throws {
+        // Given
+        func getValue(_ keyPath: KeyPath<AbstractKeyPath, String>) -> String {
+            AbstractKeyPath()[keyPath: keyPath]
+        }
+
+        // When
+        let keyPath = getValue(\.results)
+
+        // Then
+        XCTAssertEqual(keyPath, "results")
     }
 }

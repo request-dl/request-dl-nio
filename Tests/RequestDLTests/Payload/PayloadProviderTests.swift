@@ -1,5 +1,5 @@
 //
-//  PayloadProvider.swift
+//  PayloadProviderTests.swift
 //
 //  MIT License
 //
@@ -23,3 +23,13 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //  SOFTWARE.
 //
+
+import XCTest
+@testable import RequestDL
+
+final class PayloadProviderTests: XCTestCase {
+
+    func testHelloWorld() async throws {
+        XCTAssertEqual("Hello World!", "Hello World!")
+    }
+}

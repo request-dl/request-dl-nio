@@ -1,5 +1,5 @@
 //
-//  URLSessionRepresentableTests.swift
+//  URLSessionConfigurationRepresentableTests.swift
 //
 //  MIT License
 //
@@ -27,9 +27,25 @@
 import XCTest
 @testable import RequestDL
 
-final class URLSessionRepresentableTests: XCTestCase {
+final class URLSessionConfigurationRepresentableTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    struct URLSessionConfigurationMock: URLSessionConfigurationRepresentable {
+
+        func updateSessionConfiguration(_ sessionConfiguration: URLSessionConfiguration) {
+            sessionConfiguration.timeoutIntervalForRequest = 15
+            sessionConfiguration.timeoutIntervalForResource = 15
+        }
+    }
+
+    func testUpdateRequest() async throws {
+        // Given
+        let property = URLSessionConfigurationMock()
+
+        // When
+        let (session, _) = await resolve(TestProperty(property))
+
+        // Then
+        XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 15)
+        XCTAssertEqual(session.configuration.timeoutIntervalForResource, 15)
     }
 }

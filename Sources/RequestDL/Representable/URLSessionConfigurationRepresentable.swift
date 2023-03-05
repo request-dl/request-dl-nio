@@ -1,5 +1,5 @@
 //
-//  URLSessionRepresentable.swift
+//  URLSessionConfigurationRepresentable.swift
 //
 //  MIT License
 //

@@ -29,7 +29,20 @@ import XCTest
 
 final class NeverPropertyTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    private struct NeverBuilds: Property {
+
+        var body: some Property {
+            if true {
+                fatalError("Never builds")
+            }
+        }
+    }
+
+    func testNeverBuilder() async throws {
+        // Given
+        let neverBuildsType = NeverBuilds.Body.self
+
+        // Then
+        XCTAssertTrue(neverBuildsType is _OptionalContent<Never>.Type)
     }
 }

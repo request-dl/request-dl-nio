@@ -101,4 +101,20 @@ final class HeadersTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/jpeg")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "google.com")
     }
+
+    func testInvalidGroup() async {
+        // Given
+        let property = TestProperty {
+            BaseURL("localhost")
+            HeaderGroup {
+                Query("password", forKey: "api_key")
+            }
+        }
+
+        // When
+        let (_, request) = await resolve(property)
+
+        // Then
+        XCTAssertEqual(request.url?.absoluteString, "https://localhost")
+    }
 }
