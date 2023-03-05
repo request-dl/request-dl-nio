@@ -36,14 +36,16 @@ public struct FormData: Property {
     let key: String
     let contentType: ContentType
 
-    /// Creates a new `FormData` instance with the specified parameters.
-    ///
-    /// - Parameters:
-    ///   - data: The data to be sent.
-    ///   - key: The name to associate with the data.
-    ///   - fileName: The filename to associate with the data, according to RFC 7578.
-    ///   Defaults to an empty string.
-    ///   - type: The content type of the data.
+    /**
+     Creates a new `FormData` instance with the specified parameters.
+
+     - Parameters:
+        - data: The data to be sent.
+        - key: The name to associate with the data.
+        - fileName: The filename to associate with the data, according to RFC 7578.
+        Defaults to an empty string.
+        - type: The content type of the data.
+     */
     public init(
         _ data: Foundation.Data,
         forKey key: String,
@@ -56,14 +58,16 @@ public struct FormData: Property {
         self.contentType = type
     }
 
-    /// Creates a new `FormData` instance by encoding a value as JSON data.
-    ///
-    /// - Parameters:
-    ///   - object: The value to be encoded as JSON data.
-    ///   - key: The name to associate with the data.
-    ///   - fileName: The filename to associate with the data, according to RFC 7578.
-    ///   Defaults to an empty string.
-    ///   - encoder: The `JSONEncoder` to use for encoding the value.
+    /**
+     Creates a new `FormData` instance by encoding a value as JSON data.
+
+     - Parameters:
+        - object: The value to be encoded as JSON data.
+        - key: The name to associate with the data.
+        - fileName: The filename to associate with the data, according to RFC 7578.
+        Defaults to an empty string.
+        - encoder: The `JSONEncoder` to use for encoding the value.
+     */
     public init<T: Encodable>(
         _ object: T,
         forKey key: String,

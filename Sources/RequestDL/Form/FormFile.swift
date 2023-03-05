@@ -35,9 +35,9 @@ import Foundation
 
  ```swift
  FormFile(
-     key: "my_file",
      URL(fileURLWithPath: "/path/to/file"),
-     withType: .png
+     forKey: "my_file",,
+     type: .png
  )
  ```
 */
@@ -50,11 +50,22 @@ public struct FormFile: Property {
     let fileName: String
     let contentType: ContentType
 
+    /**
+     Initializes a new `FormFile` instance with a file located at the specified URL.
+
+     - Parameters:
+        - url: The URL location of the file to be sent.
+        - key: The name to associate with the file.
+        - fileName: The name to associate with the file. If `nil`, the name will be extracted
+        from the URL.
+        - type: The content type of the file. If `nil`, the type will be extracted from the URL or
+        default to `application/octet-stream`.
+     */
     public init(
         _ url: URL,
         forKey key: String,
-        fileName: String?, // if nil, will get the file name from URL provided
-        type: ContentType? // if nil, will get the contentType from URL or use application/octet-stream if fails
+        fileName: String?,
+        type: ContentType?
     ) {
         self.url = url
         self.key = key
