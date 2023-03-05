@@ -117,11 +117,6 @@ extension Path: PrimitiveProperty {
     }
 
     func makeObject() -> Object {
-        .init(
-            path
-                .split(separator: "/")
-                .filter { !$0.isEmpty }
-                .joined(separator: "/")
-        )
+        .init(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     }
 }
