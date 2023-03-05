@@ -29,7 +29,31 @@ import XCTest
 
 final class EmptyPropertyTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testEmptyBuilder() async {
+        // Given
+        @PropertyBuilder
+        var property: some Property {
+            let _ = 1
+        }
+
+        // When
+        let _ = await resolve(TestProperty(property))
+
+        // Then
+        XCTAssertTrue(property is EmptyProperty)
+    }
+
+    func testEmptyExplicitBuilder() async {
+        // Given
+        @PropertyBuilder
+        var property: some Property {
+            EmptyProperty()
+        }
+
+        // When
+        let _ = await resolve(TestProperty(property))
+
+        // Then
+        XCTAssertTrue(property is EmptyProperty)
     }
 }

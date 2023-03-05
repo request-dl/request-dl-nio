@@ -29,7 +29,22 @@ import XCTest
 
 final class ForEachTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testForEach() async {
+        // Given
+        let paths = ["api", "v1", "users"]
+
+        // When
+        let (_, request) = await resolve(TestProperty {
+            BaseURL("localhost")
+            ForEach(paths) { path in
+                Path(path)
+            }
+        })
+
+        // Then
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://localhost/api/v1/users"
+        )
     }
 }

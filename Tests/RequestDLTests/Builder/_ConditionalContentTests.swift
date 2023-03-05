@@ -29,7 +29,47 @@ import XCTest
 
 final class _ConditionalContentTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testConditionalFirstBuilder() async {
+        // Given
+        let chooseFirst = true
+
+        @PropertyBuilder
+        var result: some Property {
+            if chooseFirst {
+                BaseURL("google.com")
+            } else {
+                Headers.Origin("https://apple.com")
+            }
+        }
+
+        // When
+        let (_, request) = await resolve(result)
+
+        // Then
+        XCTAssertTrue(result is _ConditionalContent<BaseURL, Headers.Origin>)
+        XCTAssertEqual(request.url?.absoluteString, "https://google.com")
+        XCTAssertNil(request.allHTTPHeaderFields)
+    }
+
+    func testConditionalSecondBuilder() async {
+        // Given
+        let chooseFirst = false
+
+        @PropertyBuilder
+        var result: some Property {
+            if chooseFirst {
+                Headers.Origin("https://apple.com")
+            } else {
+                BaseURL("localhost")
+            }
+        }
+
+        // When
+        let (_, request) = await resolve(result)
+
+        // Then
+        XCTAssertTrue(result is _ConditionalContent<Headers.Origin, BaseURL>)
+        XCTAssertEqual(request.url?.absoluteString, "https://localhost")
+        XCTAssertNil(request.allHTTPHeaderFields)
     }
 }

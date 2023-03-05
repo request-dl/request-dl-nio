@@ -29,7 +29,34 @@ import XCTest
 
 final class GroupTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testSingleGroup() async {
+        // Given
+        let property = Group {
+            BaseURL("google.com")
+        }
+
+        // When
+        let (_, request) = await resolve(TestProperty(property))
+
+        // Then
+        XCTAssertEqual(request.url?.absoluteString, "https://google.com")
+    }
+
+    func testMultipleGroup() async {
+        // Given
+        let property = Group {
+            BaseURL("google.com")
+            Path("api/v1")
+            Query("all", forKey: "available_methods")
+        }
+
+        // When
+        let (_, request) = await resolve(TestProperty(property))
+
+        // Then
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://google.com/api/v1?available_methods=all"
+        )
     }
 }

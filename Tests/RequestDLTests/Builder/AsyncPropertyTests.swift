@@ -29,7 +29,24 @@ import XCTest
 
 final class AsyncPropertyTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testAsyncProperty() async throws {
+        // Given
+        var apiKey: String? {
+            get async {
+                "123ddf4"
+            }
+        }
+
+        // When
+        let (_, request) = await resolve(TestProperty {
+            AsyncProperty {
+                if let apiKey = await apiKey {
+                    Authorization(.bearer, token: apiKey)
+                }
+            }
+        })
+
+        // Then
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer 123ddf4")
     }
 }
