@@ -30,15 +30,15 @@ import XCTest
 final class RequestMethodTests: XCTestCase {
 
     func testDescriptions() {
-        XCTAssertEqual(RequestMethod.Get().rawValue, "GET")
-        XCTAssertEqual(RequestMethod.Head().rawValue, "HEAD")
-        XCTAssertEqual(RequestMethod.Post().rawValue, "POST")
-        XCTAssertEqual(RequestMethod.Put().rawValue, "PUT")
-        XCTAssertEqual(RequestMethod.Delete().rawValue, "DELETE")
-        XCTAssertEqual(RequestMethod.Connect().rawValue, "CONNECT")
-        XCTAssertEqual(RequestMethod.Options().rawValue, "OPTIONS")
-        XCTAssertEqual(RequestMethod.Trace().rawValue, "TRACE")
-        XCTAssertEqual(RequestMethod.Patch().rawValue, "PATCH")
+        XCTAssertEqual(HTTPMethod.get, "GET")
+        XCTAssertEqual(HTTPMethod.head, "HEAD")
+        XCTAssertEqual(HTTPMethod.post, "POST")
+        XCTAssertEqual(HTTPMethod.put, "PUT")
+        XCTAssertEqual(HTTPMethod.delete, "DELETE")
+        XCTAssertEqual(HTTPMethod.connect, "CONNECT")
+        XCTAssertEqual(HTTPMethod.options, "OPTIONS")
+        XCTAssertEqual(HTTPMethod.trace, "TRACE")
+        XCTAssertEqual(HTTPMethod.patch, "PATCH")
     }
 
     func testGetMethod() async {

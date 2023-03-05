@@ -43,23 +43,23 @@ public struct RequestMethod: Property {
 
     public typealias Body = Never
 
-    let rawMethod: RawRequestMethod
+    let httpMethod: HTTPMethod
 
     /**
-     Initializes a `HTTPMethod` instance with the specified HTTP request method.
+     Initializes a `RequestMethod` instance with the specified HTTP request method.
 
-     - Parameter type: The type of HTTP request method to use.
+     - Parameter httpMethod: The HTTP request method to use.
 
      In the following example, a GET request is made to the Apple developers website:
 
      ```swift
      DataTask {
          BaseURL("developer.apple.com")
-         Method(.get)
+         RequestMethod(.get)
      }
      */
-    public init<RawMethod: RawRequestMethod>(_ rawMethod: RawMethod) {
-        self.rawMethod = rawMethod
+    public init(_ httpMethod: HTTPMethod) {
+        self.httpMethod = httpMethod
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -84,6 +84,6 @@ extension RequestMethod: PrimitiveProperty {
     }
 
     func makeObject() -> Object {
-        .init(rawMethod.rawValue)
+        .init(httpMethod.rawValue)
     }
 }
