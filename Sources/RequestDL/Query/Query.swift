@@ -79,9 +79,9 @@ extension Query: PrimitiveProperty {
             self.value = "\(value)"
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             guard
-                let url = configuration.request.url,
+                let url = make.request.url,
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
             else { return }
 
@@ -90,7 +90,7 @@ extension Query: PrimitiveProperty {
             queryItems.append(.init(name: key, value: value))
             components.queryItems = queryItems
 
-            configuration.request.url = components.url ?? url
+            make.request.url = components.url ?? url
         }
     }
 

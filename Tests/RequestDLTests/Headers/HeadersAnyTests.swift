@@ -40,10 +40,18 @@ final class HeadersAnyTests: XCTestCase {
             Headers.Any("text/html", forKey: "Accept")
             Headers.Any("gzip", forKey: "Content-Encoding")
         }
-        
+
         let (_, request) = await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/html")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Encoding"), "gzip")
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.Any.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

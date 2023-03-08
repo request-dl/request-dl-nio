@@ -143,7 +143,7 @@ extension BaseURL: PrimitiveProperty {
             self.baseURL = baseURL
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {}
+        func makeProperty(_ make: Make) {}
     }
 
     func makeObject() -> Object {

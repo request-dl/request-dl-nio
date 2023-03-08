@@ -68,4 +68,12 @@ final class QueryTests: XCTestCase {
             """
         )
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Query.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

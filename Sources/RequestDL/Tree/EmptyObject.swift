@@ -34,5 +34,5 @@ struct EmptyObject<Content: Property>: NodeObject {
         self.content = content
     }
 
-    func makeProperty(_ configuration: MakeConfiguration) {}
+    func makeProperty(_ make: Make) {}
 }

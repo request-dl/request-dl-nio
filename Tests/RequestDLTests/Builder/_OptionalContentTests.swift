@@ -67,4 +67,12 @@ final class _OptionalContentTests: XCTestCase {
         XCTAssertTrue(result is _OptionalContent<BaseURL>)
         XCTAssertNotEqual(request.url?.absoluteString, "https://google.com")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = _OptionalContent<EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

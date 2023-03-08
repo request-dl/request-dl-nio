@@ -47,4 +47,12 @@ final class ForEachTests: XCTestCase {
             "https://localhost/api/v1/users"
         )
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = ForEach<[Int], EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

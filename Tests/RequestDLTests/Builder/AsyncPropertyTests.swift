@@ -49,4 +49,12 @@ final class AsyncPropertyTests: XCTestCase {
         // Then
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer 123ddf4")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = AsyncProperty<EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

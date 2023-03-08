@@ -22,3 +22,7 @@ type_name:
         - _DataPayload
         - _DictionaryPayload
         - _StringPayload
+
+large_tuple:
+    warning: 9
+    error: 16

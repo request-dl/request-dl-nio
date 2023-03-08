@@ -46,4 +46,12 @@ final class URLRequestRepresentableTests: XCTestCase {
         // Then
         XCTAssertEqual(request.value(forHTTPHeaderField: "api_key"), "password")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = URLRequestMock.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

@@ -72,8 +72,8 @@ extension Authorization: PrimitiveProperty {
             self.token = token
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
-            configuration.request.setValue("\(type.rawValue) \(token)", forHTTPHeaderField: "Authorization")
+        func makeProperty(_ make: Make) {
+            make.request.setValue("\(type.rawValue) \(token)", forHTTPHeaderField: "Authorization")
         }
     }
 

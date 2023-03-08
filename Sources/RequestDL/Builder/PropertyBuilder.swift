@@ -138,7 +138,7 @@ public struct PropertyBuilder {
     }
 }
 
-// swiftlint:disable function_parameter_count identifier_name large_tuple
+// swiftlint:disable function_parameter_count identifier_name
 extension PropertyBuilder {
 
     public static func buildBlock<

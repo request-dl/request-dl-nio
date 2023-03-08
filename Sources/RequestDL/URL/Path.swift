@@ -107,12 +107,12 @@ extension Path: PrimitiveProperty {
             self.path = path
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
-            guard let url = configuration.request.url else {
+        func makeProperty(_ make: Make) {
+            guard let url = make.request.url else {
                 return
             }
 
-            configuration.request.url = url.appendingPathComponent(path)
+            make.request.url = url.appendingPathComponent(path)
         }
     }
 

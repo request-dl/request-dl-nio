@@ -248,4 +248,12 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 40)
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 40)
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = _TupleContent<(EmptyProperty)>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

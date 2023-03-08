@@ -60,7 +60,7 @@ public struct ClientCertificate: Property {
      */
     public init(name: String, in bundle: Bundle, password: String) {
         guard
-            let url = bundle.url(forResource: name, withExtension: "pfx"),
+            let url = bundle.resolveURL(forResourceName: name),
             let data = try? Data(contentsOf: url)
         else {
             fatalError(
@@ -91,8 +91,8 @@ extension ClientCertificate: PrimitiveProperty {
             self.password = password
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
-            configuration.delegate.onDidReceiveChallenge {
+        func makeProperty(_ make: Make) {
+            make.delegate.onDidReceiveChallenge {
                 receivedChallenge($0)
             }
         }

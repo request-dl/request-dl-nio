@@ -34,7 +34,7 @@ extension Never: Property {
 }
 
 extension Property {
-    
+
     func bodyException() -> Never {
         preconditionFailure("An unexpected attempt was made to access the property body.")
     }

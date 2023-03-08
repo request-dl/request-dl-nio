@@ -87,9 +87,9 @@ final class PayloadTests: XCTestCase {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .millisecondsSince1970
+        encoder.dateEncodingStrategy = .secondsSince1970
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .millisecondsSince1970
+        decoder.dateDecodingStrategy = .secondsSince1970
 
         // When
         let property = TestProperty(Payload(mock, encoder: encoder))
@@ -105,5 +105,13 @@ final class PayloadTests: XCTestCase {
             mock.date.timeIntervalSince1970,
             expectedMock.date.timeIntervalSince1970
         )
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Payload<_DataPayload>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

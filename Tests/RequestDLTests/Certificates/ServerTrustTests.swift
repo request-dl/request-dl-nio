@@ -29,7 +29,58 @@ import XCTest
 
 final class ServerTrustTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testValidServer() async throws {
+        // Given
+        let certificate = try await DownloadCertificate(from: "https://github.com").download()
+        let url = Bundle.module.normalizedResourceURL
+            .appending("github_certificate", extension: "cer")
+
+        try certificate.write(to: url)
+
+        let property = ServerTrust(Certificate("github_certificate", in: .module))
+
+        // When
+        let response = try await DataTask {
+            BaseURL("github.com")
+            property
+        }.response().response as? HTTPURLResponse
+
+        // Then
+        XCTAssertEqual(response?.statusCode, 200)
+    }
+
+    func testInvalidServer() async throws {
+        // Given
+        let certificate = try await DownloadCertificate(from: "https://apple.com").download()
+        let url = Bundle.module.normalizedResourceURL
+            .appending("apple_certificate", extension: "cer")
+
+        try certificate.write(to: url)
+
+        let property = ServerTrust(Certificate("apple_certificate", in: .module))
+
+        // When
+        var responseError: URLError?
+
+        do {
+            _ = try await DataTask {
+                BaseURL("github.com")
+                property
+            }.response()
+        } catch {
+            responseError = error as? URLError
+        }
+
+        // Then
+        XCTAssertNotNil(responseError)
+        XCTAssertEqual(responseError?.code.rawValue, -999)
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = ServerTrust.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

@@ -40,4 +40,12 @@ final class HeadersOriginTests: XCTestCase {
         let (_, request) = await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "google.com:8080")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.Origin.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

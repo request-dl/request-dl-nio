@@ -34,7 +34,7 @@ public struct FormValue: Property {
     public typealias Body = Never
 
     let key: String
-    let value: CVarArg
+    let value: Any
 
     /**
      Creates a new instance of `FormValue` to represent a value with a corresponding key in a form.
@@ -47,7 +47,7 @@ public struct FormValue: Property {
         - key: The key used to reference the value in the form.
      */
     public init(
-        _ value: CVarArg,
+        _ value: Any,
         forKey key: String
     ) {
         self.key = key
@@ -64,7 +64,7 @@ extension FormValue: PrimitiveProperty {
 
     func makeObject() -> FormObject {
         FormObject {
-            PartFormRawValue(Data(String(format: "%@", value).utf8), forHeaders: [
+            PartFormRawValue(Data("\(value)".utf8), forHeaders: [
                 kContentDisposition: kContentDispositionValue(nil, forKey: key)
             ])
         }

@@ -28,5 +28,5 @@ import Foundation
 
 protocol NodeObject {
 
-    func makeProperty(_ configuration: MakeConfiguration)
+    func makeProperty(_ make: Make)
 }

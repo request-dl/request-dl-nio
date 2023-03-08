@@ -31,7 +31,8 @@ final class PartFormRawValueTests: XCTestCase {
 
     func testInitWithDataAndHeaders() throws {
         // Given
-        let data = "Test data".data(using: .utf8)!
+        let data = "Test data".data(using: .utf8) ?? Data()
+
         let headers: [String: Any] = [
             "Content-Type": "text/plain",
             "Content-Length": 9,

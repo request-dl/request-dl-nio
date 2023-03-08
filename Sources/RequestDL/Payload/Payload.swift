@@ -124,8 +124,8 @@ extension Payload: PrimitiveProperty {
             self.provider = provider
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
-            configuration.request.httpBody = provider.data
+        func makeProperty(_ make: Make) {
+            make.request.httpBody = provider.data
         }
     }
 

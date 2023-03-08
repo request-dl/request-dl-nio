@@ -1,5 +1,5 @@
 //
-//  PKCS12Tests.swift
+//  Make.swift
 //
 //  MIT License
 //
@@ -24,12 +24,21 @@
 //  SOFTWARE.
 //
 
-import XCTest
-@testable import RequestDL
+import Foundation
 
-final class PKCS12Tests: XCTestCase {
+class Make {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    var request: URLRequest
+    let configuration: URLSessionConfiguration
+    let delegate: DelegateProxy
+
+    init(
+        request: URLRequest,
+        configuration: URLSessionConfiguration,
+        delegate: DelegateProxy
+    ) {
+        self.request = request
+        self.configuration = configuration
+        self.delegate = delegate
     }
 }

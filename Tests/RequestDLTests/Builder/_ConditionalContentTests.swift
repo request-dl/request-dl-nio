@@ -72,4 +72,12 @@ final class _ConditionalContentTests: XCTestCase {
         XCTAssertEqual(request.url?.absoluteString, "https://localhost")
         XCTAssertNil(request.allHTTPHeaderFields)
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = _ConditionalContent<EmptyProperty, EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

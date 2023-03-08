@@ -59,4 +59,12 @@ final class GroupTests: XCTestCase {
             "https://google.com/api/v1?available_methods=all"
         )
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Group<EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

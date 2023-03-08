@@ -124,9 +124,9 @@ extension Headers.Cache: PrimitiveProperty {
             self.diskCapacity = diskCapacity
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             if let memoryCapacity = memoryCapacity, let diskCapacity = diskCapacity {
-                configuration.configuration.urlCache = URLCache(
+                make.configuration.urlCache = URLCache(
                     memoryCapacity: memoryCapacity,
                     diskCapacity: diskCapacity,
                     diskPath: Bundle.main.bundleIdentifier
@@ -134,7 +134,7 @@ extension Headers.Cache: PrimitiveProperty {
             }
 
             if let policy = policy {
-                configuration.configuration.requestCachePolicy = policy
+                make.configuration.requestCachePolicy = policy
             }
         }
     }
@@ -272,7 +272,7 @@ extension Headers.Cache {
      Sets the `stale-if-error` value to the given number of seconds.
 
      - Parameter seconds: The value to be set.
-     - Returns: The modified Cache object.     
+     - Returns: The modified Cache object.
      */
     public func staleIfError(_ seconds: Int) -> Self {
         edit { $0.staleIfError = seconds }

@@ -108,9 +108,9 @@ extension QueryGroup {
             self.parameters = parameters
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             guard
-                let url = configuration.request.url,
+                let url = make.request.url,
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
             else { return }
 
@@ -122,7 +122,7 @@ extension QueryGroup {
 
             components.queryItems = queryItems
 
-            configuration.request.url = components.url ?? url
+            make.request.url = components.url ?? url
         }
     }
 }

@@ -90,4 +90,12 @@ final class PathTests: XCTestCase {
             "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
         )
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Path.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

@@ -29,7 +29,72 @@ import XCTest
 
 final class ClientCertificateTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    override class func tearDown() {
+        super.tearDown()
+        FatalError.restoreFatalError()
+    }
+
+    func testLocalHost() async throws {
+        // Given
+        let url = FileManager.default.temporaryDirectory.appending("SwiftServer.\(UUID())")
+
+        try FileManager.default.createDirectory(
+            at: url,
+            withIntermediateDirectories: false
+        )
+
+        let serverCertificateName = "test_local_server_ca"
+        let clientCertificateName = "test_local_client_ca"
+        let password = "12345"
+
+        let process = try await MockServer.startWithCA(
+            url: url,
+            server: serverCertificateName,
+            client: clientCertificateName,
+            password: password
+        )
+
+        defer { process.interrupt() }
+
+        try await MockServer.writeCertificatesIntoBundle(
+            url: url,
+            server: serverCertificateName,
+            client: clientCertificateName
+        )
+
+        FatalError.replace { [weak process] in
+            process?.interrupt()
+            Swift.fatalError($0, file: $1, line: $2)
+        }
+
+        // When
+        let data = try await DataTask {
+            BaseURL("localhost:8080")
+            Path("index.txt")
+
+            ServerTrust(Certificate(
+                serverCertificateName,
+                in: .module
+            ))
+
+            ClientCertificate(
+                name: clientCertificateName,
+                in: .module,
+                password: password
+            )
+        }
+        .extractPayload()
+        .response()
+
+        // Then
+        XCTAssertEqual(String(data: data, encoding: .utf8), "Hello World!\n")
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = ClientCertificate.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

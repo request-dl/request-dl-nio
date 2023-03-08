@@ -34,14 +34,14 @@ struct FormObject: NodeObject {
         self.factory = factory
     }
 
-    func makeProperty(_ configuration: MakeConfiguration) {
+    func makeProperty(_ make: Make) {
         let constructor = MultipartFormConstructor([factory()])
 
-        configuration.request.setValue(
+        make.request.setValue(
             "multipart/form-data; boundary=\"\(constructor.boundary)\"",
             forHTTPHeaderField: "Content-Type"
         )
 
-        configuration.request.httpBody = constructor.body
+        make.request.httpBody = constructor.body
     }
 }

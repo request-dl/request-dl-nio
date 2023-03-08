@@ -42,7 +42,7 @@ extension EmptyProperty: PrimitiveProperty {
 
     struct Object: NodeObject {
 
-        func makeProperty(_ configuration: MakeConfiguration) {}
+        func makeProperty(_ make: Make) {}
     }
 
     func makeObject() -> Object {

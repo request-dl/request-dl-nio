@@ -172,4 +172,12 @@ final class BaseURLTests: XCTestCase {
         // Then
         XCTAssertEqual(request.url?.absoluteString, "ftp://apple.com")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = BaseURL.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

@@ -47,25 +47,30 @@ final class FormDataTests: XCTestCase {
 
         // When
         let (_, request) = await resolve(TestProperty(property))
+
         let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
-        let boundary = ReverseFormData.extractBoundary(contentTypeHeader) ?? "nil"
-        let reversed = ReverseFormData(request.httpBody ?? Data(), boundary: boundary)
+        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
+
+        let multipartForm = try MultipartFormParser(
+            request.httpBody ?? Data(),
+            boundary: boundary
+        ).parse()
 
         // Then
         XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(reversed.items.count, 1)
+        XCTAssertEqual(multipartForm.items.count, 1)
 
         XCTAssertEqual(
-            reversed.items[0].headers?["Content-Disposition"],
+            multipartForm.items[0].headers["Content-Disposition"],
             "form-data; name=\"\(property.key)\"; filename=\"\(property.fileName)\""
         )
 
         XCTAssertEqual(
-            reversed.items[0].headers?["Content-Type"],
+            multipartForm.items[0].headers["Content-Type"],
             property.contentType.rawValue
         )
 
-        XCTAssertEqual(reversed.items[0].data, value)
+        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
     }
 
     func testDataFormWithoutFileName() async throws {
@@ -80,25 +85,30 @@ final class FormDataTests: XCTestCase {
 
         // When
         let (_, request) = await resolve(TestProperty(property))
+
         let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
-        let boundary = ReverseFormData.extractBoundary(contentTypeHeader) ?? "nil"
-        let reversed = ReverseFormData(request.httpBody ?? Data(), boundary: boundary)
+        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
+
+        let multipartForm = try MultipartFormParser(
+            request.httpBody ?? Data(),
+            boundary: boundary
+        ).parse()
 
         // Then
         XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(reversed.items.count, 1)
+        XCTAssertEqual(multipartForm.items.count, 1)
 
         XCTAssertEqual(
-            reversed.items[0].headers?["Content-Disposition"],
+            multipartForm.items[0].headers["Content-Disposition"],
             "form-data; name=\"\(property.key)\"; filename=\"\""
         )
 
         XCTAssertEqual(
-            reversed.items[0].headers?["Content-Type"],
+            multipartForm.items[0].headers["Content-Type"],
             property.contentType.rawValue
         )
 
-        XCTAssertEqual(reversed.items[0].data, value)
+        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
     }
 
     func testEncodableData() async throws {
@@ -145,5 +155,13 @@ final class FormDataTests: XCTestCase {
 
         // Then
         XCTAssertEqual(property.fileName, fileName)
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = FormData.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

@@ -98,17 +98,17 @@ extension FormGroup {
             self.multipart = multipart
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             let multipart = multipart.map { $0() }
 
             let constructor = MultipartFormConstructor(multipart)
 
-            configuration.request.setValue(
-                "multipart/form-data; boundary=\"\(constructor.body)\"",
+            make.request.setValue(
+                "multipart/form-data; boundary=\"\(constructor.boundary)\"",
                 forHTTPHeaderField: "Content-Type"
             )
 
-            configuration.request.httpBody = constructor.body
+            make.request.httpBody = constructor.body
         }
     }
 }

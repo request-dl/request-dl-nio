@@ -93,13 +93,13 @@ extension Timeout: PrimitiveProperty {
             self.source = source
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             if source.contains(.request) {
-                configuration.configuration.timeoutIntervalForRequest = timeout
+                make.configuration.timeoutIntervalForRequest = timeout
             }
 
             if source.contains(.resource) {
-                configuration.configuration.timeoutIntervalForResource = timeout
+                make.configuration.timeoutIntervalForResource = timeout
             }
         }
     }

@@ -50,5 +50,11 @@ final class AuthorizationTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Basic bXlVc2VyOm15UGFzc3dvcmQ=")
     }
 
-    
+    func testNeverBody() async throws {
+        // Given
+        let type = Authorization.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

@@ -40,4 +40,12 @@ final class HeadersHostTests: XCTestCase {
         let (_, request) = await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Host"), "google.com:8080")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.Host.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

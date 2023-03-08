@@ -53,6 +53,7 @@ struct MultipartFormConstructor {
         }
 
         data.append(Data("--\(boundary)--".utf8))
+        data.append(Data("\(eol)".utf8))
 
         return data
     }

@@ -34,4 +34,12 @@ final class HeadersContentLengthTests: XCTestCase {
         let (_, request) = await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Length"), "1000000")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.ContentLength.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

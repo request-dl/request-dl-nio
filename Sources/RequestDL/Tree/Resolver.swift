@@ -53,21 +53,21 @@ struct Resolver<Content: Property> {
 
         let sessionObject = context.find(Session.Object.self)
 
-        let configuration = MakeConfiguration(
+        let make = Make(
             request: URLRequest(url: object.baseURL),
             configuration: sessionObject?.configuration ?? .default,
             delegate: delegate
         )
 
-        context.make(configuration)
+        context.make(make)
 
         let session = URLSession(
-            configuration: configuration.configuration,
+            configuration: make.configuration,
             delegate: delegate,
             delegateQueue: sessionObject?.queue
         )
 
-        return (session, configuration.request)
+        return (session, make.request)
     }
 }
 

@@ -83,4 +83,12 @@ final class TimeoutTests: XCTestCase {
             defaultConfiguration.timeoutIntervalForResource
         )
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Timeout.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

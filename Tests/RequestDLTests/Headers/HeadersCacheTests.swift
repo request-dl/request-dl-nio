@@ -144,4 +144,12 @@ final class HeadersCacheTests: XCTestCase {
         // Then
         XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "public")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.Cache.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

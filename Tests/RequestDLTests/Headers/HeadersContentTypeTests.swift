@@ -130,4 +130,12 @@ final class HeadersContentTypeTests: XCTestCase {
         let (_, request) = await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/pdf")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.ContentType.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

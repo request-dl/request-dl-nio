@@ -27,6 +27,7 @@
 import XCTest
 @testable import RequestDL
 
+// swiftlint:disable type_name
 final class URLSessionConfigurationRepresentableTests: XCTestCase {
 
     struct URLSessionConfigurationMock: URLSessionConfigurationRepresentable {
@@ -47,5 +48,13 @@ final class URLSessionConfigurationRepresentableTests: XCTestCase {
         // Then
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 15)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, 15)
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = URLSessionConfigurationMock.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

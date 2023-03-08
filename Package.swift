@@ -27,7 +27,8 @@ let package = Package(
         ),
         .testTarget(
             name: "RequestDLTests",
-            dependencies: ["RequestDL"]
+            dependencies: ["RequestDL"],
+            resources: [.process("Resources")]
         )
     ]
 )

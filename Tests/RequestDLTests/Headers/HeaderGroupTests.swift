@@ -66,4 +66,12 @@ final class HeaderGroupTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "localhost:8080")
         XCTAssertEqual(request.value(forHTTPHeaderField: "xxx-api-key"), "password")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = HeaderGroup<EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

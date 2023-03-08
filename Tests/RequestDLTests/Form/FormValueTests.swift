@@ -29,7 +29,7 @@ import XCTest
 
 final class FormValueTests: XCTestCase {
 
-    func testSingleForm() async {
+    func testSingleForm() async throws {
         // Given
         let key = "title"
         let value = "foo"
@@ -37,19 +37,32 @@ final class FormValueTests: XCTestCase {
 
         // When
         let (_, request) = await resolve(TestProperty(property))
+
         let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
-        let boundary = ReverseFormData.extractBoundary(contentTypeHeader) ?? "nil"
-        let reversed = ReverseFormData(request.httpBody ?? Data(), boundary: boundary)
+        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
+
+        let multipartForm = try MultipartFormParser(
+            request.httpBody ?? Data(),
+            boundary: boundary
+        ).parse()
 
         // Then
         XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(reversed.items.count, 1)
+        XCTAssertEqual(multipartForm.items.count, 1)
 
         XCTAssertEqual(
-            reversed.items[0].headers?["Content-Disposition"],
+            multipartForm.items[0].headers["Content-Disposition"],
             "form-data; name=\"\(key)\""
         )
 
-        XCTAssertEqual(reversed.items[0].data, value)
+        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = FormValue.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

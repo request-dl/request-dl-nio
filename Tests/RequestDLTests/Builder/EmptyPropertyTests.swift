@@ -33,11 +33,12 @@ final class EmptyPropertyTests: XCTestCase {
         // Given
         @PropertyBuilder
         var property: some Property {
+            // swiftlint:disable redundant_discardable_let
             let _ = 1
         }
 
         // When
-        let _ = await resolve(TestProperty(property))
+        _ = await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is EmptyProperty)
@@ -51,9 +52,17 @@ final class EmptyPropertyTests: XCTestCase {
         }
 
         // When
-        let _ = await resolve(TestProperty(property))
+        _ = await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is EmptyProperty)
+    }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = EmptyProperty.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
     }
 }

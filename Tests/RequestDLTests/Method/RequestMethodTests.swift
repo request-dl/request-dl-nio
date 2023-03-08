@@ -82,4 +82,12 @@ final class RequestMethodTests: XCTestCase {
         let (_, request) = await resolve(property)
         XCTAssertEqual(request.httpMethod, "PATCH")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = RequestMethod.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

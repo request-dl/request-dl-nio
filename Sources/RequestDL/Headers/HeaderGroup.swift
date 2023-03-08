@@ -88,9 +88,9 @@ extension HeaderGroup {
             self.parameters = parameters
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             for (key, value) in parameters {
-                configuration.request.setValue("\(value)", forHTTPHeaderField: key)
+                make.request.setValue("\(value)", forHTTPHeaderField: key)
             }
         }
     }

@@ -29,7 +29,16 @@ import XCTest
 
 final class CertificateTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testCertificateInitialization() {
+        // Given
+        let name = "myCertificate"
+        let bundle = Bundle(for: CertificateTests.self)
+
+        // When
+        let certificate = Certificate(name, in: bundle)
+
+        // Then
+        XCTAssertEqual(certificate.name, name)
+        XCTAssertEqual(certificate.bundle, bundle)
     }
 }

@@ -46,4 +46,12 @@ final class HeadersRefererTests: XCTestCase {
         let (_, request) = await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://www.google.com/search?q=apple")
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = Headers.Referer.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

@@ -86,7 +86,7 @@ struct URLSessionRepresentableObject: NodeObject {
         self.update = update
     }
 
-    func makeProperty(_ configuration: MakeConfiguration) {
-        update(configuration.configuration)
+    func makeProperty(_ make: Make) {
+        update(make.configuration)
     }
 }

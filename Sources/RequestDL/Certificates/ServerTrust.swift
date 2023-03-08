@@ -79,8 +79,8 @@ extension ServerTrust: PrimitiveProperty {
             self.certificates = certificates
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
-            configuration.delegate.onDidReceiveChallenge {
+        func makeProperty(_ make: Make) {
+            make.delegate.onDidReceiveChallenge {
                 receivedChallenge($0)
             }
         }
@@ -99,34 +99,19 @@ private extension ServerTrust.Object {
             return (.rejectProtectionSpace, nil)
         }
 
-        var error: CFError?
-
-        guard
-            let serverTrust = challenge.protectionSpace.serverTrust,
-            SecTrustEvaluateWithError(serverTrust, &error),
-            let serverCertificate = SecTrustGetCertificateAtIndex(serverTrust, 0)
-        else {
+        guard let serverTrust = challenge.protectionSpace.serverTrust else {
             return (.cancelAuthenticationChallenge, nil)
         }
 
-        let serverCertificateDER = SecCertificateCopyData(serverCertificate)
-
-        guard let serverCertificateRawPointer = CFDataGetBytePtr(serverCertificateDER) else {
-            return (.cancelAuthenticationChallenge, nil)
-        }
-
-        let serverCertificateData = Data(
-            bytes: serverCertificateRawPointer,
-            count: CFDataGetLength(serverCertificateDER)
-        )
+        let serverCertificates = serverTrust.certificates.compactMap(\.data)
 
         for certificate in certificates {
             guard
-                let clientCertificatePath = certificate.bundle.path(forResource: certificate.name, ofType: "cer"),
-                let clientCertificateData = NSData(contentsOfFile: clientCertificatePath)
+                let url = certificate.bundle.resolveURL(forResourceName: certificate.name),
+                let data = try? Data(contentsOf: url, options: .mappedIfSafe)
             else { continue }
 
-            if serverCertificateData == clientCertificateData as Data {
+            if serverCertificates.contains(data) {
                 return (.useCredential, URLCredential(trust: serverTrust))
             }
         }

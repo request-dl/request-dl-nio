@@ -79,4 +79,12 @@ final class QueryGroupTests: XCTestCase {
 
         XCTAssertNil(request.value(forHTTPHeaderField: "api_key"))
     }
+
+    func testNeverBody() async throws {
+        // Given
+        let type = QueryGroup<EmptyProperty>.self
+
+        // Then
+        XCTAssertTrue(type.Body.self == Never.self)
+    }
 }

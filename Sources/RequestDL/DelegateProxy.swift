@@ -102,7 +102,6 @@ extension DelegateProxy: URLSessionTaskDelegate {
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-
         let results = didReceiveChallengeHandler?(challenge) ?? []
 
         if results.contains(where: { $0.0 == .cancelAuthenticationChallenge }) {

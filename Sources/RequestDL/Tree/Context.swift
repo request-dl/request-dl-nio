@@ -101,15 +101,15 @@ extension Context {
 
 extension Context {
 
-    private static func make(_ configuration: MakeConfiguration, in node: NodeType) {
-        node.fetchObject()?.makeProperty(configuration)
+    private static func make(_ make: Make, in node: NodeType) {
+        node.fetchObject()?.makeProperty(make)
 
         for node in node.children {
-            make(configuration, in: node)
+            self.make(make, in: node)
         }
     }
 
-    func make(_ configuration: MakeConfiguration) {
-        Self.make(configuration, in: root)
+    func make(_ make: Make) {
+        Self.make(make, in: root)
     }
 }

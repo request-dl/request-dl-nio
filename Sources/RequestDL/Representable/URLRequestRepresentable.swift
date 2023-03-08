@@ -82,7 +82,7 @@ struct URLRequestRepresentableObject: NodeObject {
         self.update = update
     }
 
-    func makeProperty(_ configuration: MakeConfiguration) {
-        update(&configuration.request)
+    func makeProperty(_ make: Make) {
+        update(&make.request)
     }
 }

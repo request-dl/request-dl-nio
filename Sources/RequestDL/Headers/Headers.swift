@@ -42,12 +42,12 @@ extension Headers {
             self.next = next
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             let value = "\(value)"
             if !value.isEmpty {
-                configuration.request.setValue(value, forHTTPHeaderField: key)
+                make.request.setValue(value, forHTTPHeaderField: key)
             }
-            next?.makeProperty(configuration)
+            next?.makeProperty(make)
         }
     }
 }
