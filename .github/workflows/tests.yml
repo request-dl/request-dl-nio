@@ -1,4 +1,4 @@
-name: Tests
+name: Unit Tests
 
 on:
   push:
@@ -10,22 +10,18 @@ jobs:
   tests:
     runs-on: macOS-latest
     steps:
-      - name: OpenSSL Update
-        run: |
-            brew upgrade openssl ca-certificates
-
-      - name: Xcode Select
+      - name: Xcode Select ✔
         uses: devbotsxyz/xcode-select@v1.1.0
         with:
           version: 14.0.1
 
-      - name: Get Sources
+      - name: Get Sources ⬇️
         uses: actions/checkout@v3.3.0
 
-      - name: Build Package
+      - name: Build Package 🛠️
         run: swift build -v
 
-      - name: Test & publish code coverage to Code Climate
+      - name: Code Coverage (Code Climate) 🍀🚀
         uses: paambaati/codeclimate-action@v3.2.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}

@@ -1,4 +1,4 @@
-name: Liter
+name: Swiftlint
 
 on:
   push:
@@ -12,12 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3.3.0
 
-      - name: install swiftlint
+      - name: Install swiftlint
         run: >
           if [[ ! -f "/usr/local/bin/swiftlint" ]]
              then
                brew install swiftlint
              fi
 
-      - name: run swiftlint
+      - name: Swiftlint
         run: swiftlint lint

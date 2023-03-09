@@ -38,6 +38,7 @@ extension OpenSSL {
         try generateCertificate(certificate, request: selfSignedCertificateRequest, privateKey: privateKey)
 
         var pkcs12URL: URL?
+        var pkcs12Password: String?
         var certificateDEREncodedURL: URL?
 
         for option in options {
@@ -53,6 +54,7 @@ extension OpenSSL {
                 )
 
                 pkcs12URL = url
+                pkcs12Password = password
 
             case .der:
                 let derURL = outputURL.appending(name, extension: "cer")
@@ -70,6 +72,7 @@ extension OpenSSL {
             certificateURL: certificate,
             privateKeyURL: privateKey,
             pkcs12URL: pkcs12URL,
+            pkcs12Password: pkcs12Password,
             certificateDEREncodedURL: certificateDEREncodedURL
         )
     }

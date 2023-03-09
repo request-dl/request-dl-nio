@@ -16,6 +16,8 @@ struct OpenSSLCertificate {
 
     let pkcs12URL: URL?
 
+    let pkcs12Password: String?
+
     let certificateDEREncodedURL: URL?
 }
 
