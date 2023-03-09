@@ -15,6 +15,8 @@ struct OpenSSLCertificate {
     let privateKeyURL: URL
 
     let personalFileExchangeURL: URL?
+
+    let certificateDEREncodedURL: URL?
 }
 
 extension OpenSSLCertificate {
@@ -37,6 +39,11 @@ extension OpenSSLCertificate {
             data: try Data(contentsOf: $0)
         )}
 
+        let certificateDEREncodedResource = try certificateDEREncodedURL.map {(
+            path: prefixPath.appending($0.lastPathComponent),
+            data: try Data(contentsOf: $0)
+        )}
+
         let resourceURL = bundle.normalizedResourceURL
 
         try FileManager.default.createDirectory(
@@ -44,7 +51,12 @@ extension OpenSSLCertificate {
             withIntermediateDirectories: true
         )
 
-        for resource in [certificateResource, privateKeyResource, personalFileExchangeResource] {
+        let resources = [
+            certificateResource, privateKeyResource,
+            personalFileExchangeResource, certificateDEREncodedResource
+        ]
+
+        for resource in resources {
             if let resource {
                 let url = resourceURL.appendingPathComponent(resource.path)
                 try resource.data.write(to: url, options: [.atomic, .noFileProtection])
@@ -54,16 +66,9 @@ extension OpenSSLCertificate {
         return .init(
             certificatePath: certificateResource.path,
             privateKeyPath: privateKeyResource.path,
-            personalFileExchangePath: personalFileExchangeResource?.path
+            personalFileExchangePath: personalFileExchangeResource?.path,
+            certificateDEREncodedPath: certificateDEREncodedResource?.path
         )
-    }
-}
-
-extension OpenSSLCertificate {
-
-    func replace(_ data: Data, for keyPath: KeyPath<Self, URL>) throws {
-        let url = self[keyPath: keyPath]
-        try data.write(to: url, options: [.atomic, .noFileProtection])
     }
 }
 #endif

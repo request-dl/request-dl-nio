@@ -74,4 +74,4 @@ extension GroupTask {
     }
 }
 
-public typealias GroupResult<ID: Hashable, Element> = Dictionary<ID, Result<Element, Error>>
+public typealias GroupResult<ID: Hashable, Element> = [ID: Result<Element, Error>]

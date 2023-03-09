@@ -12,6 +12,10 @@ class KeyPathInvalidDataErrorTests: XCTestCase {
         let error = KeyPathInvalidDataError()
 
         // Then
-        XCTAssertEqual(error.errorDescription, "Unable to read the current data result on Task.keyPath() in key-value format")
+        XCTAssertEqual(error.errorDescription,
+            """
+            Unable to read the current data result on Task.keyPath() in key-value format
+            """
+        )
     }
 }

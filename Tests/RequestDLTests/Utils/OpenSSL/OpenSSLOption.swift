@@ -12,5 +12,7 @@ enum OpenSSLOption {
 
     /// String password
     case pfx(String)
+
+    case der
 }
 #endif

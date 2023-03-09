@@ -15,7 +15,7 @@ struct PKCS12 {
     init?(_ data: Data, password: String) {
         let importPasswordOption = [kSecImportExportPassphrase as NSString: password]
         var items: CFArray?
-        
+
         let secError = SecPKCS12Import(data as CFData, importPasswordOption as CFDictionary, &items)
 
         guard

@@ -15,5 +15,7 @@ struct OpenSSLBundleReference {
     let privateKeyPath: String
 
     let personalFileExchangePath: String?
+
+    let certificateDEREncodedPath: String?
 }
 #endif

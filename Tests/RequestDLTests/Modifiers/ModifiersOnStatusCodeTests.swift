@@ -35,7 +35,7 @@ final class ModifiersOnStatusCodeTests: XCTestCase {
         var received = [StatusCode]()
 
         // When
-        for statusCode in StatusCode.continue ... .networkAuthenticationRequired  {
+        for statusCode in StatusCode.continue ... .networkAuthenticationRequired {
             do {
                 _ = try await MockedTask(statusCode: statusCode, data: Data.init)
                     .onStatusCode(statusCodes) { _ in

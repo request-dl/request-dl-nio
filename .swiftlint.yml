@@ -1,3 +1,6 @@
+excluded:
+    .build
+
 opt_in_rules:
     - force_unwrapping
     - opening_brace
@@ -12,6 +15,7 @@ identifier_name:
     excluded:
         - id
         - ok
+        - n
 
 type_name:
     allowed_symbols:

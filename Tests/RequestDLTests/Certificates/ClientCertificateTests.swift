@@ -11,16 +11,14 @@ final class ClientCertificateTests: XCTestCase {
     func testLocalHost() async throws {
         // Given
         let password = "12345"
-        let server = try OpenSSL("ca_host_server").certificate()
+        let server = try OpenSSL("ca_host_server", with: [.der]).certificate()
         let client = try OpenSSL("ca_host_client", with: [.pfx(password)]).certificate()
+
         let output = "Hello World"
 
         // When
         let openSSLServer = OpenSSLServer(output, certificate: server, clientAuthentication: client)
         try await openSSLServer.start {
-            let onlineCertificate = try await DownloadCertificate("https://localhost:8080").download()
-            try server.replace(onlineCertificate, for: \.certificateURL)
-
             let server = try server.write(into: .module)
             let client = try client.write(into: .module)
 
@@ -28,10 +26,12 @@ final class ClientCertificateTests: XCTestCase {
                 BaseURL("localhost:8080")
                 Path("index")
 
-                ServerTrust(Certificate(
-                    server.certificatePath,
-                    in: .module
-                ))
+                if let server = server.certificateDEREncodedPath {
+                    ServerTrust(Certificate(
+                        server,
+                        in: .module
+                    ))
+                }
 
                 if let pfxPath = client.personalFileExchangePath {
                     ClientCertificate(
