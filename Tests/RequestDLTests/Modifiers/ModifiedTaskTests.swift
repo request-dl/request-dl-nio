@@ -1,35 +1,34 @@
-//
-//  ModifiedTaskTests.swift
-//
-//  MIT License
-//
-//  Copyright (c) RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import XCTest
 @testable import RequestDL
 
 final class ModifiedTaskTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    struct Modified<Body: Task>: TaskModifier {
+
+        let callback: () -> Void
+
+        func task(_ task: Body) async throws -> Body.Element {
+            callback()
+            return try await task.result()
+        }
+    }
+
+    func testModified() async throws {
+        // Given
+        var taskModified = false
+
+        // When
+        _ = try await MockedTask(data: Data.init)
+            .modify(Modified {
+                taskModified = true
+            })
+            .result()
+
+        // Then
+        XCTAssertTrue(taskModified)
     }
 }

@@ -1,28 +1,6 @@
-//
-//  GroupTask.swift
-//
-//  MIT License
-//
-//  Copyright (c) RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -43,11 +21,11 @@ import Foundation
              Query(index, forKey: "page")
          }
      }
-     .response()
+     .result()
  }
  ```
  */
-public struct GroupTask<Data: Collection, Content: Task>: Task {
+public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element: Hashable {
 
     private let data: Data
     private let map: (Data.Element) -> Content
@@ -73,43 +51,27 @@ extension GroupTask {
     - Returns: An array of `GroupResult` that encapsulates the result of each individual task.
     - Throws: Error if any of the individual tasks encounters an error during execution.
     */
-    public func response() async throws -> [GroupResult<Data.Element, Content.Element>] {
-        try await withThrowingTaskGroup(of: GroupResult<Data.Element, Content.Element>.self) { group in
+    public func result() async throws -> GroupResult<Data.Element, Content.Element> {
+        await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
             for element in data {
                 group.addTask {
-                    let data = try await map(element).response()
-                    return .init(id: element, result: data)
+                    do {
+                        return (element, .success(try await map(element).result()))
+                    } catch {
+                        return (element, .failure(error))
+                    }
                 }
             }
 
-            var stack = [GroupResult<Data.Element, Content.Element>]()
+            var results = GroupResult<Data.Element, Content.Element>()
 
-            for try await element in group {
-                stack.append(element)
+            for await (key, value) in group {
+                results[key] = value
             }
 
-            return stack
+            return results
         }
     }
 }
 
-/**
- Represents the result of a task that has been executed as part of a `GroupTask`.
-
- `GroupResult` is a simple struct that encapsulates two pieces of data: an ID value and the result
- of the associated task execution. The ID value represents the original element from the collection
- that the associated task was created from.
- */
-public struct GroupResult<ID, Element> {
-
-    /// The ID value representing the original element from the collection.
-    public let id: ID
-
-    /// The result of the associated task execution.
-    public let result: Element
-
-    init(id: ID, result: Element) {
-        self.id = id
-        self.result = result
-    }
-}
+public typealias GroupResult<ID: Hashable, Element> = Dictionary<ID, Result<Element, Error>>

@@ -1,9 +1,6 @@
-//
-//  DownloadCertificate.swift
-//
-//
-//  Created by Brenno on 06/03/23.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 @testable import RequestDL
@@ -13,7 +10,7 @@ struct DownloadCertificate {
     private let url: String
     private let delegate: Delegate
 
-    init(from url: String) {
+    init(_ url: String) {
         self.url = url
         self.delegate = Delegate()
     }

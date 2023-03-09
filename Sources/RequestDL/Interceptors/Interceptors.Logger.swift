@@ -1,38 +1,16 @@
-//
-//  Interceptors.Logger.swift
-//
-//  MIT License
-//
-//  Copyright (c) RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
 extension Interceptors {
 
     /**
-     An interceptor for logging task responses.
+     An interceptor for logging task result.
 
      Use `logInConsole(_:)` method of the `Task` to add an instance of the
-     `Interceptors.Logger` interceptor to log task responses.
+     `Interceptors.Logger` interceptor to log task result.
 
      Example:
 
@@ -41,7 +19,7 @@ extension Interceptors {
          .logInConsole(true)
      ```
 
-     - Note: If `isActive` is `true`, it logs task responses in the console.
+     - Note: If `isActive` is `true`, it logs task result in the console.
 
      - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
@@ -54,7 +32,7 @@ extension Interceptors {
         }
 
         /**
-        Called when the task response is received.
+        Called when the task result is received.
 
         - Parameter result: The result of the task execution.
         */
@@ -77,9 +55,9 @@ extension Interceptors {
 extension Task where Element == TaskResult<Data> {
 
     /**
-     Add the `Interceptors.Logger` interceptor to log task responses.
+     Add the `Interceptors.Logger` interceptor to log task result.
 
-     - Parameter isActive: If `true`, the task responses will be logged in the console.
+     - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
     public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger, Self> {

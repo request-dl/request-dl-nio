@@ -1,35 +1,106 @@
-//
-//  ModifiersStatusCodeTests.swift
-//
-//  MIT License
-//
-//  Copyright (c) RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import XCTest
 @testable import RequestDL
 
 final class ModifiersStatusCodeTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testStatusCodeValid() async throws {
+        // Given
+        var statusCodeReceived = false
+
+        // When
+        _ = try await MockedTask(statusCode: .ok, data: Data.init)
+            .onStatusCode(.ok) {
+                statusCodeReceived = ($0.response as? HTTPURLResponse)?.statusCode == 200
+            }
+            .result()
+
+        // Then
+        XCTAssertTrue(statusCodeReceived)
+    }
+
+    func testStatusInvalid() async throws {
+        // Given
+        var statusCodeReceived = false
+
+        // When
+        _ = try await MockedTask(statusCode: .ok, data: Data.init)
+            .onStatusCode(.accepted) {
+                statusCodeReceived = ($0.response as? HTTPURLResponse)?.statusCode == 200
+            }
+            .result()
+
+        // Then
+        XCTAssertFalse(statusCodeReceived)
+    }
+
+    func testRangeOfStatusCode() async throws {
+        // Given
+        let statusCodes: Range<StatusCode> = .ok ..< .badGateway
+        var received = [StatusCode]()
+
+        // When
+        for statusCode in statusCodes {
+            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
+                .onStatusCode(statusCodes) { _ in
+                    received.append(statusCode)
+                }
+                .result()
+        }
+
+        // Then
+        XCTAssertEqual(statusCodes.count, received.count)
+        XCTAssert(statusCodes.allSatisfy {
+            received.contains($0)
+        })
+    }
+
+    func testSuccessStatusCodeSet() async throws {
+        // Given
+        let statusCodeSet: StatusCodeSet = .success
+        var received = [StatusCode]()
+
+        // When
+        for rawValue in 0 ..< 600 {
+            let statusCode = StatusCode(rawValue)
+
+            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
+                .onStatusCode(statusCodeSet) { _ in
+                    received.append(statusCode)
+                }
+                .result()
+        }
+
+        // Then
+        XCTAssertEqual(statusCodeSet.count, received.count)
+        XCTAssert(received.allSatisfy {
+            statusCodeSet.contains($0)
+        })
+    }
+
+    func testSuccessAndRedirectStatusCodeSet() async throws {
+        // Given
+        let statusCodeSet: StatusCodeSet = .successAndRedirect
+        var received = [StatusCode]()
+
+        // When
+        for rawValue in 0 ..< 600 {
+            let statusCode = StatusCode(rawValue)
+
+            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
+                .onStatusCode(statusCodeSet) { _ in
+                    received.append(statusCode)
+                }
+                .result()
+        }
+
+        // Then
+        XCTAssertEqual(statusCodeSet.count, received.count)
+        XCTAssert(received.allSatisfy {
+            statusCodeSet.contains($0)
+        })
     }
 }

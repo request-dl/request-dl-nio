@@ -1,28 +1,6 @@
-//
-//  ClientCertificate.swift
-//
-//  MIT License
-//
-//  Copyright (c) RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -35,18 +13,18 @@ import Foundation
  */
 public struct ClientCertificate: Property {
 
-    private let data: Data
+    private let source: Source
     private let password: String
 
     /**
-     Creates a new instance of ClientCertificate with the given certificate data and password.
+     Creates a new instance of ClientCertificate with the given certificate URL and password.
 
      - Parameters:
-        - data: The data of the certificate.
+        - url: The URL of the certificate.
         - password: The password to access the certificate.
      */
-    public init(_ data: Data, password: String) {
-        self.data = data
+    public init(_ url: URL, password: String) {
+        self.source = .url(url)
         self.password = password
     }
 
@@ -59,18 +37,8 @@ public struct ClientCertificate: Property {
         - password: The password to access the certificate.
      */
     public init(name: String, in bundle: Bundle, password: String) {
-        guard
-            let url = bundle.resolveURL(forResourceName: name),
-            let data = try? Data(contentsOf: url)
-        else {
-            fatalError(
-                """
-                Failed to initialize PKCS12 object with the provided name, bundle, and password.
-                """
-            )
-        }
-
-        self.init(data, password: password)
+        self.source = .bundle(name, bundle)
+        self.password = password
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -83,11 +51,11 @@ extension ClientCertificate: PrimitiveProperty {
 
     struct Object: NodeObject {
 
-        private let data: Data
+        private let source: ClientCertificate.Source
         private let password: String
 
-        init(_ data: Data, password: String) {
-            self.data = data
+        fileprivate init(_ source: ClientCertificate.Source, password: String) {
+            self.source = source
             self.password = password
         }
 
@@ -99,19 +67,23 @@ extension ClientCertificate: PrimitiveProperty {
     }
 
     func makeObject() -> Object {
-        Object(data, password: password)
+        Object(source, password: password)
     }
 }
 
 private extension ClientCertificate.Object {
 
-    func receivedChallenge(_ challenge: URLAuthenticationChallenge) -> DelegateProxy.ChallengeCredential {
+    func receivedChallenge(
+        _ challenge: URLAuthenticationChallenge
+    ) -> DelegateProxy.ChallengeCredential {
 
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate else {
             return (.rejectProtectionSpace, nil)
         }
 
         guard
+            let url = source.url,
+            let data = try? Data(contentsOf: url, options: .mappedIfSafe),
             let thePKCS12 = PKCS12(data, password: password),
             let credentials = URLCredential(PKCS12: thePKCS12)
         else {
@@ -122,17 +94,22 @@ private extension ClientCertificate.Object {
     }
 }
 
-extension URLCredential {
+extension ClientCertificate {
 
-    convenience init?(PKCS12 thePKCS12: PKCS12) {
-        guard let identity = thePKCS12.identity else {
-            return nil
+    fileprivate enum Source {
+        case url(URL)
+        case bundle(String, Bundle)
+    }
+}
+
+extension ClientCertificate.Source {
+
+    fileprivate var url: URL? {
+        switch self {
+        case .url(let url):
+            return url
+        case .bundle(let resource, let bundle):
+            return bundle.resolveURL(forResourceName: resource)
         }
-
-        self.init(
-            identity: identity,
-            certificates: thePKCS12.certChain,
-            persistence: .forSession
-        )
     }
 }

@@ -1,86 +1,91 @@
-//
-//  ServerTrustTests.swift
-//
-//  MIT License
-//
-//  Copyright (c) RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import XCTest
 @testable import RequestDL
 
 final class ServerTrustTests: XCTestCase {
 
+    #if os(macOS)
     func testValidServer() async throws {
         // Given
-        let certificate = try await DownloadCertificate(from: "https://github.com").download()
-        let url = Bundle.module.normalizedResourceURL
-            .appending("github_certificate", extension: "cer")
-
-        try certificate.write(to: url)
-
-        let property = ServerTrust(Certificate("github_certificate", in: .module))
+        let server = try OpenSSL("trust_valid_server").certificate()
+        let output = "Hello World"
 
         // When
-        let response = try await DataTask {
-            BaseURL("github.com")
-            property
-        }.response().response as? HTTPURLResponse
+        let openSSLServer = OpenSSLServer(output, certificate: server)
+        try await openSSLServer.start {
+            let onlineCertificate = try await DownloadCertificate("https://localhost:8080").download()
+            try server.replace(onlineCertificate, for: \.certificateURL)
 
-        // Then
-        XCTAssertEqual(response?.statusCode, 200)
+            let server = try server.write(into: .module)
+
+            let data = try await DataTask {
+                BaseURL("localhost:8080")
+                Path("index")
+
+                ServerTrust(Certificate(
+                    server.certificatePath,
+                    in: .module
+                ))
+            }
+            .extractPayload()
+            .result()
+
+            // Then
+            XCTAssertEqual(String(data: data, encoding: .utf8), output)
+        }
     }
+    #endif
 
+    #if os(macOS)
     func testInvalidServer() async throws {
         // Given
-        let certificate = try await DownloadCertificate(from: "https://apple.com").download()
-        let url = Bundle.module.normalizedResourceURL
-            .appending("apple_certificate", extension: "cer")
-
-        try certificate.write(to: url)
-
-        let property = ServerTrust(Certificate("apple_certificate", in: .module))
+        let server = try OpenSSL("trust_invalid_server").certificate()
+        let invalid = try OpenSSL("trust_invalid_server.2").certificate()
+        let output = "Hello World"
 
         // When
-        var responseError: URLError?
+        let openSSLServer = OpenSSLServer(output, certificate: server)
+        var urlError: URLError?
 
         do {
-            _ = try await DataTask {
-                BaseURL("github.com")
-                property
-            }.response()
+            try await openSSLServer.start {
+                let server = try invalid.write(into: .module)
+
+                let data = try await DataTask {
+                    BaseURL("localhost:8080")
+                    Path("index")
+
+                    ServerTrust(Certificate(
+                        server.certificatePath,
+                        in: .module
+                    ))
+                }
+                .extractPayload()
+                .result()
+
+                // Then
+                XCTAssertEqual(String(data: data, encoding: .utf8), output)
+            }
+        } catch let error as URLError {
+            urlError = error
         } catch {
-            responseError = error as? URLError
+            throw error
         }
 
         // Then
-        XCTAssertNotNil(responseError)
-        XCTAssertEqual(responseError?.code.rawValue, -999)
+        XCTAssertNotNil(urlError)
+        XCTAssertEqual(urlError?.code.rawValue, -999)
     }
+    #endif
 
     func testNeverBody() async throws {
         // Given
-        let type = ServerTrust.self
+        let property = ServerTrust(Certificate("any", in: .module))
 
         // Then
-        XCTAssertTrue(type.Body.self == Never.self)
+        try await assertNever(property.body)
     }
 }
