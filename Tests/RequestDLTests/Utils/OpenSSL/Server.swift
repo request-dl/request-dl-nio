@@ -59,15 +59,27 @@ extension OpenSSLServer {
     fileprivate var command: String {
         var commands = ["openssl s_server -accept 8080"]
 
-        if let clientPKCS12URL = clientAuthentication?.pkcs12URL, let password = clientAuthentication?.pkcs12Password {
+        if let clientAuthentication = clientAuthentication {
             commands.append(
                 """
-                -CAfile \(clientPKCS12URL.normalizePath) \
-                -pass pass:\(password) \
-                -Verify 2
+                -CAfile \(clientAuthentication.certificateURL.normalizePath) \
+                -CAfile \(clientAuthentication.privateKeyURL.normalizePath)
                 """
             )
+
+            if let clientPKCS12URL = clientAuthentication.pkcs12URL,
+               let password = clientAuthentication.pkcs12Password {
+                commands.append(
+                    """
+                    -CAfile \(clientPKCS12URL.normalizePath) \
+                    -pass pass:\(password)
+                    """
+                )
+            }
+
+            commands.append("-Verify 1")
         }
+
 
         commands.append(
             """
