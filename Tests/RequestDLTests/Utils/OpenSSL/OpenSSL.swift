@@ -27,7 +27,7 @@ extension OpenSSL {
 
         try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
 
-        let privateKey = outputURL.appending(name, extension: ".private.pem")
+        let privateKey = outputURL.appending(name, extension: "private.pem")
         try generatePrivateKey(privateKey)
 
         let selfSignedCertificateRequest = outputURL.appending(name, extension: "crs")
@@ -44,7 +44,7 @@ extension OpenSSL {
         for option in options {
             switch option {
             case .pkcs12(let password):
-                let url = outputURL.appending(name, extension: ".pkcs12.pem")
+                let url = outputURL.appending(name, extension: "pkcs12.pem")
 
                 try generatePKCS12Certificate(
                     url,
