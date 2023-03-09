@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: OpenSSL Update
         run: |
-            brew upgrade openssl
+            brew upgrade openssl ca-certificates
 
       - name: Xcode Select
         uses: devbotsxyz/xcode-select@v1.1.0
