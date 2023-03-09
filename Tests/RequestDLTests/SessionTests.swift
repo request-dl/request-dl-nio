@@ -694,6 +694,7 @@ final class SessionTests: XCTestCase {
         )
     }
 
+    #if swift(>=5.7.2)
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
     func testValidatesDNSSec() async {
         // Given
@@ -713,6 +714,7 @@ final class SessionTests: XCTestCase {
             validatesDNSSec
         )
     }
+    #endif
 
     func testCredentialStorage() async {
         // Given

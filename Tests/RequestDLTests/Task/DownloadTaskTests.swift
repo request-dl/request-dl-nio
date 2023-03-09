@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+#if os(macOS)
 final class DownloadTaskTests: XCTestCase {
 
     func testDownloadTask() async throws {
@@ -38,3 +39,4 @@ final class DownloadTaskTests: XCTestCase {
         }
     }
 }
+#endif

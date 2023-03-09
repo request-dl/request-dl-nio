@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+#if os(macOS)
 final class DataTaskTests: XCTestCase {
 
     func testDataTask() async throws {
@@ -36,3 +37,4 @@ final class DataTaskTests: XCTestCase {
         }
     }
 }
+#endif
