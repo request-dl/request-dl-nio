@@ -1,0 +1,14 @@
+categories:
+  - title: '🚀 Enhancements'
+    labels:
+      - 'enhancement'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'bug'
+  - title: '🧰 Maintenance'
+    label:
+      - 'documentation'
+template: |
+  ## What’s Changed
+  
+  $CHANGES
