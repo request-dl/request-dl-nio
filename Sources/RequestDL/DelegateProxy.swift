@@ -41,36 +41,7 @@ extension DelegateProxy: URLSessionDelegate {
     }
 }
 
-extension DelegateProxy: URLSessionDataDelegate {
-
-    func urlSession(
-        _ session: URLSession,
-        dataTask: URLSessionDataTask,
-        willCacheResponse proposedResponse: CachedURLResponse,
-        completionHandler: @escaping (CachedURLResponse?) -> Void
-    ) {
-        #if DEBUG
-        print("[RequestDL]", """
-        If a bug is found in Cache, handle urlSession(_:dataTask:willCacheResponse:completionHandler:)
-        """)
-        #endif
-        completionHandler(proposedResponse)
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        dataTask: URLSessionDataTask,
-        didReceive response: URLResponse,
-        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
-    ) {
-        #if DEBUG
-        print("[RequestDL]", """
-        If a bug is found in Cache, handle urlSession(_:dataTask:didReceive:completionHandler:)
-        """)
-        #endif
-        completionHandler(.allow)
-    }
-}
+extension DelegateProxy: URLSessionDataDelegate {}
 
 extension DelegateProxy: URLSessionTaskDelegate {
 

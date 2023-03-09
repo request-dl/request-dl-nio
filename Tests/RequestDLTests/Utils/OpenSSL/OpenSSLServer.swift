@@ -49,7 +49,7 @@ extension OpenSSLServer {
             Swift.fatalError($0, file: $1, line: $2)
         }
 
-        try await _Concurrency.Task.sleep(nanoseconds: 3_000_000_000)
+        try await _Concurrency.Task.sleep(nanoseconds: 1_500_000_000)
         try await session()
     }
 }
@@ -67,7 +67,6 @@ extension OpenSSLServer {
                 """
             )
         }
-
 
         commands.append(
             """

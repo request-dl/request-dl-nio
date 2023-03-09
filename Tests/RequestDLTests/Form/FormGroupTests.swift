@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+// swiftlint:disable function_body_length
 final class FormGroupTests: XCTestCase {
 
     func testSingleForm() async throws {
@@ -39,7 +40,6 @@ final class FormGroupTests: XCTestCase {
         XCTAssertEqual(multipartForm.items[0].contents, Data("\(value)".utf8))
     }
 
-    /*
     func testMultipleForm() async throws {
         // Given
         let key1 = "index"
@@ -127,7 +127,6 @@ final class FormGroupTests: XCTestCase {
             try resourceFile3.data()
         )
     }
-     */
 
     func testCollision() async throws {
         // Given

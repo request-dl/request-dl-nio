@@ -7,7 +7,20 @@ import XCTest
 
 final class RequestBackgroundAdaptorTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTAssertEqual("Hello World!", "Hello World!")
+    func testBackgroundAdaptor() async {
+        // Given
+        let backgroundAdaptor = RequestBackgroundAdaptor()
+        let backgroundService = BackgroundService.shared
+        var backgroundCalled = false
+
+        // When
+        backgroundAdaptor.wrappedValue = { _ in
+            backgroundCalled = true
+        }
+
+        backgroundService.completionHandler?("")
+
+        // Then
+        XCTAssertTrue(backgroundCalled)
     }
 }

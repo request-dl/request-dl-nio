@@ -3,6 +3,7 @@
 */
 
 import Foundation
+@testable import RequestDL
 
 struct ResourceFile {
 
@@ -17,22 +18,9 @@ struct ResourceFile {
     }
 
     func url() throws -> URL {
-        guard
-            let urls = Bundle.module.urls(forResourcesWithExtension: nil, subdirectory: nil),
-            let url = urls.first(where: {
-                let displayName = $0.lastPathComponent
-
-                if displayName == resource {
-                    return true
-                }
-
-                let fileName = displayName.split(separator: ".").first.map {
-                    String($0)
-                }
-
-                return fileName == resource
-            })
-        else { throw FileNotFoundError() }
+        guard let url = Bundle.module.resolveURL(forResourceName: resource) else {
+            throw FileNotFoundError()
+        }
 
         return url
     }

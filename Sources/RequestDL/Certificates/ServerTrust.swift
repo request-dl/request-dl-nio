@@ -73,12 +73,8 @@ private extension ServerTrust.Object {
 
     func receivedChallenge(_ challenge: URLAuthenticationChallenge) -> DelegateProxy.ChallengeCredential {
 
-        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust else {
-            return (.rejectProtectionSpace, nil)
-        }
-
         guard let serverTrust = challenge.protectionSpace.serverTrust else {
-            return (.cancelAuthenticationChallenge, nil)
+            return (.rejectProtectionSpace, nil)
         }
 
         let serverCertificates = serverTrust.certificates.compactMap(\.data)

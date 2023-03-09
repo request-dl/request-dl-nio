@@ -27,7 +27,7 @@ extension OpenSSL {
 
         try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
 
-        let privateKey = outputURL.appending(name, extension: "key")
+        let privateKey = outputURL.appending(name, extension: ".private.pem")
         try generatePrivateKey(privateKey)
 
         let selfSignedCertificateRequest = outputURL.appending(name, extension: "crs")
@@ -83,7 +83,7 @@ extension OpenSSL {
     func generatePrivateKey(_ url: URL) throws {
         try Process.zsh(
             """
-            openssl genrsa \
+            openssl genrsa 2048 \
                 -out \(url.normalizePath)
             """
         ).waitUntilExit()

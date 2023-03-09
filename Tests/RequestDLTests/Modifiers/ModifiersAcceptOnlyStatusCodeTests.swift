@@ -7,71 +7,25 @@ import XCTest
 
 final class ModifiersStatusCodeTests: XCTestCase {
 
-    func testStatusCodeValid() async throws {
+    func testSuccessStatusCodeSet() async throws {
         // Given
-        var statusCodeReceived = false
-
-        // When
-        _ = try await MockedTask(statusCode: .ok, data: Data.init)
-            .onStatusCode(.ok) {
-                statusCodeReceived = ($0.response as? HTTPURLResponse)?.statusCode == 200
-            }
-            .result()
-
-        // Then
-        XCTAssertTrue(statusCodeReceived)
-    }
-
-    func testStatusInvalid() async throws {
-        // Given
-        var statusCodeReceived = false
-
-        // When
-        _ = try await MockedTask(statusCode: .ok, data: Data.init)
-            .onStatusCode(.accepted) {
-                statusCodeReceived = ($0.response as? HTTPURLResponse)?.statusCode == 200
-            }
-            .result()
-
-        // Then
-        XCTAssertFalse(statusCodeReceived)
-    }
-
-    func testRangeOfStatusCode() async throws {
-        // Given
-        let statusCodes: Range<StatusCode> = .ok ..< .badGateway
+        let statusCodes = StatusCode(0) ..< 600
+        let statusCodeSet: StatusCodeSet = .success
         var received = [StatusCode]()
+        var failures = [StatusCode]()
 
         // When
         for statusCode in statusCodes {
-            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                .onStatusCode(statusCodes) { _ in
-                    received.append(statusCode)
-                }
-                .result()
-        }
-
-        // Then
-        XCTAssertEqual(statusCodes.count, received.count)
-        XCTAssert(statusCodes.allSatisfy {
-            received.contains($0)
-        })
-    }
-
-    func testSuccessStatusCodeSet() async throws {
-        // Given
-        let statusCodeSet: StatusCodeSet = .success
-        var received = [StatusCode]()
-
-        // When
-        for rawValue in 0 ..< 600 {
-            let statusCode = StatusCode(rawValue)
-
-            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                .onStatusCode(statusCodeSet) { _ in
-                    received.append(statusCode)
-                }
-                .result()
+            do {
+                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
+                    .acceptOnlyStatusCode(statusCodeSet)
+                    .result()
+                received.append(statusCode)
+            } catch is InvalidStatusCodeError<TaskResult<Data>> {
+                failures.append(statusCode)
+            } catch {
+                throw error
+            }
         }
 
         // Then
@@ -79,22 +33,33 @@ final class ModifiersStatusCodeTests: XCTestCase {
         XCTAssert(received.allSatisfy {
             statusCodeSet.contains($0)
         })
+
+        XCTAssertTrue(failures.allSatisfy {
+            !statusCodeSet.contains($0) && statusCodes.contains($0)
+        })
+
+        XCTAssertEqual(failures.count, statusCodes.count - statusCodeSet.count)
     }
 
     func testSuccessAndRedirectStatusCodeSet() async throws {
         // Given
+        let statusCodes = StatusCode(0) ..< 600
         let statusCodeSet: StatusCodeSet = .successAndRedirect
         var received = [StatusCode]()
+        var failures = [StatusCode]()
 
         // When
-        for rawValue in 0 ..< 600 {
-            let statusCode = StatusCode(rawValue)
-
-            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                .onStatusCode(statusCodeSet) { _ in
-                    received.append(statusCode)
-                }
-                .result()
+        for statusCode in statusCodes {
+            do {
+                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
+                    .acceptOnlyStatusCode(statusCodeSet)
+                    .result()
+                received.append(statusCode)
+            } catch is InvalidStatusCodeError<TaskResult<Data>> {
+                failures.append(statusCode)
+            } catch {
+                throw error
+            }
         }
 
         // Then
@@ -102,5 +67,11 @@ final class ModifiersStatusCodeTests: XCTestCase {
         XCTAssert(received.allSatisfy {
             statusCodeSet.contains($0)
         })
+
+        XCTAssertTrue(failures.allSatisfy {
+            !statusCodeSet.contains($0) && statusCodes.contains($0)
+        })
+
+        XCTAssertEqual(failures.count, statusCodes.count - statusCodeSet.count)
     }
 }

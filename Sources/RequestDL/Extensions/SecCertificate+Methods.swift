@@ -9,13 +9,11 @@ extension SecCertificate {
     var data: Data? {
         let data = SecCertificateCopyData(self)
 
-        guard let serverCertificateRawPointer = CFDataGetBytePtr(data) else {
-            return nil
+        return CFDataGetBytePtr(data).map {
+            Data(
+                bytes: $0,
+                count: CFDataGetLength(data)
+            )
         }
-
-        return Data(
-            bytes: serverCertificateRawPointer,
-            count: CFDataGetLength(data)
-        )
     }
 }

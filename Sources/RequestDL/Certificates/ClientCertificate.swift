@@ -76,7 +76,6 @@ private extension ClientCertificate.Object {
     func receivedChallenge(
         _ challenge: URLAuthenticationChallenge
     ) -> DelegateProxy.ChallengeCredential {
-
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate else {
             return (.rejectProtectionSpace, nil)
         }
@@ -84,11 +83,17 @@ private extension ClientCertificate.Object {
         guard
             let url = source.url,
             let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-            let thePKCS12 = PKCS12(data, password: password),
-            let credentials = URLCredential(PKCS12: thePKCS12)
+            let descriptor = PKCS12Descriptor(data, password: password),
+            let certificate = descriptor.certificates.first
         else {
             fatalError("An error occurred while attempting to import the PKCS12 data using SecPKCS12Import.")
         }
+
+        let credentials = URLCredential(
+            identity: certificate.identity,
+            certificates: certificate.chain,
+            persistence: .forSession
+        )
 
         return (.useCredential, credentials)
     }
