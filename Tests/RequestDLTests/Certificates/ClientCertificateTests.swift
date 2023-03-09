@@ -12,7 +12,7 @@ final class ClientCertificateTests: XCTestCase {
         // Given
         let password = "12345"
         let server = try OpenSSL("ca_host_server", with: [.der]).certificate()
-        let client = try OpenSSL("ca_host_client", with: [.pfx(password)]).certificate()
+        let client = try OpenSSL("ca_host_client", with: [.pkcs12(password)]).certificate()
 
         let output = "Hello World"
 
@@ -33,9 +33,9 @@ final class ClientCertificateTests: XCTestCase {
                     ))
                 }
 
-                if let pfxPath = client.personalFileExchangePath {
+                if let pkcs12Path = client.pkcs12Path {
                     ClientCertificate(
-                        name: pfxPath,
+                        name: pkcs12Path,
                         in: .module,
                         password: password
                     )

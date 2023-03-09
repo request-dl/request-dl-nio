@@ -37,22 +37,22 @@ extension OpenSSL {
 
         try generateCertificate(certificate, request: selfSignedCertificateRequest, privateKey: privateKey)
 
-        var personalFileExchangeURL: URL?
+        var pkcs12URL: URL?
         var certificateDEREncodedURL: URL?
 
         for option in options {
             switch option {
-            case .pfx(let password):
-                let pfxURL = outputURL.appending(name, extension: "pfx")
+            case .pkcs12(let password):
+                let url = outputURL.appending(name, extension: ".pkcs12.pem")
 
-                try generatePFXCertificate(
-                    pfxURL,
+                try generatePKCS12Certificate(
+                    url,
                     privateKey: privateKey,
                     certificate: certificate,
                     password: password
                 )
 
-                personalFileExchangeURL = pfxURL
+                pkcs12URL = url
 
             case .der:
                 let derURL = outputURL.appending(name, extension: "cer")
@@ -69,7 +69,7 @@ extension OpenSSL {
         return .init(
             certificateURL: certificate,
             privateKeyURL: privateKey,
-            personalFileExchangeURL: personalFileExchangeURL,
+            pkcs12URL: pkcs12URL,
             certificateDEREncodedURL: certificateDEREncodedURL
         )
     }
@@ -112,7 +112,7 @@ extension OpenSSL {
         ).waitUntilExit()
     }
 
-    func generatePFXCertificate(
+    func generatePKCS12Certificate(
         _ url: URL,
         privateKey: URL,
         certificate: URL,

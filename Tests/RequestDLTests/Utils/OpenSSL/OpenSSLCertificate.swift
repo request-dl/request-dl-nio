@@ -14,7 +14,7 @@ struct OpenSSLCertificate {
 
     let privateKeyURL: URL
 
-    let personalFileExchangeURL: URL?
+    let pkcs12URL: URL?
 
     let certificateDEREncodedURL: URL?
 }
@@ -34,7 +34,7 @@ extension OpenSSLCertificate {
             data: try Data(contentsOf: privateKeyURL)
         )
 
-        let personalFileExchangeResource = try personalFileExchangeURL.map {(
+        let pkcs12Resource = try pkcs12URL.map {(
             path: prefixPath.appending($0.lastPathComponent),
             data: try Data(contentsOf: $0)
         )}
@@ -53,7 +53,7 @@ extension OpenSSLCertificate {
 
         let resources = [
             certificateResource, privateKeyResource,
-            personalFileExchangeResource, certificateDEREncodedResource
+            pkcs12Resource, certificateDEREncodedResource
         ]
 
         for resource in resources {
@@ -66,7 +66,7 @@ extension OpenSSLCertificate {
         return .init(
             certificatePath: certificateResource.path,
             privateKeyPath: privateKeyResource.path,
-            personalFileExchangePath: personalFileExchangeResource?.path,
+            pkcs12Path: pkcs12Resource?.path,
             certificateDEREncodedPath: certificateDEREncodedResource?.path
         )
     }

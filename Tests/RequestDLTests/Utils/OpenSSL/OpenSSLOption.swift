@@ -11,7 +11,7 @@ import Foundation
 enum OpenSSLOption {
 
     /// String password
-    case pfx(String)
+    case pkcs12(String)
 
     case der
 }
