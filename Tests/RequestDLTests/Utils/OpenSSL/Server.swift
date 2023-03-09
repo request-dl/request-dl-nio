@@ -62,20 +62,19 @@ extension OpenSSLServer {
         if let clientAuthentication = clientAuthentication {
             commands.append(
                 """
-                -CAfile \(clientAuthentication.certificateURL.normalizePath) \
-                -CAfile \(clientAuthentication.privateKeyURL.normalizePath)
+                -CAfile \(clientAuthentication.certificateURL.normalizePath)
                 """
             )
 
-            if let clientPKCS12URL = clientAuthentication.pkcs12URL,
-               let password = clientAuthentication.pkcs12Password {
-                commands.append(
-                    """
-                    -CAfile \(clientPKCS12URL.normalizePath) \
-                    -pass pass:\(password)
-                    """
-                )
-            }
+//            if let clientPKCS12URL = clientAuthentication.pkcs12URL,
+//               let password = clientAuthentication.pkcs12Password {
+//                commands.append(
+//                    """
+//                    -CAfile \(clientPKCS12URL.normalizePath) \
+//                    -pass pass:\(password)
+//                    """
+//                )
+//            }
 
             commands.append("-Verify 1")
         }
