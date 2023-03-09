@@ -10,6 +10,10 @@ jobs:
   tests:
     runs-on: macOS-latest
     steps:
+      - name: OpenSSL Update
+        run: |
+            brew upgrade openssl
+
       - name: Xcode Select
         uses: devbotsxyz/xcode-select@v1.1.0
         with:
