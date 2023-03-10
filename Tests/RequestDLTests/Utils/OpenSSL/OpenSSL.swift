@@ -83,8 +83,9 @@ extension OpenSSL {
     func generatePrivateKey(_ url: URL) throws {
         try Process.zsh(
             """
-            openssl genrsa 2048 \
-                -out \(url.normalizePath)
+            openssl genrsa \
+                -out \(url.normalizePath) \
+                2048
             """
         ).waitUntilExit()
     }
