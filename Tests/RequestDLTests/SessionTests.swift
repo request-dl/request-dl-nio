@@ -555,7 +555,7 @@ final class SessionTests: XCTestCase {
     func testProtocolSupported() async {
         // Given
         let tlsProtocolSupportedMin = tls_protocol_version_t.TLSv11
-        let tlsProtocolSupportedMax = tls_protocol_version_t.TLSv12
+        let tlsProtocolSupportedMax = tls_protocol_version_t.TLSv11
 
         // When
         let (session, _) = await resolve(
