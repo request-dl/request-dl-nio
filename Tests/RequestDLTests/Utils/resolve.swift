@@ -1,9 +1,6 @@
-//
-//  Resolver+Test.swift
-//
-//
-//  Created by Brenno Giovanini de Moura on 06/12/22.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 @testable import RequestDL

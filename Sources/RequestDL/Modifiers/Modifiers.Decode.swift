@@ -1,28 +1,6 @@
-//
-//  Modifiers.Decode.swift
-//
-//  MIT License
-//
-//  Copyright (c) 2022 RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -35,11 +13,11 @@ extension Modifiers {
      Generic types:
 
      - `Content`: The type of the original `Task` being modified.
-     - `Element`: The type to decode the response data into.
+     - `Element`: The type to decode the result data into.
 
      The `Decode` modifier can be used with any `Task` whose `Element` is of type
      `TaskResult<Data>`. It expects a `Decodable` type to be specified as the `Element`
-     type it will decode the response data into.
+     type it will decode the result data into.
 
      The decoding operation is performed using a `JSONDecoder`. By default, the decoding is
      performed assuming that the data is in plain format, i.e., not an array or dictionary.
@@ -57,15 +35,15 @@ extension Modifiers {
         }
 
         /**
-         Decodes the response data of the specified `Task` instance into an instance of the
+         Decodes the result data of the specified `Task` instance into an instance of the
          `Element` type specified during initialization.
 
-         - Parameter task: The `Task` instance whose response data is to be decoded.
+         - Parameter task: The `Task` instance whose result data is to be decoded.
          - Returns: A `TaskResult` instance containing the decoded data.
          - Throws: If the decoding operation fails.
          */
         public func task(_ task: Content) async throws -> TaskResult<Element> {
-            let result = try await task.response()
+            let result = try await task.result()
 
             return .init(
                 response: result.response,
@@ -96,7 +74,7 @@ extension Task where Element == TaskResult<Data> {
      `Task`.
 
      - Parameters:
-        - type: The type to decode the response data into.
+        - type: The type to decode the result data into.
         - decoder: The `JSONDecoder` instance to use for the decoding operation.
      - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
      */
@@ -109,10 +87,10 @@ extension Task where Element == TaskResult<Data> {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
-     `Task`, assuming the response data is an array.
+     `Task`, assuming the result data is an array.
 
      - Parameters:
-        - type: The type to decode the response data into.
+        - type: The type to decode the result data into.
         - decoder: The `JSONDecoder` instance to use for the decoding operation.
      - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
      */
@@ -125,10 +103,10 @@ extension Task where Element == TaskResult<Data> {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
-     `Task`, assuming the response data is a dictionary.
+     `Task`, assuming the result data is a dictionary.
 
      - Parameters:
-        - type: The type to decode the response data into.
+        - type: The type to decode the result data into.
         - decoder: The `JSONDecoder` instance to use for the decoding operation.
      - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
      */

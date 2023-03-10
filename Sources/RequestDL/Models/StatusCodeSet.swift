@@ -1,9 +1,6 @@
-//
-//  File.swift
-//
-//
-//  Created by Brenno on 04/03/23.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -72,6 +69,13 @@ extension StatusCodeSet {
 
     public mutating func update(with newMember: __owned StatusCode) -> StatusCode? {
         statusCodes.update(with: newMember)
+    }
+}
+
+extension StatusCodeSet {
+
+    public var count: Int {
+        statusCodes.count
     }
 }
 

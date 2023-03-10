@@ -1,28 +1,6 @@
-//
-//  DataTask.swift
-//
-//  MIT License
-//
-//  Copyright (c) 2022 RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -30,7 +8,7 @@ import Foundation
  A type that represents a data task request.
 
  Use `DataTask` to represent a request for a specific resource. After you've constructed your
- data task, you can use `response` function to receive the result of the request.
+ data task, you can use `result` function to receive the result of the request.
 
  In the example below, a request is made to the Apple's website:
 
@@ -39,7 +17,7 @@ import Foundation
      try await DataTask {
          BaseURL("apple.com")
      }
-     .response()
+     .result()
  }
  ```
  - Note: `DataTask` is a generic type that accepts a type that conforms to `Property` as its
@@ -65,7 +43,7 @@ extension DataTask {
     /**
      Returns a task result that encapsulates the response data for a request.
 
-     The `response` function is used to get the response data from a `DataTask` object. The function returns
+     The `result` function is used to get the response data from a `DataTask` object. The function returns
      a `TaskResult<Data>` object that encapsulates the response data or any error that occurred during the
      request execution.
 
@@ -73,7 +51,7 @@ extension DataTask {
 
      - Throws: An error of type `Error` that indicates an issue with the request or response.
      */
-    public func response() async throws -> TaskResult<Data> {
+    public func result() async throws -> TaskResult<Data> {
         let delegate = DelegateProxy()
         let (session, request) = await Resolver(content).make(delegate)
 
@@ -108,7 +86,7 @@ extension DataTask {
                 if let data = data, let response = response {
                     continuation.resume(returning: .init(response: response, data: data))
                 } else {
-                    continuation.resume(throwing: EmptyResponseError())
+                    continuation.resume(throwing: EmptyResultError())
                 }
             }
 

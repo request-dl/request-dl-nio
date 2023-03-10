@@ -1,9 +1,6 @@
-//
-//  File.swift
-//
-//
-//  Created by Brenno on 04/03/23.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -264,5 +261,16 @@ extension StatusCode: Comparable {
 
     public static func < (_ lhs: StatusCode, _ rhs: StatusCode) -> Bool {
         lhs.rawValue < rhs.rawValue
+    }
+}
+
+extension StatusCode: Strideable {
+
+    public func distance(to other: StatusCode) -> Int {
+        rawValue.distance(to: other.rawValue)
+    }
+
+    public func advanced(by n: Int) -> StatusCode {
+        .init(rawValue.advanced(by: n))
     }
 }

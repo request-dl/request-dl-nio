@@ -1,28 +1,6 @@
-//
-//  Headers.Cache.swift
-//
-//  MIT License
-//
-//  Copyright (c) 2022 RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
@@ -101,7 +79,7 @@ extension Headers {
 
         /// Returns an exception since `Never` is a type that can never be constructed.
         public var body: Never {
-            Never.bodyException()
+            bodyException()
         }
     }
 }
@@ -124,9 +102,9 @@ extension Headers.Cache: PrimitiveProperty {
             self.diskCapacity = diskCapacity
         }
 
-        func makeProperty(_ configuration: MakeConfiguration) {
+        func makeProperty(_ make: Make) {
             if let memoryCapacity = memoryCapacity, let diskCapacity = diskCapacity {
-                configuration.configuration.urlCache = URLCache(
+                make.configuration.urlCache = URLCache(
                     memoryCapacity: memoryCapacity,
                     diskCapacity: diskCapacity,
                     diskPath: Bundle.main.bundleIdentifier
@@ -134,7 +112,7 @@ extension Headers.Cache: PrimitiveProperty {
             }
 
             if let policy = policy {
-                configuration.request.cachePolicy = policy
+                make.configuration.requestCachePolicy = policy
             }
         }
     }
@@ -269,10 +247,10 @@ extension Headers.Cache {
     }
 
     /**
-     A method to set the `staleIfError` property value of the receiver `Cache` object.
+     Sets the `stale-if-error` value to the given number of seconds.
 
-     - Parameter seconds: An `Int` value representing the number of seconds to set for the `staleIfError` property.
-     - Returns: A `Cache` object with the `staleIfError` property set to the provided value.
+     - Parameter seconds: The value to be set.
+     - Returns: The modified Cache object.
      */
     public func staleIfError(_ seconds: Int) -> Self {
         edit { $0.staleIfError = seconds }

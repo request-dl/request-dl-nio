@@ -1,335 +1,737 @@
-//
-//  SessionTests.swift
-//
-//  MIT License
-//
-//  Copyright (c) 2022 RequestDL
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import XCTest
 @testable import RequestDL
 
+// swiftlint:disable type_body_length function_body_length file_length
 final class SessionTests: XCTestCase {
 
-    func testConfigurationBaseType() async {
-        let sut1 = Test(Session(.default))
-        let sut2 = Test(Session(.ephemeral))
-        let sut3 = Test(Session(.background("123"), queue: .main))
+    func testDefaultConfiguration() async throws {
+        // Given
+        let property = Session(.default)
+        let configuration = URLSessionConfiguration.default
 
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
+        // When
+        let (session, _) = await resolve(TestProperty { property })
 
-        XCTAssertEqual(session1.configuration, .default)
-        XCTAssertEqual(session2.configuration.urlCache?.diskCapacity, .zero)
-        XCTAssertEqual(session3.configuration.identifier, "123")
-        XCTAssertEqual(session3.delegateQueue, .main)
-    }
+        // Then
+        XCTAssertEqual(
+            session.configuration.networkServiceType,
+            configuration.networkServiceType
+        )
 
-    func testEmptyConfiguration() async {
-        let sut = Test(Session(.default))
+        XCTAssertEqual(
+            session.configuration.allowsCellularAccess,
+            configuration.allowsCellularAccess
+        )
 
-        let (session, _) = await resolve(sut)
-        let configuration = session.configuration
+        XCTAssertEqual(
+            session.configuration.allowsExpensiveNetworkAccess,
+            configuration.allowsExpensiveNetworkAccess
+        )
 
-        XCTAssertEqual(configuration.networkServiceType, .default)
-        XCTAssertTrue(configuration.allowsCellularAccess)
-        XCTAssertTrue(configuration.allowsExpensiveNetworkAccess)
-        XCTAssertTrue(configuration.allowsConstrainedNetworkAccess)
+        XCTAssertEqual(
+            session.configuration.allowsConstrainedNetworkAccess,
+            configuration.allowsConstrainedNetworkAccess
+        )
 
         #if swift(>=5.7.2)
         if #available(iOS 16, macOS 13, watchOS 9, tvOS 16, *) {
-            XCTAssertFalse(configuration.requiresDNSSECValidation)
+            XCTAssertEqual(
+                session.configuration.requiresDNSSECValidation,
+                configuration.requiresDNSSECValidation
+            )
         }
         #endif
 
-        XCTAssertFalse(configuration.waitsForConnectivity)
-        XCTAssertFalse(configuration.isDiscretionary)
-        XCTAssertNil(configuration.sharedContainerIdentifier)
-        XCTAssertFalse(configuration.sessionSendsLaunchEvents)
-        XCTAssertNil(configuration.connectionProxyDictionary)
-        XCTAssertFalse(configuration.httpShouldUsePipelining)
-        XCTAssertTrue(configuration.httpShouldSetCookies)
-        XCTAssertEqual(configuration.httpCookieAcceptPolicy, .onlyFromMainDocumentDomain)
-        XCTAssertEqual(configuration.httpMaximumConnectionsPerHost, 6)
-        XCTAssertNotNil(configuration.httpCookieStorage)
-        XCTAssertNotNil(configuration.urlCredentialStorage)
-        XCTAssertFalse(configuration.shouldUseExtendedBackgroundIdleMode)
+        XCTAssertEqual(
+            session.configuration.waitsForConnectivity,
+            configuration.waitsForConnectivity
+        )
+
+        XCTAssertEqual(
+            session.configuration.isDiscretionary,
+            configuration.isDiscretionary
+        )
+
+        XCTAssertEqual(
+            session.configuration.sharedContainerIdentifier,
+            configuration.sharedContainerIdentifier
+        )
+
+        XCTAssertEqual(
+            session.configuration.sessionSendsLaunchEvents,
+            configuration.sessionSendsLaunchEvents
+        )
+
+        XCTAssertEqual(
+            session.configuration.connectionProxyDictionary?.mapValues { "\($0)" },
+            configuration.connectionProxyDictionary?.mapValues { "\($0)" }
+        )
+
+        XCTAssertEqual(
+            session.configuration.tlsMinimumSupportedProtocolVersion,
+            configuration.tlsMinimumSupportedProtocolVersion
+        )
+
+        XCTAssertEqual(
+            session.configuration.tlsMaximumSupportedProtocolVersion,
+            configuration.tlsMaximumSupportedProtocolVersion
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpShouldUsePipelining,
+            configuration.httpShouldUsePipelining
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpShouldSetCookies,
+            configuration.httpShouldSetCookies
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieAcceptPolicy,
+            configuration.httpCookieAcceptPolicy
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpMaximumConnectionsPerHost,
+            configuration.httpMaximumConnectionsPerHost
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieStorage?.cookieAcceptPolicy,
+            configuration.httpCookieStorage?.cookieAcceptPolicy
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieStorage?.cookies?.count,
+            configuration.httpCookieStorage?.cookies?.count
+        )
+
+        XCTAssertEqual(
+            session.configuration.urlCredentialStorage?.allCredentials,
+            configuration.urlCredentialStorage?.allCredentials
+        )
+
+        XCTAssertEqual(
+            session.configuration.shouldUseExtendedBackgroundIdleMode,
+            configuration.shouldUseExtendedBackgroundIdleMode
+        )
+
+        XCTAssertEqual(
+            session.configuration.identifier,
+            configuration.identifier
+        )
+
+        XCTAssertEqual(
+            session.configuration.requestCachePolicy,
+            configuration.requestCachePolicy
+        )
+    }
+
+    func testEphemeralConfiguration() async throws {
+        // Given
+        let property = Session(.ephemeral)
+        let configuration = URLSessionConfiguration.ephemeral
+
+        // When
+        let (session, _) = await resolve(TestProperty { property })
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.networkServiceType,
+            configuration.networkServiceType
+        )
+
+        XCTAssertEqual(
+            session.configuration.allowsCellularAccess,
+            configuration.allowsCellularAccess
+        )
+
+        XCTAssertEqual(
+            session.configuration.allowsExpensiveNetworkAccess,
+            configuration.allowsExpensiveNetworkAccess
+        )
+
+        XCTAssertEqual(
+            session.configuration.allowsConstrainedNetworkAccess,
+            configuration.allowsConstrainedNetworkAccess
+        )
+
+        #if swift(>=5.7.2)
+        if #available(iOS 16, macOS 13, watchOS 9, tvOS 16, *) {
+            XCTAssertEqual(
+                session.configuration.requiresDNSSECValidation,
+                configuration.requiresDNSSECValidation
+            )
+        }
+        #endif
+
+        XCTAssertEqual(
+            session.configuration.waitsForConnectivity,
+            configuration.waitsForConnectivity
+        )
+
+        XCTAssertEqual(
+            session.configuration.isDiscretionary,
+            configuration.isDiscretionary
+        )
+
+        XCTAssertEqual(
+            session.configuration.sharedContainerIdentifier,
+            configuration.sharedContainerIdentifier
+        )
+
+        XCTAssertEqual(
+            session.configuration.sessionSendsLaunchEvents,
+            configuration.sessionSendsLaunchEvents
+        )
+
+        XCTAssertEqual(
+            session.configuration.connectionProxyDictionary?.mapValues { "\($0)" },
+            configuration.connectionProxyDictionary?.mapValues { "\($0)" }
+        )
+
+        XCTAssertEqual(
+            session.configuration.tlsMinimumSupportedProtocolVersion,
+            configuration.tlsMinimumSupportedProtocolVersion
+        )
+
+        XCTAssertEqual(
+            session.configuration.tlsMaximumSupportedProtocolVersion,
+            configuration.tlsMaximumSupportedProtocolVersion
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpShouldUsePipelining,
+            configuration.httpShouldUsePipelining
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpShouldSetCookies,
+            configuration.httpShouldSetCookies
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieAcceptPolicy,
+            configuration.httpCookieAcceptPolicy
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpMaximumConnectionsPerHost,
+            configuration.httpMaximumConnectionsPerHost
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieStorage?.cookieAcceptPolicy,
+            configuration.httpCookieStorage?.cookieAcceptPolicy
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieStorage?.cookies?.count,
+            configuration.httpCookieStorage?.cookies?.count
+        )
+
+        XCTAssertEqual(
+            session.configuration.urlCredentialStorage?.allCredentials,
+            configuration.urlCredentialStorage?.allCredentials
+        )
+
+        XCTAssertEqual(
+            session.configuration.shouldUseExtendedBackgroundIdleMode,
+            configuration.shouldUseExtendedBackgroundIdleMode
+        )
+
+        XCTAssertEqual(
+            session.configuration.identifier,
+            configuration.identifier
+        )
+
+        XCTAssertEqual(
+            session.configuration.requestCachePolicy,
+            configuration.requestCachePolicy
+        )
+    }
+
+    func testBackgroundConfiguration() async throws {
+        // Given
+        let backgroundID = "id"
+        let property = Session(.background(backgroundID))
+        let configuration = URLSessionConfiguration.background(withIdentifier: backgroundID)
+
+        // When
+        let (session, _) = await resolve(TestProperty { property })
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.networkServiceType,
+            configuration.networkServiceType
+        )
+
+        XCTAssertEqual(
+            session.configuration.allowsCellularAccess,
+            configuration.allowsCellularAccess
+        )
+
+        XCTAssertEqual(
+            session.configuration.allowsExpensiveNetworkAccess,
+            configuration.allowsExpensiveNetworkAccess
+        )
+
+        XCTAssertEqual(
+            session.configuration.allowsConstrainedNetworkAccess,
+            configuration.allowsConstrainedNetworkAccess
+        )
+
+        #if swift(>=5.7.2)
+        if #available(iOS 16, macOS 13, watchOS 9, tvOS 16, *) {
+            XCTAssertEqual(
+                session.configuration.requiresDNSSECValidation,
+                configuration.requiresDNSSECValidation
+            )
+        }
+        #endif
+
+        XCTAssertEqual(
+            session.configuration.waitsForConnectivity,
+            configuration.waitsForConnectivity
+        )
+
+        XCTAssertEqual(
+            session.configuration.isDiscretionary,
+            configuration.isDiscretionary
+        )
+
+        XCTAssertEqual(
+            session.configuration.sharedContainerIdentifier,
+            configuration.sharedContainerIdentifier
+        )
+
+        XCTAssertEqual(
+            session.configuration.sessionSendsLaunchEvents,
+            configuration.sessionSendsLaunchEvents
+        )
+
+        XCTAssertEqual(
+            session.configuration.connectionProxyDictionary?.mapValues { "\($0)" },
+            configuration.connectionProxyDictionary?.mapValues { "\($0)" }
+        )
+
+        XCTAssertEqual(
+            session.configuration.tlsMinimumSupportedProtocolVersion,
+            configuration.tlsMinimumSupportedProtocolVersion
+        )
+
+        XCTAssertEqual(
+            session.configuration.tlsMaximumSupportedProtocolVersion,
+            configuration.tlsMaximumSupportedProtocolVersion
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpShouldUsePipelining,
+            configuration.httpShouldUsePipelining
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpShouldSetCookies,
+            configuration.httpShouldSetCookies
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieAcceptPolicy,
+            configuration.httpCookieAcceptPolicy
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpMaximumConnectionsPerHost,
+            configuration.httpMaximumConnectionsPerHost
+        )
+
+        XCTAssertEqual(
+            session.configuration.httpCookieStorage,
+            configuration.httpCookieStorage
+        )
+
+        XCTAssertEqual(
+            session.configuration.urlCredentialStorage?.allCredentials,
+            configuration.urlCredentialStorage?.allCredentials
+        )
+
+        XCTAssertEqual(
+            session.configuration.shouldUseExtendedBackgroundIdleMode,
+            configuration.shouldUseExtendedBackgroundIdleMode
+        )
+
+        XCTAssertEqual(
+            session.configuration.identifier,
+            configuration.identifier
+        )
+
+        XCTAssertEqual(
+            session.configuration.requestCachePolicy,
+            configuration.requestCachePolicy
+        )
+
+        XCTAssertEqual(
+            session.configuration.urlCache,
+            configuration.urlCache
+        )
     }
 
     func testNetworkService() async {
-        for type in [.video, .background, .callSignaling] as [URLRequest.NetworkServiceType] {
-            let sut = Test {
+        // Given
+        let networkService: URLRequest.NetworkServiceType = .video
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
                 Session(.default)
-                    .networkService(type)
+                    .networkService(networkService)
             }
+        )
 
-            let (session, _) = await resolve(sut)
-            let configuration = session.configuration
-
-            XCTAssertEqual(configuration.networkServiceType, type)
-        }
+        // Then
+        XCTAssertEqual(
+            session.configuration.networkServiceType,
+            networkService
+        )
     }
 
-    func testCellularAccess() async {
-        let sut1 = Test {
-            Session(.default)
-                .cellularAccessDisabled(false)
-        }
+    func testCellularAccessDisabled() async {
+        // Given
+        let cellularAccessDisabled = true
 
-        let sut2 = Test {
-            Session(.default)
-                .cellularAccessDisabled(true)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .cellularAccessDisabled(cellularAccessDisabled)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .cellularAccessDisabled(true)
-                .cellularAccessDisabled(false)
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertTrue(configuration1.allowsCellularAccess)
-        XCTAssertFalse(configuration2.allowsCellularAccess)
-        XCTAssertTrue(configuration3.allowsCellularAccess)
+        // Then
+        XCTAssertEqual(
+            session.configuration.allowsCellularAccess,
+            !cellularAccessDisabled
+        )
     }
 
-    func testExpensiveNetworkAccess() async {
-        let sut1 = Test {
-            Session(.default)
-                .expensiveNetworkDisabled(false)
-        }
+    func testExpensiveNetworkDisabled() async {
+        // Given
+        let expensiveNetworkDisabled = true
 
-        let sut2 = Test {
-            Session(.default)
-                .expensiveNetworkDisabled(true)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .expensiveNetworkDisabled(expensiveNetworkDisabled)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .expensiveNetworkDisabled(true)
-                .expensiveNetworkDisabled(false)
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertTrue(configuration1.allowsExpensiveNetworkAccess)
-        XCTAssertFalse(configuration2.allowsExpensiveNetworkAccess)
-        XCTAssertTrue(configuration3.allowsExpensiveNetworkAccess)
+        // Then
+        XCTAssertEqual(
+            session.configuration.allowsExpensiveNetworkAccess,
+            !expensiveNetworkDisabled
+        )
     }
 
-    func testConstrainedNetworkAccess() async {
-        let sut1 = Test {
-            Session(.default)
-                .constrainedNetworkDisabled(false)
-        }
+    func testConstrainedNetworkDisabled() async {
+        // Given
+        let constrainedNetworkDisabled = true
 
-        let sut2 = Test {
-            Session(.default)
-                .constrainedNetworkDisabled(true)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .constrainedNetworkDisabled(constrainedNetworkDisabled)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .constrainedNetworkDisabled(true)
-                .constrainedNetworkDisabled(false)
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertTrue(configuration1.allowsConstrainedNetworkAccess)
-        XCTAssertFalse(configuration2.allowsConstrainedNetworkAccess)
-        XCTAssertTrue(configuration3.allowsConstrainedNetworkAccess)
+        // Then
+        XCTAssertEqual(
+            session.configuration.allowsConstrainedNetworkAccess,
+            !constrainedNetworkDisabled
+        )
     }
 
     func testWaitsForConnectivity() async {
-        let sut1 = Test {
-            Session(.default)
-                .waitsForConnectivity(true)
-        }
+        // Given
+        let waitsForConnectivity = true
 
-        let sut2 = Test {
-            Session(.default)
-                .waitsForConnectivity(false)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .waitsForConnectivity(waitsForConnectivity)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .waitsForConnectivity(false)
-                .waitsForConnectivity(true)
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertTrue(configuration1.waitsForConnectivity)
-        XCTAssertFalse(configuration2.waitsForConnectivity)
-        XCTAssertTrue(configuration3.waitsForConnectivity)
+        // Then
+        XCTAssertEqual(
+            session.configuration.waitsForConnectivity,
+            waitsForConnectivity
+        )
     }
 
     func testDiscretionary() async {
-        let sut1 = Test {
-            Session(.default)
-                .discretionary(true)
-        }
+        // Given
+        let discretionary = true
 
-        let sut2 = Test {
-            Session(.default)
-                .discretionary(false)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .discretionary(discretionary)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .discretionary(false)
-                .discretionary(true)
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertTrue(configuration1.isDiscretionary)
-        XCTAssertFalse(configuration2.isDiscretionary)
-        XCTAssertTrue(configuration3.isDiscretionary)
+        // Then
+        XCTAssertEqual(
+            session.configuration.isDiscretionary,
+            discretionary
+        )
     }
 
     func testSharedContainerIdentifier() async {
-        let sut1 = Test {
-            Session(.default)
-                .sharedContainerIdentifier("test1")
-        }
+        // Given
+        let sharedContainerIdentifier = "unit.test"
 
-        let sut2 = Test {
-            Session(.default)
-                .sharedContainerIdentifier("test2")
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .sharedContainerIdentifier(sharedContainerIdentifier)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .sharedContainerIdentifier("test3")
-                .sharedContainerIdentifier("test4")
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertEqual(configuration1.sharedContainerIdentifier, "test1")
-        XCTAssertEqual(configuration2.sharedContainerIdentifier, "test2")
-        XCTAssertEqual(configuration3.sharedContainerIdentifier, "test4")
+        // Then
+        XCTAssertEqual(
+            session.configuration.sharedContainerIdentifier,
+            sharedContainerIdentifier
+        )
     }
 
-    func testLaunchEvents() async {
-        let sut1 = Test {
-            Session(.default)
-                .sendsLaunchEvents(true)
-        }
+    func testSendsLaunchEvents() async {
+        // Given
+        let sendsLaunchEvents = true
 
-        let sut2 = Test {
-            Session(.default)
-                .sendsLaunchEvents(false)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .sendsLaunchEvents(sendsLaunchEvents)
+            }
+        )
 
-        let sut3 = Test {
-            Session(.default)
-                .sendsLaunchEvents(true)
-                .sendsLaunchEvents(false)
-        }
-
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
-
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
-
-        XCTAssertTrue(configuration1.sessionSendsLaunchEvents)
-        XCTAssertFalse(configuration2.sessionSendsLaunchEvents)
-        XCTAssertFalse(configuration3.sessionSendsLaunchEvents)
+        // Then
+        XCTAssertEqual(
+            session.configuration.sessionSendsLaunchEvents,
+            sendsLaunchEvents
+        )
     }
 
     func testConnectionProxyDictionary() async {
-        let value1 = ["key1": 1]
-        let value2 = ["key2": 2]
-        let value3 = ["key4": 4, "key5": 5]
+        // Given
+        let connectionProxyDictionary = [AnyHashable: Any]()
 
-        let sut1 = Test {
-            Session(.default)
-                .connectionProxyDictionary(value1)
-        }
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .connectionProxyDictionary(connectionProxyDictionary)
+            }
+        )
 
-        let sut2 = Test {
-            Session(.default)
-                .connectionProxyDictionary(value2)
-        }
+        // Then
+        XCTAssertEqual(
+            session.configuration.connectionProxyDictionary?.mapValues { "\($0)" },
+            connectionProxyDictionary.mapValues { "\($0)" }
+        )
+    }
 
-        let sut3 = Test {
-            Session(.default)
-                .connectionProxyDictionary(["key3": 3])
-                .connectionProxyDictionary(value3)
-        }
+    func testProtocolSupported() async {
+        // Given
+        let tlsProtocolSupportedMin = tls_protocol_version_t.TLSv11
+        let tlsProtocolSupportedMax = tls_protocol_version_t.TLSv11
 
-        let (session1, _) = await resolve(sut1)
-        let (session2, _) = await resolve(sut2)
-        let (session3, _) = await resolve(sut3)
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .tlsProtocolSupported(
+                        minimum: tlsProtocolSupportedMin,
+                        maximum: tlsProtocolSupportedMax
+                    )
+            }
+        )
 
-        let configuration1 = session1.configuration
-        let configuration2 = session2.configuration
-        let configuration3 = session3.configuration
+        // Then
+        XCTAssertEqual(
+            session.configuration.tlsMinimumSupportedProtocolVersion,
+            tlsProtocolSupportedMin
+        )
 
-        XCTAssertEqual(configuration1.connectionProxyDictionary as? [String: Int], value1)
-        XCTAssertEqual(configuration2.connectionProxyDictionary as? [String: Int], value2)
-        XCTAssertEqual(configuration3.connectionProxyDictionary as? [String: Int], value3)
+        XCTAssertEqual(
+            session.configuration.tlsMaximumSupportedProtocolVersion,
+            tlsProtocolSupportedMax
+        )
+    }
+
+    func testPipeliningDisabled() async {
+        // Given
+        let pipeliningDisabled = false
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .pipeliningDisabled(pipeliningDisabled)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.httpShouldUsePipelining,
+            !pipeliningDisabled
+        )
+    }
+
+    func testSetCookiesDisabled() async {
+        // Given
+        let setCookiesDisabled = true
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .setCookiesDisabled(setCookiesDisabled)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.httpShouldSetCookies,
+            !setCookiesDisabled
+        )
+    }
+
+    func testCookieAcceptPolicy() async {
+        // Given
+        let cookieAcceptPolicy: HTTPCookie.AcceptPolicy = .never
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .cookieAcceptPolicy(cookieAcceptPolicy)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.httpCookieAcceptPolicy,
+            cookieAcceptPolicy
+        )
+    }
+
+    func testCookieStorage() async {
+        // Given
+        let cookieStorage = HTTPCookieStorage()
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .cookieStorage(cookieStorage)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.httpCookieStorage,
+            cookieStorage
+        )
+    }
+
+    func testMaximumConnectionsPerHost() async {
+        // Given
+        let maximumConnectionsPerHost = 5
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .maximumConnectionsPerHost(maximumConnectionsPerHost)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.httpMaximumConnectionsPerHost,
+            maximumConnectionsPerHost
+        )
+    }
+
+    func testExtendedBackgroundIdleModeDisabled() async {
+        // Given
+        let extendedBackgroundIdleModeDisabled = false
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .extendedBackgroundIdleModeDisabled(extendedBackgroundIdleModeDisabled)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.shouldUseExtendedBackgroundIdleMode,
+            !extendedBackgroundIdleModeDisabled
+        )
+    }
+
+    #if swift(>=5.7.2)
+    @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
+    func testValidatesDNSSec() async {
+        // Given
+        let validatesDNSSec = true
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .validatesDNSSec(validatesDNSSec)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.requiresDNSSECValidation,
+            validatesDNSSec
+        )
+    }
+    #endif
+
+    func testCredentialStorage() async {
+        // Given
+        let credentialStorage = URLCredentialStorage()
+
+        // When
+        let (session, _) = await resolve(
+            TestProperty {
+                Session(.default)
+                    .credentialStorage(credentialStorage)
+            }
+        )
+
+        // Then
+        XCTAssertEqual(
+            session.configuration.urlCredentialStorage,
+            credentialStorage
+        )
     }
 }

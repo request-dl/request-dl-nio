@@ -1,23 +1,25 @@
-//
-//  File.swift
-//
-//
-//  Created by Brenno on 04/03/23.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 
 struct FormObject: NodeObject {
 
-    let type: FormType
+    let factory: () -> PartFormRawValue
 
-    init(_ type: FormType) {
-        self.type = type
+    init(_ factory: @escaping () -> PartFormRawValue) {
+        self.factory = factory
     }
 
-    func makeProperty(_ configuration: MakeConfiguration) {
-        let boundary = FormUtils.boundary
-        configuration.request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        configuration.request.httpBody = FormUtils.buildBody([type.data], with: boundary)
+    func makeProperty(_ make: Make) {
+        let constructor = MultipartFormConstructor([factory()])
+
+        make.request.setValue(
+            "multipart/form-data; boundary=\"\(constructor.boundary)\"",
+            forHTTPHeaderField: "Content-Type"
+        )
+
+        make.request.httpBody = constructor.body
     }
 }

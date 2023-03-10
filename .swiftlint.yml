@@ -1,3 +1,6 @@
+excluded:
+    .build
+
 opt_in_rules:
     - force_unwrapping
     - opening_brace
@@ -12,3 +15,18 @@ identifier_name:
     excluded:
         - id
         - ok
+        - n
+
+type_name:
+    allowed_symbols:
+        - _TupleContent
+        - _OptionalContent
+        - _ConditionalContent
+        - _EncodablePayload
+        - _DataPayload
+        - _DictionaryPayload
+        - _StringPayload
+
+large_tuple:
+    warning: 9
+    error: 16
