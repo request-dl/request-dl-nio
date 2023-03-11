@@ -1,5 +1,5 @@
 [![Swift Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2Frequest-dl%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/brennobemoura/request-dl)
-[![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2F2Frequest-dl%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/brennobemoura/request-dl)
+[![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2Frequest-dl%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/brennobemoura/request-dl)
 [![Tests](https://github.com/request-dl/request-dl/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/request-dl/request-dl/actions/workflows/tests.yml)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/516f7228a532b73b5540/test_coverage)](https://codeclimate.com/github/brennobemoura/request-dl/test_coverage)
 
@@ -56,7 +56,7 @@ try await DataTask {
 .logInConsole(true)
 .decode(GoogleResponse.self)
 .extractPayload()
-.response()
+.result()
 ```
 
 This code creates a `DataTask` with the `BaseURL` set to "google.com", a `HeaderGroup`
