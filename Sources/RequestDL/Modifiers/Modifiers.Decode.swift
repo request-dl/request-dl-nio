@@ -13,56 +13,47 @@ extension Modifiers {
      Generic types:
 
      - `Content`: The type of the original `Task` being modified.
-     - `Element`: The type to decode the result data into.
+     - `Element`: The type to decode the data into.
+     - `Output`: The decoded result.
 
      The `Decode` modifier can be used with any `Task` whose `Element` is of type
-     `TaskResult<Data>`. It expects a `Decodable` type to be specified as the `Element`
-     type it will decode the result data into.
+     `TaskResult<Data>` or `Data`. It expects a `Decodable` type to be specified as
+     the `Element` type it will decode the data into.
 
      The decoding operation is performed using a `JSONDecoder`. By default, the decoding is
      performed assuming that the data is in plain format, i.e., not an array or dictionary.
      */
-    public struct Decode<Content: Task, Element: Decodable>: TaskModifier where Content.Element == TaskResult<Data> {
+    public struct Decode<Content: Task, Element: Decodable, Output>: TaskModifier {
 
         let type: Element.Type
         let decoder: JSONDecoder
-        private let contentType: DecodeContentType
+        private let data: (Content.Element) -> Data
+        private let output: (Content.Element, Element) -> Output
 
-        fileprivate init(_ type: Element.Type, decoder: JSONDecoder, contentType: DecodeContentType) {
+        fileprivate init(
+            type: Element.Type,
+            decoder: JSONDecoder,
+            data: @escaping (Content.Element) -> Data,
+            output: @escaping (Content.Element, Element) -> Output
+        ) {
             self.type = type
             self.decoder = decoder
-            self.contentType = contentType
+            self.data = data
+            self.output = output
         }
 
         /**
-         Decodes the result data of the specified `Task` instance into an instance of the
-         `Element` type specified during initialization.
+         Decodes the data of the specified `Task` instance into an instance of the `Element`
+         type specified during initialization.
 
-         - Parameter task: The `Task` instance whose result data is to be decoded.
-         - Returns: A `TaskResult` instance containing the decoded data.
+         - Parameter task: The `Task` instance whose data is to be decoded.
+         - Returns: A `Output` instance containing the decoded data.
          - Throws: If the decoding operation fails.
          */
-        public func task(_ task: Content) async throws -> TaskResult<Element> {
+        public func task(_ task: Content) async throws -> Output {
             let result = try await task.result()
 
-            return .init(
-                response: result.response,
-                data: try decoder.decode(type, from: flatMap(result.data))
-            )
-        }
-    }
-}
-
-extension Modifiers.Decode {
-
-    private func flatMap(_ data: Data) -> Data {
-        switch contentType {
-        case .plain:
-            return data
-        case .array:
-            return data.isEmpty ? "[]".data(using: .utf8) ?? data : data
-        case .dictionary:
-            return data.isEmpty ? "{}".data(using: .utf8) ?? data : data
+            return try output(result, decoder.decode(type, from: data(result)))
         }
     }
 }
@@ -81,45 +72,41 @@ extension Task where Element == TaskResult<Data> {
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, T>> {
-        modify(Modifiers.Decode(type, decoder: decoder, contentType: .plain))
+    ) -> ModifiedTask<Modifiers.Decode<Self, T, TaskResult<T>>> {
+        modify(Modifiers.Decode(
+            type: type,
+            decoder: decoder,
+            data: \.data,
+            output: {
+                TaskResult(
+                    response: $0.response,
+                    data: $1
+                )
+            }
+        ))
     }
+}
+
+extension Task where Element == Data {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
-     `Task`, assuming the result data is an array.
+     `Task`.
 
      - Parameters:
-        - type: The type to decode the result data into.
+        - type: The type to decode the data into.
         - decoder: The `JSONDecoder` instance to use for the decoding operation.
      - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
      */
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, T>> where T: Collection {
-        modify(Modifiers.Decode(type, decoder: decoder, contentType: .array))
+    ) -> ModifiedTask<Modifiers.Decode<Self, T, T>> {
+        modify(Modifiers.Decode(
+            type: type,
+            decoder: decoder,
+            data: { $0 },
+            output: { $1 }
+        ))
     }
-
-    /**
-     Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
-     `Task`, assuming the result data is a dictionary.
-
-     - Parameters:
-        - type: The type to decode the result data into.
-        - decoder: The `JSONDecoder` instance to use for the decoding operation.
-     - Returns: A new instance of `ModifiedTask` with the `Decode` modifier applied.
-     */
-    public func decode<Key: Decodable, Value: Decodable>(
-        _ type: [Key: Value].Type,
-        decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, [Key: Value]>> {
-        modify(Modifiers.Decode(type, decoder: decoder, contentType: .dictionary))
-    }
-}
-
-private enum DecodeContentType {
-    case plain
-    case array
-    case dictionary
 }
