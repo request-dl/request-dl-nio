@@ -7,7 +7,8 @@ import Foundation
 /**
  A group of header properties that can be applied to a view.
 
- Use a HeaderGroup to combine multiple header properties into a single property. The properties can be defined either directly in the initializer or using a closure with a PropertyBuilder.
+ Use a HeaderGroup to combine multiple header properties into a single property. The properties can be defined
+ either directly in the initializer or using a closure with a PropertyBuilder.
 
  Example:
 
