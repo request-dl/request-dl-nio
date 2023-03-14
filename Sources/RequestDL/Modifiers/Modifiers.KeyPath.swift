@@ -64,7 +64,7 @@ extension Modifiers {
     }
 }
 
-extension Task where Element == TaskResult<Data> {
+extension Task<TaskResult<Data>> {
 
     /**
      Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
@@ -87,7 +87,7 @@ extension Task where Element == TaskResult<Data> {
     }
 }
 
-extension Task where Element == Data {
+extension Task<Data> {
 
     /**
      Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.

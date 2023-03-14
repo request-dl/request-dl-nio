@@ -58,7 +58,7 @@ extension Modifiers {
     }
 }
 
-extension Task where Element == TaskResult<Data> {
+extension Task<TaskResult<Data>> {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
@@ -87,7 +87,7 @@ extension Task where Element == TaskResult<Data> {
     }
 }
 
-extension Task where Element == Data {
+extension Task<Data> {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
