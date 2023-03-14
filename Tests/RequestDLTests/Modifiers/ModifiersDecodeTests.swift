@@ -103,31 +103,19 @@ final class ModifiersDecodeTests: XCTestCase {
         )
     }
 
-    func testEmptyDictionary() async throws {
+    func testArrayOfIntegersInData() async throws {
         // Given
-        let emptyData = Data()
+        let array = Array(0..<10)
 
         // When
-        let result = try await MockedTask { emptyData }
-            .decode([Int: Int].self)
+        let data = try JSONEncoder().encode(array)
+
+        let result = try await MockedTask { data }
             .extractPayload()
-            .result()
-
-        // Given
-        XCTAssertEqual(result, [:])
-    }
-
-    func testEmptyArray() async throws {
-        // Given
-        let emptyData = Data()
-
-        // When
-        let result = try await MockedTask { emptyData }
             .decode([Int].self)
-            .extractPayload()
             .result()
 
-        // Given
-        XCTAssertEqual(result, [])
+        // Then
+        XCTAssertEqual(array, result)
     }
 }

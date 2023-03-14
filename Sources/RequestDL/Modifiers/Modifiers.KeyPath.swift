@@ -19,12 +19,20 @@ extension Modifiers {
          .keyPath(\.data)
      ```
      */
-    public struct KeyPath<Content: Task>: TaskModifier where Content.Element == TaskResult<Data> {
+    public struct KeyPath<Content: Task>: TaskModifier {
 
         let keyPath: String
+        private let data: (Content.Element) -> Data
+        private let element: (Content.Element, Data) -> Content.Element
 
-        init(_ keyPath: Swift.KeyPath<AbstractKeyPath, String>) {
+        fileprivate init(
+            keyPath: Swift.KeyPath<AbstractKeyPath, String>,
+            data: @escaping (Content.Element) -> Data,
+            element: @escaping (Content.Element, Data) -> Content.Element
+        ) {
             self.keyPath = AbstractKeyPath()[keyPath: keyPath]
+            self.data = data
+            self.element = element
         }
 
         /**
@@ -34,12 +42,12 @@ extension Modifiers {
 
          - Returns: A `TaskResult` containing the extracted sub-value.
          */
-        public func task(_ task: Content) async throws -> TaskResult<Data> {
+        public func task(_ task: Content) async throws -> Content.Element {
             let result = try await task.result()
 
             guard
                 let dictionary = try JSONSerialization.jsonObject(
-                    with: result.data,
+                    with: data(result),
                     options: []
                 ) as? [String: Any]
             else { throw KeyPathInvalidDataError() }
@@ -48,18 +56,15 @@ extension Modifiers {
                 throw KeyPathNotFound(keyPath: keyPath)
             }
 
-            return .init(
-                response: result.response,
-                data: try JSONSerialization.data(
-                    withJSONObject: value,
-                    options: .fragmentsAllowed
-                )
-            )
+            return try element(result, JSONSerialization.data(
+                withJSONObject: value,
+                options: .fragmentsAllowed
+            ))
         }
     }
 }
 
-extension Task where Element == TaskResult<Data> {
+extension Task<TaskResult<Data>> {
 
     /**
      Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
@@ -69,6 +74,33 @@ extension Task where Element == TaskResult<Data> {
      - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
      */
     public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
-        modify(Modifiers.KeyPath(keyPath))
+        modify(Modifiers.KeyPath(
+            keyPath: keyPath,
+            data: \.data,
+            element: {
+                TaskResult(
+                    response: $0.response,
+                    data: $1
+                )
+            }
+        ))
+    }
+}
+
+extension Task<Data> {
+
+    /**
+     Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
+
+     - Parameter keyPath: The key path to extract the sub-value from the data.
+
+     - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
+     */
+    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
+        modify(Modifiers.KeyPath(
+            keyPath: keyPath,
+            data: { $0 },
+            element: { $1 }
+        ))
     }
 }

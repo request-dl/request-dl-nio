@@ -23,12 +23,17 @@ extension Interceptors {
 
      - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
-    public struct Logger: TaskInterceptor {
+    public struct Logger<Element>: TaskInterceptor {
 
         let isLogActive: Bool
+        let results: (Element) -> [String]
 
-        init(_ isActive: Bool) {
+        init(
+            isActive: Bool,
+            results: @escaping (Element) -> [String]
+        ) {
             isLogActive = isActive
+            self.results = results
         }
 
         /**
@@ -36,23 +41,24 @@ extension Interceptors {
 
         - Parameter result: The result of the task execution.
         */
-        public func received(_ result: Result<TaskResult<Data>, Error>) {
+        public func received(_ result: Result<Element, Error>) {
             guard isLogActive else {
                 return
             }
 
             switch result {
             case .failure(let error):
-                print("[REQUEST] Failure: \(error)")
+                print("[RequestDL] Failure: \(error)")
             case .success(let result):
-                print("[REQUEST] Success: \(result.response)")
-                print("[REQUEST] Data: \(String(data: result.data, encoding: .utf8) ?? "Couldn't decode using UTF8")")
+                for line in results(result) {
+                    print("[RequestDL]", line)
+                }
             }
         }
     }
 }
 
-extension Task where Element == TaskResult<Data> {
+extension Task {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -60,7 +66,49 @@ extension Task where Element == TaskResult<Data> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger, Self> {
-        intercept(Interceptors.Logger(isActive))
+    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
+        intercept(Interceptors.Logger(
+            isActive: isActive,
+            results: {
+                ["Success: \($0)"]
+            }
+        ))
+    }
+}
+
+extension Task<TaskResult<Data>> {
+
+    /**
+     Add the `Interceptors.Logger` interceptor to log task result.
+
+     - Parameter isActive: If `true`, the task result will be logged in the console.
+     - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
+     */
+    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
+        intercept(Interceptors.Logger(
+            isActive: isActive,
+            results: {[
+                "Response: \($0.response)",
+                "Data: \(String(data: $0.data, encoding: .utf8) ?? "Couldn't decode using UTF8")"
+            ]}
+        ))
+    }
+}
+
+extension Task<Data> {
+
+    /**
+     Add the `Interceptors.Logger` interceptor to log task result.
+
+     - Parameter isActive: If `true`, the task result will be logged in the console.
+     - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
+     */
+    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
+        intercept(Interceptors.Logger(
+            isActive: isActive,
+            results: {
+                ["Success: \(String(data: $0, encoding: .utf8) ?? "Couldn't decode using UTF8")"]
+            }
+        ))
     }
 }
