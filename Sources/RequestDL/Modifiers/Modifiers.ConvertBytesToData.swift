@@ -42,7 +42,8 @@ extension Modifiers {
         }
 
         /**
-          Returns a task that converts the bytes returned by a task that produces `URLSession.AsyncBytes` to `Data` type.
+          Returns a task that converts the bytes returned by a task that produces
+         `URLSession.AsyncBytes` to `Data` type.
 
           - Parameter task: The task that produces `URLSession.AsyncBytes`.
           - Throws: An error if the conversion fails.
@@ -66,8 +67,8 @@ extension Modifiers {
 extension Task<TaskResult<URLSession.AsyncBytes>> {
 
     /**
-     Returns a modified task that converts the bytes returned by a task that produces `TaskResult<URLSession.AsyncBytes>`
-     to `TaskResult<Data>` type.
+     Returns a modified task that converts the bytes returned by a task that produces
+     `TaskResult<URLSession.AsyncBytes>` to `TaskResult<Data>` type.
 
      - Returns: A modified task that produces `TaskResult<Data>`.
      */
@@ -88,7 +89,8 @@ extension Task<TaskResult<URLSession.AsyncBytes>> {
 extension Task<URLSession.AsyncBytes> {
 
     /**
-     Returns a modified task that converts the bytes returned by a task that produces `URLSession.AsyncBytes` to `Data` type.
+     Returns a modified task that converts the bytes returned by a task that produces
+     `URLSession.AsyncBytes` to `Data` type.
 
      - Returns: A modified task that produces `Data`.
      */
