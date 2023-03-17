@@ -4,10 +4,12 @@
 
 import Foundation
 
+/// A type-erasing wrapper that can represent any `Property` instance.
 public struct AnyProperty: Property {
 
     private let resolver: (Context) async -> Void
 
+    /// Initializes a new instance of `AnyProperty` with the given property `Content`.
     public init<Content: Property>(_ property: Content) {
         resolver = {
             await Content.makeProperty(property, $0)
