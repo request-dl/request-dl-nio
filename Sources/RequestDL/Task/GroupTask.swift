@@ -5,15 +5,16 @@
 import Foundation
 
 /**
- A task that groups multiple tasks that operate on an element of the same collection type.
+ `GroupTask` is a task that groups multiple tasks that operate on elements of the same collection type.
 
- You can use `GroupTask` to create a single task that encapsulates an array of tasks that
- operate on each element of the same collection type.
+ You can use `GroupTask` to create a single task that makes a sequence of requests based on the
+ encapsulated `Task`. For each element that should be an `ID` conforming to `Hashable`,
+ `GroupTask` will result in a dictionary of results.
 
  Usage:
 
  ```swift
- func makeMultipleRequest() async throws -> [GroupResult<Int, TaskResult<Data>>] {
+ func makeMultipleRequest() async throws -> GroupResult<Int, TaskResult<Data>> {
      try await GroupTask([0, 1, 2, 3]) { index in
          DataTask {
              BaseURL("google.com")
@@ -24,6 +25,9 @@ import Foundation
      .result()
  }
  ```
+
+ You can get the result individually or by using the `\.keys`, `\.values` properties of dictionary or by using
+ the `subscript` method.
  */
 public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element: Hashable {
 
@@ -48,8 +52,8 @@ extension GroupTask {
     /**
     Retrieves the results of the task group that encapsulates the results of each individual task.
 
-    - Returns: An array of `GroupResult` that encapsulates the result of each individual task.
-    - Throws: Error if any of the individual tasks encounters an error during execution.
+    - Returns: A `GroupResult` object that combines the result of each individual task by `ID`.
+    - Throws: An error if the operation failed for any reason.
     */
     public func result() async throws -> GroupResult<Data.Element, Content.Element> {
         await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
@@ -74,4 +78,8 @@ extension GroupTask {
     }
 }
 
+/**
+ Typealias for a dictionary where the keys are IDs of type `Hashable`, and the values are Results
+ of type `Element` or `Error`.
+ */
 public typealias GroupResult<ID: Hashable, Element> = [ID: Result<Element, Error>]
