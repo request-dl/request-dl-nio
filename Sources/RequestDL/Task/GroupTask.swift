@@ -74,4 +74,8 @@ extension GroupTask {
     }
 }
 
+/**
+ Typealias for a dictionary where the keys are IDs of type Hashable, and the values are Results
+ of type Element or Error.
+ */
 public typealias GroupResult<ID: Hashable, Element> = [ID: Result<Element, Error>]
