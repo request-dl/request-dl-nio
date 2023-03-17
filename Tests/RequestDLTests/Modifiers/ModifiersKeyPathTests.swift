@@ -70,5 +70,4 @@ final class ModifiersKeyPathTests: XCTestCase {
         // Then
         XCTAssertTrue(keyPathNotFound)
     }
-
 }
