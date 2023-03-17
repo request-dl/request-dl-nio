@@ -81,12 +81,12 @@ extension FormGroup {
 
             let constructor = MultipartFormConstructor(multipart)
 
-            make.request.setValue(
-                "multipart/form-data; boundary=\"\(constructor.boundary)\"",
-                forHTTPHeaderField: "Content-Type"
+            make.request.headers.replaceOrAdd(
+                name: "Content-Type",
+                value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
             )
 
-            make.request.httpBody = constructor.body
+            make.request.body = .data(constructor.body)
         }
     }
 }

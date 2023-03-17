@@ -12,7 +12,11 @@ Conforming types must have a `response` property of type `URLResponse.
 public protocol TaskResultPrimitive {
 
     /// The URL response returned by the task.
-    var response: URLResponse { get }
+    var status: UInt { get }
+
+    var version: (minor: Int, major: Int) { get }
+
+    var headers: [String: String] { get }
 }
 
 /**
@@ -32,10 +36,14 @@ You can initialize a `TaskResult` object by providing the response and data valu
 public struct TaskResult<Element>: TaskResultPrimitive {
 
     /// The URL response of the network request.
-    public let response: URLResponse
+    public let status: UInt
+
+    public let version: (minor: Int, major: Int)
+
+    public let headers: [String: String]
 
     /// The resulting data of the network request.
-    public let data: Element
+    public let payload: Element
 
     /**
      Initializes a `TaskResult` object with the given response and data.
@@ -44,8 +52,15 @@ public struct TaskResult<Element>: TaskResultPrimitive {
         - response: The URL response of the network request.
         - data: The resulting data of the network request.
      */
-    public init(response: URLResponse, data: Element) {
-        self.response = response
-        self.data = data
+    public init(
+        status: UInt,
+        version: (minor: Int, major: Int),
+        headers: [String: String],
+        payload: Element
+    ) {
+        self.status = status
+        self.version = version
+        self.headers = headers
+        self.payload = payload
     }
 }

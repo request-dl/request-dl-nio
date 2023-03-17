@@ -10,6 +10,7 @@ import Foundation
  After constructing your download task, you can use the `result` function to receive the
  temporary URL where the content was saved for you, which is the default behavior on Foundation.
  */
+@available(*, deprecated)
 public struct DownloadTask<Content: Property>: Task {
 
     private let content: Content
@@ -36,23 +37,7 @@ extension DownloadTask {
      - Throws: `Error` if there is any problem during the download.
      */
     public func result() async throws -> TaskResult<URL> {
-        let delegate = DelegateProxy()
-        let (session, request) = await Resolver(content).make(delegate)
-
-        defer { session.finishTasksAndInvalidate() }
-
-        if #available(iOS 15, tvOS 15, watchOS 8, macOS 12, *) {
-            let (data, response) = try await session.download(for: request, delegate: delegate)
-            return .init(
-                response: response,
-                data: data
-            )
-        } else {
-            return try await oldAPI_response(
-                session: session,
-                request: request
-            )
-        }
+        fatalError("Deprecated")
     }
 }
 

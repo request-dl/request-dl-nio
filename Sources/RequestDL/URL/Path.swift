@@ -86,11 +86,11 @@ extension Path: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            guard let url = make.request.url, !path.isEmpty else {
+            guard let url = URL(string: make.request.url), !path.isEmpty else {
                 return
             }
 
-            make.request.url = url.appendingPathComponent(path)
+            make.request.url = url.appendingPathComponent(path).absoluteString
         }
     }
 

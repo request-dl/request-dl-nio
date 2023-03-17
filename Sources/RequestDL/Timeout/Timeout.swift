@@ -73,11 +73,11 @@ extension Timeout: PrimitiveProperty {
 
         func makeProperty(_ make: Make) {
             if source.contains(.request) {
-                make.configuration.timeoutIntervalForRequest = timeout
+                make.configuration.timeout.connect = .seconds(Int64(timeout))
             }
 
             if source.contains(.resource) {
-                make.configuration.timeoutIntervalForResource = timeout
+                make.configuration.timeout.read = .seconds(Int64(timeout))
             }
         }
     }

@@ -20,6 +20,7 @@ import Foundation
  }
  ```
  */
+@available(*, deprecated)
 public protocol URLRequestRepresentable: Property where Body == Never {
 
     /**
@@ -61,6 +62,6 @@ struct URLRequestRepresentableObject: NodeObject {
     }
 
     func makeProperty(_ make: Make) {
-        update(&make.request)
+        fatalError("Deprecated")
     }
 }

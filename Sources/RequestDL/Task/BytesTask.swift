@@ -22,6 +22,7 @@ import Foundation
 
  - Note: Only available on iOS 15.0+, tvOS 15.0+, watchOS 15.0+, macOS 12.0+.
 */
+@available(*, deprecated)
 @available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
 public struct BytesTask<Content: Property>: Task {
 
@@ -60,12 +61,6 @@ extension BytesTask {
     - Throws: Any error encountered during the execution of the task.
     */
     public func result() async throws -> TaskResult<URLSession.AsyncBytes> {
-        let delegate = DelegateProxy()
-        let (session, request) = await Resolver(content).make(delegate)
-
-        defer { session.finishTasksAndInvalidate() }
-
-        let (data, response) = try await session.bytes(for: request, delegate: delegate)
-        return .init(response: response, data: data)
+        fatalError("Deprecated")
     }
 }

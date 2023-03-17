@@ -103,7 +103,7 @@ extension Payload: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            make.request.httpBody = provider.data
+            make.request.body = .data(provider.data)
         }
     }
 

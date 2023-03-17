@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import AsyncHTTPClient
 
 struct Resolver<Content: Property> {
 
@@ -18,7 +19,7 @@ struct Resolver<Content: Property> {
         return context
     }
 
-    func make(_ delegate: DelegateProxy) async -> (URLSession, URLRequest) {
+    func make(_ delegate: DelegateProxy) async throws -> (HTTPClient, HTTPRequest) {
         let context = await resolve()
 
         guard let object = context.find(BaseURL.Object.self) else {
@@ -32,17 +33,16 @@ struct Resolver<Content: Property> {
         let sessionObject = context.find(Session.Object.self)
 
         let make = Make(
-            request: URLRequest(url: object.baseURL),
-            configuration: sessionObject?.configuration ?? .default,
+            request: HTTPRequest(url: object.baseURL.absoluteString),
+            configuration: sessionObject?.configuration ?? .init(tlsConfiguration: .clientDefault),
             delegate: delegate
         )
 
         context.make(make)
 
-        let session = URLSession(
-            configuration: make.configuration,
-            delegate: delegate,
-            delegateQueue: sessionObject?.queue
+        let session = HTTPClient(
+            eventLoopGroupProvider: sessionObject?.eventLoopGroup ?? .createNew,
+            configuration: make.configuration
         )
 
         return (session, make.request)

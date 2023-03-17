@@ -3,16 +3,17 @@
 */
 
 import Foundation
+import AsyncHTTPClient
 
 class Make {
 
-    var request: URLRequest
-    let configuration: URLSessionConfiguration
+    var request: HTTPRequest
+    var configuration: HTTPClient.Configuration
     let delegate: DelegateProxy
 
     init(
-        request: URLRequest,
-        configuration: URLSessionConfiguration,
+        request: HTTPRequest,
+        configuration: HTTPClient.Configuration,
         delegate: DelegateProxy
     ) {
         self.request = request

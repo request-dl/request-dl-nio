@@ -57,7 +57,7 @@ extension RequestMethod: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            make.request.httpMethod = httpMethod
+            make.request.method = .init(httpMethod)
         }
     }
 

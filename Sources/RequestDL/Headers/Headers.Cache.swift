@@ -103,17 +103,7 @@ extension Headers.Cache: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            if let memoryCapacity = memoryCapacity, let diskCapacity = diskCapacity {
-                make.configuration.urlCache = URLCache(
-                    memoryCapacity: memoryCapacity,
-                    diskCapacity: diskCapacity,
-                    diskPath: Bundle.main.bundleIdentifier
-                )
-            }
-
-            if let policy = policy {
-                make.configuration.requestCachePolicy = policy
-            }
+            fatalError()
         }
     }
 

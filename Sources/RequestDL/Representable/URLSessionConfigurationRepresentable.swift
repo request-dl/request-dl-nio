@@ -24,6 +24,7 @@ import Foundation
  }
  ```
  */
+@available(*, deprecated)
 public protocol URLSessionConfigurationRepresentable: Property where Body == Never {
 
     /**
@@ -65,6 +66,6 @@ struct URLSessionRepresentableObject: NodeObject {
     }
 
     func makeProperty(_ make: Make) {
-        update(make.configuration)
+        fatalError("Deprecated")
     }
 }
