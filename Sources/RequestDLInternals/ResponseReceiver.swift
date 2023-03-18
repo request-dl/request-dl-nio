@@ -8,37 +8,61 @@
 import Foundation
 import AsyncHTTPClient
 
-@globalActor
-actor StreamActor {
-    static var shared = StreamActor()
-}
-
-@StreamActor
-class Stream<Value> {
+public class Stream<Value> {
 
     private enum State<Value> {
         case value(Value)
-        case end
+        case end(Value?)
         case failure(Error)
+
+        var value: Value? {
+            switch self {
+            case .value(let value):
+                return value
+            case .end(let value):
+                return value
+            case .failure:
+                return nil
+            }
+        }
+
+        var isFailure: Bool {
+            guard case .failure = self else {
+                return false
+            }
+
+            return true
+        }
+
+        var isClosed: Bool {
+            guard case .end = self else {
+                return false
+            }
+
+            return true
+        }
     }
 
     private var closure: ((State<Value>) -> Void)?
-    private var queue: State<[Value]>
+    private var state: State<[Value]>
+    private let queue: OperationQueue
 
-    init() {
+    init(queue: OperationQueue) {
         closure = nil
-        queue = .value([])
+        state = .value([])
+        self.queue = queue
     }
 
     private func post(_ state: State<Value>) {
-        guard case .value(let values) = queue else {
-            return
-        }
+        guard
+            !self.state.isFailure && !self.state.isClosed,
+            let values = self.state.value
+        else { return }
 
         switch state {
         case .value(let value):
             guard let closure = closure else {
-                queue = .value(values + [value])
+                self.state = .value(values + [value])
                 return
             }
 
@@ -46,61 +70,80 @@ class Stream<Value> {
                 closure(.value(value))
             }
 
-            queue = .value([])
+            self.state = .value([])
         case .end:
-            queue = .end
+            self.state = .end(values.isEmpty ? nil : values)
             closure?(state)
         case .failure(let error):
-            queue = .failure(error)
+            self.state = .failure(error)
             closure?(state)
         }
     }
 
-    nonisolated func append(_ value: Value) {
-        Task { @StreamActor in
-            post(.value(value))
-        }
+    func append(_ value: Value) {
+        post(.value(value))
     }
 
-    nonisolated func close() {
-        Task { @StreamActor in
-            post(.end)
-        }
+    func close() {
+        post(.end(nil))
     }
 
-    nonisolated func failure(_ error: Error) {
-        Task { @StreamActor in
-            post(.failure(error))
-        }
+    func failure(_ error: Error) {
+        post(.failure(error))
     }
 
     private func attach(_ closure: @escaping (State<Value>) -> Void) {
         self.closure = closure
 
-        switch queue {
+        switch self.state {
         case .value(let values):
             for value in values {
                 closure(.value(value))
             }
-            queue = .value([])
-        case .end:
-            closure(.end)
+            self.state = .value([])
+        case .end(let values):
+            if let values = values {
+                for value in values {
+                    closure(.value(value))
+                }
+            }
+            closure(.end(nil))
         case .failure(let error):
             closure(.failure(error))
         }
     }
 
-    nonisolated func makeAsyncStream() -> AsyncThrowingStream<Value, Error> {
+    func perform(_ block: @escaping () -> Void) {
+        queue.addOperation(block)
+    }
+
+    func observe(_ closure: @escaping (Result<Value?, Error>) -> Void) {
+        attach {
+            switch $0 {
+            case .value(let value):
+                closure(.success(value))
+            case .end(let value):
+                if let value = value {
+                    closure(.success(value))
+                }
+                closure(.success(nil))
+            case .failure(let error):
+                closure(.failure(error))
+            }
+        }
+    }
+
+    func makeAsyncStream() -> AsyncThrowingStream<Value, Error> {
         AsyncThrowingStream { continuation in
-            Task { @StreamActor in
-                attach {
-                    switch $0 {
-                    case .value(let value):
+            observe {
+                switch $0 {
+                case .failure(let error):
+                    continuation.finish(throwing: error)
+                case .success(let value):
+                    if let value = value {
                         continuation.yield(value)
-                    case .end:
+                    } else {
                         continuation.finish(throwing: nil)
-                    case .failure(let error):
-                        continuation.finish(throwing: error)
                     }
                 }
             }
@@ -146,14 +189,14 @@ class StreamResponse: HTTPClientResponseDelegate {
             fatalError()
         }
 
-        state = .head
-        phase = .download
+        state = .uploading
+        phase = .upload
         upload.close()
     }
 
     func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void> {
         guard
-            ([.idle].contains(state) && phase == .upload)
+            ([.idle, .uploading].contains(state) && phase == .upload)
                 || [.head].contains(state) && phase == .download
         else { fatalError() }
 
@@ -170,7 +213,7 @@ class StreamResponse: HTTPClientResponseDelegate {
             isKeepAlive: head.isKeepAlive
         ))
 
-        state = .downloading
+        state = .head
         phase = .download
         upload.close()
 
@@ -178,28 +221,34 @@ class StreamResponse: HTTPClientResponseDelegate {
     }
 
     func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void> {
-        guard [.downloading].contains(state) && phase == .download else {
+        guard [.head, .downloading].contains(state) && phase == .download else {
             fatalError()
         }
 
         state = .downloading
         phase = .download
+        head.close()
 
-        for byte in buffer.readableBytesView {
-            download.append(byte)
+        let promise = task.eventLoop.makePromise(of: Void.self)
+        download.perform { [download] in
+            for byte in buffer.readableBytesView {
+                download.append(byte)
+            }
+
+            promise.succeed()
         }
-
-        return task.eventLoop.makeSucceededVoidFuture()
+        return promise.futureResult
     }
 
     func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
-        guard [.downloading].contains(state) && phase == .download else {
+        guard [.head, .downloading, .end].contains(state) && phase == .download else {
             fatalError()
         }
 
         state = .end
         phase = .download
         download.close()
+        head.close()
     }
 
     func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {

@@ -7,10 +7,10 @@ let package = Package(
     name: "RequestDL",
     platforms: [.iOS(.v13), .tvOS(.v13), .watchOS(.v6), .macOS(.v11)],
     products: [
-        .library(
-            name: "RequestDL",
-            targets: ["RequestDL"]
-        ),
+//        .library(
+//            name: "RequestDL",
+//            targets: ["RequestDL"]
+//        ),
         .library(
             name: "RequestDLInternals",
             targets: ["RequestDLInternals"]
@@ -39,18 +39,24 @@ let package = Package(
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client")
             ]
         ),
 
-        .target(
-            name: "RequestDL",
-            dependencies: ["RequestDLInternals"]
-        ),
         .testTarget(
-            name: "RequestDLTests",
-            dependencies: ["RequestDL"],
-            resources: [.process("Resources")]
+            name: "RequestDLInternalsTests",
+            dependencies: ["RequestDLInternals"]
         )
+
+//        .target(
+//            name: "RequestDL",
+//            dependencies: ["RequestDLInternals"]
+//        ),
+//        .testTarget(
+//            name: "RequestDLTests",
+//            dependencies: ["RequestDL"],
+//            resources: [.process("Resources")]
+//        )
     ]
 )

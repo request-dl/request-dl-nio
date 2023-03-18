@@ -4,6 +4,57 @@
 
 import Foundation
 
+public typealias BytesStream = Stream<UInt8>
+
+public enum ResponsePart {
+    case upload(Int)
+    case download(ResponseHead, BytesStream)
+}
+
+public typealias ResponseStream = Stream<ResponsePart>
+
+func reduce(
+    queue: OperationQueue,
+    upload: Stream<Int>,
+    head: Stream<ResponseHead>,
+    download: BytesStream
+) -> ResponseStream {
+    let stream = ResponseStream(queue: queue)
+
+    upload.observe {
+        switch $0 {
+        case .failure(let error):
+            stream.failure(error)
+            stream.close()
+        case .success(let part):
+            if let part = part {
+                stream.append(.upload(part))
+            } else {
+                var receivedHead: ResponseHead?
+
+                head.observe {
+                    switch $0 {
+                    case .failure(let error):
+                        stream.failure(error)
+                        stream.close()
+                    case .success(let head):
+                        if let head = head {
+                            receivedHead = head
+                        } else if let head = receivedHead {
+                            stream.append(.download(head, download))
+                            stream.close()
+                        } else {
+                            fatalError()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return stream
+}
+
 public struct AsyncStream<Element>: AsyncSequence {
 
     private let stream: AsyncThrowingStream<Element, Error>
@@ -33,30 +84,14 @@ public typealias AsyncBytes = AsyncStream<UInt8>
 
 public struct AsyncResponse: AsyncSequence {
 
-    public typealias Element = Result
+    private let response: AsyncThrowingStream<ResponsePart, Error>
 
-    private let upload: AsyncThrowingStream<Int, Error>
-    private let head: AsyncThrowingStream<ResponseHead, Error>
-    private let download: Stream<UInt8>
-
-    init(
-        upload: Stream<Int>,
-        head: Stream<ResponseHead>,
-        download: Stream<UInt8>
-    ) {
-        self.upload = upload.makeAsyncStream()
-        self.head = head.makeAsyncStream()
-        self.download = download
+    init(response: Stream<ResponsePart>) {
+        self.response = response.makeAsyncStream()
     }
 
     public func makeAsyncIterator() -> Iterator {
-        Iterator(
-            upload: upload.makeAsyncIterator(),
-            download: (
-                head.makeAsyncIterator(),
-                download
-            )
-        )
+        Iterator(response: response.makeAsyncIterator())
     }
 }
 
@@ -64,41 +99,17 @@ extension AsyncResponse {
 
     public struct Iterator: AsyncIteratorProtocol {
 
-        public typealias Element = AsyncResponse.Result
+        public typealias Element = AsyncResponse.Element
 
-        let upload: AsyncThrowingStream<Int, Error>.Iterator?
-        let download: (
-            AsyncThrowingStream<ResponseHead, Error>.Iterator,
-            Stream<UInt8>
-        )?
+        var response: AsyncThrowingStream<ResponsePart, Error>.Iterator
 
-        public mutating func next() async throws -> AsyncResponse.Result? {
-            if var upload = upload, let part = try await upload.next() {
-                self = .init(
-                    upload: upload,
-                    download: download
-                )
-
+        public mutating func next() async throws -> Element? {
+            switch try await response.next() {
+            case .upload(let part):
                 return .upload(part)
-            } else if let download = download {
-                var headStream = download.0
-                let download = download.1
-
-                var lastHead: ResponseHead?
-
-                while let head = try await headStream.next() {
-                    lastHead = head
-                }
-
-                self = .init(
-                    upload: nil,
-                    download: nil
-                )
-
-                return lastHead.map {
-                    .download($0, .init(download))
-                }
-            } else {
+            case .download(let response, let bytes):
+                return .download(response, .init(bytes))
+            case .none:
                 return nil
             }
         }
@@ -107,7 +118,7 @@ extension AsyncResponse {
 
 extension AsyncResponse {
 
-    public enum Result {
+    public enum Element {
         case upload(Int)
         case download(ResponseHead, AsyncBytes)
     }

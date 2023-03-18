@@ -37,7 +37,7 @@ extension Request {
     struct Body {
 
         func build() -> HTTPClient.Body {
-            .
+            .data(Data("Hello World!".utf8))
         }
     }
 }
