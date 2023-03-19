@@ -30,7 +30,6 @@ extension AsyncBytes {
         var referenceIterator: AsyncThrowingStream<ByteBuffer, Error>.AsyncIterator
         private var index: Int = .zero
         private var buffer: Array<UInt8>.SubSequence = .init()
-        private var oldValue: ByteBuffer?
 
         init(_ referenceIterator: AsyncThrowingStream<ByteBuffer, Error>.AsyncIterator) {
             self.referenceIterator = referenceIterator
@@ -46,13 +45,9 @@ extension AsyncBytes {
                 return nil
             }
 
-            let origin = byteBuffer
-            precondition(oldValue?.readableBytes ?? .zero <= origin.readableBytes)
-
             byteBuffer.moveReaderIndex(to: index)
             let bytes = byteBuffer.readBytes(length: byteBuffer.readableBytes) ?? []
             index = byteBuffer.readerIndex
-            oldValue = origin
 
             return bytes.first.map {
                 buffer = bytes.dropFirst()

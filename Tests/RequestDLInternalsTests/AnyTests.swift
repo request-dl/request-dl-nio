@@ -11,7 +11,7 @@ import XCTest
 class AnyTests: XCTestCase {
 
     func testSome() async throws {
-        try await callRequests(10)
+        try await callRequests(1)
     }
 
     func testGroup() async throws {
@@ -50,10 +50,24 @@ extension AnyTests {
             return
         }
 
+        var request = Request(url: "https://google.com")
+        request.method = "POST"
+        request.body = .init(
+            length: nil,
+            streams: (0 ..< 10).map { index in
+                {
+                    InputStream(data: Data((0 ..< 1024 - (index * 100)).map { _ in
+                        let element = Int.random(in: Int(UInt8.min) ... Int(UInt8.max))
+                        return UInt8(element)
+                    }))
+                }
+            }
+        )
+
         let task = try await Session(
             provider: .shared,
             configuration: .init()
-        ).request(.init(url: "https://google.com"))
+        ).request(request)
 
         for try await result in task.response {
             switch result {

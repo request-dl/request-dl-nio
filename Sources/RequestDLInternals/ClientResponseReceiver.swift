@@ -81,9 +81,12 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
         }
 
         if var bytesBuffer {
+            self.bytesBuffer = nil
+
             var buffer = buffer
             bytesBuffer.writeBuffer(&buffer)
             self.bytesBuffer = bytesBuffer
+
             download.append(.success(bytesBuffer))
         } else {
             bytesBuffer = buffer
@@ -101,6 +104,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
             fatalError()
         }
 
+        bytesBuffer = nil
         state = .end
         phase = .download
         download.close()
@@ -109,6 +113,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
         defer {
+            bytesBuffer = nil
             state = .failure
             upload.close()
             head.close()

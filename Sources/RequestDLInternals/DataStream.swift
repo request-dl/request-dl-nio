@@ -14,19 +14,12 @@ class DataStream<Value> {
         self.queue = StackStreamQueue()
         self.operationQueue = OperationQueue()
 
+        operationQueue.qualityOfService = .background
         operationQueue.maxConcurrentOperationCount = 1
     }
 
-    func queueIfNeeded(_ operation: @escaping () -> Void) {
-        if isQueueing {
-            operationQueue.addOperation(operation)
-        } else {
-            operation()
-        }
-    }
-
     func append(_ value: Result<Value, Error>) {
-        queueIfNeeded {
+        operationQueue.addOperation {
             switch value {
             case .success(let value):
                 self.queue.append(.success(value))
@@ -37,7 +30,7 @@ class DataStream<Value> {
     }
 
     func close() {
-        queueIfNeeded {
+        operationQueue.addOperation {
             self.queue.append(.success(nil))
         }
     }

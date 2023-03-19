@@ -32,7 +32,11 @@ public class SessionTask {
     }
 
     deinit {
-        shutdown()
+        do {
+            try client.syncShutdown()
+        } catch {
+            print(error)
+        }
     }
 }
 
@@ -110,7 +114,7 @@ public struct Session {
             download: download
         )
 
-        let request = try request.build()
+        let request = try request.build(client.eventLoopGroup.next())
 
         let eventLoopFuture = client.execute(
             request: request,
@@ -144,8 +148,8 @@ extension Session.Provider {
         switch self {
         case .shared:
             return "\(ObjectIdentifier(MultiThreadedEventLoopGroup.shared))"
-        case .identifier(let id, _):
-            return id
+        case .identifier(let id, let numberOfThreads):
+            return "\(id).\(numberOfThreads)"
         case .custom(let eventLoopGroup):
             return "\(ObjectIdentifier(eventLoopGroup))"
         }
