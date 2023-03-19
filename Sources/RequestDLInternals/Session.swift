@@ -10,32 +10,36 @@ import NIOPosix
 public class SessionTask {
 
     public let response: AsyncResponse
-    private let client: HTTPClient
-    private let promise: EventLoopFuture<Void>
+    private var payload: (HTTPClient, EventLoopFuture<Void>)?
+    private var complete: Bool = false
 
-    public init(
-        response: AsyncResponse,
-        client: HTTPClient,
-        promise: EventLoopFuture<Void>
-    ) {
+    public init(_ response: AsyncResponse) {
         self.response = response
-        self.client = client
-        self.promise = promise
+    }
+
+    func attach(_ client: HTTPClient, _ eventLoopFuture: EventLoopFuture<Void>) {
+        payload = (client, eventLoopFuture.always { [weak self] _ in
+            self?.complete = true
+        })
     }
 
     public func shutdown() {
-        promise.flatMap { [client] in
-            client.shutdown()
-        }.whenComplete {
-            print("[Shutdown]", $0)
+        guard let (client, promise) = payload else {
+            return
+        }
+
+        self.payload = nil
+
+        promise.whenComplete { _ in
+            try? client.syncShutdown()
         }
     }
 
     deinit {
-        do {
-            try client.syncShutdown()
-        } catch {
-            print(error)
+        if complete {
+            try? payload?.0.syncShutdown()
+        } else {
+            shutdown()
         }
     }
 }
@@ -91,13 +95,7 @@ public struct Session {
         )
     }
 
-    func regular(_ url: String) async throws -> HTTPClient.Response {
-        let response = try await client.execute(request: .init(url: url)).get()
-        try await client.shutdown()
-        return response
-    }
-
-    func request(_ request: Request) throws -> SessionTask {
+    public func request(_ request: Request) throws -> SessionTask {
         let upload = DataStream<Int>()
         let head = DataStream<ResponseHead>()
         let download = DataStream<ByteBuffer>()
@@ -121,11 +119,9 @@ public struct Session {
             delegate: delegate
         )
         
-        return .init(
-            response: response,
-            client: client,
-            promise: eventLoopFuture.futureResult
-        )
+        let sessionTask = SessionTask(response)
+        sessionTask.attach(client, eventLoopFuture.futureResult)
+        return sessionTask
     }
 
     func invalidate() async throws {

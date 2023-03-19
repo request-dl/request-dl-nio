@@ -93,7 +93,7 @@ extension HeaderGroup {
 
         func makeProperty(_ make: Make) {
             for (key, value) in parameters {
-                make.request.headers.replaceOrAdd(name: key, value: "\(value)")
+                make.request.headers.setValue("\(value)", forKey: key)
             }
         }
     }

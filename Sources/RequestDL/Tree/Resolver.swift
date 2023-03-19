@@ -3,7 +3,7 @@
 */
 
 import Foundation
-import AsyncHTTPClient
+import RequestDLInternals
 
 struct Resolver<Content: Property> {
 
@@ -19,7 +19,7 @@ struct Resolver<Content: Property> {
         return context
     }
 
-    func make(_ delegate: DelegateProxy) async throws -> (HTTPClient, HTTPRequest) {
+    func make() async throws -> (RequestDLInternals.Session, Request) {
         let context = await resolve()
 
         guard let object = context.find(BaseURL.Object.self) else {
@@ -33,15 +33,14 @@ struct Resolver<Content: Property> {
         let sessionObject = context.find(Session.Object.self)
 
         let make = Make(
-            request: HTTPRequest(url: object.baseURL.absoluteString),
-            configuration: sessionObject?.configuration ?? .init(tlsConfiguration: .clientDefault),
-            delegate: delegate
+            request: Request(url: object.baseURL.absoluteString),
+            configuration: sessionObject?.configuration ?? .init()
         )
 
         context.make(make)
 
-        let session = HTTPClient(
-            eventLoopGroupProvider: sessionObject?.eventLoopGroup ?? .createNew,
+        let session = await RequestDLInternals.Session(
+            provider: sessionObject?.provider ?? .shared,
             configuration: make.configuration
         )
 

@@ -17,7 +17,20 @@ extension Session {
         public var ignoreUncleanSSLShutdown: Bool = false
         public var decompression: Decompression = .disabled
 
+        private var updatingKeyPaths: ((inout HTTPClient.Configuration) -> Void)?
+
         public init() {}
+
+        public mutating func setValue<Value>(
+            _ value: Value,
+            forKey keyPath: WritableKeyPath<HTTPClient.Configuration, Value>
+        ) {
+            let old = updatingKeyPaths
+            updatingKeyPaths = {
+                old?(&$0)
+                $0[keyPath: keyPath] = value
+            }
+        }
     }
 }
 
@@ -50,4 +63,11 @@ extension Session.Configuration {
     public typealias ConnectionPool = HTTPClient.Configuration.ConnectionPool
 
     public typealias Proxy = HTTPClient.Configuration.Proxy
+}
+
+import NIOHTTPCompression
+
+extension Session.Decompression {
+
+    public typealias Limit = NIOHTTPDecompression.DecompressionLimit
 }

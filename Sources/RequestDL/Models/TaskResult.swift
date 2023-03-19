@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import RequestDLInternals
 
 /**
 A protocol that represents a primitive task result.

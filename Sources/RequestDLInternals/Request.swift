@@ -7,12 +7,12 @@ import AsyncHTTPClient
 
 public struct Request {
 
-    var url: String
-    var method: String?
-    var headers: Headers
-    var body: Body?
+    public var url: String
+    public var method: String?
+    public var headers: Headers
+    public var body: Body?
 
-    init(url: String) {
+    public init(url: String) {
         self.url = url
         self.method = nil
         self.headers = .init()
@@ -36,12 +36,12 @@ import NIOCore
 
 extension Request {
 
-    struct Body {
+    public struct Body {
 
         private let length: Int?
         private let iterator: DataSequence.Iterator
 
-        init(
+        public init(
             length: Int?,
             bufferSize: Int = 1024,
             streams: [() -> InputStream]

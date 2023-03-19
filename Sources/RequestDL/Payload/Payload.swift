@@ -103,7 +103,12 @@ extension Payload: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            make.request.body = .data(provider.data)
+            let data = provider.data
+
+            make.request.body = .init(
+                length: data.count,
+                streams: [{ InputStream(data: data) }]
+            )
         }
     }
 
