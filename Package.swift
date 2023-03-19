@@ -5,7 +5,6 @@ import PackageDescription
 
 let package = Package(
     name: "RequestDL",
-    platforms: [.iOS(.v13), .tvOS(.v13), .watchOS(.v6), .macOS(.v11)],
     products: [
 //        .library(
 //            name: "RequestDL",
