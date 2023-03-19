@@ -4,6 +4,7 @@
 
 import Foundation
 import NIOCore
+import NIOFoundationCompat
 
 public struct AsyncBytes: AsyncSequence {
     public typealias Element = UInt8
