@@ -66,8 +66,8 @@ extension AsyncBytes {
             lastByteBuffer = byteBuffer
         }
 
-        if var lastByteBuffer {
-            return lastByteBuffer.readData(length: lastByteBuffer.readableBytes) ?? Data()
+        if let lastByteBuffer {
+            return Data(buffer: lastByteBuffer)
         } else {
             return Data()
         }
