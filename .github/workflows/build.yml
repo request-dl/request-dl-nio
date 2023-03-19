@@ -1,0 +1,26 @@
+name: Swift
+
+on: [push]
+
+jobs:
+  build:
+    name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        swift: ["5.7.3"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: ☑️ Swift Select
+        uses: swift-actions/setup-swift@v1.22.0
+        with:
+            swift-version: ${{ matrix.swift }}
+
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v3.3.0
+
+      - name: 🛠️ Build Package
+        run: swift build -v
+
+      - name: 🔎 Test Package
+        run: swift test --enable-code-coverage
