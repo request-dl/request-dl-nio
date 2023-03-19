@@ -50,5 +50,4 @@ extension Session.Configuration {
     public typealias ConnectionPool = HTTPClient.Configuration.ConnectionPool
 
     public typealias Proxy = HTTPClient.Configuration.Proxy
-
 }

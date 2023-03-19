@@ -22,26 +22,7 @@ class AnyTests: XCTestCase {
                 for index in 0 ..< 100 {
                     group.addTask {
                         do {
-                            print(index)
-                            let results = try await Session(
-                                provider: .shared,
-                                configuration: .init()
-                            ).request(.init(url: "https://google.com"))
-
-                            var data = Data()
-
-                            for try await result in AsyncResponse(response: results) {
-                                switch result {
-                                case .upload:
-                                    break
-                                case .download(_, let bytes):
-                                    for try await byte in bytes {
-                                        data.append(byte)
-                                    }
-                                }
-                            }
-
-                            return (index, .success(data))
+                            return (index, .success(try await self.sessionTask()))
                         } catch {
                             return (index, .failure(error))
                         }
@@ -69,28 +50,76 @@ extension AnyTests {
             return
         }
 
-        let results = try await Session(
+        let task = try await Session(
             provider: .shared,
             configuration: .init()
         ).request(.init(url: "https://google.com"))
 
-        for try await result in AsyncResponse(response: results) {
+        for try await result in task.response {
             switch result {
             case .upload(let part):
-//                print("Uploading (\(part))")
+                print("Uploading (\(part))")
                 break
             case .download(let head, let bytes):
-//                print("HEAD", head)
+                print("HEAD", head)
 
                 var data = Data()
                 for try await byte in bytes {
                     data.append(byte)
                 }
 
-//                print(data.count)
+                print(data.count)
+//                print(try await Data(bytes).count)
             }
         }
 
-//        try await callRequests(count - 1)
+        task.shutdown()
+        try await callRequests(count - 1)
+    }
+}
+
+extension AnyTests {
+
+    func sessionTask() async throws -> Data {
+        let task = try await Session(
+            provider: .shared,
+            configuration: .init()
+        ).request(.init(url: "https://google.com"))
+
+        var data = Data()
+
+        for try await result in task.response {
+            switch result {
+            case .upload:
+                break
+            case .download(_, let bytes):
+                for try await byte in bytes {
+                    data.append(byte)
+                    print("[Received]", byte)
+                }
+//                data = try await Data(bytes)
+                print(data.count)
+            }
+        }
+        task.shutdown()
+
+        return data
+    }
+
+    func regularTask() async throws -> Data {
+        let response = try await Session(
+            provider: .shared,
+            configuration: .init()
+        ).regular("https://google.com")
+
+        let data = response.body.flatMap {
+            Data($0.readableBytesView)
+        } ?? Data()
+
+        for byte in data {
+            print("[Received]", byte)
+        }
+
+        return data
     }
 }

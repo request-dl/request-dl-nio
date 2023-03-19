@@ -1,14 +1,40 @@
-//
-//  File.swift
-//  
-//
-//  Created by Brenno on 17/03/23.
-//
+/*
+ See LICENSE for this package's licensing information.
+*/
 
 import Foundation
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
+
+public class SessionTask {
+
+    public let response: AsyncResponse
+    private let client: HTTPClient
+    private let promise: EventLoopFuture<Void>
+
+    public init(
+        response: AsyncResponse,
+        client: HTTPClient,
+        promise: EventLoopFuture<Void>
+    ) {
+        self.response = response
+        self.client = client
+        self.promise = promise
+    }
+
+    public func shutdown() {
+        promise.flatMap { [client] in
+            client.shutdown()
+        }.whenComplete {
+            print("[Shutdown]", $0)
+        }
+    }
+
+    deinit {
+        shutdown()
+    }
+}
 
 actor EventLoopManager {
 
@@ -43,7 +69,7 @@ public typealias EventLoopGroup = NIOCore.EventLoopGroup
 
 extension MultiThreadedEventLoopGroup {
 
-    static let shared = MultiThreadedEventLoopGroup(numberOfThreads: ProcessInfo().processorCount)
+    static let shared = MultiThreadedEventLoopGroup(numberOfThreads: ProcessInfo.processInfo.processorCount)
 }
 
 public struct Session {
@@ -61,14 +87,24 @@ public struct Session {
         )
     }
 
-    func request(_ request: Request) throws -> ResponseStream {
-        let queue = OperationQueue()
+    func regular(_ url: String) async throws -> HTTPClient.Response {
+        let response = try await client.execute(request: .init(url: url)).get()
+        try await client.shutdown()
+        return response
+    }
 
-        let upload = Stream<Int>(queue: queue)
-        let head = Stream<ResponseHead>(queue: queue)
-        let download = Stream<UInt8>(queue: queue)
+    func request(_ request: Request) throws -> SessionTask {
+        let upload = DataStream<Int>()
+        let head = DataStream<ResponseHead>()
+        let download = DataStream<ByteBuffer>()
 
-        let delegate = StreamResponse(
+        let delegate = ClientResponseReceiver(
+            upload: upload,
+            head: head,
+            download: download
+        )
+
+        let response = AsyncResponse(
             upload: upload,
             head: head,
             download: download
@@ -76,22 +112,15 @@ public struct Session {
 
         let request = try request.build()
 
-        let futurePromise = client.execute(
+        let eventLoopFuture = client.execute(
             request: request,
             delegate: delegate
-        ).futureResult
-
-        futurePromise.whenComplete { _ in
-            Task {
-                try await client.shutdown()
-            }
-        }
+        )
         
-        return reduce(
-            queue: queue,
-            upload: upload,
-            head: head,
-            download: download
+        return .init(
+            response: response,
+            client: client,
+            promise: eventLoopFuture.futureResult
         )
     }
 

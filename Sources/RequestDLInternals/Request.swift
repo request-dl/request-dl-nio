@@ -36,8 +36,12 @@ extension Request {
 
     struct Body {
 
+        private let length: Int?
+
         func build() -> HTTPClient.Body {
-            .data(Data("Hello World!".utf8))
+            .stream(length: length) { stream in
+                stream.write(.byteBuffer(.init(string: "")))
+            }
         }
     }
 }
