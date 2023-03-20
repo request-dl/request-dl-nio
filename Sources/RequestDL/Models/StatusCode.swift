@@ -28,12 +28,12 @@ import Foundation
 */
 public struct StatusCode {
 
-    let rawValue: Int
+    let rawValue: UInt
 
     /// Initializes a status code with the provided integer value.
     ///
     /// - Parameter rawValue: The integer value of the status code.
-    public init(_ rawValue: Int) {
+    public init(_ rawValue: UInt) {
         self.rawValue = rawValue
     }
 }
@@ -253,7 +253,7 @@ extension StatusCode: ExpressibleByIntegerLiteral {
     ///
     /// - Parameter value: The integer literal value.
     public init(integerLiteral value: IntegerLiteralType) {
-        self.init(value)
+        self.init(UInt(value))
     }
 }
 

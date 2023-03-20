@@ -30,6 +30,10 @@ public struct Headers {
         headers[key]
     }
 
+    public var allHeaderFields: [String: String] {
+        headers
+    }
+
     func build() ->  [(String, String)] {
         headers.map { ($0, $1) }
     }

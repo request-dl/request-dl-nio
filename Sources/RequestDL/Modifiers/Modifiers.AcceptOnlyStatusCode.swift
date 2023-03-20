@@ -27,8 +27,7 @@ extension Modifiers {
             let result = try await task.result()
 
             guard
-                let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(StatusCode(httpResponse.statusCode))
+                statusCodes.isEmpty || statusCodes.contains(StatusCode(result.head.status.code))
             else {
                 throw InvalidStatusCodeError<Content.Element>(data: result)
             }

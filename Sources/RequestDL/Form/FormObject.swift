@@ -15,11 +15,15 @@ struct FormObject: NodeObject {
     func makeProperty(_ make: Make) {
         let constructor = MultipartFormConstructor([factory()])
 
-        make.request.headers.replaceOrAdd(
-            name: "Content-Type",
-            value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
+        make.request.headers.setValue(
+            "multipart/form-data; boundary=\"\(constructor.boundary)\"",
+            forKey: "Content-Type"
         )
 
-        make.request.body = .data(constructor.body)
+        let data = constructor.body
+
+        make.request.body = .init(length: data.count, streams: [{
+            InputStream(data: data)
+        }])
     }
 }

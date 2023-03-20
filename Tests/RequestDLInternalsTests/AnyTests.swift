@@ -119,21 +119,4 @@ extension AnyTests {
 
         return data
     }
-
-    func regularTask() async throws -> Data {
-        let response = try await Session(
-            provider: .shared,
-            configuration: .init()
-        ).regular("https://google.com")
-
-        let data = response.body.flatMap {
-            Data($0.readableBytesView)
-        } ?? Data()
-
-        for byte in data {
-            print("[Received]", byte)
-        }
-
-        return data
-    }
 }

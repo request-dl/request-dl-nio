@@ -34,7 +34,7 @@ extension Modifiers {
          - Returns: A new instance of `Payload` type that contains only the payload data.
          */
         public func task(_ task: Content) async throws -> Element {
-            try await task.result().data
+            try await task.result().payload
         }
     }
 }

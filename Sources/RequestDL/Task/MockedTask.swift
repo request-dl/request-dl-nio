@@ -60,22 +60,17 @@ extension MockedTask {
      from the provided status code and headers.
      */
     public func result() async throws -> TaskResult<Data> {
-        guard let response = HTTPURLResponse(
-            url: FileManager.default.temporaryDirectory,
-            statusCode: statusCode.rawValue,
-            httpVersion: nil,
-            headerFields: headers
-        ) else { throw FailedToCreateURLResponseError() }
-
-        return .init(response: response, data: data)
-    }
-}
-
-public struct FailedToCreateURLResponseError: LocalizedError {
-
-    init() {}
-
-    public var errorDescription: String? {
-        "Failed to create URL response for mocked task"
+        .init(
+            head: ResponseHead(
+                status: .init(
+                    code: statusCode.rawValue,
+                    reason: "Mock status"
+                ),
+                version: .init(minor: 1, major: 2),
+                headers: headers ?? [:],
+                isKeepAlive: false
+            ),
+            payload: data
+        )
     }
 }

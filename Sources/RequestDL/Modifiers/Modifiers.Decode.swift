@@ -76,11 +76,11 @@ extension Task<TaskResult<Data>> {
         modify(Modifiers.Decode(
             type: type,
             decoder: decoder,
-            data: \.data,
+            data: \.payload,
             output: {
                 TaskResult(
-                    response: $0.response,
-                    data: $1
+                    head: $0.head,
+                    payload: $1
                 )
             }
         ))

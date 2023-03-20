@@ -4,7 +4,6 @@
 
 import Foundation
 
-@available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
 extension Modifiers {
 
     /**
@@ -30,11 +29,11 @@ extension Modifiers {
      */
     public struct ConvertBytesToData<Content: Task, Output>: TaskModifier {
 
-        private let bytes: (Content.Element) -> URLSession.AsyncBytes
+        private let bytes: (Content.Element) -> AsyncBytes
         private let element: (Content.Element, Data) -> Output
 
         fileprivate init(
-            bytes: @escaping (Content.Element) -> URLSession.AsyncBytes,
+            bytes: @escaping (Content.Element) -> AsyncBytes,
             element: @escaping (Content.Element, Data) -> Output
         ) {
             self.bytes = bytes
@@ -63,8 +62,7 @@ extension Modifiers {
     }
 }
 
-@available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
-extension Task<TaskResult<URLSession.AsyncBytes>> {
+extension Task<TaskResult<AsyncBytes>> {
 
     /**
      Returns a modified task that converts the bytes returned by a task that produces
@@ -74,19 +72,18 @@ extension Task<TaskResult<URLSession.AsyncBytes>> {
      */
     public func convertBytesToData() -> ModifiedTask<Modifiers.ConvertBytesToData<Self, TaskResult<Data>>> {
         modify(Modifiers.ConvertBytesToData(
-            bytes: \.data,
+            bytes: \.payload,
             element: {
                 TaskResult(
-                    response: $0.response,
-                    data: $1
+                    head: $0.head,
+                    payload: $1
                 )
             }
         ))
     }
 }
 
-@available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
-extension Task<URLSession.AsyncBytes> {
+extension Task<AsyncBytes> {
 
     /**
      Returns a modified task that converts the bytes returned by a task that produces

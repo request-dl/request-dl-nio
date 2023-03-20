@@ -76,11 +76,11 @@ extension Task<TaskResult<Data>> {
     public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
         modify(Modifiers.KeyPath(
             keyPath: keyPath,
-            data: \.data,
+            data: \.payload,
             element: {
                 TaskResult(
-                    response: $0.response,
-                    data: $1
+                    head: $0.head,
+                    payload: $1
                 )
             }
         ))

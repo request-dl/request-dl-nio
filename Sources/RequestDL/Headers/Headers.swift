@@ -23,7 +23,7 @@ extension Headers {
         func makeProperty(_ make: Make) {
             let value = "\(value)"
             if !value.isEmpty {
-                make.request.headers.replaceOrAdd(name: key, value: value)
+                make.request.headers.setValue(value, forKey: key)
             }
             next?.makeProperty(make)
         }

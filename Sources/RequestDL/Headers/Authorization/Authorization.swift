@@ -51,9 +51,9 @@ extension Authorization: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            make.request.headers.replaceOrAdd(
-                name: "Authorization",
-                value: "\(type.rawValue) \(token)"
+            make.request.headers.setValue(
+                "\(type.rawValue) \(token)",
+                forKey: "Authorization"
             )
         }
     }
