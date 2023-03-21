@@ -9,28 +9,26 @@ import Foundation
 
 extension Modifiers {
 
-    public struct Download<Content: Task>: TaskModifier where Content.Element == TaskResult<AsyncBytes> {
+    public struct Download<Content: Task, Output>: TaskModifier {
 
-        public typealias Element = Data
-
-        let contentLengthKey: String?
         let progress: (UInt8, Int?) -> Void
 
-        public func task(_ task: Content) async throws -> Element {
+        let data: (Content.Element) -> (Int?, AsyncBytes)
+        let output: (Content.Element, Data) -> Output
+
+        public func task(_ task: Content) async throws -> Output {
             let result = try await task.result()
 
-            let contentLenght = contentLengthKey
-                .flatMap { result.head.headers[$0] }
-                .flatMap(Int.init)
+            let (contentLength, bytes) = data(result)
 
             var data = Data()
 
-            for try await byte in result.payload {
+            for try await byte in bytes {
                 data.append(byte)
-                progress(byte, contentLenght)
+                progress(byte, contentLength)
             }
 
-            return data
+            return output(result, data)
         }
     }
 }
@@ -39,11 +37,38 @@ extension Task<TaskResult<AsyncBytes>> {
 
     public func download(
         _ contentLengthKey: String? = "content-length",
-        progress: @escaping (UInt8, Int?) -> Void
-    ) -> ModifiedTask<Modifiers.Download<Self>> {
+        _ progress: @escaping (UInt8, Int?) -> Void
+    ) -> ModifiedTask<Modifiers.Download<Self, TaskResult<Data>>> {
         modify(Modifiers.Download(
-            contentLengthKey: contentLengthKey,
-            progress: progress
+            progress: progress,
+            data: { result in
+                (
+                    contentLengthKey
+                        .flatMap { result.head.headers[$0] }
+                        .flatMap(Int.init),
+                    result.payload
+                )
+            },
+            output: {
+                .init(
+                    head: $0.head,
+                    payload: $1
+                )
+            }
+        ))
+    }
+}
+
+extension Task<AsyncBytes> {
+
+    public func download(
+        _ contentLength: Int?,
+        _ progress: @escaping (UInt8, Int?) -> Void
+    ) -> ModifiedTask<Modifiers.Download<Self, Data>> {
+        modify(Modifiers.Download(
+            progress: progress,
+            data: { (contentLength, $0) },
+            output: { $1 }
         ))
     }
 }

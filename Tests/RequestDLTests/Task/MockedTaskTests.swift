@@ -29,7 +29,7 @@ final class MockedTaskTests: XCTestCase {
 
         XCTAssertNotNil(response)
         XCTAssertEqual(response?.statusCode, statusCode)
-        XCTAssertEqual(result.data, data)
+        XCTAssertEqual(result.payload, data)
 
         XCTAssertEqual(response?.allHeaderFields.keys.count, headers.keys.count)
         XCTAssertTrue(headers.keys.allSatisfy {
@@ -52,7 +52,7 @@ final class MockedTaskTests: XCTestCase {
 
         XCTAssertNotNil(response)
         XCTAssertEqual(response?.statusCode, 200)
-        XCTAssertEqual(result.data, data)
+        XCTAssertEqual(result.payload, data)
         XCTAssertTrue(response?.allHeaderFields.isEmpty ?? true)
     }
 }

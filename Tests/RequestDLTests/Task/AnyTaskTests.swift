@@ -17,6 +17,6 @@ final class AnyTaskTests: XCTestCase {
             .result()
 
         // Then
-        XCTAssertEqual(result.data, data)
+        XCTAssertEqual(result.payload, data)
     }
 }

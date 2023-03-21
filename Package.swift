@@ -8,8 +8,8 @@ let package = Package(
     platforms: [.macOS(.v10_15), .iOS(.v13), .tvOS(.v13), .watchOS(.v6)],
     products: [
         .library(
-            name: "RequestDL",
-            targets: ["RequestDL"]
+            name: "RequestDLInternals",
+            targets: ["RequestDLInternals"]
         )
     ],
     dependencies: [
@@ -47,16 +47,19 @@ let package = Package(
 
         .testTarget(
             name: "RequestDLInternalsTests",
-            dependencies: ["RequestDLInternals"]
-        ),
+            dependencies: [
+                "RequestDLInternals",
+                .product(name: "NIO", package: "swift-nio")
+            ]
+        )//,
 
-        .target(
-            name: "RequestDL",
-            dependencies: ["RequestDLInternals"]
-        ),
+//        .target(
+//            name: "RequestDL",
+//            dependencies: ["RequestDLInternals"]
+//        ),
 //        .testTarget(
 //            name: "RequestDLTests",
-//            dependencies: ["RequestDL"],
+//            dependencies: ["RequestDL", "RequestDLInternals"],
 //            resources: [.process("Resources")]
 //        )
     ]

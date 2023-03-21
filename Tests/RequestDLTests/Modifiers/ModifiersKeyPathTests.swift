@@ -17,7 +17,7 @@ final class ModifiersKeyPathTests: XCTestCase {
             .result()
 
         // Then
-        XCTAssertEqual(result.data, Data("true".utf8))
+        XCTAssertEqual(result.payload, Data("true".utf8))
     }
 
     func testWrongKeyPath() async throws {

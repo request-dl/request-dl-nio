@@ -9,14 +9,14 @@ final class HeadersHostTests: XCTestCase {
 
     func testHost() async throws {
         let property = TestProperty(Headers.Host("google.com"))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Host"), "google.com")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Host"), "google.com")
     }
 
     func testHostWithPort() async throws {
         let property = TestProperty(Headers.Host("google.com", port: "8080"))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Host"), "google.com:8080")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Host"), "google.com:8080")
     }
 
     func testNeverBody() async throws {

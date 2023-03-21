@@ -3,11 +3,11 @@
 */
 
 import Foundation
+import RequestDLInternals
 @testable import RequestDL
 
 func resolve<Content: Property>(
-    _ content: Content,
-    in delegate: DelegateProxy = .init()
-) async -> (URLSession, URLRequest) {
-    await Resolver(content).make(delegate)
+    _ content: Content
+) async throws -> (RequestDLInternals.Session, RequestDLInternals.Request) {
+    try await Resolver(content).make()
 }

@@ -26,7 +26,7 @@ final class GroupTaskTests: XCTestCase {
             case .failure, .none:
                 return false
             case .success(let result):
-                return result.data == Data("\($0)".utf8)
+                return result.payload == Data("\($0)".utf8)
             }
         })
     }

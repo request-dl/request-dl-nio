@@ -12,7 +12,7 @@ public struct AsyncBytes: AsyncSequence {
 
     public typealias Element = RequestDLInternals.AsyncBytes.Element
 
-    private let asyncBytes: RequestDLInternals.AsyncBytes
+    fileprivate let asyncBytes: RequestDLInternals.AsyncBytes
 
     init(_ asyncBytes: RequestDLInternals.AsyncBytes) {
         self.asyncBytes = asyncBytes
@@ -20,5 +20,12 @@ public struct AsyncBytes: AsyncSequence {
 
     public func makeAsyncIterator() -> RequestDLInternals.AsyncBytes.AsyncIterator {
         asyncBytes.makeAsyncIterator()
+    }
+}
+
+extension Data {
+
+    init(_ asyncBytes: AsyncBytes) async throws {
+        try await self.init(asyncBytes.asyncBytes)
     }
 }

@@ -15,14 +15,14 @@ final class QueryGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             property
         })
 
         // Then
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             """
             https://localhost?\
             number=123&\
@@ -40,14 +40,14 @@ final class QueryGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             property
         })
 
         // Then
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             """
             https://localhost?\
             number=123&\
@@ -55,7 +55,7 @@ final class QueryGroupTests: XCTestCase {
             """
         )
 
-        XCTAssertNil(request.value(forHTTPHeaderField: "api_key"))
+        XCTAssertNil(request.headers.getValue(forKey: "api_key"))
     }
 
     func testNeverBody() async throws {

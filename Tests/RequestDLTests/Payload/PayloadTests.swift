@@ -23,7 +23,7 @@ final class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(dictionary, options: options))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         let expectedPayload = _DictionaryPayload(dictionary, options: options)
 
         // Then
@@ -37,7 +37,7 @@ final class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(foo, using: encoding))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         let expectedPayload = _StringPayload(foo, using: encoding)
 
         // Then
@@ -50,7 +50,7 @@ final class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(data))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         let expectedPayload = _DataPayload(data)
 
         // Then
@@ -71,7 +71,7 @@ final class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(mock, encoder: encoder))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         let expectedPayload = _EncodablePayload(mock, encoder: encoder)
         let expectedMock = try decoder.decode(Mock.self, from: expectedPayload.data)
 

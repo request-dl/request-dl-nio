@@ -12,13 +12,13 @@ final class AnyPropertyTests: XCTestCase {
         let property = Query(123, forKey: "number")
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             AnyProperty(property)
         })
 
         // Then
-        XCTAssertEqual(request.url?.absoluteString, "https://localhost?number=123")
+        XCTAssertEqual(request.url, "https://localhost?number=123")
     }
 
     func testNeverBody() async throws {

@@ -9,56 +9,56 @@ final class RequestMethodTests: XCTestCase {
 
     func testGetHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.get))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "GET")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "GET")
     }
 
     func testHeadHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.head))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "HEAD")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "HEAD")
     }
 
     func testPostHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.post))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "POST")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "POST")
     }
 
     func testPutHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.put))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "PUT")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "PUT")
     }
 
     func testDeleteHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.delete))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "DELETE")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "DELETE")
     }
 
     func testConnectHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.connect))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "CONNECT")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "CONNECT")
     }
 
     func testOptionsHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.options))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "OPTIONS")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "OPTIONS")
     }
 
     func testTraceHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.trace))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "TRACE")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "TRACE")
     }
 
     func testPatchHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.patch))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.httpMethod, "PATCH")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.method, "PATCH")
     }
 
     func testNeverBody() async throws {

@@ -43,7 +43,7 @@ extension Modifiers {
 
 extension Task<AsyncResponse> {
 
-    public func uploading(
+    public func upload(
         _ progress: @escaping (Int) -> Void
     ) -> ModifiedTask<Modifiers.Upload<Self>> {
         modify(Modifiers.Upload(progress: progress))

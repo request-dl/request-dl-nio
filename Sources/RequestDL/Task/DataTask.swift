@@ -52,8 +52,21 @@ extension DataTask {
 
      - Throws: An error of type `Error` that indicates an issue with the request or response.
      */
-    public func result() async throws -> AsyncResponse {
-        let (session, request) = try await Resolver(content).make()
-        return try .init(session.request(request).response)
+    public func result() async throws -> TaskResult<Data> {
+        let result = try await RawTask(content).result()
+
+        for try await part in result {
+            switch part {
+            case .upload:
+                break
+            case .download(let head, let bytes):
+                return .init(
+                    head: head,
+                    payload: try await Data(bytes)
+                )
+            }
+        }
+
+        fatalError()
     }
 }

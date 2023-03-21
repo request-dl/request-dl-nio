@@ -7,7 +7,7 @@ import XCTest
 
 final class EmptyPropertyTests: XCTestCase {
 
-    func testEmptyBuilder() async {
+    func testEmptyBuilder() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -16,13 +16,13 @@ final class EmptyPropertyTests: XCTestCase {
         }
 
         // When
-        _ = await resolve(TestProperty(property))
+        _ = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is EmptyProperty)
     }
 
-    func testEmptyExplicitBuilder() async {
+    func testEmptyExplicitBuilder() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -30,7 +30,7 @@ final class EmptyPropertyTests: XCTestCase {
         }
 
         // When
-        _ = await resolve(TestProperty(property))
+        _ = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is EmptyProperty)

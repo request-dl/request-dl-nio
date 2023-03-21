@@ -3,9 +3,10 @@
 */
 
 import Foundation
+
+#if canImport(Darwin)
 import Darwin
 
-#if DEBUG
 @discardableResult
 func raise(_ value: Int32) -> Int32 {
     Raise.closure(value)

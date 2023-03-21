@@ -15,11 +15,11 @@ final class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is Headers.ContentType)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
     func testLimitedNotAvailableBuildBlock() async throws {
@@ -32,12 +32,12 @@ final class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         print(type(of: property))
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertNil(request.allHTTPHeaderFields)
+        XCTAssertNil(request.headers.allHeaderFields)
     }
 
     func testLimitedAvailableBuildBlock() async throws {
@@ -50,11 +50,11 @@ final class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         print(type(of: property))
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 }

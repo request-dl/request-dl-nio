@@ -44,51 +44,18 @@ public class SessionTask {
     }
 }
 
-actor EventLoopManager {
-
-    public static let shared = EventLoopManager()
-
-    private var groups: [String: EventLoopGroup] = [:]
-
-    func newClient(
-        id: String,
-        factory: @escaping () -> EventLoopGroup,
-        configuration: HTTPClient.Configuration
-    ) -> HTTPClient {
-        if let group = groups[id] {
-            print("Using registered")
-            return HTTPClient(
-                eventLoopGroupProvider: .shared(group),
-                configuration: configuration
-            )
-        } else {
-            print("Creating new")
-            let group = factory()
-            groups[id] = group
-            return HTTPClient(
-                eventLoopGroupProvider: .shared(group),
-                configuration: configuration
-            )
-        }
-    }
-}
-
-public typealias EventLoopGroup = NIOCore.EventLoopGroup
-
-extension MultiThreadedEventLoopGroup {
-
-    static let shared = MultiThreadedEventLoopGroup(numberOfThreads: ProcessInfo.processInfo.processorCount)
-}
-
 public struct Session {
 
     private let client: HTTPClient
+    public let configuration: Configuration
 
     public init(
         provider: Provider,
         configuration: Configuration
     ) async {
-        client = await EventLoopManager.shared.newClient(
+        self.configuration = configuration
+        
+        client = await EventLoopGroupManager.shared.client(
             id: provider.id,
             factory: { provider.build() },
             configuration: configuration.build()

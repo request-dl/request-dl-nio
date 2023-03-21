@@ -7,106 +7,106 @@ import XCTest
 
 final class HeadersAcceptTests: XCTestCase {
 
-    func testHeadersJsonAccept() async {
+    func testHeadersJsonAccept() async throws {
         let property = TestProperty(Headers.Accept(.json))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/json")
     }
 
-    func testHeadersXmlAccept() async {
+    func testHeadersXmlAccept() async throws {
         let property = TestProperty(Headers.Accept(.xml))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/xml")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/xml")
     }
 
-    func testHeadersFormDataAccept() async {
+    func testHeadersFormDataAccept() async throws {
         let property = TestProperty(Headers.Accept(.formData))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "form-data")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "form-data")
     }
 
-    func testHeadersFormURLEncodedAccept() async {
+    func testHeadersFormURLEncodedAccept() async throws {
         let property = TestProperty(Headers.Accept(.formURLEncoded))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/x-www-form-urlencoded")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/x-www-form-urlencoded")
     }
 
-    func testHeadersTextAccept() async {
+    func testHeadersTextAccept() async throws {
         let property = TestProperty(Headers.Accept(.text))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/plain")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/plain")
     }
 
-    func testHeadersHtmlAccept() async {
+    func testHeadersHtmlAccept() async throws {
         let property = TestProperty(Headers.Accept(.html))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/html")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/html")
     }
 
-    func testHeadersCssAccept() async {
+    func testHeadersCssAccept() async throws {
         let property = TestProperty(Headers.Accept(.css))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/css")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/css")
     }
 
-    func testHeadersJavascriptAccept() async {
+    func testHeadersJavascriptAccept() async throws {
         let property = TestProperty(Headers.Accept(.javascript))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/javascript")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/javascript")
     }
 
-    func testHeadersGifAccept() async {
+    func testHeadersGifAccept() async throws {
         let property = TestProperty(Headers.Accept(.gif))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/gif")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/gif")
     }
 
-    func testHeadersPngAccept() async {
+    func testHeadersPngAccept() async throws {
         let property = TestProperty(Headers.Accept(.png))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/png")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/png")
     }
 
-    func testHeadersJpegAccept() async {
+    func testHeadersJpegAccept() async throws {
         let property = TestProperty(Headers.Accept(.jpeg))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/jpeg")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/jpeg")
     }
 
-    func testHeadersBmpAccept() async {
+    func testHeadersBmpAccept() async throws {
         let property = TestProperty(Headers.Accept(.bmp))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/bmp")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/bmp")
     }
 
-    func testHeadersWebpAccept() async {
+    func testHeadersWebpAccept() async throws {
         let property = TestProperty(Headers.Accept(.webp))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/webp")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/webp")
     }
 
-    func testHeadersMidiAccept() async {
+    func testHeadersMidiAccept() async throws {
         let property = TestProperty(Headers.Accept(.midi))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "audio/midi")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "audio/midi")
     }
 
-    func testHeadersMpegAccept() async {
+    func testHeadersMpegAccept() async throws {
         let property = TestProperty(Headers.Accept(.mpeg))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "audio/mpeg")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "audio/mpeg")
     }
 
-    func testHeadersWavAccept() async {
+    func testHeadersWavAccept() async throws {
         let property = TestProperty(Headers.Accept(.wav))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "audio/wav")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "audio/wav")
     }
 
-    func testHeadersPdfAccept() async {
+    func testHeadersPdfAccept() async throws {
         let property = TestProperty(Headers.Accept(.pdf))
-        let (_, request) = await resolve(property)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/pdf")
+        let (_, request) = try await resolve(property)
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/pdf")
     }
 
     func testNeverBody() async throws {

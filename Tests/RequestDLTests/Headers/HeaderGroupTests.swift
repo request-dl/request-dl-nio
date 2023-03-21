@@ -9,8 +9,8 @@ final class HeaderGroupTests: XCTestCase {
 
     func testHeaderGroupWithEmptyValue() async throws {
         let property = TestProperty(HeaderGroup {})
-        let (_, request) = await resolve(property)
-        XCTAssertTrue(request.allHTTPHeaderFields?.isEmpty ?? true)
+        let (_, request) = try await resolve(property)
+        XCTAssertTrue(request.headers.allHeaderFields?.isEmpty ?? true)
     }
 
     func testHeaderGroupWithDictionary() async throws {
@@ -21,12 +21,12 @@ final class HeaderGroupTests: XCTestCase {
             "xxx-api-key": "password"
         ]))
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/html")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "localhost:8080")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "xxx-api-key"), "password")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/html")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "localhost:8080")
+        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
     }
 
     func testHeaderGroupWithMultipleHeaders() async throws {
@@ -37,12 +37,12 @@ final class HeaderGroupTests: XCTestCase {
             Headers.Any("password", forKey: "xxx-api-key")
         })
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/javascript")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "localhost:8080")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "xxx-api-key"), "password")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "text/javascript")
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "localhost:8080")
+        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
     }
 
     func testNeverBody() async throws {

@@ -17,6 +17,6 @@ final class TaskResultTests: XCTestCase {
 
         // Then
         XCTAssertEqual(result.response, response)
-        XCTAssertEqual(result.data, data)
+        XCTAssertEqual(result.payload, data)
     }
 }

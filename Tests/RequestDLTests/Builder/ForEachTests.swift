@@ -7,12 +7,12 @@ import XCTest
 
 final class ForEachTests: XCTestCase {
 
-    func testForEach() async {
+    func testForEach() async throws {
         // Given
         let paths = ["api", "v1", "users"]
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             ForEach(paths) { path in
                 Path(path)
@@ -21,7 +21,7 @@ final class ForEachTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://localhost/api/v1/users"
         )
     }

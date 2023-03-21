@@ -24,9 +24,9 @@ final class FormDataTests: XCTestCase {
         )
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
-        let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
+        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
@@ -62,9 +62,9 @@ final class FormDataTests: XCTestCase {
         )
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
-        let contentTypeHeader = request.value(forHTTPHeaderField: "Content-Type")
+        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(

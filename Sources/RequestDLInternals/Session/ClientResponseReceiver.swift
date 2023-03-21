@@ -64,7 +64,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
                 minor: head.version.minor,
                 major: head.version.major
             ),
-            headers: Headers(head.headers.map { $0 }),
+            headers: Headers(head.headers),
             isKeepAlive: head.isKeepAlive
         )))
 

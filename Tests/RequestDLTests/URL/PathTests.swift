@@ -7,43 +7,43 @@ import XCTest
 
 final class PathTests: XCTestCase {
 
-    func testSinglePath() async {
+    func testSinglePath() async throws {
         // Given
         let path = "api"
         let host = "google.com"
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL(host)
             Path(path)
         })
 
         // Then
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://\(host)/\(path)"
         )
     }
 
-    func testSingleInstanceWithMultiplePath() async {
+    func testSingleInstanceWithMultiplePath() async throws {
         // Given
         let path = "api/v1/users/10/detail"
         let host = "google.com"
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL(host)
             Path(path)
         })
 
         // Then
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://\(host)/\(path)"
         )
     }
 
-    func testMultiplePath() async {
+    func testMultiplePath() async throws {
         // Given
         let path1 = "api"
         let path2 = "v1/"
@@ -52,7 +52,7 @@ final class PathTests: XCTestCase {
         let characterSetRule = CharacterSet(charactersIn: "/")
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL(host)
             Path(path1)
             Path(path2)
@@ -64,7 +64,7 @@ final class PathTests: XCTestCase {
         let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
 
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
         )
     }

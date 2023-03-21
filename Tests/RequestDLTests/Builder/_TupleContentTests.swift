@@ -7,7 +7,7 @@ import XCTest
 
 final class _TupleContentTests: XCTestCase {
 
-    func testTupleTwoElementsBuilder() async {
+    func testTupleTwoElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -16,7 +16,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -24,11 +24,11 @@ final class _TupleContentTests: XCTestCase {
             Headers.Origin
         )>)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://google.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.url, "https://google.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
     }
 
-    func testTupleThreeElementsBuilder() async {
+    func testTupleThreeElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -38,7 +38,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -47,12 +47,12 @@ final class _TupleContentTests: XCTestCase {
             Headers.ContentType
         )>)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://google.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.url, "https://google.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
-    func testTupleFourElementsBuilder() async {
+    func testTupleFourElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -63,7 +63,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -73,12 +73,12 @@ final class _TupleContentTests: XCTestCase {
             Path
         )>)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://google.com/search")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.url, "https://google.com/search")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
-    func testTupleFiveElementsBuilder() async {
+    func testTupleFiveElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -90,7 +90,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -102,15 +102,15 @@ final class _TupleContentTests: XCTestCase {
         )>)
 
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
-    func testTupleSixElementsBuilder() async {
+    func testTupleSixElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -123,7 +123,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = await resolve(result)
+        let (session, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -136,18 +136,18 @@ final class _TupleContentTests: XCTestCase {
         )>)
 
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
 
-        XCTAssertEqual(session.configuration.timeoutIntervalForResource, 40)
-        XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 40)
+        XCTAssertEqual(session.configuration.timeout.read, .seconds(40))
+        XCTAssertEqual(session.configuration.timeout.connect, .seconds(40))
     }
 
-    func testTupleSevenElementsBuilder() async {
+    func testTupleSevenElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -161,7 +161,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = await resolve(result)
+        let (session, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -175,18 +175,18 @@ final class _TupleContentTests: XCTestCase {
         )>)
 
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://google.com/search?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
 
-        XCTAssertEqual(session.configuration.timeoutIntervalForResource, 40)
-        XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 40)
+        XCTAssertEqual(session.configuration.timeout.read, .seconds(40))
+        XCTAssertEqual(session.configuration.timeout.connect, .seconds(40))
     }
 
-    func testTupleEightElementsBuilder() async {
+    func testTupleEightElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -201,7 +201,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = await resolve(result)
+        let (session, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -216,15 +216,15 @@ final class _TupleContentTests: XCTestCase {
         )>)
 
         XCTAssertEqual(
-            request.url?.absoluteString,
+            request.url,
             "https://google.com/search/results?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
 
-        XCTAssertEqual(session.configuration.timeoutIntervalForResource, 40)
-        XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 40)
+        XCTAssertEqual(session.configuration.timeout.read, .seconds(40))
+        XCTAssertEqual(session.configuration.timeout.connect, .seconds(40))
     }
 
     func testNeverBody() async throws {
