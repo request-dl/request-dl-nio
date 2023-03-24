@@ -3,6 +3,7 @@
 */
 
 import XCTest
+#if canImport(Combine)
 import Combine
 @testable import RequestDL
 
@@ -72,3 +73,4 @@ final class PublishedTaskTests: XCTestCase {
         XCTAssertTrue(isSuccess)
     }
 }
+#endif

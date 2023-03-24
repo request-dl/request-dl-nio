@@ -3,8 +3,9 @@
 */
 
 import Foundation
+#if canImport(Combine)
 import Combine
-import SwiftUI
+import _Concurrency
 
 /**
 A publisher that wraps a Task instance and publishes its output asynchronously.
@@ -36,7 +37,7 @@ extension PublishedTask {
 
     class Subscription<S: Subscriber>: Combine.Subscription where S.Failure == Error {
 
-        private var task: SwiftUI.Task<Void, Never>?
+        private var task: _Concurrency.Task<Void, Never>?
 
         private let wrapper: () async throws -> S.Input
         private var subscriber: S?
@@ -54,7 +55,7 @@ extension PublishedTask {
                 return
             }
 
-            task = SwiftUI.Task {
+            task = _Concurrency.Task {
                 do {
                     _ = subscriber.receive(try await wrapper())
                     subscriber.receive(completion: .finished)
@@ -82,3 +83,4 @@ extension Task {
         .init(self)
     }
 }
+#endif

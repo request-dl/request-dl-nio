@@ -4,7 +4,12 @@
 
 import Foundation
 
-extension Never: Property {}
+extension Never: Property {
+
+    public var body: Never {
+        bodyException()
+    }
+}
 
 extension Property {
 
