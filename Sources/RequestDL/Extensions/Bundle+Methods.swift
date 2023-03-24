@@ -22,16 +22,16 @@ extension Bundle {
     func resolveURL(forResourceName name: String) -> URL? {
         let (name, subdirectory) = resolve(name: name)
 
-        let urls = urls(
+        let resourcesURL = (urls(
             forResourcesWithExtension: nil,
             subdirectory: subdirectory
-        ) ?? []
+        ) ?? []) as [URL]
 
         guard !name.contains(".") else {
-            return urls.first(where: { $0.lastPathComponent == name })
+            return resourcesURL.first { $0.lastPathComponent == name }
         }
 
-        return urls.first(where: {
+        return resourcesURL.first(where: {
             let path = $0.lastPathComponent
 
             guard path.contains(".") else {

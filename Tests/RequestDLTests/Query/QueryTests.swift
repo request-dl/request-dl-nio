@@ -28,7 +28,7 @@ final class QueryTests: XCTestCase {
             Query(123, forKey: "number")
             Query(1, forKey: "page")
             Query("password", forKey: "api_key")
-            Query([9, "nine"], forKey: "array")
+            Query([9, "nine"] as [Any], forKey: "array")
         }
 
         // When
