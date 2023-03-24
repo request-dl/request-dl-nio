@@ -3,7 +3,11 @@
 */
 
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 @discardableResult
 func raise(_ value: Int32) -> Int32 {
