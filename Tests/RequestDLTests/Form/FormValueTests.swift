@@ -20,7 +20,7 @@ final class FormValueTests: XCTestCase {
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            request.httpBody ?? Data(),
+            await request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 

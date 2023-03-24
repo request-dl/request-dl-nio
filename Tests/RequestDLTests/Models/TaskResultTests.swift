@@ -9,14 +9,20 @@ final class TaskResultTests: XCTestCase {
 
     func testResult() async throws {
         // Given
-        let response = URLResponse()
+        let head = ResponseHead(
+            status: .init(code: 101, reason: ""),
+            version: .init(minor: 0, major: 1),
+            headers: ["Content-Type": "application/json"],
+            isKeepAlive: false
+        )
+
         let data = Data()
 
         // When
-        let result = TaskResult(response: response, data: data)
+        let result = TaskResult(head: head, payload: data)
 
         // Then
-        XCTAssertEqual(result.response, response)
+        XCTAssertEqual(result.head, head)
         XCTAssertEqual(result.payload, data)
     }
 }

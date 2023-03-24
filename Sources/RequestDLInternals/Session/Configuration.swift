@@ -16,6 +16,7 @@ extension Session {
         public var proxy: Proxy?
         public var ignoreUncleanSSLShutdown: Bool = false
         public var decompression: Decompression = .disabled
+        public var readingMode: Response.ReadingMode = .length(1_024)
 
         private var updatingKeyPaths: ((inout HTTPClient.Configuration) -> Void)?
 
@@ -37,7 +38,7 @@ extension Session {
 extension Session.Configuration {
 
     func build() -> HTTPClient.Configuration {
-        HTTPClient.Configuration(
+        var configuration = HTTPClient.Configuration(
             tlsConfiguration: tlsConfiguration,
             redirectConfiguration: redirectConfiguration,
             timeout: timeout,
@@ -46,6 +47,10 @@ extension Session.Configuration {
             ignoreUncleanSSLShutdown: ignoreUncleanSSLShutdown,
             decompression: decompression
         )
+
+        updatingKeyPaths?(&configuration)
+
+        return configuration
     }
 }
 

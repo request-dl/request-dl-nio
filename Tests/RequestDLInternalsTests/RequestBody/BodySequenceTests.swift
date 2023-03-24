@@ -37,7 +37,7 @@ class BodySequenceTests: XCTestCase {
     func testBodySequence_whenContainsTwoDataLessThenSize_shouldBeEqualParts() async throws {
         // Given
         let part1 = Data("Hello World!".utf8)
-        let part2 = Data("Earth is a big planet".utf8)
+        let part2 = Data("Earth is a small planet".utf8)
 
         let bodySequence = makeSequence(size: 1024) {
             BodyItem(part1)
@@ -54,7 +54,7 @@ class BodySequenceTests: XCTestCase {
     func testBodySequence_whenContainsTwoDataGreaterThenSize_shouldBeFragmentedIntoParts() async throws {
         // Given
         let part1 = Data("Hello World!".utf8)
-        let part2 = Data("Earth is a big planet".utf8)
+        let part2 = Data("Earth is a small planet".utf8)
         let size = 2
 
         let bodySequence = makeSequence(size: size) {
@@ -74,7 +74,7 @@ class BodySequenceTests: XCTestCase {
         // Given
 
         let part1 = Data("Hello World!".utf8)
-        let part2 = Data("Earth is a big planet".utf8)
+        let part2 = Data("Earth is a small planet".utf8)
         let part3 = Data("Contents in the file".utf8)
         let size = 16
 

@@ -14,6 +14,10 @@ public struct Headers {
     }
 
     init(_ headers: HTTPHeaders) {
+        self.init(Array(headers))
+    }
+
+    public init(_ headers: [(String, String)]) {
         self.init()
 
         for (name, value) in headers {
@@ -27,7 +31,7 @@ public struct Headers {
         set {
             let key = HeaderKey(key)
 
-            if let value = dictionary[key] {
+            if appending, let value = dictionary[key] {
                 dictionary[key] = newValue.map {
                     value + "; \($0)"
                 }
@@ -114,5 +118,19 @@ private extension Headers {
         func hash(into hasher: inout Hasher) {
             hash.hash(into: &hasher)
         }
+    }
+}
+
+extension Headers: Equatable {
+
+    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.dictionary == rhs.dictionary
+    }
+}
+
+extension Headers: Hashable {
+
+    public func hash(into hasher: inout Hasher) {
+        dictionary.hash(into: &hasher)
     }
 }

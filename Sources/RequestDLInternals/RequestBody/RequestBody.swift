@@ -29,39 +29,99 @@ public struct RequestBody {
         self.init(size, content())
     }
 
-    func build(_ eventLoop: EventLoop) -> HTTPClient.Body {
-        let iterator = BodySequence(
+    func build() -> HTTPClient.Body {
+        let body = BodySequence(
             buffers: buffers(),
             size: size
-        ).makeIterator()
+        )
 
-        return .stream(length: iterator.size) { stream in
-            write(
-                iterator: iterator,
-                stream: stream,
-                eventLoop: eventLoop
+        return .stream(length: body.size) {
+            Self.connect(
+                writer: $0,
+                body: body
             )
         }
     }
 }
 
+import Foundation
+
 extension RequestBody {
 
-    func write(
-        iterator: BodySequence.Iterator,
-        stream: HTTPClient.Body.StreamWriter,
+    static func consume(
+        iterator: StreamWriterSequence.Iterator,
         eventLoop: EventLoop
     ) -> EventLoopFuture<Void> {
-        guard let item = iterator.next() else {
-            return eventLoop.makeSucceededVoidFuture()
+        eventLoop.makeFutureWithTask {
+            while let next = iterator.next() {
+                try await next.get()
+            }
+        }
+    }
+
+    static func connect(
+        writer: HTTPClient.Body.StreamWriter,
+        body: BodySequence
+    ) -> EventLoopFuture<Void> {
+        let sequence = StreamWriterSequence(
+            writer: writer,
+            body: body
+        ).makeIterator()
+
+        guard let first = sequence.next() else {
+            fatalError()
         }
 
-        return stream.write(.byteBuffer(item)).flatMap {
-            write(
-                iterator: iterator,
-                stream: stream,
-                eventLoop: eventLoop
-            )
+        return first.flatMapWithEventLoop {
+            consume(iterator: sequence, eventLoop: $1)
+        }
+    }
+}
+
+struct StreamWriterSequence: Sequence {
+
+    typealias Element = EventLoopFuture<Void>
+
+    let writer: HTTPClient.Body.StreamWriter
+    let body: BodySequence
+
+    init(
+        writer: HTTPClient.Body.StreamWriter,
+        body: BodySequence
+    ) {
+        self.writer = writer
+        self.body = body
+    }
+
+    func makeIterator() -> Iterator {
+        Iterator(
+            writer: writer,
+            iterator: body.makeIterator()
+        )
+    }
+}
+
+extension StreamWriterSequence {
+
+    class Iterator: IteratorProtocol {
+
+        private let writer: HTTPClient.Body.StreamWriter
+        private var iterator: BodySequence.Iterator
+
+        init(
+            writer: HTTPClient.Body.StreamWriter,
+            iterator: BodySequence.Iterator
+        ) {
+            self.writer = writer
+            self.iterator = iterator
+        }
+
+        func next() -> Element? {
+            guard let item = iterator.next() else {
+                return nil
+            }
+
+            return writer.write(.byteBuffer(item))
         }
     }
 }

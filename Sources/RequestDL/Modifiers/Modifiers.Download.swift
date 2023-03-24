@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Brenno on 20/03/23.
 //
@@ -11,7 +11,7 @@ extension Modifiers {
 
     public struct Download<Content: Task, Output>: TaskModifier {
 
-        let progress: (UInt8, Int?) -> Void
+        let progress: (Data, Int?) -> Void
 
         let data: (Content.Element) -> (Int?, AsyncBytes)
         let output: (Content.Element, Data) -> Output
@@ -37,7 +37,7 @@ extension Task<TaskResult<AsyncBytes>> {
 
     public func download(
         _ contentLengthKey: String? = "content-length",
-        _ progress: @escaping (UInt8, Int?) -> Void
+        _ progress: @escaping (Data, Int?) -> Void
     ) -> ModifiedTask<Modifiers.Download<Self, TaskResult<Data>>> {
         modify(Modifiers.Download(
             progress: progress,
@@ -63,7 +63,7 @@ extension Task<AsyncBytes> {
 
     public func download(
         _ contentLength: Int?,
-        _ progress: @escaping (UInt8, Int?) -> Void
+        _ progress: @escaping (Data, Int?) -> Void
     ) -> ModifiedTask<Modifiers.Download<Self, Data>> {
         modify(Modifiers.Download(
             progress: progress,

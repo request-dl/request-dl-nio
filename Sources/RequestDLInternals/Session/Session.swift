@@ -30,8 +30,9 @@ public class SessionTask {
 
         self.payload = nil
 
-        promise.whenComplete { _ in
-            try? client.syncShutdown()
+        Task {
+            try? await promise.get()
+            try? await client.shutdown()
         }
     }
 
@@ -46,7 +47,7 @@ public class SessionTask {
 
 public struct Session {
 
-    private let client: HTTPClient
+    private let client: () async -> HTTPClient
     public let configuration: Configuration
 
     public init(
@@ -54,18 +55,20 @@ public struct Session {
         configuration: Configuration
     ) async {
         self.configuration = configuration
-        
-        client = await EventLoopGroupManager.shared.client(
-            id: provider.id,
-            factory: { provider.build() },
-            configuration: configuration.build()
-        )
+
+        client = {
+            await EventLoopGroupManager.shared.client(
+                id: provider.id,
+                factory: { provider.build() },
+                configuration: configuration.build()
+            )
+        }
     }
 
-    public func request(_ request: Request) throws -> SessionTask {
+    public func request(_ request: Request) async throws -> SessionTask {
         let upload = DataStream<Int>()
         let head = DataStream<ResponseHead>()
-        let download = DataStream<ByteBuffer>()
+        let download = DownloadBuffer(readingMode: configuration.readingMode)
 
         let delegate = ClientResponseReceiver(
             upload: upload,
@@ -76,23 +79,20 @@ public struct Session {
         let response = AsyncResponse(
             upload: upload,
             head: head,
-            download: download
+            download: download.stream
         )
 
-        let request = try request.build(client.eventLoopGroup.next())
+        let request = try request.build()
+        let client = await client()
 
         let eventLoopFuture = client.execute(
             request: request,
             delegate: delegate
-        )
-        
-        let sessionTask = SessionTask(response)
-        sessionTask.attach(client, eventLoopFuture.futureResult)
-        return sessionTask
-    }
+        ).futureResult
 
-    func invalidate() async throws {
-        try await client.shutdown()
+        let sessionTask = SessionTask(response)
+        sessionTask.attach(client, eventLoopFuture)
+        return sessionTask
     }
 }
 

@@ -33,7 +33,7 @@ final class PublishedTaskTests: XCTestCase {
                 expectation.fulfill()
             }.store(in: &cancellation)
 
-        await waitForExpectations(timeout: 3.0)
+        await fulfillment(of: [expectation], timeout: 3.0)
 
         // Then
         XCTAssertTrue(isSuccess)
@@ -66,7 +66,7 @@ final class PublishedTaskTests: XCTestCase {
         subject.send()
         subject.send()
 
-        await waitForExpectations(timeout: 3.0)
+        await fulfillment(of: [expectation], timeout: 3.0)
 
         // Then
         XCTAssertTrue(isSuccess)

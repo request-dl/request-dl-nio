@@ -6,6 +6,7 @@ import XCTest
 import NIOCore
 @testable import RequestDLInternals
 
+// swiftlint:disable type_body_length file_length
 class DataBufferTests: XCTestCase {
 
     var byteURL: ByteURL!
@@ -335,7 +336,7 @@ class DataBufferTests: XCTestCase {
         let otherByteURL = ByteURL()
 
         let data = Data("Hello World".utf8)
-        let otherData = Data("Earth is a big place to live".utf8)
+        let otherData = Data("Earth is a small planet to live".utf8)
 
         var sut1 = DataBuffer(byteURL)
         var sut2 = DataBuffer(otherByteURL)
@@ -492,5 +493,16 @@ class DataBufferTests: XCTestCase {
         XCTAssertEqual(readerIndex, .zero)
         XCTAssertEqual(readableBytes, data.count)
         XCTAssertEqual(writableBytes, .zero)
+    }
+
+    func testDataBuffer_whenReadZeroBytes_shouldBeNil() async throws {
+        // Given
+        var dataBuffer = DataBuffer()
+
+        // When
+        let data = dataBuffer.readData(.zero)
+
+        // Then
+        XCTAssertNil(data)
     }
 }

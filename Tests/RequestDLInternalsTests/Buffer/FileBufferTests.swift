@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDLInternals
 
+// swiftlint:disable type_body_length file_length
 class FileBufferTests: XCTestCase {
 
     var fileURL: URL!
@@ -344,7 +345,7 @@ class FileBufferTests: XCTestCase {
         defer { try? removeFileIfNeeded(otherFile) }
 
         let data = Data("Hello World".utf8)
-        let otherData = Data("Earth is a big place to live".utf8)
+        let otherData = Data("Earth is a small planet to live".utf8)
 
         var sut1 = FileBuffer(fileURL)
         var sut2 = FileBuffer(otherFile)
@@ -403,8 +404,9 @@ class FileBufferTests: XCTestCase {
 
     func testFileBuffer_whenInitBytes_shouldReadContents() async throws {
         // Given
-        let bytes = Array(Data("Hello World".utf8))
-        var fileBuffer = FileBuffer(bytes)
+        let data = Data("Hello World".utf8)
+        let bytes = Array(data)
+        var fileBuffer = FileBuffer(BytesSequence(data))
 
         // When
         let readedBytes = fileBuffer.readBytes(fileBuffer.readableBytes)
@@ -499,6 +501,17 @@ class FileBufferTests: XCTestCase {
         XCTAssertEqual(readableBytes, data.count)
         XCTAssertEqual(writableBytes, .zero)
     }
+
+    func testFileBuffer_whenReadZeroBytes_shouldBeNil() async throws {
+        // Given
+        var dataBuffer = FileBuffer()
+
+        // When
+        let data = dataBuffer.readData(.zero)
+
+        // Then
+        XCTAssertNil(data)
+    }
 }
 
 extension FileBufferTests {
@@ -507,6 +520,5 @@ extension FileBufferTests {
         if FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)
         }
-
     }
 }

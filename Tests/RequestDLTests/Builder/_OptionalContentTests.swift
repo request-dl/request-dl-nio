@@ -24,7 +24,7 @@ final class _OptionalContentTests: XCTestCase {
         // Then
         XCTAssertTrue(result is _OptionalContent<BaseURL>)
         XCTAssertEqual(request.url, "https://google.com")
-        XCTAssertNil(request.headers.allHeaderFields)
+        XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testConditionDisableBuilder() async throws {

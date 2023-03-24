@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import _RequestDLExtensions
 @testable import RequestDL
 
 final class PayloadTests: XCTestCase {
@@ -24,10 +25,12 @@ final class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(dictionary, options: options))
         let (_, request) = try await resolve(property)
+
         let expectedPayload = _DictionaryPayload(dictionary, options: options)
+        let payload = try await request.body?.data()
 
         // Then
-        XCTAssertEqual(request.httpBody, expectedPayload.data)
+        XCTAssertEqual(payload, expectedPayload.data)
     }
 
     func testStringPayload() async throws {
@@ -38,10 +41,12 @@ final class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(foo, using: encoding))
         let (_, request) = try await resolve(property)
+
         let expectedPayload = _StringPayload(foo, using: encoding)
+        let payload = try await request.body?.data()
 
         // Then
-        XCTAssertEqual(request.httpBody, expectedPayload.data)
+        XCTAssertEqual(payload, expectedPayload.data)
     }
 
     func testDataPayload() async throws {
@@ -51,10 +56,12 @@ final class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(data))
         let (_, request) = try await resolve(property)
+
         let expectedPayload = _DataPayload(data)
+        let payload = try await request.body?.data()
 
         // Then
-        XCTAssertEqual(request.httpBody, expectedPayload.data)
+        XCTAssertEqual(payload, expectedPayload.data)
     }
 
     func testEncodablePayload() async throws {
@@ -73,10 +80,12 @@ final class PayloadTests: XCTestCase {
         let property = TestProperty(Payload(mock, encoder: encoder))
         let (_, request) = try await resolve(property)
         let expectedPayload = _EncodablePayload(mock, encoder: encoder)
+
         let expectedMock = try decoder.decode(Mock.self, from: expectedPayload.data)
+        let payload = try await request.body?.data()
 
         // Then
-        XCTAssertEqual(request.httpBody, expectedPayload.data)
+        XCTAssertEqual(payload, expectedPayload.data)
         XCTAssertEqual(mock.foo, expectedMock.foo)
 
         XCTAssertEqual(

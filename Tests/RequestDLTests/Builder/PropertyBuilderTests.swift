@@ -37,7 +37,7 @@ final class PropertyBuilderTests: XCTestCase {
         // Then
         print(type(of: property))
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertNil(request.headers.allHeaderFields)
+        XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testLimitedAvailableBuildBlock() async throws {

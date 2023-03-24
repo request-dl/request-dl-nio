@@ -30,7 +30,7 @@ public struct FileBuffer: BufferProtocol {
         writeData(data)
     }
 
-    public init<S>(_ bytes: S) where S : Sequence, S.Element == UInt8 {
+    public init<S>(_ bytes: S) where S: Sequence, S.Element == UInt8 {
         self.init()
         writeBytes(bytes)
     }

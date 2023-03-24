@@ -11,12 +11,12 @@ public struct AsyncResponse: AsyncSequence {
 
     private let upload: AsyncThrowingStream<Int, Error>
     private let head: AsyncThrowingStream<ResponseHead, Error>
-    private let download: DataStream<ByteBuffer>
+    private let download: DataStream<DataBuffer>
 
     init(
         upload: DataStream<Int>,
         head: DataStream<ResponseHead>,
-        download: DataStream<ByteBuffer>
+        download: DataStream<DataBuffer>
     ) {
         self.upload = upload.asyncStream()
         self.head = head.asyncStream()
@@ -35,12 +35,10 @@ extension AsyncResponse {
 
     public struct Iterator: AsyncIteratorProtocol {
 
-        public typealias Element = AsyncResponse.Element
-
         let upload: AsyncThrowingStream<Int, Error>.AsyncIterator?
         let download: (
             head: AsyncThrowingStream<ResponseHead, Error>,
-            bytes: DataStream<ByteBuffer>
+            bytes: DataStream<DataBuffer>
         )?
 
         public mutating func next() async throws -> Element? {
@@ -52,7 +50,7 @@ extension AsyncResponse {
                 return .upload(part)
             }
 
-            guard let (heads, bytes) = download else {
+            guard let (heads, data) = download else {
                 return nil
             }
 
@@ -64,7 +62,7 @@ extension AsyncResponse {
 
             self = .init(upload: nil, download: nil)
             return lastHead.map {
-                .download($0, .init(bytes))
+                .download($0, .init(data))
             }
         }
     }

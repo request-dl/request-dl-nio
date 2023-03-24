@@ -3,6 +3,7 @@
 */
 
 import XCTest
+@testable import RequestDLInternals
 @testable import RequestDL
 
 final class TimeoutTests: XCTestCase {
@@ -16,7 +17,7 @@ final class TimeoutTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeoutIntervalForRequest, timeout)
+        XCTAssertEqual(session.configuration.timeout.connect, .seconds(Int64(timeout)))
     }
 
     func testResourceTimeout() async throws {
@@ -28,7 +29,7 @@ final class TimeoutTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeoutIntervalForResource, timeout)
+        XCTAssertEqual(session.configuration.timeout.read, .seconds(Int64(timeout)))
     }
 
     func testAllTimeout() async throws {
@@ -40,25 +41,25 @@ final class TimeoutTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeoutIntervalForRequest, timeout)
-        XCTAssertEqual(session.configuration.timeoutIntervalForResource, timeout)
+        XCTAssertEqual(session.configuration.timeout.read, .seconds(Int64(timeout)))
+        XCTAssertEqual(session.configuration.timeout.connect, .seconds(Int64(timeout)))
     }
 
     func testDefaultTimeout() async throws {
-        let defaultConfiguration = URLSessionConfiguration.default
+        let defaultConfiguration = RequestDLInternals.Session.Configuration()
 
         // When
         let (session, _) = try await resolve(TestProperty {})
 
         // Then
         XCTAssertEqual(
-            session.configuration.timeoutIntervalForRequest,
-            defaultConfiguration.timeoutIntervalForRequest
+            session.configuration.timeout.read,
+            defaultConfiguration.timeout.read
         )
 
         XCTAssertEqual(
-            session.configuration.timeoutIntervalForResource,
-            defaultConfiguration.timeoutIntervalForResource
+            session.configuration.timeout.connect,
+            defaultConfiguration.timeout.connect
         )
     }
 

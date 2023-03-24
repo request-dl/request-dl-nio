@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import _RequestDLExtensions
 @testable import RequestDL
 
 final class FormDataTests: XCTestCase {
@@ -30,7 +31,7 @@ final class FormDataTests: XCTestCase {
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            request.httpBody ?? Data(),
+            await request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 
@@ -68,7 +69,7 @@ final class FormDataTests: XCTestCase {
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            request.httpBody ?? Data(),
+            await request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 

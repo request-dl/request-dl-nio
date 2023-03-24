@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-#if DEBUG && canImport(Darwin)
+#if DEBUG
 final class InterceptorsBreakpointTests: XCTestCase {
 
     func testBreakpoint() async throws {

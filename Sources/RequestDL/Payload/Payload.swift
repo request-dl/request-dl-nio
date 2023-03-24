@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import RequestDLInternals
 
 /**
  A representation of the HTTP body data in a request.
@@ -103,12 +104,9 @@ extension Payload: PrimitiveProperty {
         }
 
         func makeProperty(_ make: Make) {
-            let data = provider.data
-
-            make.request.body = .init(
-                length: data.count,
-                streams: [{ InputStream(data: data) }]
-            )
+            make.request.body = RequestBody {
+                BodyItem(provider.data)
+            }
         }
     }
 

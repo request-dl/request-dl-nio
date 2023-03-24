@@ -22,12 +22,12 @@ public struct Request {
 
 extension Request {
 
-    func build(_ eventLoop: EventLoop) throws -> HTTPClient.Request {
+    func build() throws -> HTTPClient.Request {
         try HTTPClient.Request(
             url: url,
             method: method.map { .init(rawValue: $0) } ?? .GET,
             headers: headers.build(),
-            body: body?.build(eventLoop)
+            body: body?.build()
         )
     }
 }

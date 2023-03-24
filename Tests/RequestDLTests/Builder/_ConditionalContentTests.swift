@@ -26,7 +26,7 @@ final class _ConditionalContentTests: XCTestCase {
         // Then
         XCTAssertTrue(result is _ConditionalContent<BaseURL, Headers.Origin>)
         XCTAssertEqual(request.url, "https://google.com")
-        XCTAssertNil(request.headers.allHeaderFields)
+        XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testConditionalSecondBuilder() async throws {
@@ -48,7 +48,7 @@ final class _ConditionalContentTests: XCTestCase {
         // Then
         XCTAssertTrue(result is _ConditionalContent<Headers.Origin, BaseURL>)
         XCTAssertEqual(request.url, "https://localhost")
-        XCTAssertNil(request.headers.allHeaderFields)
+        XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testNeverBody() async throws {

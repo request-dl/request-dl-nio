@@ -43,6 +43,10 @@ public class ByteHandle {
         case .write:
             return nil
         case .read:
+            guard count > .zero else {
+                return nil
+            }
+
             let index = Int(index)
             precondition(count + index <= url.writtenBytes)
 

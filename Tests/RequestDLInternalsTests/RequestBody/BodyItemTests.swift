@@ -18,7 +18,7 @@ class BodyItemTests: XCTestCase {
         try await super.tearDown()
         context = nil
     }
-    
+
     func testBodyItem_whenInitDataBuffer_shouldBeValid() async throws {
         // Given
         let data = Data("Hello World!".utf8)
@@ -83,7 +83,7 @@ class BodyItemTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("InitURL.text")
-        
+
         defer { try? FileManager.default.removeItem(at: url) }
 
         if !FileManager.default.fileExists(atPath: url.path) {

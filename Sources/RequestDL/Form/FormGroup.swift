@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import RequestDLInternals
 
 /**
  A type representing an HTTP form with a list of content.
@@ -86,10 +87,9 @@ extension FormGroup {
                 forKey: "Content-Type"
             )
 
-            let data = constructor.body
-            make.request.body = .init(length: data.count, streams: [{
-                InputStream(data: data)
-            }])
+            make.request.body = RequestBody {
+                BodyItem(constructor.body)
+            }
         }
     }
 }

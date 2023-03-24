@@ -7,13 +7,15 @@ import NIOCore
 import NIOFoundationCompat
 
 public struct AsyncBytes: AsyncSequence {
-    public typealias Element = UInt8
+    public typealias Element = Data
 
     public typealias AsyncStream = AsyncThrowingStream<Element, Error>
 
-    fileprivate let asyncStream: AsyncThrowingStream<ByteBuffer, Error>
+    fileprivate let seed: ObjectIdentifier
+    fileprivate let asyncStream: AsyncThrowingStream<DataBuffer, Error>
 
-    init(_ dataStream: DataStream<ByteBuffer>) {
+    init(_ dataStream: DataStream<DataBuffer>) {
+        self.seed = ObjectIdentifier(dataStream)
         self.asyncStream = dataStream.asyncStream()
     }
 
@@ -26,52 +28,39 @@ extension AsyncBytes {
 
     public struct Iterator: AsyncIteratorProtocol {
 
-        public typealias Element = UInt8
+        var iterator: AsyncThrowingStream<DataBuffer, Error>.AsyncIterator
 
-        var referenceIterator: AsyncThrowingStream<ByteBuffer, Error>.AsyncIterator
-        private var index: Int = .zero
-        private var buffer: Array<UInt8>.SubSequence = .init()
-
-        init(_ referenceIterator: AsyncThrowingStream<ByteBuffer, Error>.AsyncIterator) {
-            self.referenceIterator = referenceIterator
+        init(_ iterator: AsyncThrowingStream<DataBuffer, Error>.AsyncIterator) {
+            self.iterator = iterator
         }
 
-        public mutating func next() async throws -> UInt8? {
-            if let byte = buffer.first {
-                buffer.removeFirst()
-                return byte
-            }
-
-            guard var byteBuffer = try await referenceIterator.next() else {
+        public mutating func next() async throws -> Data? {
+            guard var dataBuffer = try await iterator.next() else {
                 return nil
             }
 
-            byteBuffer.moveReaderIndex(to: index)
-            let bytes = byteBuffer.readBytes(length: byteBuffer.readableBytes) ?? []
-            index = byteBuffer.readerIndex
-
-            return bytes.first.map {
-                buffer = bytes.dropFirst()
-                return $0
-            }
+            return dataBuffer.readData(dataBuffer.readableBytes)
         }
+    }
+}
+
+extension AsyncBytes: Equatable {
+
+    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.seed == rhs.seed
     }
 }
 
 extension AsyncBytes {
 
     fileprivate func data() async throws -> Data {
-        var lastByteBuffer: ByteBuffer?
+        var items = [Data]()
 
-        for try await byteBuffer in asyncStream {
-            lastByteBuffer = byteBuffer
+        for try await data in self {
+            items.append(data)
         }
 
-        if let lastByteBuffer {
-            return Data(buffer: lastByteBuffer)
-        } else {
-            return Data()
-        }
+        return items.reduce(Data(), +)
     }
 }
 

@@ -38,6 +38,7 @@ public struct RequestBodyBuilder {
     }
 }
 
+// swiftlint:disable function_parameter_count identifier_name
 extension RequestBodyBuilder {
 
     public static func buildBlock<
@@ -109,7 +110,6 @@ extension RequestBodyBuilder {
             _AnyBody(c4)
         ])
     }
-
 
     public static func buildBlock<
         C0: BodyContent,

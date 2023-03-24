@@ -30,7 +30,7 @@ final class InterceptedTaskTests: XCTestCase {
             .result()
 
         // Then
-        await waitForExpectations(timeout: 3)
+        await fulfillment(of: [expectation], timeout: 3)
         XCTAssertTrue(taskIntercepted)
     }
 }

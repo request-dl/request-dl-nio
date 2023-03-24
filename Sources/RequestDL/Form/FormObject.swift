@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import RequestDLInternals
 
 struct FormObject: NodeObject {
 
@@ -20,10 +21,8 @@ struct FormObject: NodeObject {
             forKey: "Content-Type"
         )
 
-        let data = constructor.body
-
-        make.request.body = .init(length: data.count, streams: [{
-            InputStream(data: data)
-        }])
+        make.request.body = RequestBody {
+            BodyItem(constructor.body)
+        }
     }
 }

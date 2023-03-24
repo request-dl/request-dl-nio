@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Brenno on 20/03/23.
 //
@@ -11,12 +11,12 @@ public struct DownloadTask<Content: Property>: Task {
 
     private let lengthKey: String?
     private let upload: (Int) -> Void
-    private let download: (UInt8, Int?) -> Void
+    private let download: (Data, Int?) -> Void
     private let content: Content
 
     public init(
         _ lengthKey: String? = nil,
-        _ progress: @escaping (UInt8, Int?) -> Void,
+        _ progress: @escaping (Data, Int?) -> Void,
         @PropertyBuilder content: () -> Content
     ) {
         self.init(
@@ -30,7 +30,7 @@ public struct DownloadTask<Content: Property>: Task {
     public init(
         _ lengthKey: String? = nil,
         upload: @escaping (Int) -> Void,
-        download: @escaping (UInt8, Int?) -> Void,
+        download: @escaping (Data, Int?) -> Void,
         @PropertyBuilder content: () -> Content
     ) {
         self.lengthKey = lengthKey

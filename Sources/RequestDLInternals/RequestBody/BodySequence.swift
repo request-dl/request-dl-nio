@@ -7,88 +7,94 @@ import NIOCore
 
 struct BodySequence: Sequence {
 
-    private let size: Int
+    let size: Int
+    let fragmentSize: Int
     private let buffers: [BufferProtocol]
 
     init(
         buffers: [BufferProtocol],
-        size: Int?
+        size fragment: Int?
     ) {
-        self.buffers = buffers
-        self.size = size ?? {
-            let totalBytes = buffers.lazy
-                .map(\.estimatedBytes)
-                .reduce(.zero, +)
+        let size = buffers.lazy
+            .map(\.estimatedBytes)
+            .reduce(.zero, +)
 
-            if totalBytes == .zero {
+        self.buffers = buffers
+        self.size = size
+        self.fragmentSize = fragment ?? {
+            if size == .zero {
                 return .zero
             }
 
-            let fragments = Int(floor(Double(totalBytes) / 10_000))
-            return fragments == .zero && totalBytes > .zero ? 1 : fragments
+            let fragments = Int(floor(Double(size) / 10_000))
+            return fragments == .zero && size > .zero ? 1 : fragments
         }()
     }
 
     func makeIterator() -> Iterator {
         Iterator(
             buffers: buffers,
-            size: size
+            size: size,
+            fragment: fragmentSize
         )
     }
 }
 
 extension BodySequence {
 
-    class Iterator: IteratorProtocol {
+    struct Iterator: IteratorProtocol {
 
-        private var bytes: ByteBuffer?
+        private var bytes: ByteBuffer
         private(set) var buffers: [BufferProtocol]
         let size: Int
+        let fragment: Int
 
         init(
             buffers: [BufferProtocol],
-            size: Int
+            size: Int,
+            fragment: Int
         ) {
             self.buffers = buffers
             self.size = size
-            self.bytes = .init(repeating: .zero, count: size)
-            bytes?.moveReaderIndex(to: .zero)
-            bytes?.moveWriterIndex(to: .zero)
+            self.fragment = fragment
+            self.bytes = .init(repeating: .zero, count: fragment)
+            bytes.moveReaderIndex(to: .zero)
+            bytes.moveWriterIndex(to: .zero)
         }
 
-        func next() -> ByteBuffer? {
-            guard size > .zero, var bytes = bytes else {
+        mutating func next() -> ByteBuffer? {
+            guard fragment > .zero else {
                 return nil
             }
 
-            if bytes.writerIndex == size {
+            if bytes.writerIndex == fragment {
+                let chunk = ByteBuffer(buffer: bytes)
                 bytes.moveReaderIndex(to: .zero)
-                self.bytes = .init(repeating: .zero, count: size)
-                self.bytes?.moveReaderIndex(to: .zero)
-                self.bytes?.moveWriterIndex(to: .zero)
-                return bytes
+                bytes.moveWriterIndex(to: .zero)
+                return chunk
             }
 
             guard var buffer = buffers.first else {
-                self.bytes = nil
+                let chunk = ByteBuffer(buffer: bytes)
                 bytes.moveReaderIndex(to: .zero)
-                return bytes.readableBytes > .zero ? bytes : nil
+                bytes.moveWriterIndex(to: .zero)
+                return chunk.readableBytes > .zero ? chunk : nil
             }
 
-            let availableBytes = size - bytes.writerIndex
+            let availableBytes = fragment - bytes.writerIndex
             let length = buffer.readableBytes > availableBytes ? availableBytes : buffer.readableBytes
 
-            if let data = buffer.readData(length) {
-                bytes.writeData(data)
-                self.bytes = bytes
-
-                if buffer.readableBytes == .zero {
-                    buffers.removeFirst()
-                } else {
-                    buffers[.zero] = buffer
-                }
-            } else {
+            guard let data = buffer.readData(length) else {
                 buffers.removeFirst()
+                return next()
+            }
+
+            bytes.writeData(data)
+
+            if buffer.readableBytes == .zero {
+                buffers.removeFirst()
+            } else {
+                buffers[.zero] = buffer
             }
 
             return next()

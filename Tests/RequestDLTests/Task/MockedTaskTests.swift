@@ -9,7 +9,7 @@ final class MockedTaskTests: XCTestCase {
 
     func testMock() async throws {
         // Given
-        let statusCode = 200
+        let statusCode: UInt = 200
         let headers = [
             "Content-Type": "application/json",
             "Accept": "text/html"
@@ -25,17 +25,15 @@ final class MockedTaskTests: XCTestCase {
         .result()
 
         // Then
-        let response = result.response as? HTTPURLResponse
+        let response = result.head
 
         XCTAssertNotNil(response)
-        XCTAssertEqual(response?.statusCode, statusCode)
+        XCTAssertEqual(response.status.code, statusCode)
         XCTAssertEqual(result.payload, data)
 
-        XCTAssertEqual(response?.allHeaderFields.keys.count, headers.keys.count)
+        XCTAssertEqual(response.headers.keys.count, headers.keys.count)
         XCTAssertTrue(headers.keys.allSatisfy {
-            headers[$0] == (response?.allHeaderFields[$0]).map {
-                "\($0)"
-            }
+            headers[$0] == response.headers[$0]
         })
     }
 
@@ -48,11 +46,10 @@ final class MockedTaskTests: XCTestCase {
             .result()
 
         // Then
-        let response = result.response as? HTTPURLResponse
+        let head = result.head
 
-        XCTAssertNotNil(response)
-        XCTAssertEqual(response?.statusCode, 200)
+        XCTAssertEqual(head.status.code, 200)
         XCTAssertEqual(result.payload, data)
-        XCTAssertTrue(response?.allHeaderFields.isEmpty ?? true)
+        XCTAssertTrue(head.headers.isEmpty)
     }
 }

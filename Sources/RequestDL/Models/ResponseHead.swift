@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Brenno on 20/03/23.
 //
@@ -8,7 +8,7 @@
 import Foundation
 import RequestDLInternals
 
-public struct ResponseHead {
+public struct ResponseHead: Equatable {
 
     public let status: Status
     public let version: Version
@@ -31,15 +31,15 @@ public struct ResponseHead {
         self.init(
             status: .init(head.status),
             version: .init(head.version),
-            headers: head.headers.allHeaderFields,
+            headers: Dictionary(Array(head.headers)) { key, _ in key },
             isKeepAlive: head.isKeepAlive
         )
-    }    
+    }
 }
 
 extension ResponseHead {
 
-    public struct Status {
+    public struct Status: Equatable {
 
         public let code: UInt
         public let reason: String
@@ -60,7 +60,7 @@ extension ResponseHead {
         }
     }
 
-    public struct Version {
+    public struct Version: Equatable {
 
         public let minor: Int
         public let major: Int

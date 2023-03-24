@@ -4,7 +4,6 @@
 
 import Foundation
 
-#if canImport(Darwin)
 extension Interceptors {
 
     /**
@@ -58,4 +57,3 @@ extension Task {
         intercept(Interceptors.Breakpoint())
     }
 }
-#endif

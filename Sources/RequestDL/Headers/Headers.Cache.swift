@@ -20,10 +20,6 @@ extension Headers {
      */
     public struct Cache: Property {
 
-        private let policy: URLRequest.CachePolicy?
-        private let memoryCapacity: Int?
-        private let diskCapacity: Int?
-
         var isCached = true
 
         var isStored = true
@@ -53,29 +49,7 @@ extension Headers {
         /**
          Initializes a Cache object with default values.
          */
-        public init() {
-            memoryCapacity = nil
-            diskCapacity = nil
-            policy = nil
-        }
-
-        /**
-         Initializes a Cache object with given values.
-
-         - Parameters:
-            - policy: The cache policy to be used.
-            - memoryCapacity: The maximum amount of memory to be used for caching in bytes.
-            - diskCapacity: The maximum amount of disk space to be used for caching in bytes.
-         */
-        public init(
-            _ policy: URLRequest.CachePolicy,
-            memoryCapacity: Int = 10_000_000,
-            diskCapacity: Int = 1_000_000_000
-        ) {
-            self.policy = policy
-            self.memoryCapacity = memoryCapacity
-            self.diskCapacity = diskCapacity
-        }
+        public init() {}
 
         /// Returns an exception since `Never` is a type that can never be constructed.
         public var body: Never {
@@ -86,36 +60,10 @@ extension Headers {
 
 extension Headers.Cache: PrimitiveProperty {
 
-    struct CacheObject: NodeObject {
-
-        private let policy: URLRequest.CachePolicy?
-        private let memoryCapacity: Int?
-        private let diskCapacity: Int?
-
-        init(
-            policy: URLRequest.CachePolicy?,
-            memoryCapacity: Int?,
-            diskCapacity: Int?
-        ) {
-            self.policy = policy
-            self.memoryCapacity = memoryCapacity
-            self.diskCapacity = diskCapacity
-        }
-
-        func makeProperty(_ make: Make) {
-            fatalError()
-        }
-    }
-
     func makeObject() -> Headers.Object {
         Headers.Object(
             contents().joined(separator: ", "),
-            forKey: "Cache-Control",
-            next: CacheObject(
-                policy: policy,
-                memoryCapacity: memoryCapacity,
-                diskCapacity: diskCapacity
-            )
+            forKey: "Cache-Control"
         )
     }
 }

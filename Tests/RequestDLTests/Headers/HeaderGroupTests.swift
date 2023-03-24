@@ -10,7 +10,7 @@ final class HeaderGroupTests: XCTestCase {
     func testHeaderGroupWithEmptyValue() async throws {
         let property = TestProperty(HeaderGroup {})
         let (_, request) = try await resolve(property)
-        XCTAssertTrue(request.headers.allHeaderFields?.isEmpty ?? true)
+        XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testHeaderGroupWithDictionary() async throws {

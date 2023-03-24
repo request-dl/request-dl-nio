@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Brenno on 20/03/23.
 //
@@ -17,6 +17,6 @@ struct RawTask<Content: Property>: Task {
 
     func result() async throws -> AsyncResponse {
         let (session, request) = try await Resolver(content).make()
-        return try .init(session.request(request).response)
+        return try await .init(session.request(request).response)
     }
 }

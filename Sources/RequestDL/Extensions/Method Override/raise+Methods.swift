@@ -3,8 +3,6 @@
 */
 
 import Foundation
-
-#if canImport(Darwin)
 import Darwin
 
 @discardableResult
@@ -29,4 +27,3 @@ enum Raise {
         closure = defaultClosure
     }
 }
-#endif

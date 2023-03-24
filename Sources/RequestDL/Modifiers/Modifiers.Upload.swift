@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Brenno on 20/03/23.
 //
@@ -11,11 +11,9 @@ extension Modifiers {
 
     public struct Upload<Content: Task>: TaskModifier where Content.Element == AsyncResponse {
 
-        public typealias Element = TaskResult<AsyncBytes>
-
         let progress: (Int) -> Void
 
-        public func task(_ task: Content) async throws -> Element {
+        public func task(_ task: Content) async throws -> TaskResult<AsyncBytes> {
             let result = try await task.result()
 
             var body: TaskResult<AsyncBytes>?

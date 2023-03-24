@@ -4,7 +4,6 @@
 
 import Foundation
 import AsyncHTTPClient
-
 import NIOCore
 import NIOHTTP1
 
@@ -14,8 +13,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     let upload: DataStream<Int>
     let head: DataStream<ResponseHead>
-    let download: DataStream<ByteBuffer>
-    private var bytesBuffer: ByteBuffer?
+    var download: DownloadBuffer
 
     var phase: Phase = .upload
     var state: State = .idle
@@ -23,7 +21,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
     init(
         upload: DataStream<Int>,
         head: DataStream<ResponseHead>,
-        download: DataStream<ByteBuffer>
+        download: DownloadBuffer
     ) {
         self.upload = upload
         self.head = head
@@ -32,7 +30,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     func didSendRequestPart(task: HTTPClient.Task<Response>, _ part: IOData) {
         guard [.idle, .uploading].contains(state) && phase == .upload else {
-            fatalError()
+            return
         }
 
         state = .uploading
@@ -41,7 +39,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     func didSendRequest(task: HTTPClient.Task<Response>) {
         guard [.idle, .uploading].contains(state) && phase == .upload else {
-            fatalError()
+            return
         }
 
         state = .uploading
@@ -68,9 +66,10 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
             isKeepAlive: head.isKeepAlive
         )))
 
+        self.upload.close()
+        self.head.close()
         state = .head
         phase = .download
-        upload.close()
 
         return task.eventLoop.makeSucceededVoidFuture()
     }
@@ -80,17 +79,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
             fatalError()
         }
 
-        if var bytesBuffer {
-            self.bytesBuffer = nil
-
-            var buffer = buffer
-            bytesBuffer.writeBuffer(&buffer)
-            self.bytesBuffer = bytesBuffer
-
-            download.append(.success(bytesBuffer))
-        } else {
-            bytesBuffer = buffer
-        }
+        download.append(buffer)
 
         state = .downloading
         phase = .download
@@ -104,16 +93,15 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
             fatalError()
         }
 
-        bytesBuffer = nil
         state = .end
         phase = .download
         download.close()
         head.close()
+        upload.close()
     }
 
     func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
         defer {
-            bytesBuffer = nil
             state = .failure
             upload.close()
             head.close()
@@ -128,7 +116,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
         case .head:
             head.append(.failure(error))
         case .downloading:
-            download.append(.failure(error))
+            download.failed(error)
         case .end, .failure:
             fatalError()
         }

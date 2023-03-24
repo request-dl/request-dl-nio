@@ -27,18 +27,10 @@ final class HeadersCacheTests: XCTestCase {
 
     func testInitializationWithPolicy() async throws {
         // Given
-        let policy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
-        let memoryCapacity = 10_000_000
-        let diskCapacity = 1_000_000_000
+        let cache = Headers.Cache()
 
         // When
-        let cache = Headers.Cache(
-            policy,
-            memoryCapacity: memoryCapacity,
-            diskCapacity: diskCapacity
-        )
-
-        let (session, request) = try await resolve(TestProperty(cache))
+        let (_, request) = try await resolve(TestProperty(cache))
 
         // Then
         XCTAssertTrue(cache.isCached)
@@ -55,16 +47,12 @@ final class HeadersCacheTests: XCTestCase {
         XCTAssertFalse(cache.needsProxyRevalidate)
         XCTAssertFalse(cache.isImmutable)
 
-        XCTAssertNil(request.headers.allHeaderFields)
-        XCTAssertEqual(session.configuration.requestCachePolicy, policy)
-        XCTAssertEqual(session.configuration.urlCache?.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(session.configuration.urlCache?.diskCapacity, diskCapacity)
+        XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testModifiedCacheWithAllProperties() async throws {
         // Given
-        let policy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
-        let cache = Headers.Cache(policy)
+        let cache = Headers.Cache()
 
         let modifiedCache = cache
             .cached(false)
@@ -82,7 +70,7 @@ final class HeadersCacheTests: XCTestCase {
             .immutable()
 
         // When
-        let (session, request) = try await resolve(TestProperty(modifiedCache))
+        let (_, request) = try await resolve(TestProperty(modifiedCache))
 
         // Then
         XCTAssertFalse(modifiedCache.isCached)
@@ -98,8 +86,6 @@ final class HeadersCacheTests: XCTestCase {
         XCTAssertTrue(modifiedCache.needsRevalidate)
         XCTAssertTrue(modifiedCache.needsProxyRevalidate)
         XCTAssertTrue(modifiedCache.isImmutable)
-
-        XCTAssertEqual(session.configuration.requestCachePolicy, policy)
 
         XCTAssertEqual(
             request.headers.getValue(forKey: "Cache-Control"),

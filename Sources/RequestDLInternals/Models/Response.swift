@@ -4,7 +4,7 @@
 
 import Foundation
 
-public enum Response {
+public enum Response: Equatable {
     case upload(Int)
     case download(ResponseHead, AsyncBytes)
 }
