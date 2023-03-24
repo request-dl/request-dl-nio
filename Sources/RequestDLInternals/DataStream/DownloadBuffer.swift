@@ -56,7 +56,7 @@ struct DownloadBuffer {
                 buffer.writeBytes(bytes)
 
                 guard bytes == separator else {
-                    let index = byteBuffer.readableBytes - (length - 1)
+                    let index = byteBuffer.readerIndex - (length - 1)
                     byteBuffer.moveReaderIndex(to: index)
                     continue
                 }
