@@ -81,7 +81,7 @@ class DownloadBufferTests: XCTestCase {
         let line2 = Data("1;2;4;8;16,".utf8)
         let line3 = Data("32;64;128;256;512".utf8)
 
-        var download = DownloadBuffer(readingMode: .byte(separator[.zero]))
+        var download = DownloadBuffer(readingMode: .separator(Array(separator)))
 
         // When
         download.append(.init(data: line1 + line2))
@@ -99,7 +99,7 @@ class DownloadBufferTests: XCTestCase {
         // Given
         let separator = Data(",".utf8)
 
-        var download = DownloadBuffer(readingMode: .byte(separator[.zero]))
+        var download = DownloadBuffer(readingMode: .separator(Array(separator)))
 
         // When
         download.append(.init(data: separator))

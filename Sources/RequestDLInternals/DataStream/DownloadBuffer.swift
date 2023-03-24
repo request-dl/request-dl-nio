@@ -49,11 +49,15 @@ struct DownloadBuffer {
                     buffer.moveWriterIndex(to: .zero)
                 }
             }
-        case .byte(let separator):
-            while let bytes = byteBuffer.readBytes(length: 1) {
+        case .separator(let separator):
+            let length = separator.count
+
+            while let bytes = byteBuffer.readBytes(length: length) {
                 buffer.writeBytes(bytes)
 
-                guard bytes.contains(separator) else {
+                guard bytes == separator else {
+                    let index = byteBuffer.readableBytes - (length - 1)
+                    byteBuffer.moveReaderIndex(to: index)
                     continue
                 }
 
@@ -91,6 +95,6 @@ extension Response {
 
     public enum ReadingMode: Equatable {
         case length(Int)
-        case byte(UInt8)
+        case separator([UInt8])
     }
 }

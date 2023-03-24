@@ -129,55 +129,6 @@ extension Session {
     }
 }
 
-extension Session {
-
-    public enum Configuration {
-
-        case `default`
-
-        case identifier(String, numberOfThreads: Int = ProcessInfo.processInfo.activeProcessorCount)
-
-        case custom(EventLoopGroup)
-    }
-}
-
-extension Session.Configuration {
-
-    func build() -> RequestDLInternals.Session.Provider {
-        switch self {
-        case .default:
-            return .shared
-        case .identifier(let string, let numberOfThreads):
-            return .identifier(string, numberOfThreads: numberOfThreads)
-        case .custom(let eventLoopGroup):
-            return .custom(eventLoopGroup)
-        }
-    }
-}
-
-extension Session {
-
-    public enum DecompressionLimit {
-        case none
-        case ratio(Int)
-        case size(Int)
-    }
-}
-
-extension Session.DecompressionLimit {
-
-    func build() -> RequestDLInternals.Session.Decompression.Limit {
-        switch self {
-        case .none:
-            return .none
-        case .ratio(let value):
-            return .ratio(value)
-        case .size(let value):
-            return .size(value)
-        }
-    }
-}
-
 extension Session: PrimitiveProperty {
 
     struct Object: NodeObject {

@@ -176,11 +176,7 @@ extension FileBuffer {
         }
 
         private var path: String {
-            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
-                return url.path()
-            } else {
-                return url.path
-            }
+            url.absolutePath()
         }
 
         var writtenBytes: Int {

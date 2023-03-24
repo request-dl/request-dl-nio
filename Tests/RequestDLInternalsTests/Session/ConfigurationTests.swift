@@ -108,7 +108,7 @@ class ConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetReadingMode_shoudlBeEqual() async throws {
         // Given
-        let readingMode = Response.ReadingMode.byte(70)
+        let readingMode = Response.ReadingMode.separator([70])
 
         // When
         configuration.readingMode = readingMode
