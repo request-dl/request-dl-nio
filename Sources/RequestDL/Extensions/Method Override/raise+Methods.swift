@@ -3,11 +3,6 @@
 */
 
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 @discardableResult
 func raise(_ value: Int32) -> Int32 {
@@ -20,7 +15,7 @@ enum Raise {
     fileprivate static var closure: RaiseClosure = defaultClosure
 
     private static let defaultClosure: RaiseClosure = {
-        Darwin.raise($0)
+        Foundation.raise($0)
     }
 
     static func replace(with closure: @escaping RaiseClosure) {
