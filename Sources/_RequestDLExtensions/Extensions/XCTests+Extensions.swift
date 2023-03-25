@@ -7,7 +7,7 @@ import XCTest
 #if !canImport(Darwin)
 extension XCTestCase {
 
-    func fulfillment(
+    public func fulfillment(
         of expectations: [XCTestExpectation],
         timeout seconds: TimeInterval = .infinity,
         enforceOrder enforceOrderOfFulfillment: Bool = false
