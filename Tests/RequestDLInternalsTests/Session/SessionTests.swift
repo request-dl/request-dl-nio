@@ -4,6 +4,7 @@
 
 import XCTest
 import _RequestDLExtensions
+import _RequestDLServer
 @testable import RequestDLInternals
 
 class SessionTests: XCTestCase {
@@ -92,10 +93,11 @@ class SessionTests: XCTestCase {
     func testSession_whenUploadingFile_shouldBeValid() async throws {
         // Given
         let server = try OpenSSL().certificate()
-        let output = "Hello World"
+        let message = "Hello World"
+        let output = try JSONSerialization.data(withJSONObject: ["message": message])
 
-        let length = 1_024
-        let fragment = 64
+        let length = 100_000_000
+        let fragment = 1_024 * 8
         let url = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -110,8 +112,8 @@ class SessionTests: XCTestCase {
         var fileBuffer = FileBuffer(url)
         fileBuffer.writeData(Data.randomData(length: length))
 
-        var request = Request(url: "https://localhost:8080/index")
-        request.method = "GET"
+        var request = Request(url: "https://localhost:8080")
+        request.method = "POST"
         request.body = RequestBody(fragment) {
             BodyItem(fileBuffer)
         }
@@ -120,14 +122,21 @@ class SessionTests: XCTestCase {
         secureConnection.trustRoots = .file(server.certificateURL.path)
         session.configuration.secureConnection = secureConnection
 
-        // When
-        let openSSLServer = OpenSSLServer(output, certificate: server)
-        try await openSSLServer.start {
+        var serverConfiguration = Session.SecureConnection(.server)
+        serverConfiguration.certificateChain = .init([.file(server.certificateURL.path)])
+        serverConfiguration.privateKey = .file(server.privateKeyURL.path)
+
+        try await Server(
+            host: "localhost",
+            port: 8080,
+            configuration: try serverConfiguration.build(),
+            output: output
+        ).run {
             let task = try await session.request(request)
-            
+
             var parts: [Int] = []
-            var download: (ResponseHead, AsyncBytes)?
-            
+            var download: (ResponseHead, [String: Any]?)?
+
             for try await result in task.response {
                 switch result {
                 case .upload(let part):
@@ -135,16 +144,52 @@ class SessionTests: XCTestCase {
                     parts.append(part)
                 case .download(let head, let bytes):
                     NSLog("Head %d %@", head.status.code, head.status.reason)
-                    download = (head, bytes)
+                    let data = Data(try await Array(bytes).joined())
+                    let json = try JSONSerialization.jsonObject(
+                        with: data,
+                        options: [.fragmentsAllowed]
+                    ) as? [String: Any]
+
+                    download = (head, json)
                 }
             }
-            
+
             // Then
             XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
             XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
             XCTAssertNotNil(download)
             XCTAssertEqual(download?.0.status.code, 200)
+            XCTAssertEqual(download?.1?.mapValues { "\($0)" }, [
+                "message": message,
+                "received_bytes": "\(length)"
+            ])
         }
+
+        // When
+//        let openSSLServer = OpenSSLServer(output, certificate: server)
+//        try await openSSLServer.start {
+//            let task = try await session.request(request)
+//
+//            var parts: [Int] = []
+//            var download: (ResponseHead, AsyncBytes)?
+//
+//            for try await result in task.response {
+//                switch result {
+//                case .upload(let part):
+//                    NSLog("Send %d bytes (%d)", part, parts.count)
+//                    parts.append(part)
+//                case .download(let head, let bytes):
+//                    NSLog("Head %d %@", head.status.code, head.status.reason)
+//                    download = (head, bytes)
+//                }
+//            }
+//
+//            // Then
+//            XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
+//            XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
+//            XCTAssertNotNil(download)
+//            XCTAssertEqual(download?.0.status.code, 200)
+//        }
     }
     #endif
 }
