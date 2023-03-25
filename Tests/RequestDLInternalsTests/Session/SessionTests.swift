@@ -144,10 +144,13 @@ class SessionTests: XCTestCase {
             XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
             XCTAssertNotNil(download)
             XCTAssertEqual(download?.0.status.code, 200)
-            XCTAssertEqual(download?.1, try HTTPResult(
-                receivedBytes: length,
-                response: message
-            ).encode())
+            XCTAssertEqual(
+                try (download?.1).map(HTTPResult<String>.resolve),
+                HTTPResult(
+                    receivedBytes: length,
+                    response: message
+                )
+            )
         }
     }
 }

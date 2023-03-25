@@ -7,7 +7,7 @@ import NIO
 import NIOSSL
 import NIOHTTP1
 
-public struct InternalServer<Response: Codable> {
+public struct InternalServer<Response: Codable> where Response: Equatable {
 
     let host: String
     let port: UInt

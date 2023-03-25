@@ -6,7 +6,7 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-final class HTTPHandler<Response: Codable> {
+final class HTTPHandler<Response: Codable> where Response: Equatable {
 
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart

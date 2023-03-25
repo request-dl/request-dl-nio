@@ -8,7 +8,7 @@ import _RequestDLExtensions
 
 final class PayloadTests: XCTestCase {
 
-    struct Mock: Codable {
+    struct Mock: Codable, Equatable {
         let foo: String
         let date: Date
     }
@@ -29,8 +29,20 @@ final class PayloadTests: XCTestCase {
         let expectedPayload = _DictionaryPayload(dictionary, options: options)
         let payload = try await request.body?.data()
 
+        let payloadDecoded = try payload.map {
+            try JSONSerialization.jsonObject(with: $0)
+        } as? [String: Any]
+
+        let expectedPayloadDecoded = try JSONSerialization.jsonObject(
+            with: expectedPayload.data
+        ) as? [String: Any]
+
         // Then
-        XCTAssertEqual(payload, expectedPayload.data)
+        XCTAssertNotNil(payloadDecoded)
+        XCTAssertEqual(
+            payloadDecoded?.mapValues { "\($0)" },
+            expectedPayloadDecoded?.mapValues { "\($0)" }
+        )
     }
 
     func testStringPayload() async throws {
@@ -82,10 +94,12 @@ final class PayloadTests: XCTestCase {
         let expectedPayload = _EncodablePayload(mock, encoder: encoder)
 
         let expectedMock = try decoder.decode(Mock.self, from: expectedPayload.data)
-        let payload = try await request.body?.data()
+        let payloadMock = try await (request.body?.data()).map {
+            try decoder.decode(Mock.self, from: $0)
+        }
 
         // Then
-        XCTAssertEqual(payload, expectedPayload.data)
+        XCTAssertEqual(payloadMock, expectedMock)
         XCTAssertEqual(mock.foo, expectedMock.foo)
 
         XCTAssertEqual(
