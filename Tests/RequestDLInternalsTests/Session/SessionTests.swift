@@ -88,6 +88,7 @@ class SessionTests: XCTestCase {
         }
     }
 
+    #if os(macOS) || os(Linux)
     func testSession_whenUploadingFile_shouldBeValid() async throws {
         // Given
         let server = try OpenSSL().certificate()
@@ -145,4 +146,5 @@ class SessionTests: XCTestCase {
             XCTAssertEqual(download?.0.status.code, 200)
         }
     }
+    #endif
 }

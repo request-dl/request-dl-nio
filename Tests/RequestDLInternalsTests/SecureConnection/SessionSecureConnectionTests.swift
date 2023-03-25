@@ -180,6 +180,7 @@ class SessionSecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut.cipherSuiteValues, cipherSuitesValues)
     }
 
+    #if os(macOS) || os(Linux)
     func testSecureConnection_whenServer_shouldBeValid() async throws {
         // Given
         let openSSL = try OpenSSL().certificate()
@@ -219,6 +220,7 @@ class SessionSecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut.cipherSuites, configuration.cipherSuites)
         XCTAssertEqual(sut.cipherSuiteValues, configuration.cipherSuiteValues)
     }
+    #endif
 
     func testSecureConnection_whenClient_shouldBeValid() async throws {
         // Given

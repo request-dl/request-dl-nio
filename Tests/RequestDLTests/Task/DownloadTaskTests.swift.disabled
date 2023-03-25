@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 final class DownloadTaskTests: XCTestCase {
 
     func testDownloadTask() async throws {

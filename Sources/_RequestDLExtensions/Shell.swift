@@ -4,7 +4,7 @@
 
 import Foundation
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 extension Process {
 
     public static func zsh(_ args: String...) throws -> Process {

@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 @available(macOS 12, *)
 final class ModifiersConvertBytesToDataTests: XCTestCase {
 

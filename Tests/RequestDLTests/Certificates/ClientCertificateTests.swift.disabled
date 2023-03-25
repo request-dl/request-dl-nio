@@ -7,7 +7,7 @@ import XCTest
 
 final class ClientCertificateTests: XCTestCase {
 
-    #if os(macOS)
+    #if os(macOS) || os(Linux)
     func testLocalHost() async throws {
         // Given
         let password = "12345"

@@ -20,6 +20,8 @@ class TrustRootsTests: XCTestCase {
         XCTAssertEqual(resolved, .default)
     }
 
+
+    #if os(macOS) || os(Linux)
     func testRoots_whenCertificate_shouldBeValid() async throws {
         // Given
         let openSSL = try OpenSSL("\(UUID())").certificate()
@@ -31,7 +33,9 @@ class TrustRootsTests: XCTestCase {
         // Then
         XCTAssertEqual(resolved, try .certificates(NIOSSLCertificate.fromPEMBytes(Array(data))))
     }
-
+    #endif
+    
+    #if os(macOS) || os(Linux)
     func testRoots_whenFile_shouldBeValid() async throws {
         // Given
         let openSSL = try OpenSSL("\(UUID())").certificate()
@@ -42,4 +46,5 @@ class TrustRootsTests: XCTestCase {
         // Then
         XCTAssertEqual(resolved, .file(openSSL.certificateURL.path))
     }
+    #endif
 }

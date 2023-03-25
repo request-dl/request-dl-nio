@@ -2,6 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
+#if os(macOS) || os(Linux)
 import XCTest
 import _RequestDLExtensions
 @testable import RequestDLInternals
@@ -56,3 +57,4 @@ class CertificateTests: XCTestCase {
         XCTAssertEqual(resolved, try .init(file: path, format: .der))
     }
 }
+#endif

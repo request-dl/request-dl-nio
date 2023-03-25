@@ -4,7 +4,7 @@
 
 import Foundation
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 public struct OpenSSLCertificate {
 
     public let certificateURL: URL

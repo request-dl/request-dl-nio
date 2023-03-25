@@ -2,6 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
+#if os(macOS) || os(Linux)
 import XCTest
 import NIOSSL
 import _RequestDLExtensions
@@ -44,3 +45,4 @@ class AdditionalTrustRootsTests: XCTestCase {
         ])
     }
 }
+#endif

@@ -4,7 +4,7 @@
 
 import Foundation
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 public struct OpenSSLBundleReference {
 
     public let certificatePath: String

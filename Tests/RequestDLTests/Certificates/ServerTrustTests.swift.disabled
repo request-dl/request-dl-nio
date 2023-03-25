@@ -7,7 +7,7 @@ import XCTest
 
 final class ServerTrustTests: XCTestCase {
 
-    #if os(macOS)
+    #if os(macOS) || os(Linux)
     func testValidServer() async throws {
         // Given
         let server = try OpenSSL("trust_valid_server", with: [.der]).certificate()
@@ -38,7 +38,7 @@ final class ServerTrustTests: XCTestCase {
     }
     #endif
 
-    #if os(macOS)
+    #if os(macOS) || os(Linux)
     func testInvalidServer() async throws {
         // Given
         let server = try OpenSSL("trust_invalid_server").certificate()

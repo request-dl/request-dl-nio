@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import _RequestDLExtensions
 #if canImport(Combine)
 import Combine
 @testable import RequestDL

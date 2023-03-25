@@ -2,6 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
+#if os(macOS) || os(Linux)
 import XCTest
 import NIOSSL
 import _RequestDLExtensions
@@ -11,9 +12,8 @@ class CertificateSourceTests: XCTestCase {
 
     func testSource_whenCertificate_shouldBeValid() async throws {
         // Given
-        let seed = UUID()
-        let certificate = try OpenSSL("\(seed)").certificate()
-        let data = try Data(contentsOf: certificate.certificateURL)
+        let openSSL = try OpenSSL().certificate()
+        let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
         let certificatePEM = Certificate(Array(data), format: .pem)
@@ -70,3 +70,4 @@ class CertificateSourceTests: XCTestCase {
         XCTAssertEqual(resolved, try NIOSSLCertificate.fromPEMFile(filePEM.path))
     }
 }
+#endif
