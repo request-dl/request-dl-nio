@@ -4,7 +4,7 @@
 
 import XCTest
 
-#if !canImport(Darwin)
+#if swift(<5.8)
 extension XCTestCase {
 
     public func fulfillment(

@@ -44,7 +44,7 @@ class CertificatePrivateKeyTests: XCTestCase {
 
         // When
         let resolved = try PrivateKey(Array(data), format: .pem) {
-            CertificatePassword(Array(Data(password.utf8)))
+            $0(Array(Data(password.utf8)))
         }.build()
 
         // Then
@@ -62,7 +62,7 @@ class CertificatePrivateKeyTests: XCTestCase {
 
         // When
         let resolved = try PrivateKey(Array(data), format: .der) {
-            CertificatePassword(Array(Data(password.utf8)))
+            $0(Array(Data(password.utf8)))
         }.build()
 
         // Then
