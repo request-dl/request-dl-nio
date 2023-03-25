@@ -89,8 +89,8 @@ final class PayloadTests: XCTestCase {
         XCTAssertEqual(mock.foo, expectedMock.foo)
 
         XCTAssertEqual(
-            mock.date.timeIntervalSince1970,
-            expectedMock.date.timeIntervalSince1970
+            mock.date.seconds,
+            expectedMock.date.seconds
         )
     }
 

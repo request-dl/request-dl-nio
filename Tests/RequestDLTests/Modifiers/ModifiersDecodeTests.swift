@@ -33,8 +33,8 @@ final class ModifiersDecodeTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            result.map(\.timeIntervalSince1970),
-            array.map(\.timeIntervalSince1970)
+            result.map(\.seconds),
+            array.map(\.seconds)
         )
     }
 
@@ -69,7 +69,7 @@ final class ModifiersDecodeTests: XCTestCase {
             var transformed = [Int: Int]()
 
             for (key, value) in dictionary {
-                transformed[Int(key.timeIntervalSince1970)] = value
+                transformed[Int(key.seconds)] = value
             }
 
             return transformed
@@ -98,8 +98,8 @@ final class ModifiersDecodeTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            result.date.timeIntervalSince1970,
-            mock.date.timeIntervalSince1970
+            result.date.seconds,
+            mock.date.seconds
         )
     }
 

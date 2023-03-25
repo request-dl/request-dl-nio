@@ -118,7 +118,7 @@ final class FormDataTests: XCTestCase {
         XCTAssertEqual(property.key, "data")
         XCTAssertEqual(property.data, expectedData)
         XCTAssertEqual(expectedMock.foo, mock.foo)
-        XCTAssertEqual(expectedMock.date.timeIntervalSince1970, mock.date.timeIntervalSince1970)
+        XCTAssertEqual(expectedMock.date.seconds, mock.date.seconds)
     }
 
     func testEncodableWithFilename() async throws {
