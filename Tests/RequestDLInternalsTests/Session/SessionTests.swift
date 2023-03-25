@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import _RequestDLExtensions
 @testable import RequestDLInternals
 
 class SessionTests: XCTestCase {
@@ -12,7 +13,7 @@ class SessionTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
 
-        session = await Session(
+        session = try await Session(
             provider: .shared,
             configuration: .init()
         )
@@ -89,8 +90,11 @@ class SessionTests: XCTestCase {
 
     func testSession_whenUploadingFile_shouldBeValid() async throws {
         // Given
-        let length = 100_000_000
-        let fragment = 8_192
+        let server = try OpenSSL("data_task_server", with: [.der]).certificate()
+        let output = "Hello World"
+
+        let length = 540_672
+        let fragment = 1_024
         let url = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -105,33 +109,40 @@ class SessionTests: XCTestCase {
         var fileBuffer = FileBuffer(url)
         fileBuffer.writeData(Data.randomData(length: length))
 
-        var request = Request(url: "http://127.0.0.1")
-        request.method = "POST"
+        var request = Request(url: "https://localhost:8080/index")
+        request.method = "GET"
         request.body = RequestBody(fragment) {
             BodyItem(fileBuffer)
         }
 
+        var secureConnection = Session.SecureConnection(.client)
+        secureConnection.trustRoots = .file(server.certificateURL.path)
+        session.configuration.secureConnection = secureConnection
+
         // When
-        let task = try await session.request(request)
-
-        var parts: [Int] = []
-        var download: (ResponseHead, AsyncBytes)?
-
-        for try await result in task.response {
-            switch result {
-            case .upload(let part):
-                NSLog("Send %d bytes (%d)", part, parts.count)
-                parts.append(part)
-            case .download(let head, let bytes):
-                NSLog("Head %d %@", head.status.code, head.status.reason)
-                download = (head, bytes)
+        let openSSLServer = OpenSSLServer(output, certificate: server)
+        try await openSSLServer.start {
+            let task = try await session.request(request)
+            
+            var parts: [Int] = []
+            var download: (ResponseHead, AsyncBytes)?
+            
+            for try await result in task.response {
+                switch result {
+                case .upload(let part):
+                    NSLog("Send %d bytes (%d)", part, parts.count)
+                    parts.append(part)
+                case .download(let head, let bytes):
+                    NSLog("Head %d %@", head.status.code, head.status.reason)
+                    download = (head, bytes)
+                }
             }
+            
+            // Then
+            XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
+            XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
+            XCTAssertNotNil(download)
+            XCTAssertEqual(download?.0.status.code, 200)
         }
-
-        // Then
-        XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
-        XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
-        XCTAssertNotNil(download)
-        XCTAssertEqual(download?.0.status.code, 200)
     }
 }

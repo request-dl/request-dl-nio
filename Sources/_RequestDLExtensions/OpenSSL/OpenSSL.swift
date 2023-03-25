@@ -5,12 +5,12 @@
 import Foundation
 
 #if os(macOS)
-struct OpenSSL {
+public struct OpenSSL {
 
     private let name: String
     private let options: [OpenSSLOption]
 
-    init(_ name: String, with options: [OpenSSLOption] = []) {
+    public init(_ name: String, with options: [OpenSSLOption] = []) {
         self.name = name
         self.options = options
     }
@@ -18,7 +18,7 @@ struct OpenSSL {
 
 extension OpenSSL {
 
-    func certificate() throws -> OpenSSLCertificate {
+    public func certificate() throws -> OpenSSLCertificate {
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("RequestDL_OpenSSL.\(UUID())")
 

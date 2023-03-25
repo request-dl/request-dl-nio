@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import _RequestDLExtensions
 
 /**
  A representation of a client certificate that can be used in an HTTP request.

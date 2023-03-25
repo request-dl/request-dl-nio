@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-extension Session {
+public protocol CertificatePrivateKeyRepresentable {
 
-    public typealias TLSConfiguration = NIOSSL.TLSConfiguration
+    func build() throws -> NIOSSLPrivateKey
 }

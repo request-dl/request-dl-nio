@@ -47,20 +47,20 @@ public class SessionTask {
 
 public struct Session {
 
-    private let client: () async -> HTTPClient
-    public let configuration: Configuration
+    private let client: (Configuration) async throws -> HTTPClient
+    public var configuration: Configuration
 
     public init(
         provider: Provider,
         configuration: Configuration
-    ) async {
+    ) async throws {
         self.configuration = configuration
 
-        client = {
+        client = { configuration in
             await EventLoopGroupManager.shared.client(
                 id: provider.id,
                 factory: { provider.build() },
-                configuration: configuration.build()
+                configuration: try configuration.build()
             )
         }
     }
@@ -83,7 +83,7 @@ public struct Session {
         )
 
         let request = try request.build()
-        let client = await client()
+        let client = try await client(configuration)
 
         let eventLoopFuture = client.execute(
             request: request,

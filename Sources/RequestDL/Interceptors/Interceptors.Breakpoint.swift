@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import _RequestDLExtensions
 
 extension Interceptors {
 
@@ -36,7 +37,7 @@ extension Interceptors {
          */
         public func received(_ result: Result<Element, Error>) {
             #if DEBUG
-            raise(SIGTRAP)
+            _RequestDLExtensions.raise(SIGTRAP)
             #endif
         }
     }

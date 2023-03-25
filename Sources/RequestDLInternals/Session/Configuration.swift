@@ -9,7 +9,7 @@ extension Session {
 
     public struct Configuration {
 
-        public var tlsConfiguration: TLSConfiguration?
+        public var secureConnection: Session.SecureConnection?
         public var redirectConfiguration: RedirectConfiguration?
         public var timeout: Timeout = .init()
         public var connectionPool: ConnectionPool = .init()
@@ -37,9 +37,9 @@ extension Session {
 
 extension Session.Configuration {
 
-    func build() -> HTTPClient.Configuration {
+    func build() throws -> HTTPClient.Configuration {
         var configuration = HTTPClient.Configuration(
-            tlsConfiguration: tlsConfiguration,
+            tlsConfiguration: try secureConnection?.build(),
             redirectConfiguration: redirectConfiguration,
             timeout: timeout,
             connectionPool: connectionPool,

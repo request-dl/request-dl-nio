@@ -90,6 +90,7 @@ class AsyncResponseTests: XCTestCase {
 
         // When
         self.head.append(.success(head))
+        self.download.append(.success(.init(data)))
 
         upload.close()
         self.head.close()

@@ -7,7 +7,7 @@ import XCTest
 
 final class PartFormRawValueTests: XCTestCase {
 
-    func testInitWithDataAndHeaders() throws {
+    func testInitWithDataAndHeaders() async throws {
         // Given
         let data = "Test data".data(using: .utf8) ?? Data()
 
@@ -28,7 +28,7 @@ final class PartFormRawValueTests: XCTestCase {
         XCTAssertEqual(part.headers["Custom-Header"] as? String, "custom-value")
     }
 
-    func testContentDispositionValue_withFileName() {
+    func testContentDispositionValue_withFileName() async throws {
         // Given
         let key = "testKey"
         let fileName = "testFile.txt"
@@ -43,7 +43,7 @@ final class PartFormRawValueTests: XCTestCase {
         )
     }
 
-    func testContentDispositionValue_withoutFileName() {
+    func testContentDispositionValue_withoutFileName() async throws {
         // Given
         let key = "testKey"
 

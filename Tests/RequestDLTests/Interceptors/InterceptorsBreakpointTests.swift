@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import _RequestDLExtensions
 @testable import RequestDL
 
 #if DEBUG

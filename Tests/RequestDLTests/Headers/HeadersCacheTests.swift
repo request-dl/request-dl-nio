@@ -7,7 +7,7 @@ import XCTest
 
 final class HeadersCacheTests: XCTestCase {
 
-    func testDefaultValues() {
+    func testDefaultValues() async throws {
         let cache = Headers.Cache()
 
         XCTAssertTrue(cache.isCached)

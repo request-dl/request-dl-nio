@@ -5,12 +5,12 @@
 import Foundation
 
 @discardableResult
-func raise(_ value: Int32) -> Int32 {
+public func raise(_ value: Int32) -> Int32 {
     Raise.closure(value)
 }
 
-enum Raise {
-    typealias RaiseClosure = (Int32) -> Int32
+public enum Raise {
+    public typealias RaiseClosure = (Int32) -> Int32
 
     fileprivate static var closure: RaiseClosure = defaultClosure
 
@@ -18,11 +18,11 @@ enum Raise {
         Foundation.raise($0)
     }
 
-    static func replace(with closure: @escaping RaiseClosure) {
+    public static func replace(with closure: @escaping RaiseClosure) {
         self.closure = closure
     }
 
-    static func restoreRaise() {
+    public static func restoreRaise() {
         closure = defaultClosure
     }
 }

@@ -5,12 +5,12 @@
 import Foundation
 
 #if DEBUG
-func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+public func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
     Print.closure(items, separator, terminator)
 }
 
-enum Print {
-    typealias PrintClosure = ([Any], String, String) -> Void
+public enum Print {
+    public typealias PrintClosure = ([Any], String, String) -> Void
 
     fileprivate static var closure: PrintClosure = defaultClosure
 
@@ -20,14 +20,14 @@ enum Print {
             .joined(separator: $1)
             .appending($2)
 
-        Swift.print(output)
+        Swift.print(output, separator: "", terminator: "")
     }
 
-    static func replace(with closure: @escaping PrintClosure) {
+    public static func replace(with closure: @escaping PrintClosure) {
         self.closure = closure
     }
 
-    static func restoreRaise() {
+    public static func restoreRaise() {
         closure = defaultClosure
     }
 }

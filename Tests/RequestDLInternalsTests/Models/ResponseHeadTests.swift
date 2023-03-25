@@ -7,7 +7,7 @@ import XCTest
 
 class ResponseHeadTests: XCTestCase {
 
-    func testResponse_whenHeadInit_shouldBeValid() {
+    func testResponse_whenHeadInit_shouldBeValid() async throws {
         // Given
         let status = ResponseHead.Status(code: 200, reason: "OK")
         let version = ResponseHead.Version(minor: 0, major: 1)
@@ -33,7 +33,7 @@ class ResponseHeadTests: XCTestCase {
         XCTAssertTrue(responseHead.isKeepAlive)
     }
 
-    func testResponse_whenStatusInit_shouldBeValid() {
+    func testResponse_whenStatusInit_shouldBeValid() async throws {
         // Given
         let status = ResponseHead.Status(code: 200, reason: "OK")
 
@@ -42,7 +42,7 @@ class ResponseHeadTests: XCTestCase {
         XCTAssertEqual(status.reason, "OK")
     }
 
-    func testResponse_whenVersionInit_shouldBeValid() {
+    func testResponse_whenVersionInit_shouldBeValid() async throws {
         // Given
         let version = ResponseHead.Version(minor: 0, major: 1)
 

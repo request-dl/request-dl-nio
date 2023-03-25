@@ -5,7 +5,7 @@
 import Foundation
 
 #if os(macOS)
-enum OpenSSLOption {
+public enum OpenSSLOption {
 
     /// String password
     case pkcs12(String)

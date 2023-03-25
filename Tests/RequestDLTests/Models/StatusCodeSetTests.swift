@@ -7,12 +7,12 @@ import XCTest
 
 final class StatusCodeSetTests: XCTestCase {
 
-    func testInit() {
+    func testInit() async throws {
         let set = StatusCodeSet()
         XCTAssertTrue(set.isEmpty)
     }
 
-    func testInitWithSequence() {
+    func testInitWithSequence() async throws {
         let sequence: [StatusCode] = [.ok, .created, .accepted]
         let set = StatusCodeSet(sequence)
         XCTAssertEqual(set.count, 3)
@@ -21,7 +21,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertTrue(set.contains(.accepted))
     }
 
-    func testUnion() {
+    func testUnion() async throws {
         let set1: StatusCodeSet = [.ok, .created, .badRequest]
         let set2: StatusCodeSet = [400, 401, 404]
         let expectedResult: StatusCodeSet = [200, 201, 400, 401, 404]
@@ -31,7 +31,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertEqual(result, expectedResult)
     }
 
-    func testIntersection() {
+    func testIntersection() async throws {
         let set1 = StatusCodeSet([.ok, .created, .noContent])
         let set2 = StatusCodeSet([.ok, .badRequest, .forbidden])
 
@@ -54,7 +54,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertTrue(intersection3.isEmpty)
     }
 
-    func testSymmetricDifference() {
+    func testSymmetricDifference() async throws {
         let set1 = StatusCodeSet([200, 201, 204])
         let set2 = StatusCodeSet([200, 400, 404])
 
@@ -63,7 +63,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertEqual(symmetricDifference, [201, 204, 400, 404])
     }
 
-    func testFormUnion() {
+    func testFormUnion() async throws {
         var set1 = StatusCodeSet([200, 201, 202])
         let set2 = StatusCodeSet([201, 203])
 
@@ -72,7 +72,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertEqual(set1, [200, 201, 202, 203])
     }
 
-    func testFormIntersection() {
+    func testFormIntersection() async throws {
         var set1 = StatusCodeSet([200, 201, 202])
         let set2 = StatusCodeSet([201, 203])
 
@@ -81,7 +81,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertEqual(set1, [201])
     }
 
-    func testFormSymmetricDifference() {
+    func testFormSymmetricDifference() async throws {
         var statusCodeSet = StatusCodeSet([200, 201, 202, 203])
         let other = StatusCodeSet([201, 202, 204, 205])
 
@@ -90,14 +90,14 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertEqual(statusCodeSet, [200, 203, 204, 205])
     }
 
-    func testContains() {
+    func testContains() async throws {
         let statusCodeSet = StatusCodeSet([200, 201, 202, 203])
         XCTAssertTrue(statusCodeSet.contains(200))
         XCTAssertTrue(statusCodeSet.contains(202))
         XCTAssertFalse(statusCodeSet.contains(204))
     }
 
-    func testInsert() {
+    func testInsert() async throws {
         var set = StatusCodeSet([.ok, .created])
         let result = set.insert(.noContent)
         XCTAssertTrue(result.inserted)
@@ -105,21 +105,21 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertTrue(set.contains(.noContent))
     }
 
-    func testRemove() {
+    func testRemove() async throws {
         var set = StatusCodeSet([.ok, .created])
         let result = set.remove(.created)
         XCTAssertEqual(result, .created)
         XCTAssertFalse(set.contains(.created))
     }
 
-    func testUpdate() {
+    func testUpdate() async throws {
         var set = StatusCodeSet([.ok, .created])
         let result = set.update(with: .created)
         XCTAssertEqual(result, .created)
         XCTAssertEqual(set, [.ok, .created])
     }
 
-    func testSuccess() {
+    func testSuccess() async throws {
         let success = StatusCodeSet.success
         XCTAssertTrue(success.contains(.ok))
         XCTAssertTrue(success.contains(.created))
@@ -133,7 +133,7 @@ final class StatusCodeSetTests: XCTestCase {
         XCTAssertTrue(success.contains(.imUsed))
     }
 
-    func testSuccessAndRedirect() {
+    func testSuccessAndRedirect() async throws {
         let successAndRedirect = StatusCodeSet.successAndRedirect
         XCTAssertTrue(successAndRedirect.contains(.ok))
         XCTAssertTrue(successAndRedirect.contains(.created))

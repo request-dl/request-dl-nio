@@ -5,7 +5,13 @@ import PackageDescription
 
 let package = Package(
     name: "RequestDL",
-    platforms: [.macOS(.v10_15), .iOS(.v13), .tvOS(.v13), .watchOS(.v6)],
+    platforms: [
+        .macOS(.v10_15),
+        .iOS(.v13),
+        .tvOS(.v13),
+        .watchOS(.v6),
+        .macCatalyst(.v13)
+    ],
     products: [
         .library(
             name: "RequestDL",
@@ -49,11 +55,6 @@ let package = Package(
         ),
 
         .target(
-            name: "RequestDL",
-            dependencies: ["RequestDLInternals"]
-        ),
-
-        .target(
             name: "_RequestDLExtensions",
             dependencies: [
                 "RequestDLInternals",
@@ -61,6 +62,14 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client")
+            ]
+        ),
+
+        .target(
+            name: "RequestDL",
+            dependencies: [
+                "RequestDLInternals",
+                "_RequestDLExtensions"
             ]
         ),
 

@@ -16,7 +16,7 @@ class RequestBodyTests: XCTestCase {
         }
 
         // When
-        var buffers = try await body.buffers()
+        let buffers = try await body.buffers()
 
         // Then
         XCTAssertEqual(

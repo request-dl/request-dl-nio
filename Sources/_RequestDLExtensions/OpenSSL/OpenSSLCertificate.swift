@@ -5,22 +5,22 @@
 import Foundation
 
 #if os(macOS)
-struct OpenSSLCertificate {
+public struct OpenSSLCertificate {
 
-    let certificateURL: URL
+    public let certificateURL: URL
 
-    let privateKeyURL: URL
+    public let privateKeyURL: URL
 
-    let pkcs12URL: URL?
+    public let pkcs12URL: URL?
 
-    let pkcs12Password: String?
+    public let pkcs12Password: String?
 
-    let certificateDEREncodedURL: URL?
+    public let certificateDEREncodedURL: URL?
 }
 
 extension OpenSSLCertificate {
 
-    func write(into bundle: Bundle) throws -> OpenSSLBundleReference {
+    public func write(into bundle: Bundle) throws -> OpenSSLBundleReference {
         let prefixPath = "OpenSSL.\(UUID())/"
 
         let certificateResource = (
@@ -58,7 +58,7 @@ extension OpenSSLCertificate {
         for resource in resources {
             if let resource {
                 let url = resourceURL.appendingPathComponent(resource.path)
-                try resource.data.write(to: url, options: [.atomic, .noFileProtection])
+                try resource.data.write(to: url, options: [.atomic])
             }
         }
 

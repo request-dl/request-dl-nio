@@ -7,17 +7,17 @@ import XCTest
 
 final class TimeoutSourceTests: XCTestCase {
 
-    func testRequestTimeout() {
+    func testRequestTimeout() async throws {
         let requestTimeout = Timeout.Source.request
         XCTAssertEqual(requestTimeout.rawValue, 1 << 0)
     }
 
-    func testResourceTimeout() {
+    func testResourceTimeout() async throws {
         let resourceTimeout = Timeout.Source.resource
         XCTAssertEqual(resourceTimeout.rawValue, 1 << 1)
     }
 
-    func testAllTimeout() {
+    func testAllTimeout() async throws {
         let allTimeout = Timeout.Source.all
         XCTAssertEqual(allTimeout, [.request, .resource])
     }

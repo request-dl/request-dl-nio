@@ -3,10 +3,9 @@
 */
 
 import Foundation
-@testable import RequestDL
 
 #if os(macOS)
-struct OpenSSLServer {
+public struct OpenSSLServer {
 
     private let certificate: OpenSSLCertificate
 
@@ -14,13 +13,13 @@ struct OpenSSLServer {
 
     private let output: String
 
-    init(_ output: String, certificate: OpenSSLCertificate) {
+    public init(_ output: String, certificate: OpenSSLCertificate) {
         self.output = output
         self.certificate = certificate
         self.clientAuthentication = nil
     }
 
-    init(
+    public init(
         _ output: String,
         certificate: OpenSSLCertificate,
         clientAuthentication: OpenSSLCertificate
@@ -33,7 +32,7 @@ struct OpenSSLServer {
 
 extension OpenSSLServer {
 
-    func start(_ session: () async throws -> Void) async throws {
+    public func start(_ session: () async throws -> Void) async throws {
         let process = try Process.zsh(
             """
             echo -n "\(output)" > index

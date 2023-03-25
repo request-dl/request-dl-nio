@@ -4,6 +4,7 @@
 
 import Foundation
 import RequestDLInternals
+import _RequestDLExtensions
 
 struct Resolver<Content: Property> {
 
@@ -39,7 +40,7 @@ struct Resolver<Content: Property> {
 
         context.make(make)
 
-        let session = await RequestDLInternals.Session(
+        let session = try await RequestDLInternals.Session(
             provider: sessionObject?.provider ?? .shared,
             configuration: make.configuration
         )

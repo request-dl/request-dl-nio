@@ -23,15 +23,15 @@ class ConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetTLSConfiguration_shoudlBeEqual() async throws {
         // Given
-        let tlsConfiguration = Session.TLSConfiguration.clientDefault
+        let secureConnection = Session.SecureConnection(.client)
 
         // When
-        configuration.tlsConfiguration = tlsConfiguration
+        configuration.secureConnection = secureConnection
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
-        XCTAssertEqual(configuration.tlsConfiguration, tlsConfiguration)
+        XCTAssertEqual(configuration.tlsConfiguration, try secureConnection.build())
     }
 
     func testConfiguration_whenSetRedirectConfiguration_shoudlBeEqual() async throws {
@@ -41,7 +41,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.redirectConfiguration = redirectConfiguration
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertEqual(configuration.redirectConfiguration, redirectConfiguration)
@@ -60,7 +60,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.timeout = timeout
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertEqual(configuration.timeout.connect, connect)
@@ -74,7 +74,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.connectionPool = connectionPool
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertEqual(configuration.connectionPool, connectionPool)
@@ -87,7 +87,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.proxy = proxy
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertEqual(configuration.proxy, proxy)
@@ -100,7 +100,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.decompression = decompression
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertEqual(configuration.decompression, decompression)
@@ -124,7 +124,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.setValue(version, forKey: \.httpVersion)
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertEqual(configuration.httpVersion, version)
@@ -137,7 +137,7 @@ class ConfigurationTests: XCTestCase {
         // When
         configuration.setValue(waitForConnectivity, forKey: \.networkFrameworkWaitForConnectivity)
 
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertFalse(configuration.networkFrameworkWaitForConnectivity)
@@ -145,7 +145,7 @@ class ConfigurationTests: XCTestCase {
 
     func testConfiguration_whenInit_shouldBeDefault() async throws {
         // When
-        let configuration = configuration.build()
+        let configuration = try configuration.build()
 
         // Then
         XCTAssertNil(configuration.tlsConfiguration)

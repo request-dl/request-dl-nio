@@ -6,7 +6,7 @@ import Foundation
 
 extension Bundle {
 
-    func resolve(name: String) -> (name: String, subdirectory: String?) {
+    public func resolve(name: String) -> (name: String, subdirectory: String?) {
         guard name.contains("/") else {
             return (name, nil)
         }
@@ -19,7 +19,7 @@ extension Bundle {
         )
     }
 
-    func resolveURL(forResourceName name: String) -> URL? {
+    public func resolveURL(forResourceName name: String) -> URL? {
         let (name, subdirectory) = resolve(name: name)
 
         let resourcesURL = (urls(
@@ -43,5 +43,15 @@ extension Bundle {
                 .dropLast()
                 .joined(separator: ".") == name
         })
+    }
+
+    public var normalizedResourceURL: URL {
+        if let resourceURL {
+            return resourceURL
+        }
+
+        return bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Resource")
     }
 }

@@ -7,7 +7,7 @@ import XCTest
 
 final class CertificateTests: XCTestCase {
 
-    func testCertificateInitialization() {
+    func testCertificateInitialization() async throws {
         // Given
         let name = "myCertificate"
         let bundle = Bundle(for: CertificateTests.self)

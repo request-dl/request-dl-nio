@@ -7,39 +7,39 @@ import XCTest
 
 final class InternetProtocolTests: XCTestCase {
 
-    func testHttpRawValue() {
+    func testHttpRawValue() async throws {
         XCTAssertEqual(InternetProtocol.http, "http")
     }
 
-    func testHttpsRawValue() {
+    func testHttpsRawValue() async throws {
         XCTAssertEqual(InternetProtocol.https, "https")
     }
 
-    func testFtpRawValue() {
+    func testFtpRawValue() async throws {
         XCTAssertEqual(InternetProtocol.ftp, "ftp")
     }
 
-    func testSmtpRawValue() {
+    func testSmtpRawValue() async throws {
         XCTAssertEqual(InternetProtocol.smtp, "smtp")
     }
 
-    func testImapRawValue() {
+    func testImapRawValue() async throws {
         XCTAssertEqual(InternetProtocol.imap, "imap")
     }
 
-    func testPopRawValue() {
+    func testPopRawValue() async throws {
         XCTAssertEqual(InternetProtocol.pop, "pop")
     }
 
-    func testDnsRawValue() {
+    func testDnsRawValue() async throws {
         XCTAssertEqual(InternetProtocol.dns, "dns")
     }
 
-    func testSshRawValue() {
+    func testSshRawValue() async throws {
         XCTAssertEqual(InternetProtocol.ssh, "ssh")
     }
 
-    func testTelnetRawValue() {
+    func testTelnetRawValue() async throws {
         XCTAssertEqual(InternetProtocol.telnet, "telnet")
     }
 }
