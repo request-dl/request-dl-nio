@@ -11,8 +11,6 @@ public struct OpenSSLBundleReference {
 
     public let privateKeyPath: String
 
-    public let pkcs12Path: String?
-
-    public let certificateDEREncodedPath: String?
+    public let pksPath: String?
 }
 #endif

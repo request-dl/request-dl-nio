@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public protocol CertificatePrivateKeyRepresentable {
+public protocol PrivateKeyRepresentable {
 
     func build() throws -> NIOSSLPrivateKey
 }

@@ -26,7 +26,7 @@ extension Session {
         public var certificateVerification: CertificateVerification?
         public var trustRoots: TrustRoots?
         public var additionalTrustRoots: AdditionalTrustRoots?
-        public var privateKey: CertificatePrivateKeyRepresentable?
+        public var privateKey: PrivateKeySource?
         public var signingSignatureAlgorithms: [SignatureAlgorithm]?
         public var verifySignatureAlgorithms: [SignatureAlgorithm]?
         public var sendCANameList: Bool?
@@ -61,6 +61,9 @@ extension Session.SecureConnection {
                 tlsConfiguration.certificateChain = try certificateChain.build()
             }
 
+            if let privateKey {
+                tlsConfiguration.privateKey = try privateKey.build()
+            }
         case .server:
             guard
                 let source = try certificateChain?.build(),
@@ -69,7 +72,7 @@ extension Session.SecureConnection {
 
             tlsConfiguration = .makeServerConfiguration(
                 certificateChain: source,
-                privateKey: .privateKey(privateKey)
+                privateKey: privateKey
             )
         }
 

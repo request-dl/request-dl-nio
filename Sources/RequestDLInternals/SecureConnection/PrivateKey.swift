@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public struct CertificatePrivateKey<Password: CertificatePasswordProvider> {
+public struct PrivateKey<Password: CertificatePasswordProvider> {
 
     enum Source {
         case file(String)
@@ -41,7 +41,7 @@ public struct CertificatePrivateKey<Password: CertificatePasswordProvider> {
     }
 }
 
-extension CertificatePrivateKey: CertificatePrivateKeyRepresentable {
+extension PrivateKey: PrivateKeyRepresentable {
 
     public func build() throws -> NIOSSLPrivateKey {
         let format = format.build()

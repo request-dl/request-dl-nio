@@ -8,8 +8,9 @@ import Foundation
 public enum OpenSSLOption {
 
     /// String password
-    case pkcs12(String)
+    case pks(String)
 
-    case der
+    /// String password
+    case privateKey(String)
 }
 #endif

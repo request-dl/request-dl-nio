@@ -11,11 +11,9 @@ public struct OpenSSLCertificate {
 
     public let privateKeyURL: URL
 
-    public let pkcs12URL: URL?
+    public let pksURL: URL?
 
-    public let pkcs12Password: String?
-
-    public let certificateDEREncodedURL: URL?
+    public let pksPassword: String?
 }
 
 extension OpenSSLCertificate {
@@ -33,12 +31,7 @@ extension OpenSSLCertificate {
             data: try Data(contentsOf: privateKeyURL)
         )
 
-        let pkcs12Resource = try pkcs12URL.map {(
-            path: prefixPath.appending($0.lastPathComponent),
-            data: try Data(contentsOf: $0)
-        )}
-
-        let certificateDEREncodedResource = try certificateDEREncodedURL.map {(
+        let pksResource = try pksURL.map {(
             path: prefixPath.appending($0.lastPathComponent),
             data: try Data(contentsOf: $0)
         )}
@@ -52,7 +45,7 @@ extension OpenSSLCertificate {
 
         let resources = [
             certificateResource, privateKeyResource,
-            pkcs12Resource, certificateDEREncodedResource
+            pksResource
         ]
 
         for resource in resources {
@@ -65,8 +58,7 @@ extension OpenSSLCertificate {
         return .init(
             certificatePath: certificateResource.path,
             privateKeyPath: privateKeyResource.path,
-            pkcs12Path: pkcs12Resource?.path,
-            certificateDEREncodedPath: certificateDEREncodedResource?.path
+            pksPath: pksResource?.path
         )
     }
 }

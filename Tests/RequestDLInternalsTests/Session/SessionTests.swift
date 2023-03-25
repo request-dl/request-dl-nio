@@ -90,7 +90,7 @@ class SessionTests: XCTestCase {
 
     func testSession_whenUploadingFile_shouldBeValid() async throws {
         // Given
-        let server = try OpenSSL("data_task_server", with: [.der]).certificate()
+        let server = try OpenSSL().certificate()
         let output = "Hello World"
 
         let length = 540_672

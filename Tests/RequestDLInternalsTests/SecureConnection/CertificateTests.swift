@@ -10,9 +10,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenPEMBytes_shouldBeValid() async throws {
         // Given
-        let seed = UUID()
-        let certificate = try OpenSSL("\(seed)").certificate()
-        let data = try Data(contentsOf: certificate.certificateURL)
+        let openSSL = try OpenSSL().certificate()
+        let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
         let resolved = try Certificate(Array(data), format: .pem).build()
@@ -23,15 +22,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenDERBytes_shouldBeValid() async throws {
         // Given
-        let seed = UUID()
-        let certificate = try OpenSSL("\(seed)", with: [.der]).certificate()
-
-        guard let url = certificate.certificateDEREncodedURL else {
-            XCTFail("Missing DER URL")
-            return
-        }
-
-        let data = try Data(contentsOf: url)
+        let openSSL = try OpenSSL(format: .der).certificate()
+        let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
         let resolved = try Certificate(Array(data), format: .der).build()
@@ -42,9 +34,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenPEMFile_shouldBeValid() async throws {
         // Given
-        let seed = UUID()
-        let certificate = try OpenSSL("\(seed)").certificate()
-        let path = certificate.certificateURL.path
+        let openSSL = try OpenSSL().certificate()
+        let path = openSSL.certificateURL.path
 
         // When
         let resolved = try Certificate(path, format: .pem).build()
@@ -55,15 +46,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenDERFile_shouldBeValid() async throws {
         // Given
-        let seed = UUID()
-        let certificate = try OpenSSL("\(seed)", with: [.der]).certificate()
-
-        guard let url = certificate.certificateDEREncodedURL else {
-            XCTFail("Missing DER URL")
-            return
-        }
-
-        let path = url.path
+        let openSSL = try OpenSSL(format: .der).certificate()
+        let path = openSSL.certificateURL.path
 
         // When
         let resolved = try Certificate(path, format: .der).build()
