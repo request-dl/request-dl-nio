@@ -2,9 +2,9 @@
  See LICENSE for this package's licensing information.
 */
 
-#if os(macOS) || os(Linux)
 import XCTest
 import NIOSSL
+import _RequestDLServer
 import _RequestDLExtensions
 @testable import RequestDLInternals
 
@@ -12,7 +12,7 @@ class AdditionalTrustRootSourceTests: XCTestCase {
 
     func testTrustRoot_whenCertificate_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL().certificate()
+        let openSSL = Certificates().client()
         let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
@@ -26,22 +26,20 @@ class AdditionalTrustRootSourceTests: XCTestCase {
 
     func testSource_whenFile_shouldBeValid() async throws {
         // Given
-        let seeds = [UUID(), UUID(), UUID()]
-        let openSSL = try seeds.map {
-            try OpenSSL("\($0)").certificate()
-        }
-        let data = try openSSL.map {
+        let certificates = [
+            Certificates().client(),
+            Certificates().server()
+        ]
+
+        let data = try certificates.map {
             try Data(contentsOf: $0.certificateURL)
         }.joined()
 
-        let filePEM = openSSL[0].certificateURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("\(UUID()).merged.pem")
+        let filePEM = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RequestDL.\(UUID())")
+            .appendingPathComponent("merged.pem")
 
-        if !FileManager.default.fileExists(atPath: filePEM.path) {
-            FileManager.default.createFile(atPath: filePEM.path, contents: nil)
-        }
-
+        try filePEM.createPathIfNeeded()
         try Data(data).write(to: filePEM)
 
         // When
@@ -52,4 +50,3 @@ class AdditionalTrustRootSourceTests: XCTestCase {
         XCTAssertEqual(resolved, .file(filePEM.path))
     }
 }
-#endif

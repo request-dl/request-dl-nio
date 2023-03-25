@@ -2,8 +2,8 @@
  See LICENSE for this package's licensing information.
 */
 
-#if os(macOS) || os(Linux)
 import XCTest
+import _RequestDLServer
 import _RequestDLExtensions
 @testable import RequestDLInternals
 
@@ -11,7 +11,7 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenPEMBytes_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL().certificate()
+        let openSSL = Certificates().client()
         let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
@@ -23,7 +23,7 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenDERBytes_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL(format: .der).certificate()
+        let openSSL = Certificates(.der).client()
         let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
@@ -35,7 +35,7 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenPEMFile_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL().certificate()
+        let openSSL = Certificates().client()
         let path = openSSL.certificateURL.path
 
         // When
@@ -47,7 +47,7 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenDERFile_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL(format: .der).certificate()
+        let openSSL = Certificates(.der).client()
         let path = openSSL.certificateURL.path
 
         // When
@@ -57,4 +57,3 @@ class CertificateTests: XCTestCase {
         XCTAssertEqual(resolved, try .init(file: path, format: .der))
     }
 }
-#endif

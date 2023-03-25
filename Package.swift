@@ -46,16 +46,6 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "_RequestDLServer",
-            dependencies: [
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOHTTP2", package: "swift-nio-http2")
-            ]
-        ),
-
-        .target(
             name: "RequestDLInternals",
             dependencies: [
                 .product(name: "NIO", package: "swift-nio"),
@@ -87,6 +77,17 @@ let package = Package(
             ]
         ),
 
+        .target(
+            name: "_RequestDLServer",
+            dependencies: [
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOHTTP2", package: "swift-nio-http2")
+            ],
+            resources: [.process("Resources")]
+        ),
+
         .testTarget(
             name: "RequestDLInternalsTests",
             dependencies: [
@@ -104,8 +105,9 @@ let package = Package(
             name: "RequestDLTests",
             dependencies: [
                 "RequestDL",
-                "RequestDLInternals",
-                "_RequestDLExtensions"
+                "_RequestDLServer",
+                "_RequestDLExtensions",
+                "RequestDLInternals"
             ],
             resources: [.process("Resources")]
         )

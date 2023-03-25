@@ -4,6 +4,7 @@
 
 import XCTest
 import NIOSSL
+import _RequestDLServer
 import _RequestDLExtensions
 @testable import RequestDLInternals
 
@@ -21,10 +22,9 @@ class TrustRootsTests: XCTestCase {
     }
 
 
-    #if os(macOS) || os(Linux)
     func testRoots_whenCertificate_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL("\(UUID())").certificate()
+        let openSSL = Certificates().client()
         let data = try Data(contentsOf: openSSL.certificateURL)
 
         // When
@@ -33,12 +33,10 @@ class TrustRootsTests: XCTestCase {
         // Then
         XCTAssertEqual(resolved, try .certificates(NIOSSLCertificate.fromPEMBytes(Array(data))))
     }
-    #endif
-    
-    #if os(macOS) || os(Linux)
+
     func testRoots_whenFile_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL("\(UUID())").certificate()
+        let openSSL = Certificates().client()
 
         // When
         let resolved = try TrustRoots.file(openSSL.certificateURL.path).build()
@@ -46,5 +44,4 @@ class TrustRootsTests: XCTestCase {
         // Then
         XCTAssertEqual(resolved, .file(openSSL.certificateURL.path))
     }
-    #endif
 }

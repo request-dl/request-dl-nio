@@ -2,9 +2,9 @@
  See LICENSE for this package's licensing information.
 */
 
-#if os(macOS) || os(Linux)
 import XCTest
 import NIOSSL
+import _RequestDLServer
 import _RequestDLExtensions
 @testable import RequestDLInternals
 
@@ -12,7 +12,7 @@ class CertificatePrivateKeyTests: XCTestCase {
 
     func testPrivate_whenPEM_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL().certificate()
+        let openSSL = Certificates().client()
         let data = try Data(contentsOf: openSSL.privateKeyURL)
 
         // When
@@ -24,7 +24,7 @@ class CertificatePrivateKeyTests: XCTestCase {
 
     func testPrivate_whenDER_shouldBeValid() async throws {
         // Given
-        let openSSL = try OpenSSL(format: .der).certificate()
+        let openSSL = Certificates(.der).client()
 
         let data = try Data(contentsOf: openSSL.privateKeyURL)
 
@@ -38,7 +38,7 @@ class CertificatePrivateKeyTests: XCTestCase {
     func testPrivate_whenPEMWithPassword_shouldBeValid() async throws {
         // Given
         let password = "password123"
-        let openSSL = try OpenSSL(with: [.privateKey(password)]).certificate()
+        let openSSL = Certificates().client(password: true)
 
         let data = try Data(contentsOf: openSSL.privateKeyURL)
 
@@ -56,7 +56,7 @@ class CertificatePrivateKeyTests: XCTestCase {
     func testPrivate_whenDERWithPassword_shouldBeValid() async throws {
         // Given
         let password = "password123"
-        let openSSL = try OpenSSL(format: .der, with: [.privateKey(password)]).certificate()
+        let openSSL = Certificates(.der).client(password: true)
 
         let data = try Data(contentsOf: openSSL.privateKeyURL)
 
@@ -71,4 +71,3 @@ class CertificatePrivateKeyTests: XCTestCase {
         })
     }
 }
-#endif

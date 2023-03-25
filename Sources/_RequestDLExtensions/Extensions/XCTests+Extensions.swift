@@ -2,9 +2,9 @@
  See LICENSE for this package's licensing information.
 */
 
+#if swift(<5.8)
 import XCTest
 
-#if swift(<5.8)
 extension XCTestCase {
 
     public func fulfillment(

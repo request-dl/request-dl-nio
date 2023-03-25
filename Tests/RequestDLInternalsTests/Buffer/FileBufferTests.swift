@@ -18,13 +18,13 @@ class FileBufferTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferTests.txt")
 
-        try removeFileIfNeeded(fileURL)
+        try fileURL.removeIfNeeded()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
 
-        try removeFileIfNeeded(fileURL)
+        try fileURL.removeIfNeeded()
         fileURL = nil
     }
 
@@ -342,7 +342,7 @@ class FileBufferTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferOtherFile.txt")
 
-        defer { try? removeFileIfNeeded(otherFile) }
+        defer { try? otherFile.removeIfNeeded() }
 
         let data = Data("Hello World".utf8)
         let otherData = Data("Earth is a small planet to live".utf8)
@@ -511,14 +511,5 @@ class FileBufferTests: XCTestCase {
 
         // Then
         XCTAssertNil(data)
-    }
-}
-
-extension FileBufferTests {
-
-    func removeFileIfNeeded(_ url: URL) throws {
-        if FileManager.default.fileExists(atPath: url.path) {
-            try FileManager.default.removeItem(at: url)
-        }
     }
 }

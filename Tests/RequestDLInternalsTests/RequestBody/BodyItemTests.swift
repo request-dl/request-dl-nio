@@ -84,11 +84,8 @@ class BodyItemTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("InitURL.text")
 
-        defer { try? FileManager.default.removeItem(at: url) }
-
-        if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-        }
+        defer { try? url.removeIfNeeded() }
+        try url.createPathIfNeeded()
 
         let data = Data("Hello world".utf8)
         try data.write(to: url)
