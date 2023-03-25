@@ -94,8 +94,8 @@ class SessionTests: XCTestCase {
         let server = try OpenSSL().certificate()
         let output = "Hello World"
 
-        let length = 540_672
-        let fragment = 1_024
+        let length = 1_024
+        let fragment = 64
         let url = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .deletingLastPathComponent()

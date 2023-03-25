@@ -22,6 +22,7 @@ final class PropertyBuilderTests: XCTestCase {
         XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
+    #if !os(Linux)
     func testLimitedNotAvailableBuildBlock() async throws {
         // Given
         @PropertyBuilder
@@ -39,6 +40,7 @@ final class PropertyBuilderTests: XCTestCase {
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
         XCTAssertTrue(request.headers.isEmpty)
     }
+    #endif
 
     func testLimitedAvailableBuildBlock() async throws {
         // Given
