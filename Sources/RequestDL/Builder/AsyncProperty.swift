@@ -16,7 +16,7 @@ import Foundation
      RequestMethod(.get)
 
      AsyncProperty {
-         if let id = await getCurrentUserID() {
+         if let id = try await getCurrentUserID() {
              Path("\(id)")
          }
      }
