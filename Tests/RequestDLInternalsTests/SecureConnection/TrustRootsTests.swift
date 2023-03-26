@@ -21,8 +21,8 @@ class TrustRootsTests: XCTestCase {
 
     func testRoots_whenCertificate_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates().client()
-        let data = try Data(contentsOf: openSSL.certificateURL)
+        let certificates = Certificates().client()
+        let data = try Data(contentsOf: certificates.certificateURL)
 
         // When
         let resolved = try TrustRoots.certificate(.bytes(Array(data))).build()
@@ -33,12 +33,12 @@ class TrustRootsTests: XCTestCase {
 
     func testRoots_whenFile_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates().client()
+        let certificates = Certificates().client()
 
         // When
-        let resolved = try TrustRoots.file(openSSL.certificateURL.path).build()
+        let resolved = try TrustRoots.file(certificates.certificateURL.path).build()
 
         // Then
-        XCTAssertEqual(resolved, .file(openSSL.certificateURL.path))
+        XCTAssertEqual(resolved, .file(certificates.certificateURL.path))
     }
 }

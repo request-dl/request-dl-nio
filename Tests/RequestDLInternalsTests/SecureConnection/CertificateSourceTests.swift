@@ -10,8 +10,8 @@ class CertificateSourceTests: XCTestCase {
 
     func testSource_whenCertificate_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates().client()
-        let data = try Data(contentsOf: openSSL.certificateURL)
+        let certificates = Certificates().client()
+        let data = try Data(contentsOf: certificates.certificateURL)
 
         // When
         let certificatePEM = Certificate(Array(data), format: .pem)

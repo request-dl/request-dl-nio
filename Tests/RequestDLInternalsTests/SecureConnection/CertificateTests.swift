@@ -9,8 +9,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenPEMBytes_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates().client()
-        let data = try Data(contentsOf: openSSL.certificateURL)
+        let certificates = Certificates().client()
+        let data = try Data(contentsOf: certificates.certificateURL)
 
         // When
         let resolved = try Certificate(Array(data), format: .pem).build()
@@ -21,8 +21,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenDERBytes_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates(.der).client()
-        let data = try Data(contentsOf: openSSL.certificateURL)
+        let certificates = Certificates(.der).client()
+        let data = try Data(contentsOf: certificates.certificateURL)
 
         // When
         let resolved = try Certificate(Array(data), format: .der).build()
@@ -33,8 +33,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenPEMFile_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates().client()
-        let path = openSSL.certificateURL.path
+        let certificates = Certificates().client()
+        let path = certificates.certificateURL.path
 
         // When
         let resolved = try Certificate(path, format: .pem).build()
@@ -45,8 +45,8 @@ class CertificateTests: XCTestCase {
 
     func testCertificate_whenDERFile_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates(.der).client()
-        let path = openSSL.certificateURL.path
+        let certificates = Certificates(.der).client()
+        let path = certificates.certificateURL.path
 
         // When
         let resolved = try Certificate(path, format: .der).build()

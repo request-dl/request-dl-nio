@@ -10,8 +10,8 @@ class CertificatePrivateKeyTests: XCTestCase {
 
     func testPrivate_whenPEM_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates().client()
-        let data = try Data(contentsOf: openSSL.privateKeyURL)
+        let certificates = Certificates().client()
+        let data = try Data(contentsOf: certificates.privateKeyURL)
 
         // When
         let resolved = try PrivateKey(Array(data), format: .pem).build()
@@ -22,9 +22,9 @@ class CertificatePrivateKeyTests: XCTestCase {
 
     func testPrivate_whenDER_shouldBeValid() async throws {
         // Given
-        let openSSL = Certificates(.der).client()
+        let certificates = Certificates(.der).client()
 
-        let data = try Data(contentsOf: openSSL.privateKeyURL)
+        let data = try Data(contentsOf: certificates.privateKeyURL)
 
         // When
         let resolved = try PrivateKey(Array(data), format: .der).build()
@@ -36,9 +36,9 @@ class CertificatePrivateKeyTests: XCTestCase {
     func testPrivate_whenPEMWithPassword_shouldBeValid() async throws {
         // Given
         let password = "password123"
-        let openSSL = Certificates().client(password: true)
+        let certificates = Certificates().client(password: true)
 
-        let data = try Data(contentsOf: openSSL.privateKeyURL)
+        let data = try Data(contentsOf: certificates.privateKeyURL)
 
         // When
         let resolved = try PrivateKey(Array(data), format: .pem) {
@@ -54,9 +54,9 @@ class CertificatePrivateKeyTests: XCTestCase {
     func testPrivate_whenDERWithPassword_shouldBeValid() async throws {
         // Given
         let password = "password123"
-        let openSSL = Certificates(.der).client(password: true)
+        let certificates = Certificates(.der).client(password: true)
 
-        let data = try Data(contentsOf: openSSL.privateKeyURL)
+        let data = try Data(contentsOf: certificates.privateKeyURL)
 
         // When
         let resolved = try PrivateKey(Array(data), format: .der) {
