@@ -45,7 +45,7 @@ public struct FormGroup<Content: Property>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
+    ) async throws {
         let node = Node(
             root: context.root,
             object: EmptyObject(property),
@@ -53,7 +53,7 @@ public struct FormGroup<Content: Property>: Property {
         )
 
         let newContext = Context(node)
-        await Content.makeProperty(property.content, newContext)
+        try await Content.makeProperty(property.content, newContext)
 
         let parameters = newContext
             .findCollection(FormObject.self)

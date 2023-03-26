@@ -16,7 +16,7 @@ extension PrimitiveProperty {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
+    ) async throws {
         let node = Node(
             root: context.root,
             object: property.makeObject(),
@@ -29,6 +29,6 @@ extension PrimitiveProperty {
             return
         }
 
-        await Body.makeProperty(property.body, newContext)
+        try await Body.makeProperty(property.body, newContext)
     }
 }

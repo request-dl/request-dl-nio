@@ -27,7 +27,7 @@ public struct AsyncProperty<Content: Property>: Property {
 
     public typealias Body = Never
 
-    private let content: () async -> Content
+    private let content: () async throws -> Content
 
     /**
      Initializes with an asynchronous content provided.
@@ -35,7 +35,7 @@ public struct AsyncProperty<Content: Property>: Property {
      - Parameters:
         - content: The content of the request to be built.
      */
-    public init(@PropertyBuilder content: @escaping () async -> Content) {
+    public init(@PropertyBuilder content: @escaping () async throws -> Content) {
         self.content = content
     }
 
@@ -48,7 +48,7 @@ public struct AsyncProperty<Content: Property>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
-        await Content.makeProperty(property.content(), context)
+    ) async throws {
+        try await Content.makeProperty(property.content(), context)
     }
 }

@@ -16,7 +16,7 @@ final class AsyncPropertyTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             AsyncProperty {
                 if let apiKey = await apiKey {
                     Authorization(.bearer, token: apiKey)

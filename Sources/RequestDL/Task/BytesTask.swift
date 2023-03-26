@@ -61,7 +61,7 @@ extension BytesTask {
     */
     public func result() async throws -> TaskResult<URLSession.AsyncBytes> {
         let delegate = DelegateProxy()
-        let (session, request) = await Resolver(content).make(delegate)
+        let (session, request) = try await Resolver(content).make(delegate)
 
         defer { session.finishTasksAndInvalidate() }
 

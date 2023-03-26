@@ -15,7 +15,7 @@ final class HeadersTests: XCTestCase {
             Headers.Any("password", forKey: "xxx-api-key")
         }
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/javascript")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
@@ -23,7 +23,7 @@ final class HeadersTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "xxx-api-key"), "password")
     }
 
-    func testCollisionHeaders() async {
+    func testCollisionHeaders() async throws {
         let property = TestProperty {
             Headers.ContentType(.javascript)
             Headers.ContentType(.webp)
@@ -32,14 +32,14 @@ final class HeadersTests: XCTestCase {
             Headers.Any("password123", forKey: "xxx-api-key")
         }
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/webp")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/jpeg")
         XCTAssertEqual(request.value(forHTTPHeaderField: "xxx-api-key"), "password123")
     }
 
-    func testCollisionHeadersWithGroup() async {
+    func testCollisionHeadersWithGroup() async throws {
         let property = TestProperty {
             Headers.ContentType(.javascript)
             Headers.Accept(.jpeg)
@@ -51,14 +51,14 @@ final class HeadersTests: XCTestCase {
             }
         }
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/webp")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "image/jpeg")
         XCTAssertEqual(request.value(forHTTPHeaderField: "xxx-api-key"), "password123")
     }
 
-    func testCombinedHeadersWithGroup() async {
+    func testCombinedHeadersWithGroup() async throws {
         let property = TestProperty {
             Headers.Host("localhost", port: "8080")
 
@@ -71,7 +71,7 @@ final class HeadersTests: XCTestCase {
             Headers.Origin("google.com")
         }
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Host"), "localhost:8080")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/webp")
@@ -80,7 +80,7 @@ final class HeadersTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "google.com")
     }
 
-    func testInvalidGroup() async {
+    func testInvalidGroup() async throws {
         // Given
         let property = TestProperty {
             BaseURL("localhost")
@@ -90,7 +90,7 @@ final class HeadersTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         // Then
         XCTAssertEqual(request.url?.absoluteString, "https://localhost")

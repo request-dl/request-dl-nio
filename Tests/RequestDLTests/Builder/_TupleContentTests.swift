@@ -7,7 +7,7 @@ import XCTest
 
 final class _TupleContentTests: XCTestCase {
 
-    func testTupleTwoElementsBuilder() async {
+    func testTupleTwoElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -16,7 +16,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -28,7 +28,7 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
     }
 
-    func testTupleThreeElementsBuilder() async {
+    func testTupleThreeElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -38,7 +38,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -52,7 +52,7 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
     }
 
-    func testTupleFourElementsBuilder() async {
+    func testTupleFourElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -63,7 +63,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -78,7 +78,7 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
     }
 
-    func testTupleFiveElementsBuilder() async {
+    func testTupleFiveElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -90,7 +90,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -110,7 +110,7 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
     }
 
-    func testTupleSixElementsBuilder() async {
+    func testTupleSixElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -123,7 +123,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = await resolve(result)
+        let (session, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -147,7 +147,7 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 40)
     }
 
-    func testTupleSevenElementsBuilder() async {
+    func testTupleSevenElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -161,7 +161,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = await resolve(result)
+        let (session, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(
@@ -186,7 +186,7 @@ final class _TupleContentTests: XCTestCase {
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 40)
     }
 
-    func testTupleEightElementsBuilder() async {
+    func testTupleEightElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -201,7 +201,7 @@ final class _TupleContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = await resolve(result)
+        let (session, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _TupleContent<(

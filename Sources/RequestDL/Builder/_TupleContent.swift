@@ -8,9 +8,9 @@ import Foundation
 /// to be used directly by clients of this framework.
 public struct _TupleContent<T>: Property {
 
-    private let transformHandler: (Context) async -> Void
+    private let transformHandler: (Context) async throws -> Void
 
-    init(transform: @escaping (Context) async -> Void) {
+    init(transform: @escaping (Context) async throws -> Void) {
         self.transformHandler = transform
     }
 
@@ -23,7 +23,7 @@ public struct _TupleContent<T>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
-        await property.transformHandler(context)
+    ) async throws {
+        try await property.transformHandler(context)
     }
 }

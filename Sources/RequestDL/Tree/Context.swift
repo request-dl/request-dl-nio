@@ -79,15 +79,15 @@ extension Context {
 
 extension Context {
 
-    private static func make(_ make: Make, in node: NodeType) {
-        node.fetchObject()?.makeProperty(make)
+    private static func make(_ make: Make, in node: NodeType) async throws {
+        try await node.fetchObject()?.makeProperty(make)
 
         for node in node.children {
-            self.make(make, in: node)
+            try await self.make(make, in: node)
         }
     }
 
-    func make(_ make: Make) {
-        Self.make(make, in: root)
+    func make(_ make: Make) async throws {
+        try await Self.make(make, in: root)
     }
 }

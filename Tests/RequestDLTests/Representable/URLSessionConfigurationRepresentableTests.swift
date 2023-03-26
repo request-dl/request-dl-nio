@@ -21,7 +21,7 @@ final class URLSessionConfigurationRepresentableTests: XCTestCase {
         let property = URLSessionConfigurationMock()
 
         // When
-        let (session, _) = await resolve(TestProperty(property))
+        let (session, _) = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, 15)

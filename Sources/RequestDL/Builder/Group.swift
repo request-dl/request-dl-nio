@@ -45,7 +45,7 @@ public struct Group<Content: Property>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
-        await Content.makeProperty(property.content, context)
+    ) async throws {
+        try await Content.makeProperty(property.content, context)
     }
 }

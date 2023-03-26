@@ -51,9 +51,9 @@ public struct ForEach<Data: Collection, Content: Property>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
+    ) async throws {
         for property in property.data.map(property.map) {
-            await Content.makeProperty(property, context)
+            try await Content.makeProperty(property, context)
         }
     }
 }

@@ -7,7 +7,7 @@ import XCTest
 
 final class _ConditionalContentTests: XCTestCase {
 
-    func testConditionalFirstBuilder() async {
+    func testConditionalFirstBuilder() async throws {
         // Given
         let chooseFirst = true
 
@@ -21,7 +21,7 @@ final class _ConditionalContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _ConditionalContent<BaseURL, Headers.Origin>)
@@ -29,7 +29,7 @@ final class _ConditionalContentTests: XCTestCase {
         XCTAssertNil(request.allHTTPHeaderFields)
     }
 
-    func testConditionalSecondBuilder() async {
+    func testConditionalSecondBuilder() async throws {
         // Given
         let chooseFirst = false
 
@@ -43,7 +43,7 @@ final class _ConditionalContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _ConditionalContent<Headers.Origin, BaseURL>)

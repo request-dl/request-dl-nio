@@ -6,5 +6,5 @@ import Foundation
 
 protocol NodeObject {
 
-    func makeProperty(_ make: Make)
+    func makeProperty(_ make: Make) async throws
 }

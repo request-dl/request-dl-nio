@@ -15,7 +15,7 @@ final class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is Headers.ContentType)
@@ -32,7 +32,7 @@ final class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         print(type(of: property))
@@ -50,7 +50,7 @@ final class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         print(type(of: property))

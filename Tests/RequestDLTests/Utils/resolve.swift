@@ -8,6 +8,6 @@ import Foundation
 func resolve<Content: Property>(
     _ content: Content,
     in delegate: DelegateProxy = .init()
-) async -> (URLSession, URLRequest) {
-    await Resolver(content).make(delegate)
+) async throws -> (URLSession, URLRequest) {
+    try await Resolver(content).make(delegate)
 }

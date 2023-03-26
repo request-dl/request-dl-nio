@@ -7,105 +7,105 @@ import XCTest
 
 final class HeadersContentTypeTests: XCTestCase {
 
-    func testHeadersJsonContentType() async {
+    func testHeadersJsonContentType() async throws {
         let property = TestProperty(Headers.ContentType(.json))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
     }
 
-    func testHeadersXmlContentType() async {
+    func testHeadersXmlContentType() async throws {
         let property = TestProperty(Headers.ContentType(.xml))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/xml")
     }
 
-    func testHeadersFormDataContentType() async {
+    func testHeadersFormDataContentType() async throws {
         let property = TestProperty(Headers.ContentType(.formData))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "form-data")
     }
 
-    func testHeadersFormURLEncodedContentType() async {
+    func testHeadersFormURLEncodedContentType() async throws {
         let property = TestProperty(Headers.ContentType(.formURLEncoded))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/x-www-form-urlencoded")
     }
 
-    func testHeadersTextContentType() async {
+    func testHeadersTextContentType() async throws {
         let property = TestProperty(Headers.ContentType(.text))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/plain")
     }
 
-    func testHeadersHtmlContentType() async {
+    func testHeadersHtmlContentType() async throws {
         let property = TestProperty(Headers.ContentType(.html))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/html")
     }
 
-    func testHeadersCssContentType() async {
+    func testHeadersCssContentType() async throws {
         let property = TestProperty(Headers.ContentType(.css))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/css")
     }
 
-    func testHeadersJavascriptContentType() async {
+    func testHeadersJavascriptContentType() async throws {
         let property = TestProperty(Headers.ContentType(.javascript))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/javascript")
     }
 
-    func testHeadersGifContentType() async {
+    func testHeadersGifContentType() async throws {
         let property = TestProperty(Headers.ContentType(.gif))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/gif")
     }
 
-    func testHeadersPngContentType() async {
+    func testHeadersPngContentType() async throws {
         let property = TestProperty(Headers.ContentType(.png))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/png")
     }
 
-    func testHeadersJpegContentType() async {
+    func testHeadersJpegContentType() async throws {
         let property = TestProperty(Headers.ContentType(.jpeg))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
     }
 
-    func testHeadersBmpContentType() async {
+    func testHeadersBmpContentType() async throws {
         let property = TestProperty(Headers.ContentType(.bmp))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/bmp")
     }
 
-    func testHeadersWebpContentType() async {
+    func testHeadersWebpContentType() async throws {
         let property = TestProperty(Headers.ContentType(.webp))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/webp")
     }
 
-    func testHeadersMidiContentType() async {
+    func testHeadersMidiContentType() async throws {
         let property = TestProperty(Headers.ContentType(.midi))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "audio/midi")
     }
 
-    func testHeadersMpegContentType() async {
+    func testHeadersMpegContentType() async throws {
         let property = TestProperty(Headers.ContentType(.mpeg))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "audio/mpeg")
     }
 
-    func testHeadersWavContentType() async {
+    func testHeadersWavContentType() async throws {
         let property = TestProperty(Headers.ContentType(.wav))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "audio/wav")
     }
 
-    func testHeadersPdfContentType() async {
+    func testHeadersPdfContentType() async throws {
         let property = TestProperty(Headers.ContentType(.pdf))
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/pdf")
     }
 
