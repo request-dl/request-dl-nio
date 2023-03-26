@@ -20,12 +20,12 @@ extension Headers {
             self.next = next
         }
 
-        func makeProperty(_ make: Make) {
+        func makeProperty(_ make: Make) async throws {
             let value = "\(value)"
             if !value.isEmpty {
                 make.request.headers.setValue(value, forKey: key)
             }
-            next?.makeProperty(make)
+            try await next?.makeProperty(make)
         }
     }
 }

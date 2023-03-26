@@ -14,14 +14,14 @@ struct Resolver<Content: Property> {
         self.content = content
     }
 
-    private func resolve() async -> Context {
+    private func resolve() async throws  -> Context {
         let context = Context(RootNode())
-        await Content.makeProperty(content, context)
+        try await Content.makeProperty(content, context)
         return context
     }
 
     func make() async throws -> (RequestDLInternals.Session, Request) {
-        let context = await resolve()
+        let context = try await resolve()
 
         guard let object = context.find(BaseURL.Object.self) else {
             fatalError(
@@ -38,7 +38,7 @@ struct Resolver<Content: Property> {
             configuration: sessionObject?.configuration ?? .init()
         )
 
-        context.make(make)
+        try await context.make(make)
 
         let session = try await RequestDLInternals.Session(
             provider: sessionObject?.provider ?? .shared,
@@ -51,8 +51,8 @@ struct Resolver<Content: Property> {
 
 extension Resolver {
 
-    func debugPrint() async {
-        let context = await resolve()
+    func debugPrint() async throws {
+        let context = try await resolve()
         context.debug()
     }
 }

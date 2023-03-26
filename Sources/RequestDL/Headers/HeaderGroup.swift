@@ -43,7 +43,7 @@ public struct HeaderGroup<Content: Property>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
+    ) async throws {
         let node = Node(
             root: context.root,
             object: EmptyObject(property),
@@ -51,7 +51,7 @@ public struct HeaderGroup<Content: Property>: Property {
         )
 
         let newContext = Context(node)
-        await Content.makeProperty(property.parameter, newContext)
+        try await Content.makeProperty(property.parameter, newContext)
 
         let parameters = newContext.findCollection(Headers.Object.self).map {
             ($0.key, $0.value)
