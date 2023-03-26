@@ -7,12 +7,12 @@ import Foundation
 /// A type-erasing wrapper that can represent any `Property` instance.
 public struct AnyProperty: Property {
 
-    private let resolver: (Context) async -> Void
+    private let resolver: (Context) async throws -> Void
 
     /// Initializes a new instance of `AnyProperty` with the given property `Content`.
     public init<Content: Property>(_ property: Content) {
         resolver = {
-            await Content.makeProperty(property, $0)
+            try await Content.makeProperty(property, $0)
         }
     }
 
@@ -23,7 +23,7 @@ public struct AnyProperty: Property {
     public static func makeProperty(
         _ property: AnyProperty,
         _ context: Context
-    ) async {
-        await property.resolver(context)
+    ) async throws {
+        try await property.resolver(context)
     }
 }

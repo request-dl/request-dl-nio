@@ -7,20 +7,20 @@ import XCTest
 
 final class GroupTests: XCTestCase {
 
-    func testSingleGroup() async {
+    func testSingleGroup() async throws {
         // Given
         let property = Group {
             BaseURL("google.com")
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertEqual(request.url?.absoluteString, "https://google.com")
     }
 
-    func testMultipleGroup() async {
+    func testMultipleGroup() async throws {
         // Given
         let property = Group {
             BaseURL("google.com")
@@ -29,7 +29,7 @@ final class GroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertEqual(

@@ -7,7 +7,7 @@ import XCTest
 
 final class _OptionalContentTests: XCTestCase {
 
-    func testConditionActiveBuilder() async {
+    func testConditionActiveBuilder() async throws {
         // Given
         let applyCondition = true
 
@@ -19,7 +19,7 @@ final class _OptionalContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(result)
+        let (_, request) = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _OptionalContent<BaseURL>)
@@ -27,7 +27,7 @@ final class _OptionalContentTests: XCTestCase {
         XCTAssertNil(request.allHTTPHeaderFields)
     }
 
-    func testConditionDisableBuilder() async {
+    func testConditionDisableBuilder() async throws {
         // Given
         let applyCondition = false
 
@@ -39,7 +39,7 @@ final class _OptionalContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty(result))
+        let (_, request) = try await resolve(TestProperty(result))
 
         // Then
         XCTAssertTrue(result is _OptionalContent<BaseURL>)

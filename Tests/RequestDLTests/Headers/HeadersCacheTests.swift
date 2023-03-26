@@ -25,7 +25,7 @@ final class HeadersCacheTests: XCTestCase {
         XCTAssertFalse(cache.isImmutable)
     }
 
-    func testInitializationWithPolicy() async {
+    func testInitializationWithPolicy() async throws {
         // Given
         let policy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
         let memoryCapacity = 10_000_000
@@ -38,7 +38,7 @@ final class HeadersCacheTests: XCTestCase {
             diskCapacity: diskCapacity
         )
 
-        let (session, request) = await resolve(TestProperty(cache))
+        let (session, request) = try await resolve(TestProperty(cache))
 
         // Then
         XCTAssertTrue(cache.isCached)
@@ -61,7 +61,7 @@ final class HeadersCacheTests: XCTestCase {
         XCTAssertEqual(session.configuration.urlCache?.diskCapacity, diskCapacity)
     }
 
-    func testModifiedCacheWithAllProperties() async {
+    func testModifiedCacheWithAllProperties() async throws {
         // Given
         let policy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
         let cache = Headers.Cache(policy)
@@ -82,7 +82,7 @@ final class HeadersCacheTests: XCTestCase {
             .immutable()
 
         // When
-        let (session, request) = await resolve(TestProperty(modifiedCache))
+        let (session, request) = try await resolve(TestProperty(modifiedCache))
 
         // Then
         XCTAssertFalse(modifiedCache.isCached)
@@ -111,13 +111,13 @@ final class HeadersCacheTests: XCTestCase {
         )
     }
 
-    func testPublicCache() async {
+    func testPublicCache() async throws {
         // Given
         let cache = Headers.Cache()
             .public(true)
 
         // When
-        let (_, request) = await resolve(TestProperty(cache))
+        let (_, request) = try await resolve(TestProperty(cache))
 
         // Then
         XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "public")

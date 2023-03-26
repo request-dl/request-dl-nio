@@ -9,7 +9,7 @@ final class HeaderGroupTests: XCTestCase {
 
     func testHeaderGroupWithEmptyValue() async throws {
         let property = TestProperty(HeaderGroup {})
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
         XCTAssertTrue(request.allHTTPHeaderFields?.isEmpty ?? true)
     }
 
@@ -21,7 +21,7 @@ final class HeaderGroupTests: XCTestCase {
             "xxx-api-key": "password"
         ]))
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/html")
@@ -37,7 +37,7 @@ final class HeaderGroupTests: XCTestCase {
             Headers.Any("password", forKey: "xxx-api-key")
         })
 
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "text/javascript")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")

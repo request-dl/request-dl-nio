@@ -127,8 +127,8 @@ extension PropertyBuilder {
         _ c1: C1
     ) -> _TupleContent<(C0, C1)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
         }
     }
 
@@ -142,9 +142,9 @@ extension PropertyBuilder {
         _ c2: C2
     ) -> _TupleContent<(C0, C1, C2)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
-            await C2.makeProperty(c2, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
+            try await C2.makeProperty(c2, $0)
         }
     }
 
@@ -160,10 +160,10 @@ extension PropertyBuilder {
         _ c3: C3
     ) -> _TupleContent<(C0, C1, C2, C3)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
-            await C2.makeProperty(c2, $0)
-            await C3.makeProperty(c3, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
+            try await C2.makeProperty(c2, $0)
+            try await C3.makeProperty(c3, $0)
         }
     }
 
@@ -181,11 +181,11 @@ extension PropertyBuilder {
         _ c4: C4
     ) -> _TupleContent<(C0, C1, C2, C3, C4)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
-            await C2.makeProperty(c2, $0)
-            await C3.makeProperty(c3, $0)
-            await C4.makeProperty(c4, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
+            try await C2.makeProperty(c2, $0)
+            try await C3.makeProperty(c3, $0)
+            try await C4.makeProperty(c4, $0)
         }
     }
 
@@ -205,12 +205,12 @@ extension PropertyBuilder {
         _ c5: C5
     ) -> _TupleContent<(C0, C1, C2, C3, C4, C5)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
-            await C2.makeProperty(c2, $0)
-            await C3.makeProperty(c3, $0)
-            await C4.makeProperty(c4, $0)
-            await C5.makeProperty(c5, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
+            try await C2.makeProperty(c2, $0)
+            try await C3.makeProperty(c3, $0)
+            try await C4.makeProperty(c4, $0)
+            try await C5.makeProperty(c5, $0)
         }
     }
 
@@ -232,13 +232,13 @@ extension PropertyBuilder {
         _ c6: C6
     ) -> _TupleContent<(C0, C1, C2, C3, C4, C5, C6)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
-            await C2.makeProperty(c2, $0)
-            await C3.makeProperty(c3, $0)
-            await C4.makeProperty(c4, $0)
-            await C5.makeProperty(c5, $0)
-            await C6.makeProperty(c6, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
+            try await C2.makeProperty(c2, $0)
+            try await C3.makeProperty(c3, $0)
+            try await C4.makeProperty(c4, $0)
+            try await C5.makeProperty(c5, $0)
+            try await C6.makeProperty(c6, $0)
         }
     }
 
@@ -262,14 +262,14 @@ extension PropertyBuilder {
         _ c7: C7
     ) -> _TupleContent<(C0, C1, C2, C3, C4, C5, C6, C7)> {
         _TupleContent {
-            await C0.makeProperty(c0, $0)
-            await C1.makeProperty(c1, $0)
-            await C2.makeProperty(c2, $0)
-            await C3.makeProperty(c3, $0)
-            await C4.makeProperty(c4, $0)
-            await C5.makeProperty(c5, $0)
-            await C6.makeProperty(c6, $0)
-            await C7.makeProperty(c7, $0)
+            try await C0.makeProperty(c0, $0)
+            try await C1.makeProperty(c1, $0)
+            try await C2.makeProperty(c2, $0)
+            try await C3.makeProperty(c3, $0)
+            try await C4.makeProperty(c4, $0)
+            try await C5.makeProperty(c5, $0)
+            try await C6.makeProperty(c6, $0)
+            try await C7.makeProperty(c7, $0)
         }
     }
 }

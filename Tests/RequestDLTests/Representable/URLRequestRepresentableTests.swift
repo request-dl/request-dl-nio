@@ -19,7 +19,7 @@ final class URLRequestRepresentableTests: XCTestCase {
         let property = URLRequestMock()
 
         // When
-        let (_, request) = await resolve(TestProperty(property))
+        let (_, request) = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertEqual(request.value(forHTTPHeaderField: "api_key"), "password")

@@ -7,7 +7,7 @@ import XCTest
 
 final class RequestBackgroundAdaptorTests: XCTestCase {
 
-    func testBackgroundAdaptor() async {
+    func testBackgroundAdaptor() async throws {
         // Given
         let backgroundAdaptor = RequestBackgroundAdaptor()
         let backgroundService = BackgroundService.shared

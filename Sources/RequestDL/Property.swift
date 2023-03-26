@@ -40,13 +40,13 @@ public protocol Property {
     var body: Body { get }
 
     /// This method is used internally and should not be called directly.
-    static func makeProperty(_ property: Self, _ context: Context) async
+    static func makeProperty(_ property: Self, _ context: Context) async throws
 }
 
 extension Property {
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(_ property: Self, _ context: Context) async {
+    public static func makeProperty(_ property: Self, _ context: Context) async throws {
         let node = Node(
             root: context.root,
             object: EmptyObject(property),
@@ -54,6 +54,6 @@ extension Property {
         )
 
         let newContext = context.append(node)
-        await Body.makeProperty(property.body, newContext)
+        try await Body.makeProperty(property.body, newContext)
     }
 }

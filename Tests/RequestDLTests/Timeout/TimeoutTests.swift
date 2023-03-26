@@ -7,48 +7,48 @@ import XCTest
 
 final class TimeoutTests: XCTestCase {
 
-    func testRequestTimeout() async {
+    func testRequestTimeout() async throws {
         // Given
         let requestTimeout = Timeout.Source.request
         let timeout = TimeInterval(75)
 
         // When
-        let (session, _) = await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
+        let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, timeout)
     }
 
-    func testResourceTimeout() async {
+    func testResourceTimeout() async throws {
         // Given
         let resourceTimeout = Timeout.Source.resource
         let timeout = TimeInterval(1_999)
 
         // When
-        let (session, _) = await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
+        let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, timeout)
     }
 
-    func testAllTimeout() async {
+    func testAllTimeout() async throws {
         // Given
         let requestTimeout = Timeout.Source.all
         let timeout = TimeInterval(75)
 
         // When
-        let (session, _) = await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
+        let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
         XCTAssertEqual(session.configuration.timeoutIntervalForRequest, timeout)
         XCTAssertEqual(session.configuration.timeoutIntervalForResource, timeout)
     }
 
-    func testDefaultTimeout() async {
+    func testDefaultTimeout() async throws {
         let defaultConfiguration = URLSessionConfiguration.default
 
         // When
-        let (session, _) = await resolve(TestProperty {})
+        let (session, _) = try await resolve(TestProperty {})
 
         // Then
         XCTAssertEqual(

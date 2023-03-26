@@ -12,7 +12,7 @@ final class QueryTests: XCTestCase {
         let property = Query(123, forKey: "number")
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             property
         })
@@ -32,7 +32,7 @@ final class QueryTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(property)
+        let (_, request) = try await resolve(property)
 
         // Then
         XCTAssertEqual(

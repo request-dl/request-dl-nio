@@ -14,7 +14,7 @@ final class SessionTests: XCTestCase {
         let configuration = URLSessionConfiguration.default
 
         // When
-        let (session, _) = await resolve(TestProperty { property })
+        let (session, _) = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
@@ -138,7 +138,7 @@ final class SessionTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
 
         // When
-        let (session, _) = await resolve(TestProperty { property })
+        let (session, _) = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
@@ -263,7 +263,7 @@ final class SessionTests: XCTestCase {
         let configuration = URLSessionConfiguration.background(withIdentifier: backgroundID)
 
         // When
-        let (session, _) = await resolve(TestProperty { property })
+        let (session, _) = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
@@ -381,12 +381,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testNetworkService() async {
+    func testNetworkService() async throws {
         // Given
         let networkService: URLRequest.NetworkServiceType = .video
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .networkService(networkService)
@@ -400,12 +400,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testCellularAccessDisabled() async {
+    func testCellularAccessDisabled() async throws {
         // Given
         let cellularAccessDisabled = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .cellularAccessDisabled(cellularAccessDisabled)
@@ -419,12 +419,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testExpensiveNetworkDisabled() async {
+    func testExpensiveNetworkDisabled() async throws {
         // Given
         let expensiveNetworkDisabled = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .expensiveNetworkDisabled(expensiveNetworkDisabled)
@@ -438,12 +438,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testConstrainedNetworkDisabled() async {
+    func testConstrainedNetworkDisabled() async throws {
         // Given
         let constrainedNetworkDisabled = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .constrainedNetworkDisabled(constrainedNetworkDisabled)
@@ -457,12 +457,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testWaitsForConnectivity() async {
+    func testWaitsForConnectivity() async throws {
         // Given
         let waitsForConnectivity = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .waitsForConnectivity(waitsForConnectivity)
@@ -476,12 +476,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testDiscretionary() async {
+    func testDiscretionary() async throws {
         // Given
         let discretionary = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .discretionary(discretionary)
@@ -495,12 +495,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testSharedContainerIdentifier() async {
+    func testSharedContainerIdentifier() async throws {
         // Given
         let sharedContainerIdentifier = "unit.test"
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .sharedContainerIdentifier(sharedContainerIdentifier)
@@ -514,12 +514,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testSendsLaunchEvents() async {
+    func testSendsLaunchEvents() async throws {
         // Given
         let sendsLaunchEvents = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .sendsLaunchEvents(sendsLaunchEvents)
@@ -533,12 +533,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testConnectionProxyDictionary() async {
+    func testConnectionProxyDictionary() async throws {
         // Given
         let connectionProxyDictionary = [AnyHashable: Any]()
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .connectionProxyDictionary(connectionProxyDictionary)
@@ -552,13 +552,13 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testProtocolSupported() async {
+    func testProtocolSupported() async throws {
         // Given
         let tlsProtocolSupportedMin = tls_protocol_version_t.TLSv11
         let tlsProtocolSupportedMax = tls_protocol_version_t.TLSv11
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .tlsProtocolSupported(
@@ -580,12 +580,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testPipeliningDisabled() async {
+    func testPipeliningDisabled() async throws {
         // Given
         let pipeliningDisabled = false
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .pipeliningDisabled(pipeliningDisabled)
@@ -599,12 +599,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testSetCookiesDisabled() async {
+    func testSetCookiesDisabled() async throws {
         // Given
         let setCookiesDisabled = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .setCookiesDisabled(setCookiesDisabled)
@@ -618,12 +618,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testCookieAcceptPolicy() async {
+    func testCookieAcceptPolicy() async throws {
         // Given
         let cookieAcceptPolicy: HTTPCookie.AcceptPolicy = .never
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .cookieAcceptPolicy(cookieAcceptPolicy)
@@ -637,12 +637,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testCookieStorage() async {
+    func testCookieStorage() async throws {
         // Given
         let cookieStorage = HTTPCookieStorage()
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .cookieStorage(cookieStorage)
@@ -656,12 +656,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testMaximumConnectionsPerHost() async {
+    func testMaximumConnectionsPerHost() async throws {
         // Given
         let maximumConnectionsPerHost = 5
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .maximumConnectionsPerHost(maximumConnectionsPerHost)
@@ -675,12 +675,12 @@ final class SessionTests: XCTestCase {
         )
     }
 
-    func testExtendedBackgroundIdleModeDisabled() async {
+    func testExtendedBackgroundIdleModeDisabled() async throws {
         // Given
         let extendedBackgroundIdleModeDisabled = false
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .extendedBackgroundIdleModeDisabled(extendedBackgroundIdleModeDisabled)
@@ -696,12 +696,12 @@ final class SessionTests: XCTestCase {
 
     #if swift(>=5.7.2)
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
-    func testValidatesDNSSec() async {
+    func testValidatesDNSSec() async throws {
         // Given
         let validatesDNSSec = true
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .validatesDNSSec(validatesDNSSec)
@@ -716,12 +716,12 @@ final class SessionTests: XCTestCase {
     }
     #endif
 
-    func testCredentialStorage() async {
+    func testCredentialStorage() async throws {
         // Given
         let credentialStorage = URLCredentialStorage()
 
         // When
-        let (session, _) = await resolve(
+        let (session, _) = try await resolve(
             TestProperty {
                 Session(.default)
                     .credentialStorage(credentialStorage)

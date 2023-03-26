@@ -23,9 +23,9 @@ public struct _OptionalContent<Content: Property>: Property {
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
+    ) async throws {
         if let content = property.content {
-            await Content.makeProperty(content, context)
+            try await Content.makeProperty(content, context)
         }
     }
 }

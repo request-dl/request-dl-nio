@@ -37,7 +37,7 @@ extension DownloadTask {
      */
     public func result() async throws -> TaskResult<URL> {
         let delegate = DelegateProxy()
-        let (session, request) = await Resolver(content).make(delegate)
+        let (session, request) = try await Resolver(content).make(delegate)
 
         defer { session.finishTasksAndInvalidate() }
 

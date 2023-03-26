@@ -30,12 +30,12 @@ public struct _ConditionalContent<
     public static func makeProperty(
         _ property: Self,
         _ context: Context
-    ) async {
+    ) async throws {
         switch property.option {
         case .first(let property):
-            await TrueProperty.makeProperty(property, context)
+            try await TrueProperty.makeProperty(property, context)
         case .second(let property):
-            await FalseProperty.makeProperty(property, context)
+            try await FalseProperty.makeProperty(property, context)
         }
     }
 }

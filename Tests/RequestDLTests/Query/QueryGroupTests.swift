@@ -15,7 +15,7 @@ final class QueryGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             property
         })
@@ -40,7 +40,7 @@ final class QueryGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
             property
         })
