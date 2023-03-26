@@ -3,7 +3,7 @@
 */
 
 import XCTest
-import _RequestDLExtensions
+import RequestDLInternals
 @testable import RequestDL
 
 final class InterceptorsLoggerTests: XCTestCase {

@@ -32,7 +32,7 @@ extension Session {
         public var sendCANameList: Bool?
         public var renegotiationSupport: NIORenegotiationSupport?
         public var shutdownTimeout: TimeAmount?
-        public var pskHint: String? = nil
+        public var pskHint: String?
         public var applicationProtocols: [String]?
         public var keyLogCallback: NIOSSLKeyLogCallback?
         public var pskClientCallback: NIOPSKClientIdentityCallback?

@@ -4,8 +4,6 @@
 
 import XCTest
 import NIOSSL
-import _RequestDLServer
-import _RequestDLExtensions
 @testable import RequestDLInternals
 
 class ChainCertificateTests: XCTestCase {
@@ -38,7 +36,7 @@ class ChainCertificateTests: XCTestCase {
 
         // Then
         XCTAssertEqual(resolved, try [
-            .certificate(certificate.build()),
+            .certificate(certificate.build())
         ] + CertificateSource.file(filePEM.path).build().map {
             .certificate($0)
         })

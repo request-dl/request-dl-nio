@@ -4,7 +4,6 @@
 
 import Foundation
 import RequestDLInternals
-import _RequestDLExtensions
 
 struct Resolver<Content: Property> {
 
@@ -14,7 +13,7 @@ struct Resolver<Content: Property> {
         self.content = content
     }
 
-    private func resolve() async throws  -> Context {
+    private func resolve() async throws -> Context {
         let context = Context(RootNode())
         try await Content.makeProperty(content, context)
         return context

@@ -3,7 +3,7 @@
 */
 
 import Foundation
-import _RequestDLExtensions
+import RequestDLInternals
 
 /**
  The BaseURL struct defines the base URL for a request. It provides the

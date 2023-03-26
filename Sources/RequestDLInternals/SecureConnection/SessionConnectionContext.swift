@@ -5,7 +5,7 @@
 import Foundation
 
 extension Session {
-    
+
     public enum ConnectionContext {
         case client
         case server

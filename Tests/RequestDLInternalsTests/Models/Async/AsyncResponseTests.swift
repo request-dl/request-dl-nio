@@ -3,7 +3,6 @@
 */
 
 import XCTest
-import _RequestDLExtensions
 @testable import RequestDLInternals
 
 class AsyncResponseTests: XCTestCase {

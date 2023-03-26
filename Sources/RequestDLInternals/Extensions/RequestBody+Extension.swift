@@ -6,7 +6,6 @@ import Foundation
 import NIOCore
 import NIOPosix
 import AsyncHTTPClient
-@testable import RequestDLInternals
 
 extension RequestBody {
 

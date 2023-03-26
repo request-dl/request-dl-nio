@@ -3,8 +3,6 @@
 */
 
 import XCTest
-import _RequestDLServer
-import _RequestDLExtensions
 @testable import RequestDLInternals
 
 class CertificateTests: XCTestCase {

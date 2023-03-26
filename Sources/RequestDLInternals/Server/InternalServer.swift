@@ -39,7 +39,7 @@ extension InternalServer {
     public func run(_ closure: () async throws -> Void) async throws {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-        
+
         do {
             let bootstrap = ServerBootstrap(group: group)
                 .childChannelInitializer { channel in

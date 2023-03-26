@@ -4,8 +4,6 @@
 
 import XCTest
 import NIOSSL
-import _RequestDLServer
-import _RequestDLExtensions
 @testable import RequestDLInternals
 
 class TrustRootsTests: XCTestCase {
@@ -20,7 +18,6 @@ class TrustRootsTests: XCTestCase {
         // Then
         XCTAssertEqual(resolved, .default)
     }
-
 
     func testRoots_whenCertificate_shouldBeValid() async throws {
         // Given

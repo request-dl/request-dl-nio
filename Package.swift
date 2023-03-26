@@ -38,10 +38,6 @@ let package = Package(
         .package(
             url: "https://github.com/swift-server/async-http-client",
             from: "1.15.0"
-        ),
-        .package(
-            url: "https://github.com/apple/swift-nio-http2.git",
-            from: "1.19.0"
         )
     ],
     targets: [
@@ -55,45 +51,19 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client")
-            ]
-        ),
-
-        .target(
-            name: "_RequestDLExtensions",
-            dependencies: [
-                "RequestDLInternals",
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "AsyncHTTPClient", package: "async-http-client")
-            ]
+            ],
+            resources: [.process("Resources")]
         ),
 
         .target(
             name: "RequestDL",
-            dependencies: [
-                "RequestDLInternals",
-                "_RequestDLExtensions"
-            ]
-        ),
-
-        .target(
-            name: "_RequestDLServer",
-            dependencies: [
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOHTTP2", package: "swift-nio-http2")
-            ],
-            resources: [.process("Resources")]
+            dependencies: ["RequestDLInternals"]
         ),
 
         .testTarget(
             name: "RequestDLInternalsTests",
             dependencies: [
                 "RequestDLInternals",
-                "_RequestDLServer",
-                "_RequestDLExtensions",
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOPosix", package: "swift-nio"),
@@ -105,8 +75,6 @@ let package = Package(
             name: "RequestDLTests",
             dependencies: [
                 "RequestDL",
-                "_RequestDLServer",
-                "_RequestDLExtensions",
                 "RequestDLInternals"
             ],
             resources: [.process("Resources")]

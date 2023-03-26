@@ -4,8 +4,6 @@
 
 import XCTest
 import NIOSSL
-import _RequestDLServer
-import _RequestDLExtensions
 @testable import RequestDLInternals
 
 class AdditionalTrustRootSourceTests: XCTestCase {

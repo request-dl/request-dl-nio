@@ -3,8 +3,6 @@
 */
 
 import XCTest
-import _RequestDLExtensions
-import _RequestDLServer
 @testable import RequestDLInternals
 
 class SessionTests: XCTestCase {

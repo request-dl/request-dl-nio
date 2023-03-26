@@ -24,7 +24,7 @@ public struct PrivateKey<Password: Collection> where Password.Element == UInt8 {
         self.password = nil
     }
 
-    public init(_ bytes: [UInt8], format: CertificateFormat) where Password == [UInt8]  {
+    public init(_ bytes: [UInt8], format: CertificateFormat) where Password == [UInt8] {
         self.source = .bytes(bytes)
         self.format = format
         self.password = nil

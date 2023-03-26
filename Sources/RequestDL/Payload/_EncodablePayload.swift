@@ -3,7 +3,7 @@
 */
 
 import Foundation
-import _RequestDLExtensions
+import RequestDLInternals
 
 public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
 

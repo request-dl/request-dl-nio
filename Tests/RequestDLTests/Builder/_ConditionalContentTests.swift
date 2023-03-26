@@ -3,7 +3,7 @@
 */
 
 import XCTest
-import _RequestDLExtensions
+import RequestDLInternals
 @testable import RequestDL
 
 final class _ConditionalContentTests: XCTestCase {
@@ -25,7 +25,7 @@ final class _ConditionalContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _ConditionalContent<BaseURL, Headers.Origin>)
+        XCTAssertTrue(result is _ConditionalContent<BaseURL, RequestDL.Headers.Origin>)
         XCTAssertEqual(request.url, "https://google.com")
         XCTAssertTrue(request.headers.isEmpty)
     }
@@ -47,7 +47,7 @@ final class _ConditionalContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _ConditionalContent<Headers.Origin, BaseURL>)
+        XCTAssertTrue(result is _ConditionalContent<RequestDL.Headers.Origin, BaseURL>)
         XCTAssertEqual(request.url, "https://localhost")
         XCTAssertTrue(request.headers.isEmpty)
     }
