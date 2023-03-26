@@ -26,7 +26,7 @@ extension URL {
     }
     #endif
 
-    func absolutePath(percentEncoded: Bool = true) -> String {
+    public func absolutePath(percentEncoded: Bool = true) -> String {
         #if canImport(Darwin)
         return darwin_absolutePath(percentEncoded: percentEncoded)
         #else

@@ -15,15 +15,6 @@ public struct CertificateResouce {
 
 extension CertificateResouce {
 
-    private static func `extension`(for format: CertificateFormat) -> String {
-        switch format {
-        case .der:
-            return "cer"
-        case .pem:
-            return "pem"
-        }
-    }
-
     init(
         _ path: String,
         in bundle: Bundle,
@@ -33,12 +24,12 @@ extension CertificateResouce {
 
         self.certificateURL = bundle.url(
             forResource: "\(path).public",
-            withExtension: Self.extension(for: format)
+            withExtension: format.pathExtension
         ).unsafelyUnwrapped
 
         self.privateKeyURL = bundle.url(
             forResource: "\(path).private",
-            withExtension: Self.extension(for: format)
+            withExtension: format.pathExtension
         ).unsafelyUnwrapped
 
         self.pskURL = bundle.url(
