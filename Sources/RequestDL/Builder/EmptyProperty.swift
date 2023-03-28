@@ -16,14 +16,13 @@ public struct EmptyProperty: Property {
     }
 }
 
-extension EmptyProperty: PrimitiveProperty {
+extension EmptyProperty {
 
-    struct Object: NodeObject {
-
-        func makeProperty(_ make: Make) {}
-    }
-
-    func makeObject() -> Object {
-        .init()
+    public static func _makeProperty(
+        property: _GraphValue<EmptyProperty>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(EmptyLeaf())
     }
 }

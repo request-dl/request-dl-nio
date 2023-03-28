@@ -10,39 +10,41 @@ final class TimeoutTests: XCTestCase {
 
     func testRequestTimeout() async throws {
         // Given
-        let requestTimeout = Timeout.Source.request
-        let timeout = TimeInterval(75)
+        let requestTimeout = Timeout.Source.connect
+        let timeout = UnitTime.seconds(75)
 
         // When
-        let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
+        let (session, _) = try await resolve(TestProperty {
+            Timeout(timeout, for: requestTimeout)
+        })
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.connect, .seconds(Int64(timeout)))
+        XCTAssertEqual(session.configuration.timeout.connect, timeout.build())
     }
 
     func testResourceTimeout() async throws {
         // Given
-        let resourceTimeout = Timeout.Source.resource
-        let timeout = TimeInterval(1_999)
+        let resourceTimeout = Timeout.Source.connect
+        let timeout = UnitTime.seconds(1_999)
 
         // When
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.read, .seconds(Int64(timeout)))
+        XCTAssertEqual(session.configuration.timeout.connect, timeout.build())
     }
 
     func testAllTimeout() async throws {
         // Given
         let requestTimeout = Timeout.Source.all
-        let timeout = TimeInterval(75)
+        let timeout = UnitTime.seconds(75)
 
         // When
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.read, .seconds(Int64(timeout)))
-        XCTAssertEqual(session.configuration.timeout.connect, .seconds(Int64(timeout)))
+        XCTAssertEqual(session.configuration.timeout.read, timeout.build())
+        XCTAssertEqual(session.configuration.timeout.connect, timeout.build())
     }
 
     func testDefaultTimeout() async throws {
@@ -65,7 +67,7 @@ final class TimeoutTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = Timeout(1.0)
+        let property = Timeout(.seconds(1))
 
         // Then
         try await assertNever(property.body)

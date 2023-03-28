@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct Certificates<Content: Property>: Property {
 
@@ -16,31 +15,37 @@ public struct Certificates<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
+}
 
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
+extension Certificates {
+
+    private struct Node: SecureConnectionPropertyNode {
+
+        let nodes: [Leaf<SecureConnectionNode>]
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            for node in nodes {
+                node.passthrough(&secureConnection)
+            }
+        }
+    }
+
+    public static func _makeProperty(
+        property: _GraphValue<Certificates<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        var inputs = inputs[self, \.content]
+        inputs.environment.certificateProperty = .chain
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
         )
 
-        let newContext = Context(node)
-        try await Content.makeProperty(property.content, newContext)
-
-        let certificates = newContext
-            .findCollection(CertificateNode.self)
-
-        context.append(Node(
-            root: context.root,
-            object: SecureConnectionNode {
-                for certificate in certificates {
-                    certificate(.chain, secureConnection: &$0)
-                }
-            },
-            children: []
-        ))
+        return .init(Leaf(SecureConnectionNode(
+            Node(nodes: outputs.node
+                .search(for: SecureConnectionNode.self)
+                .filter { $0.contains(CertificateNode.self) }
+            )
+        )))
     }
 }

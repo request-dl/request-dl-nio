@@ -7,6 +7,7 @@ import NIOCore
 import NIOFoundationCompat
 
 public struct AsyncBytes: AsyncSequence {
+    
     public typealias Element = Data
 
     public typealias AsyncStream = AsyncThrowingStream<Element, Error>

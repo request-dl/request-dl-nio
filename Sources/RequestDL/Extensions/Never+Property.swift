@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Never: Property {
 
@@ -15,6 +14,10 @@ extension Never: Property {
 extension Property {
 
     func bodyException() -> Never {
-        fatalError("An unexpected attempt was made to access the property body.")
+        Internals.Log.failure(
+            """
+            An unexpected attempt was made to access the property body.
+            """
+        )
     }
 }

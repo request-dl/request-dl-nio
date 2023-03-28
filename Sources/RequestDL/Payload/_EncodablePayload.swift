@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
 
@@ -22,7 +21,7 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
         do {
             return try encoder.encode(object)
         } catch {
-            fatalError(
+            Internals.Log.failure(
                 """
                 An error occurred while trying to encode the object to data: \(error.localizedDescription).
                 """

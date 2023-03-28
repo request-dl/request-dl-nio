@@ -36,7 +36,6 @@ final class PropertyBuilderTests: XCTestCase {
         let (_, request) = try await resolve(TestProperty(property))
 
         // Then
-        print(type(of: property))
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
         XCTAssertTrue(request.headers.isEmpty)
     }
@@ -55,7 +54,6 @@ final class PropertyBuilderTests: XCTestCase {
         let (_, request) = try await resolve(TestProperty(property))
 
         // Then
-        print(type(of: property))
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
         XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
     }

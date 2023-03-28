@@ -22,38 +22,69 @@ import Foundation
  }
  ```
  */
-public struct ForEach<Data: Collection, Content: Property>: Property {
+public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID : Hashable, Content: Property {
 
-    private let data: Data
-    private let map: (Data.Element) -> Content
+    public let data: Data
 
-    /**
-     Initializes the `ForEach` request with collection of data provided.
+    public let content: (Data.Element) -> Content
 
-     - Parameters:
-         - data: The collection of data to iterate over.
-         - content: A closure that creates a content for each element of the collection.
-     */
+    private let id: KeyPath<Data.Element, ID>
+
+    private var abstractContent: Content {
+        Internals.Log.failure(
+            """
+            There was an attempt to access a variable for which access was not expected.
+            """
+        )
+    }
+
     public init(
         _ data: Data,
+        id: KeyPath<Data.Element, ID>,
         @PropertyBuilder content: @escaping (Data.Element) -> Content
     ) {
         self.data = data
-        self.map = content
+        self.id = id
+        self.content = content
+    }
+
+    public init(
+        _ data: Data,
+        @PropertyBuilder content: @escaping (Data.Element) -> Content
+    ) where Data.Element: Identifiable, ID == Data.Element.ID {
+        self.init(
+            data,
+            id: \.id,
+            content: content
+        )
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
+}
+
+extension ForEach {
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        for property in property.data.map(property.map) {
-            try await Content.makeProperty(property, context)
+    public static func _makeProperty(
+        property: _GraphValue<ForEach<Data, ID, Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        var group = ChildrenNode()
+
+        for element in property.data {
+            let output = try await Content._makeProperty(
+                property: property.dynamic {
+                    $0.content(element)
+                },
+                inputs: inputs[self, element[keyPath: property.id], \.abstractContent]
+            )
+
+            group.append(output.node)
         }
+
+        return .init(group)
     }
 }

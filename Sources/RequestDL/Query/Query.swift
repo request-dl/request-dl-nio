@@ -45,34 +45,38 @@ public struct Query: Property {
     }
 }
 
-extension Query: PrimitiveProperty {
+extension Query {
 
-    class Object: NodeObject {
+    struct Node: PropertyNode {
 
         let key: String
         let value: String
 
-        init(_ value: Any, forKey key: String) {
+        fileprivate init(_ value: Any, forKey key: String) {
             self.key = key
             self.value = "\(value)"
         }
 
-        func makeProperty(_ make: Make) {
-            guard
-                let url = URL(string: make.request.url),
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-            else { return }
+        func make(_ make: inout Make) async throws {
+            guard let url = URL(string: make.request.url) else {
+                return
+            }
 
-            var queryItems = components.queryItems ?? []
-
-            queryItems.append(.init(name: key, value: value))
-            components.queryItems = queryItems
-
-            make.request.url = (components.url ?? url).absoluteString
+            make.request.url = url.appendingQueries([.init(
+                name: key,
+                value: value
+            )]).absoluteString
         }
     }
 
-    func makeObject() -> Object {
-        Object(value, forKey: key)
+    public static func _makeProperty(
+        property: _GraphValue<Query>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(
+            property.value,
+            forKey: property.key
+        )))
     }
 }

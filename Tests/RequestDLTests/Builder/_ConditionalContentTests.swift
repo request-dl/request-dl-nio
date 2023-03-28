@@ -3,7 +3,7 @@
 */
 
 import XCTest
-import RequestDLInternals
+@testable import RequestDLInternals
 @testable import RequestDL
 
 final class _ConditionalContentTests: XCTestCase {
@@ -25,7 +25,7 @@ final class _ConditionalContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _ConditionalContent<BaseURL, RequestDL.Headers.Origin>)
+        XCTAssertTrue(result is _EitherContent<BaseURL, RequestDL.Headers.Origin>)
         XCTAssertEqual(request.url, "https://google.com")
         XCTAssertTrue(request.headers.isEmpty)
     }
@@ -47,14 +47,14 @@ final class _ConditionalContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _ConditionalContent<RequestDL.Headers.Origin, BaseURL>)
+        XCTAssertTrue(result is _EitherContent<RequestDL.Headers.Origin, BaseURL>)
         XCTAssertEqual(request.url, "https://localhost")
         XCTAssertTrue(request.headers.isEmpty)
     }
 
     func testNeverBody() async throws {
         // Given
-        let property = _ConditionalContent<EmptyProperty, EmptyProperty>(first: .init())
+        let property = _EitherContent<EmptyProperty, EmptyProperty>(first: .init())
 
         // Then
         try await assertNever(property.body)
@@ -63,8 +63,8 @@ final class _ConditionalContentTests: XCTestCase {
 
 func assertNever<T>(_ closure: @autoclosure @escaping () throws -> T) async throws {
     try await withUnsafeThrowingContinuation { continuation in
-        FatalError.replace { message, file, line in
-            FatalError.restoreFatalError()
+        SwiftOverride.FatalError.replace { message, file, line in
+            SwiftOverride.FatalError.restoreFatalError()
             continuation.resume()
             Thread.exit()
             Swift.fatalError(message, file: file, line: line)

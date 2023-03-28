@@ -18,7 +18,7 @@ extension CertificateResouce {
     init(
         _ path: String,
         in bundle: Bundle,
-        format: CertificateFormat
+        format: Certificate.Format
     ) {
         let path = path.replacingOccurrences(of: "_", with: ".")
 

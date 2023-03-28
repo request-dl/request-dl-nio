@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Interceptors {
 
@@ -37,7 +36,7 @@ extension Interceptors {
          */
         public func received(_ result: Result<Element, Error>) {
             #if DEBUG
-            RequestDLInternals.raise(SIGTRAP)
+            Internals.raise(SIGTRAP)
             #endif
         }
     }

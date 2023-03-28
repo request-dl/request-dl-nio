@@ -5,12 +5,15 @@
 import Foundation
 import NIOSSL
 
-public enum CertificateFormat {
-    case der
-    case pem
+extension Certificate {
+
+    public enum Format {
+        case der
+        case pem
+    }
 }
 
-extension CertificateFormat {
+extension Certificate.Format {
 
     public var pathExtension: String {
         switch self {
@@ -22,7 +25,7 @@ extension CertificateFormat {
     }
 }
 
-extension CertificateFormat {
+extension Certificate.Format {
 
     func build() -> NIOSSLSerializationFormats {
         switch self {

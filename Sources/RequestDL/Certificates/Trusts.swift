@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct Trusts<Content: Property>: Property {
 
@@ -23,45 +22,45 @@ public struct Trusts<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
+}
 
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
+extension Trusts {
+
+    private struct Node: SecureConnectionPropertyNode {
+        
+        let isDefault: Bool
+        let nodes: [Leaf<SecureConnectionNode>]
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            secureConnection.trustRoots = isDefault ? .default : nil
+
+            for node in nodes {
+                node.passthrough(&secureConnection)
+            }
+        }
+    }
+
+    public static func _makeProperty(
+        property: _GraphValue<Trusts<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        var inputs = inputs[self, \.content]
+
+        let isDefault = property.options == .default
+        inputs.environment.certificateProperty = isDefault ? .additionalTrust : .trust
+
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
         )
 
-        let newContext = Context(node)
-        try await Content.makeProperty(property.content, newContext)
-
-        let certificates = newContext
-            .findCollection(CertificateNode.self)
-
-        if property.options == .default {
-            context.append(Node(
-                root: context.root,
-                object: SecureConnectionNode {
-                    $0.trustRoots = .default
-                },
-                children: []
-            ))
-        }
-
-        for (index, certificate) in certificates.enumerated() {
-            context.append(Node(
-                root: context.root,
-                object: SecureConnectionNode {
-                    if index == .zero && property.options == nil {
-                        certificate(.trust, secureConnection: &$0)
-                    } else {
-                        certificate(.additionalTrust, secureConnection: &$0)
-                    }
-                },
-                children: []
-            ))
-        }
+        return .init(Leaf(SecureConnectionNode(
+            Node(
+                isDefault: isDefault,
+                nodes: outputs.node
+                    .search(for: SecureConnectionNode.self)
+                    .filter { $0.contains(CertificateNode.self) }
+            )
+        )))
     }
 }

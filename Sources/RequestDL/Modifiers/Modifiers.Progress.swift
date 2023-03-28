@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Modifiers {
 
@@ -85,7 +84,18 @@ extension Modifiers.Progress {
             }
         }
 
-        fatalError()
+        Internals.Log.failure(
+            """
+            An error occurred while attempting to iterate through an \
+            asynchronous sequence representing the stages of a request.
+
+            The absence of a complete request was detected, as the loop \
+            terminated prematurely without encountering an upload or download \
+            step.
+
+            Please, open a bug report 🔎
+            """
+        )
     }
 
     fileprivate static func download(

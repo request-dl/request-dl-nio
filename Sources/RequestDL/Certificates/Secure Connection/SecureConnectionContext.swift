@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public enum SecureConnectionContext {
     case server
@@ -12,7 +11,7 @@ public enum SecureConnectionContext {
 
 extension SecureConnectionContext {
 
-    func build() -> RequestDLInternals.Session.ConnectionContext {
+    func build() -> Internals.ConnectionContext {
         switch self {
         case .server:
             return .server

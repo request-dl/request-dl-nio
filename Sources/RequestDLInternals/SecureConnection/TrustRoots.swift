@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public enum TrustRoots {
+public enum TrustRoots: Equatable {
     case `default`
     case file(String)
     case certificate(CertificateSource)

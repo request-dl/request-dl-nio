@@ -234,7 +234,7 @@ extension DataBuffer {
                 try _inputStream?.close()
                 try _outputStream?.close()
             } catch {
-                fatalError("\(error)")
+                Log.failure(error)
             }
         }
     }

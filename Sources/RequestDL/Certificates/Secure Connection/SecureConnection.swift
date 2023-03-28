@@ -9,7 +9,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     private let content: Content
 
-    private var secureConnection: RequestDLInternals.Session.SecureConnection
+    private var secureConnection: Internals.SecureConnection
 
     public init(
         _ context: SecureConnectionContext = .client,
@@ -27,32 +27,6 @@ public struct SecureConnection<Content: Property>: Property {
         var mutableSelf = self
         edit(&mutableSelf)
         return mutableSelf
-    }
-
-    public static func makeProperty(
-        _ property: SecureConnection<Content>,
-        _ context: Context
-    ) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
-        )
-
-        let newContext = Context(node)
-        try await Content.makeProperty(property.content, newContext)
-
-        let parameters = newContext
-            .findCollection(SecureConnectionNode.self)
-
-        context.append(Node(
-            root: context.root,
-            object: Object(
-                secureConnection: property.secureConnection,
-                items: parameters
-            ),
-            children: []
-        ))
     }
 }
 
@@ -80,18 +54,11 @@ extension SecureConnection {
 
 extension SecureConnection {
 
-    public func keyLog(_ closure: @escaping (DataBuffer) -> Void) -> Self {
+    public func keyLog(
+        _ closure: @Sendable @escaping (ByteBuffer) -> Void
+    ) -> Self {
         edit {
-            $0.secureConnection.keyLogCallback = {
-                var buffer = $0
-                var dataBuffer = DataBuffer()
-
-                if let data = buffer.readData(length: buffer.readableBytes) {
-                    dataBuffer.writeData(data)
-                }
-
-                closure(dataBuffer)
-            }
+            $0.secureConnection.keyLogCallback = closure
         }
     }
 }
@@ -152,25 +119,38 @@ extension SecureConnection {
 
 extension SecureConnection {
 
-    class Object: NodeObject {
+    private struct Node: PropertyNode {
 
-        private var secureConnection: RequestDLInternals.Session.SecureConnection
-        private let items: [SecureConnectionNode]
+        let secureConnection: Internals.SecureConnection
+        let nodes: [Leaf<SecureConnectionNode>]
 
-        init(
-            secureConnection: RequestDLInternals.Session.SecureConnection,
-            items: [SecureConnectionNode]
-        ) {
-            self.secureConnection = secureConnection
-            self.items = items
-        }
-
-        func makeProperty(_ make: Make) async throws {
-            for item in items {
-                try await item(&secureConnection)
-            }
-
+        func make(_ make: inout Make) async throws {
             make.configuration.secureConnection = secureConnection
+
+            for node in nodes {
+                try await node.make(&make)
+            }
         }
+    }
+
+    public static func _makeProperty(
+        property: _GraphValue<SecureConnection<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        var inputs = inputs[self, \.content]
+
+        if property.secureConnection.context == .server {
+            inputs.environment.certificateProperty = .chain
+        }
+
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
+        )
+
+        return .init(Leaf(Node(
+            secureConnection: property.secureConnection,
+            nodes: outputs.node.search(for: SecureConnectionNode.self)
+        )))
     }
 }

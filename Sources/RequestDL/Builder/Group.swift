@@ -24,13 +24,13 @@ import Foundation
  */
 public struct Group<Content: Property>: Property {
 
-    private let content: Content
+    public let content: Content
 
     /**
      Initializes the group request.
 
      - Parameters:
-        - content: The closure that contains the requests to be grouped.
+     - content: The closure that contains the requests to be grouped.
      */
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
@@ -40,12 +40,22 @@ public struct Group<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
+}
+
+extension Group {
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        try await Content.makeProperty(property.content, context)
+    public static func _makeProperty(
+        property: _GraphValue<Group<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        let output = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs[self, \.content]
+        )
+
+        var children = ChildrenNode()
+        children.append(output.node)
+        return .init(children)
     }
 }

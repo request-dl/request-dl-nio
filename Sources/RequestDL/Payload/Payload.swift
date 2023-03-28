@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 /**
  A representation of the HTTP body data in a request.
@@ -93,24 +92,28 @@ public struct Payload<Provider: PayloadProvider>: Property {
     }
 }
 
-extension Payload: PrimitiveProperty {
+extension Payload {
 
-    struct Object: NodeObject {
+    struct Node: PropertyNode {
 
         private let provider: Provider
 
-        init(_ provider: Provider) {
+        fileprivate init(_ provider: Provider) {
             self.provider = provider
         }
 
-        func makeProperty(_ make: Make) {
-            make.request.body = RequestBody {
-                BodyItem(provider.data)
+        func make(_ make: inout Make) async throws {
+            make.request.body = Internals.RequestBody {
+                Internals.BodyItem(provider.data)
             }
         }
     }
 
-    func makeObject() -> Object {
-        .init(provider)
+    public static func _makeProperty(
+        property: _GraphValue<Payload<Provider>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(property.provider)))
     }
 }

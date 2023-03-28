@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 /**
  A type representing an HTTP form with a list of content.
@@ -31,7 +30,7 @@ public struct FormGroup<Content: Property>: Property {
      Initializes a new instance of `Form` with the specified list of properties.
 
      - Parameters:
-        - content: A property builder closure that creates a list of `Property` objects.
+     - content: A property builder closure that creates a list of `Property` objects.
      */
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
@@ -41,44 +40,16 @@ public struct FormGroup<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
-
-    /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
-        )
-
-        let newContext = Context(node)
-        try await Content.makeProperty(property.content, newContext)
-
-        let parameters = newContext
-            .findCollection(FormObject.self)
-            .map(\.factory)
-
-        context.append(Node(
-            root: context.root,
-            object: Object(parameters),
-            children: []
-        ))
-    }
 }
 
 extension FormGroup {
 
-    struct Object: NodeObject {
-        private let multipart: [() -> PartFormRawValue]
+    private struct Node: PropertyNode {
 
-        init(_ multipart: [() -> PartFormRawValue]) {
-            self.multipart = multipart
-        }
+        let nodes: [Leaf<FormNode>]
 
-        func makeProperty(_ make: Make) {
-            let multipart = multipart.map { $0() }
+        func make(_ make: inout Make) async throws {
+            let multipart = nodes.map(\.factory).map { $0() }
 
             let constructor = MultipartFormConstructor(multipart)
 
@@ -87,9 +58,26 @@ extension FormGroup {
                 forKey: "Content-Type"
             )
 
-            make.request.body = RequestBody {
-                BodyItem(constructor.body)
+            make.request.body = Internals.RequestBody {
+                Internals.BodyItem(constructor.body)
             }
         }
+    }
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<FormGroup<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        let inputs = inputs[self, \.content]
+
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
+        )
+
+        let nodes = outputs.node.search(for: FormNode.self)
+
+        return .init(Leaf(Node(nodes: nodes)))
     }
 }

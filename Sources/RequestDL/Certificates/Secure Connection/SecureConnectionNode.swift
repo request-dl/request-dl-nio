@@ -3,24 +3,66 @@
 */
 
 import Foundation
-import RequestDLInternals
 
-class SecureConnectionNode: NodeObject {
+protocol SecureConnectionPropertyNode {
 
-    private let closure: (inout RequestDLInternals.Session.SecureConnection) -> Void
+    func make(_ secureConnection: inout Internals.SecureConnection)
+}
 
-    init(_ closure: @escaping (inout RequestDLInternals.Session.SecureConnection) -> Void) {
-        self.closure = closure
+struct SecureConnectionNode: PropertyNode {
+
+    private let node: SecureConnectionPropertyNode
+
+    init(_ node: SecureConnectionPropertyNode) {
+        self.node = node
     }
 
-    func makeProperty(_ make: Make) async throws {
-        print("[RequestDL] TLS should be configure inside SecureConnection property")
+    func make(_ make: inout Make) async throws {
+        guard var secureConnection = make.configuration.secureConnection else {
+            Internals.Log.failure(
+                """
+                An attempt was made to access the secure connection, but \
+                the required property could not be found.
+
+                Please verify that the property is correctly set up inside \
+                the SecureConnection property.
+                """
+            )
+        }
+
+        passthrough(&secureConnection)
+        make.configuration.secureConnection = secureConnection
     }
 }
 
 extension SecureConnectionNode {
 
-    func callAsFunction(_ secureConnection: inout RequestDLInternals.Session.SecureConnection) async throws {
-        closure(&secureConnection)
+    struct Contains {
+
+        fileprivate let node: SecureConnectionPropertyNode
+
+        func callAsFunction<Property: SecureConnectionPropertyNode>(_ type: Property.Type) -> Bool {
+            node is Property
+        }
+    }
+
+    var contains: Contains {
+        .init(node: node)
+    }
+}
+
+extension SecureConnectionNode {
+
+    struct Passthrough {
+
+        fileprivate let node: SecureConnectionPropertyNode
+
+        func callAsFunction(_ secureConnection: inout Internals.SecureConnection) {
+            node.make(&secureConnection)
+        }
+    }
+
+    var passthrough: Passthrough {
+        .init(node: node)
     }
 }

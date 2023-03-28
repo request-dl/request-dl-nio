@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public enum CertificateSource {
+public enum CertificateSource: Equatable {
 
     case certificate(Certificate)
 

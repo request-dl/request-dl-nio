@@ -46,22 +46,24 @@ public struct RequestMethod: Property {
     }
 }
 
-extension RequestMethod: PrimitiveProperty {
+extension RequestMethod {
 
-    struct Object: NodeObject {
+    private struct Node: PropertyNode {
 
-        private let httpMethod: String
+        let httpMethod: String
 
-        init(_ httpMethod: String) {
-            self.httpMethod = httpMethod
-        }
-
-        func makeProperty(_ make: Make) {
+        func make(_ make: inout Make) async throws {
             make.request.method = .init(httpMethod)
         }
     }
 
-    func makeObject() -> Object {
-        .init(httpMethod.rawValue)
+    public static func _makeProperty(
+        property: _GraphValue<RequestMethod>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(
+            httpMethod: property.httpMethod.rawValue
+        )))
     }
 }

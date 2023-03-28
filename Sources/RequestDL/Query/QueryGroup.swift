@@ -38,38 +38,13 @@ public struct QueryGroup<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
-
-    /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
-        )
-
-        let newContext = Context(node)
-        try await Content.makeProperty(property.content, newContext)
-
-        let parameters = newContext.findCollection(Query.Object.self).map {
-            ($0.key, $0.value)
-        }
-
-        context.append(Node(
-            root: context.root,
-            object: Object(parameters),
-            children: []
-        ))
-    }
 }
 
-extension QueryGroup where Content == ForEach<[String: Any], Query> {
+extension QueryGroup where Content == ForEach<[String: Any], String, Query> {
 
     public init(_ dictionary: [String: Any]) {
         self.init {
-            ForEach(dictionary) {
+            ForEach(dictionary, id: \.key) {
                 Query($0.value, forKey: $0.key)
             }
         }
@@ -78,29 +53,33 @@ extension QueryGroup where Content == ForEach<[String: Any], Query> {
 
 extension QueryGroup {
 
-    struct Object: NodeObject {
+    struct Node: PropertyNode {
 
-        private let parameters: [(String, String)]
+        let leafs: [Leaf<Query.Node>]
 
-        init(_ parameters: [(String, String)]) {
-            self.parameters = parameters
+        fileprivate init(_ leafs: [Leaf<Query.Node>]) {
+            self.leafs = leafs
         }
 
-        func makeProperty(_ make: Make) {
-            guard
-                let url = URL(string: make.request.url),
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-            else { return }
-
-            var queryItems = components.queryItems ?? []
-
-            for (key, value) in parameters {
-                queryItems.append(.init(name: key, value: value))
+        func make(_ make: inout Make) async throws {
+            for leaf in leafs {
+                try await leaf.make(&make)
             }
-
-            components.queryItems = queryItems
-
-            make.request.url = (components.url ?? url).absoluteString
         }
+    }
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<QueryGroup<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        let inputs = inputs[self, \.content]
+
+        let output = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
+        )
+
+        return .init(Leaf(Node(output.node.search(for: Query.Node.self))))
     }
 }

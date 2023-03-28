@@ -64,14 +64,21 @@ public struct FormData: Property {
     }
 }
 
-extension FormData: PrimitiveProperty {
+extension FormData {
 
-    func makeObject() -> FormObject {
-        FormObject {
-            PartFormRawValue(data, forHeaders: [
-                kContentDisposition: kContentDispositionValue(fileName, forKey: key),
-                "Content-Type": contentType
+    public static func _makeProperty(
+        property: _GraphValue<FormData>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(FormNode {
+            PartFormRawValue(property.data, forHeaders: [
+                kContentDisposition: kContentDispositionValue(
+                    property.fileName,
+                    forKey: property.key
+                ),
+                "Content-Type": property.contentType
             ])
-        }
+        }))
     }
 }

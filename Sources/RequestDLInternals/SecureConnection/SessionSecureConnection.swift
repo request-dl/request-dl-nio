@@ -70,7 +70,14 @@ extension Session.SecureConnection {
             guard
                 let source = try certificateChain?.build(),
                 let privateKey = try privateKey?.build()
-            else { fatalError() }
+            else {
+                Log.failure(
+                    """
+                    The required resources for building the certificate chain \
+                    or private key could not be found or accessed.
+                    """
+                )
+            }
 
             tlsConfiguration = .makeServerConfiguration(
                 certificateChain: source,

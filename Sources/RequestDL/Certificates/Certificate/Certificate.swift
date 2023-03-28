@@ -3,22 +3,21 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct Certificate: Property {
 
     private let source: CertificateNode.Source
-    private let format: CertificateFormat
+    private let format: Format
 
     public init<Bytes: Sequence>(
         _ bytes: Bytes,
-        format: CertificateFormat = .pem
+        format: Format = .pem
     ) where Bytes.Element == UInt8 {
         self.source = .bytes(Array(bytes))
         self.format = format
     }
 
-    public init(_ file: String, format: CertificateFormat = .pem) {
+    public init(_ file: String, format: Format = .pem) {
         self.source = .file(file)
         self.format = format
     }
@@ -26,18 +25,24 @@ public struct Certificate: Property {
     public init(
         _ file: String,
         in bundle: Bundle,
-        format: CertificateFormat = .pem
+        format: Format = .pem
     ) {
         guard
             let path = bundle.resolveURL(forResourceName: {
-                let pathExtension = ".\(format.pathExtension)"
+                let pathExtension = ".\(format().pathExtension)"
                 if file.hasSuffix(pathExtension) {
                     return file
                 } else {
                     return "\(file)\(pathExtension)"
                 }
             }())?.absolutePath()
-        else { fatalError() }
+        else {
+            Internals.Log.failure(
+                """
+                An error occurred while trying to access an invalid file path.
+                """
+            )
+        }
 
         self.init(
             path,
@@ -50,12 +55,40 @@ public struct Certificate: Property {
     }
 }
 
-extension Certificate: PrimitiveProperty {
+extension Certificate {
 
-    func makeObject() -> CertificateNode {
-        CertificateNode(
-            source: source,
-            format: format
-        )
+    public static func _makeProperty(
+        property: _GraphValue<Certificate>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        let inputs = inputs[self]
+
+        return .init(Leaf(SecureConnectionNode(
+            CertificateNode(
+                source: property.source,
+                property: inputs.environment.certificateProperty,
+                format: property.format()
+            )
+        )))
+    }
+}
+
+extension Certificate {
+
+    public enum Format {
+        case pem
+        case der
+    }
+}
+
+extension Certificate.Format {
+
+    func callAsFunction() -> Internals.Certificate.Format {
+        switch self {
+        case .der:
+            return .der
+        case .pem:
+            return .pem
+        }
     }
 }

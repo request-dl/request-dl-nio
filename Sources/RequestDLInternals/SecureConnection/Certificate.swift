@@ -5,22 +5,22 @@
 import Foundation
 import NIOSSL
 
-public struct Certificate {
+public struct Certificate: Equatable {
 
-    enum Source {
+    enum Source: Equatable {
         case file(String)
         case bytes([UInt8])
     }
 
     let source: Source
-    let format: CertificateFormat
+    let format: Format
 
-    public init(_ file: String, format: CertificateFormat) {
+    public init(_ file: String, format: Format) {
         self.source = .file(file)
         self.format = format
     }
 
-    public init(_ bytes: [UInt8], format: CertificateFormat) {
+    public init(_ bytes: [UInt8], format: Format) {
         self.source = .bytes(bytes)
         self.format = format
     }

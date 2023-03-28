@@ -3,15 +3,14 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct AsyncResponse: AsyncSequence {
 
     public typealias Element = Response
 
-    private let asyncResponse: RequestDLInternals.AsyncResponse
+    private let asyncResponse: Internals.AsyncResponse
 
-    init(_ asyncResponse: RequestDLInternals.AsyncResponse) {
+    init(_ asyncResponse: Internals.AsyncResponse) {
         self.asyncResponse = asyncResponse
     }
 
@@ -24,7 +23,7 @@ extension AsyncResponse {
 
     public struct Iterator: AsyncIteratorProtocol {
 
-        var iterator: RequestDLInternals.AsyncResponse.Iterator
+        var iterator: Internals.AsyncResponse.Iterator
 
         mutating public func next() async throws -> Element? {
             switch try await iterator.next() {

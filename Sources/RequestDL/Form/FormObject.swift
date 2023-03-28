@@ -3,9 +3,8 @@
 */
 
 import Foundation
-import RequestDLInternals
 
-struct FormObject: NodeObject {
+struct FormNode: PropertyNode {
 
     let factory: () -> PartFormRawValue
 
@@ -13,7 +12,7 @@ struct FormObject: NodeObject {
         self.factory = factory
     }
 
-    func makeProperty(_ make: Make) {
+    func make(_ make: inout Make) async throws {
         let constructor = MultipartFormConstructor([factory()])
 
         make.request.headers.setValue(
@@ -21,8 +20,8 @@ struct FormObject: NodeObject {
             forKey: "Content-Type"
         )
 
-        make.request.body = RequestBody {
-            BodyItem(constructor.body)
+        make.request.body = Internals.RequestBody {
+            Internals.BodyItem(constructor.body)
         }
     }
 }

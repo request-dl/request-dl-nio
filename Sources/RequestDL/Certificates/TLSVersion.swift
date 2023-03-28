@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public enum TLSVersion: Int {
     case v1
@@ -21,7 +20,7 @@ extension TLSVersion: Comparable {
 
 extension TLSVersion {
 
-    func build() -> RequestDLInternals.TLSVersion {
+    func build() -> Internals.TLSVersion {
         switch self {
         case .v1:
             return .tlsv1

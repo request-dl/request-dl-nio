@@ -26,7 +26,16 @@ extension RequestBody {
                     buffers.append(.init(data))
                 }
             case .fileRegion:
-                fatalError()
+                Log.failure(
+                    """
+                    RequestBody currently doesn't support stream using \
+                    IOData.fileRegion.
+
+                    This was an unexpected behavior.
+
+                    Please, open a bug report 🔎
+                    """
+                )
             }
 
             return eventLoop.makeSucceededVoidFuture()

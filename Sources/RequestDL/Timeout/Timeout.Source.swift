@@ -32,14 +32,14 @@ extension Timeout {
     public struct Source: OptionSet {
 
         /// The timeout interval for the request.
-        public static let request = Source(rawValue: 1 << 0)
+        public static let connect = Source(rawValue: 1 << 0)
 
         /// The timeout interval for resource which determinate how long
         /// to wait the resource to be transferred.
-        public static let resource = Source(rawValue: 1 << 1)
+        public static let read = Source(rawValue: 1 << 1)
 
         /// Defines same timeout interval for `request` and `resource`
-        public static let all: Self = [.request, .resource]
+        public static let all: Self = [.connect, .read]
 
         public let rawValue: Int
 

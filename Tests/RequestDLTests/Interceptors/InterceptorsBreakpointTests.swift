@@ -3,7 +3,7 @@
 */
 
 import XCTest
-import RequestDLInternals
+@testable import RequestDLInternals
 @testable import RequestDL
 
 #if DEBUG
@@ -13,9 +13,9 @@ final class InterceptorsBreakpointTests: XCTestCase {
         // Given
         var breakpointActivated = false
 
-        Raise.replace {
+        SwiftOverride.Raise.replace {
             breakpointActivated = $0 == SIGTRAP
-            Raise.restoreRaise()
+            SwiftOverride.Raise.restoreRaise()
             return $0
         }
 

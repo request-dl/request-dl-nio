@@ -1,0 +1,386 @@
+//
+//  File.swift
+//  
+//
+//  Created by Brenno on 28/03/23.
+//
+
+import XCTest
+@testable import RequestDL
+
+class ResolveTests: XCTestCase {
+
+    func testDebug_whenContainsOneHierarchy_shouldBeValid() async throws {
+        // Given
+        let property = Group {
+            BaseURL("apple.com")
+            Path("api")
+            Path("v2")
+
+            Headers.Accept(.json)
+            Headers.ContentType(.json)
+
+            Timeout(60)
+
+            Session()
+                .decompressionLimit(.ratio(500))
+        }
+
+        // When
+        let debugDescription = try await Resolve(property).debugDescription
+
+        // Then
+        XCTAssertEqual(debugDescription, Self.oneHierarchyOutput)
+    }
+
+    func testDebug_whenContainsTwoHierarchy_shouldBeValid() async throws {
+        // Given
+        let property = Group {
+            BaseURL("apple.com")
+            Path("api")
+            Path("v2")
+
+            HeaderGroup {
+                Headers.Accept(.json)
+                Headers.ContentType(.json)
+
+                Timeout(60) // should be eliminated
+            }
+
+            QueryGroup {
+                Query("some question", forKey: "q")
+            }
+        }
+
+        // When
+        let debugDescription = try await Resolve(property).debugDescription
+
+        // Then
+        XCTAssertEqual(debugDescription, Self.twoHierarchyOutput)
+    }
+
+    func testDebug_whenContainsSecureConnection_shouldBeValid() async throws {
+        // Given
+        let property = Group {
+            BaseURL("apple.com")
+
+            SecureConnection {
+                Certificates {
+                    Certificate([0, 1, 2])
+                }
+
+                Certificate([2, 3, 4])
+                Certificate([4, 5, 6])
+
+                Trusts {
+                    Certificate([6, 7, 8])
+                    Certificate([8, 9, 10])
+                }
+            }
+
+            PrivateKey([0, 2])
+        }
+
+        // When
+        let debugDescription = try await Resolve(property).debugDescription
+
+        // Then
+        XCTAssertEqual(debugDescription, Self.secureConnectionOutput)
+    }
+}
+
+extension ResolveTests {
+
+    static var oneHierarchyOutput: String {
+        """
+        Resolve {
+            ChildrenNode {
+                Leaf<Node> {
+                    property = Node {
+                        baseURL = URL {
+                            _url = https://apple.com
+                        }
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        path = api
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        path = v2
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        key = Accept,
+                        value = application/json,
+                        next = nil
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        key = Content-Type,
+                        value = application/json,
+                        next = nil
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        timeout = UnitTime {
+                            nanoseconds = 60
+                        },
+                        source = Source {
+                            rawValue = 3
+                        }
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        configuration = Configuration {
+                            secureConnection = nil,
+                            redirectConfiguration = nil,
+                            timeout = Timeout {
+                                connect = nil,
+                                read = nil
+                            },
+                            connectionPool = ConnectionPool {
+                                idleTimeout = TimeAmount {
+                                    nanoseconds = 60000000000
+                                },
+                                concurrentHTTP1ConnectionsPerHostSoftLimit = 8,
+                                retryConnectionEstablishment = true
+                            },
+                            proxy = nil,
+                            ignoreUncleanSSLShutdown = false,
+                            decompression = Decompression.enabled(
+                                Tuple (
+                                    DecompressionLimit {
+                                        limit = Limit.ratio(500)
+                                    }
+                                )
+                            ),
+                            readingMode = ReadingMode.length(1024),
+                            updatingKeyPaths = nil
+                        },
+                        provider = .shared
+                    }
+                }
+            }
+        }
+        """
+    }
+
+    static var twoHierarchyOutput: String {
+        """
+        Resolve {
+            ChildrenNode {
+                Leaf<Node> {
+                    property = Node {
+                        baseURL = URL {
+                            _url = https://apple.com
+                        }
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        path = api
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        path = v2
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        nodes = Array [
+                            Leaf<Node> {
+                                property = Node {
+                                    key = Accept,
+                                    value = application/json,
+                                    next = nil
+                                }
+                            },
+                            Leaf<Node> {
+                                property = Node {
+                                    key = Content-Type,
+                                    value = application/json,
+                                    next = nil
+                                }
+                            }
+                        ]
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        leafs = Array [
+                            Leaf<Node> {
+                                property = Node {
+                                    key = q,
+                                    value = some question
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        """
+    }
+
+    static var secureConnectionOutput: String {
+        """
+        Resolve {
+            ChildrenNode {
+                Leaf<Node> {
+                    property = Node {
+                        baseURL = URL {
+                            _url = https://apple.com
+                        }
+                    }
+                },
+                Leaf<Node> {
+                    property = Node {
+                        secureConnection = SecureConnection {
+                            context = .client,
+                            certificateChain = nil,
+                            certificateVerification = nil,
+                            trustRoots = nil,
+                            additionalTrustRoots = nil,
+                            privateKey = nil,
+                            signingSignatureAlgorithms = nil,
+                            verifySignatureAlgorithms = nil,
+                            sendCANameList = nil,
+                            renegotiationSupport = nil,
+                            shutdownTimeout = nil,
+                            pskHint = nil,
+                            applicationProtocols = nil,
+                            keyLogCallback = nil,
+                            pskClientCallback = nil,
+                            pskServerCallback = nil,
+                            minimumTLSVersion = nil,
+                            maximumTLSVersion = nil,
+                            cipherSuites = nil,
+                            cipherSuiteValues = nil
+                        },
+                        nodes = Array [
+                            Leaf<SecureConnectionNode> {
+                                property = SecureConnectionNode {
+                                    node = Node {
+                                        nodes = Array [
+                                            Leaf<SecureConnectionNode> {
+                                                property = SecureConnectionNode {
+                                                    node = CertificateNode {
+                                                        source = Source.bytes(
+                                                            Array [
+                                                                0,
+                                                                1,
+                                                                2
+                                                            ]
+                                                        ),
+                                                        property = .chain,
+                                                        format = .pem
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            Leaf<SecureConnectionNode> {
+                                property = SecureConnectionNode {
+                                    node = CertificateNode {
+                                        source = Source.bytes(
+                                            Array [
+                                                2,
+                                                3,
+                                                4
+                                            ]
+                                        ),
+                                        property = .additionalTrust,
+                                        format = .pem
+                                    }
+                                }
+                            },
+                            Leaf<SecureConnectionNode> {
+                                property = SecureConnectionNode {
+                                    node = CertificateNode {
+                                        source = Source.bytes(
+                                            Array [
+                                                4,
+                                                5,
+                                                6
+                                            ]
+                                        ),
+                                        property = .additionalTrust,
+                                        format = .pem
+                                    }
+                                }
+                            },
+                            Leaf<SecureConnectionNode> {
+                                property = SecureConnectionNode {
+                                    node = Node {
+                                        isDefault = false,
+                                        nodes = Array [
+                                            Leaf<SecureConnectionNode> {
+                                                property = SecureConnectionNode {
+                                                    node = CertificateNode {
+                                                        source = Source.bytes(
+                                                            Array [
+                                                                6,
+                                                                7,
+                                                                8
+                                                            ]
+                                                        ),
+                                                        property = .trust,
+                                                        format = .pem
+                                                    }
+                                                }
+                                            },
+                                            Leaf<SecureConnectionNode> {
+                                                property = SecureConnectionNode {
+                                                    node = CertificateNode {
+                                                        source = Source.bytes(
+                                                            Array [
+                                                                8,
+                                                                9,
+                                                                10
+                                                            ]
+                                                        ),
+                                                        property = .trust,
+                                                        format = .pem
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                Leaf<SecureConnectionNode> {
+                    property = SecureConnectionNode {
+                        node = Node {
+                            source = Source.privateKey(
+                                PrivateKey<Array<UInt8>> {
+                                    source = Source.bytes(
+                                        Array [
+                                            0,
+                                            2
+                                        ]
+                                    ),
+                                    format = .pem,
+                                    password = nil
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        """
+    }
+}

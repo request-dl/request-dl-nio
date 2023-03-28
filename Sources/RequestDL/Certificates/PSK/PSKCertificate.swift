@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct PSKCertificate<PSK: PSKType>: Property {
 
@@ -47,19 +46,20 @@ extension PSKCertificate {
     }
 }
 
-extension PSKCertificate: PrimitiveProperty {
+extension PSKCertificate {
 
-    func makeObject() -> SecureConnectionNode {
-        SecureConnectionNode {
-            $0.pskHint = hint
+    private struct Node: SecureConnectionPropertyNode {
 
+        let source: Source
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
             switch source {
             case .client(let closure):
-                $0.pskClientCallback = {
+                secureConnection.pskClientCallback = {
                     try closure(.init($0)).build()
                 }
             case .server(let closure):
-                $0.pskServerCallback = {
+                secureConnection.pskServerCallback = {
                     try closure(.init(
                         serverHint: $0,
                         clientHint: $1
@@ -67,5 +67,15 @@ extension PSKCertificate: PrimitiveProperty {
                 }
             }
         }
+    }
+
+    public static func _makeProperty(
+        property: _GraphValue<PSKCertificate<PSK>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(SecureConnectionNode(
+            Node(source: property.source)
+        )))
     }
 }

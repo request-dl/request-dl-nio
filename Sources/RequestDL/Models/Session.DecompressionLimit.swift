@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Session {
 
@@ -16,7 +15,7 @@ extension Session {
 
 extension Session.DecompressionLimit {
 
-    func build() -> RequestDLInternals.Session.Decompression.Limit {
+    func build() -> Internals.Session.Decompression.Limit {
         switch self {
         case .none:
             return .none

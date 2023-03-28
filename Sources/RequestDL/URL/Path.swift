@@ -75,17 +75,13 @@ public struct Path: Property {
     }
 }
 
-extension Path: PrimitiveProperty {
+extension Path {
 
-    struct Object: NodeObject {
+    private struct Node: PropertyNode {
 
         let path: String
 
-        init(_ path: String) {
-            self.path = path
-        }
-
-        func makeProperty(_ make: Make) {
+        func make(_ make: inout Make) async throws {
             guard let url = URL(string: make.request.url), !path.isEmpty else {
                 return
             }
@@ -94,7 +90,14 @@ extension Path: PrimitiveProperty {
         }
     }
 
-    func makeObject() -> Object {
-        .init(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+    public static func _makeProperty(
+        property: _GraphValue<Path>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+
+        let path = property.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        return .init(Leaf(Node(path: path)))
     }
 }

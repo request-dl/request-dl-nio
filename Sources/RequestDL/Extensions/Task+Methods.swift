@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Task {
 
@@ -20,12 +19,12 @@ extension Task {
      */
     public func ping(_ times: Int = 1, debug: Bool = true) async throws {
         guard times > 0 else {
-            fatalError("The 'times' parameter must be greater than 0.")
+            Internals.Log.failure("The 'times' parameter must be greater than 0.")
         }
 
         for index in 0 ..< times {
             if debug {
-                print("[RequestDL] Pinging \(index + 1) started")
+                Internals.Log.debug("Pinging \(index + 1) started")
             }
 
             let time = Date()
@@ -34,7 +33,7 @@ extension Task {
             if debug {
                 let interval = Date().timeIntervalSince(time)
 
-                print("[RequestDL] Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
+                Internals.Log.debug("[RequestDL] Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
             }
         }
     }

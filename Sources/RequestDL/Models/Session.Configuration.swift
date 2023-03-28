@@ -19,7 +19,7 @@ extension Session {
 
 extension Session.Configuration {
 
-    func build() -> RequestDLInternals.Session.Provider {
+    func build() -> Internals.Session.Provider {
         switch self {
         case .default:
             return .shared

@@ -3,13 +3,12 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct PrivateKey<Password: Collection>: Property where Password.Element == UInt8 {
 
     fileprivate enum Source {
         case file(String)
-        case privateKey(RequestDLInternals.PrivateKey<Password>)
+        case privateKey(Internals.PrivateKey<Password>)
     }
 
     private let source: Source
@@ -18,42 +17,42 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         self.source = source
     }
 
-    public init(_ file: String, format: CertificateFormat = .pem) where Password == [UInt8] {
+    public init(_ file: String, format: Certificate.Format = .pem) where Password == [UInt8] {
         switch format {
         case .pem:
             self.init(.file(file))
         case .der:
-            self.init(.privateKey(.init(file, format: format)))
+            self.init(.privateKey(.init(file, format: format())))
         }
     }
 
-    public init(_ bytes: [UInt8], format: CertificateFormat = .pem) where Password == [UInt8] {
+    public init(_ bytes: [UInt8], format: Certificate.Format = .pem) where Password == [UInt8] {
         self.init(.privateKey(.init(
             bytes,
-            format: format
+            format: format()
         )))
     }
 
     public init(
         _ file: String,
-        format: CertificateFormat = .pem,
+        format: Certificate.Format = .pem,
         password: @escaping ((Password) -> Void) -> Void
     ) {
         self.init(.privateKey(.init(
             file,
-            format: format,
+            format: format(),
             password: password
         )))
     }
 
     public init(
         _ bytes: [UInt8],
-        format: CertificateFormat = .pem,
+        format: Certificate.Format = .pem,
         password: @escaping ((Password) -> Void) -> Void
     ) {
         self.init(.privateKey(.init(
             bytes,
-            format: format,
+            format: format(),
             password: password
         )))
     }
@@ -63,16 +62,29 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
     }
 }
 
-extension PrivateKey: PrimitiveProperty {
+extension PrivateKey {
 
-    func makeObject() -> SecureConnectionNode {
-        SecureConnectionNode {
+    private struct Node: SecureConnectionPropertyNode {
+
+        let source: Source
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
             switch source {
             case .file(let file):
-                $0.privateKey = .file(file)
+                secureConnection.privateKey = .file(file)
             case .privateKey(let privateKey):
-                $0.privateKey = .privateKey(privateKey)
+                secureConnection.privateKey = .privateKey(privateKey)
             }
         }
+    }
+
+    public static func _makeProperty(
+        property: _GraphValue<PrivateKey<Password>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(SecureConnectionNode(
+            Node(source: property.source)
+        )))
     }
 }

@@ -10,7 +10,7 @@ class CertificateFormatTests: XCTestCase {
 
     func testFormat_whenIsPEM_shouldBePEM() async throws {
         // Given
-        let format = CertificateFormat.pem
+        let format = Certificate.Format.pem
 
         // When
         let resolved = format.build()
@@ -21,7 +21,7 @@ class CertificateFormatTests: XCTestCase {
 
     func testFormat_whenIsDER_shouldBeDER() async throws {
         // Given
-        let format = CertificateFormat.der
+        let format = Certificate.Format.der
 
         // When
         let resolved = format.build()

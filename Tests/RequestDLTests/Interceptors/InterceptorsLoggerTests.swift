@@ -3,7 +3,7 @@
 */
 
 import XCTest
-import RequestDLInternals
+@testable import RequestDLInternals
 @testable import RequestDL
 
 final class InterceptorsLoggerTests: XCTestCase {
@@ -13,7 +13,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         let data = Data("Hello World!".utf8)
         var strings = [String]()
 
-        Print.replace { items, separator, _ in
+        SwiftOverride.Print.replace { separator, _, items in
             strings.append(
                 items
                     .map { "\($0)" }
@@ -22,17 +22,19 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { Print.restoreRaise() }
+        defer { SwiftOverride.Print.restoreRaise() }
 
         let result = try await MockedTask { data }
             .logInConsole(true)
             .result()
 
         // Then
-        XCTAssertEqual(strings, [
-            "[RequestDL] Head: \(result.head)",
-            "[RequestDL] Payload: \(String(data: data, encoding: .utf8) ?? "")"
-        ])
+        XCTAssertTrue(strings.first?.contains(
+            """
+            Head: \(result.head)
+            Payload: \(String(data: data, encoding: .utf8) ?? "")
+            """
+        ) ?? false)
     }
 
     func testConsoleData() async throws {
@@ -40,7 +42,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         let data = Data("Hello World!".utf8)
         var strings = [String]()
 
-        Print.replace { items, separator, _ in
+        SwiftOverride.Print.replace { separator, _, items in
             strings.append(
                 items
                     .map { "\($0)" }
@@ -49,7 +51,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { Print.restoreRaise() }
+        defer { SwiftOverride.Print.restoreRaise() }
 
         _ = try await MockedTask { data }
             .extractPayload()
@@ -57,9 +59,11 @@ final class InterceptorsLoggerTests: XCTestCase {
             .result()
 
         // Then
-        XCTAssertEqual(strings, [
-            "[RequestDL] Success: \(String(data: data, encoding: .utf8) ?? "")"
-        ])
+        XCTAssertTrue(strings.first?.contains(
+            """
+            Success: \(String(data: data, encoding: .utf8) ?? "")
+            """
+        ) ?? false)
     }
 
     func testConsoleDecoded() async throws {
@@ -67,7 +71,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         let value = "Hello World!"
         var strings = [String]()
 
-        Print.replace { items, separator, _ in
+        SwiftOverride.Print.replace { separator, _, items in
             strings.append(
                 items
                     .map { "\($0)" }
@@ -76,7 +80,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { Print.restoreRaise() }
+        defer { SwiftOverride.Print.restoreRaise() }
 
         let data = try JSONEncoder().encode(value)
 
@@ -87,8 +91,8 @@ final class InterceptorsLoggerTests: XCTestCase {
             .result()
 
         // Then
-        XCTAssertEqual(strings, [
-            "[RequestDL] Success: \(value)"
-        ])
+        XCTAssertTrue(strings.first?.contains(
+            "Success: \(value)"
+        ) ?? false)
     }
 }

@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 /**
  A type that represents a data task request.
@@ -53,7 +52,7 @@ extension DataTask {
      - Throws: An error of type `Error` that indicates an issue with the request or response.
      */
     public func result() async throws -> AsyncResponse {
-        let (session, request) = try await Resolver(content).make()
+        let (session, request) = try await Resolve(content).build()
         return try await .init(session.request(request).response)
     }
 }

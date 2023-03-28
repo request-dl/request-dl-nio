@@ -37,12 +37,12 @@ public struct Session: Property {
 
     public typealias Body = Never
 
-    private var configuration: RequestDLInternals.Session.Configuration
-    private let provider: RequestDLInternals.Session.Provider
+    var configuration: Internals.Session.Configuration
+    let provider: Internals.Session.Provider
 
     fileprivate init(
-        configuration: RequestDLInternals.Session.Configuration,
-        provider: RequestDLInternals.Session.Provider
+        configuration: Internals.Session.Configuration,
+        provider: Internals.Session.Provider
     ) {
         self.configuration = configuration
         self.provider = provider
@@ -80,10 +80,10 @@ public struct Session: Property {
 
 private extension Session {
 
-    func edit(_ edit: (inout RequestDLInternals.Session.Configuration) -> Void) -> Self {
-        var mutableConfiguration = configuration
-        edit(&mutableConfiguration)
-        return self
+    func edit(_ edit: (inout Internals.Session.Configuration) -> Void) -> Self {
+        var mutableSelf = self
+        edit(&mutableSelf.configuration)
+        return mutableSelf
     }
 }
 
@@ -129,25 +129,24 @@ extension Session {
     }
 }
 
-extension Session: PrimitiveProperty {
+extension Session {
 
-    struct Object: NodeObject {
+    struct Node: PropertyNode {
 
-        let configuration: RequestDLInternals.Session.Configuration
-        let provider: RequestDLInternals.Session.Provider
+        let configuration: Internals.Session.Configuration
+        let provider: Internals.Session.Provider
 
-        init(
-            _ configuration: RequestDLInternals.Session.Configuration,
-            _ provider: RequestDLInternals.Session.Provider
-        ) {
-            self.configuration = configuration
-            self.provider = provider
-        }
-
-        func makeProperty(_ make: Make) {}
+        func make(_ make: inout Make) async throws {}
     }
 
-    func makeObject() -> Object {
-        .init(configuration, provider)
+    public static func _makeProperty(
+        property: _GraphValue<Session>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(
+            configuration: property.configuration,
+            provider: property.provider
+        )))
     }
 }

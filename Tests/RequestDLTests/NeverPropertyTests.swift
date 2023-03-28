@@ -12,7 +12,7 @@ final class NeverPropertyTests: XCTestCase {
 
         var body: some Property {
             if true {
-                fatalError("Never builds")
+                Internals.Log.failure("Never builds")
             }
         }
     }

@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct UnitTime: Hashable, Sendable {
 
@@ -88,7 +87,7 @@ extension UnitTime: AdditiveArithmetic {
 
 extension UnitTime {
 
-    func build() -> TimeAmount {
+    func build() -> Internals.TimeAmount {
         .nanoseconds(Int64(nanoseconds))
     }
 }

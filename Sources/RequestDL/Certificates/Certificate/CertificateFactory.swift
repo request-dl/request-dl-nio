@@ -3,33 +3,14 @@
 */
 
 import Foundation
-import RequestDLInternals
 
-class CertificateNode: SecureConnectionNode {
+struct CertificateNode: SecureConnectionPropertyNode {
 
-    private let source: Source
-    private let format: CertificateFormat
+    let source: Source
+    let property: CertificateProperty
+    let format: Internals.Certificate.Format
 
-    init(
-        source: Source,
-        format: CertificateFormat
-    ) {
-        self.source = source
-        self.format = format
-        super.init {
-            Self.resolve(
-                source: source,
-                format: format,
-                property: .additionalTrust,
-                secureConnection: &$0
-            )
-        }
-    }
-
-    func callAsFunction(
-        _ property: CertificateProperty,
-        secureConnection: inout RequestDLInternals.Session.SecureConnection
-    ) {
+    func make(_ secureConnection: inout Internals.SecureConnection) {
         Self.resolve(
             source: source,
             format: format,
@@ -43,8 +24,8 @@ extension CertificateNode {
 
     private static func appendCertificateAtChain(
         source: Source,
-        format: CertificateFormat,
-        secureConnection: inout RequestDLInternals.Session.SecureConnection
+        format: Internals.Certificate.Format,
+        secureConnection: inout Internals.SecureConnection
     ) {
         var chain = secureConnection.certificateChain ?? .init()
 
@@ -65,8 +46,8 @@ extension CertificateNode {
 
     private static func appendCertificateAtTrust(
         source: Source,
-        format: CertificateFormat,
-        secureConnection: inout RequestDLInternals.Session.SecureConnection
+        format: Internals.Certificate.Format,
+        secureConnection: inout Internals.SecureConnection
     ) {
         switch format {
         case .der:
@@ -87,8 +68,8 @@ extension CertificateNode {
 
     private static func appendCertificateAtAdditionalTrust(
         source: Source,
-        format: CertificateFormat,
-        secureConnection: inout RequestDLInternals.Session.SecureConnection
+        format: Internals.Certificate.Format,
+        secureConnection: inout Internals.SecureConnection
     ) {
         var trusts = secureConnection.additionalTrustRoots ?? .init()
 
@@ -113,9 +94,9 @@ extension CertificateNode {
 
     fileprivate static func resolve(
         source: Source,
-        format: CertificateFormat,
+        format: Internals.Certificate.Format,
         property: CertificateProperty,
-        secureConnection: inout RequestDLInternals.Session.SecureConnection
+        secureConnection: inout Internals.SecureConnection
     ) {
         switch property {
         case .chain:
@@ -125,6 +106,10 @@ extension CertificateNode {
                 secureConnection: &secureConnection
             )
         case .trust:
+            guard secureConnection.trustRoots == nil else {
+                fallthrough
+            }
+            
             appendCertificateAtTrust(
                 source: source,
                 format: format,
@@ -150,7 +135,7 @@ extension CertificateNode {
 
 extension CertificateNode.Source {
 
-    fileprivate func build(_ format: CertificateFormat) -> RequestDLInternals.Certificate {
+    fileprivate func build(_ format: Internals.Certificate.Format) -> Internals.Certificate {
         switch self {
         case .bytes(let bytes):
             return .init(bytes, format: format)

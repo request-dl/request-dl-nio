@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct PSKClientCertificate {
 
@@ -19,7 +18,7 @@ public struct PSKClientCertificate {
 
 extension PSKClientCertificate {
 
-    func build() -> PSKClientIdentityResponse {
+    func build() -> Internals.PSKClientIdentityResponse {
         .init(
             key: key,
             identity: identity

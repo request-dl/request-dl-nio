@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Interceptors {
 
@@ -49,11 +48,9 @@ extension Interceptors {
 
             switch result {
             case .failure(let error):
-                print("[RequestDL] Failure: \(error)")
+                Internals.Log.debug("Failure: \(error)")
             case .success(let result):
-                for line in results(result) {
-                    print("[RequestDL]", line)
-                }
+                Internals.Log.debug(results(result).joined(separator: "\n"))
             }
         }
     }

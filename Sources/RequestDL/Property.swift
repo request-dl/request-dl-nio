@@ -40,20 +40,19 @@ public protocol Property {
     var body: Body { get }
 
     /// This method is used internally and should not be called directly.
-    static func makeProperty(_ property: Self, _ context: Context) async throws
+    static func _makeProperty(property: _GraphValue<Self>, inputs: _PropertyInputs) async throws -> _PropertyOutputs
 }
 
 extension Property {
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(_ property: Self, _ context: Context) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
+    public static func _makeProperty(
+        property: _GraphValue<Self>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        try await Body._makeProperty(
+            property: property.body,
+            inputs: inputs[self]
         )
-
-        let newContext = context.append(node)
-        try await Body.makeProperty(property.body, newContext)
     }
 }

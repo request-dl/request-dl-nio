@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public struct AdditionalTrustRoots {
+public struct AdditionalTrustRoots: Equatable {
 
     private(set) var sources: [AdditionalTrustRootSource]
 

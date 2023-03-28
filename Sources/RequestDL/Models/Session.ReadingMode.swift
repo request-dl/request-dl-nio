@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 extension Session {
 
@@ -15,7 +14,7 @@ extension Session {
 
 extension Session.ReadingMode {
 
-    func build() -> RequestDLInternals.Response.ReadingMode {
+    func build() -> Internals.Response.ReadingMode {
         switch self {
         case .length(let length):
             return .length(length)

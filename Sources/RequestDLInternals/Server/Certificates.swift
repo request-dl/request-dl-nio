@@ -6,9 +6,9 @@ import Foundation
 
 public struct Certificates {
 
-    private let format: CertificateFormat
+    private let format: Certificate.Format
 
-    public init(_ format: CertificateFormat = .pem) {
+    public init(_ format: Certificate.Format = .pem) {
         self.format = format
     }
 

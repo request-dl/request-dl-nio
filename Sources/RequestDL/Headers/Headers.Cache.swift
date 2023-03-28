@@ -58,13 +58,17 @@ extension Headers {
     }
 }
 
-extension Headers.Cache: PrimitiveProperty {
+extension Headers.Cache {
 
-    func makeObject() -> Headers.Object {
-        Headers.Object(
-            contents().joined(separator: ", "),
+    public static func _makeProperty(
+        property: _GraphValue<Headers.Cache>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.contents.joined(separator: ", "),
             forKey: "Cache-Control"
-        )
+        )))
     }
 }
 
@@ -232,7 +236,7 @@ extension Headers.Cache {
 extension Headers.Cache {
 
     // swiftlint:disable cyclomatic_complexity
-    func contents() -> [String] {
+    var contents: [String] {
         var contents = [String]()
 
         if !isCached {

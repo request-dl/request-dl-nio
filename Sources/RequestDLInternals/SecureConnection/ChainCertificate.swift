@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public struct ChainCertificate {
+public struct ChainCertificate: Equatable {
 
     private(set) var sources: [CertificateSource]
 

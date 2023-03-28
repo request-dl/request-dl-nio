@@ -5,7 +5,7 @@
 import Foundation
 import NIOSSL
 
-public enum AdditionalTrustRootSource {
+public enum AdditionalTrustRootSource: Equatable {
     case file(String)
     case certificate(CertificateSource)
 }

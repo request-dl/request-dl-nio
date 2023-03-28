@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct _DictionaryPayload: PayloadProvider {
 
@@ -25,7 +24,7 @@ public struct _DictionaryPayload: PayloadProvider {
                 options: options
             )
         } catch {
-            fatalError(
+            Internals.Log.failure(
                 """
                 An error occurred while trying to serialize JSON data: \(error.localizedDescription).
                 """

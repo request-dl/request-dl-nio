@@ -51,7 +51,9 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
         guard
             ([.idle, .uploading].contains(state) && phase == .upload)
                 || [.head].contains(state) && phase == .download
-        else { fatalError() }
+        else {
+            unexpectedStateOrPhase()
+        }
 
         self.head.append(.success(ResponseHead(
             status: ResponseHead.Status(
@@ -76,7 +78,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void> {
         guard [.head, .downloading].contains(state) && phase == .download else {
-            fatalError()
+            unexpectedStateOrPhase()
         }
 
         download.append(buffer)
@@ -90,7 +92,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
         guard [.head, .downloading, .end].contains(state) && phase == .download else {
-            fatalError()
+            unexpectedStateOrPhase()
         }
 
         state = .end
@@ -120,6 +122,30 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
         case .end, .failure:
             fatalError()
         }
+    }
+}
+
+extension ClientResponseReceiver {
+    
+    func unexpectedStateOrPhase(_ line: UInt = #line) -> Never {
+        Log.debug(
+            """
+            state = \(state)
+            phase = \(phase)
+            """,
+            line: line
+        )
+
+        Log.failure(
+            """
+            An invalid state or phase has been detected, which could \
+            cause unexpected behavior within the application.
+
+            If this was not an intentional change, please report this \
+            issue by opening a bug report 🔎.
+            """,
+            line: line
+        )
     }
 }
 

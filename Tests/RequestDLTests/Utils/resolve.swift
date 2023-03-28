@@ -9,5 +9,5 @@ import RequestDLInternals
 func resolve<Content: Property>(
     _ content: Content
 ) async throws -> (RequestDLInternals.Session, RequestDLInternals.Request) {
-    try await Resolver(content).make()
+    try await Resolve(content).build()
 }

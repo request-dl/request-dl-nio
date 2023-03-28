@@ -3,7 +3,6 @@
 */
 
 import Foundation
-import RequestDLInternals
 
 public struct ResponseHead: Equatable {
 
@@ -24,7 +23,7 @@ public struct ResponseHead: Equatable {
         self.isKeepAlive = isKeepAlive
     }
 
-    init(_ head: RequestDLInternals.ResponseHead) {
+    init(_ head: Internals.ResponseHead) {
         self.init(
             status: .init(head.status),
             version: .init(head.version),
@@ -49,7 +48,7 @@ extension ResponseHead {
             self.reason = reason
         }
 
-        init(_ status: RequestDLInternals.ResponseHead.Status) {
+        init(_ status: Internals.ResponseHead.Status) {
             self.init(
                 code: status.code,
                 reason: status.reason
@@ -70,7 +69,7 @@ extension ResponseHead {
             self.major = major
         }
 
-        init(_ version: RequestDLInternals.ResponseHead.Version) {
+        init(_ version: Internals.ResponseHead.Version) {
             self.init(
                 minor: version.minor,
                 major: version.major

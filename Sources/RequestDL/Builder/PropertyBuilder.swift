@@ -48,8 +48,15 @@ public struct PropertyBuilder {
     }
 
     /// Builds a single instance of `Property` component.
-    public static func buildBlock<Content: Property>(_ component: Content) -> Content {
-        component
+    public static func buildPartialBlock<Content: Property>(first: Content) -> Content {
+        first
+    }
+
+    public static func buildPartialBlock<Content: Property, Next: Property>(
+        accumulated: Content,
+        next: Next
+    ) -> _PartialContent<Content, Next> {
+        .init(accumulated: accumulated, next: next)
     }
 
     /// A helper method for the `PropertyBuilder` to include optional content in the result builder.
@@ -63,11 +70,10 @@ public struct PropertyBuilder {
      - Note: This is a result builder method that is called when the builder encounters an `if` statement
      with a condition that evaluates to `true`.
      */
-    public static func buildEither<
-        TrueProperty: Property,
-        FalseProperty: Property
-    >(first: TrueProperty) -> _ConditionalContent<TrueProperty, FalseProperty> {
-        _ConditionalContent(first: first)
+    public static func buildEither<First: Property, Second: Property>(
+        first component: First
+    ) -> _EitherContent<First, Second> {
+        .init(first: component)
     }
 
     /**
@@ -87,11 +93,10 @@ public struct PropertyBuilder {
          }
      }
      */
-    public static func buildEither<
-        TrueProperty: Property,
-        FalseProperty: Property
-    >(second: FalseProperty) -> _ConditionalContent<TrueProperty, FalseProperty> {
-        _ConditionalContent(second: second)
+    public static func buildEither<First: Property, Second: Property>(
+        second component: Second
+    ) -> _EitherContent<First, Second> {
+        .init(second: component)
     }
 
     /**
@@ -113,163 +118,5 @@ public struct PropertyBuilder {
      */
     public static func buildLimitedAvailability<Content: Property>(_ component: Content) -> Content {
         component
-    }
-}
-
-// swiftlint:disable function_parameter_count identifier_name
-extension PropertyBuilder {
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property
-    >(
-        _ c0: C0,
-        _ c1: C1
-    ) -> _TupleContent<(C0, C1)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-        }
-    }
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property,
-        C2: Property
-    >(
-        _ c0: C0,
-        _ c1: C1,
-        _ c2: C2
-    ) -> _TupleContent<(C0, C1, C2)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-        }
-    }
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property,
-        C2: Property,
-        C3: Property
-    >(
-        _ c0: C0,
-        _ c1: C1,
-        _ c2: C2,
-        _ c3: C3
-    ) -> _TupleContent<(C0, C1, C2, C3)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-        }
-    }
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property,
-        C2: Property,
-        C3: Property,
-        C4: Property
-    >(
-        _ c0: C0,
-        _ c1: C1,
-        _ c2: C2,
-        _ c3: C3,
-        _ c4: C4
-    ) -> _TupleContent<(C0, C1, C2, C3, C4)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-        }
-    }
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property,
-        C2: Property,
-        C3: Property,
-        C4: Property,
-        C5: Property
-    >(
-        _ c0: C0,
-        _ c1: C1,
-        _ c2: C2,
-        _ c3: C3,
-        _ c4: C4,
-        _ c5: C5
-    ) -> _TupleContent<(C0, C1, C2, C3, C4, C5)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-            try await C5.makeProperty(c5, $0)
-        }
-    }
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property,
-        C2: Property,
-        C3: Property,
-        C4: Property,
-        C5: Property,
-        C6: Property
-    >(
-        _ c0: C0,
-        _ c1: C1,
-        _ c2: C2,
-        _ c3: C3,
-        _ c4: C4,
-        _ c5: C5,
-        _ c6: C6
-    ) -> _TupleContent<(C0, C1, C2, C3, C4, C5, C6)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-            try await C5.makeProperty(c5, $0)
-            try await C6.makeProperty(c6, $0)
-        }
-    }
-
-    public static func buildBlock<
-        C0: Property,
-        C1: Property,
-        C2: Property,
-        C3: Property,
-        C4: Property,
-        C5: Property,
-        C6: Property,
-        C7: Property
-    >(
-        _ c0: C0,
-        _ c1: C1,
-        _ c2: C2,
-        _ c3: C3,
-        _ c4: C4,
-        _ c5: C5,
-        _ c6: C6,
-        _ c7: C7
-    ) -> _TupleContent<(C0, C1, C2, C3, C4, C5, C6, C7)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-            try await C5.makeProperty(c5, $0)
-            try await C6.makeProperty(c6, $0)
-            try await C7.makeProperty(c7, $0)
-        }
     }
 }

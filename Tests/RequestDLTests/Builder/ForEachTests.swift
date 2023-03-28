@@ -14,7 +14,7 @@ final class ForEachTests: XCTestCase {
         // When
         let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
-            ForEach(paths) { path in
+            ForEach(paths, id: \.self) { path in
                 Path(path)
             }
         })
@@ -28,7 +28,7 @@ final class ForEachTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = ForEach([Int]()) { _ in
+        let property = ForEach([Int](), id: \.self) { _ in
             EmptyProperty()
         }
 

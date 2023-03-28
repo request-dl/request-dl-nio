@@ -36,9 +36,16 @@ extension Headers {
     }
 }
 
-extension Headers.Referer: PrimitiveProperty {
+extension Headers.Referer {
 
-    func makeObject() -> Headers.Object {
-        .init(value, forKey: "Referer")
+    public static func _makeProperty(
+        property: _GraphValue<Headers.Referer>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.value,
+            forKey: "Referer"
+        )))
     }
 }
