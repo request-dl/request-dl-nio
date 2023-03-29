@@ -28,6 +28,12 @@ public struct PSKCertificate<PSK: PSKType>: Property {
         source = .server(closure)
     }
 
+    public init(
+        _ closure: @escaping (PSKClientDescription) throws -> PSKClientCertificate
+    ) where PSK == PSKClient {
+        self.init(.client, closure)
+    }
+
     fileprivate func edit(_ edit: (inout Self) -> Void) -> Self {
         var mutableSelf = self
         edit(&mutableSelf)

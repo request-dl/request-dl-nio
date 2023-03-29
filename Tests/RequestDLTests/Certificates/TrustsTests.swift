@@ -70,4 +70,14 @@ class TrustsTests: XCTestCase {
             ])
         )
     }
+
+    func testTrusts_whenAccessBody_shouldBeNever() async throws {
+        // Given
+        let sut = RequestDL.Trusts {
+            RequestDL.Certificate([0, 1, 2])
+        }
+
+        // Then
+        try await assertNever(sut.body)
+    }
 }

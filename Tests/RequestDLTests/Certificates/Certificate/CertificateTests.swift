@@ -203,4 +203,12 @@ class CertificateTests: XCTestCase {
             .init([.certificate(.init(bytes, format: .der))])
         )
     }
+
+    func testCertificate_whenAccessBody_shouldBeNever() async throws {
+        // Given
+        let sut = RequestDL.Certificate([0, 1, 2])
+
+        // Then
+        try await assertNever(sut.body)
+    }
 }

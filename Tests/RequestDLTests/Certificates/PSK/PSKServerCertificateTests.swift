@@ -7,7 +7,14 @@ import XCTest
 
 class PSKServerCertificateTests: XCTestCase {
 
-    func testHelloWorld() async throws {
-        XCTFail("Hello World")
+    func testPSK_whenInit_shouldBeValid() async throws {
+        // Given
+        let key = SecureBytes([0, 1, 2])
+
+        // When
+        let sut = PSKServerCertificate(key).build()
+
+        // Then
+        XCTAssertEqual(sut.key, key)
     }
 }
