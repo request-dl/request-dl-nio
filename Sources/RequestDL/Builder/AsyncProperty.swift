@@ -41,7 +41,7 @@ public struct AsyncProperty<Content: Property>: Property {
      Initializes with an asynchronous content provided.
 
      - Parameters:
-        - content: The content of the request to be built.
+     - content: The content of the request to be built.
      */
     public init(@PropertyBuilder content: @escaping () async throws -> Content) {
         self.content = content
@@ -51,6 +51,9 @@ public struct AsyncProperty<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
+}
+
+extension AsyncProperty {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(

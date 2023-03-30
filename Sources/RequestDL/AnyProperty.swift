@@ -26,6 +26,7 @@ public struct AnyProperty: Property {
         }
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
@@ -33,6 +34,7 @@ public struct AnyProperty: Property {
 
 extension AnyProperty {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<AnyProperty>,
         inputs: _PropertyInputs

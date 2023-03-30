@@ -4,7 +4,7 @@
 
 import Foundation
 
-/// A struct representing an empty request.
+/// A struct representing an empty property.
 public struct EmptyProperty: Property {
 
     /// Initializes an empty request.
@@ -18,6 +18,7 @@ public struct EmptyProperty: Property {
 
 extension EmptyProperty {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<EmptyProperty>,
         inputs: _PropertyInputs

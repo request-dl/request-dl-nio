@@ -134,6 +134,7 @@ extension BaseURL {
         func make(_ make: inout Make) async throws {}
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<BaseURL>,
         inputs: _PropertyInputs

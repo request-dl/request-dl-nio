@@ -40,6 +40,7 @@ public struct FormValue: Property {
 
 extension FormValue {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<FormValue>,
         inputs: _PropertyInputs

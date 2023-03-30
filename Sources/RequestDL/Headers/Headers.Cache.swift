@@ -60,6 +60,7 @@ extension Headers {
 
 extension Headers.Cache {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Headers.Cache>,
         inputs: _PropertyInputs

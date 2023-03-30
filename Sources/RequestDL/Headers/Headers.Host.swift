@@ -44,6 +44,7 @@ extension Headers {
 
 extension Headers.Host {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Headers.Host>,
         inputs: _PropertyInputs

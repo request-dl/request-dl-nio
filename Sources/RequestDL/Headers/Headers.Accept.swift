@@ -31,6 +31,7 @@ extension Headers {
 
 extension Headers.Accept {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Headers.Accept>,
         inputs: _PropertyInputs

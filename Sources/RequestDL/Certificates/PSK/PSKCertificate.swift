@@ -40,6 +40,7 @@ public struct PSKCertificate<PSK: PSKType>: Property {
         return mutableSelf
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
@@ -78,6 +79,7 @@ extension PSKCertificate {
         }
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<PSKCertificate<PSK>>,
         inputs: _PropertyInputs

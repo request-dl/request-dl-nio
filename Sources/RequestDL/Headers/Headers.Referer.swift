@@ -38,6 +38,7 @@ extension Headers {
 
 extension Headers.Referer {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Headers.Referer>,
         inputs: _PropertyInputs

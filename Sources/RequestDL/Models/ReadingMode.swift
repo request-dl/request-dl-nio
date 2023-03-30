@@ -20,6 +20,7 @@ public struct ReadingMode: Property {
         self.init(separator: Array(Data(separator.utf8)))
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
@@ -36,6 +37,7 @@ extension ReadingMode {
         }
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<ReadingMode>,
         inputs: _PropertyInputs

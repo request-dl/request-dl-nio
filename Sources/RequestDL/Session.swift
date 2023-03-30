@@ -138,6 +138,7 @@ extension Session {
         func make(_ make: inout Make) async throws {}
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Session>,
         inputs: _PropertyInputs

@@ -57,6 +57,7 @@ extension RequestMethod {
         }
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<RequestMethod>,
         inputs: _PropertyInputs

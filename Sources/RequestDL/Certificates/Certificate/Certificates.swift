@@ -41,6 +41,7 @@ public struct Certificates<Content: Property>: Property {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
@@ -74,6 +75,7 @@ extension Certificates {
         }
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Certificates<Content>>,
         inputs: _PropertyInputs

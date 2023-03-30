@@ -56,6 +56,7 @@ extension Headers {
 
 extension Headers.Origin {
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Headers.Origin>,
         inputs: _PropertyInputs

@@ -19,6 +19,7 @@ public struct SecureConnection<Content: Property>: Property {
         self.content = content()
     }
 
+    /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
@@ -144,6 +145,7 @@ extension SecureConnection {
         }
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<SecureConnection<Content>>,
         inputs: _PropertyInputs

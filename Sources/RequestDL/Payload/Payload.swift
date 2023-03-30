@@ -109,6 +109,7 @@ extension Payload {
         }
     }
 
+    /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<Payload<Provider>>,
         inputs: _PropertyInputs
