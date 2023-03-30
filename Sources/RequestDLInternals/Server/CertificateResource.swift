@@ -4,7 +4,7 @@
 
 import Foundation
 
-public struct CertificateResouce {
+public struct CertificateResource {
 
     public let certificateURL: URL
 
@@ -13,7 +13,7 @@ public struct CertificateResouce {
     public let pskURL: URL
 }
 
-extension CertificateResouce {
+extension CertificateResource {
 
     init(
         _ path: String,

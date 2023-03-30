@@ -28,18 +28,20 @@ extension URL {
 
     public func absolutePath(percentEncoded: Bool = true) -> String {
         #if canImport(Darwin)
-        return darwin_absolutePath(percentEncoded: percentEncoded)
+        return absoluteURL.darwin_absolutePath(percentEncoded: percentEncoded)
         #else
-        return unknown_absolutePath(percentEncoded: percentEncoded)
+        return absoluteURL.unknown_absolutePath(percentEncoded: percentEncoded)
         #endif
     }
 
     public func createPathIfNeeded() throws {
-        let diretories = deletingLastPathComponent()
+        let path = absolutePath()
+
+        let directories = deletingLastPathComponent()
 
         if !FileManager.default.fileExists(atPath: path) {
             try FileManager.default.createDirectory(
-                at: diretories,
+                at: directories,
                 withIntermediateDirectories: true
             )
         }
@@ -50,6 +52,8 @@ extension URL {
     }
 
     public func removeIfNeeded() throws {
+        let path = absolutePath()
+        
         if FileManager.default.fileExists(atPath: path) {
             try FileManager.default.removeItem(at: self)
         }

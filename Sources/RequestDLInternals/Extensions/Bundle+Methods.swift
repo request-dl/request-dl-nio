@@ -6,42 +6,57 @@ import Foundation
 
 extension Bundle {
 
-    public func resolve(name: String) -> (name: String, subdirectory: String?) {
-        guard name.contains("/") else {
-            return (name, nil)
+    private struct File {
+        let name: String
+        let `extension`: String?
+        let subdirectory: String?
+    }
+
+    private func resolve(name: String) -> File {
+        guard !name.isEmpty else {
+            return .init(
+                name: name,
+                extension: nil,
+                subdirectory: nil
+            )
         }
 
         var components = name.split(separator: "/")
+        let nameWithExtension = components.removeLast()
 
-        return (
-            name: String(components.removeLast()),
-            subdirectory: String(components.joined(separator: "/"))
+        if !nameWithExtension.contains(".") {
+            return .init(
+                name: "\(nameWithExtension)",
+                extension: nil,
+                subdirectory: components.isEmpty ? nil : components.joined(separator: "/")
+            )
+        }
+
+        var nameComponents = nameWithExtension.split(separator: ".")
+        let `extension` = nameComponents.removeLast()
+
+        return .init(
+            name: nameComponents.joined(separator: "."),
+            extension: "\(`extension`)",
+            subdirectory: components.joined(separator: "/")
         )
     }
 
     public func resolveURL(forResourceName name: String) -> URL? {
-        let (name, subdirectory) = resolve(name: name)
+        let file = resolve(name: name)
 
-        let resourcesURL = (urls(
-            forResourcesWithExtension: nil,
-            subdirectory: subdirectory
-        ) ?? []) as [URL]
+        let urls = urls(
+            forResourcesWithExtension: file.extension,
+            subdirectory: file.subdirectory,
+            localization: nil
+        ) ?? []
 
-        guard !name.contains(".") else {
-            return resourcesURL.first { $0.lastPathComponent == name }
-        }
-
-        return resourcesURL.first(where: {
-            let path = $0.lastPathComponent
-
-            guard path.contains(".") else {
-                return path == name
+        return (urls as [URL]).first(where: {
+            if let pathExtension = file.extension {
+                return $0.lastPathComponent == "\(file.name).\(pathExtension)"
+            } else {
+                return $0.deletingPathExtension().lastPathComponent == file.name
             }
-
-            return path
-                .split(separator: ".", omittingEmptySubsequences: false)
-                .dropLast()
-                .joined(separator: ".") == name
         })
     }
 
@@ -52,6 +67,6 @@ extension Bundle {
 
         return bundleURL
             .appendingPathComponent("Contents")
-            .appendingPathComponent("Resource")
+            .appendingPathComponent("Resources")
     }
 }

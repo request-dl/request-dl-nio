@@ -22,3 +22,17 @@ extension PrivateKeySource {
         }
     }
 }
+
+extension PrivateKeySource: Equatable {
+
+    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.file(let lhs), .file(let rhs)):
+            return lhs == rhs
+        case (.privateKey(let lhs), .privateKey(let rhs)):
+            return lhs.isEqual(to: rhs)
+        default:
+            return false
+        }
+    }
+}

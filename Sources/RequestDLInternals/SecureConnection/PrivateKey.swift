@@ -9,7 +9,7 @@ public struct PrivateKey<Password: Collection> where Password.Element == UInt8 {
 
     public typealias PasswordClosure = ((Password) -> Void) throws -> Void
 
-    enum Source {
+    enum Source: Equatable {
         case file(String)
         case bytes([UInt8])
     }
@@ -18,25 +18,25 @@ public struct PrivateKey<Password: Collection> where Password.Element == UInt8 {
     let format: Certificate.Format
     let password: PasswordClosure?
 
-    public init(_ file: String, format: Certificate.Format) where Password == [UInt8] {
+    public init(_ file: String, format: Certificate.Format = .pem) where Password == [UInt8] {
         self.source = .file(file)
         self.format = format
         self.password = nil
     }
 
-    public init(_ bytes: [UInt8], format: Certificate.Format) where Password == [UInt8] {
+    public init(_ bytes: [UInt8], format: Certificate.Format = .pem) where Password == [UInt8] {
         self.source = .bytes(bytes)
         self.format = format
         self.password = nil
     }
 
-    public init(_ file: String, format: Certificate.Format, password: @escaping PasswordClosure) {
+    public init(_ file: String, format: Certificate.Format = .pem, password: @escaping PasswordClosure) {
         self.source = .file(file)
         self.format = format
         self.password = password
     }
 
-    public init(_ bytes: [UInt8], format: Certificate.Format, password: @escaping PasswordClosure) {
+    public init(_ bytes: [UInt8], format: Certificate.Format = .pem, password: @escaping PasswordClosure) {
         self.source = .bytes(bytes)
         self.format = format
         self.password = password
@@ -62,5 +62,14 @@ extension PrivateKey: PrivateKeyRepresentable {
                 return try .init(file: file, format: format)
             }
         }
+    }
+
+    public func isEqual(to representable: PrivateKeyRepresentable) -> Bool {
+        guard
+            let lhs = try? build(),
+            let rhs = try? representable.build()
+        else { return false }
+
+        return lhs == rhs
     }
 }

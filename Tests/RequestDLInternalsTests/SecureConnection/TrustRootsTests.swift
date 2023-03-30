@@ -8,6 +8,16 @@ import NIOSSL
 
 class TrustRootsTests: XCTestCase {
 
+    var client: CertificateResource!
+    var server: CertificateResource!
+
+    override func setUp() async throws {
+        try await super.setUp()
+
+        client = Certificates().client()
+        server = Certificates().server()
+    }
+
     func testRoots_whenDefault_shouldBeValid() async throws {
         // Given
         let root = TrustRoots.default
@@ -19,26 +29,56 @@ class TrustRootsTests: XCTestCase {
         XCTAssertEqual(resolved, .default)
     }
 
-    func testRoots_whenCertificate_shouldBeValid() async throws {
+    func testTrusts_whenCertificates_shouldBeValid() async throws {
         // Given
-        let certificates = Certificates().client()
-        let data = try Data(contentsOf: certificates.certificateURL)
+        var trusts = TrustRoots()
+        trusts.append(.init(client.certificateURL.absolutePath()))
+        trusts.append(.init(server.certificateURL.absolutePath()))
 
         // When
-        let resolved = try TrustRoots.certificate(.bytes(Array(data))).build()
+        let sut = try trusts.build()
 
         // Then
-        XCTAssertEqual(resolved, try .certificates(NIOSSLCertificate.fromPEMBytes(Array(data))))
+        XCTAssertEqual(sut, try .certificates([
+            .init(file: client.certificateURL.absolutePath(), format: .pem),
+            .init(file: server.certificateURL.absolutePath(), format: .pem)
+        ]))
     }
 
-    func testRoots_whenFile_shouldBeValid() async throws {
+    func testTrustRoot_whenFilesMerged_shouldBeValid() async throws {
         // Given
-        let certificates = Certificates().client()
+        let data = try [client, server]
+            .map { try Data(contentsOf: $0.certificateURL) }
+            .reduce(Data(), +)
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RequestDL.\(UUID())")
+            .appendingPathComponent("merged.pem")
+
+        defer { try? fileURL.removeIfNeeded() }
+        try fileURL.createPathIfNeeded()
+
+        try data.write(to: fileURL)
 
         // When
-        let resolved = try TrustRoots.file(certificates.certificateURL.path).build()
+        let sut = try TrustRoots.file(fileURL.absolutePath()).build()
 
         // Then
-        XCTAssertEqual(resolved, .file(certificates.certificateURL.path))
+        XCTAssertEqual(sut, .file(fileURL.absolutePath()))
+    }
+
+    func testTrustRoot_whenBytesMerged_shouldBeValid() async throws {
+        // Given
+        let data = try [client, server]
+            .map { try Data(contentsOf: $0.certificateURL) }
+            .reduce(Data(), +)
+
+        let bytes = Array(data)
+
+        // When
+        let sut = try TrustRoots.bytes(bytes).build()
+
+        // Then
+        XCTAssertEqual(sut, try .certificates(NIOSSLCertificate.fromPEMBytes(bytes)))
     }
 }

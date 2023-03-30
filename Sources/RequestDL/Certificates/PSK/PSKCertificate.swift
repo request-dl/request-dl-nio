@@ -57,8 +57,11 @@ extension PSKCertificate {
     private struct Node: SecureConnectionPropertyNode {
 
         let source: Source
+        let hint: String?
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
+            secureConnection.pskHint = hint
+
             switch source {
             case .client(let closure):
                 secureConnection.pskClientCallback = {
@@ -81,7 +84,10 @@ extension PSKCertificate {
     ) async throws -> _PropertyOutputs {
         _ = inputs[self]
         return .init(Leaf(SecureConnectionNode(
-            Node(source: property.source)
+            Node(
+                source: property.source,
+                hint: property.hint
+            )
         )))
     }
 }

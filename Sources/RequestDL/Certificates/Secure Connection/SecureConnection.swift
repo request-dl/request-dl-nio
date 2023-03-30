@@ -47,6 +47,13 @@ extension SecureConnection {
     public func version(_ range: Range<TLSVersion>) -> Self {
         version(
             minimum: range.lowerBound,
+            maximum: range.upperBound.downgrade
+        )
+    }
+
+    public func version(_ range: ClosedRange<TLSVersion>) -> Self {
+        version(
+            minimum: range.lowerBound,
             maximum: range.upperBound
         )
     }
@@ -105,7 +112,7 @@ extension SecureConnection {
 extension SecureConnection {
 
     public func sendCANameListDisabled(_ isDisabled: Bool) -> Self {
-        edit { $0.secureConnection.sendCANameList = isDisabled }
+        edit { $0.secureConnection.sendCANameList = !isDisabled }
     }
 }
 
@@ -114,6 +121,10 @@ extension SecureConnection {
     public func cipherSuites(_ suites: String...) -> Self {
         suites.forEach { precondition(!$0.contains(":")) }
         return edit { $0.secureConnection.cipherSuites = suites.joined(separator: ":") }
+    }
+
+    public func cipherSuites(_ suites: NIOTLSCipher...) -> Self {
+        return edit { $0.secureConnection.cipherSuiteValues = suites }
     }
 }
 
@@ -137,11 +148,7 @@ extension SecureConnection {
         property: _GraphValue<SecureConnection<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        var inputs = inputs[self, \.content]
-
-        if property.secureConnection.context == .server {
-            inputs.environment.certificateProperty = .chain
-        }
+        let inputs = inputs[self, \.content]
 
         let outputs = try await Content._makeProperty(
             property: property.content,

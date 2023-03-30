@@ -15,12 +15,12 @@ public struct Certificate: Equatable {
     let source: Source
     let format: Format
 
-    public init(_ file: String, format: Format) {
+    public init(_ file: String, format: Format = .pem) {
         self.source = .file(file)
         self.format = format
     }
 
-    public init(_ bytes: [UInt8], format: Format) {
+    public init(_ bytes: [UInt8], format: Format = .pem) {
         self.source = .bytes(bytes)
         self.format = format
     }

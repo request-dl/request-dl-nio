@@ -6,7 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDLInternals
 
-class AdditionalTrustRootsTests: XCTestCase {
+class CertificateChainTests: XCTestCase {
 
     var client: CertificateResource!
     var server: CertificateResource!
@@ -18,20 +18,20 @@ class AdditionalTrustRootsTests: XCTestCase {
         server = Certificates().server()
     }
 
-    func testTrusts_whenCertificates_shouldBeValid() async throws {
+    func testChain_whenCertificates_shouldBeValid() async throws {
         // Given
-        var trusts = AdditionalTrustRoots()
-        trusts.append(.init(client.certificateURL.absolutePath()))
-        trusts.append(.init(server.certificateURL.absolutePath()))
+        var chain = CertificateChain()
+        chain.append(.init(client.certificateURL.absolutePath()))
+        chain.append(.init(server.certificateURL.absolutePath()))
 
         // When
-        let sut = try trusts.build()
+        let sut = try chain.build()
 
         // Then
-        XCTAssertEqual(sut, try .certificates([
-            .init(file: client.certificateURL.absolutePath(), format: .pem),
-            .init(file: server.certificateURL.absolutePath(), format: .pem)
-        ]))
+        XCTAssertEqual(sut, try [
+            .certificate(.init(file: client.certificateURL.absolutePath(), format: .pem)),
+            .certificate(.init(file: server.certificateURL.absolutePath(), format: .pem))
+        ])
     }
 
     func testTrustRoot_whenFilesMerged_shouldBeValid() async throws {
@@ -50,10 +50,12 @@ class AdditionalTrustRootsTests: XCTestCase {
         try data.write(to: fileURL)
 
         // When
-        let sut = try AdditionalTrustRoots.file(fileURL.absolutePath()).build()
+        let sut = try CertificateChain.file(fileURL.absolutePath()).build()
 
         // Then
-        XCTAssertEqual(sut, .file(fileURL.absolutePath()))
+        XCTAssertEqual(sut, try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath()).map {
+            .certificate($0)
+        })
     }
 
     func testTrustRoot_whenBytesMerged_shouldBeValid() async throws {
@@ -65,9 +67,11 @@ class AdditionalTrustRootsTests: XCTestCase {
         let bytes = Array(data)
 
         // When
-        let sut = try AdditionalTrustRoots.bytes(bytes).build()
+        let sut = try CertificateChain.bytes(bytes).build()
 
         // Then
-        XCTAssertEqual(sut, try .certificates(NIOSSLCertificate.fromPEMBytes(bytes)))
+        XCTAssertEqual(sut, try NIOSSLCertificate.fromPEMBytes(bytes).map {
+            .certificate($0)
+        })
     }
 }

@@ -24,10 +24,10 @@ extension Session {
     public struct SecureConnection {
 
         public var context: ConnectionContext
-        public var certificateChain: ChainCertificate?
+        public var certificateChain: CertificateChain?
         public var certificateVerification: CertificateVerification?
         public var trustRoots: TrustRoots?
-        public var additionalTrustRoots: AdditionalTrustRoots?
+        public var additionalTrustRoots: [AdditionalTrustRoots]?
         public var privateKey: PrivateKeySource?
         public var signingSignatureAlgorithms: [SignatureAlgorithm]?
         public var verifySignatureAlgorithms: [SignatureAlgorithm]?
@@ -106,7 +106,9 @@ extension Session.SecureConnection {
         }
 
         if let additionalTrustRoots {
-            tlsConfiguration.additionalTrustRoots = try additionalTrustRoots.build()
+            tlsConfiguration.additionalTrustRoots = try additionalTrustRoots.map {
+                try $0.build()
+            }
         }
 
         if let certificateVerification {

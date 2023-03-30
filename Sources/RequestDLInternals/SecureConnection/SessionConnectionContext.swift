@@ -6,7 +6,7 @@ import Foundation
 
 extension Session {
 
-    public enum ConnectionContext {
+    public enum ConnectionContext: Equatable {
         case client
         case server
     }

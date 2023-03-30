@@ -4,7 +4,7 @@
 
 import Foundation
 
-public struct Certificates<Content: Property>: Property {
+public struct AdditionalTrusts<Content: Property>: Property {
 
     enum Source {
         case file(String)
@@ -46,7 +46,7 @@ public struct Certificates<Content: Property>: Property {
     }
 }
 
-extension Certificates {
+extension AdditionalTrusts {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -61,21 +61,25 @@ extension Certificates {
         func make(_ secureConnection: inout Internals.SecureConnection) {
             switch source {
             case .file(let file):
-                secureConnection.certificateChain = .file(file)
+                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
+                additionalTrustRoots.append(.file(file))
+                secureConnection.additionalTrustRoots = additionalTrustRoots
             case .bytes(let bytes):
-                secureConnection.certificateChain = .bytes(bytes)
+                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
+                additionalTrustRoots.append(.bytes(bytes))
+                secureConnection.additionalTrustRoots = additionalTrustRoots
             case .nodes(let nodes):
                 var collector = secureConnection.collector()
                 for node in nodes {
                     node.passthrough(&collector)
                 }
-                secureConnection = collector(\.certificateChain)
+                secureConnection = collector(\.additionalTrustRoots)
             }
         }
     }
 
     public static func _makeProperty(
-        property: _GraphValue<Certificates<Content>>,
+        property: _GraphValue<AdditionalTrusts<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         switch property.source {
@@ -94,7 +98,7 @@ extension Certificates {
         case .content:
             var inputs = inputs[self, \.content]
 
-            inputs.environment.certificateProperty = .chain
+            inputs.environment.certificateProperty = .additionalTrust
 
             let outputs = try await Content._makeProperty(
                 property: property.content,

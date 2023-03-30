@@ -27,6 +27,7 @@ extension Modifiers {
 
      - Note: This modifier is available in iOS 15.0+, tvOS 15.0+, watchOS 15.0+, and macOS 12.0+.
      */
+    @available(*, deprecated, renamed: "IgnoresProgress")
     public struct ConvertBytesToData<Content: Task, Output>: TaskModifier {
 
         private let bytes: (Content.Element) -> AsyncBytes
@@ -70,6 +71,7 @@ extension Task<TaskResult<AsyncBytes>> {
 
      - Returns: A modified task that produces `TaskResult<Data>`.
      */
+    @available(*, deprecated, renamed: "ignoresDownloadProgress")
     public func convertBytesToData() -> ModifiedTask<Modifiers.ConvertBytesToData<Self, TaskResult<Data>>> {
         modify(Modifiers.ConvertBytesToData(
             bytes: \.payload,
@@ -91,6 +93,7 @@ extension Task<AsyncBytes> {
 
      - Returns: A modified task that produces `Data`.
      */
+    @available(*, deprecated, renamed: "ignoresDownloadProgress")
     public func convertBytesToData() -> ModifiedTask<Modifiers.ConvertBytesToData<Self, Data>> {
         modify(Modifiers.ConvertBytesToData(
             bytes: { $0 },

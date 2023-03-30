@@ -6,7 +6,7 @@ import XCTest
 @testable import RequestDLInternals
 @testable import RequestDL
 
-class TrustsTests: XCTestCase {
+class AdditionalTrustsTests: XCTestCase {
 
     var client: CertificateResource!
     var server: CertificateResource!
@@ -17,14 +17,14 @@ class TrustsTests: XCTestCase {
         server = RequestDLInternals.Certificates().server()
     }
 
-    func testTrusts_whenCertificates_shouldBeValid() async throws {
+    func testAdditional_whenCertificates_shouldBeValid() async throws {
         // Given
         let server = try Array(Data(contentsOf: server.certificateURL))
 
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Trusts {
+                RequestDL.AdditionalTrusts {
                     RequestDL.Certificate(client.certificateURL.absolutePath())
                     RequestDL.Certificate(server)
                 }
@@ -33,15 +33,15 @@ class TrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
-            .certificates([
+            session.configuration.secureConnection?.additionalTrustRoots,
+            .init([.certificates([
                 .init(client.certificateURL.absolutePath()),
                 .init(server)
-            ])
+            ])])
         )
     }
 
-    func testTrusts_whenFile_shouldBeValid() async throws {
+    func testAdditional_whenFile_shouldBeValid() async throws {
         // Given
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -59,18 +59,18 @@ class TrustsTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Trusts(fileURL.absolutePath())
+                RequestDL.AdditionalTrusts(fileURL.absolutePath())
             }
         })
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
-            .file(fileURL.absolutePath())
+            session.configuration.secureConnection?.additionalTrustRoots,
+            .init([.file(fileURL.absolutePath())])
         )
     }
 
-    func testTrusts_whenBytes_shouldBeValid() async throws {
+    func testAdditional_whenBytes_shouldBeValid() async throws {
         // Given
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -81,20 +81,20 @@ class TrustsTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Trusts(bytes)
+                RequestDL.AdditionalTrusts(bytes)
             }
         })
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
-            .bytes(bytes)
+            session.configuration.secureConnection?.additionalTrustRoots,
+            .init([.bytes(bytes)])
         )
     }
 
     func testTrusts_whenAccessBody_shouldBeNever() async throws {
         // Given
-        let sut = RequestDL.Trusts {
+        let sut = RequestDL.AdditionalTrusts {
             RequestDL.Certificate([0, 1, 2])
         }
 

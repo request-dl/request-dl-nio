@@ -3,7 +3,3 @@
 */
 
 import Foundation
-
-public enum TrustsOption {
-    case `default`
-}

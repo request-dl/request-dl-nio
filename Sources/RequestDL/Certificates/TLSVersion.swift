@@ -13,6 +13,17 @@ public enum TLSVersion: Int {
 
 extension TLSVersion: Comparable {
 
+    var downgrade: TLSVersion {
+        switch self {
+        case .v1, .v1_1:
+            return .v1
+        case .v1_2:
+            return .v1_1
+        case .v1_3:
+            return .v1_2
+        }
+    }
+
     public static func < (_ lhs: TLSVersion, _ rhs: TLSVersion) -> Bool {
         lhs.rawValue < rhs.rawValue
     }

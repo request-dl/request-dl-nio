@@ -5,12 +5,12 @@
 import Foundation
 
 struct CertificatePropertyKey: EnvironmentKey {
-    static var defaultValue: CertificateProperty = .additionalTrust
+    static var defaultValue: CertificateProperty?
 }
 
 extension EnvironmentValues {
 
-    var certificateProperty: CertificateProperty {
+    var certificateProperty: CertificateProperty? {
         get { self[CertificatePropertyKey.self] }
         set { self[CertificatePropertyKey.self] = newValue }
     }

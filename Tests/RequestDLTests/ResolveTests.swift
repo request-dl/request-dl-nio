@@ -69,12 +69,14 @@ class ResolveTests: XCTestCase {
                     Certificate([0, 1, 2])
                 }
 
-                Certificate([2, 3, 4])
-                Certificate([4, 5, 6])
-
                 Trusts {
                     Certificate([6, 7, 8])
                     Certificate([8, 9, 10])
+                }
+
+                AdditionalTrusts {
+                    Certificate([2, 3, 4])
+                    Certificate([4, 5, 6])
                 }
             }
 
@@ -268,94 +270,123 @@ extension ResolveTests {
                         nodes = Array [
                             Leaf<SecureConnectionNode> {
                                 property = SecureConnectionNode {
-                                    node = Node {
-                                        nodes = Array [
-                                            Leaf<SecureConnectionNode> {
-                                                property = SecureConnectionNode {
-                                                    node = CertificateNode {
-                                                        source = Source.bytes(
-                                                            Array [
-                                                                0,
-                                                                1,
-                                                                2
-                                                            ]
-                                                        ),
-                                                        property = .chain,
-                                                        format = .pem
+                                    source = Source.node(
+                                        Node {
+                                            source = Source.nodes(
+                                                Array [
+                                                    Leaf<SecureConnectionNode> {
+                                                        property = SecureConnectionNode {
+                                                            source = Source.collectorNode(
+                                                                CertificateNode {
+                                                                    source = Source.bytes(
+                                                                        Array [
+                                                                            0,
+                                                                            1,
+                                                                            2
+                                                                        ]
+                                                                    ),
+                                                                    property = .chain,
+                                                                    format = .pem
+                                                                }
+                                                            )
+                                                        }
                                                     }
-                                                }
-                                            }
-                                        ]
-                                    }
+                                                ]
+                                            )
+                                        }
+                                    )
                                 }
                             },
                             Leaf<SecureConnectionNode> {
                                 property = SecureConnectionNode {
-                                    node = CertificateNode {
-                                        source = Source.bytes(
-                                            Array [
-                                                2,
-                                                3,
-                                                4
-                                            ]
-                                        ),
-                                        property = .additionalTrust,
-                                        format = .pem
-                                    }
+                                    source = Source.node(
+                                        Node {
+                                            source = Source.nodes(
+                                                Array [
+                                                    Leaf<SecureConnectionNode> {
+                                                        property = SecureConnectionNode {
+                                                            source = Source.collectorNode(
+                                                                CertificateNode {
+                                                                    source = Source.bytes(
+                                                                        Array [
+                                                                            6,
+                                                                            7,
+                                                                            8
+                                                                        ]
+                                                                    ),
+                                                                    property = .trust,
+                                                                    format = .pem
+                                                                }
+                                                            )
+                                                        }
+                                                    },
+                                                    Leaf<SecureConnectionNode> {
+                                                        property = SecureConnectionNode {
+                                                            source = Source.collectorNode(
+                                                                CertificateNode {
+                                                                    source = Source.bytes(
+                                                                        Array [
+                                                                            8,
+                                                                            9,
+                                                                            10
+                                                                        ]
+                                                                    ),
+                                                                    property = .trust,
+                                                                    format = .pem
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                ]
+                                            )
+                                        }
+                                    )
                                 }
                             },
                             Leaf<SecureConnectionNode> {
                                 property = SecureConnectionNode {
-                                    node = CertificateNode {
-                                        source = Source.bytes(
-                                            Array [
-                                                4,
-                                                5,
-                                                6
-                                            ]
-                                        ),
-                                        property = .additionalTrust,
-                                        format = .pem
-                                    }
-                                }
-                            },
-                            Leaf<SecureConnectionNode> {
-                                property = SecureConnectionNode {
-                                    node = Node {
-                                        isDefault = false,
-                                        nodes = Array [
-                                            Leaf<SecureConnectionNode> {
-                                                property = SecureConnectionNode {
-                                                    node = CertificateNode {
-                                                        source = Source.bytes(
-                                                            Array [
-                                                                6,
-                                                                7,
-                                                                8
-                                                            ]
-                                                        ),
-                                                        property = .trust,
-                                                        format = .pem
+                                    source = Source.node(
+                                        Node {
+                                            source = Source.nodes(
+                                                Array [
+                                                    Leaf<SecureConnectionNode> {
+                                                        property = SecureConnectionNode {
+                                                            source = Source.collectorNode(
+                                                                CertificateNode {
+                                                                    source = Source.bytes(
+                                                                        Array [
+                                                                            2,
+                                                                            3,
+                                                                            4
+                                                                        ]
+                                                                    ),
+                                                                    property = .additionalTrust,
+                                                                    format = .pem
+                                                                }
+                                                            )
+                                                        }
+                                                    },
+                                                    Leaf<SecureConnectionNode> {
+                                                        property = SecureConnectionNode {
+                                                            source = Source.collectorNode(
+                                                                CertificateNode {
+                                                                    source = Source.bytes(
+                                                                        Array [
+                                                                            4,
+                                                                            5,
+                                                                            6
+                                                                        ]
+                                                                    ),
+                                                                    property = .additionalTrust,
+                                                                    format = .pem
+                                                                }
+                                                            )
+                                                        }
                                                     }
-                                                }
-                                            },
-                                            Leaf<SecureConnectionNode> {
-                                                property = SecureConnectionNode {
-                                                    node = CertificateNode {
-                                                        source = Source.bytes(
-                                                            Array [
-                                                                8,
-                                                                9,
-                                                                10
-                                                            ]
-                                                        ),
-                                                        property = .trust,
-                                                        format = .pem
-                                                    }
-                                                }
-                                            }
-                                        ]
-                                    }
+                                                ]
+                                            )
+                                        }
+                                    )
                                 }
                             }
                         ]
@@ -363,20 +394,22 @@ extension ResolveTests {
                 },
                 Leaf<SecureConnectionNode> {
                     property = SecureConnectionNode {
-                        node = Node {
-                            source = Source.privateKey(
-                                PrivateKey<Array<UInt8>> {
-                                    source = Source.bytes(
-                                        Array [
-                                            0,
-                                            2
-                                        ]
-                                    ),
-                                    format = .pem,
-                                    password = nil
-                                }
-                            )
-                        }
+                        source = Source.node(
+                            Node {
+                                source = Source.privateKey(
+                                    PrivateKey<Array<UInt8>> {
+                                        source = Source.bytes(
+                                            Array [
+                                                0,
+                                                2
+                                            ]
+                                        ),
+                                        format = .pem,
+                                        password = nil
+                                    }
+                                )
+                            }
+                        )
                     }
                 }
             }

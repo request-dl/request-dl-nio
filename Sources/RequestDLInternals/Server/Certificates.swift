@@ -12,11 +12,12 @@ public struct Certificates {
         self.format = format
     }
 
-    public func server() -> CertificateResouce {
+    public func server() -> CertificateResource {
         .init("server", in: .module, format: format)
     }
 
-    public func client(password: Bool = false) -> CertificateResouce {
+    /// pass:password
+    public func client(password: Bool = false) -> CertificateResource {
         .init(
             password ? "client_password" : "client",
             in: .module,

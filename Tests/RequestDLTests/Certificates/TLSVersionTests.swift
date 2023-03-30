@@ -50,4 +50,31 @@ class TLSVersionTests: XCTestCase {
         // Then
         XCTAssertEqual(sut, .tlsv13)
     }
+
+    func testVersion_whenComparableV1WithV11_shouldBeLower() async throws {
+        // Given
+        let lhs: TLSVersion = .v1
+        let rhs: TLSVersion = .v1_1
+
+        // Then
+        XCTAssertLessThan(lhs, rhs)
+    }
+
+    func testVersion_whenComparableV11WithV13_shouldBeLower() async throws {
+        // Given
+        let lhs: TLSVersion = .v1_1
+        let rhs: TLSVersion = .v1_3
+
+        // Then
+        XCTAssertLessThan(lhs, rhs)
+    }
+
+    func testVersion_whenComparableV12WithV1_shouldBeGreater() async throws {
+        // Given
+        let lhs: TLSVersion = .v1_2
+        let rhs: TLSVersion = .v1
+
+        // Then
+        XCTAssertGreaterThan(lhs, rhs)
+    }
 }

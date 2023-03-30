@@ -113,9 +113,12 @@ class SessionTests: XCTestCase {
         }
 
         var secureConnection = Session.SecureConnection(.client)
-        secureConnection.trustRoots = .file(certificates.certificateURL.path)
+        secureConnection.trustRoots = .certificates([
+            .init(certificates.certificateURL.absolutePath())
+        ])
         session.configuration.secureConnection = secureConnection
 
+        // When
         try await InternalServer(
             host: "localhost",
             port: 8080,

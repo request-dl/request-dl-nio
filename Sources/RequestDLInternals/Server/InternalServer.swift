@@ -40,24 +40,32 @@ extension InternalServer {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
 
-        do {
-            let bootstrap = ServerBootstrap(group: group)
-                .childChannelInitializer { channel in
-                    // ③ add handlers to the pipeline
-                    channel.pipeline
-                        .addHandler(NIOSSLServerHandler(context: sslContext))
-                        .flatMap {
-                            channel.pipeline.configureHTTPServerPipeline()
-                        }
-                        .flatMap {
-                            channel.pipeline.addHandler(HTTPHandler(response))
-                        }
-                }
+        let bootstrap = ServerBootstrap(group: group)
+            .childChannelInitializer { channel in
+                // ③ add handlers to the pipeline
+                channel.pipeline
+                    .addHandler(NIOSSLServerHandler(context: sslContext))
+                    .flatMap {
+                        channel.pipeline.configureHTTPServerPipeline()
+                    }
+                    .flatMap {
+                        channel.pipeline.addHandler(HTTPHandler(response))
+                    }
+            }
+            .bind(host: host, port: Int(port))
 
-            let channel = try await bootstrap.bind(host: host, port: Int(port)).get()
-            try await closure()
-            try await channel.close()
-            try await group.shutdownGracefully()
+        do {
+            let channel = try await bootstrap.get()
+
+            do {
+                try await closure()
+                try await channel.close()
+                try await group.shutdownGracefully()
+            } catch {
+                try await channel.close()
+                try await group.shutdownGracefully()
+                throw error
+            }
         } catch {
             try await group.shutdownGracefully()
             throw error

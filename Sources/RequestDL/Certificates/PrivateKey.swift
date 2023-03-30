@@ -35,6 +35,17 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
 
     public init(
         _ file: String,
+        in bundle: Bundle,
+        format: Certificate.Format = .pem
+    ) where Password == [UInt8] {
+        self.init(
+            format.resolve(for: file, in: bundle),
+            format: format
+        )
+    }
+
+    public init(
+        _ file: String,
         format: Certificate.Format = .pem,
         password: @escaping ((Password) -> Void) -> Void
     ) {
@@ -55,6 +66,19 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
             format: format(),
             password: password
         )))
+    }
+
+    public init(
+        _ file: String,
+        in bundle: Bundle,
+        format: Certificate.Format = .pem,
+        password: @escaping ((Password) -> Void) -> Void
+    ) {
+        self.init(
+            format.resolve(for: file, in: bundle),
+            format: format,
+            password: password
+        )
     }
 
     public var body: Never {

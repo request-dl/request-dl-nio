@@ -64,6 +64,29 @@ class PSKCertificateTests: XCTestCase {
         XCTAssertEqual(sut?.key, key)
     }
 
+    func testCertificate_whenSetPSKHint_shouldContainsInSecureConnection() async throws {
+        // Given
+        let hint = "some.hint"
+
+        // When
+        let (session, _) = try await resolve(TestProperty {
+            RequestDL.SecureConnection {
+                RequestDL.PSKCertificate(.client) { description in
+                    PSKClientCertificate(
+                        key: .init([0, 1, 2]),
+                        identity: description.serverHint
+                    )
+                }
+                .hint(hint)
+            }
+        })
+
+        let sut = session.configuration.secureConnection
+
+        // Then
+        XCTAssertEqual(sut?.pskHint, hint)
+    }
+
     func testPSK_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.PSKCertificate { _ in

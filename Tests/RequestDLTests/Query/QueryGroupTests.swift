@@ -58,6 +58,42 @@ final class QueryGroupTests: XCTestCase {
         XCTAssertNil(request.headers.getValue(forKey: "api_key"))
     }
 
+    func testQueries_whenInitWithDictionary_shouldBeValid() async throws {
+        // Given
+        let queries = [
+            "number": 123,
+            "page": 1
+        ]
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL("localhost")
+            QueryGroup(queries)
+        })
+
+
+        let queryItems = URL(string: request.url)
+            .flatMap {
+                URLComponents(url: $0, resolvingAgainstBaseURL: true)
+            }
+            .flatMap(\.queryItems) ?? []
+
+        // Then
+        XCTAssertEqual(queryItems.count, 2)
+        XCTAssertTrue(queryItems.contains(
+            URLQueryItem(
+                name: "number",
+                value: "123"
+            )
+        ))
+        XCTAssertTrue(queryItems.contains(
+            URLQueryItem(
+                name: "page",
+                value: "1"
+            )
+        ))
+    }
+
     func testNeverBody() async throws {
         // Given
         let property = QueryGroup {}
