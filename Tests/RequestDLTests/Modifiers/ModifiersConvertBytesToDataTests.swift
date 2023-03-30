@@ -17,11 +17,11 @@ final class ModifiersConvertBytesToDataTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8080,
+            port: 8081,
             response: message
-        ).run {
+        ).run { baseURL in
             let data = try await DataTask {
-                BaseURL("localhost:8080")
+                BaseURL(baseURL)
                 Path("index")
                 SecureConnection {
                     Trusts {
@@ -47,11 +47,11 @@ final class ModifiersConvertBytesToDataTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8080,
+            port: 8082,
             response: message
-        ).run {
+        ).run { baseURL in
             let data = try await DataTask {
-                BaseURL("localhost:8080")
+                BaseURL(baseURL)
                 Path("index")
                 SecureConnection {
                     Trusts {

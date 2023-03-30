@@ -12,7 +12,7 @@ final class TaskResultTests: XCTestCase {
         let head = ResponseHead(
             status: .init(code: 101, reason: ""),
             version: .init(minor: 0, major: 1),
-            headers: ["Content-Type": "application/json"],
+            headers: .init(["Content-Type": "application/json"]),
             isKeepAlive: false
         )
 

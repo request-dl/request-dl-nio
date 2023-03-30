@@ -31,9 +31,9 @@ final class MockedTaskTests: XCTestCase {
         XCTAssertEqual(response.status.code, statusCode)
         XCTAssertEqual(result.payload, data)
 
-        XCTAssertEqual(response.headers.keys.count, headers.keys.count)
+        XCTAssertEqual(response.headers.count, headers.count)
         XCTAssertTrue(headers.keys.allSatisfy {
-            headers[$0] == response.headers[$0]
+            headers[$0] == response.headers.getValue(forKey: $0)
         })
     }
 

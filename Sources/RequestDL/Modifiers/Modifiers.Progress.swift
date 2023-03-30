@@ -19,7 +19,7 @@ extension Modifiers {
                 let data = try await Self.download(
                     progress,
                     length: progress.contentLengthHeaderKey
-                        .flatMap { downloadPart.head.headers[$0] }
+                        .flatMap(downloadPart.head.headers.getValue)
                         .flatMap(Int.init),
                     content: downloadPart.payload
                 )
@@ -43,7 +43,7 @@ extension Modifiers {
                 let data = try await Self.download(
                     progress,
                     length: progress.contentLengthHeaderKey
-                        .flatMap { downloadPart.head.headers[$0] }
+                        .flatMap(downloadPart.head.headers.getValue)
                         .flatMap(Int.init),
                     content: downloadPart.payload
                 )
@@ -117,13 +117,13 @@ extension Modifiers.Progress {
 extension Task<AsyncResponse> {
 
     public func progress(
-        _ progres: Progress
+        _ progress: Progress
     ) -> ModifiedTask<Modifiers.Progress<Self, TaskResult<Data>>> {
-        modify(Modifiers.Progress(progres))
+        modify(Modifiers.Progress(progress))
     }
 
-    public func progress(
-        upload: UploadProgress
+    public func uploadProgress(
+        _ upload: UploadProgress
     ) -> ModifiedTask<Modifiers.Progress<Self, TaskResult<AsyncBytes>>> {
         modify(Modifiers.Progress(upload))
     }
@@ -131,8 +131,8 @@ extension Task<AsyncResponse> {
 
 extension Task<TaskResult<AsyncBytes>> {
 
-    public func progress(
-        download: DownloadProgress
+    public func downloadProgress(
+        _ download: DownloadProgress
     ) -> ModifiedTask<Modifiers.Progress<Self, TaskResult<Data>>> {
         modify(Modifiers.Progress(download))
     }
@@ -140,8 +140,8 @@ extension Task<TaskResult<AsyncBytes>> {
 
 extension Task<AsyncBytes> {
 
-    public func progress(
-        download: DownloadProgress,
+    public func downloadProgress(
+        _ download: DownloadProgress,
         length: Int? = nil
     ) -> ModifiedTask<Modifiers.Progress<Self, Data>> {
         modify(Modifiers.Progress(download, length: length))

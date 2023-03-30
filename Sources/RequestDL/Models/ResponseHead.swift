@@ -8,13 +8,13 @@ public struct ResponseHead: Equatable {
 
     public let status: Status
     public let version: Version
-    public let headers: [String: String]
+    public let headers: HTTPHeaders
     public let isKeepAlive: Bool
 
     public init(
         status: Status,
         version: Version,
-        headers: [String: String],
+        headers: HTTPHeaders,
         isKeepAlive: Bool
     ) {
         self.status = status
@@ -27,7 +27,7 @@ public struct ResponseHead: Equatable {
         self.init(
             status: .init(head.status),
             version: .init(head.version),
-            headers: Dictionary(Array(head.headers)) { key, _ in key },
+            headers: .init(head.headers),
             isKeepAlive: head.isKeepAlive
         )
     }

@@ -13,6 +13,10 @@ final class HTTPHandler<Response: Codable> where Response: Equatable {
 
     private var result: HTTPResult<Response>
 
+    private var resultData: Data{
+        (try? result.encode()) ?? Data()
+    }
+
     init(_ response: Response) {
         self.result = .init(
             receivedBytes: .zero,
@@ -28,20 +32,25 @@ extension HTTPHandler: ChannelInboundHandler {
 
         switch request {
         case .head(let head):
-            let response = HTTPResponseHead(
+            var response = HTTPResponseHead(
                 version: head.version,
                 status: HTTPResponseStatus.ok
             )
+
+            let value = head.headers.first(name: "content-length")
+                .flatMap(Int.init) ?? .zero
+
+            result.receivedBytes = value
+            response.headers.add(name: "content-length", value: "\(resultData.count)")
+            result.receivedBytes = .zero
 
             context.write(wrapOutboundOut(.head(response)), promise: nil)
         case .body(let bytes):
             result.receivedBytes += bytes.readableBytes
         case .end:
-            let data = (try? result.encode()) ?? Data()
-            let buffer = ByteBuffer(bytes: data)
-
             var headers = HTTPHeaders()
-            headers.add(name: "content-length", value: "\(data.count)")
+            let buffer = ByteBuffer(bytes: resultData)
+            headers.add(name: "content-length", value: "\(resultData.count)")
 
             context.writeAndFlush(wrapOutboundOut(.body(.byteBuffer(buffer))))
                 .flatMap {

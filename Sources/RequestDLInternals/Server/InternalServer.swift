@@ -36,7 +36,7 @@ public struct InternalServer<Response: Codable> where Response: Equatable {
 
 extension InternalServer {
 
-    public func run(_ closure: () async throws -> Void) async throws {
+    public func run(_ closure: (String) async throws -> Void) async throws {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
 
@@ -58,7 +58,7 @@ extension InternalServer {
             let channel = try await bootstrap.get()
 
             do {
-                try await closure()
+                try await closure("\(host):\(port)")
                 try await channel.close()
                 try await group.shutdownGracefully()
             } catch {

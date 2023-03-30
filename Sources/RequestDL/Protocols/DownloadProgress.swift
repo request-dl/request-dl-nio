@@ -14,6 +14,6 @@ public protocol DownloadProgress {
 extension DownloadProgress {
 
     public var contentLengthHeaderKey: String? {
-        return nil
+        "Content-Length"
     }
 }

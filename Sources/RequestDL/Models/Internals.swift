@@ -14,6 +14,8 @@ enum Internals {
     typealias SecureConnection = Session.SecureConnection
 
     typealias Request = RequestDLInternals.Request
+
+    typealias Headers = RequestDLInternals.Headers
 }
 
 extension Internals {

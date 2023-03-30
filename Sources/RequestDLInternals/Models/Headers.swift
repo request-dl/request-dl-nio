@@ -5,7 +5,7 @@
 import Foundation
 import NIOHTTP1
 
-public struct Headers {
+public struct Headers: Sendable {
 
     private var dictionary: [HeaderKey: String]
 
@@ -88,7 +88,7 @@ extension Headers: Sequence {
     }
 }
 
-extension Headers: Any {
+extension Headers {
 
     public var isEmpty: Bool {
         dictionary.isEmpty

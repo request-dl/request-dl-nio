@@ -67,7 +67,7 @@ extension MockedTask {
                     reason: "Mock status"
                 ),
                 version: .init(minor: 1, major: 2),
-                headers: headers ?? [:],
+                headers: .init(headers ?? [:]),
                 isKeepAlive: false
             ),
             payload: data

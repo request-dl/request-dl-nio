@@ -106,24 +106,24 @@ class SessionTests: XCTestCase {
         var fileBuffer = FileBuffer(url)
         fileBuffer.writeData(Data.randomData(length: length))
 
-        var request = Request(url: "https://localhost:8080")
-        request.method = "POST"
-        request.body = RequestBody(fragment) {
-            BodyItem(fileBuffer)
-        }
-
-        var secureConnection = Session.SecureConnection(.client)
-        secureConnection.trustRoots = .certificates([
-            .init(certificates.certificateURL.absolutePath())
-        ])
-        session.configuration.secureConnection = secureConnection
-
         // When
         try await InternalServer(
             host: "localhost",
             port: 8080,
             response: message
-        ).run {
+        ).run { baseURL in
+            var request = Request(url: "https://\(baseURL)")
+            request.method = "POST"
+            request.body = RequestBody(fragment) {
+                BodyItem(fileBuffer)
+            }
+
+            var secureConnection = Session.SecureConnection(.client)
+            secureConnection.trustRoots = .certificates([
+                .init(certificates.certificateURL.absolutePath())
+            ])
+            session.configuration.secureConnection = secureConnection
+
             let task = try await session.request(request)
 
             var parts: [Int] = []
