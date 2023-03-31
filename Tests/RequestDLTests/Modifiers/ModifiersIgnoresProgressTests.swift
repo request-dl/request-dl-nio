@@ -24,7 +24,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
                 Path("index")
                 SecureConnection {
                     Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath())
+                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                     }
                 }
             }
@@ -55,7 +55,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
                 Path("index")
                 SecureConnection {
                     Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath())
+                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                     }
                 }
             }
@@ -85,7 +85,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
                 Path("index")
                 SecureConnection {
                     Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath())
+                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                     }
                 }
             }

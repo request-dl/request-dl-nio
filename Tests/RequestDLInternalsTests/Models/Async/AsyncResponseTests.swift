@@ -57,6 +57,7 @@ class AsyncResponseTests: XCTestCase {
     func testResponse_whenOnlyHead_shouldReceiveHead() async throws {
         // Given
         let head = ResponseHead(
+            url: "https://localhost",
             status: .init(code: 200, reason: "OK"),
             version: .init(minor: .zero, major: 1),
             headers: .init(),
@@ -79,6 +80,7 @@ class AsyncResponseTests: XCTestCase {
     func testResponse_whenHeadWithBytes_shouldReceiveHeadAndBytes() async throws {
         // Given
         let head = ResponseHead(
+            url: "https://localhost",
             status: .init(code: 200, reason: "OK"),
             version: .init(minor: .zero, major: 1),
             headers: .init(),

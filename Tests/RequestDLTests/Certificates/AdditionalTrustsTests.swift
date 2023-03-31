@@ -25,7 +25,7 @@ class AdditionalTrustsTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.AdditionalTrusts {
-                    RequestDL.Certificate(client.certificateURL.absolutePath())
+                    RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
                     RequestDL.Certificate(server)
                 }
             }
@@ -35,7 +35,7 @@ class AdditionalTrustsTests: XCTestCase {
         XCTAssertEqual(
             session.configuration.secureConnection?.additionalTrustRoots,
             .init([.certificates([
-                .init(client.certificateURL.absolutePath()),
+                .init(client.certificateURL.absolutePath(percentEncoded: false)),
                 .init(server)
             ])])
         )
@@ -59,14 +59,14 @@ class AdditionalTrustsTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.AdditionalTrusts(fileURL.absolutePath())
+                RequestDL.AdditionalTrusts(fileURL.absolutePath(percentEncoded: false))
             }
         })
 
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.additionalTrustRoots,
-            .init([.file(fileURL.absolutePath())])
+            .init([.file(fileURL.absolutePath(percentEncoded: false))])
         )
     }
 

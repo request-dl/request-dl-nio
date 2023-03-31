@@ -24,7 +24,7 @@ final class DataTaskTests: XCTestCase {
                 Path("index")
 
                 SecureConnection {
-                    Trusts(certificate.certificateURL.absolutePath())
+                    Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
             .ignoresProgress()

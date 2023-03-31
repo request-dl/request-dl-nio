@@ -182,8 +182,8 @@ class SessionSecureConnectionTests: XCTestCase {
     func testSecureConnection_whenServer_shouldBeValid() async throws {
         // Given
         let certificates = Certificates().client()
-        let certificateChain = CertificateChain.certificates([.init(certificates.certificateURL.absolutePath(), format: .pem)])
-        let privateKey = PrivateKeySource.file(certificates.privateKeyURL.absolutePath())
+        let certificateChain = CertificateChain.certificates([.init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)])
+        let privateKey = PrivateKeySource.file(certificates.privateKeyURL.absolutePath(percentEncoded: false))
 
         let configuration: TLSConfiguration = .makeServerConfiguration(
             certificateChain: try certificateChain.build(),

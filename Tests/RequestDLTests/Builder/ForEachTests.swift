@@ -7,7 +7,32 @@ import XCTest
 
 final class ForEachTests: XCTestCase {
 
-    func testForEach() async throws {
+    struct Value: Identifiable {
+        let id: String
+    }
+
+    func testForEach_whenIDByIdentifiable_shouldBeValid() async throws {
+        // Given
+        let paths = ["api", "v1", "users"].map {
+            Value(id: $0)
+        }
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL("localhost")
+            ForEach(paths) { path in
+                Path(path.id)
+            }
+        })
+
+        // Then
+        XCTAssertEqual(
+            request.url,
+            "https://localhost/api/v1/users"
+        )
+    }
+
+    func testForEach_whenIDBySelf_shouldBeValid() async throws {
         // Given
         let paths = ["api", "v1", "users"]
 

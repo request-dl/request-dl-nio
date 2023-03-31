@@ -9,6 +9,7 @@ class ResponseHeadTests: XCTestCase {
 
     func testResponse_whenHeadInit_shouldBeValid() async throws {
         // Given
+        let url = "https://localhost"
         let status = ResponseHead.Status(code: 200, reason: "OK")
         let version = ResponseHead.Version(minor: 0, major: 1)
         var headers = Headers()
@@ -18,6 +19,7 @@ class ResponseHeadTests: XCTestCase {
 
         // When
         let responseHead = ResponseHead(
+            url: url,
             status: status,
             version: version,
             headers: headers,
@@ -25,6 +27,7 @@ class ResponseHeadTests: XCTestCase {
         )
 
         // Then
+        XCTAssertEqual(responseHead.url, url)
         XCTAssertEqual(responseHead.status.code, 200)
         XCTAssertEqual(responseHead.status.reason, "OK")
         XCTAssertEqual(responseHead.version.minor, 0)

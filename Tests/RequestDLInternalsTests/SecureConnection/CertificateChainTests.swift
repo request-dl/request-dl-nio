@@ -21,16 +21,16 @@ class CertificateChainTests: XCTestCase {
     func testChain_whenCertificates_shouldBeValid() async throws {
         // Given
         var chain = CertificateChain()
-        chain.append(.init(client.certificateURL.absolutePath()))
-        chain.append(.init(server.certificateURL.absolutePath()))
+        chain.append(.init(client.certificateURL.absolutePath(percentEncoded: false)))
+        chain.append(.init(server.certificateURL.absolutePath(percentEncoded: false)))
 
         // When
         let sut = try chain.build()
 
         // Then
         XCTAssertEqual(sut, try [
-            .certificate(.init(file: client.certificateURL.absolutePath(), format: .pem)),
-            .certificate(.init(file: server.certificateURL.absolutePath(), format: .pem))
+            .certificate(.init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
+            .certificate(.init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
         ])
     }
 
@@ -50,10 +50,10 @@ class CertificateChainTests: XCTestCase {
         try data.write(to: fileURL)
 
         // When
-        let sut = try CertificateChain.file(fileURL.absolutePath()).build()
+        let sut = try CertificateChain.file(fileURL.absolutePath(percentEncoded: false)).build()
 
         // Then
-        XCTAssertEqual(sut, try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath()).map {
+        XCTAssertEqual(sut, try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
             .certificate($0)
         })
     }

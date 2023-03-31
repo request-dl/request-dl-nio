@@ -32,16 +32,16 @@ class TrustRootsTests: XCTestCase {
     func testTrusts_whenCertificates_shouldBeValid() async throws {
         // Given
         var trusts = TrustRoots()
-        trusts.append(.init(client.certificateURL.absolutePath()))
-        trusts.append(.init(server.certificateURL.absolutePath()))
+        trusts.append(.init(client.certificateURL.absolutePath(percentEncoded: false)))
+        trusts.append(.init(server.certificateURL.absolutePath(percentEncoded: false)))
 
         // When
         let sut = try trusts.build()
 
         // Then
         XCTAssertEqual(sut, try .certificates([
-            .init(file: client.certificateURL.absolutePath(), format: .pem),
-            .init(file: server.certificateURL.absolutePath(), format: .pem)
+            .init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+            .init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem)
         ]))
     }
 
@@ -61,10 +61,10 @@ class TrustRootsTests: XCTestCase {
         try data.write(to: fileURL)
 
         // When
-        let sut = try TrustRoots.file(fileURL.absolutePath()).build()
+        let sut = try TrustRoots.file(fileURL.absolutePath(percentEncoded: false)).build()
 
         // Then
-        XCTAssertEqual(sut, .file(fileURL.absolutePath()))
+        XCTAssertEqual(sut, .file(fileURL.absolutePath(percentEncoded: false)))
     }
 
     func testTrustRoot_whenBytesMerged_shouldBeValid() async throws {

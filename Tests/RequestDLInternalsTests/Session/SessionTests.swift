@@ -120,7 +120,7 @@ class SessionTests: XCTestCase {
 
             var secureConnection = Session.SecureConnection(.client)
             secureConnection.trustRoots = .certificates([
-                .init(certificates.certificateURL.absolutePath())
+                .init(certificates.certificateURL.absolutePath(percentEncoded: false))
             ])
             session.configuration.secureConnection = secureConnection
 

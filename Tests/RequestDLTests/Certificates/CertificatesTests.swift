@@ -25,7 +25,7 @@ class CertificatesTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Certificates {
-                    RequestDL.Certificate(client.certificateURL.absolutePath())
+                    RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
                     RequestDL.Certificate(server)
                 }
             }
@@ -35,7 +35,7 @@ class CertificatesTests: XCTestCase {
         XCTAssertEqual(
             session.configuration.secureConnection?.certificateChain,
             .certificates([
-                .init(client.certificateURL.absolutePath()),
+                .init(client.certificateURL.absolutePath(percentEncoded: false)),
                 .init(server)
             ])
         )
@@ -59,14 +59,14 @@ class CertificatesTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Certificates(fileURL.absolutePath())
+                RequestDL.Certificates(fileURL.absolutePath(percentEncoded: false))
             }
         })
 
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.certificateChain,
-            .file(fileURL.absolutePath())
+            .file(fileURL.absolutePath(percentEncoded: false))
         )
     }
 

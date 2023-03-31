@@ -10,6 +10,7 @@ final class TaskResultTests: XCTestCase {
     func testResult() async throws {
         // Given
         let head = ResponseHead(
+            url: nil,
             status: .init(code: 101, reason: ""),
             version: .init(minor: 0, major: 1),
             headers: .init(["Content-Type": "application/json"]),
