@@ -176,3 +176,4 @@ final class FormGroupTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
+// swiftlint:enable function_body_length

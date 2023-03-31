@@ -27,9 +27,16 @@ extension Headers {
     }
 }
 
-extension Headers.ContentLength: PrimitiveProperty {
+extension Headers.ContentLength {
 
-    func makeObject() -> Headers.Object {
-        .init(bytes, forKey: "Content-Length")
+    public static func _makeProperty(
+        property: _GraphValue<Headers.ContentLength>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.bytes,
+            forKey: "Content-Length"
+        )))
     }
 }

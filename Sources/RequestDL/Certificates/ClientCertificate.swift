@@ -11,9 +11,10 @@ import Foundation
  `RequestBuilder`. It has two initializers, one that takes the certificate data and password as parameters,
  and another that takes the certificate name, bundle, and password.
  */
+@available(*, deprecated, renamed: "PrivateKey")
 public struct ClientCertificate: Property {
 
-    private let source: Source
+    private let source: ClientCertificateSource
     private let password: String
 
     /**
@@ -47,31 +48,34 @@ public struct ClientCertificate: Property {
     }
 }
 
-extension ClientCertificate: PrimitiveProperty {
+@available(*, deprecated, renamed: "PrivateKey")
+extension ClientCertificate {
 
-    struct Object: NodeObject {
-
-        private let source: ClientCertificate.Source
-        private let password: String
-
-        fileprivate init(_ source: ClientCertificate.Source, password: String) {
-            self.source = source
-            self.password = password
-        }
-
-        func makeProperty(_ make: Make) {
-            make.delegate.onDidReceiveChallenge {
-                receivedChallenge($0)
-            }
-        }
-    }
-
-    func makeObject() -> Object {
-        Object(source, password: password)
+    public static func _makeProperty(
+        property: _GraphValue<ClientCertificate>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(ClientCertificateNode(
+            source: property.source,
+            password: property.password
+        )))
     }
 }
 
-private extension ClientCertificate.Object {
+struct ClientCertificateNode: PropertyNode {
+
+    let source: ClientCertificateSource
+    let password: String
+
+    func make(_ make: inout Make) async throws {
+        make.delegate.onDidReceiveChallenge {
+            receivedChallenge($0)
+        }
+    }
+}
+
+private extension ClientCertificateNode {
 
     func receivedChallenge(
         _ challenge: URLAuthenticationChallenge
@@ -99,15 +103,12 @@ private extension ClientCertificate.Object {
     }
 }
 
-extension ClientCertificate {
-
-    fileprivate enum Source {
-        case url(URL)
-        case bundle(String, Bundle)
-    }
+enum ClientCertificateSource {
+    case url(URL)
+    case bundle(String, Bundle)
 }
 
-extension ClientCertificate.Source {
+extension ClientCertificateSource {
 
     fileprivate var url: URL? {
         switch self {

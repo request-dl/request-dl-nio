@@ -23,6 +23,7 @@ import Foundation
  - Note: Only available on iOS 15.0+, tvOS 15.0+, watchOS 15.0+, macOS 12.0+.
 */
 @available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
+@available(*, deprecated, renamed: "DataTask")
 public struct BytesTask<Content: Property>: Task {
 
     private let content: Content
@@ -50,6 +51,7 @@ public struct BytesTask<Content: Property>: Task {
 }
 
 @available(iOS 15, tvOS 15, watchOS 15, macOS 12, *)
+@available(*, deprecated, renamed: "DataTask")
 extension BytesTask {
 
     /**
@@ -61,7 +63,7 @@ extension BytesTask {
     */
     public func result() async throws -> TaskResult<URLSession.AsyncBytes> {
         let delegate = DelegateProxy()
-        let (session, request) = try await Resolver(content).make(delegate)
+        let (session, request) = try await Resolve(content).build(delegate)
 
         defer { session.finishTasksAndInvalidate() }
 

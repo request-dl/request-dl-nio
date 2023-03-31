@@ -18,6 +18,7 @@ import CommonCrypto
 
  - Note: A `ServerTrust` instance should only contain trusted certificates of the server.
  */
+@available(*, deprecated, renamed: "Trusts")
 public struct ServerTrust: Property {
 
     private let certificates: [Certificate]
@@ -47,29 +48,32 @@ public struct ServerTrust: Property {
     }
 }
 
-extension ServerTrust: PrimitiveProperty {
+@available(*, deprecated, renamed: "Trusts")
+extension ServerTrust {
 
-    struct Object: NodeObject {
-
-        private let certificates: [Certificate]
-
-        public init(_ certificates: [Certificate]) {
-            self.certificates = certificates
-        }
-
-        func makeProperty(_ make: Make) {
-            make.delegate.onDidReceiveChallenge {
-                receivedChallenge($0)
-            }
-        }
-    }
-
-    func makeObject() -> Object {
-        Object(certificates)
+    public static func _makeProperty(
+        property: _GraphValue<ServerTrust>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(ServerTrustNode(
+            certificates: property.certificates
+        )))
     }
 }
 
-private extension ServerTrust.Object {
+struct ServerTrustNode: PropertyNode {
+
+    let certificates: [Certificate]
+
+    func make(_ make: inout Make) async throws {
+        make.delegate.onDidReceiveChallenge {
+            receivedChallenge($0)
+        }
+    }
+}
+
+private extension ServerTrustNode {
 
     func receivedChallenge(_ challenge: URLAuthenticationChallenge) -> DelegateProxy.ChallengeCredential {
 
@@ -80,10 +84,9 @@ private extension ServerTrust.Object {
         let serverCertificates = serverTrust.certificates.compactMap(\.data)
 
         for certificate in certificates {
-            guard
-                let url = certificate.bundle.resolveURL(forResourceName: certificate.name),
-                let data = try? Data(contentsOf: url, options: .mappedIfSafe)
-            else { continue }
+            guard let data = certificate.obtainDERData() else {
+                continue
+            }
 
             if serverCertificates.contains(data) {
                 return (.useCredential, URLCredential(trust: serverTrust))
@@ -91,5 +94,26 @@ private extension ServerTrust.Object {
         }
 
         return (.cancelAuthenticationChallenge, nil)
+    }
+}
+
+extension Certificate {
+
+    func obtainDERData() -> Data? {
+        guard
+            let url = bundle.resolveURL(forResourceName: name),
+            let data = try? Data(contentsOf: url, options: .mappedIfSafe)
+        else { return nil }
+
+        if let certificate = SecCertificateCreateWithData(nil, data as CFData) {
+            return SecCertificateCopyData(certificate) as Data
+        }
+
+        let cleanupData = data
+            .compactMap { $0 == Array("\n".utf8)[0] ? nil : $0 }
+            .dropFirst(Data("-----BEGIN CERTIFICATE-----".utf8).count)
+            .dropLast(Data("-----END CERTIFICATE-----".utf8).count)
+
+        return Data(base64Encoded: Data(cleanupData))
     }
 }

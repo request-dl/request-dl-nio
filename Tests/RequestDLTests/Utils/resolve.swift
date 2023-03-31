@@ -9,5 +9,5 @@ func resolve<Content: Property>(
     _ content: Content,
     in delegate: DelegateProxy = .init()
 ) async throws -> (URLSession, URLRequest) {
-    try await Resolver(content).make(delegate)
+    try await Resolve(content).build(delegate)
 }

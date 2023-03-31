@@ -39,10 +39,9 @@ extension Modifiers {
         public func task(_ task: Content) async throws -> Content.Element {
             let result = try await task.result()
 
-            guard
-                let response = result.response as? HTTPURLResponse,
-                contains(StatusCode(response.statusCode))
-            else { return result }
+            guard contains(StatusCode(result.head.status.code)) else {
+                return result
+            }
 
             try mapHandler(result)
             return result

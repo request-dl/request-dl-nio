@@ -48,8 +48,18 @@ public struct PropertyBuilder {
     }
 
     /// Builds a single instance of `Property` component.
-    public static func buildBlock<Content: Property>(_ component: Content) -> Content {
-        component
+    public static func buildPartialBlock<Content: Property>(first: Content) -> Content {
+        first
+    }
+
+    public static func buildPartialBlock<Accumulated: Property, Next: Property>(
+        accumulated: Accumulated,
+        next: Next
+    ) -> _PartialContent<Accumulated, Next> {
+        _PartialContent(
+            accumulated: accumulated,
+            next: next
+        )
     }
 
     /// A helper method for the `PropertyBuilder` to include optional content in the result builder.
@@ -63,11 +73,10 @@ public struct PropertyBuilder {
      - Note: This is a result builder method that is called when the builder encounters an `if` statement
      with a condition that evaluates to `true`.
      */
-    public static func buildEither<
-        TrueProperty: Property,
-        FalseProperty: Property
-    >(first: TrueProperty) -> _ConditionalContent<TrueProperty, FalseProperty> {
-        _ConditionalContent(first: first)
+    public static func buildEither<First: Property, Second: Property>(
+        first component: First
+    ) -> _EitherContent<First, Second> {
+        .init(first: component)
     }
 
     /**
@@ -87,11 +96,10 @@ public struct PropertyBuilder {
          }
      }
      */
-    public static func buildEither<
-        TrueProperty: Property,
-        FalseProperty: Property
-    >(second: FalseProperty) -> _ConditionalContent<TrueProperty, FalseProperty> {
-        _ConditionalContent(second: second)
+    public static func buildEither<First: Property, Second: Property>(
+        second component: Second
+    ) -> _EitherContent<First, Second> {
+        .init(second: component)
     }
 
     /**
@@ -116,9 +124,19 @@ public struct PropertyBuilder {
     }
 }
 
-// swiftlint:disable function_parameter_count identifier_name
 extension PropertyBuilder {
 
+    /// Builds a single instance of `Property` component.
+    @available(*, deprecated, renamed: "buildPartialBlock(first:)")
+    public static func buildBlock<Content: Property>(_ component: Content) -> Content {
+        component
+    }
+}
+
+// swiftlint:disable function_parameter_count identifier_name file_length function_body_length
+extension PropertyBuilder {
+
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property
@@ -126,12 +144,27 @@ extension PropertyBuilder {
         _ c0: C0,
         _ c1: C1
     ) -> _TupleContent<(C0, C1)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
+        _TupleContent((c0, c1)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            return .init(children)
         }
     }
 
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property,
@@ -141,13 +174,34 @@ extension PropertyBuilder {
         _ c1: C1,
         _ c2: C2
     ) -> _TupleContent<(C0, C1, C2)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
+        _TupleContent((c0, c1, c2)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            let input2 = inputs[type, \.value.2]
+            let output2 = try await C2._makeProperty(
+                property: property.dynamic(\.value.2),
+                inputs: input2
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            children.append(output2.node)
+            return .init(children)
         }
     }
 
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property,
@@ -159,14 +213,41 @@ extension PropertyBuilder {
         _ c2: C2,
         _ c3: C3
     ) -> _TupleContent<(C0, C1, C2, C3)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
+        _TupleContent((c0, c1, c2, c3)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            let input2 = inputs[type, \.value.2]
+            let output2 = try await C2._makeProperty(
+                property: property.dynamic(\.value.2),
+                inputs: input2
+            )
+
+            let input3 = inputs[type, \.value.3]
+            let output3 = try await C3._makeProperty(
+                property: property.dynamic(\.value.3),
+                inputs: input3
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            children.append(output2.node)
+            children.append(output3.node)
+            return .init(children)
         }
     }
 
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property,
@@ -180,15 +261,48 @@ extension PropertyBuilder {
         _ c3: C3,
         _ c4: C4
     ) -> _TupleContent<(C0, C1, C2, C3, C4)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
+        _TupleContent((c0, c1, c2, c3, c4)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            let input2 = inputs[type, \.value.2]
+            let output2 = try await C2._makeProperty(
+                property: property.dynamic(\.value.2),
+                inputs: input2
+            )
+
+            let input3 = inputs[type, \.value.3]
+            let output3 = try await C3._makeProperty(
+                property: property.dynamic(\.value.3),
+                inputs: input3
+            )
+
+            let input4 = inputs[type, \.value.4]
+            let output4 = try await C4._makeProperty(
+                property: property.dynamic(\.value.4),
+                inputs: input4
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            children.append(output2.node)
+            children.append(output3.node)
+            children.append(output4.node)
+            return .init(children)
         }
     }
 
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property,
@@ -204,16 +318,55 @@ extension PropertyBuilder {
         _ c4: C4,
         _ c5: C5
     ) -> _TupleContent<(C0, C1, C2, C3, C4, C5)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-            try await C5.makeProperty(c5, $0)
+        _TupleContent((c0, c1, c2, c3, c4, c5)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            let input2 = inputs[type, \.value.2]
+            let output2 = try await C2._makeProperty(
+                property: property.dynamic(\.value.2),
+                inputs: input2
+            )
+
+            let input3 = inputs[type, \.value.3]
+            let output3 = try await C3._makeProperty(
+                property: property.dynamic(\.value.3),
+                inputs: input3
+            )
+
+            let input4 = inputs[type, \.value.4]
+            let output4 = try await C4._makeProperty(
+                property: property.dynamic(\.value.4),
+                inputs: input4
+            )
+
+            let input5 = inputs[type, \.value.5]
+            let output5 = try await C5._makeProperty(
+                property: property.dynamic(\.value.5),
+                inputs: input5
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            children.append(output2.node)
+            children.append(output3.node)
+            children.append(output4.node)
+            children.append(output5.node)
+            return .init(children)
         }
     }
 
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property,
@@ -231,17 +384,62 @@ extension PropertyBuilder {
         _ c5: C5,
         _ c6: C6
     ) -> _TupleContent<(C0, C1, C2, C3, C4, C5, C6)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-            try await C5.makeProperty(c5, $0)
-            try await C6.makeProperty(c6, $0)
+        _TupleContent((c0, c1, c2, c3, c4, c5, c6)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            let input2 = inputs[type, \.value.2]
+            let output2 = try await C2._makeProperty(
+                property: property.dynamic(\.value.2),
+                inputs: input2
+            )
+
+            let input3 = inputs[type, \.value.3]
+            let output3 = try await C3._makeProperty(
+                property: property.dynamic(\.value.3),
+                inputs: input3
+            )
+
+            let input4 = inputs[type, \.value.4]
+            let output4 = try await C4._makeProperty(
+                property: property.dynamic(\.value.4),
+                inputs: input4
+            )
+
+            let input5 = inputs[type, \.value.5]
+            let output5 = try await C5._makeProperty(
+                property: property.dynamic(\.value.5),
+                inputs: input5
+            )
+
+            let input6 = inputs[type, \.value.6]
+            let output6 = try await C6._makeProperty(
+                property: property.dynamic(\.value.6),
+                inputs: input6
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            children.append(output2.node)
+            children.append(output3.node)
+            children.append(output4.node)
+            children.append(output5.node)
+            children.append(output6.node)
+            return .init(children)
         }
     }
 
+    @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
     public static func buildBlock<
         C0: Property,
         C1: Property,
@@ -261,15 +459,66 @@ extension PropertyBuilder {
         _ c6: C6,
         _ c7: C7
     ) -> _TupleContent<(C0, C1, C2, C3, C4, C5, C6, C7)> {
-        _TupleContent {
-            try await C0.makeProperty(c0, $0)
-            try await C1.makeProperty(c1, $0)
-            try await C2.makeProperty(c2, $0)
-            try await C3.makeProperty(c3, $0)
-            try await C4.makeProperty(c4, $0)
-            try await C5.makeProperty(c5, $0)
-            try await C6.makeProperty(c6, $0)
-            try await C7.makeProperty(c7, $0)
+        _TupleContent((c0, c1, c2, c3, c4, c5, c6, c7)) { property, inputs, type in
+            let input0 = inputs[type, \.value.0]
+            let output0 = try await C0._makeProperty(
+                property: property.dynamic(\.value.0),
+                inputs: input0
+            )
+
+            let input1 = inputs[type, \.value.1]
+            let output1 = try await C1._makeProperty(
+                property: property.dynamic(\.value.1),
+                inputs: input1
+            )
+
+            let input2 = inputs[type, \.value.2]
+            let output2 = try await C2._makeProperty(
+                property: property.dynamic(\.value.2),
+                inputs: input2
+            )
+
+            let input3 = inputs[type, \.value.3]
+            let output3 = try await C3._makeProperty(
+                property: property.dynamic(\.value.3),
+                inputs: input3
+            )
+
+            let input4 = inputs[type, \.value.4]
+            let output4 = try await C4._makeProperty(
+                property: property.dynamic(\.value.4),
+                inputs: input4
+            )
+
+            let input5 = inputs[type, \.value.5]
+            let output5 = try await C5._makeProperty(
+                property: property.dynamic(\.value.5),
+                inputs: input5
+            )
+
+            let input6 = inputs[type, \.value.6]
+            let output6 = try await C6._makeProperty(
+                property: property.dynamic(\.value.6),
+                inputs: input6
+            )
+
+            let input7 = inputs[type, \.value.7]
+            let output7 = try await C7._makeProperty(
+                property: property.dynamic(\.value.7),
+                inputs: input7
+            )
+
+            var children = ChildrenNode()
+            children.append(output0.node)
+            children.append(output1.node)
+            children.append(output2.node)
+            children.append(output3.node)
+            children.append(output4.node)
+            children.append(output5.node)
+            children.append(output6.node)
+            children.append(output7.node)
+            return .init(children)
         }
     }
 }
+// swiftlint:enable identifier_name function_body_length function_parameter_count

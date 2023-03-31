@@ -17,9 +17,6 @@ extension Modifiers {
      */
     public struct FlatMapError<Content: Task>: TaskModifier {
 
-        // swiftlint:disable nesting
-        public typealias Element = Content.Element
-
         let flatMapErrorHandler: (Error) throws -> Void
 
         init(flatMapErrorHandler: @escaping (Error) throws -> Void) {
@@ -33,7 +30,7 @@ extension Modifiers {
          - Throws: An error if the transformation fails.
          - Returns: The result of the transformation.
          */
-        public func task(_ task: Content) async throws -> Element {
+        public func task(_ task: Content) async throws -> Content.Element {
             do {
                 return try await task.result()
             } catch {

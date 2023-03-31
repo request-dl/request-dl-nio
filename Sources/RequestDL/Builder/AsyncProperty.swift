@@ -25,9 +25,15 @@ import Foundation
  */
 public struct AsyncProperty<Content: Property>: Property {
 
-    public typealias Body = Never
-
     private let content: () async throws -> Content
+
+    private var abstractContent: Content {
+        fatalError(
+            """
+            There was an attempt to access a variable for which access was not expected.
+            """
+        )
+    }
 
     /**
      Initializes with an asynchronous content provided.
@@ -43,12 +49,20 @@ public struct AsyncProperty<Content: Property>: Property {
     public var body: Never {
         bodyException()
     }
+}
+
+extension AsyncProperty {
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        try await Content.makeProperty(property.content(), context)
+    public static func _makeProperty(
+        property: _GraphValue<AsyncProperty<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        try await Content._makeProperty(
+            property: property.dynamic {
+                try await $0.content()
+            },
+            inputs: inputs[self, \.abstractContent]
+        )
     }
 }

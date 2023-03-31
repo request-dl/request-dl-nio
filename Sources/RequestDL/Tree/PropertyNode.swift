@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol NodeObject {
+protocol PropertyNode {
 
-    func makeProperty(_ make: Make) async throws
+    func make(_ make: inout Make) async throws
 }

@@ -7,14 +7,14 @@ import XCTest
 
 final class ForEachTests: XCTestCase {
 
-    func testForEach() async throws {
+    func testForEach_whenIDBySelf_shouldBeValid() async throws {
         // Given
         let paths = ["api", "v1", "users"]
 
         // When
         let (_, request) = try await resolve(TestProperty {
             BaseURL("localhost")
-            ForEach(paths) { path in
+            ForEach(paths, id: \.self) { path in
                 Path(path)
             }
         })

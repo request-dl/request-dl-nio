@@ -53,7 +53,7 @@ extension DataTask {
      */
     public func result() async throws -> TaskResult<Data> {
         let delegate = DelegateProxy()
-        let (session, request) = try await Resolver(content).make(delegate)
+        let (session, request) = try await Resolve(content).build(delegate)
 
         defer { session.finishTasksAndInvalidate() }
 

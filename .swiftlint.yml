@@ -12,10 +12,13 @@ trailing_whitespace:
     severity: error
 
 identifier_name:
+    allowed_symbols:
+        - _
     excluded:
         - id
         - ok
         - n
+        - v1
 
 type_name:
     allowed_symbols:

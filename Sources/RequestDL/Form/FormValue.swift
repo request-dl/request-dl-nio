@@ -38,13 +38,20 @@ public struct FormValue: Property {
     }
 }
 
-extension FormValue: PrimitiveProperty {
+extension FormValue {
 
-    func makeObject() -> FormObject {
-        FormObject {
-            PartFormRawValue(Data("\(value)".utf8), forHeaders: [
-                kContentDisposition: kContentDispositionValue(nil, forKey: key)
+    public static func _makeProperty(
+        property: _GraphValue<FormValue>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(FormNode {
+            PartFormRawValue(Data("\(property.value)".utf8), forHeaders: [
+                kContentDisposition: kContentDispositionValue(
+                    nil,
+                    forKey: property.key
+                )
             ])
-        }
+        }))
     }
 }

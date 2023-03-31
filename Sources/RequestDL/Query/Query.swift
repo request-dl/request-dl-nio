@@ -45,19 +45,14 @@ public struct Query: Property {
     }
 }
 
-extension Query: PrimitiveProperty {
+extension Query {
 
-    class Object: NodeObject {
+    struct Node: PropertyNode {
 
-        let key: String
-        let value: String
+        fileprivate let key: String
+        fileprivate let value: String
 
-        init(_ value: Any, forKey key: String) {
-            self.key = key
-            self.value = "\(value)"
-        }
-
-        func makeProperty(_ make: Make) {
+        func make(_ make: inout Make) async throws {
             guard
                 let url = make.request.url,
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
@@ -72,7 +67,15 @@ extension Query: PrimitiveProperty {
         }
     }
 
-    func makeObject() -> Object {
-        Object(value, forKey: key)
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<Query>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(
+            key: property.key,
+            value: "\(property.value)"
+        )))
     }
 }

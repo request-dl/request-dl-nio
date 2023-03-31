@@ -9,23 +9,23 @@ public enum Headers {}
 
 extension Headers {
 
-    struct Object: NodeObject {
+    struct Node: PropertyNode {
         let key: String
         let value: Any
-        let next: NodeObject?
+        let next: PropertyNode?
 
-        init(_ value: Any, forKey key: String, next: NodeObject? = nil) {
+        init(_ value: Any, forKey key: String, next: PropertyNode? = nil) {
             self.key = key
             self.value = value
             self.next = next
         }
 
-        func makeProperty(_ make: Make) async throws {
+        func make(_ make: inout Make) async throws {
             let value = "\(value)"
             if !value.isEmpty {
                 make.request.setValue(value, forHTTPHeaderField: key)
             }
-            try await next?.makeProperty(make)
+            try await next?.make(&make)
         }
     }
 }

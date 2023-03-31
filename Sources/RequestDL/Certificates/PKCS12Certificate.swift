@@ -49,4 +49,5 @@ extension PKCS12Certificate {
             subjects: dictionary.compactMapValues { "\($0)" }
         )
     }
+    // swiftlint:enable force_cast
 }

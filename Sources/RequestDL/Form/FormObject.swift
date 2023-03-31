@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct FormObject: NodeObject {
+struct FormNode: PropertyNode {
 
     let factory: () -> PartFormRawValue
 
@@ -12,7 +12,7 @@ struct FormObject: NodeObject {
         self.factory = factory
     }
 
-    func makeProperty(_ make: Make) {
+    func make(_ make: inout Make) async throws {
         let constructor = MultipartFormConstructor([factory()])
 
         make.request.setValue(

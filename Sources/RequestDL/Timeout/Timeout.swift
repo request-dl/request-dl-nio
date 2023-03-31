@@ -33,8 +33,13 @@ public struct Timeout: Property {
 
     public typealias Body = Never
 
-    let timeout: TimeInterval
+    let timeout: UnitTime
     let source: Source
+
+    public init(_ timeout: UnitTime, for source: Source = .all) {
+        self.timeout = timeout
+        self.source = source
+    }
 
     /**
      Initializes a new instance of `Timeout`.
@@ -48,9 +53,12 @@ public struct Timeout: Property {
      - Note: By default, the `source` parameter is set to `.all`.
 
      */
+    @available(*, deprecated, renamed: "init(_:for:)")
     public init(_ timeout: TimeInterval, for source: Source = .all) {
-        self.timeout = timeout
-        self.source = source
+        self.init(
+            UnitTime.nanoseconds(Int64(floor(timeout * 1_000_000_000))),
+            for: source
+        )
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -59,30 +67,34 @@ public struct Timeout: Property {
     }
 }
 
-extension Timeout: PrimitiveProperty {
+extension Timeout {
 
-    struct Object: NodeObject {
+    private struct Node: PropertyNode {
 
-        let timeout: TimeInterval
+        let timeout: UnitTime
         let source: Source
 
-        init(_ timeout: TimeInterval, _ source: Source) {
-            self.timeout = timeout
-            self.source = source
-        }
+        func make(_ make: inout Make) async throws {
+            let timeout = TimeInterval(Double(timeout.nanoseconds) / 1_000_000_000)
 
-        func makeProperty(_ make: Make) {
-            if source.contains(.request) {
+            if source.contains(.connect) {
                 make.configuration.timeoutIntervalForRequest = timeout
             }
 
-            if source.contains(.resource) {
+            if source.contains(.read) {
                 make.configuration.timeoutIntervalForResource = timeout
             }
         }
     }
 
-    func makeObject() -> Object {
-        .init(timeout, source)
+    public static func _makeProperty(
+        property: _GraphValue<Timeout>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(
+            timeout: property.timeout,
+            source: property.source
+        )))
     }
 }

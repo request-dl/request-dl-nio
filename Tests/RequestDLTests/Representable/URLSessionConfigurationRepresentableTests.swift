@@ -36,3 +36,4 @@ final class URLSessionConfigurationRepresentableTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
+// swiftlint:enable type_name

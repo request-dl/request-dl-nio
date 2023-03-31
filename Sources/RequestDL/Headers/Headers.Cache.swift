@@ -67,6 +67,12 @@ extension Headers {
             - memoryCapacity: The maximum amount of memory to be used for caching in bytes.
             - diskCapacity: The maximum amount of disk space to be used for caching in bytes.
          */
+        @available(*, deprecated, message: """
+        Caching directly managed by URLSession has been discontinued.
+
+        If your project requires this feature, you will need to implement \
+        a task modifier to manage the cache.
+        """)
         public init(
             _ policy: URLRequest.CachePolicy,
             memoryCapacity: Int = 10_000_000,
@@ -84,25 +90,15 @@ extension Headers {
     }
 }
 
-extension Headers.Cache: PrimitiveProperty {
+extension Headers.Cache {
 
-    struct CacheObject: NodeObject {
+    private struct Node: PropertyNode {
 
-        private let policy: URLRequest.CachePolicy?
-        private let memoryCapacity: Int?
-        private let diskCapacity: Int?
+        let policy: URLRequest.CachePolicy?
+        let memoryCapacity: Int?
+        let diskCapacity: Int?
 
-        init(
-            policy: URLRequest.CachePolicy?,
-            memoryCapacity: Int?,
-            diskCapacity: Int?
-        ) {
-            self.policy = policy
-            self.memoryCapacity = memoryCapacity
-            self.diskCapacity = diskCapacity
-        }
-
-        func makeProperty(_ make: Make) {
+        func make(_ make: inout Make) async throws {
             if let memoryCapacity = memoryCapacity, let diskCapacity = diskCapacity {
                 make.configuration.urlCache = URLCache(
                     memoryCapacity: memoryCapacity,
@@ -117,16 +113,20 @@ extension Headers.Cache: PrimitiveProperty {
         }
     }
 
-    func makeObject() -> Headers.Object {
-        Headers.Object(
-            contents().joined(separator: ", "),
+    public static func _makeProperty(
+        property: _GraphValue<Headers.Cache>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.contents.joined(separator: ", "),
             forKey: "Cache-Control",
-            next: CacheObject(
-                policy: policy,
-                memoryCapacity: memoryCapacity,
-                diskCapacity: diskCapacity
+            next: Node(
+                policy: property.policy,
+                memoryCapacity: property.memoryCapacity,
+                diskCapacity: property.diskCapacity
             )
-        )
+        )))
     }
 }
 
@@ -293,8 +293,7 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
-    // swiftlint:disable cyclomatic_complexity
-    func contents() -> [String] {
+    var contents: [String] {
         var contents = [String]()
 
         if !isCached {
