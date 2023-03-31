@@ -42,7 +42,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "RequestDLInternals",
+            name: "RequestDL",
             dependencies: [
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
@@ -51,23 +51,6 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client")
-            ],
-            resources: [.process("Resources")]
-        ),
-
-        .target(
-            name: "RequestDL",
-            dependencies: ["RequestDLInternals"]
-        ),
-
-        .testTarget(
-            name: "RequestDLInternalsTests",
-            dependencies: [
-                "RequestDLInternals",
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "AsyncHTTPClient", package: "async-http-client")
             ]
         ),
 
@@ -75,7 +58,10 @@ let package = Package(
             name: "RequestDLTests",
             dependencies: [
                 "RequestDL",
-                "RequestDLInternals"
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client")
             ],
             resources: [.process("Resources")]
         )
