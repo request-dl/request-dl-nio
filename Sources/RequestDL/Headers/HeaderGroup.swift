@@ -21,51 +21,24 @@ import Foundation
  */
 public struct HeaderGroup<Content: Property>: Property {
 
-    public typealias Body = Never
-
-    let parameter: Content
+    let content: Content
 
     /**
      Initializes a new `HeaderGroup` with a closure that contains the header properties.
 
-     - Parameter parameter: A closure that returns the `Content` containing the header properties.
+     - Parameter content: A closure that returns the `Content` containing the header properties.
      */
-    public init(@PropertyBuilder parameter: () -> Content) {
-        self.parameter = parameter()
+    public init(@PropertyBuilder content: () -> Content) {
+        self.content = content()
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
-
-    /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        let node = Node(
-            root: context.root,
-            object: EmptyObject(property),
-            children: []
-        )
-
-        let newContext = Context(node)
-        try await Content.makeProperty(property.parameter, newContext)
-
-        let parameters = newContext.findCollection(Headers.Object.self).map {
-            ($0.key, $0.value)
-        }
-
-        context.append(Node(
-            root: context.root,
-            object: Object(parameters),
-            children: []
-        ))
-    }
 }
 
-extension HeaderGroup where Content == ForEach<[String: Any], Headers.`Any`> {
+extension HeaderGroup where Content == ForEach<[String: Any], String, Headers.`Any`> {
 
     /**
      Initializes a new `HeaderGroup` with a dictionary of headers.
@@ -74,7 +47,7 @@ extension HeaderGroup where Content == ForEach<[String: Any], Headers.`Any`> {
      */
     public init(_ dictionary: [String: Any]) {
         self.init {
-            ForEach(dictionary) {
+            ForEach(dictionary, id: \.key) {
                 Headers.Any($0.value, forKey: $0.key)
             }
         }
@@ -83,18 +56,29 @@ extension HeaderGroup where Content == ForEach<[String: Any], Headers.`Any`> {
 
 extension HeaderGroup {
 
-    struct Object: NodeObject {
+    private struct Node: PropertyNode {
 
-        private let parameters: [(String, Any)]
+        let nodes: [Leaf<Headers.Node>]
 
-        init(_ parameters: [(String, Any)]) {
-            self.parameters = parameters
-        }
-
-        func makeProperty(_ make: Make) {
-            for (key, value) in parameters {
-                make.request.setValue("\(value)", forHTTPHeaderField: key)
+        func make(_ make: inout Make) async throws {
+            for node in nodes {
+                try await node.make(&make)
             }
         }
+    }
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<HeaderGroup<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        let inputs = inputs[self, \.content]
+
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
+        )
+
+        return .init(Leaf(Node(nodes: outputs.node.search(for: Headers.Node.self))))
     }
 }

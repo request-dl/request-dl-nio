@@ -92,22 +92,22 @@ public struct Payload<Provider: PayloadProvider>: Property {
     }
 }
 
-extension Payload: PrimitiveProperty {
+extension Payload {
 
-    struct Object: NodeObject {
+    private struct Node: PropertyNode {
 
-        private let provider: Provider
+        let provider: Provider
 
-        init(_ provider: Provider) {
-            self.provider = provider
-        }
-
-        func makeProperty(_ make: Make) {
+        func make(_ make: inout Make) async throws {
             make.request.httpBody = provider.data
         }
     }
 
-    func makeObject() -> Object {
-        .init(provider)
+    public static func _makeProperty(
+        property: _GraphValue<Payload<Provider>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(provider: property.provider)))
     }
 }

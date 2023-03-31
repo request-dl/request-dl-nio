@@ -4,11 +4,13 @@
 
 import Foundation
 
-class Make {
+struct Make {
 
     var request: URLRequest
     let configuration: URLSessionConfiguration
     let delegate: DelegateProxy
+
+    var isInsideSecureConnection = false
 
     init(
         request: URLRequest,

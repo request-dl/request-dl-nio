@@ -38,11 +38,22 @@ public struct Session: Property {
     private var configuration: URLSessionConfiguration
     private let queue: OperationQueue?
 
+    public init() {
+        self.configuration = .default
+        self.queue = nil
+    }
+
+    public init(_ identifier: String) {
+        self.configuration = .background(withIdentifier: identifier)
+        self.queue = nil
+    }
+
     /**
      Initializes a session with the specified configuration.
 
      - Parameter configuration: The type of session configuration to use.
      */
+    @available(*, deprecated)
     public init(_ configuration: Configuration) {
         self.configuration = configuration.sessionConfiguration
         self.queue = nil
@@ -55,6 +66,7 @@ public struct Session: Property {
         - configuration: The type of session configuration to use.
         - queue: The operation queue that will execute the requests.
     */
+    @available(*, deprecated)
     public init(_ configuration: Configuration, queue: OperationQueue) {
         self.configuration = configuration.sessionConfiguration
         self.queue = queue
@@ -81,6 +93,7 @@ extension Session {
      - Parameter type: The network service type.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func networkService(_ type: URLRequest.NetworkServiceType) -> Self {
         edit { $0.networkServiceType = type }
     }
@@ -90,6 +103,7 @@ extension Session {
      - Parameter isDisabled: `true` to disable or `false` to enable.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func cellularAccessDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsCellularAccess = !isDisabled }
     }
@@ -99,6 +113,7 @@ extension Session {
      - Parameter isDisabled: `true` to disable or `false` to enable.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func expensiveNetworkDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsExpensiveNetworkAccess = !isDisabled }
     }
@@ -108,6 +123,7 @@ extension Session {
      - Parameter isDisabled: `true` to disable or `false` to enable.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func constrainedNetworkDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.allowsConstrainedNetworkAccess = !isDisabled }
     }
@@ -118,6 +134,7 @@ extension Session {
      - Parameter flag: `true` to require DNSSEC validation or `false` to not require it.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
     public func validatesDNSSec(_ flag: Bool) -> Self {
         edit { $0.requiresDNSSECValidation = flag }
@@ -147,6 +164,7 @@ extension Session {
      - Parameter identifier: The shared container identifier.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func sharedContainerIdentifier(_ identifier: String?) -> Self {
         edit { $0.sharedContainerIdentifier = identifier }
     }
@@ -156,6 +174,7 @@ extension Session {
      - Parameter flag: `true` to send launch events or `false` to not send them.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func sendsLaunchEvents(_ flag: Bool) -> Self {
         edit { $0.sessionSendsLaunchEvents = flag }
     }
@@ -164,6 +183,7 @@ extension Session {
      - Parameter dictionary: The connection proxy dictionary.
      - Returns: `Self` for chaining.
      */
+    @available(*, deprecated)
     public func connectionProxyDictionary(_ dictionary: [AnyHashable: Any]?) -> Self {
         edit { $0.connectionProxyDictionary = dictionary }
     }
@@ -174,6 +194,7 @@ extension Session {
      - Parameter minimum: The minimum supported TLS protocol version.
      - Returns: The session instance with the configured minimum TLS protocol version.
      */
+    @available(*, deprecated, renamed: "SecureConnection.version(minimum:)")
     public func tlsProtocolSupported(minimum: tls_protocol_version_t) -> Self {
         edit { $0.tlsMinimumSupportedProtocolVersion = minimum }
     }
@@ -184,6 +205,7 @@ extension Session {
      - Parameter maximum: The maximum supported TLS protocol version.
      - Returns: The session instance with the configured maximum TLS protocol version.
      */
+    @available(*, deprecated, renamed: "SecureConnection.version(maximum:)")
     public func tlsProtocolSupported(maximum: tls_protocol_version_t) -> Self {
         edit { $0.tlsMaximumSupportedProtocolVersion = maximum }
     }
@@ -196,6 +218,7 @@ extension Session {
      - maximum: The maximum supported TLS protocol version.
      - Returns: The session instance with the configured TLS protocol version range.
      */
+    @available(*, deprecated, renamed: "SecureConnection.version(minimum:maximum:)")
     public func tlsProtocolSupported(
         minimum: tls_protocol_version_t,
         maximum: tls_protocol_version_t
@@ -210,6 +233,7 @@ extension Session {
      - Parameter isDisabled: If `true`, disables pipelining. If `false`, enables pipelining.
      - Returns: The session instance with pipelining enabled or disabled.
      */
+    @available(*, deprecated)
     public func pipeliningDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.httpShouldUsePipelining = !isDisabled }
     }
@@ -220,6 +244,7 @@ extension Session {
      - Parameter isDisabled: If `true`, disables cookie setting. If `false`, enables cookie setting.
      - Returns: The session instance with cookie setting enabled or disabled.
      */
+    @available(*, deprecated)
     public func setCookiesDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.httpShouldSetCookies = !isDisabled }
     }
@@ -230,6 +255,7 @@ extension Session {
      - Parameter policy: The cookie accept policy to use.
      - Returns: The session instance with the configured cookie accept policy.
      */
+    @available(*, deprecated)
     public func cookieAcceptPolicy(_ policy: HTTPCookie.AcceptPolicy) -> Self {
         edit { $0.httpCookieAcceptPolicy = policy }
     }
@@ -250,6 +276,7 @@ extension Session {
      - Parameter storage: The cookie storage to use.
      - Returns: The session instance with the configured cookie storage.
      */
+    @available(*, deprecated)
     public func cookieStorage(_ storage: HTTPCookieStorage?) -> Self {
         edit { $0.httpCookieStorage = storage }
     }
@@ -260,6 +287,7 @@ extension Session {
      - Parameter storage: The URL credential storage to use.
      - Returns: The session instance with the configured URL credential storage.
      */
+    @available(*, deprecated)
     public func credentialStorage(_ storage: URLCredentialStorage?) -> Self {
         edit { $0.urlCredentialStorage = storage }
     }
@@ -275,6 +303,7 @@ extension Session {
 
      - Returns: A reference to the current session instance.
      */
+    @available(*, deprecated)
     public func extendedBackgroundIdleModeDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.shouldUseExtendedBackgroundIdleMode = !isDisabled }
     }
@@ -324,22 +353,24 @@ extension Session.Configuration {
     }
 }
 
-extension Session: PrimitiveProperty {
+extension Session {
 
-    struct Object: NodeObject {
+    struct Node: PropertyNode {
 
         let configuration: URLSessionConfiguration
         let queue: OperationQueue?
 
-        init(_ configuration: URLSessionConfiguration, _ queue: OperationQueue?) {
-            self.configuration = configuration
-            self.queue = queue
-        }
-
-        func makeProperty(_ make: Make) {}
+        func make(_ make: inout Make) async throws {}
     }
 
-    func makeObject() -> Object {
-        .init(configuration, queue)
+    public static func _makeProperty(
+        property: _GraphValue<Session>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Node(
+            configuration: property.configuration,
+            queue: property.queue
+        )))
     }
 }

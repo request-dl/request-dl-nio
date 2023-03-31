@@ -25,11 +25,9 @@ extension Modifiers {
          */
         public func task(_ task: Content) async throws -> Content.Element {
             let result = try await task.result()
+            let status = result.head.status.code
 
-            guard
-                let httpResponse = result.response as? HTTPURLResponse,
-                statusCodes.isEmpty || statusCodes.contains(StatusCode(httpResponse.statusCode))
-            else {
+            guard statusCodes.isEmpty || statusCodes.contains(StatusCode(status)) else {
                 throw InvalidStatusCodeError<Content.Element>(data: result)
             }
 

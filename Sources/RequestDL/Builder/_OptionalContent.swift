@@ -8,24 +8,37 @@ import Foundation
 /// to be used directly by clients of this framework.
 public struct _OptionalContent<Content: Property>: Property {
 
-    private let content: Content?
+    private let source: Content?
+
+    public var content: Content {
+        source.unsafelyUnwrapped
+    }
 
     init(_ content: Content?) {
-        self.content = content
+        self.source = content
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
+}
+
+extension _OptionalContent {
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async throws {
-        if let content = property.content {
-            try await Content.makeProperty(content, context)
+    public static func _makeProperty(
+        property: _GraphValue<_OptionalContent<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        switch property.source {
+        case .none:
+            return .init(EmptyLeaf())
+        case .some:
+            return try await Content._makeProperty(
+                property: property.content,
+                inputs: inputs[self, \.content]
+            )
         }
     }
 }

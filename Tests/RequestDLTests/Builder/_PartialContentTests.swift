@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-final class _TupleContentTests: XCTestCase {
+final class _PartialContentTests: XCTestCase {
 
     func testTupleTwoElementsBuilder() async throws {
         // Given
@@ -19,10 +19,10 @@ final class _TupleContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
+        XCTAssertTrue(result is _PartialContent<
             BaseURL,
             Headers.Origin
-        )>)
+        >)
 
         XCTAssertEqual(request.url?.absoluteString, "https://google.com")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
@@ -41,11 +41,13 @@ final class _TupleContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
-            BaseURL,
-            Headers.Origin,
+        XCTAssertTrue(result is _PartialContent<
+            _PartialContent<
+                BaseURL,
+                Headers.Origin
+            >,
             Headers.ContentType
-        )>)
+        >)
 
         XCTAssertEqual(request.url?.absoluteString, "https://google.com")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
@@ -66,12 +68,16 @@ final class _TupleContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
-            BaseURL,
-            Headers.Origin,
-            Headers.ContentType,
+        XCTAssertTrue(result is _PartialContent<
+            _PartialContent<
+                _PartialContent<
+                    BaseURL,
+                    Headers.Origin
+                >,
+                Headers.ContentType
+            >,
             Path
-        )>)
+        >)
 
         XCTAssertEqual(request.url?.absoluteString, "https://google.com/search")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://apple.com")
@@ -93,13 +99,19 @@ final class _TupleContentTests: XCTestCase {
         let (_, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
-            BaseURL,
-            Headers.Origin,
-            Headers.ContentType,
-            Path,
+        XCTAssertTrue(result is _PartialContent<
+            _PartialContent<
+                _PartialContent<
+                    _PartialContent<
+                        BaseURL,
+                        Headers.Origin
+                    >,
+                    Headers.ContentType
+                >,
+                Path
+            >,
             Query
-        )>)
+        >)
 
         XCTAssertEqual(
             request.url?.absoluteString,
@@ -126,14 +138,22 @@ final class _TupleContentTests: XCTestCase {
         let (session, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
-            BaseURL,
-            Headers.Origin,
-            Headers.ContentType,
-            Path,
-            Query,
+        XCTAssertTrue(result is _PartialContent<
+            _PartialContent<
+                _PartialContent<
+                    _PartialContent<
+                        _PartialContent<
+                            BaseURL,
+                            Headers.Origin
+                        >,
+                        Headers.ContentType
+                    >,
+                    Path
+                >,
+                Query
+            >,
             Timeout
-        )>)
+        >)
 
         XCTAssertEqual(
             request.url?.absoluteString,
@@ -164,15 +184,25 @@ final class _TupleContentTests: XCTestCase {
         let (session, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
-            BaseURL,
-            Headers.Origin,
-            Headers.ContentType,
-            Path,
-            Query,
-            Timeout,
+        XCTAssertTrue(result is _PartialContent<
+            _PartialContent<
+                _PartialContent<
+                    _PartialContent<
+                        _PartialContent<
+                            _PartialContent<
+                                BaseURL,
+                                Headers.Origin
+                            >,
+                            Headers.ContentType
+                        >,
+                        Path
+                    >,
+                    Query
+                >,
+                Timeout
+            >,
             Query
-        )>)
+        >)
 
         XCTAssertEqual(
             request.url?.absoluteString,
@@ -204,16 +234,28 @@ final class _TupleContentTests: XCTestCase {
         let (session, request) = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _TupleContent<(
-            BaseURL,
-            Headers.Origin,
-            Headers.ContentType,
-            Path,
-            Query,
-            Timeout,
-            Query,
+        XCTAssertTrue(result is _PartialContent<
+            _PartialContent<
+                _PartialContent<
+                    _PartialContent<
+                        _PartialContent<
+                            _PartialContent<
+                                _PartialContent<
+                                    BaseURL,
+                                    Headers.Origin
+                                >,
+                                Headers.ContentType
+                            >,
+                            Path
+                        >,
+                        Query
+                    >,
+                    Timeout
+                >,
+                Query
+            >,
             Path
-        )>)
+        >)
 
         XCTAssertEqual(
             request.url?.absoluteString,
@@ -229,7 +271,10 @@ final class _TupleContentTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = _TupleContent<EmptyProperty>(transform: { _ in })
+        let property = _PartialContent<EmptyProperty, EmptyProperty>(
+            accumulated: .init(),
+            next: .init()
+        )
 
         // Then
         try await assertNever(property.body)

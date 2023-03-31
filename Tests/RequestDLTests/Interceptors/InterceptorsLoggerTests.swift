@@ -29,7 +29,7 @@ final class InterceptorsLoggerTests: XCTestCase {
 
         // Then
         XCTAssertEqual(strings, [
-            "[RequestDL] Response: \(result.response)",
+            "[RequestDL] Response: \(result.head)",
             "[RequestDL] Data: \(String(data: data, encoding: .utf8) ?? "")"
         ])
     }

@@ -111,24 +111,35 @@ extension BaseURL {
     }
 }
 
-extension BaseURL: PrimitiveProperty {
+extension BaseURL {
 
-    struct Object: NodeObject {
+    struct Node: PropertyNode {
 
         let baseURL: URL
 
-        init(_ baseURL: URL) {
+        fileprivate init(_ baseURL: URL) {
             self.baseURL = baseURL
         }
 
-        func makeProperty(_ make: Make) {}
+        func make(_ make: inout Make) async throws {}
     }
 
-    func makeObject() -> Object {
-        guard let baseURL = URL(string: absoluteString) else {
-            fatalError("Failed to create URL from absolute string: \(absoluteString)")
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<BaseURL>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+
+        guard let baseURL = URL(string: property.absoluteString) else {
+            fatalError(
+                """
+                Failed to create URL from absolute string: \
+                \(property.absoluteString)
+                """
+            )
         }
 
-        return .init(baseURL)
+        return .init(Leaf(Node(baseURL)))
     }
 }

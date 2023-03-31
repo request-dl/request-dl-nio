@@ -62,7 +62,7 @@ extension MockedTask {
     public func result() async throws -> TaskResult<Data> {
         guard let response = HTTPURLResponse(
             url: FileManager.default.temporaryDirectory,
-            statusCode: statusCode.rawValue,
+            statusCode: Int(statusCode.rawValue),
             httpVersion: nil,
             headerFields: headers
         ) else { throw FailedToCreateURLResponseError() }

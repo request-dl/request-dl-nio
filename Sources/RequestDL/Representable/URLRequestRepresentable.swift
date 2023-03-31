@@ -20,6 +20,7 @@ import Foundation
  }
  ```
  */
+@available(*, deprecated)
 public protocol URLRequestRepresentable: Property where Body == Never {
 
     /**
@@ -30,37 +31,54 @@ public protocol URLRequestRepresentable: Property where Body == Never {
     func updateRequest(_ request: inout URLRequest)
 }
 
+@available(*, deprecated)
 extension URLRequestRepresentable {
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
+}
+
+@available(*, deprecated)
+extension URLRequestRepresentable {
+
+    private var pointer: Pointer<Self> {
+        .init(self)
+    }
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async {
-        let node = Node(
-            root: context.root,
-            object: URLRequestRepresentableObject(property.updateRequest(_:)),
-            children: []
-        )
-
-        context.append(node)
+    public static func _makeProperty(
+        property: _GraphValue<Self>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(URLRequestRepresentableNode(
+            property: property.pointer()
+        )))
     }
 }
 
-struct URLRequestRepresentableObject: NodeObject {
+@available(*, deprecated)
+struct Pointer<Property> {
 
-    private let update: (inout URLRequest) -> Void
+    private let pointer: Property
 
-    init(_ update: @escaping (inout URLRequest) -> Void) {
-        self.update = update
+    init(_ pointer: Property) {
+        self.pointer = pointer
     }
 
-    func makeProperty(_ make: Make) {
-        update(&make.request)
+    func callAsFunction() -> Property {
+        pointer
+    }
+}
+
+@available(*, deprecated)
+fileprivate struct URLRequestRepresentableNode<Property: URLRequestRepresentable>: PropertyNode {
+
+    let property: Property
+
+    func make(_ make: inout Make) async throws {
+        property.updateRequest(&make.request)
     }
 }

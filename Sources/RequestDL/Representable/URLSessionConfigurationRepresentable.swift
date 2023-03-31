@@ -24,6 +24,7 @@ import Foundation
  }
  ```
  */
+@available(*, deprecated)
 public protocol URLSessionConfigurationRepresentable: Property where Body == Never {
 
     /**
@@ -34,37 +35,40 @@ public protocol URLSessionConfigurationRepresentable: Property where Body == Nev
     func updateSessionConfiguration(_ sessionConfiguration: URLSessionConfiguration)
 }
 
+@available(*, deprecated)
 extension URLSessionConfigurationRepresentable {
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
+}
+
+@available(*, deprecated)
+extension URLSessionConfigurationRepresentable {
+
+    private var pointer: Pointer<Self> {
+        .init(self)
+    }
 
     /// This method is used internally and should not be called directly.
-    public static func makeProperty(
-        _ property: Self,
-        _ context: Context
-    ) async {
-        let node = Node(
-            root: context.root,
-            object: URLSessionRepresentableObject(property.updateSessionConfiguration(_:)),
-            children: []
-        )
-
-        context.append(node)
+    public static func _makeProperty(
+        property: _GraphValue<Self>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(URLSessionConfigurationRepresentableNode(
+            property: property.pointer()
+        )))
     }
 }
 
-struct URLSessionRepresentableObject: NodeObject {
+@available(*, deprecated)
+fileprivate struct URLSessionConfigurationRepresentableNode<Property: URLSessionConfigurationRepresentable>: PropertyNode {
 
-    private let update: (URLSessionConfiguration) -> Void
+    let property: Property
 
-    init(_ update: @escaping (URLSessionConfiguration) -> Void) {
-        self.update = update
-    }
-
-    func makeProperty(_ make: Make) {
-        update(make.configuration)
+    func make(_ make: inout Make) async throws {
+        property.updateSessionConfiguration(make.configuration)
     }
 }

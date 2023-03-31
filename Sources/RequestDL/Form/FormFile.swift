@@ -68,16 +68,23 @@ public struct FormFile: Property {
     }
 }
 
-extension FormFile: PrimitiveProperty {
+extension FormFile {
 
-    func makeObject() -> FormObject {
-        FormObject {
-            let data = (try? Data(contentsOf: url)) ?? Data()
+    public static func _makeProperty(
+        property: _GraphValue<FormFile>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(FormNode {
+            let data = (try? Data(contentsOf: property.url)) ?? Data()
 
             return PartFormRawValue(data, forHeaders: [
-                kContentDisposition: kContentDispositionValue(fileName, forKey: key),
-                "Content-Type": contentType
+                kContentDisposition: kContentDispositionValue(
+                    property.fileName,
+                    forKey: property.key
+                ),
+                "Content-Type": property.contentType
             ])
-        }
+        }))
     }
 }

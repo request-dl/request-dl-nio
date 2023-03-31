@@ -29,9 +29,16 @@ extension Headers {
     }
 }
 
-extension Headers.Accept: PrimitiveProperty {
+extension Headers.Accept {
 
-    func makeObject() -> Headers.Object {
-        .init(type.rawValue, forKey: "Accept")
+    public static func _makeProperty(
+        property: _GraphValue<Headers.Accept>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.type.rawValue,
+            forKey: "Accept"
+        )))
     }
 }

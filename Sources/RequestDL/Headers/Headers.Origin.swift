@@ -54,9 +54,16 @@ extension Headers {
     }
 }
 
-extension Headers.Origin: PrimitiveProperty {
+extension Headers.Origin {
 
-    func makeObject() -> Headers.Object {
-        .init(value, forKey: "Origin")
+    public static func _makeProperty(
+        property: _GraphValue<Headers.Origin>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.value,
+            forKey: "Origin"
+        )))
     }
 }

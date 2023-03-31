@@ -28,6 +28,7 @@ extension Modifiers {
 
      - Note: This modifier is available in iOS 15.0+, tvOS 15.0+, watchOS 15.0+, and macOS 12.0+.
      */
+    @available(*, deprecated)
     public struct ConvertBytesToData<Content: Task, Output>: TaskModifier {
 
         private let bytes: (Content.Element) -> URLSession.AsyncBytes
@@ -72,9 +73,10 @@ extension Task<TaskResult<URLSession.AsyncBytes>> {
 
      - Returns: A modified task that produces `TaskResult<Data>`.
      */
+    @available(*, deprecated)
     public func convertBytesToData() -> ModifiedTask<Modifiers.ConvertBytesToData<Self, TaskResult<Data>>> {
         modify(Modifiers.ConvertBytesToData(
-            bytes: \.data,
+            bytes: \.payload,
             element: {
                 TaskResult(
                     response: $0.response,
@@ -94,6 +96,7 @@ extension Task<URLSession.AsyncBytes> {
 
      - Returns: A modified task that produces `Data`.
      */
+    @available(*, deprecated)
     public func convertBytesToData() -> ModifiedTask<Modifiers.ConvertBytesToData<Self, Data>> {
         modify(Modifiers.ConvertBytesToData(
             bytes: { $0 },

@@ -88,8 +88,8 @@ extension Task<TaskResult<Data>> {
         intercept(Interceptors.Logger(
             isActive: isActive,
             results: {[
-                "Response: \($0.response)",
-                "Data: \(String(data: $0.data, encoding: .utf8) ?? "Couldn't decode using UTF8")"
+                "Response: \($0.head)",
+                "Data: \(String(data: $0.payload, encoding: .utf8) ?? "Couldn't decode using UTF8")"
             ]}
         ))
     }

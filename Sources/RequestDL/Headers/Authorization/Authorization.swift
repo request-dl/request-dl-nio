@@ -39,23 +39,16 @@ public struct Authorization: Property {
     }
 }
 
-extension Authorization: PrimitiveProperty {
+extension Authorization {
 
-    struct Object: NodeObject {
-        let type: TokenType
-        let token: Any
-
-        init(_ type: TokenType, token: Any) {
-            self.type = type
-            self.token = token
-        }
-
-        func makeProperty(_ make: Make) {
-            make.request.setValue("\(type.rawValue) \(token)", forHTTPHeaderField: "Authorization")
-        }
-    }
-
-    func makeObject() -> Object {
-        .init(type, token: token)
+    public static func _makeProperty(
+        property: _GraphValue<Authorization>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            "\(property.type.rawValue) \(property.token)",
+            forKey: "Authorization"
+        )))
     }
 }

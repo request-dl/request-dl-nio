@@ -27,9 +27,16 @@ extension Headers {
     }
 }
 
-extension Headers.ContentType: PrimitiveProperty {
+extension Headers.ContentType {
 
-    func makeObject() -> Headers.Object {
-        .init(contentType.rawValue, forKey: "Content-Type")
+    public static func _makeProperty(
+        property: _GraphValue<Headers.ContentType>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        _ = inputs[self]
+        return .init(Leaf(Headers.Node(
+            property.contentType.rawValue,
+            forKey: "Content-Type"
+        )))
     }
 }
