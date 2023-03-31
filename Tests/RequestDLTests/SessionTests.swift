@@ -735,3 +735,4 @@ final class SessionTests: XCTestCase {
         )
     }
 }
+// swiftlint:enable type_body_length function_body_length file_length

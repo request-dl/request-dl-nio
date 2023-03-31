@@ -59,6 +59,7 @@ final class PropertyBuilderTests: XCTestCase {
     }
 }
 
+// swiftlint:disable identifier_name
 @available(*, deprecated)
 extension PropertyBuilderTests {
 
@@ -245,3 +246,4 @@ extension PropertyBuilderTests {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Basic some")
     }
 }
+// swiftlint:enable identifier_name

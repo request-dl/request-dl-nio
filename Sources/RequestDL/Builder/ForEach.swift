@@ -22,7 +22,7 @@ import Foundation
  }
  ```
  */
-public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID : Hashable, Content: Property {
+public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Hashable, Content: Property {
 
     public let data: Data
 

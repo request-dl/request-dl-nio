@@ -10,9 +10,6 @@ extension Modifiers {
     /// error handling and transformation.
     public struct MapError<Content: Task>: TaskModifier {
 
-        // swiftlint:disable nesting
-        public typealias Element = Content.Element
-
         let mapErrorHandler: (Error) throws -> Element
 
         init(mapErrorHandler: @escaping (Error) throws -> Element) {
@@ -25,7 +22,7 @@ extension Modifiers {
          - Parameter task: A `Task` that returns a `TaskResult` containing the error to map.
          - Returns: A new error.
          */
-        public func task(_ task: Content) async throws -> Element {
+        public func task(_ task: Content) async throws -> Content.Element {
             do {
                 return try await task.result()
             } catch {

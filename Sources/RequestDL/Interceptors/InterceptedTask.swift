@@ -4,16 +4,18 @@
 
 import Foundation
 
-// swiftlint:disable line_length
 /**
  A task that can be intercepted by an `Interceptor` and returns a `Content` object.
 
  - Interceptor: The type of `Interceptor` that will intercept the task.
  - Content: The type of `Content` that will be returned by the task.
 
- An `InterceptedTask` conforms to the `Task` protocol and defines a `result()` method that returns a `Content.Element` object. The `result()` method can throw an error asynchronously.
+ An `InterceptedTask` conforms to the `Task` protocol and defines a `result()` method that returns
+ a `Content.Element` object. The `result()` method can throw an error asynchronously.
  */
-public struct InterceptedTask<Interceptor: TaskInterceptor, Content: Task>: Task where Interceptor.Element == Content.Element {
+public struct InterceptedTask<
+    Interceptor: TaskInterceptor, Content: Task
+>: Task where Interceptor.Element == Content.Element {
 
     public typealias Element = Content.Element
 

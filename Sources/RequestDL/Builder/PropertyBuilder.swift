@@ -133,7 +133,7 @@ extension PropertyBuilder {
     }
 }
 
-// swiftlint:disable function_parameter_count identifier_name
+// swiftlint:disable function_parameter_count identifier_name file_length function_body_length
 extension PropertyBuilder {
 
     @available(*, deprecated, renamed: "buildPartialBlock(accumulated:next:)")
@@ -521,3 +521,4 @@ extension PropertyBuilder {
         }
     }
 }
+// swiftlint:enable identifier_name function_body_length function_parameter_count

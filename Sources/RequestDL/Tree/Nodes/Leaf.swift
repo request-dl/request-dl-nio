@@ -32,7 +32,7 @@ extension Leaf: PropertyNode {
 struct EmptyLeaf: Node {
 
     init() {}
-    
+
     mutating func next() -> Node? {
         nil
     }

@@ -74,7 +74,7 @@ struct Pointer<Property> {
 }
 
 @available(*, deprecated)
-fileprivate struct URLRequestRepresentableNode<Property: URLRequestRepresentable>: PropertyNode {
+private struct URLRequestRepresentableNode<Property: URLRequestRepresentable>: PropertyNode {
 
     let property: Property
 

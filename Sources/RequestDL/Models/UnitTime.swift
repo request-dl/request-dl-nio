@@ -99,7 +99,7 @@ extension UnitTime: AdditiveArithmetic {
         .init(lhs.nanoseconds + rhs.nanoseconds)
     }
 
-    public static func +=(lhs: inout UnitTime, rhs: UnitTime) {
+    public static func += (lhs: inout UnitTime, rhs: UnitTime) {
         lhs = lhs + rhs
     }
 
@@ -107,7 +107,7 @@ extension UnitTime: AdditiveArithmetic {
         .init(lhs.nanoseconds - rhs.nanoseconds)
     }
 
-    public static func -=(lhs: inout UnitTime, rhs: UnitTime) {
+    public static func -= (lhs: inout UnitTime, rhs: UnitTime) {
         lhs = lhs - rhs
     }
 

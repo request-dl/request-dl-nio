@@ -64,7 +64,7 @@ extension URLSessionConfigurationRepresentable {
 }
 
 @available(*, deprecated)
-fileprivate struct URLSessionConfigurationRepresentableNode<Property: URLSessionConfigurationRepresentable>: PropertyNode {
+private struct URLSessionConfigurationRepresentableNode<Property: URLSessionConfigurationRepresentable>: PropertyNode {
 
     let property: Property
 
