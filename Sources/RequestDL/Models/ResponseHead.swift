@@ -6,17 +6,20 @@ import Foundation
 
 public struct ResponseHead: Equatable {
 
+    public let url: URL?
     public let status: Status
     public let version: Version
     public let headers: HTTPHeaders
     public let isKeepAlive: Bool
 
     public init(
+        url: URL?,
         status: Status,
         version: Version,
         headers: HTTPHeaders,
         isKeepAlive: Bool
     ) {
+        self.url = url
         self.status = status
         self.version = version
         self.headers = headers
@@ -25,6 +28,7 @@ public struct ResponseHead: Equatable {
 
     init(_ head: Internals.ResponseHead) {
         self.init(
+            url: .init(string: head.url),
             status: .init(head.status),
             version: .init(head.version),
             headers: .init(head.headers),

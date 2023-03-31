@@ -21,8 +21,6 @@ import Foundation
  */
 public struct HeaderGroup<Content: Property>: Property {
 
-    public typealias Body = Never
-
     let content: Content
 
     /**

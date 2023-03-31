@@ -11,6 +11,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
 
     typealias Response = Void
 
+    let url: String
     let upload: DataStream<Int>
     let head: DataStream<ResponseHead>
     var download: DownloadBuffer
@@ -19,10 +20,12 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
     var state: State = .idle
 
     init(
+        url: String,
         upload: DataStream<Int>,
         head: DataStream<ResponseHead>,
         download: DownloadBuffer
     ) {
+        self.url = url
         self.upload = upload
         self.head = head
         self.download = download
@@ -56,6 +59,7 @@ class ClientResponseReceiver: HTTPClientResponseDelegate {
         }
 
         self.head.append(.success(ResponseHead(
+            url: url,
             status: ResponseHead.Status(
                 code: head.status.code,
                 reason: head.status.reasonPhrase

@@ -47,7 +47,6 @@ extension AnyProperty {
 extension AnyProperty {
 
     fileprivate struct Erased<Body: Property>: Property {
-
         let body: Body
     }
 }

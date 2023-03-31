@@ -71,6 +71,7 @@ public struct Session {
         let download = DownloadBuffer(readingMode: configuration.readingMode)
 
         let delegate = ClientResponseReceiver(
+            url: request.url,
             upload: upload,
             head: head,
             download: download

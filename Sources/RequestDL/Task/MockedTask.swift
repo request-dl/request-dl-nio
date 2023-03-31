@@ -62,6 +62,7 @@ extension MockedTask {
     public func result() async throws -> TaskResult<Data> {
         .init(
             head: ResponseHead(
+                url: nil,
                 status: .init(
                     code: statusCode.rawValue,
                     reason: "Mock status"

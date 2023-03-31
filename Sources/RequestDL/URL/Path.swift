@@ -54,8 +54,6 @@ import Foundation
  */
 public struct Path: Property {
 
-    public typealias Body = Never
-
     private let path: String
 
     /**

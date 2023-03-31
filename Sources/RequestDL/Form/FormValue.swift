@@ -9,8 +9,6 @@ import Foundation
 /// It can be used to represent simple values like strings and numbers.
 public struct FormValue: Property {
 
-    public typealias Body = Never
-
     let key: String
     let value: Any
 

@@ -176,7 +176,7 @@ extension FileBuffer {
         }
 
         private var path: String {
-            url.absolutePath()
+            url.absolutePath(percentEncoded: false)
         }
 
         var writtenBytes: Int {

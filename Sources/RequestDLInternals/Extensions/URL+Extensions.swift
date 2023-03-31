@@ -35,7 +35,7 @@ extension URL {
     }
 
     public func createPathIfNeeded() throws {
-        let path = absolutePath()
+        let path = absolutePath(percentEncoded: false)
 
         let directories = deletingLastPathComponent()
 
@@ -52,7 +52,7 @@ extension URL {
     }
 
     public func removeIfNeeded() throws {
-        let path = absolutePath()
+        let path = absolutePath(percentEncoded: false)
         
         if FileManager.default.fileExists(atPath: path) {
             try FileManager.default.removeItem(at: self)

@@ -112,6 +112,6 @@ extension Certificate.Format {
             )
         }
 
-        return resourceURL.absolutePath()
+        return resourceURL.absolutePath(percentEncoded: false)
     }
 }

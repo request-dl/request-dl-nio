@@ -37,8 +37,6 @@ import Foundation
  */
 public struct BaseURL: Property {
 
-    public typealias Body = Never
-
     let internetProtocol: InternetProtocol
     let host: String
 

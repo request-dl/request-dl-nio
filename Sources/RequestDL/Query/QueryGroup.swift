@@ -21,8 +21,6 @@ Usage:
  */
 public struct QueryGroup<Content: Property>: Property {
 
-    public typealias Body = Never
-
     let content: Content
 
     /**

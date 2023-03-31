@@ -22,8 +22,6 @@ import Foundation
  */
 public struct FormGroup<Content: Property>: Property {
 
-    public typealias Body = Never
-
     let content: Content
 
     /**

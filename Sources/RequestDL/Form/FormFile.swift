@@ -21,8 +21,6 @@ import Foundation
 */
 public struct FormFile: Property {
 
-    public typealias Body = Never
-
     let url: URL
     let key: String
     let fileName: String

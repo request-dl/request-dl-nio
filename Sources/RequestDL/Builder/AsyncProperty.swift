@@ -25,8 +25,6 @@ import Foundation
  */
 public struct AsyncProperty<Content: Property>: Property {
 
-    public typealias Body = Never
-
     private let content: () async throws -> Content
 
     private var abstractContent: Content {

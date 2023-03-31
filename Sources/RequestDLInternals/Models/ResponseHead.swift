@@ -5,6 +5,7 @@
 import Foundation
 
 public struct ResponseHead: Equatable {
+    public let url: String
     public let status: Status
     public let version: Version
     public let headers: Headers

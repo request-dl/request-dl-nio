@@ -31,8 +31,6 @@ import Foundation
  */
 public struct Timeout: Property {
 
-    public typealias Body = Never
-
     let timeout: UnitTime
     let source: Source
 

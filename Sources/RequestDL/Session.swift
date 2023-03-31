@@ -34,8 +34,6 @@ import RequestDLInternals
  */
 public struct Session: Property {
 
-    public typealias Body = Never
-
     var configuration: Internals.Session.Configuration
     let provider: Internals.Session.Provider
 

@@ -19,8 +19,6 @@ import Foundation
  */
 public struct RequestMethod: Property {
 
-    public typealias Body = Never
-
     let httpMethod: HTTPMethod
 
     /**

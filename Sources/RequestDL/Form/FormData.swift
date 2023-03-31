@@ -7,8 +7,6 @@ import Foundation
 /// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
 public struct FormData: Property {
 
-    public typealias Body = Never
-
     let data: Foundation.Data
     let fileName: String
     let key: String

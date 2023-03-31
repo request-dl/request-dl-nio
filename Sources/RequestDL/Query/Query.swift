@@ -22,8 +22,6 @@ import Foundation
 */
 public struct Query: Property {
 
-    public typealias Body = Never
-
     let key: String
     let value: Any
 
@@ -49,13 +47,8 @@ extension Query {
 
     struct Node: PropertyNode {
 
-        let key: String
-        let value: String
-
-        fileprivate init(_ value: Any, forKey key: String) {
-            self.key = key
-            self.value = "\(value)"
-        }
+        fileprivate let key: String
+        fileprivate let value: String
 
         func make(_ make: inout Make) async throws {
             guard let url = URL(string: make.request.url) else {
@@ -76,8 +69,8 @@ extension Query {
     ) async throws -> _PropertyOutputs {
         _ = inputs[self]
         return .init(Leaf(Node(
-            property.value,
-            forKey: property.key
+            key: property.key,
+            value: "\(property.value)"
         )))
     }
 }

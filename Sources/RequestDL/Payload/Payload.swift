@@ -30,8 +30,6 @@ import Foundation
  */
 public struct Payload<Provider: PayloadProvider>: Property {
 
-    public typealias Body = Never
-
     private let provider: Provider
 
     /**
