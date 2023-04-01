@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import NIOSSL
 
 public enum TLSVersion: Int {
 
@@ -39,7 +40,7 @@ extension TLSVersion: Comparable {
 
 extension TLSVersion {
 
-    func build() -> Internals.TLSVersion {
+    func build() -> NIOSSL.TLSVersion {
         switch self {
         case .v1:
             return .tlsv1

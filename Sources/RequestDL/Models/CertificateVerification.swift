@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import NIOSSL
 
 public enum CertificateVerification: Sendable {
 
@@ -15,7 +16,7 @@ public enum CertificateVerification: Sendable {
 
 extension CertificateVerification {
 
-    func build() -> Internals.CertificateVerification {
+    func build() -> NIOSSL.CertificateVerification {
         switch self {
         case .none:
             return .none

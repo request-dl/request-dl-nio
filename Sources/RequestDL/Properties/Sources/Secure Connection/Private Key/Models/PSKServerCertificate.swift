@@ -3,19 +3,20 @@
 */
 
 import Foundation
+import NIOSSL
 
 public struct PSKServerCertificate {
 
-    public let key: SecureBytes
+    public let key: NIOSSL.NIOSSLSecureBytes
 
-    public init(_ key: SecureBytes) {
+    public init(_ key: NIOSSL.NIOSSLSecureBytes) {
         self.key = key
     }
 }
 
 extension PSKServerCertificate {
 
-    func build() -> Internals.PSKServerIdentityResponse {
-        .init(key: key.build())
+    func build() -> NIOSSL.PSKServerIdentityResponse {
+        .init(key: key)
     }
 }

@@ -33,7 +33,7 @@ extension Task {
             if debug {
                 let interval = Date().timeIntervalSince(time)
 
-                Internals.Log.debug("[RequestDL] Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
+                Internals.Log.debug("Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
             }
         }
     }

@@ -56,9 +56,9 @@ extension FormGroup {
                 forKey: "Content-Type"
             )
 
-            make.request.body = Internals.RequestBody {
-                Internals.BodyItem(constructor.body)
-            }
+            make.request.body = Internals.Body(buffers: [
+                Internals.DataBuffer(constructor.body)
+            ])
         }
     }
 

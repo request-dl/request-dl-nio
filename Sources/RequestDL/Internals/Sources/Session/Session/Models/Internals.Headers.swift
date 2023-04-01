@@ -6,6 +6,7 @@ import Foundation
 import NIOHTTP1
 
 extension Internals {
+
     struct Headers: Sendable {
 
         private var dictionary: [HeaderKey: String]
@@ -14,7 +15,7 @@ extension Internals {
             self.dictionary = [:]
         }
 
-        init(_ headers: HTTPHeaders) {
+        init(_ headers: NIOHTTP1.HTTPHeaders) {
             self.init(Array(headers))
         }
 
@@ -61,7 +62,7 @@ extension Internals {
             self[key]
         }
 
-        func build() -> HTTPHeaders {
+        func build() -> NIOHTTP1.HTTPHeaders {
             .init(Array(self))
         }
     }

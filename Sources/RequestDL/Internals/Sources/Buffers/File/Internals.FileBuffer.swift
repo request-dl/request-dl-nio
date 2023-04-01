@@ -307,7 +307,7 @@ extension Internals.FileBuffer {
                 try _inputStream?.close()
                 try _outputStream?.close()
             } catch {
-                Log.failure(error)
+                Internals.Log.failure(error)
             }
         }
     }

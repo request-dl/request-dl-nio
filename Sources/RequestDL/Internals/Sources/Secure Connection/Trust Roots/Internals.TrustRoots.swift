@@ -5,24 +5,27 @@
 import Foundation
 import NIOSSL
 
-enum TrustRoots: Equatable {
+extension Internals {
 
-    case `default`
+    enum TrustRoots: Equatable {
 
-    case file(String)
+        case `default`
 
-    case bytes([UInt8])
+        case file(String)
 
-    case certificates([Certificate])
+        case bytes([UInt8])
+
+        case certificates([Internals.Certificate])
+    }
 }
 
-extension TrustRoots {
+extension Internals.TrustRoots {
 
     init() {
         self = .certificates([])
     }
 
-    mutating func append(_ certificate: Certificate) {
+    mutating func append(_ certificate: Internals.Certificate) {
         guard case .certificates(let certificates) = self else {
             fatalError()
         }
@@ -31,7 +34,7 @@ extension TrustRoots {
     }
 }
 
-extension TrustRoots {
+extension Internals.TrustRoots {
 
     func build() throws -> NIOSSLTrustRoots {
         switch self {

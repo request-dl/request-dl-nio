@@ -5,29 +5,32 @@
 import NIOCore
 import AsyncHTTPClient
 
-actor EventLoopGroupManager {
+extension Internals {
 
-    static let shared = EventLoopGroupManager()
+    actor EventLoopGroupManager {
 
-    private var groups: [String: EventLoopGroup] = [:]
+        static let shared = EventLoopGroupManager()
 
-    func client(
-        id: String,
-        factory: @escaping () -> EventLoopGroup,
-        configuration: HTTPClient.Configuration
-    ) -> HTTPClient {
-        if let group = groups[id] {
-            return HTTPClient(
-                eventLoopGroupProvider: .shared(group),
-                configuration: configuration
-            )
-        } else {
-            let group = factory()
-            groups[id] = group
-            return HTTPClient(
-                eventLoopGroupProvider: .shared(group),
-                configuration: configuration
-            )
+        private var groups: [String: EventLoopGroup] = [:]
+
+        func client(
+            id: String,
+            factory: @escaping () -> EventLoopGroup,
+            configuration: HTTPClient.Configuration
+        ) -> HTTPClient {
+            if let group = groups[id] {
+                return HTTPClient(
+                    eventLoopGroupProvider: .shared(group),
+                    configuration: configuration
+                )
+            } else {
+                let group = factory()
+                groups[id] = group
+                return HTTPClient(
+                    eventLoopGroupProvider: .shared(group),
+                    configuration: configuration
+                )
+            }
         }
     }
 }

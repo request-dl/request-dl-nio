@@ -4,7 +4,12 @@
 
 import Foundation
 
-enum Log {
+extension Internals {
+
+    enum Log {}
+}
+
+extension Internals.Log {
 
     static func debug(
         _ items: Any...,
@@ -52,7 +57,7 @@ enum Log {
     }
 }
 
-extension Log {
+extension Internals.Log {
 
     fileprivate static func log(
         _ items: Any...,
@@ -75,15 +80,15 @@ extension Log {
 
         switch level {
         case .debug, .warning:
-            SwiftOverride.print(message)
+            Internals.Override.print(message)
             return nil
         case .failure:
-            SwiftOverride.fatalError(message, file: file, line: line)
+            Internals.Override.fatalError(message, file: file, line: line)
         }
     }
 }
 
-extension Log {
+extension Internals.Log {
 
     fileprivate enum Level {
         case debug
@@ -92,7 +97,7 @@ extension Log {
     }
 }
 
-extension Log.Level {
+extension Internals.Log.Level {
 
     var rawValue: String {
         switch self {

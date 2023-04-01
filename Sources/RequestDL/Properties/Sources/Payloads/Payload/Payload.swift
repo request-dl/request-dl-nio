@@ -101,9 +101,9 @@ extension Payload {
         }
 
         func make(_ make: inout Make) async throws {
-            make.request.body = Internals.RequestBody {
-                Internals.BodyItem(provider.data)
-            }
+            make.request.body = Internals.Body(buffers: [
+                Internals.DataBuffer(provider.data)
+            ])
         }
     }
 

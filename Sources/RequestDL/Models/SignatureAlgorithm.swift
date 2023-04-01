@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import NIOSSL
 
 public struct SignatureAlgorithm: RawRepresentable, Hashable, Sendable {
 
@@ -12,7 +13,7 @@ public struct SignatureAlgorithm: RawRepresentable, Hashable, Sendable {
         self.rawValue = rawValue
     }
 
-    private init(_ signatureAlgorithm: Internals.SignatureAlgorithm) {
+    private init(_ signatureAlgorithm: NIOSSL.SignatureAlgorithm) {
         self.init(rawValue: signatureAlgorithm.rawValue)
     }
 }
@@ -35,7 +36,7 @@ extension SignatureAlgorithm {
 
 extension SignatureAlgorithm {
 
-    func build() -> Internals.SignatureAlgorithm {
+    func build() -> NIOSSL.SignatureAlgorithm {
         .init(rawValue: rawValue)
     }
 }

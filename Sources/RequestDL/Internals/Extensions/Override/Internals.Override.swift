@@ -4,4 +4,7 @@
 
 import Foundation
 
-enum SwiftOverride {}
+extension Internals {
+
+    enum Override {}
+}

@@ -9,7 +9,7 @@ extension Internals {
 
     enum CertificateChain: Equatable {
 
-        case certificates([Certificate])
+        case certificates([Internals.Certificate])
 
         case bytes([UInt8])
 
@@ -23,7 +23,7 @@ extension Internals.CertificateChain {
         self = .certificates([])
     }
 
-    mutating func append(_ certificate: Certificate) {
+    mutating func append(_ certificate: Internals.Certificate) {
         guard case .certificates(let certificates) = self else {
             fatalError()
         }

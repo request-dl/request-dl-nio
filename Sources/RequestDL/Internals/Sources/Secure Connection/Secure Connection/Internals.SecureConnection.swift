@@ -32,13 +32,13 @@ extension Internals {
         var cipherSuites: String?
         var cipherSuiteValues: [NIOSSL.NIOTLSCipher]?
 
-        init(_ context: ConnectionContext) {
+        init(_ context: Internals.Session.Context) {
             self.context = context
         }
     }
 }
 
-extension Session.SecureConnection {
+extension Internals.SecureConnection {
 
     func build() throws -> NIOSSL.TLSConfiguration {
         var tlsConfiguration: TLSConfiguration
@@ -59,7 +59,7 @@ extension Session.SecureConnection {
                 let source = try certificateChain?.build(),
                 let privateKey = try privateKey?.build()
             else {
-                Log.failure(
+                Internals.Log.failure(
                     """
                     The required resources for building the certificate chain \
                     or private key could not be found or accessed.

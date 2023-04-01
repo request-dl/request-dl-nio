@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import NIOSSL
 
 public enum RenegotiationSupport {
 
@@ -15,7 +16,7 @@ public enum RenegotiationSupport {
 
 extension RenegotiationSupport {
 
-    func build() -> Internals.NIORenegotiationSupport {
+    func build() -> NIOSSL.NIORenegotiationSupport {
         switch self {
         case .none:
             return .none

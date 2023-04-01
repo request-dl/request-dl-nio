@@ -3,7 +3,7 @@
 */
 
 import Foundation
-@_implementationOnly import RequestDLInternals
+import NIOCore
 
 public struct SecureConnection<Content: Property>: Property {
 
@@ -63,11 +63,11 @@ extension SecureConnection {
 extension SecureConnection {
 
     public func keyLog(
-        _ closure: @Sendable @escaping (ByteBuffer) -> Void
+        _ closure: @Sendable @escaping (NIOCore.ByteBuffer) -> Void
     ) -> Self {
         edit {
             $0.secureConnection.keyLogCallback = {
-                closure(.init($0))
+                closure($0)
             }
         }
     }

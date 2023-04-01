@@ -36,7 +36,7 @@ extension Interceptors {
          */
         public func received(_ result: Result<Element, Error>) {
             #if DEBUG
-            Internals.raise(SIGTRAP)
+            Internals.Override.raise(SIGTRAP)
             #endif
         }
     }

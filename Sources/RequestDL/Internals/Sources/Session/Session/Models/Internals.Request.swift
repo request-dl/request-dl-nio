@@ -12,7 +12,7 @@ extension Internals {
         var url: String
         var method: String?
         var headers: Headers
-        var body: RequestBody?
+        var body: Body?
 
         init(url: String) {
             self.url = url

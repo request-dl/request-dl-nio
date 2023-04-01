@@ -11,7 +11,7 @@ public enum SecureConnectionContext {
 
 extension SecureConnectionContext {
 
-    func build() -> Internals.ConnectionContext {
+    func build() -> Internals.Session.Context {
         switch self {
         case .server:
             return .server

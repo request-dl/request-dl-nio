@@ -30,7 +30,7 @@ class SessionTask {
 
         self.payload = nil
 
-        Task {
+        _Concurrency.Task {
             try? await promise.get()
             try? await client.shutdown()
         }

@@ -7,17 +7,17 @@ import NIOCore
 import NIOPosix
 import AsyncHTTPClient
 
-extension RequestBody {
+extension Internals.Body {
 
     func data() async throws -> Data {
         try await buffers().resolveData().reduce(Data(), +)
     }
 
-    func buffers() async throws -> [DataBuffer] {
+    func buffers() async throws -> [Internals.DataBuffer] {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let eventLoop = group.any()
 
-        var buffers: [DataBuffer] = []
+        var buffers: [Internals.DataBuffer] = []
 
         try await build().stream(.init(closure: {
             switch $0 {

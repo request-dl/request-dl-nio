@@ -3,14 +3,15 @@
 */
 
 import Foundation
+import NIOSSL
 
 public struct PSKClientCertificate {
 
-    public let key: SecureBytes
+    public let key: NIOSSL.NIOSSLSecureBytes
 
     public let identity: String
 
-    public init(key: SecureBytes, identity: String) {
+    public init(key: NIOSSL.NIOSSLSecureBytes, identity: String) {
         self.key = key
         self.identity = identity
     }
@@ -18,9 +19,9 @@ public struct PSKClientCertificate {
 
 extension PSKClientCertificate {
 
-    func build() -> Internals.PSKClientIdentityResponse {
+    func build() -> NIOSSL.PSKClientIdentityResponse {
         .init(
-            key: key.build(),
+            key: key,
             identity: identity
         )
     }

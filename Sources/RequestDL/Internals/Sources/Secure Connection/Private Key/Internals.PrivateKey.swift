@@ -6,6 +6,7 @@ import Foundation
 import NIOSSL
 
 extension Internals {
+    
     struct PrivateKey<Password: Collection> where Password.Element == UInt8 {
 
         typealias PasswordClosure = ((Password) -> Void) throws -> Void

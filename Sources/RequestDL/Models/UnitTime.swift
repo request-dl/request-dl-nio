@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import NIOCore
 
 public struct UnitTime: Hashable, Sendable {
 
@@ -87,7 +88,7 @@ extension UnitTime: AdditiveArithmetic {
 
 extension UnitTime {
 
-    func build() -> Internals.TimeAmount {
+    func build() -> NIOCore.TimeAmount {
         .nanoseconds(Int64(nanoseconds))
     }
 }

@@ -4,7 +4,7 @@
 
 import Foundation
 
-extension SwiftOverride {
+extension Internals.Override {
 
     #if DEBUG
     enum Raise {

@@ -14,7 +14,7 @@ extension Internals {
 
         init(
             _ size: Int? = nil,
-            _ buffers: [BufferProtocol]
+            buffers: [BufferProtocol]
         ) {
             _body = .init(
                 buffers: buffers,
@@ -60,7 +60,7 @@ extension Internals.Body {
         ).makeIterator()
 
         guard let first = sequence.next() else {
-            Log.failure(
+            Internals.Log.failure(
                 """
                 Creating a RequestBody with an empty BodyContent is potentially \
                 risky and may cause unexpected behavior.

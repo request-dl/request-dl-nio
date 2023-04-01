@@ -4,15 +4,18 @@
 
 import Foundation
 
-struct ResponseHead: Equatable {
-    let url: String
-    let status: Status
-    let version: Version
-    let headers: Headers
-    let isKeepAlive: Bool
+extension Internals {
+
+    struct ResponseHead: Equatable {
+        let url: String
+        let status: Status
+        let version: Version
+        let headers: Headers
+        let isKeepAlive: Bool
+    }
 }
 
-extension ResponseHead {
+extension Internals.ResponseHead {
 
     struct Version: Equatable {
         let minor: Int
