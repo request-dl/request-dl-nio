@@ -28,9 +28,7 @@ struct Resolve<Root: Property> {
 
         guard let baseURLNode = output.node.first(of: BaseURL.Node.self) else {
             Internals.Log.failure(
-                """
-                Failed to find the required BaseURL object in the context.
-                """
+                .cantResolveBaseURLFromNodes(output.node, for: Self.self)
             )
         }
 

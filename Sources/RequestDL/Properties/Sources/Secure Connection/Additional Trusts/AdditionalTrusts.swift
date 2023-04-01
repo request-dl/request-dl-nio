@@ -16,7 +16,9 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
     var content: Content {
         guard case .content(let content) = source else {
-            fatalError()
+            Internals.Log.failure(
+                .unexpectedCertificateSource(source)
+            )
         }
 
         return content

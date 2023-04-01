@@ -29,9 +29,7 @@ public struct AsyncProperty<Content: Property>: Property {
 
     private var abstractContent: Content {
         Internals.Log.failure(
-            """
-            There was an attempt to access a variable for which access was not expected.
-            """
+            .accessingAbstractContent()
         )
     }
 

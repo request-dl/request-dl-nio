@@ -16,9 +16,7 @@ extension Property {
 
     func bodyException() -> Never {
         Internals.Log.failure(
-            """
-            An unexpected attempt was made to access the property body.
-            """
+            .accessingNeverBody(self)
         )
     }
 }

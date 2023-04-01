@@ -60,10 +60,7 @@ extension Internals.SecureConnection {
                 let privateKey = try privateKey?.build()
             else {
                 Internals.Log.failure(
-                    """
-                    The required resources for building the certificate chain \
-                    or private key could not be found or accessed.
-                    """
+                    .cantResolveCertificatesForServer()
                 )
             }
 

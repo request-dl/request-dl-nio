@@ -37,9 +37,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
 
     private var abstractContent: Content {
         Internals.Log.failure(
-            """
-            There was an attempt to access a variable for which access was not expected.
-            """
+            .accessingAbstractContent()
         )
     }
 

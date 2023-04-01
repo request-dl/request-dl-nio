@@ -60,18 +60,7 @@ extension Internals.Body {
         ).makeIterator()
 
         guard let first = sequence.next() else {
-            Internals.Log.failure(
-                """
-                Creating a RequestBody with an empty BodyContent is potentially \
-                risky and may cause unexpected behavior.
-
-                Please ensure that a valid content is provided to the RequestBody \
-                to avoid any potential issues.
-
-                If no content is intended for the RequestBody, please consider \
-                using a different approach.
-                """
-            )
+            Internals.Log.failure(.emptyRequestBody())
         }
 
         return first.flatMapWithEventLoop {
