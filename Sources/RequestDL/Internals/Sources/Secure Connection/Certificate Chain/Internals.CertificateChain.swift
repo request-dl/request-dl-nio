@@ -25,7 +25,9 @@ extension Internals.CertificateChain {
 
     mutating func append(_ certificate: Internals.Certificate) {
         guard case .certificates(let certificates) = self else {
-            fatalError()
+            Internals.Log.failure(
+                .expectingCertificatesCase(self)
+            )
         }
 
         self = .certificates(certificates + [certificate])

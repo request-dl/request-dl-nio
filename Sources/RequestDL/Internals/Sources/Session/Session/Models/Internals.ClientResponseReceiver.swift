@@ -126,7 +126,7 @@ extension Internals {
             case .downloading:
                 download.failed(error)
             case .end, .failure:
-                fatalError()
+                unexpectedStateOrPhase(error: error)
             }
         }
     }
@@ -134,23 +134,13 @@ extension Internals {
 
 extension Internals.ClientResponseReceiver {
 
-    func unexpectedStateOrPhase(_ line: UInt = #line) -> Never {
-        Internals.Log.debug(
-            """
-            state = \(state)
-            phase = \(phase)
-            """,
-            line: line
-        )
-
+    func unexpectedStateOrPhase(error: Error? = nil, line: UInt = #line) -> Never {
         Internals.Log.failure(
-            """
-            An invalid state or phase has been detected, which could \
-            cause unexpected behavior within the application.
-
-            If this was not an intentional change, please report this \
-            issue by opening a bug report 🔎.
-            """,
+            .unexpectedStateOrPhase(
+                state: state,
+                phase: phase,
+                error: error
+            ),
             line: line
         )
     }

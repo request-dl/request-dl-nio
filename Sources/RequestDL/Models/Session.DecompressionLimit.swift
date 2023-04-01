@@ -3,7 +3,7 @@
 */
 
 import Foundation
-import AsyncHTTPClient
+import NIOHTTPCompression
 
 extension Session {
 
@@ -16,7 +16,7 @@ extension Session {
 
 extension Session.DecompressionLimit {
 
-    func build() -> AsyncHTTPClient.HTTPClient.Decompression.Limit {
+    func build() -> NIOHTTPDecompression.DecompressionLimit {
         switch self {
         case .none:
             return .none

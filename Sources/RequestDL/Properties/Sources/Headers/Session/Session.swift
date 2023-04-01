@@ -3,7 +3,7 @@
 */
 
 import Foundation
-@_implementationOnly import RequestDLInternals
+import NIOCore
 
 /**
  The Session object is used to set various properties related to URLSessionConfiguration.
@@ -62,7 +62,7 @@ public struct Session: Property {
         )
     }
 
-    /* public */ init(_ customLoopGroup: EventLoopGroup) {
+    public init(_ customLoopGroup: NIOCore.EventLoopGroup) {
         self.init(
             configuration: .init(),
             provider: .custom(customLoopGroup)
