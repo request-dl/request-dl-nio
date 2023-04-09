@@ -14,7 +14,7 @@ final class InterceptorsBreakpointTests: XCTestCase {
 
         Internals.Override.Raise.replace {
             breakpointActivated = $0 == SIGTRAP
-            Internals.Override.Raise.restoreRaise()
+            Internals.Override.Raise.restore()
             return $0
         }
 

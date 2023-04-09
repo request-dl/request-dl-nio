@@ -21,7 +21,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { Internals.Override.Print.restoreRaise() }
+        defer { Internals.Override.Print.restore() }
 
         let result = try await MockedTask { data }
             .logInConsole(true)
@@ -50,7 +50,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { Internals.Override.Print.restoreRaise() }
+        defer { Internals.Override.Print.restore() }
 
         _ = try await MockedTask { data }
             .extractPayload()
@@ -79,7 +79,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { Internals.Override.Print.restoreRaise() }
+        defer { Internals.Override.Print.restore() }
 
         let data = try JSONEncoder().encode(value)
 

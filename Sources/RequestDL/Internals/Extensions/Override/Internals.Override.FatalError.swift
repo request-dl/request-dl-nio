@@ -21,7 +21,7 @@ extension Internals.Override {
             self.closure = closure
         }
 
-        static func restoreFatalError() {
+        static func restore() {
             closure = defaultClosure
         }
     }

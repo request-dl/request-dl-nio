@@ -18,7 +18,7 @@ final class DataTaskTests: XCTestCase {
             port: 8090,
             response: output
         ).run { baseURL in
-            let data = try await UploadTask {
+            let data = try await DataTask {
                 BaseURL(baseURL)
                 Path("index")
 
@@ -26,7 +26,6 @@ final class DataTaskTests: XCTestCase {
                     Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
-            .ignoresProgress()
             .extractPayload()
             .result()
 

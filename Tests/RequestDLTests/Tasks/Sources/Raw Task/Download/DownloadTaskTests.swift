@@ -7,7 +7,33 @@ import XCTest
 
 class DownloadTaskTests: XCTestCase {
 
-    func testHelloWorld() {
-        XCTFail("Hello World")
+    func testDataTask() async throws {
+        // Given
+        let certificate = Certificates().server()
+        let output = "Hello World"
+
+        // When
+        try await InternalServer(
+            host: "localhost",
+            port: 8092,
+            response: output
+        ).run { baseURL in
+            let data = try await DownloadTask {
+                BaseURL(baseURL)
+                Path("index")
+
+                SecureConnection {
+                    Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                }
+            }
+            .ignoresDownloadProgress()
+            .extractPayload()
+            .result()
+
+            let result = try HTTPResult<String>(data)
+
+            // Then
+            XCTAssertEqual(result.response, output)
+        }
     }
 }

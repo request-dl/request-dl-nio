@@ -63,7 +63,7 @@ final class _EitherContentTests: XCTestCase {
 func assertNever<T>(_ closure: @autoclosure @escaping () throws -> T) async throws {
     try await withUnsafeThrowingContinuation { continuation in
         Internals.Override.FatalError.replace { message, file, line in
-            Internals.Override.FatalError.restoreFatalError()
+            Internals.Override.FatalError.restore()
             continuation.resume()
             Thread.exit()
             Swift.fatalError(message, file: file, line: line)

@@ -20,7 +20,7 @@ extension Internals.Override {
             self.closure = closure
         }
 
-        static func restoreRaise() {
+        static func restore() {
             closure = defaultClosure
         }
     }

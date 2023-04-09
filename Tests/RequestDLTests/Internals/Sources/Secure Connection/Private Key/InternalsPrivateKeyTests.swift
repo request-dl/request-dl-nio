@@ -68,4 +68,63 @@ class InternalsPrivateKeyTests: XCTestCase {
             $0(Array(Data(password.utf8)))
         })
     }
+
+    func testPrivate_whenPEMFile_shouldBeValid() async throws {
+        // Given
+        let certificates = Certificates().client()
+        let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
+
+        // When
+        let resolved = try Internals.PrivateKey(file, format: .pem).build()
+
+        // Then
+        XCTAssertEqual(resolved, try .init(file: file, format: .pem))
+    }
+
+    func testPrivate_whenDERFile_shouldBeValid() async throws {
+        // Given
+        let certificates = Certificates(.der).client()
+
+        let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
+
+        // When
+        let resolved = try Internals.PrivateKey(file, format: .der).build()
+
+        // Then
+        XCTAssertEqual(resolved, try .init(file: file, format: .der))
+    }
+
+    func testPrivate_whenPEMFileWithPassword_shouldBeValid() async throws {
+        // Given
+        let password = "password123"
+        let certificates = Certificates().client(password: true)
+        let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
+
+        // When
+        let resolved = try Internals.PrivateKey(file, format: .pem) {
+            $0(Array(Data(password.utf8)))
+        }.build()
+
+        // Then
+        XCTAssertEqual(resolved, try .init(file: file, format: .pem) {
+            $0(Array(Data(password.utf8)))
+        })
+    }
+
+    func testPrivate_whenDERFileWithPassword_shouldBeValid() async throws {
+        // Given
+        let password = "password123"
+        let certificates = Certificates(.der).client(password: true)
+        let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
+
+        // When
+        let resolved = try Internals.PrivateKey(file, format: .der) {
+            $0(Array(Data(password.utf8)))
+        }.build()
+
+        // Then
+        XCTAssertEqual(resolved, try .init(file: file, format: .der) {
+            $0(Array(Data(password.utf8)))
+        })
+    }
 }
