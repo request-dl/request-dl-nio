@@ -19,7 +19,9 @@ extension Task {
      */
     public func ping(_ times: Int = 1, debug: Bool = true) async throws {
         guard times > 0 else {
-            Internals.Log.failure("The 'times' parameter must be greater than 0.")
+            Internals.Log.failure(
+                .timesShouldBeGreaterThanZero(times)
+            )
         }
 
         for index in 0 ..< times {

@@ -18,9 +18,7 @@ public struct _EitherContent<First: Property, Second: Property>: Property {
         _first = { first }
         _second = {
             Internals.Log.failure(
-                """
-                There was an attempt to access a variable for which access was not expected.
-                """
+                .accessingAbstractContent()
             )
         }
     }
@@ -30,9 +28,7 @@ public struct _EitherContent<First: Property, Second: Property>: Property {
         _second = { second }
         _first = {
             Internals.Log.failure(
-                """
-                There was an attempt to access a variable for which access was not expected.
-                """
+                .accessingAbstractContent()
             )
         }
     }

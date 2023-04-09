@@ -25,9 +25,11 @@ public struct _DictionaryPayload: PayloadProvider {
             )
         } catch {
             Internals.Log.failure(
-                """
-                An error occurred while trying to serialize JSON data: \(error.localizedDescription).
-                """
+                .cantSerializeJSONData(
+                    dictionary,
+                    options,
+                    error
+                )
             )
         }
     }

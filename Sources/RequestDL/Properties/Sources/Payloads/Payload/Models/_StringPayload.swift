@@ -18,6 +18,15 @@ public struct _StringPayload: PayloadProvider {
     }
 
     public var data: Data {
-        string.data(using: encoding) ?? Data()
+        if let data = string.data(using: encoding) {
+            return data
+        }
+
+        Internals.Log.failure(
+            .cantEncodeString(
+                string,
+                encoding
+            )
+        )
     }
 }

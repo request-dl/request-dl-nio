@@ -76,17 +76,7 @@ extension Certificate {
 
         guard let certificateProperty = inputs.environment.certificateProperty else {
             Internals.Log.failure(
-                """
-                It seems that you are attempting to create a Certificate \
-                property outside of the allowed context.
-
-                Please note that Certificates, Trusts, and AdditionalTrusts \
-                are the only valid contexts in which you can create a \
-                Certificate property.
-
-                Please ensure that you are creating your Certificate property \
-                within one of these contexts to avoid encountering this error.
-                """
+                .cantCreateCertificateOutsideSecureConnection()
             )
         }
 
@@ -132,9 +122,10 @@ extension Certificate.Format {
 
         guard let resourceURL = bundle.resolveURL(forResourceName: resourceName) else {
             Internals.Log.failure(
-                """
-                An error occurred while trying to access an invalid file path.
-                """
+                .cantOpenCertificateFile(
+                    resourceName,
+                    bundle
+                )
             )
         }
 

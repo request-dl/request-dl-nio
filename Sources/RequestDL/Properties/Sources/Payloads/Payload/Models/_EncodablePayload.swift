@@ -22,9 +22,7 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
             return try encoder.encode(object)
         } catch {
             Internals.Log.failure(
-                """
-                An error occurred while trying to encode the object to data: \(error.localizedDescription).
-                """
+                .cantEncodeObject(object, error)
             )
         }
     }

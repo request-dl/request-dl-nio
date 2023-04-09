@@ -29,13 +29,7 @@ struct SecureConnectionNode: PropertyNode {
     func make(_ make: inout Make) async throws {
         guard let secureConnection = make.configuration.secureConnection else {
             Internals.Log.failure(
-                """
-                An attempt was made to access the secure connection, but \
-                the required property could not be found.
-
-                Please verify that the property is correctly set up inside \
-                the SecureConnection property.
-                """
+                .cantCreateCertificateOutsideSecureConnection()
             )
         }
 

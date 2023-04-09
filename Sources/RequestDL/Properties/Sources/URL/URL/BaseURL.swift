@@ -99,19 +99,13 @@ extension BaseURL {
     fileprivate var absoluteString: String {
         if host.contains("://") {
             Internals.Log.failure(
-                """
-                Invalid host string: The protocol communication should \
-                not be included.
-                """
+                .invalidHost(host)
             )
         }
 
         guard let host = host.split(separator: "/").first else {
             Internals.Log.failure(
-                """
-                Unexpected format for host string: Could not extract the \
-                host.
-                """
+                .unexpectedHost(host)
             )
         }
 
@@ -141,10 +135,7 @@ extension BaseURL {
 
         guard let baseURL = URL(string: property.absoluteString) else {
             Internals.Log.failure(
-                """
-                Failed to create URL from absolute string: \
-                \(property.absoluteString)
-                """
+                .failedToResolveURL(property.absoluteString)
             )
         }
 
