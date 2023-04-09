@@ -3,7 +3,6 @@
 */
 
 import XCTest
-@testable import RequestDLInternals
 @testable import RequestDL
 
 // swiftlint:disable type_body_length function_body_length file_length

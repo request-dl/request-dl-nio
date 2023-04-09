@@ -3,7 +3,6 @@
 */
 
 import XCTest
-@testable import RequestDLInternals
 @testable import RequestDL
 
 final class TimeoutTests: XCTestCase {

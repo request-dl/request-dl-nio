@@ -3,7 +3,6 @@
 */
 
 import XCTest
-import RequestDLInternals
 @testable import RequestDL
 
 class ModifiersIgnoresProgressTests: XCTestCase {

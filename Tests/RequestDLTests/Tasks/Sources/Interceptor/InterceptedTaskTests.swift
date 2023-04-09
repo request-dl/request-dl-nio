@@ -3,7 +3,6 @@
 */
 
 import XCTest
-import RequestDLInternals
 @testable import RequestDL
 
 final class InterceptedTaskTests: XCTestCase {
