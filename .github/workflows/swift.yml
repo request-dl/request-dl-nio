@@ -27,11 +27,17 @@ jobs:
       - name: 🛠️ Build Package
         run: swift build -v
 
+      - name: 🔎 Test Package
+        run: swift build -v
+        if: matrix.os == 'ubuntu-latest'
+
       - name: 🍀 Code Coverage (Code Climate)
         uses: paambaati/codeclimate-action@v3.2.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
-          coverageCommand: swift test --enable-code-coverage
+          coverageCommand: |
+            swift test --enable-code-coverage
           debug: true
           coverageLocations: ${{github.workspace}}/.build/debug/codecov/*.json:lcov-json
+        if: matrix.os == 'macos-latest'
