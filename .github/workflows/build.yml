@@ -1,0 +1,32 @@
+name: Swift
+
+on: [push]
+
+jobs:
+  build:
+    name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        swift: ["5.7.2"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: ☑️ Swift Select
+        uses: swift-actions/setup-swift@v1
+        with:
+            swift-version: ${{ matrix.swift }}
+
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v3.3.0
+
+      - name: 🛠️ Build Package
+        run: swift build -v
+
+      - name: 🍀 Code Coverage (Code Climate)
+        uses: paambaati/codeclimate-action@v3.2.0
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+        with:
+          coverageCommand: swift test --enable-code-coverage
+          debug: true
+          coverageLocations: ${{github.workspace}}/.build/debug/codecov/*.json:lcov-json

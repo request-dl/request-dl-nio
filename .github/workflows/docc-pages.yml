@@ -28,11 +28,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3.3.0
 
-      - name: Enable DocC package
-        run: |
-          grep -v 'DocC' Package.swift > tmp
-          mv tmp Package.swift
-
       - name: Setup Pages
         uses: actions/configure-pages@v3.0.4
 

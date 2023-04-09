@@ -6,8 +6,7 @@ import Foundation
 @testable import RequestDL
 
 func resolve<Content: Property>(
-    _ content: Content,
-    in delegate: DelegateProxy = .init()
-) async throws -> (URLSession, URLRequest) {
-    try await Resolve(content).build(delegate)
+    _ content: Content
+) async throws -> (Internals.Session, Internals.Request) {
+    try await Resolve(content).build()
 }
