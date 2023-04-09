@@ -1,9 +1,0 @@
-plugins:
-  swiftlint:
-    enabled: true
-
-exclude_patterns:
-- ".build/"
-- "**/.build/"
-- "Tests/"
-- "**/tests/"
