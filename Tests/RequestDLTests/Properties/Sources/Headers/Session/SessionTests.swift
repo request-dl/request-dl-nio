@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import AsyncHTTPClient
 @testable import RequestDL
 
 // swiftlint:disable type_body_length function_body_length file_length
@@ -24,7 +25,10 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(sut.timeout.read, configuration.timeout.read)
         XCTAssertEqual(sut.proxy, configuration.proxy)
         XCTAssertEqual(sut.ignoreUncleanSSLShutdown, configuration.ignoreUncleanSSLShutdown)
-        XCTAssertEqual(sut.decompression, configuration.decompression)
+        XCTAssertEqual(
+            String(describing: sut.decompression),
+            String(describing: configuration.decompression)
+        )
         XCTAssertEqual(sut.readingMode, configuration.readingMode)
         XCTAssertEqual(sut.connectionPool, configuration.connectionPool)
     }
@@ -77,7 +81,10 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(session.configuration.redirectConfiguration, .disallow)
+        XCTAssertEqual(
+            String(describing: session.configuration.redirectConfiguration),
+            String(describing: HTTPClient.Configuration.RedirectConfiguration.disallow)
+        )
     }
 
     func testSession_whenEnableRedirect_shouldBeValid() async throws {
@@ -92,10 +99,13 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(session.configuration.redirectConfiguration, .follow(
-            max: max,
-            allowCycles: cycles
-        ))
+        XCTAssertEqual(
+            String(describing: session.configuration.redirectConfiguration),
+            String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(
+                max: max,
+                allowCycles: cycles
+            ))
+        )
     }
 
     func testSession_whenIgnoreUncleanSSLShutdown_shouldBeValid() async throws {
@@ -119,7 +129,10 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(session.configuration.decompression, .disabled)
+        XCTAssertEqual(
+            String(describing: session.configuration.decompression),
+            String(describing: HTTPClient.Decompression.disabled)
+        )
     }
 
     func testSession_whenDecompressionLimit_shouldBeValid() async throws {
@@ -132,7 +145,10 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(session.configuration.decompression, .enabled(limit: decompressionLimit.build()))
+        XCTAssertEqual(
+            String(describing: session.configuration.decompression),
+            String(describing: HTTPClient.Decompression.enabled(limit: decompressionLimit.build()))
+        )
     }
 
     func testSession_whenNeverBody_shouldBeNever() async throws {

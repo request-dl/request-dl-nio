@@ -12,9 +12,9 @@ final class InterceptorsBreakpointTests: XCTestCase {
         // Given
         var breakpointActivated = false
 
-        SwiftOverride.Raise.replace {
+        Internals.Override.Raise.replace {
             breakpointActivated = $0 == SIGTRAP
-            SwiftOverride.Raise.restoreRaise()
+            Internals.Override.Raise.restoreRaise()
             return $0
         }
 

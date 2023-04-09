@@ -7,6 +7,6 @@ import Foundation
 
 func resolve<Content: Property>(
     _ content: Content
-) async throws -> (RequestDLInternals.Session, RequestDLInternals.Request) {
+) async throws -> (Internals.Session, Internals.Request) {
     try await Resolve(content).build()
 }

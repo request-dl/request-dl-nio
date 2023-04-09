@@ -9,7 +9,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
 
     func testIgnores_whenUploadStep_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates().server()
+        let resource = Certificates().server()
         let message = "Hello World"
 
         // When
@@ -18,7 +18,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             port: 8083,
             response: message
         ).run { baseURL in
-            let bytes = try await DataTask {
+            let bytes = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
                 SecureConnection {
@@ -34,13 +34,13 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             let data = try await Data(Array(bytes).joined())
 
             // Then
-            XCTAssertEqual(try HTTPResult.resolve(data).response, message)
+            XCTAssertEqual(try HTTPResult(data).response, message)
         }
     }
 
     func testIgnores_whenDownloadStep_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates().server()
+        let resource = Certificates().server()
         let message = "Hello World"
 
         // When
@@ -49,7 +49,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             port: 8084,
             response: message
         ).run { baseURL in
-            let data = try await DataTask {
+            let data = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
                 SecureConnection {
@@ -64,13 +64,13 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             .result()
 
             // Then
-            XCTAssertEqual(try HTTPResult.resolve(data).response, message)
+            XCTAssertEqual(try HTTPResult(data).response, message)
         }
     }
 
     func testIgnores_whenSkipProgress_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates().server()
+        let resource = Certificates().server()
         let message = "Hello World"
 
         // When
@@ -79,7 +79,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             port: 8085,
             response: message
         ).run { baseURL in
-            let data = try await DataTask {
+            let data = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
                 SecureConnection {
@@ -93,7 +93,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             .result()
 
             // Then
-            XCTAssertEqual(try HTTPResult.resolve(data).response, message)
+            XCTAssertEqual(try HTTPResult(data).response, message)
         }
     }
 }

@@ -47,7 +47,7 @@ final class TimeoutTests: XCTestCase {
     }
 
     func testDefaultTimeout() async throws {
-        let defaultConfiguration = RequestDLInternals.Session.Configuration()
+        let defaultConfiguration = Internals.Session.Configuration()
 
         // When
         let (session, _) = try await resolve(TestProperty {})

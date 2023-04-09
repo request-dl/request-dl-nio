@@ -62,7 +62,7 @@ class ResolveTests: XCTestCase {
             BaseURL("apple.com")
 
             SecureConnection {
-                Certificates {
+                RequestDL.Certificates {
                     Certificate([0, 1, 2])
                 }
 

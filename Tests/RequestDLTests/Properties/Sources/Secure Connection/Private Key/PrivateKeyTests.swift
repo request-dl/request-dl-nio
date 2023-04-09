@@ -9,7 +9,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileNoPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client()
+        let resource = Certificates(.pem).client()
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -27,7 +27,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitDERFileNoPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.der).client()
+        let resource = Certificates(.der).client()
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -39,7 +39,7 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(
+            .privateKey(Internals.PrivateKey(
                 resource.privateKeyURL.absolutePath(percentEncoded: false),
                 format: .der
             ))
@@ -48,7 +48,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileWithPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client(password: true)
+        let resource = Certificates(.pem).client(password: true)
         let password = Array(Data("password".utf8))
 
         // When
@@ -63,7 +63,7 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false)) {
+            .privateKey(Internals.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .pem) {
                 $0(password)
             })
         )
@@ -71,7 +71,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitDERFileWithPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.der).client()
+        let resource = Certificates(.der).client()
         let password = Array(Data("password".utf8))
 
         // When
@@ -86,7 +86,7 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(
+            .privateKey(Internals.PrivateKey(
                 resource.privateKeyURL.absolutePath(percentEncoded: false),
                 format: .der,
                 password: {
@@ -98,7 +98,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMBytesNoPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client()
+        let resource = Certificates(.pem).client()
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
 
         // When
@@ -111,13 +111,13 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(bytes, format: .pem))
+            .privateKey(Internals.PrivateKey(bytes, format: .pem))
         )
     }
 
     func testPrivateKey_whenInitDERBytesNoPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.der).client()
+        let resource = Certificates(.der).client()
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
 
         // When
@@ -130,7 +130,7 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(
+            .privateKey(Internals.PrivateKey(
                 bytes,
                 format: .der
             ))
@@ -139,7 +139,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMBytesWithPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client(password: true)
+        let resource = Certificates(.pem).client(password: true)
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
         let password = Array(Data("password".utf8))
 
@@ -155,7 +155,7 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(bytes) {
+            .privateKey(Internals.PrivateKey(bytes, format: .pem) {
                 $0(password)
             })
         )
@@ -163,7 +163,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitDERBytesWithPassword_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.der).client()
+        let resource = Certificates(.der).client()
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
         let password = Array(Data("password".utf8))
 
@@ -179,7 +179,7 @@ class PrivateKeyTests: XCTestCase {
         // Then
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
-            .privateKey(RequestDLInternals.PrivateKey(
+            .privateKey(Internals.PrivateKey(
                 bytes,
                 format: .der,
                 password: {
@@ -191,7 +191,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileNoPasswordInBundle_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client()
+        let resource = Certificates(.pem).client()
 
         let file = resource.privateKeyURL.lastPathComponent
 
@@ -213,7 +213,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileWithPasswordInBundle_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client(password: true)
+        let resource = Certificates(.pem).client(password: true)
         let password = Array(Data("password".utf8))
 
         let file = resource.privateKeyURL.lastPathComponent
@@ -231,7 +231,7 @@ class PrivateKeyTests: XCTestCase {
         XCTAssertEqual(
             session.configuration.secureConnection?.privateKey,
             Bundle.module.resolveURL(forResourceName: file).map {
-                .privateKey(RequestDLInternals.PrivateKey($0.absolutePath(percentEncoded: false)) {
+                .privateKey(Internals.PrivateKey($0.absolutePath(percentEncoded: false), format: .pem) {
                     $0(password)
                 })
             }
@@ -240,7 +240,7 @@ class PrivateKeyTests: XCTestCase {
 
     func testCertificate_whenAccessBody_shouldBeNever() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates(.pem).client()
+        let resource = Certificates(.pem).client()
 
         // Wehn
         let sut = RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false))

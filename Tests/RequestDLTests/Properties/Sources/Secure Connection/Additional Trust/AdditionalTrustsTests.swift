@@ -12,8 +12,8 @@ class AdditionalTrustsTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        client = RequestDLInternals.Certificates().client()
-        server = RequestDLInternals.Certificates().server()
+        client = Certificates().client()
+        server = Certificates().server()
     }
 
     func testAdditional_whenCertificates_shouldBeValid() async throws {
@@ -34,8 +34,8 @@ class AdditionalTrustsTests: XCTestCase {
         XCTAssertEqual(
             session.configuration.secureConnection?.additionalTrustRoots,
             .init([.certificates([
-                .init(client.certificateURL.absolutePath(percentEncoded: false)),
-                .init(server)
+                .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+                .init(server, format: .pem)
             ])])
         )
     }

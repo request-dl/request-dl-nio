@@ -12,7 +12,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         let data = Data("Hello World!".utf8)
         var strings = [String]()
 
-        SwiftOverride.Print.replace { separator, _, items in
+        Internals.Override.Print.replace { separator, _, items in
             strings.append(
                 items
                     .map { "\($0)" }
@@ -21,7 +21,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { SwiftOverride.Print.restoreRaise() }
+        defer { Internals.Override.Print.restoreRaise() }
 
         let result = try await MockedTask { data }
             .logInConsole(true)
@@ -41,7 +41,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         let data = Data("Hello World!".utf8)
         var strings = [String]()
 
-        SwiftOverride.Print.replace { separator, _, items in
+        Internals.Override.Print.replace { separator, _, items in
             strings.append(
                 items
                     .map { "\($0)" }
@@ -50,7 +50,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { SwiftOverride.Print.restoreRaise() }
+        defer { Internals.Override.Print.restoreRaise() }
 
         _ = try await MockedTask { data }
             .extractPayload()
@@ -70,7 +70,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         let value = "Hello World!"
         var strings = [String]()
 
-        SwiftOverride.Print.replace { separator, _, items in
+        Internals.Override.Print.replace { separator, _, items in
             strings.append(
                 items
                     .map { "\($0)" }
@@ -79,7 +79,7 @@ final class InterceptorsLoggerTests: XCTestCase {
         }
 
         // When
-        defer { SwiftOverride.Print.restoreRaise() }
+        defer { Internals.Override.Print.restoreRaise() }
 
         let data = try JSONEncoder().encode(value)
 

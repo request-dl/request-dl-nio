@@ -63,7 +63,7 @@ class ModifiersProgressTests: XCTestCase {
 
     func testIgnores_whenUploadStep_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates().server()
+        let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
 
         // When
@@ -72,7 +72,7 @@ class ModifiersProgressTests: XCTestCase {
             port: 8086,
             response: ""
         ).run { baseURL in
-            _ = try await DataTask {
+            _ = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
                 Payload(data)
@@ -94,7 +94,7 @@ class ModifiersProgressTests: XCTestCase {
 
     func testIgnores_whenDownloadStep_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates().server()
+        let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
 
@@ -104,7 +104,7 @@ class ModifiersProgressTests: XCTestCase {
             port: 8087,
             response: message
         ).run { baseURL in
-            let data = try await DataTask {
+            let data = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
 
@@ -121,7 +121,7 @@ class ModifiersProgressTests: XCTestCase {
             .extractPayload()
             .result()
 
-            let result = try HTTPResult<String>.resolve(data)
+            let result = try HTTPResult<String>(data)
 
             // Then
             XCTAssertEqual(downloadMonitor.length, data.count)
@@ -141,7 +141,7 @@ class ModifiersProgressTests: XCTestCase {
 
     func testIgnores_whenCompleteProgress_shouldBeValid() async throws {
         // Given
-        let resource = RequestDLInternals.Certificates().server()
+        let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
@@ -152,7 +152,7 @@ class ModifiersProgressTests: XCTestCase {
             port: 8088,
             response: message
         ).run { baseURL in
-            let receivedData = try await DataTask {
+            let receivedData = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
 
@@ -172,7 +172,7 @@ class ModifiersProgressTests: XCTestCase {
             .extractPayload()
             .result()
 
-            let result = try HTTPResult<String>.resolve(receivedData)
+            let result = try HTTPResult<String>(receivedData)
 
             // Then
             XCTAssertEqual(progressMonitor.length, receivedData.count)

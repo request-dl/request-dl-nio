@@ -9,7 +9,7 @@ final class DataTaskTests: XCTestCase {
 
     func testDataTask() async throws {
         // Given
-        let certificate = RequestDLInternals.Certificates().server()
+        let certificate = Certificates().server()
         let output = "Hello World"
 
         // When
@@ -18,7 +18,7 @@ final class DataTaskTests: XCTestCase {
             port: 8090,
             response: output
         ).run { baseURL in
-            let data = try await DataTask {
+            let data = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
 
@@ -30,7 +30,7 @@ final class DataTaskTests: XCTestCase {
             .extractPayload()
             .result()
 
-            let result = try HTTPResult<String>.resolve(data)
+            let result = try HTTPResult<String>(data)
 
             // Then
             XCTAssertEqual(result.response, output)
