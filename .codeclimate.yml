@@ -3,7 +3,7 @@ plugins:
     enabled: true
 
 exclude_patterns:
-    - .build
+    - .build/
     - **/.build/
     - Tests/
     - **/tests/
