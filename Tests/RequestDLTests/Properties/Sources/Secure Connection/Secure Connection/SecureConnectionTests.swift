@@ -3,13 +3,14 @@
 */
 
 import XCTest
+import NIOSSL
 @testable import RequestDL
 
 class SecureConnectionTests: XCTestCase {
 
     func testSecure_whenDefaultInit_shouldBeValid() async throws {
         // Given
-        let secureConnection = RequestDLInternals.Session.SecureConnection(.client)
+        let secureConnection = Internals.SecureConnection(.client)
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -36,7 +37,7 @@ class SecureConnectionTests: XCTestCase {
 
     func testSecure_whenUpdatesVerification_shouldBeValid() async throws {
         // Given
-        let verification: CertificateVerification = .noHostnameVerification
+        let verification: RequestDL.CertificateVerification = .noHostnameVerification
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -47,13 +48,13 @@ class SecureConnectionTests: XCTestCase {
         let sut = session.configuration.secureConnection
 
         // Then
-        XCTAssertEqual(sut?.certificateVerification, verification)
+        XCTAssertEqual(sut?.certificateVerification, verification.build())
     }
 
     func testSecure_whenUpdatesSigningSignatureAlgorithms_shouldBeValid() async throws {
         // Given
-        let algorithm1 = SignatureAlgorithm.rsaPkcs1Sha1
-        let algorithm2 = SignatureAlgorithm.rsaPssRsaeSha512
+        let algorithm1 = RequestDL.SignatureAlgorithm.rsaPkcs1Sha1
+        let algorithm2 = RequestDL.SignatureAlgorithm.rsaPssRsaeSha512
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -64,13 +65,15 @@ class SecureConnectionTests: XCTestCase {
         let sut = session.configuration.secureConnection
 
         // Then
-        XCTAssertEqual(sut?.signingSignatureAlgorithms, [algorithm1, algorithm2])
+        XCTAssertEqual(sut?.signingSignatureAlgorithms, [algorithm1, algorithm2].map {
+            $0.build()
+        })
     }
 
     func testSecure_whenUpdatesVerifySignatureAlgorithms_shouldBeValid() async throws {
         // Given
-        let algorithm1 = SignatureAlgorithm.ecdsaSecp256R1Sha256
-        let algorithm2 = SignatureAlgorithm.ecdsaSecp521R1Sha512
+        let algorithm1 = RequestDL.SignatureAlgorithm.ecdsaSecp256R1Sha256
+        let algorithm2 = RequestDL.SignatureAlgorithm.ecdsaSecp521R1Sha512
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -81,7 +84,9 @@ class SecureConnectionTests: XCTestCase {
         let sut = session.configuration.secureConnection
 
         // Then
-        XCTAssertEqual(sut?.verifySignatureAlgorithms, [algorithm1, algorithm2])
+        XCTAssertEqual(sut?.verifySignatureAlgorithms, [algorithm1, algorithm2].map {
+            $0.build()
+        })
     }
 
     func testSecure_whenUpdatesSendCANameList_shouldBeValid() async throws {
@@ -254,8 +259,8 @@ class SecureConnectionTests: XCTestCase {
 
     func testSecure_whenUpdatesCipherSuiteValues_shouldBeValid() async throws {
         // Given
-        let suite1: NIOTLSCipher = .TLS_AES_128_GCM_SHA256
-        let suite2: NIOTLSCipher = .TLS_CHACHA20_POLY1305_SHA256
+        let suite1: RequestDL.TLSCipher = .TLS_AES_128_GCM_SHA256
+        let suite2: RequestDL.TLSCipher = .TLS_CHACHA20_POLY1305_SHA256
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -266,7 +271,9 @@ class SecureConnectionTests: XCTestCase {
         let sut = session.configuration.secureConnection
 
         // Then
-        XCTAssertEqual(sut?.cipherSuiteValues, [suite1, suite2])
+        XCTAssertEqual(sut?.cipherSuiteValues, [suite1, suite2].map {
+            $0.build()
+        })
     }
 
     func testSecure_whenUpdatesKeyLog_shouldBeValid() async throws {

@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol Node: CustomDebugStringConvertible {
+protocol Node: NodeStringConvertible {
 
     mutating func next() -> Node?
 }
@@ -49,13 +49,13 @@ extension Node {
 
 extension Node {
 
-    var debugDescription: String {
+    var nodeDescription: String {
         let title = String(describing: type(of: self))
         var mutableSelf = self
         var children = [String]()
 
         while let node = mutableSelf.next() {
-            children.append(node.debugDescription)
+            children.append(node.nodeDescription)
         }
 
         if children.isEmpty {
@@ -64,7 +64,7 @@ extension Node {
 
         let childrenDescription = children
             .joined(separator: ",\n")
-            .debug_updateLinesByShifting(inline: false)
+            .debug_shiftLines()
 
         return "\(title) {\n\(childrenDescription)\n}"
     }

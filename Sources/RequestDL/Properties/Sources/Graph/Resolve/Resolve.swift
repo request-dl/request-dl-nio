@@ -74,14 +74,14 @@ extension Node {
 
 extension Resolve {
 
-    var debugDescription: String {
+    var nodeDescription: String {
         get async throws {
             let title = "Resolve"
             let outputs = try await outputs()
 
             let nodesDescription = outputs.node
-                .debugDescription
-                .debug_updateLinesByShifting(inline: false)
+                .nodeDescription
+                .debug_shiftLines()
 
             return """
             \(title) {
@@ -91,7 +91,8 @@ extension Resolve {
         }
     }
 
-    func printDescription() async throws {
-        Internals.Log.debug(try await debugDescription)
-    }
+//    Not Available
+//    func printDescription() async throws {
+//        Internals.Log.debug(try await debugDescription)
+//    }
 }

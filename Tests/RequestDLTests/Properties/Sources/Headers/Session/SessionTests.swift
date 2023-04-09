@@ -81,8 +81,13 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
+        guard let redirectConfiguration = session.configuration.redirectConfiguration else {
+            XCTFail("Redirect Configuration is nil")
+            return
+        }
+        
         XCTAssertEqual(
-            String(describing: session.configuration.redirectConfiguration),
+            String(describing: redirectConfiguration),
             String(describing: HTTPClient.Configuration.RedirectConfiguration.disallow)
         )
     }
@@ -99,8 +104,13 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
+        guard let redirectConfiguration = session.configuration.redirectConfiguration else {
+            XCTFail("Redirect Configuration is nil")
+            return
+        }
+
         XCTAssertEqual(
-            String(describing: session.configuration.redirectConfiguration),
+            String(describing: redirectConfiguration),
             String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(
                 max: max,
                 allowCycles: cycles

@@ -24,7 +24,7 @@ class ResolveTests: XCTestCase {
         }
 
         // When
-        let debugDescription = try await Resolve(property).debugDescription
+        let debugDescription = try await Resolve(property).nodeDescription
 
         // Then
         XCTAssertEqual(debugDescription, Self.oneHierarchyOutput)
@@ -50,7 +50,7 @@ class ResolveTests: XCTestCase {
         }
 
         // When
-        let debugDescription = try await Resolve(property).debugDescription
+        let debugDescription = try await Resolve(property).nodeDescription
 
         // Then
         XCTAssertEqual(debugDescription, Self.twoHierarchyOutput)
@@ -81,7 +81,7 @@ class ResolveTests: XCTestCase {
         }
 
         // When
-        let debugDescription = try await Resolve(property).debugDescription
+        let debugDescription = try await Resolve(property).nodeDescription
 
         // Then
         XCTAssertEqual(debugDescription, Self.secureConnectionOutput)
@@ -96,9 +96,7 @@ extension ResolveTests {
             ChildrenNode {
                 Leaf<Node> {
                     property = Node {
-                        baseURL = URL {
-                            _url = https://apple.com
-                        }
+                        baseURL = https://apple.com
                     }
                 },
                 Leaf<Node> {
@@ -154,11 +152,9 @@ extension ResolveTests {
                             proxy = nil,
                             ignoreUncleanSSLShutdown = false,
                             decompression = Decompression.enabled(
-                                Tuple (
-                                    DecompressionLimit {
-                                        limit = Limit.ratio(500)
-                                    }
-                                )
+                                DecompressionLimit {
+                                    limit = Limit.ratio(500)
+                                }
                             ),
                             readingMode = ReadingMode.length(1024),
                             updatingKeyPaths = nil
@@ -177,9 +173,7 @@ extension ResolveTests {
             ChildrenNode {
                 Leaf<Node> {
                     property = Node {
-                        baseURL = URL {
-                            _url = https://apple.com
-                        }
+                        baseURL = https://apple.com
                     }
                 },
                 Leaf<Node> {
@@ -194,7 +188,7 @@ extension ResolveTests {
                 },
                 Leaf<Node> {
                     property = Node {
-                        nodes = Array [
+                        nodes = [
                             Leaf<Node> {
                                 property = Node {
                                     key = Accept,
@@ -214,7 +208,7 @@ extension ResolveTests {
                 },
                 Leaf<Node> {
                     property = Node {
-                        leafs = Array [
+                        leafs = [
                             Leaf<Node> {
                                 property = Node {
                                     key = q,
@@ -235,9 +229,7 @@ extension ResolveTests {
             ChildrenNode {
                 Leaf<Node> {
                     property = Node {
-                        baseURL = URL {
-                            _url = https://apple.com
-                        }
+                        baseURL = https://apple.com
                     }
                 },
                 Leaf<Node> {
@@ -264,24 +256,18 @@ extension ResolveTests {
                             cipherSuites = nil,
                             cipherSuiteValues = nil
                         },
-                        nodes = Array [
+                        nodes = [
                             Leaf<SecureConnectionNode> {
                                 property = SecureConnectionNode {
                                     source = Source.node(
                                         Node {
                                             source = Source.nodes(
-                                                Array [
+                                                [
                                                     Leaf<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
-                                                                    source = Source.bytes(
-                                                                        Array [
-                                                                            0,
-                                                                            1,
-                                                                            2
-                                                                        ]
-                                                                    ),
+                                                                    source = Source.bytes([0, 1, 2]),
                                                                     property = .chain,
                                                                     format = .pem
                                                                 }
@@ -299,18 +285,12 @@ extension ResolveTests {
                                     source = Source.node(
                                         Node {
                                             source = Source.nodes(
-                                                Array [
+                                                [
                                                     Leaf<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
-                                                                    source = Source.bytes(
-                                                                        Array [
-                                                                            6,
-                                                                            7,
-                                                                            8
-                                                                        ]
-                                                                    ),
+                                                                    source = Source.bytes([6, 7, 8]),
                                                                     property = .trust,
                                                                     format = .pem
                                                                 }
@@ -321,13 +301,7 @@ extension ResolveTests {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
-                                                                    source = Source.bytes(
-                                                                        Array [
-                                                                            8,
-                                                                            9,
-                                                                            10
-                                                                        ]
-                                                                    ),
+                                                                    source = Source.bytes([8, 9, 10]),
                                                                     property = .trust,
                                                                     format = .pem
                                                                 }
@@ -345,18 +319,12 @@ extension ResolveTests {
                                     source = Source.node(
                                         Node {
                                             source = Source.nodes(
-                                                Array [
+                                                [
                                                     Leaf<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
-                                                                    source = Source.bytes(
-                                                                        Array [
-                                                                            2,
-                                                                            3,
-                                                                            4
-                                                                        ]
-                                                                    ),
+                                                                    source = Source.bytes([2, 3, 4]),
                                                                     property = .additionalTrust,
                                                                     format = .pem
                                                                 }
@@ -367,13 +335,7 @@ extension ResolveTests {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
-                                                                    source = Source.bytes(
-                                                                        Array [
-                                                                            4,
-                                                                            5,
-                                                                            6
-                                                                        ]
-                                                                    ),
+                                                                    source = Source.bytes([4, 5, 6]),
                                                                     property = .additionalTrust,
                                                                     format = .pem
                                                                 }
@@ -395,12 +357,7 @@ extension ResolveTests {
                             Node {
                                 source = Source.privateKey(
                                     PrivateKey<Array<UInt8>> {
-                                        source = Source.bytes(
-                                            Array [
-                                                0,
-                                                2
-                                            ]
-                                        ),
+                                        source = Source.bytes([0, 2]),
                                         format = .pem,
                                         password = nil
                                     }

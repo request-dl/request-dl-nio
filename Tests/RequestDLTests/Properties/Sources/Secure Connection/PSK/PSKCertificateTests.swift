@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import NIOSSL
 @testable import RequestDL
 
 class PSKCertificateTests: XCTestCase {
@@ -11,7 +12,7 @@ class PSKCertificateTests: XCTestCase {
         // Given
         let hint = "hint"
         let identity = "host"
-        let key = SecureBytes([0, 1, 2])
+        let key = NIOSSLSecureBytes([0, 1, 2])
         var receivedHint: String?
 
         // When
@@ -39,7 +40,7 @@ class PSKCertificateTests: XCTestCase {
         // Given
         let serverHint = "s.hint"
         let clientHint = "c.hint"
-        let key = SecureBytes([0, 1, 2])
+        let key = NIOSSLSecureBytes([0, 1, 2])
 
         var receivedServerHint: String?
         var receivedClientHint: String?

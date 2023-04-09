@@ -3,13 +3,14 @@
 */
 
 import XCTest
+import NIOSSL
 @testable import RequestDL
 
 class PSKServerCertificateTests: XCTestCase {
 
     func testPSK_whenInit_shouldBeValid() async throws {
         // Given
-        let key = SecureBytes([0, 1, 2])
+        let key = NIOSSLSecureBytes([0, 1, 2])
 
         // When
         let sut = PSKServerCertificate(key).build()

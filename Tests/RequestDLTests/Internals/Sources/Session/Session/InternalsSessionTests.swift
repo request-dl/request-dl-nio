@@ -114,7 +114,7 @@ class InternalsSessionTests: XCTestCase {
         ).run { baseURL in
             var request = Internals.Request(url: "https://\(baseURL)")
             request.method = "POST"
-            request.body = Internals.Body(buffers: [
+            request.body = Internals.Body(fragment, buffers: [
                 fileBuffer
             ])
 
