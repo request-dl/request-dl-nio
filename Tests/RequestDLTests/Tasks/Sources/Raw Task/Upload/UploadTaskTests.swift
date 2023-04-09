@@ -16,7 +16,7 @@ class UploadTaskTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8077,
+            port: 8888,
             response: output
         ).run { baseURL in
             let data = try await UploadTask {

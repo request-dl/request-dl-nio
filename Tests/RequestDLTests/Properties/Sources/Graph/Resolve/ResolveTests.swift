@@ -24,7 +24,7 @@ class ResolveTests: XCTestCase {
         }
 
         // When
-        let debugDescription = try await Resolve(property).nodeDescription
+        let debugDescription = try await Resolve(property).description()
 
         // Then
         XCTAssertEqual(debugDescription, Self.oneHierarchyOutput)
@@ -50,7 +50,7 @@ class ResolveTests: XCTestCase {
         }
 
         // When
-        let debugDescription = try await Resolve(property).nodeDescription
+        let debugDescription = try await Resolve(property).description()
 
         // Then
         XCTAssertEqual(debugDescription, Self.twoHierarchyOutput)
@@ -81,7 +81,7 @@ class ResolveTests: XCTestCase {
         }
 
         // When
-        let debugDescription = try await Resolve(property).nodeDescription
+        let debugDescription = try await Resolve(property).description()
 
         // Then
         XCTAssertEqual(debugDescription, Self.secureConnectionOutput)

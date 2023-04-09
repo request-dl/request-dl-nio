@@ -69,7 +69,7 @@ class ModifiersProgressTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8086,
+            port: 8888,
             response: ""
         ).run { baseURL in
             _ = try await UploadTask {
@@ -101,7 +101,7 @@ class ModifiersProgressTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8087,
+            port: 8888,
             response: message
         ).run { baseURL in
             let data = try await UploadTask {
@@ -149,7 +149,7 @@ class ModifiersProgressTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8088,
+            port: 8888,
             response: message
         ).run { baseURL in
             let receivedData = try await UploadTask {

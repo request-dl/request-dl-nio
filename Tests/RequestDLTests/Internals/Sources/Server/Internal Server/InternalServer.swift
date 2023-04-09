@@ -41,10 +41,13 @@ extension InternalServer {
         let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
 
         let bootstrap = ServerBootstrap(group: group)
+            // ① Set up our ServerChannel
+            .serverChannelOption(ChannelOptions.backlog, value: 256)
+            .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
                 // ③ add handlers to the pipeline
                 channel.pipeline
-                    .addHandler(NIOSSLServerHandler(context: sslContext))
+                    .addHandlers([BackPressureHandler(), NIOSSLServerHandler(context: sslContext)])
                     .flatMap {
                         channel.pipeline.configureHTTPServerPipeline()
                     }
@@ -52,6 +55,10 @@ extension InternalServer {
                         channel.pipeline.addHandler(HTTPHandler(response))
                     }
             }
+            // ④ Set up child channel options
+            .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
+            .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
             .bind(host: host, port: Int(port))
 
         do {

@@ -74,21 +74,19 @@ extension Node {
 
 extension Resolve {
 
-    var nodeDescription: String {
-        get async throws {
-            let title = "Resolve"
-            let outputs = try await outputs()
+    func description() async throws -> String {
+        let title = "Resolve"
+        let outputs = try await outputs()
 
-            let nodesDescription = outputs.node
-                .nodeDescription
-                .debug_shiftLines()
+        let nodesDescription = outputs.node
+            .nodeDescription
+            .debug_shiftLines()
 
-            return """
-            \(title) {
-            \(nodesDescription)
-            }
-            """
+        return """
+        \(title) {
+        \(nodesDescription)
         }
+        """
     }
 
 //    Not Available
