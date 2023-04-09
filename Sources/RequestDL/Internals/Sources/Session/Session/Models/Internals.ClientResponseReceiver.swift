@@ -8,7 +8,7 @@ import NIOCore
 import NIOHTTP1
 
 extension Internals {
-    
+
     class ClientResponseReceiver: HTTPClientResponseDelegate {
 
         typealias Response = Void

@@ -6,7 +6,6 @@ import XCTest
 import AsyncHTTPClient
 @testable import RequestDL
 
-// swiftlint:disable type_body_length function_body_length file_length
 final class SessionTests: XCTestCase {
 
     func testSession_whenInitAsDefault_shouldBeValid() async throws {
@@ -69,7 +68,10 @@ final class SessionTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit, maximumConnections)
+        XCTAssertEqual(
+            session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit,
+            maximumConnections
+        )
     }
 
     func testSession_whenDisableRedirect_shouldBeValid() async throws {
@@ -85,7 +87,7 @@ final class SessionTests: XCTestCase {
             XCTFail("Redirect Configuration is nil")
             return
         }
-        
+
         XCTAssertEqual(
             String(describing: redirectConfiguration),
             String(describing: HTTPClient.Configuration.RedirectConfiguration.disallow)

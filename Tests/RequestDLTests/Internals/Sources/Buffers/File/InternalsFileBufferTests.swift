@@ -513,3 +513,4 @@ class InternalsFileBufferTests: XCTestCase {
         XCTAssertNil(data)
     }
 }
+// swiftlint:enable type_body_length file_length

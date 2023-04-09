@@ -64,7 +64,7 @@ extension Internals.Log.Message {
             """,
             parameters: [
                 String(describing: type(of: state)): state,
-                String(describing: type(of: phase)): phase,
+                String(describing: type(of: phase)): phase
             ].merging(error.map {[
                 String(describing: type(of: $0)): $0
             ]} ?? [:], uniquingKeysWith: { lhs, _ in lhs })
@@ -190,7 +190,7 @@ extension Internals.Log.Message {
             parameters: [
                 String(describing: type(of: error)): error,
                 String(describing: type(of: options)): options,
-                String(describing: type(of: dictionary)): dictionary,
+                String(describing: type(of: dictionary)): dictionary
             ] as [String: Any]
         )
     }
@@ -205,7 +205,7 @@ extension Internals.Log.Message {
             """,
             parameters: [
                 String(describing: type(of: error)): error,
-                String(describing: type(of: object)): object,
+                String(describing: type(of: object)): object
             ] as [String: Any]
         )
     }
@@ -220,7 +220,7 @@ extension Internals.Log.Message {
             """,
             parameters: [
                 String(describing: type(of: object)): object,
-                String(describing: type(of: encoding)): encoding,
+                String(describing: type(of: encoding)): encoding
             ] as [String: Any]
         )
     }

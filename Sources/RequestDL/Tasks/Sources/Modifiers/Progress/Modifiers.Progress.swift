@@ -73,7 +73,10 @@ extension Modifiers {
 
 extension Modifiers.Progress {
 
-    fileprivate static func upload(_ progress: RequestDL.UploadProgress, content: AsyncResponse) async throws -> TaskResult<AsyncBytes> {
+    fileprivate static func upload(
+        _ progress: RequestDL.UploadProgress,
+        content: AsyncResponse
+    ) async throws -> TaskResult<AsyncBytes> {
 
         for try await step in content {
             switch step {

@@ -36,7 +36,6 @@ extension Internals.Body {
     }
 }
 
-
 extension Internals.Body {
 
     private static func consume(

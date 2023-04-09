@@ -40,7 +40,7 @@ extension Internals {
 
 extension Internals.SecureConnection {
 
-    func build() throws -> NIOSSL.TLSConfiguration {
+    private func makeTLSConfigurationByContext() throws -> NIOSSL.TLSConfiguration {
         var tlsConfiguration: TLSConfiguration
 
         switch context {
@@ -69,6 +69,13 @@ extension Internals.SecureConnection {
                 privateKey: privateKey
             )
         }
+
+        return tlsConfiguration
+    }
+
+    // swiftlint:disable cyclomatic_complexity
+    func build() throws -> NIOSSL.TLSConfiguration {
+        var tlsConfiguration = try makeTLSConfigurationByContext()
 
         if let minimumTLSVersion {
             tlsConfiguration.minimumTLSVersion = minimumTLSVersion
@@ -134,4 +141,5 @@ extension Internals.SecureConnection {
 
         return tlsConfiguration
     }
+    // swiftlint:enable cyclomatic_complexity
 }

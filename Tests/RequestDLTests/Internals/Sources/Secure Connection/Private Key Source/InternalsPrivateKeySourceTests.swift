@@ -18,7 +18,7 @@ class InternalsPrivateKeySourceTests: XCTestCase {
         try await super.tearDown()
         certificate = nil
     }
-    
+
     func testPrivateKeyByFile() async throws {
         // Given
         let path = certificate.privateKeyURL.absolutePath(percentEncoded: false)

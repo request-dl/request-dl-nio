@@ -6,7 +6,7 @@ import Foundation
 
 struct HTTPResult<Response: Codable>: Codable, Equatable where Response: Equatable {
 
-    internal(set) var receivedBytes: Int
+    var receivedBytes: Int
     let response: Response
 
     init(

@@ -12,7 +12,9 @@ extension URL {
         }
 
         let path = components.path.removingPercentEncoding ?? components.path
-        components.path = percentEncoded ? path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "" : path
+        components.path = percentEncoded ? {
+            (path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "")
+        }() : path
         return components.path
     }
 

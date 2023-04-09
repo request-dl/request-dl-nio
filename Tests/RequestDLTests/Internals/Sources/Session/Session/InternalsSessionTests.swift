@@ -87,6 +87,7 @@ class InternalsSessionTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable function_body_length
     func testSession_whenUploadingFile_shouldBeValid() async throws {
         // Given
         let certificates = Certificates().server()
@@ -154,4 +155,5 @@ class InternalsSessionTests: XCTestCase {
             )
         }
     }
+    // swiftlint:enable function_body_length
 }

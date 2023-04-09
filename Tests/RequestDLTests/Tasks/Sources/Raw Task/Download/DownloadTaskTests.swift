@@ -15,7 +15,7 @@ class DownloadTaskTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8092,
+            port: 8078,
             response: output
         ).run { baseURL in
             let data = try await DownloadTask {

@@ -7,6 +7,7 @@ import NIOSSL
 import NIOCore
 @testable import RequestDL
 
+// TODO: Missing properties
 class InternalsSecureConnectionTests: XCTestCase {
 
     var secureConnection: Internals.SecureConnection!
@@ -25,7 +26,6 @@ class InternalsSecureConnectionTests: XCTestCase {
      XCTAssertEqual(sut.pskClientCallback, secureConnection.pskClientCallback)
      XCTAssertEqual(sut.pskServerCallback, secureConnection.pskServerCallback)
      XCTAssertEqual(sut.keyLogCallback, secureConnection.keyLogCallback)
-     XCTAssertEqual(sut.certificateChain, secureConnection.certificateChain)
      XCTAssertEqual(sut.trustRoots, secureConnection.trustRoots)
      XCTAssertEqual(sut.additionalTrustRoots, secureConnection.additionalTrustRoots)
      XCTAssertEqual(sut.privateKey, secureConnection.privateKey)
@@ -183,8 +183,16 @@ class InternalsSecureConnectionTests: XCTestCase {
     func testSecureConnection_whenServer_shouldBeValid() async throws {
         // Given
         let certificates = Certificates().client()
-        let certificateChain = Internals.CertificateChain.certificates([.init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)])
-        let privateKey = Internals.PrivateKeySource.file(certificates.privateKeyURL.absolutePath(percentEncoded: false))
+
+        let certificateChain = Internals.CertificateChain.certificates([
+            Internals.Certificate(
+                certificates.certificateURL.absolutePath(percentEncoded: false),
+                format: .pem
+        )])
+
+        let privateKey = Internals.PrivateKeySource.file(
+            certificates.privateKeyURL.absolutePath(percentEncoded: false)
+        )
 
         let configuration: TLSConfiguration = .makeServerConfiguration(
             certificateChain: try certificateChain.build(),

@@ -15,7 +15,7 @@ final class DataTaskTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8090,
+            port: 8079,
             response: output
         ).run { baseURL in
             let data = try await DataTask {

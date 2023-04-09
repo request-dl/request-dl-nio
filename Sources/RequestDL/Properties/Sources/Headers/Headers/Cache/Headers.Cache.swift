@@ -236,7 +236,6 @@ extension Headers.Cache {
 
 extension Headers.Cache {
 
-    // swiftlint:disable cyclomatic_complexity
     var contents: [String] {
         var contents = [String]()
 

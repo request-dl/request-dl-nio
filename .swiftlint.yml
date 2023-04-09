@@ -33,3 +33,9 @@ type_name:
 large_tuple:
     warning: 9
     error: 16
+
+nesting:
+    type_level: 
+        warning: 4
+        error: 6
+

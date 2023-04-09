@@ -5,15 +5,15 @@
 import Foundation
 
 extension Internals {
-    
+
     struct FileBuffer: BufferProtocol {
-        
+
         private let storage: Storage
-        
+
         private(set) var readerIndex: Int = .zero
-        
+
         private(set) var writerIndex: Int
-        
+
         private init(storage: Storage) {
             self.storage = storage
             self.writerIndex = storage.writtenBytes

@@ -4,7 +4,6 @@
 
 import Foundation
 
-
 /// A property that groups together other properties for use in a `DataTask`.
 ///
 /// A `Group` property is used to group together other properties that share common characteristics, such

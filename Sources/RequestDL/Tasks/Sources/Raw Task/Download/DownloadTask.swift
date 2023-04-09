@@ -5,9 +5,9 @@
 import Foundation
 
 public struct DownloadTask<Content: Property>: Task {
-    
+
     private let content: Content
-    
+
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
