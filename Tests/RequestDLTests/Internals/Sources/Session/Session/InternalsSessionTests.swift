@@ -110,7 +110,7 @@ class InternalsSessionTests: XCTestCase {
         // When
         try await InternalServer(
             host: "localhost",
-            port: 8080,
+            port: 8076,
             response: message
         ).run { baseURL in
             var request = Internals.Request(url: "https://\(baseURL)")
