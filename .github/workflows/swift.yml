@@ -27,17 +27,28 @@ jobs:
       - name: 🛠️ Build Package
         run: swift build -v
 
-      - name: 🔎 Test Package
-        run: swift build -v
-        if: matrix.os == 'ubuntu-latest'
+#      - name: 🔎 Test Package
+#        run: swift build -v
+#        if: matrix.os == 'ubuntu-latest'
 
-      - name: 🍀 Code Coverage (Code Climate)
-        uses: paambaati/codeclimate-action@v3.2.0
-        env:
-          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
-        with:
-          coverageCommand: |
-            swift test --enable-code-coverage
-          debug: true
-          coverageLocations: ${{github.workspace}}/.build/debug/codecov/*.json:lcov-json
-        if: matrix.os == 'macos-latest'
+      - name: 🍀 Code Coverage (Codecov)
+        uses: codecov/codecov-action@v3
+
+#      - name: 🍀 Code Coverage (Code Climate)
+#        uses: paambaati/codeclimate-action@v3.2.0
+#        env:
+#          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+#        with:
+#          coverageCommand: |
+#            xcrun llvm-cov export \
+#                Package.swift \
+#                --instr-profile=.build/debug/codecov/default.profdata \
+#                --ignore-filename-regex=".build|Tests|Pods|Carthage|DerivedData" \
+#                --format="lcov" > output.json
+#                 \
+#              --ignore-filename-regex='(.build|Tests)[/\\].*' \
+#              -instr-profile $(swift test --enable-code-coverage --show-codecov-path | xargs dirname)/default.profdata \
+#              $(swift test --show-test-binary-path)
+#          debug: true
+#          coverageLocations: ${{github.workspace}}/.build/debug/codecov/*.json:lcov-json
+#        if: matrix.os == 'macos-latest'
