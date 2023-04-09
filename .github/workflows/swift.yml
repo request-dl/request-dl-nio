@@ -29,5 +29,9 @@ jobs:
 
       - name: 🍀 Code Coverage (Codecov)
         uses: codecov/codecov-action@v3
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          env_vars: ${{ matrix.os }}
+          flags: unittests
+          files: ${{ github.workspace }}/.build/debug/codecov/*.json
+          verbose: true
