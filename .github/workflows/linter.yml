@@ -2,15 +2,15 @@ name: Swiftlint
 
 on:
   push:
-     branches:
-     - main
+    branches: [main]
   pull_request:
 
 jobs:
   lint:
     runs-on: macOS-latest
     steps:
-      - uses: actions/checkout@v3.3.0
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v3.3.0
 
       - name: Install swiftlint
         run: >

@@ -4,6 +4,10 @@
 
 import Foundation
 
+/**
+ A structure representing chain certificate for a property used inside
+ for server context.
+ */
 public struct Certificates<Content: Property>: Property {
 
     enum Source {
@@ -24,18 +28,56 @@ public struct Certificates<Content: Property>: Property {
         return content
     }
 
+    /**
+     Initializes a new instance of the Certificates struct.
+
+     Example:
+
+     ```swift
+     DataTask {
+        SecureConnection {
+            Certificates {
+                Certificate(certificate1Path, format: .der)
+                Certificate(certificate2Path, format: .pem)
+            }
+        }
+     }
+     ```
+
+     - Parameter content: A closure that returns the content of the Certificates.
+     */
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
+    /**
+     Initializes a new instance of the Certificates struct with the specified file
+     in `PEM` format.
+
+     - Parameter file: The path to the file.
+     */
     public init(_ file: String) where Content == Never {
         source = .file(file)
     }
 
+    /**
+     Initializes a new instance of the Certificates struct with the specified bytes
+     in `PEM` format.
+
+     - Parameter bytes: An array of bytes.
+     */
     public init(_ bytes: [UInt8]) where Content == Never {
         source = .bytes(bytes)
     }
 
+    /**
+     Initializes a new instance of the Certificates struct with the specified file in the specified bundle
+     in `PEM` format.
+
+     - Parameters:
+        - file: The path to the file.
+        - bundle: The bundle containing the file.
+     */
     public init(
         _ file: String,
         in bundle: Bundle

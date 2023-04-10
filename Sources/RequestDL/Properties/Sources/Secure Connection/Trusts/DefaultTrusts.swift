@@ -4,8 +4,14 @@
 
 import Foundation
 
+/**
+ A structure that represents default trusts.
+ */
 public struct DefaultTrusts: Property {
 
+    /**
+     Initializes a new instance of the DefaultTrusts structure.
+     */
     public init() {}
 
     /// Returns an exception since `Never` is a type that can never be constructed.

@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        swift: ["5.7.2"]
+        swift: ["5.8", "5.7"]
     runs-on: ${{ matrix.os }}
     steps:
       - name: ☑️ Swift Select
@@ -24,14 +24,5 @@ jobs:
       - name: ⬇️ Get Sources
         uses: actions/checkout@v3.3.0
 
-      - name: 🛠️ Test Package
-        run: swift test --enable-code-coverage
-
-      - name: 🍀 Code Coverage (Codecov)
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          env_vars: ${{ matrix.os }}
-          flags: unittests
-          files: ${{ github.workspace }}/.build/debug/codecov/*.json
-          verbose: true
+      - name: 🍀 Test Package
+        run: swift test

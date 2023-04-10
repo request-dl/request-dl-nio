@@ -1,0 +1,30 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  code-coverage:
+    runs-on: macOS-latest
+    steps:
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v3.3.0
+      
+      - name: 🛠️ Test Package
+        run: swift test --enable-code-coverage
+
+      - name: 🖨️ LLVM Coverage Format
+        run: |
+          xcrun llvm-cov export $(find .build -name RequestDLPackageTests) \
+            -format="lcov" \
+            -instr-profile=$(find .build -name default.profdata) \
+            -ignore-filename-regex=".build|Test" > RequestDL.lcov
+
+      - name: 📦 Upload to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ github.workspace }}/RequestDL.lcov
+          verbose: true
