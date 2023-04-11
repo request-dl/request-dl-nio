@@ -1,7 +1,7 @@
 [![Swift Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2Frequest-dl%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/brennobemoura/request-dl)
 [![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2Frequest-dl%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/brennobemoura/request-dl)
 [![Swift](https://github.com/brennobemoura/request-dl/actions/workflows/swift.yml/badge.svg)](https://github.com/brennobemoura/request-dl/actions/workflows/swift.yml)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/516f7228a532b73b5540/test_coverage)](https://codeclimate.com/github/brennobemoura/request-dl/test_coverage)
+[![codecov](https://codecov.io/gh/brennobemoura/request-dl/branch/main/graph/badge.svg?token=MW5J053T85)](https://codecov.io/gh/brennobemoura/request-dl)
 
 # RequestDL
 
