@@ -4,6 +4,9 @@
 
 import Foundation
 
+/**
+ A structure representing trusts as a property.
+ */
 public struct Trusts<Content: Property>: Property {
 
     enum Source {
@@ -24,18 +27,56 @@ public struct Trusts<Content: Property>: Property {
         return content
     }
 
+    /**
+     Initializes a new instance of the Trusts struct.
+
+     Example:
+
+     ```swift
+     DataTask {
+        SecureConnection {
+            Trusts {
+                Certificate(rootPath, format: .der)
+                Certificate(secondPath, format: .pem)
+            }
+        }
+     }
+     ```
+
+     - Parameter content: A closure that returns the content of the Trusts.
+     */
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
+    /**
+     Initializes a new instance of the Trusts struct with the specified file
+     in `PEM` format.
+
+     - Parameter file: The path to the file.
+     */
     public init(_ file: String) where Content == Never {
         source = .file(file)
     }
 
+    /**
+     Initializes a new instance of the Trusts struct with the specified bytes
+     in `PEM` format.
+
+     - Parameter bytes: An array of bytes.
+     */
     public init(_ bytes: [UInt8]) where Content == Never {
         source = .bytes(bytes)
     }
 
+    /**
+     Initializes a new instance of the Trusts struct with the specified file in the specified bundle
+     in `PEM` format.
+
+     - Parameters:
+        - file: The path to the file.
+        - bundle: The bundle containing the file.
+     */
     public init(
         _ file: String,
         in bundle: Bundle

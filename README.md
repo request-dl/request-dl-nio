@@ -5,19 +5,22 @@
 
 # RequestDL
 
+> Thanks to **Mike Lewis**, progress is seamlessly integrated into this library,
+providing a simple and streamlined experience.
+
 RequestDL is a Swift package designed to simplify the process of performing network
-requests. It provides a set of tools, including the Task protocol, which supports
-different types of requests, including DataTask, DownloadTask, and BytesTask.
+requests. It provides a set of tools, including the `Task` protocol, which supports
+different types of requests, including `DataTask`, `DownloadTask`, and `UploadTask`.
 
 One of the key features of RequestDL is its support for specifying properties of a
-URLRequest, such as Query, Payload, and Headers, among others. You can also use 
-TaskModifier and TaskInterceptor to process the response after the request is 
+request, such as `Query`, `Payload`, and `Headers`, among others. You can also use 
+`TaskModifier` and `TaskInterceptor` to process the response after the request is 
 complete, allowing for actions like decoding, mapping, error handling based on status
 codes, and logging responses in the console.
 
-RequestDL's Property protocol is another powerful feature that allows developers to
-implement custom properties to define various aspects of the URLRequest within a 
-struct specification or using the @PropertyBuilder. This makes it easy to customize 
+The `Property` protocol is another powerful feature that allows developers to
+implement custom properties to define various aspects of the request within a 
+struct specification or using the `@PropertyBuilder`. This makes it easy to customize 
 requests to meet specific needs.
 
 - **[Documentation](https://brennobemoura.github.io/request-dl/documentation/requestdl/)**
@@ -29,7 +32,7 @@ add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/brennobemoura/request-dl.git", from: "1.0.0")
+    .package(url: "https://github.com/brennobemoura/request-dl.git", from: "2.0.0")
 ]
 ```
 
@@ -37,10 +40,10 @@ dependencies: [
 
 Using RequestDL is easy and intuitive. You can create network requests in a 
 declarative way, specifying the properties of the request through the use of 
-the Property protocol or using the @PropertyBuilder attribute.
+the `Property` protocol or using the `@PropertyBuilder` attribute.
 
-Here's an example of a simple DataTask that queries Google for the term "apple", 
-logs the response in the console, and ignores the URLResponse:
+Here's an example of a simple `DataTask` that queries Google for the term "apple", 
+logs the response in the console, and ignores the HTTP's response head:
 
 ```swift
 try await DataTask {

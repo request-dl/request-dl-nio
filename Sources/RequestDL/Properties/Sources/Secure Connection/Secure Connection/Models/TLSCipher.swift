@@ -5,6 +5,10 @@
 import Foundation
 import NIOSSL
 
+/// Represents a TLS cipher suite.
+///
+/// TLSCipher defines various commonly used cipher suites for securing communication over TLS
+/// (Transport Layer Security) protocol.
 public struct TLSCipher: RawRepresentable, Hashable, Sendable {
 
     public let rawValue: UInt16

@@ -4,14 +4,33 @@
 
 import Foundation
 
+/// A structure representing the head of an HTTP response.
 public struct ResponseHead: Equatable {
 
+    /// The URL of the response.
     public let url: URL?
+
+    /// The status of the response.
     public let status: Status
+
+    /// The version of the HTTP protocol used in the response.
     public let version: Version
+
+    /// The headers of the response.
     public let headers: HTTPHeaders
+
+    /// A boolean value indicating whether the connection should be kept alive after the response.
     public let isKeepAlive: Bool
 
+    /// Initializes a new instance of `ResponseHead`.
+    ///
+    /// - Parameters:
+    ///   - url: The URL of the response.
+    ///   - status: The status of the response.
+    ///   - version: The version of the HTTP protocol used in the response.
+    ///   - headers: The headers of the response.
+    ///   - isKeepAlive: A boolean value indicating whether the connection should be kept alive after
+    ///   the response.
     public init(
         url: URL?,
         status: Status,
@@ -39,11 +58,20 @@ public struct ResponseHead: Equatable {
 
 extension ResponseHead {
 
+    /// A structure representing the status of an HTTP response.
     public struct Status: Equatable {
 
+        /// The HTTP status code of the response.
         public let code: UInt
+
+        /// The reason phrase associated with the HTTP status code.
         public let reason: String
 
+        /// Initializes a new instance of `Status`.
+        ///
+        /// - Parameters:
+        ///   - code: The HTTP status code of the response.
+        ///   - reason: The reason phrase associated with the HTTP status code.
         public init(
             code: UInt,
             reason: String
@@ -60,11 +88,20 @@ extension ResponseHead {
         }
     }
 
+    /// A structure representing the version of the HTTP protocol used in an HTTP response.
     public struct Version: Equatable {
 
+        /// The minor version number of the HTTP protocol used in the response.
         public let minor: Int
+
+        /// The major version number of the HTTP protocol used in the response.
         public let major: Int
 
+        /// Initializes a new instance of `Version`.
+        ///
+        /// - Parameters:
+        ///   - minor: The minor version number of the HTTP protocol used in the response.
+        ///   - major: The major version number of the HTTP protocol used in the response.
         public init(
             minor: Int,
             major: Int

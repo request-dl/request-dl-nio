@@ -20,6 +20,7 @@ extension Internals {
 
         var phase: Phase = .upload
         var state: State = .idle
+        var reference: StreamReference = .none
 
         init(
             url: String,
@@ -39,6 +40,8 @@ extension Internals {
             }
 
             state = .uploading
+            reference = .upload
+
             upload.append(.success(part.readableBytes))
         }
 
@@ -49,6 +52,8 @@ extension Internals {
 
             state = .uploading
             phase = .upload
+            reference = .head
+
             upload.close()
         }
 
@@ -76,8 +81,10 @@ extension Internals {
 
             self.upload.close()
             self.head.close()
+
             state = .head
             phase = .download
+            reference = .download
 
             return task.eventLoop.makeSucceededVoidFuture()
         }
@@ -91,6 +98,8 @@ extension Internals {
 
             state = .downloading
             phase = .download
+            reference = .download
+            
             head.close()
 
             return task.eventLoop.makeSucceededVoidFuture()
@@ -103,6 +112,8 @@ extension Internals {
 
             state = .end
             phase = .download
+            reference = .lockout
+
             download.close()
             head.close()
             upload.close()
@@ -118,12 +129,27 @@ extension Internals {
 
             switch state {
             case .idle:
+                guard reference <= .head else {
+                    fallthrough
+                }
                 head.append(.failure(error))
             case .uploading:
+                guard reference <= .upload else {
+                    fallthrough
+                }
+
                 upload.append(.failure(error))
             case .head:
+                guard reference <= .head else {
+                    fallthrough
+                }
+
                 head.append(.failure(error))
             case .downloading:
+                guard reference <= .download else {
+                    fallthrough
+                }
+
                 download.failed(error)
             case .end, .failure:
                 unexpectedStateOrPhase(error: error)
@@ -163,5 +189,18 @@ extension Internals.ClientResponseReceiver {
     enum Phase {
         case upload
         case download
+    }
+
+    enum StreamReference: Int, Comparable {
+
+        case none
+        case upload
+        case head
+        case download
+        case lockout
+
+        static func < (_ lhs: Self, _ rhs: Self) -> Bool {
+            lhs.rawValue < rhs.rawValue
+        }
     }
 }

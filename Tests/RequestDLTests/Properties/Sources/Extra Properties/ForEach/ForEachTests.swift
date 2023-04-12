@@ -51,6 +51,44 @@ final class ForEachTests: XCTestCase {
         )
     }
 
+    func testForEach_whenRange_shouldBeValid() async throws {
+        // Given
+        let range = 0 ..< 3
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL("localhost")
+            ForEach(range) { index in
+                Path("\(index)")
+            }
+        })
+
+        // Then
+        XCTAssertEqual(
+            request.url,
+            "https://localhost/\(range.map { "\($0)" }.joined(separator: "/"))"
+        )
+    }
+
+    func testForEach_whenClosedRange_shouldBeValid() async throws {
+        // Given
+        let range = 0 ... 3
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL("localhost")
+            ForEach(range) { index in
+                Path("\(index)")
+            }
+        })
+
+        // Then
+        XCTAssertEqual(
+            request.url,
+            "https://localhost/\(range.map { "\($0)" }.joined(separator: "/"))"
+        )
+    }
+
     func testNeverBody() async throws {
         // Given
         let property = ForEach([Int](), id: \.self) { _ in

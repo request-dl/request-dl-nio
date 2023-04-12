@@ -139,6 +139,58 @@ class ModifiersProgressTests: XCTestCase {
         }
     }
 
+    func testIgnores_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+        // Given
+        let resource = Certificates().server()
+        let message = String(repeating: "c", count: 1_024 * 64)
+        let length = 1_024
+
+        let expectingData = try HTTPResult(
+            receivedBytes: .zero,
+            response: message
+        ).encode()
+
+        // When
+        try await InternalServer(
+            host: "localhost",
+            port: 8888,
+            response: message
+        ).run { baseURL in
+            let data = try await UploadTask {
+                BaseURL(baseURL)
+                Path("index")
+
+                SecureConnection {
+                    Trusts {
+                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                    }
+                }
+
+                ReadingMode(length: length)
+            }
+            .ignoresUploadProgress()
+            .extractPayload()
+            .downloadProgress(downloadMonitor, length: expectingData.count)
+            .result()
+
+            let result = try HTTPResult<String>(data)
+
+            // Then
+            XCTAssertEqual(downloadMonitor.length, data.count)
+            XCTAssertEqual(result.receivedBytes, .zero)
+
+            let completeParts = downloadMonitor.receivedData.dropLast()
+            if !completeParts.isEmpty {
+                XCTAssertEqual(
+                    completeParts.map(\.count),
+                    completeParts.indices.map { _ in length }
+                )
+            }
+
+            XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        }
+    }
+
     func testIgnores_whenCompleteProgress_shouldBeValid() async throws {
         // Given
         let resource = Certificates().server()

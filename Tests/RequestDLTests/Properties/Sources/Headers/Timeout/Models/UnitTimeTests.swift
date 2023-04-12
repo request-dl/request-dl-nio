@@ -130,4 +130,47 @@ class UnitTimeTests: XCTestCase {
         // Then
         XCTAssertEqual(sut, [.seconds(6), .hours(10)])
     }
+
+    func testUnitTime_whenZero() async throws {
+        // Given
+        let sut = UnitTime.zero
+
+        // Then
+        XCTAssertEqual(sut.nanoseconds, .zero)
+    }
+
+    func testUnitTime_whenAddingWithAssignment() async throws {
+        // Given
+        var lhs = UnitTime.zero
+        let rhs = UnitTime.hours(1)
+
+        // When
+        lhs += rhs
+
+        // Then
+        XCTAssertEqual(lhs, .hours(1))
+    }
+
+    func testUnitTime_whenSubtractingWithAssignment() async throws {
+        // Given
+        var lhs = UnitTime.hours(1)
+        let rhs = UnitTime.minutes(45)
+
+        // When
+        lhs -= rhs
+
+        // Then
+        XCTAssertEqual(lhs, .minutes(15))
+    }
+
+    func testUnitTime_whenMultiplying() async throws {
+        // Given
+        let lhs = UnitTime.hours(1)
+        let value = 2
+
+        // When
+
+        // Then
+        XCTAssertEqual(lhs * value, .hours(2))
+    }
 }

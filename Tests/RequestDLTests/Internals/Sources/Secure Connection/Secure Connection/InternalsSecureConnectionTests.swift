@@ -22,14 +22,111 @@ class InternalsSecureConnectionTests: XCTestCase {
         secureConnection = nil
     }
 
-    /*
-     XCTAssertEqual(sut.pskClientCallback, secureConnection.pskClientCallback)
-     XCTAssertEqual(sut.pskServerCallback, secureConnection.pskServerCallback)
-     XCTAssertEqual(sut.keyLogCallback, secureConnection.keyLogCallback)
-     XCTAssertEqual(sut.trustRoots, secureConnection.trustRoots)
-     XCTAssertEqual(sut.additionalTrustRoots, secureConnection.additionalTrustRoots)
-     XCTAssertEqual(sut.privateKey, secureConnection.privateKey)
-     */
+    func testSecureConnection_whenKeyLog_shouldBeValid() async throws {
+        // Given
+        let data = Data("Hello World".utf8)
+
+        // When
+        secureConnection.keyLogCallback = { @Sendable in
+            var bytes = $0
+            let receivedData = bytes.readData(length: bytes.readableBytes)
+            precondition(data == receivedData)
+        }
+
+        let sut = try secureConnection.build()
+
+        // Then
+        sut.keyLogCallback?(.init(data: data))
+    }
+
+    func testSecureConnection_whenPSKClient_shouldBeValid() async throws {
+        // Given
+        let identity = "apple.com"
+
+        // When
+        secureConnection.pskClientCallback = { @Sendable in
+            .init(
+                key: .init(Data($0.utf8)),
+                identity: $0
+            )
+        }
+
+        let sut = try secureConnection.build()
+
+        // Then
+        let result = try sut.pskClientCallback.map { try $0(identity) }
+
+        XCTAssertEqual(
+            result?.identity,
+            identity
+        )
+
+        XCTAssertEqual(
+            result.map { Data($0.key) },
+            Data(identity.utf8)
+        )
+    }
+
+    func testSecureConnection_whenPSKServer_shouldBeValid() async throws {
+        // Given
+        let hint = "default"
+        let identity = "apple.com"
+
+        // When
+        secureConnection.pskServerCallback = { @Sendable in
+            .init(key: .init(Data([$0, $1].joined(separator: ",").utf8)))
+        }
+
+        let sut = try secureConnection.build()
+
+        // Then
+        XCTAssertEqual(
+            try sut.pskServerCallback.map { try Data($0(hint, identity).key) },
+            Data([hint, identity].joined(separator: ",").utf8)
+        )
+    }
+
+    func testSecureConnection_whenTrustRoots_shouldBeValid() async throws {
+        // Given
+        let server = Certificates().server()
+        let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
+
+        // When
+        secureConnection.trustRoots = .file(certificatePath)
+
+        let sut = try secureConnection.build()
+
+        // Then
+        XCTAssertEqual(sut.trustRoots, .file(certificatePath))
+    }
+
+    func testSecureConnection_whenAdditionalTrustRoots_shouldBeValid() async throws {
+        // Given
+        let server = Certificates().server()
+        let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
+
+        // When
+        secureConnection.additionalTrustRoots = [.file(certificatePath)]
+
+        let sut = try secureConnection.build()
+
+        // Then
+        XCTAssertEqual(sut.additionalTrustRoots, [.file(certificatePath)])
+    }
+
+    func testSecureConnection_whenPrivateKey_shouldBeValid() async throws {
+        // Given
+        let server = Certificates().server()
+        let privateKeyPath = server.privateKeyURL.absolutePath(percentEncoded: false)
+
+        // When
+        secureConnection.privateKey = .file(privateKeyPath)
+
+        let sut = try secureConnection.build()
+
+        // Then
+        XCTAssertEqual(sut.privateKey, .file(privateKeyPath))
+    }
 
     func testSecureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given

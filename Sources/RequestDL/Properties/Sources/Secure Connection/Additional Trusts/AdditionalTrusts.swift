@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- A structure representing additional trusts for a property.
+ A structure representing additional trusts as a property.
  */
 public struct AdditionalTrusts<Content: Property>: Property {
 
@@ -51,7 +51,7 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
     /**
      Initializes a new instance of the AdditionalTrusts struct with the specified file
-     in `PEM` format.     
+     in `PEM` format.
 
      - Parameter file: The path to the file.
      */

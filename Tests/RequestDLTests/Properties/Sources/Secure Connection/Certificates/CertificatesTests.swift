@@ -26,6 +26,7 @@ class CertificatesTests: XCTestCase {
                 RequestDL.Certificates {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
                     RequestDL.Certificate(server)
+                    RequestDL.Certificate("client.public", in: .module)
                 }
             }
         })
@@ -35,7 +36,13 @@ class CertificatesTests: XCTestCase {
             session.configuration.secureConnection?.certificateChain,
             .certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                .init(server, format: .pem)
+                .init(server, format: .pem),
+                .init(
+                    Bundle.module
+                        .url(forResource: "client.public", withExtension: "pem")!
+                        .absolutePath(percentEncoded: false),
+                    format: .pem
+                )
             ])
         )
     }

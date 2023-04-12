@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// A struct representing a pre-shared key (PSK) certificate.
 public struct PSKCertificate<PSK: PSKType>: Property {
 
     private enum Source {
@@ -14,6 +15,12 @@ public struct PSKCertificate<PSK: PSKType>: Property {
     private let source: Source
     private var hint: String?
 
+    /// Creates a PSK certificate for client-side authentication with the given PSK and closure that
+    /// generates a PSK client certificate.
+    ///
+    /// - Parameters:
+    ///   - psk: The pre-shared key (PSK) for the certificate.
+    ///   - closure: A closure that generates a PSK client certificate given a PSK client description.
     public init(
         _ psk: PSK,
         _ closure: @escaping (PSKClientDescription) throws -> PSKClientCertificate
@@ -21,6 +28,12 @@ public struct PSKCertificate<PSK: PSKType>: Property {
         source = .client(closure)
     }
 
+    /// Creates a PSK certificate for server-side authentication with the given PSK and closure that
+    /// generates a PSK server certificate.
+    ///
+    /// - Parameters:
+    ///   - psk: The pre-shared key (PSK) for the certificate.
+    ///   - closure: A closure that generates a PSK server certificate given a PSK server description.
     public init(
         _ psk: PSK,
         _ closure: @escaping (PSKServerDescription) throws -> PSKServerCertificate
@@ -28,6 +41,11 @@ public struct PSKCertificate<PSK: PSKType>: Property {
         source = .server(closure)
     }
 
+    /// Creates a PSK certificate for client-side authentication with the given closure that generates a PSK
+    /// client certificate.
+    ///
+    /// - Parameters:
+    ///   - closure: A closure that generates a PSK client certificate given a PSK client description.
     public init(
         _ closure: @escaping (PSKClientDescription) throws -> PSKClientCertificate
     ) where PSK == PSKClient {
@@ -48,6 +66,10 @@ public struct PSKCertificate<PSK: PSKType>: Property {
 
 extension PSKCertificate {
 
+    /// Adds a hint to the PSK certificate.
+    ///
+    /// - Parameter hint: A hint string to be associated with the PSK certificate.
+    /// - Returns: The PSK certificate instance with the hint added.
     public func hint(_ hint: String) -> Self {
         edit { $0.hint = hint }
     }

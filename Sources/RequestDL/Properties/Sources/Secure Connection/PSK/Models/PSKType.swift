@@ -32,10 +32,10 @@ extension PSKType where Self == PSKServer {
 }
 
 extension PSKType where Self == PSKClient {
-    
+
     /**
      A static property that returns an instance of PSKClient.
-     
+
      - Returns: An instance of PSKClient.
      */
     public static var client: PSKClient {

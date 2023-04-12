@@ -20,6 +20,7 @@ import Foundation
      .result()
  }
  ```
+
  - Note: `DataTask` is a generic type that accepts a type that conforms to `Property` as its
  parameter. `Property` protocol contains information about the request such as its URL, headers,
  body and etc.

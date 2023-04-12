@@ -26,4 +26,10 @@ final class AuthorizationTokenTypeTests: XCTestCase {
         let type = Authorization.TokenType.bearer
         XCTAssertEqual(type, "Bearer")
     }
+
+    func testHashable() async throws {
+        let sut: Set<Authorization.TokenType> = [.bearer, .bearer, .basic]
+
+        XCTAssertEqual(sut, [.bearer, .basic])
+    }
 }

@@ -139,6 +139,14 @@ extension Internals.SecureConnection {
             tlsConfiguration.keyLogCallback = keyLogCallback
         }
 
+        if let pskClientCallback {
+            tlsConfiguration.pskClientCallback = pskClientCallback
+        }
+
+        if let pskServerCallback {
+            tlsConfiguration.pskServerCallback = pskServerCallback
+        }
+
         return tlsConfiguration
     }
     // swiftlint:enable cyclomatic_complexity

@@ -17,7 +17,8 @@ struct InternalServer<Response: Codable> where Response: Equatable {
     init(
         host: String,
         port: UInt,
-        response: Response
+        response: Response,
+        disableCAValidation: Bool = true
     ) throws {
         let server = Certificates().server()
 
@@ -25,12 +26,23 @@ struct InternalServer<Response: Codable> where Response: Equatable {
         self.port = port
         self.response = response
 
-        self.tlsConfiguration = .makeServerConfiguration(
+        var tlsConfiguration: TLSConfiguration = .makeServerConfiguration(
             certificateChain: try NIOSSLCertificate.fromPEMFile(server.certificateURL.path).map {
                 .certificate($0)
             },
             privateKey: .file(server.privateKeyURL.path)
         )
+
+        if !disableCAValidation {
+            tlsConfiguration.pskClientCallback = {
+                .init(
+                    key: .init(try Data(contentsOf: server.pskURL)),
+                    identity: $0
+                )
+            }
+        }
+
+        self.tlsConfiguration = tlsConfiguration
     }
 }
 

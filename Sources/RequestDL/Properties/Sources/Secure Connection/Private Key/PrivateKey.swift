@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// A struct representing a private key for `SecureConnection` configuration.
 public struct PrivateKey<Password: Collection>: Property where Password.Element == UInt8 {
 
     fileprivate enum Source {
@@ -17,6 +18,11 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         self.source = source
     }
 
+    /// Creates a private key from a file with the specified format without password.
+    ///
+    /// - Parameters:
+    ///   - file: The path to the file containing the private key.
+    ///   - format: The format of the private key file. Default is `.pem`.
     public init(_ file: String, format: Certificate.Format = .pem) where Password == [UInt8] {
         switch format {
         case .pem:
@@ -26,6 +32,11 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         }
     }
 
+    /// Creates a private key from bytes with the specified format without password.
+    ///
+    /// - Parameters:
+    ///   - bytes: The bytes representing the private key.
+    ///   - format: The format of the private key bytes. Default is `.pem`.
     public init(_ bytes: [UInt8], format: Certificate.Format = .pem) where Password == [UInt8] {
         self.init(.privateKey(.init(
             bytes,
@@ -33,6 +44,12 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         )))
     }
 
+    /// Creates a private key from a file in the specified bundle with the specified format without password.
+    ///
+    /// - Parameters:
+    ///   - file: The name of the file containing the private key.
+    ///   - bundle: The bundle containing the file.
+    ///   - format: The format of the private key file. Default is `.pem`.
     public init(
         _ file: String,
         in bundle: Bundle,
@@ -44,6 +61,14 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         )
     }
 
+    /// Creates a private key from a file with the specified format, and allows for providing a password
+    /// callback closure.
+    ///
+    /// - Parameters:
+    ///   - file: The path to the file containing the private key.
+    ///   - format: The format of the private key file. Default is `.pem`.
+    ///   - password: A closure that will be called with a password callback closure as its argument.
+    ///   The password callback closure should be invoked with the password for the private key.
     public init(
         _ file: String,
         format: Certificate.Format = .pem,
@@ -56,6 +81,14 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         )))
     }
 
+    /// Creates a private key from bytes with the specified format, and allows for providing a password
+    /// callback closure.
+    ///
+    /// - Parameters:
+    ///   - bytes: The bytes representing the private key.
+    ///   - format: The format of the private key bytes. Default is `.pem`.
+    ///   - password: A closure that will be called with a password callback closure as its argument.
+    ///   The password callback closure should be invoked with the password for the private key.
     public init(
         _ bytes: [UInt8],
         format: Certificate.Format = .pem,
@@ -68,6 +101,15 @@ public struct PrivateKey<Password: Collection>: Property where Password.Element 
         )))
     }
 
+    /// Creates a private key from a file in the specified bundle with the specified format, and allows for
+    /// providing a password callback closure.
+    ///
+    /// - Parameters:
+    ///   - file: The name of the file containing the private key.
+    ///   - bundle: The bundle containing the file.
+    ///   - format: The format of the private key file. Default is `.pem`.
+    ///   - password: A closure that will be called with a password callback closure as its argument.
+    ///   The password callback closure should be invoked with the password for the private key.
     public init(
         _ file: String,
         in bundle: Bundle,
