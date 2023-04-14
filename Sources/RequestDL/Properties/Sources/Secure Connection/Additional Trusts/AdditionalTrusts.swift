@@ -40,6 +40,7 @@ public struct AdditionalTrusts<Content: Property>: Property {
                 Certificate(secondPath, format: .pem)
             }
         }
+        .verification(.fullVerification)
      }
      ```
 

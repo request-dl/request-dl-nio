@@ -4,50 +4,49 @@
 
 import Foundation
 
-/// A struct representing a pre-shared key (PSK) certificate.
-public struct PSKCertificate<PSK: PSKType>: Property {
+/// A struct representing a pre-shared key (PSK).
+public struct PSKIdentity<PSK: PSKType>: Property {
 
     private enum Source {
-        case server((PSKServerDescription) throws -> PSKServerCertificate)
-        case client((PSKClientDescription) throws -> PSKClientCertificate)
+        case server((PSKServerDescription) throws -> PSKServerIdentity)
+        case client((PSKClientDescription) throws -> PSKClientIdentity)
     }
 
     private let source: Source
     private var hint: String?
 
-    /// Creates a PSK certificate for client-side authentication with the given PSK and closure that
-    /// generates a PSK client certificate.
+    /// Creates a PSK identity for client-side authentication with the given type and closure that
+    /// generates the PSK.
     ///
     /// - Parameters:
-    ///   - psk: The pre-shared key (PSK) for the certificate.
-    ///   - closure: A closure that generates a PSK client certificate given a PSK client description.
+    ///   - psk: The PSK type.
+    ///   - closure: A closure that generates a PSK client for a given client description.
     public init(
         _ psk: PSK,
-        _ closure: @escaping (PSKClientDescription) throws -> PSKClientCertificate
+        _ closure: @escaping (PSKClientDescription) throws -> PSKClientIdentity
     ) where PSK == PSKClient {
         source = .client(closure)
     }
 
-    /// Creates a PSK certificate for server-side authentication with the given PSK and closure that
-    /// generates a PSK server certificate.
+    /// Creates a PSK identity for server-side authentication with the given type and closure that
+    /// generates the PSK.
     ///
     /// - Parameters:
-    ///   - psk: The pre-shared key (PSK) for the certificate.
-    ///   - closure: A closure that generates a PSK server certificate given a PSK server description.
+    ///   - psk: The PSK type.
+    ///   - closure: A closure that generates a PSK server for a given server description.
     public init(
         _ psk: PSK,
-        _ closure: @escaping (PSKServerDescription) throws -> PSKServerCertificate
+        _ closure: @escaping (PSKServerDescription) throws -> PSKServerIdentity
     ) where PSK == PSKServer {
         source = .server(closure)
     }
 
-    /// Creates a PSK certificate for client-side authentication with the given closure that generates a PSK
-    /// client certificate.
+    /// Creates a PSK identity for client-side authentication with the given type and closure that
+    /// generates the PSK.
     ///
-    /// - Parameters:
-    ///   - closure: A closure that generates a PSK client certificate given a PSK client description.
+    /// - Parameter closure: A closure that generates a PSK client for a given client description.
     public init(
-        _ closure: @escaping (PSKClientDescription) throws -> PSKClientCertificate
+        _ closure: @escaping (PSKClientDescription) throws -> PSKClientIdentity
     ) where PSK == PSKClient {
         self.init(.client, closure)
     }
@@ -64,18 +63,18 @@ public struct PSKCertificate<PSK: PSKType>: Property {
     }
 }
 
-extension PSKCertificate {
+extension PSKIdentity {
 
-    /// Adds a hint to the PSK certificate.
+    /// Adds a hint to the PSK.
     ///
-    /// - Parameter hint: A hint string to be associated with the PSK certificate.
-    /// - Returns: The PSK certificate instance with the hint added.
+    /// - Parameter hint: A hint string to be associated with the identity.
+    /// - Returns: The PSK instance with the hint added.
     public func hint(_ hint: String) -> Self {
         edit { $0.hint = hint }
     }
 }
 
-extension PSKCertificate {
+extension PSKIdentity {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -103,7 +102,7 @@ extension PSKCertificate {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<PSKCertificate<PSK>>,
+        property: _GraphValue<PSKIdentity<PSK>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         _ = inputs[self]

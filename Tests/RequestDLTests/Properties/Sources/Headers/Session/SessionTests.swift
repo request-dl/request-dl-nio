@@ -163,6 +163,24 @@ final class SessionTests: XCTestCase {
         )
     }
 
+    func testSession_whenDNSOverride_shouldBeValid() async throws {
+        // Given
+        let origin = "google.com"
+        let destination = "apple.com"
+
+        let property = Session()
+            .overrideDNS(destination, from: origin)
+
+        // When
+        let (session, _) = try await resolve(TestProperty { property })
+
+        // Then
+        XCTAssertEqual(
+            try session.configuration.build().dnsOverride,
+            [origin: destination]
+        )
+    }
+
     func testSession_whenNeverBody_shouldBeNever() async throws {
         // Given
         let property = Session()

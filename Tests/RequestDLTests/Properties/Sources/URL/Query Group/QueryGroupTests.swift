@@ -16,7 +16,7 @@ final class QueryGroupTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             property
         })
 
@@ -24,7 +24,7 @@ final class QueryGroupTests: XCTestCase {
         XCTAssertEqual(
             request.url,
             """
-            https://localhost?\
+            https://127.0.0.1?\
             number=123&\
             page=1
             """
@@ -41,7 +41,7 @@ final class QueryGroupTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             property
         })
 
@@ -49,7 +49,7 @@ final class QueryGroupTests: XCTestCase {
         XCTAssertEqual(
             request.url,
             """
-            https://localhost?\
+            https://127.0.0.1?\
             number=123&\
             page=1
             """
@@ -67,7 +67,7 @@ final class QueryGroupTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             QueryGroup(queries)
         })
 

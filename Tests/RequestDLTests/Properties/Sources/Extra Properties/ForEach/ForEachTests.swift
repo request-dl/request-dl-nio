@@ -19,7 +19,7 @@ final class ForEachTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             ForEach(paths) { path in
                 Path(path.id)
             }
@@ -28,7 +28,7 @@ final class ForEachTests: XCTestCase {
         // Then
         XCTAssertEqual(
             request.url,
-            "https://localhost/api/v1/users"
+            "https://127.0.0.1/api/v1/users"
         )
     }
 
@@ -38,7 +38,7 @@ final class ForEachTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             ForEach(paths, id: \.self) { path in
                 Path(path)
             }
@@ -47,7 +47,7 @@ final class ForEachTests: XCTestCase {
         // Then
         XCTAssertEqual(
             request.url,
-            "https://localhost/api/v1/users"
+            "https://127.0.0.1/api/v1/users"
         )
     }
 
@@ -57,7 +57,7 @@ final class ForEachTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             ForEach(range) { index in
                 Path("\(index)")
             }
@@ -66,7 +66,7 @@ final class ForEachTests: XCTestCase {
         // Then
         XCTAssertEqual(
             request.url,
-            "https://localhost/\(range.map { "\($0)" }.joined(separator: "/"))"
+            "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
 
@@ -76,7 +76,7 @@ final class ForEachTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             ForEach(range) { index in
                 Path("\(index)")
             }
@@ -85,7 +85,7 @@ final class ForEachTests: XCTestCase {
         // Then
         XCTAssertEqual(
             request.url,
-            "https://localhost/\(range.map { "\($0)" }.joined(separator: "/"))"
+            "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
 

@@ -13,7 +13,7 @@ class PSKServerCertificateTests: XCTestCase {
         let key = NIOSSLSecureBytes([0, 1, 2])
 
         // When
-        let sut = PSKServerCertificate(key).build()
+        let sut = PSKServerIdentity(key).build()
 
         // Then
         XCTAssertEqual(sut.key, key)

@@ -14,7 +14,7 @@ class PSKClientCertificateTests: XCTestCase {
         let key = NIOSSLSecureBytes([0, 1, 2])
 
         // When
-        let sut = PSKClientCertificate(
+        let sut = PSKClientIdentity(
             key: key,
             identity: identity
         ).build()

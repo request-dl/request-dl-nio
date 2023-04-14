@@ -38,7 +38,7 @@ final class _EitherContentTests: XCTestCase {
             if chooseFirst {
                 Headers.Origin("https://apple.com")
             } else {
-                BaseURL("localhost")
+                BaseURL("127.0.0.1")
             }
         }
 
@@ -47,7 +47,7 @@ final class _EitherContentTests: XCTestCase {
 
         // Then
         XCTAssertTrue(result is _EitherContent<RequestDL.Headers.Origin, BaseURL>)
-        XCTAssertEqual(request.url, "https://localhost")
+        XCTAssertEqual(request.url, "https://127.0.0.1")
         XCTAssertTrue(request.headers.isEmpty)
     }
 

@@ -21,23 +21,23 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/apple/swift-docc-plugin.git",
-            from: "1.0.0"
+            from: "1.2.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio.git",
-            from: "2.42.0"
+            from: "2.50.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl.git",
-            from: "2.22.0"
+            from: "2.23.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras.git",
-            from: "1.13.0"
+            from: "1.19.0"
         ),
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.15.0"
+            from: "1.17.0"
         )
     ],
     targets: [
@@ -48,7 +48,6 @@ let package = Package(
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client")
             ]

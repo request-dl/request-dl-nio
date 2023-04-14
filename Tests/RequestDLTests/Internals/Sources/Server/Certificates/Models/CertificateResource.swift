@@ -10,8 +10,6 @@ struct CertificateResource {
     let certificateURL: URL
 
     let privateKeyURL: URL
-
-    let pskURL: URL
 }
 
 extension CertificateResource {
@@ -31,11 +29,6 @@ extension CertificateResource {
         self.privateKeyURL = bundle.url(
             forResource: "\(path).private",
             withExtension: format.pathExtension
-        ).unsafelyUnwrapped
-
-        self.pskURL = bundle.url(
-            forResource: "\(path).psk",
-            withExtension: "pem"
         ).unsafelyUnwrapped
     }
 }

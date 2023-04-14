@@ -23,7 +23,7 @@ extension Timeout {
          func website() -> DataTask {
              DataTask {
                  BaseURL("google.com")
-                 Timeout(60, for: .all)
+                 Timeout(.seconds(60), for: .all)
              }
          }
      }

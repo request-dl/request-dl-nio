@@ -99,7 +99,7 @@ extension Internals {
             state = .downloading
             phase = .download
             reference = .download
-            
+
             head.close()
 
             return task.eventLoop.makeSucceededVoidFuture()

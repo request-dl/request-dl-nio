@@ -9,7 +9,7 @@ class InternalsResponseHeadTests: XCTestCase {
 
     func testResponse_whenHeadInit_shouldBeValid() async throws {
         // Given
-        let url = "https://localhost"
+        let url = "https://127.0.0.1"
         let status = Internals.ResponseHead.Status(code: 200, reason: "OK")
         let version = Internals.ResponseHead.Version(minor: 0, major: 1)
         var headers = Internals.Headers()

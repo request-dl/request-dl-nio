@@ -85,7 +85,10 @@ class InternalsSessionConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetProxy_shoudlBeEqual() async throws {
         // Given
-        let proxy = HTTPClient.Configuration.Proxy.server(host: "localhost", port: 8080)
+        let proxy = HTTPClient.Configuration.Proxy.server(
+            host: "localhost",
+            port: 8888
+        )
 
         // When
         configuration.proxy = proxy

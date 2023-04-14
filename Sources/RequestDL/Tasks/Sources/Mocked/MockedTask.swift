@@ -14,13 +14,15 @@ import Foundation
      statusCode: 200,
      headers: ["Content-Type": "application/json"],
      data: {
-         """
-         {
-             "id": 1,
-             "name": "John Doe",
-             "email": "johndoe@example.com"
-         }
-         """.data(using: .utf8)!
+         Data(
+             """
+             {
+                 "id": 1,
+                 "name": "John Doe",
+                 "email": "johndoe@example.com"
+             }
+             """.utf8
+         )
      }
  )
  ```

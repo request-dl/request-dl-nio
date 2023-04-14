@@ -7,7 +7,6 @@ import NIOSSL
 import NIOCore
 @testable import RequestDL
 
-// TODO: Missing properties
 class InternalsSecureConnectionTests: XCTestCase {
 
     var secureConnection: Internals.SecureConnection!

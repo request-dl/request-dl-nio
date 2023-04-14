@@ -12,7 +12,7 @@ import Foundation
  To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
 
  ```swift
- Timeout(40, for: .request)
+ Timeout(.seconds(40), for: .request)
  ```
 
  In the example below, a request is made to Google's website with the timeout for all types.
@@ -20,7 +20,7 @@ import Foundation
  ```swift
  DataTask {
      BaseURL("google.com")
-     Timeout(60, for: .all)
+     Timeout(.seconds(60), for: .all)
  }
 
  ```

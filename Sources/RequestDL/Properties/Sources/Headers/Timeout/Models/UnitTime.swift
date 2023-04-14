@@ -32,7 +32,6 @@ public struct UnitTime: Hashable, Sendable {
 
 extension UnitTime: ExpressibleByIntegerLiteral {
 
-
     public init(integerLiteral value: Int64) {
         self.init(value)
     }

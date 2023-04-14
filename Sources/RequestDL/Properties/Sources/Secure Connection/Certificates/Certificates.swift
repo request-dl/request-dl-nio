@@ -6,7 +6,9 @@ import Foundation
 
 /**
  A structure representing chain certificate for a property used inside
- for server context.
+ for sending the public certificates.
+
+ The receiver obtains the sender's certificates as Trust Roots.
  */
 public struct Certificates<Content: Property>: Property {
 

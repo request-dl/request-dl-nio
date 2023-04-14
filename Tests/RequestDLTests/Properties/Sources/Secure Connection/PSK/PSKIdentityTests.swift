@@ -6,7 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
-class PSKCertificateTests: XCTestCase {
+class PSKIdentityTests: XCTestCase {
 
     func testCertificate_whenInitClient_shouldBeValid() async throws {
         // Given
@@ -18,7 +18,7 @@ class PSKCertificateTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.PSKCertificate(.client) { description in
+                RequestDL.PSKIdentity(.client) { description in
                     receivedHint = description.serverHint
                     return .init(
                         key: key,
@@ -48,7 +48,7 @@ class PSKCertificateTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.PSKCertificate(.server) { description in
+                RequestDL.PSKIdentity(.server) { description in
                     receivedServerHint = description.serverHint
                     receivedClientHint = description.clientHint
                     return .init(key)
@@ -71,8 +71,8 @@ class PSKCertificateTests: XCTestCase {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.PSKCertificate(.client) { description in
-                    PSKClientCertificate(
+                RequestDL.PSKIdentity(.client) { description in
+                    PSKClientIdentity(
                         key: .init([0, 1, 2]),
                         identity: description.serverHint
                     )
@@ -89,7 +89,7 @@ class PSKCertificateTests: XCTestCase {
 
     func testPSK_whenAccessBody_shouldBeNever() async throws {
         // Given
-        let sut = RequestDL.PSKCertificate { _ in
+        let sut = RequestDL.PSKIdentity { _ in
             .init(key: .init([0, 1, 2]), identity: "")
         }
 

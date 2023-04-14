@@ -39,8 +39,8 @@ class CertificatesTests: XCTestCase {
                 .init(server, format: .pem),
                 .init(
                     Bundle.module
-                        .url(forResource: "client.public", withExtension: "pem")!
-                        .absolutePath(percentEncoded: false),
+                        .url(forResource: "client.public", withExtension: "pem")?
+                        .absolutePath(percentEncoded: false) ?? "",
                     format: .pem
                 )
             ])

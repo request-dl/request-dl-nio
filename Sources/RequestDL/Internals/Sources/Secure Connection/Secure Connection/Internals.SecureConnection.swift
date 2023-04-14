@@ -73,7 +73,7 @@ extension Internals.SecureConnection {
         return tlsConfiguration
     }
 
-    // swiftlint:disable cyclomatic_complexity
+    // swiftlint:disable cyclomatic_complexity function_body_length
     func build() throws -> NIOSSL.TLSConfiguration {
         var tlsConfiguration = try makeTLSConfigurationByContext()
 
@@ -149,5 +149,5 @@ extension Internals.SecureConnection {
 
         return tlsConfiguration
     }
-    // swiftlint:enable cyclomatic_complexity
+    // swiftlint:enable cyclomatic_complexity function_body_length
 }

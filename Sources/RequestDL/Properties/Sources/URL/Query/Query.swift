@@ -17,7 +17,8 @@ import Foundation
      Path("users")
      Query("john@example.com", forKey: "email")
      Query(30, forKey: "age")
- }.request()
+ }
+ .result()
  ```
 */
 public struct Query: Property {

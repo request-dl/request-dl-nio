@@ -32,10 +32,6 @@ openssl req -x509 -sha256 -days 10950  -key private.pem -in request.crs -out pub
 ```
 
 ```
-openssl pkcs12 -export -inkey private.pem -in public.pem -out psk.pem
-```
-
-```
 openssl x509 -inform PEM -outform DER -in public.pem -out public.cer
 openssl x509 -noout -fingerprint -sha1 -inform dec -in public.cer
 ```

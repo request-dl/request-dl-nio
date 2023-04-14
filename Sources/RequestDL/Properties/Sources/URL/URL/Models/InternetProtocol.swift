@@ -23,7 +23,7 @@ import Foundation
  it to be initialized with a string literal, like so:
 
  ```swift
- let customInternetProtocol: InternetProtocol = "htts"
+ let customInternetProtocol: InternetProtocol = "www"
  ```
  */
 public struct InternetProtocol {

@@ -157,7 +157,9 @@ extension ResolveTests {
                                 }
                             ),
                             readingMode = ReadingMode.length(1024),
-                            updatingKeyPaths = nil
+                            updatingKeyPaths = Optional<(inout Configuration) -> ()> {
+                                some = (Function)
+                            }
                         },
                         provider = .shared
                     }

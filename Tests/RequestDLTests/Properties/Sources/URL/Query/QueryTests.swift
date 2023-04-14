@@ -13,18 +13,18 @@ final class QueryTests: XCTestCase {
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             property
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://localhost?number=123")
+        XCTAssertEqual(request.url, "https://127.0.0.1?number=123")
     }
 
     func testMultipleQueries() async throws {
         // Given
         let property = TestProperty {
-            BaseURL("localhost")
+            BaseURL("127.0.0.1")
             Query(123, forKey: "number")
             Query(1, forKey: "page")
             Query("password", forKey: "api_key")
@@ -38,7 +38,7 @@ final class QueryTests: XCTestCase {
         XCTAssertEqual(
             request.url,
             """
-            https://localhost?\
+            https://127.0.0.1?\
             number=123&\
             page=1&\
             api_key=password&\

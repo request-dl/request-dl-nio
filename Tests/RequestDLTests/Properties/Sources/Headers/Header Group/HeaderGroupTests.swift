@@ -17,7 +17,7 @@ final class HeaderGroupTests: XCTestCase {
         let property = TestProperty(HeaderGroup([
             "Content-Type": "application/json",
             "Accept": "text/html",
-            "Origin": "localhost:8080",
+            "Origin": "127.0.0.1:8080",
             "xxx-api-key": "password"
         ]))
 
@@ -25,7 +25,7 @@ final class HeaderGroupTests: XCTestCase {
 
         XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
         XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/html")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "localhost:8080")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "127.0.0.1:8080")
         XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
     }
 
@@ -33,7 +33,7 @@ final class HeaderGroupTests: XCTestCase {
         let property = TestProperty(HeaderGroup {
             Headers.ContentType(.javascript)
             Headers.Accept(.json)
-            Headers.Origin("localhost:8080")
+            Headers.Origin("127.0.0.1:8080")
             Headers.Any("password", forKey: "xxx-api-key")
         })
 
@@ -41,7 +41,7 @@ final class HeaderGroupTests: XCTestCase {
 
         XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "text/javascript")
         XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/json")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "localhost:8080")
+        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "127.0.0.1:8080")
         XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
     }
 

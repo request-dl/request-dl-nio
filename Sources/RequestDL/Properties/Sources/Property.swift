@@ -13,6 +13,7 @@ import Foundation
 
  ```swift
  struct DefaultHeaders: Property {
+
     let cache: Bool
 
     var body: some Property {
@@ -20,7 +21,8 @@ import Foundation
         Headers.Accept(.json)
 
         if cache {
-            Cache(.returnCacheDataElseLoad)
+            Headers.Cache()
+                .cached(true)
         }
     }
  }

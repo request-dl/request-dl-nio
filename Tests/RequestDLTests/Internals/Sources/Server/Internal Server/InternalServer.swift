@@ -6,6 +6,7 @@ import Foundation
 import NIO
 import NIOSSL
 import NIOHTTP1
+@testable import RequestDL
 
 struct InternalServer<Response: Codable> where Response: Equatable {
 
@@ -18,31 +19,38 @@ struct InternalServer<Response: Codable> where Response: Equatable {
         host: String,
         port: UInt,
         response: Response,
-        disableCAValidation: Bool = true
+        option: Option? = nil
     ) throws {
-        let server = Certificates().server()
 
         self.host = host
         self.port = port
         self.response = response
 
-        var tlsConfiguration: TLSConfiguration = .makeServerConfiguration(
-            certificateChain: try NIOSSLCertificate.fromPEMFile(server.certificateURL.path).map {
-                .certificate($0)
-            },
-            privateKey: .file(server.privateKeyURL.path)
-        )
+        switch option {
+        case .none:
+            tlsConfiguration = try Self.makeDefaultTLSConfiguration()
+        case .psk(let key, let identity):
+            var tlsConfiguration: TLSConfiguration = .makePreSharedKeyConfiguration()
+            tlsConfiguration.minimumTLSVersion = .tlsv1
+            tlsConfiguration.maximumTLSVersion = .tlsv12
 
-        if !disableCAValidation {
-            tlsConfiguration.pskClientCallback = {
-                .init(
-                    key: .init(try Data(contentsOf: server.pskURL)),
-                    identity: $0
-                )
+            tlsConfiguration.pskServerCallback = { hint, clientIdentity in
+                var bytes = NIOSSLSecureBytes()
+                bytes.append(key)
+                bytes.append(":\(identity)".utf8)
+                bytes.append(":\(clientIdentity)".utf8)
+                bytes.append(":\(hint)".utf8)
+                return .init(key: bytes)
             }
-        }
+            tlsConfiguration.pskHint = "pskHint"
 
-        self.tlsConfiguration = tlsConfiguration
+            self.tlsConfiguration = tlsConfiguration
+        case .client(let client):
+            var tlsConfiguration = try Self.makeDefaultTLSConfiguration()
+            tlsConfiguration.trustRoots = .file(client.certificateURL.absolutePath(percentEncoded: false))
+            tlsConfiguration.certificateVerification = .noHostnameVerification
+            self.tlsConfiguration = tlsConfiguration
+        }
     }
 }
 
@@ -52,14 +60,15 @@ extension InternalServer {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
 
-        let bootstrap = ServerBootstrap(group: group)
-            // ① Set up our ServerChannel
+        let futureChannel = ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
-                // ③ add handlers to the pipeline
                 channel.pipeline
-                    .addHandlers([BackPressureHandler(), NIOSSLServerHandler(context: sslContext)])
+                    .addHandlers([
+                        BackPressureHandler(),
+                        NIOSSLServerHandler(context: sslContext)
+                    ])
                     .flatMap {
                         channel.pipeline.configureHTTPServerPipeline()
                     }
@@ -67,14 +76,13 @@ extension InternalServer {
                         channel.pipeline.addHandler(HTTPHandler(response))
                     }
             }
-            // ④ Set up child channel options
             .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
             .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
             .bind(host: host, port: Int(port))
 
         do {
-            let channel = try await bootstrap.get()
+            let channel = try await futureChannel.get()
 
             do {
                 try await closure("\(host):\(port)")
@@ -89,5 +97,24 @@ extension InternalServer {
             try await group.shutdownGracefully()
             throw error
         }
+    }
+}
+
+extension InternalServer {
+
+    enum Option {
+        case client(CertificateResource)
+        case psk(Data, String)
+    }
+
+    static func makeDefaultTLSConfiguration() throws -> NIOSSL.TLSConfiguration {
+        let server = Certificates().server()
+
+        return .makeServerConfiguration(
+            certificateChain: try NIOSSLCertificate.fromPEMFile(
+                server.certificateURL.absolutePath(percentEncoded: false)
+            ).map { .certificate($0) },
+            privateKey: .file(server.privateKeyURL.absolutePath(percentEncoded: false))
+        )
     }
 }
