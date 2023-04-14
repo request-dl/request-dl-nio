@@ -161,7 +161,7 @@ extension ResolveTests {
                                 some = (Function)
                             }
                         },
-                        provider = .shared
+                        provider = SharedSessionProvider()
                     }
                 }
             }
