@@ -3,6 +3,7 @@ name: Code Coverage
 on:
   push:
     branches: [main]
+  pull_requests:
 
 jobs:
   code-coverage:
@@ -19,7 +20,7 @@ jobs:
           xcrun llvm-cov export $(find .build -name RequestDLPackageTests) \
             -format="lcov" \
             -instr-profile=$(find .build -name default.profdata) \
-            -ignore-filename-regex=".build|Test" > RequestDL.lcov
+            -ignore-filename-regex=".build|Tests" > RequestDL.lcov
 
       - name: 📦 Upload to Codecov
         uses: codecov/codecov-action@v3
