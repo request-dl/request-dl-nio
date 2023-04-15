@@ -24,7 +24,7 @@ jobs:
             swift-version: ${{ matrix.swift }}
 
       - name: ⬇️ Get Sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.2
 
       - name: 🍀 Test Package
         run: swift test
