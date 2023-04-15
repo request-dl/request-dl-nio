@@ -3,7 +3,7 @@ name: Swift
 on:
   pull_request:
     branches: [main]
-    paths-include:
+    paths:
       - 'Package.swift'
       - 'Sources/**'
       - 'Tests/**'

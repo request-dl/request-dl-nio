@@ -2,7 +2,7 @@ name: Swiftlint
 
 on:
   pull_request:
-    paths-include:
+    paths:
       - '.swiftlint.yml'
       - 'Sources/**'
       - 'Tests/**'
