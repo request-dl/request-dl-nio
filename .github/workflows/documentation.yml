@@ -35,7 +35,7 @@ jobs:
           transform-for-static-hosting: 'true'
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1.0.7
+        uses: actions/upload-pages-artifact@v1.0.8
 
   # Deployment job
   deploy:
