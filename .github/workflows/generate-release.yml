@@ -3,8 +3,7 @@ name: Generate Release
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   update_release_draft:
