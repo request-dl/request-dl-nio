@@ -3,7 +3,15 @@ name: Code Coverage
 on:
   push:
     branches: [main]
+    paths-include:
+      - 'Package.swift'
+      - 'Sources/**'
+      - 'Tests/**'
   pull_request:
+    paths-include:
+      - 'Package.swift'
+      - 'Sources/**'
+      - 'Tests/**'
 
 jobs:
   code-coverage:
