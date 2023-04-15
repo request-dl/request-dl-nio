@@ -2,6 +2,10 @@ name: Swiftlint
 
 on:
   pull_request:
+    paths:
+      - '.swiftlint.yml'
+      - 'Sources/**'
+      - 'Tests/**'
 
 jobs:
   lint:
