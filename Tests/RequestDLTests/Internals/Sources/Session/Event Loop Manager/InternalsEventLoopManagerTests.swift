@@ -70,4 +70,20 @@ class InternalsEventLoopManagerTests: XCTestCase {
         // Then
         XCTAssertTrue(client1.eventLoopGroup === client2.eventLoopGroup)
     }
+
+    func testManager_whenCustomGroup_shouldBeValid() async throws {
+        // Given
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+        // When
+        let client = await manager.client(
+            .init(),
+            for: .custom(group)
+        )
+
+        try await client.shutdown()
+
+        // Then
+        XCTAssertTrue(client.eventLoopGroup === group)
+    }
 }
