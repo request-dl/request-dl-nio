@@ -5,35 +5,35 @@
 import Foundation
 import NIOCore
 import AsyncHTTPClient
+import _Concurrency
 
 extension Internals {
 
-    class EventLoopGroupManager {
+    actor EventLoopGroupManager {
 
         static let shared = EventLoopGroupManager()
 
-        private let queue: OperationQueue
         private var groups: [String: EventLoopGroup] = [:]
 
-        init() {
-            queue = OperationQueue()
-            queue.qualityOfService = .background
+        private func _makeClient(
+            _ configuration: HTTPClient.Configuration,
+            for sessionProvider: SessionProvider
+        ) -> HTTPClient {
+            let group = groups[sessionProvider.id] ?? sessionProvider.group()
+            groups[sessionProvider.id] = group
+            return .init(
+                eventLoopGroupProvider: .shared(group),
+                configuration: configuration
+            )
         }
 
-        func client(
+        nonisolated func client(
             _ configuration: HTTPClient.Configuration,
             for sessionProvider: SessionProvider
         ) async -> HTTPClient {
-            await withCheckedContinuation { continuation in
-                queue.addOperation {
-                    let group = self.groups[sessionProvider.id] ?? sessionProvider.group()
-                    self.groups[sessionProvider.id] = group
-                    continuation.resume(returning: HTTPClient(
-                        eventLoopGroupProvider: .shared(group),
-                        configuration: configuration
-                    ))
-                }
-            }
+            await _Concurrency.Task(priority: .low) {
+                await _makeClient(configuration, for: sessionProvider)
+            }.value
         }
     }
 }
