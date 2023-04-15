@@ -2,8 +2,10 @@
  See LICENSE for this package's licensing information.
 */
 
+import Foundation
 import NIOCore
 import AsyncHTTPClient
+import _Concurrency
 
 extension Internals {
 
@@ -13,24 +15,25 @@ extension Internals {
 
         private var groups: [String: EventLoopGroup] = [:]
 
-        func client(
-            id: String,
-            factory: @escaping () -> EventLoopGroup,
-            configuration: HTTPClient.Configuration
+        private func _makeClient(
+            _ configuration: HTTPClient.Configuration,
+            for sessionProvider: SessionProvider
         ) -> HTTPClient {
-            if let group = groups[id] {
-                return HTTPClient(
-                    eventLoopGroupProvider: .shared(group),
-                    configuration: configuration
-                )
-            } else {
-                let group = factory()
-                groups[id] = group
-                return HTTPClient(
-                    eventLoopGroupProvider: .shared(group),
-                    configuration: configuration
-                )
-            }
+            let group = groups[sessionProvider.id] ?? sessionProvider.group()
+            groups[sessionProvider.id] = group
+            return .init(
+                eventLoopGroupProvider: .shared(group),
+                configuration: configuration
+            )
+        }
+
+        nonisolated func client(
+            _ configuration: HTTPClient.Configuration,
+            for sessionProvider: SessionProvider
+        ) async -> HTTPClient {
+            await _Concurrency.Task(priority: .low) {
+                await _makeClient(configuration, for: sessionProvider)
+            }.value
         }
     }
 }

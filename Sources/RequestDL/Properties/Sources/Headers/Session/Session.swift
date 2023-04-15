@@ -27,7 +27,7 @@ public struct Session: Property {
 
     private var _configuration: Internals.Session.Configuration
     var dnsOverride: [String: String]
-    let provider: Internals.Session.Provider
+    let provider: SessionProvider
 
     var configuration: Internals.Session.Configuration {
         var configuration = _configuration
@@ -37,7 +37,7 @@ public struct Session: Property {
 
     fileprivate init(
         configuration: Internals.Session.Configuration,
-        provider: Internals.Session.Provider
+        provider: SessionProvider
     ) {
         self._configuration = configuration
         self.dnsOverride = [:]
@@ -65,7 +65,7 @@ public struct Session: Property {
     ) {
         self.init(
             configuration: .init(),
-            provider: .identifier(identifier, numberOfThreads: numberOfThreads)
+            provider: .identified(identifier, numberOfThreads: numberOfThreads)
         )
     }
 
@@ -184,7 +184,7 @@ extension Session {
     struct Node: PropertyNode {
 
         let configuration: Internals.Session.Configuration
-        let provider: Internals.Session.Provider
+        let provider: SessionProvider
 
         func make(_ make: inout Make) async throws {}
     }

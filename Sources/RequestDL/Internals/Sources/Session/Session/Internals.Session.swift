@@ -53,16 +53,15 @@ extension Internals {
         var configuration: Internals.Session.Configuration
 
         init(
-            provider: Provider,
+            provider: SessionProvider,
             configuration: Configuration
         ) async throws {
             self.configuration = configuration
 
             client = { configuration in
                 await EventLoopGroupManager.shared.client(
-                    id: provider.id,
-                    factory: { provider.build() },
-                    configuration: try configuration.build()
+                    try configuration.build(),
+                    for: provider
                 )
             }
         }
@@ -96,40 +95,6 @@ extension Internals {
             let sessionTask = SessionTask(response)
             sessionTask.attach(client, eventLoopFuture)
             return sessionTask
-        }
-    }
-}
-
-extension Internals.Session {
-
-    enum Provider {
-        case shared
-        case identifier(String, numberOfThreads: Int = 1)
-        case custom(EventLoopGroup)
-    }
-}
-
-extension Internals.Session.Provider {
-
-    var id: String {
-        switch self {
-        case .shared:
-            return "\(ObjectIdentifier(MultiThreadedEventLoopGroup.shared))"
-        case .identifier(let id, let numberOfThreads):
-            return "\(id).\(numberOfThreads)"
-        case .custom(let eventLoopGroup):
-            return "\(ObjectIdentifier(eventLoopGroup))"
-        }
-    }
-
-    func build() -> EventLoopGroup {
-        switch self {
-        case .shared:
-            return MultiThreadedEventLoopGroup.shared
-        case .identifier(_, let numberOfThreads):
-            return MultiThreadedEventLoopGroup(numberOfThreads: numberOfThreads)
-        case .custom(let eventLoopGroup):
-            return eventLoopGroup
         }
     }
 }

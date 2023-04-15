@@ -4,6 +4,7 @@
 
 import Foundation
 import NIOCore
+import NIOFoundationCompat
 
 extension Internals {
 

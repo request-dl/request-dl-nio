@@ -9,6 +9,16 @@ import NIOPosix
 
 class InternalsEventLoopManagerTests: XCTestCase {
 
+    struct CustomProvider: SessionProvider {
+
+        let id = "test"
+        private let _group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+        func group() -> EventLoopGroup {
+            _group
+        }
+    }
+
     private var manager: Internals.EventLoopGroupManager!
 
     override func setUp() async throws {
@@ -23,42 +33,35 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
     func testManager_whenRegisterGroup_shouldBeResolved() async throws {
         // Given
-        let id = "test"
-        var group: EventLoopGroup! = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        var provider: CustomProvider! = CustomProvider()
 
         // When
-        weak var reference = group
+        weak var reference = provider.group()
 
         try await manager.client(
-            id: id,
-            factory: { group },
-            configuration: .init()
+            .init(),
+            for: provider
         ).shutdown()
 
         // Then
-        group = nil
+        provider = nil
 
         XCTAssertNotNil(reference)
     }
 
     func testManager_whenRegisterIdentifier_shouldBeResolvedOnlyOnce() async throws {
         // Given
-        let id = "test"
-        let group: () -> EventLoopGroup = {
-            MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        }
+        let provider = CustomProvider()
 
         // When
         let client1 = await manager.client(
-            id: id,
-            factory: group,
-            configuration: .init()
+            .init(),
+            for: provider
         )
 
         let client2 = await manager.client(
-            id: id,
-            factory: group,
-            configuration: .init()
+            .init(),
+            for: provider
         )
 
         try await client1.shutdown()
@@ -66,5 +69,21 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
         // Then
         XCTAssertTrue(client1.eventLoopGroup === client2.eventLoopGroup)
+    }
+
+    func testManager_whenCustomGroup_shouldBeValid() async throws {
+        // Given
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+        // When
+        let client = await manager.client(
+            .init(),
+            for: .custom(group)
+        )
+
+        try await client.shutdown()
+
+        // Then
+        XCTAssertTrue(client.eventLoopGroup === group)
     }
 }
