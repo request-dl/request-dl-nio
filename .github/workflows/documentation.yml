@@ -20,7 +20,7 @@ jobs:
     runs-on: macOS-latest
     steps:
       - name: ⬇️ Get Sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.2
 
       - name: Setup Pages
         uses: actions/configure-pages@v3.0.4
@@ -35,7 +35,7 @@ jobs:
           transform-for-static-hosting: 'true'
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1.0.7
+        uses: actions/upload-pages-artifact@v1.0.8
 
   # Deployment job
   deploy:

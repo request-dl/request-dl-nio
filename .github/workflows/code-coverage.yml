@@ -3,14 +3,22 @@ name: Code Coverage
 on:
   push:
     branches: [main]
+    paths:
+      - 'Package.swift'
+      - 'Sources/**'
+      - 'Tests/**'
   pull_request:
+    paths:
+      - 'Package.swift'
+      - 'Sources/**'
+      - 'Tests/**'
 
 jobs:
   code-coverage:
     runs-on: macOS-latest
     steps:
       - name: ⬇️ Get Sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.2
       
       - name: 🛠️ Test Package
         run: swift test --enable-code-coverage
