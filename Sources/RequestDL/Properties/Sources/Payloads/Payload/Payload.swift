@@ -94,8 +94,14 @@ public struct Payload<Provider>: Property {
         source = { .data($0.buffer) }
     }
 
-    public init(_ file: URL) where Provider == _FilePayload {
-        provider = _FilePayload(file)
+    /**
+     Initializes a `Payload` with file `URL`.
+
+     - Parameters:
+        - fileURL: The file url to be used as the body.
+     */
+    public init(_ fileURL: URL) where Provider == _FilePayload {
+        provider = _FilePayload(fileURL)
         source = { .file($0.buffer) }
     }
 
