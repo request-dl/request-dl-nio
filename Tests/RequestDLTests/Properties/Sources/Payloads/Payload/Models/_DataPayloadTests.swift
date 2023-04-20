@@ -15,6 +15,6 @@ final class _DataPayloadTests: XCTestCase {
         let payload = _DataPayload(data)
 
         // Then
-        XCTAssertEqual(payload.buffer, Internals.DataBuffer(data))
+        XCTAssertEqual(payload.buffer.getData(), data)
     }
 }

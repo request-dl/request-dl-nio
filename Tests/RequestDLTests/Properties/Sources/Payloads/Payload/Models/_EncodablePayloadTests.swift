@@ -30,7 +30,7 @@ final class _EncodablePayloadTests: XCTestCase {
         let expectedMock = try decoder.decode(Mock.self, from: expectedData)
 
         // Then
-        XCTAssertEqual(payload.buffer, Internals.DataBuffer(expectedData))
+        XCTAssertEqual(payload.buffer.getData(), expectedData)
         XCTAssertEqual(mock.foo, expectedMock.foo)
 
         XCTAssertEqual(

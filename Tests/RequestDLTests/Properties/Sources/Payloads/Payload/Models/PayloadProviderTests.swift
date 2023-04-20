@@ -28,6 +28,6 @@ final class PayloadProviderTests: XCTestCase {
         let payload = PayloadProviderMock(data)
 
         // Then
-        XCTAssertEqual(payload.buffer, Internals.DataBuffer(data))
+        XCTAssertEqual(payload.buffer.getData(), data)
     }
 }

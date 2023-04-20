@@ -23,6 +23,6 @@ final class _FilePayloadTests: XCTestCase {
         let payload = _FilePayload(url)
 
         // Then
-        XCTAssertEqual(payload.buffer, Internals.FileBuffer(data))
+        XCTAssertEqual(payload.buffer.getData(), data)
     }
 }
