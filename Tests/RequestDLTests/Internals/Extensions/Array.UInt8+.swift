@@ -10,7 +10,7 @@ extension Array<UInt8> {
     func split(by size: Int) -> [Data] {
         var buffer = Internals.DataBuffer(self)
         var items = [Data]()
-        var readedBytes = 0
+        var readBytes = 0
 
         func nextSize() -> Int {
             if buffer.readableBytes - size < .zero {
@@ -21,7 +21,7 @@ extension Array<UInt8> {
         }
 
         while let data = buffer.readData(nextSize()) {
-            readedBytes += data.count
+            readBytes += data.count
             items.append(data)
         }
 
