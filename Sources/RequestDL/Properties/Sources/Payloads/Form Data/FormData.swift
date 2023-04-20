@@ -7,7 +7,7 @@ import Foundation
 /// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
 public struct FormData: Property {
 
-    let data: Foundation.Data
+    let buffer: Internals.DataBuffer
     let fileName: String
     let key: String
     let contentType: ContentType
@@ -28,7 +28,7 @@ public struct FormData: Property {
         fileName: String = "",
         type: ContentType
     ) {
-        self.data = data
+        self.buffer = Internals.DataBuffer(data)
         self.key = key
         self.fileName = fileName
         self.contentType = type
@@ -52,7 +52,7 @@ public struct FormData: Property {
     ) {
         self.key = key
         self.fileName = fileName
-        self.data = _EncodablePayload(object, encoder: encoder).data
+        self.buffer = _EncodablePayload(object, encoder: encoder).buffer
         self.contentType = .json
     }
 
@@ -71,7 +71,7 @@ extension FormData {
     ) async throws -> _PropertyOutputs {
         _ = inputs[self]
         return .init(Leaf(FormNode {
-            PartFormRawValue(property.data, forHeaders: [
+            PartFormRawValue(property.buffer.getData() ?? Data(), forHeaders: [
                 kContentDisposition: kContentDispositionValue(
                     property.fileName,
                     forKey: property.key

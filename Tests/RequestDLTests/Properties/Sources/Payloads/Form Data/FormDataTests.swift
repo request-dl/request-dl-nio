@@ -108,14 +108,16 @@ final class FormDataTests: XCTestCase {
             encoder: encoder
         )
 
+        let propertyData = property.buffer.getData() ?? Data()
+
         let expectedData = try encoder.encode(mock)
-        let expectedMock = try decoder.decode(Mock.self, from: property.data)
+        let expectedMock = try decoder.decode(Mock.self, from: propertyData)
 
         // Then
         XCTAssertEqual(property.contentType, .json)
         XCTAssertEqual(property.fileName, "")
         XCTAssertEqual(property.key, "data")
-        XCTAssertEqual(property.data, expectedData)
+        XCTAssertEqual(propertyData, expectedData)
         XCTAssertEqual(expectedMock.foo, mock.foo)
         XCTAssertEqual(expectedMock.date.seconds, mock.date.seconds)
     }

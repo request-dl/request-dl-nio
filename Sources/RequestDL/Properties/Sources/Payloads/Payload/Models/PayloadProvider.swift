@@ -4,13 +4,9 @@
 
 import Foundation
 
-/**
- Protocol that defines the requirements for a body provider.
+protocol PayloadProvider {
 
- - Note: A body provider must provide the data that will be sent in the request body.
-*/
-public protocol PayloadProvider {
+    associatedtype Buffer
 
-    /// The data that will be sent in the request body.
-    var data: Data { get }
+    var buffer: Buffer { get }
 }

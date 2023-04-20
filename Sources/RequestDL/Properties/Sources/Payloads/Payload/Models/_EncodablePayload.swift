@@ -17,7 +17,7 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
         self.encoder = encoder
     }
 
-    public var data: Data {
+    private var data: Data {
         do {
             return try encoder.encode(object)
         } catch {
@@ -25,5 +25,9 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
                 .cantEncodeObject(object, error)
             )
         }
+    }
+
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
 }

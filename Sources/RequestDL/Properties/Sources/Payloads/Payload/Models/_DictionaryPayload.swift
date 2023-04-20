@@ -17,7 +17,7 @@ public struct _DictionaryPayload: PayloadProvider {
         self.options = options
     }
 
-    public var data: Data {
+    private var data: Data {
         do {
             return try JSONSerialization.data(
                 withJSONObject: dictionary,
@@ -32,5 +32,9 @@ public struct _DictionaryPayload: PayloadProvider {
                 )
             )
         }
+    }
+
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
 }

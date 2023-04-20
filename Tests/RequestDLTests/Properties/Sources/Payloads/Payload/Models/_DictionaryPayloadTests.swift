@@ -20,6 +20,6 @@ final class _DictionaryPayloadTests: XCTestCase {
         let expectedData = try JSONSerialization.data(withJSONObject: data, options: options)
 
         // Then
-        XCTAssertEqual(payload.data, expectedData)
+        XCTAssertEqual(payload.buffer.getData(), expectedData)
     }
 }

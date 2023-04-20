@@ -16,6 +16,6 @@ final class _StringPayloadTests: XCTestCase {
         let expectedData = Data(foo.utf8)
 
         // Then
-        XCTAssertEqual(payload.data, expectedData)
+        XCTAssertEqual(payload.buffer.getData(), expectedData)
     }
 }

@@ -32,7 +32,7 @@ final class PayloadTests: XCTestCase {
         } as? [String: Any]
 
         let expectedPayloadDecoded = try JSONSerialization.jsonObject(
-            with: expectedPayload.data
+            with: expectedPayload.buffer.getData() ?? Data()
         ) as? [String: Any]
 
         // Then
@@ -55,7 +55,7 @@ final class PayloadTests: XCTestCase {
         let payload = try await request.body?.data()
 
         // Then
-        XCTAssertEqual(payload, expectedPayload.data)
+        XCTAssertEqual(payload, expectedPayload.buffer.getData())
     }
 
     func testDataPayload() async throws {
@@ -69,7 +69,7 @@ final class PayloadTests: XCTestCase {
         let payload = try await request.body?.data()
 
         // Then
-        XCTAssertEqual(payload, expectedPayload.data)
+        XCTAssertEqual(payload, expectedPayload.buffer.getData())
     }
 
     func testEncodablePayload() async throws {
@@ -89,7 +89,8 @@ final class PayloadTests: XCTestCase {
         let (_, request) = try await resolve(property)
         let expectedPayload = _EncodablePayload(mock, encoder: encoder)
 
-        let expectedMock = try decoder.decode(Mock.self, from: expectedPayload.data)
+        let expectedData = expectedPayload.buffer.getData() ?? Data()
+        let expectedMock = try decoder.decode(Mock.self, from: expectedData)
         let payloadMock = try await (request.body?.data()).map {
             try decoder.decode(Mock.self, from: $0)
         }
@@ -102,6 +103,28 @@ final class PayloadTests: XCTestCase {
             mock.date.seconds,
             expectedMock.date.seconds
         )
+    }
+
+    func testFilePayload() async throws {
+        // Given
+        let data = Data("Hello World".utf8)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RequestDL.\(UUID())")
+            .appendingPathComponent("file_payload")
+
+        try url.createPathIfNeeded()
+        defer { try? url.removeIfNeeded() }
+
+        try data.write(to: url)
+
+        // When
+        let property = TestProperty(Payload(url))
+        let (_, request) = try await resolve(property)
+        let expectedPayload = _FilePayload(url)
+        let payload = try await request.body?.data()
+
+        // Then
+        XCTAssertEqual(payload, expectedPayload.buffer.getData())
     }
 
     func testNeverBody() async throws {
