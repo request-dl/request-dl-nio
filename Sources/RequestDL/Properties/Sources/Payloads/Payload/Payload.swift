@@ -28,9 +28,15 @@ import Foundation
  }
  ```
  */
-public struct Payload<Provider: PayloadProvider>: Property {
+public struct Payload<Provider>: Property {
+
+    enum Source {
+        case file(Internals.FileBuffer)
+        case data(Internals.DataBuffer)
+    }
 
     private let provider: Provider
+    private let source: (Provider) -> Source
 
     /**
      Initializes a `Payload` with a dictionary.
@@ -44,6 +50,7 @@ public struct Payload<Provider: PayloadProvider>: Property {
         options: JSONSerialization.WritingOptions = .prettyPrinted
     ) where Provider == _DictionaryPayload {
         provider = _DictionaryPayload(dictionary, options: options)
+        source = { .data($0.buffer) }
     }
 
     /**
@@ -58,6 +65,7 @@ public struct Payload<Provider: PayloadProvider>: Property {
         encoder: JSONEncoder = .init()
     ) where Provider == _EncodablePayload<T> {
         provider = _EncodablePayload(value, encoder: encoder)
+        source = { .data($0.buffer) }
     }
 
     /**
@@ -72,6 +80,7 @@ public struct Payload<Provider: PayloadProvider>: Property {
         using encoding: String.Encoding = .utf8
     ) where Provider == _StringPayload {
         provider = _StringPayload(string, using: encoding)
+        source = { .data($0.buffer) }
     }
 
     /**
@@ -82,6 +91,12 @@ public struct Payload<Provider: PayloadProvider>: Property {
      */
     public init(_ data: Data) where Provider == _DataPayload {
         provider = _DataPayload(data)
+        source = { .data($0.buffer) }
+    }
+
+    public init(_ file: URL) where Provider == _FilePayload {
+        provider = _FilePayload(file)
+        source = { .file($0.buffer) }
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -94,16 +109,19 @@ extension Payload {
 
     struct Node: PropertyNode {
 
-        private let provider: Provider
+        private let source: () -> Source
 
-        fileprivate init(_ provider: Provider) {
-            self.provider = provider
+        fileprivate init(_ source: @escaping () -> Source) {
+            self.source = source
         }
 
         func make(_ make: inout Make) async throws {
-            make.request.body = Internals.Body(buffers: [
-                Internals.DataBuffer(provider.data)
-            ])
+            switch source() {
+            case .data(let dataBuffer):
+                make.request.body = Internals.Body(buffers: [dataBuffer])
+            case .file(let fileBuffer):
+                make.request.body = Internals.Body(buffers: [fileBuffer])
+            }
         }
     }
 
@@ -113,6 +131,8 @@ extension Payload {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         _ = inputs[self]
-        return .init(Leaf(Node(property.provider)))
+        return .init(Leaf(Node {
+            property.source(property.provider)
+        }))
     }
 }

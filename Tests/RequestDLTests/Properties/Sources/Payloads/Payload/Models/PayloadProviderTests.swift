@@ -8,10 +8,15 @@ import XCTest
 final class PayloadProviderTests: XCTestCase {
 
     struct PayloadProviderMock: PayloadProvider {
-        let data: Data
+
+        private let data: Data
 
         init(_ data: Data) {
             self.data = data
+        }
+
+        var buffer: Internals.DataBuffer {
+            Internals.DataBuffer(data)
         }
     }
 
@@ -23,6 +28,6 @@ final class PayloadProviderTests: XCTestCase {
         let payload = PayloadProviderMock(data)
 
         // Then
-        XCTAssertEqual(payload.data, data)
+        XCTAssertEqual(payload.buffer, Internals.DataBuffer(data))
     }
 }

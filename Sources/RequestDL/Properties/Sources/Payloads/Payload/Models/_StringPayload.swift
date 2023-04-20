@@ -17,7 +17,7 @@ public struct _StringPayload: PayloadProvider {
         self.encoding = encoding
     }
 
-    public var data: Data {
+    private var data: Data {
         if let data = string.data(using: encoding) {
             return data
         }
@@ -28,5 +28,9 @@ public struct _StringPayload: PayloadProvider {
                 encoding
             )
         )
+    }
+
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
 }

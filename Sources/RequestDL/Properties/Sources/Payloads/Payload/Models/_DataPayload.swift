@@ -6,9 +6,13 @@ import Foundation
 
 public struct _DataPayload: PayloadProvider {
 
-    public let data: Data
+    private let data: Data
 
     init(_ data: Data) {
         self.data = data
+    }
+
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
 }
