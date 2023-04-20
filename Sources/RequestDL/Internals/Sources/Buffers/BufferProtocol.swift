@@ -44,3 +44,17 @@ protocol BufferProtocol {
 
     mutating func moveWriterIndex(to index: Int)
 }
+
+extension BufferProtocol {
+
+    func getData() -> Data? {
+        var mutableSelf = self
+        return mutableSelf.readData(mutableSelf.readableBytes)
+    }
+
+    func getBytes() -> [UInt8]? {
+        var mutableSelf = self
+        return mutableSelf.readBytes(mutableSelf.readableBytes)
+    }
+}
+

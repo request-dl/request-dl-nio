@@ -505,5 +505,47 @@ class InternalsDataBufferTests: XCTestCase {
         // Then
         XCTAssertNil(data)
     }
+
+    func testDataBuffer_whenGetData() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        let dataBuffer = Internals.DataBuffer(data)
+
+        // Then
+        XCTAssertEqual(dataBuffer.getData(), data)
+    }
+
+    func testDataBuffer_whenGetDataByMovingReaderIndex() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
+
+        // When
+        dataBuffer.moveReaderIndex(to: 64)
+
+        // Then
+        XCTAssertEqual(dataBuffer.getData(), data[64 ..< data.count])
+    }
+
+    func testDataBuffer_whenGetBytes() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        let dataBuffer = Internals.DataBuffer(data)
+
+        // Then
+        XCTAssertEqual(dataBuffer.getBytes(), Array(data))
+    }
+
+    func testDataBuffer_whenGetBytesByMovingReaderIndex() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
+
+        // When
+        dataBuffer.moveReaderIndex(to: 64)
+
+        // Then
+        XCTAssertEqual(dataBuffer.getBytes(), Array(data[64 ..< data.count]))
+    }
 }
 // swiftlint:enable type_body_length file_length
