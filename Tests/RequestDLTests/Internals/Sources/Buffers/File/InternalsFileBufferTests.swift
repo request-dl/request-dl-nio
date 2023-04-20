@@ -487,13 +487,13 @@ class InternalsFileBufferTests: XCTestCase {
     func testFileBuffer_whenInitDataBuffer_shouldBeEqual() async throws {
         // Given
         let data = Data.randomData(length: 1_000_000)
-        let dataBuffer = Internals.FileBuffer(Internals.DataBuffer(data))
+        let fileBuffer = Internals.FileBuffer(Internals.DataBuffer(data))
 
         // When
-        let writerIndex = dataBuffer.writerIndex
-        let readerIndex = dataBuffer.readerIndex
-        let readableBytes = dataBuffer.readableBytes
-        let writableBytes = dataBuffer.writableBytes
+        let writerIndex = fileBuffer.writerIndex
+        let readerIndex = fileBuffer.readerIndex
+        let readableBytes = fileBuffer.readableBytes
+        let writableBytes = fileBuffer.writableBytes
 
         // Then
         XCTAssertEqual(writerIndex, data.count)
