@@ -14,12 +14,13 @@ public struct _PropertyInputs {
     init<Root: Property, ID: Hashable, Body: Property>(
         root: Root.Type,
         id: ID,
-        body: KeyPath<Root, Body>
+        body: KeyPath<Root, Body>,
+        environment: EnvironmentValues = .init()
     ) {
         self.root = ObjectIdentifier(root)
         self.id = id
         self.body = ObjectIdentifier(Body.self)
-        self.environment = .init()
+        self.environment = environment
     }
 
     subscript<Root: Property, ID: Hashable, Body: Property>(
@@ -43,19 +44,25 @@ extension _PropertyInputs {
 
     init<Root: Property, Body: Property>(
         root: Root.Type,
-        body: KeyPath<Root, Body>
+        body: KeyPath<Root, Body>,
+        environment: EnvironmentValues = .init()
     ) {
         self.init(
             root: root,
             id: ObjectIdentifier(Body.self),
-            body: body
+            body: body,
+            environment: environment
         )
     }
 
-    init<Root: Property>(root: Root.Type) {
+    init<Root: Property>(
+        root: Root.Type,
+        environment: EnvironmentValues = .init()
+    ) {
         self.init(
             root: root,
-            body: \.body
+            body: \.body,
+            environment: environment
         )
     }
 }
