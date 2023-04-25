@@ -7,7 +7,7 @@ import Foundation
 /// A type-erasing wrapper that can represent any `Property` instance.
 public struct AnyProperty: Property {
 
-    private let makeProperty: () async throws -> _PropertyOutputs
+    private let makeProperty: (_PropertyInputs) async throws -> _PropertyOutputs
 
     /// Initializes a new instance of `AnyProperty` with the given property `Content`.
     public init<Content: Property>(_ property: Content) {
@@ -16,7 +16,8 @@ public struct AnyProperty: Property {
             let root = _GraphValue.root(erased)
             let inputs = _PropertyInputs(
                 root: Erased<Content>.self,
-                body: \.self
+                body: \.self,
+                environment: $0.environment
             )
 
             return try await Erased._makeProperty(
@@ -40,7 +41,7 @@ extension AnyProperty {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         _ = inputs[self]
-        return try await property.makeProperty()
+        return try await property.makeProperty(inputs)
     }
 }
 
