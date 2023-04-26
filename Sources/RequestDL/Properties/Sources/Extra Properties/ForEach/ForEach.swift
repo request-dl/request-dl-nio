@@ -126,7 +126,7 @@ extension ForEach {
         property: _GraphValue<ForEach<Data, ID, Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         var group = ChildrenNode()
 

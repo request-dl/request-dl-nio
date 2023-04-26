@@ -23,7 +23,7 @@ extension EmptyProperty {
         property: _GraphValue<EmptyProperty>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(EmptyLeaf())
     }
 }

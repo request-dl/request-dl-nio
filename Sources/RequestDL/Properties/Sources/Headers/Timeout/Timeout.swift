@@ -80,7 +80,7 @@ extension Timeout {
         property: _GraphValue<Timeout>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(Node(
             timeout: property.timeout,
             source: property.source

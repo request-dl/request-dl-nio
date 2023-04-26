@@ -18,7 +18,7 @@ private struct EnvironmentProperty<Content: Property, Value>: Property {
         property: _GraphValue<EnvironmentProperty<Content, Value>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         var inputs = inputs
         inputs.environment[keyPath: property.keyPath] = property.value

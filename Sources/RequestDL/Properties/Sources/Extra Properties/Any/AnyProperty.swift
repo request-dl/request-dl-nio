@@ -34,7 +34,7 @@ extension AnyProperty {
         property: _GraphValue<AnyProperty>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return try await property.makeProperty(property, inputs)
     }
 }

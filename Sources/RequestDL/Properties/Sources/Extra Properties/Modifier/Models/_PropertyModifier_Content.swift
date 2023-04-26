@@ -26,7 +26,7 @@ public struct _PropertyModifier_Content<Modifier: PropertyModifier>: Property {
         property: _GraphValue<_PropertyModifier_Content<Modifier>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return try await property.maker((property, inputs))
     }
 }

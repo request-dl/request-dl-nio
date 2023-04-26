@@ -194,7 +194,7 @@ extension Session {
         property: _GraphValue<Session>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(Node(
             configuration: property.configuration,
             provider: property.provider

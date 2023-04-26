@@ -50,7 +50,7 @@ extension AsyncProperty {
         property: _GraphValue<AsyncProperty<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let id = ObjectIdentifier(Content.self)
         let content = try await property.content()

@@ -46,7 +46,7 @@ extension Group {
         property: _GraphValue<Group<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let output = try await Content._makeProperty(
             property: property.content,

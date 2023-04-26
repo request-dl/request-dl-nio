@@ -131,7 +131,7 @@ extension BaseURL {
         property: _GraphValue<BaseURL>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         guard let baseURL = URL(string: property.absoluteString) else {
             Internals.Log.failure(

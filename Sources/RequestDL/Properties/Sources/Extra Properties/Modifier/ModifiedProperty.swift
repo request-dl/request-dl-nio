@@ -17,7 +17,7 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
         property: _GraphValue<ModifiedProperty<Content, Modifier>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let modifiedContent = _PropertyModifier_Content<Modifier> { graph, inputs in
             let id = ObjectIdentifier(Content.self)

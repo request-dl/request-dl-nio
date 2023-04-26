@@ -38,7 +38,7 @@ extension Headers.`Any` {
         property: _GraphValue<Headers.`Any`>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(Headers.Node(
             property.value,
             forKey: property.key

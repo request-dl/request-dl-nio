@@ -60,7 +60,7 @@ extension RequestMethod {
         property: _GraphValue<RequestMethod>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(Node(
             httpMethod: property.httpMethod.rawValue
         )))

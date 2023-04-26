@@ -124,7 +124,7 @@ extension Trusts {
         property: _GraphValue<Trusts<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         switch property.source {
         case .file(let file):

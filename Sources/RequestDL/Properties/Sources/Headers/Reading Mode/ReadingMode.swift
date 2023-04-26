@@ -57,7 +57,7 @@ extension ReadingMode {
         property: _GraphValue<ReadingMode>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(Node(mode: property.mode)))
     }
 }

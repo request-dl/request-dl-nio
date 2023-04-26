@@ -57,7 +57,7 @@ extension _EitherContent {
         property: _GraphValue<_EitherContent<First, Second>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         switch property.source {
         case .first:

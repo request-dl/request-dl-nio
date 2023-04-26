@@ -72,7 +72,7 @@ extension Certificate {
         property: _GraphValue<Certificate>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         guard let certificateProperty = inputs.environment.certificateProperty else {
             Internals.Log.failure(

@@ -24,7 +24,7 @@ extension _PartialContent {
         property: _GraphValue<_PartialContent<Accumulated, Next>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let accumulatedOutput = try await Accumulated._makeProperty(
             property: property.accumulated,

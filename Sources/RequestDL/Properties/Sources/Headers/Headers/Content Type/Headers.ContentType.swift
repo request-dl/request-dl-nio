@@ -34,7 +34,7 @@ extension Headers.ContentType {
         property: _GraphValue<Headers.ContentType>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(
             Headers.Node(
                 property.contentType.rawValue,

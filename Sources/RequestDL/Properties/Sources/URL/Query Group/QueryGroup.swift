@@ -71,7 +71,7 @@ extension QueryGroup {
         property: _GraphValue<QueryGroup<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let output = try await Content._makeProperty(
             property: property.content,

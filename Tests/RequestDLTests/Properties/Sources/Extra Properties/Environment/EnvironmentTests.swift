@@ -23,7 +23,7 @@ class EnvironmentTests: XCTestCase {
             property: _GraphValue<EnvironmentTests.IntegerReceiver>,
             inputs: _PropertyInputs
         ) async throws -> _PropertyOutputs {
-            property.assertIfNeeded()
+            property.assertPathway()
             property.value(inputs.environment.integer)
             return .init(EmptyLeaf())
         }

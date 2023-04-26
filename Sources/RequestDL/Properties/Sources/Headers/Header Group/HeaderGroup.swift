@@ -72,7 +72,7 @@ extension HeaderGroup {
         property: _GraphValue<HeaderGroup<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let outputs = try await Content._makeProperty(
             property: property.content,

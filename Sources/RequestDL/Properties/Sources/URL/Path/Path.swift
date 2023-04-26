@@ -93,7 +93,7 @@ extension Path {
         property: _GraphValue<Path>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         let path = property.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 

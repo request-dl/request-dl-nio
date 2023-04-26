@@ -126,7 +126,7 @@ extension Certificates {
         property: _GraphValue<Certificates<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         switch property.source {
         case .file(let file):

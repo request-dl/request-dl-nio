@@ -31,7 +31,7 @@ extension _OptionalContent {
         property: _GraphValue<_OptionalContent<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
 
         switch property.source {
         case .none:

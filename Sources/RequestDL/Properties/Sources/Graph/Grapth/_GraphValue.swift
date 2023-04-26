@@ -96,7 +96,7 @@ private struct _GraphDetached: Hashable {
 
 extension _GraphValue {
 
-    func assertIfNeeded() {
+    func assertPathway() {
         previous?.assertNext(id)
     }
 

@@ -69,7 +69,7 @@ extension FormData {
         property: _GraphValue<FormData>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(FormNode {
             PartFormRawValue(property.buffer.getData() ?? Data(), forHeaders: [
                 kContentDisposition: kContentDispositionValue(

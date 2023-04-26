@@ -61,7 +61,7 @@ extension Headers.Origin {
         property: _GraphValue<Headers.Origin>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        property.assertIfNeeded()
+        property.assertPathway()
         return .init(Leaf(Headers.Node(
             property.value,
             forKey: "Origin"
