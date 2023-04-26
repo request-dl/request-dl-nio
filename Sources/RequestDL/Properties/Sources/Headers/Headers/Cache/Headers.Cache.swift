@@ -65,7 +65,8 @@ extension Headers.Cache {
         property: _GraphValue<Headers.Cache>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertIfNeeded()
+
         return .init(Leaf(Headers.Node(
             property.contents.joined(separator: ", "),
             forKey: "Cache-Control"

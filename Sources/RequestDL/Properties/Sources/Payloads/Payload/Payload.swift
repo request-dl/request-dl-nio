@@ -136,7 +136,7 @@ extension Payload {
         property: _GraphValue<Payload<Provider>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertIfNeeded()
         return .init(Leaf(Node {
             property.source(property.provider)
         }))

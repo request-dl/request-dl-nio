@@ -46,9 +46,11 @@ extension Group {
         property: _GraphValue<Group<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
+        property.assertIfNeeded()
+
         let output = try await Content._makeProperty(
             property: property.content,
-            inputs: inputs[self, \.content]
+            inputs: inputs
         )
 
         var children = ChildrenNode()

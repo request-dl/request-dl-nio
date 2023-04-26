@@ -36,7 +36,7 @@ extension Headers.Accept {
         property: _GraphValue<Headers.Accept>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertIfNeeded()
         return .init(Leaf(Headers.Node(
             property.type.rawValue,
             forKey: "Accept"

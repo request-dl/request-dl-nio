@@ -232,7 +232,7 @@ extension SecureConnection {
         property: _GraphValue<SecureConnection<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        let inputs = inputs[self, \.content]
+        property.assertIfNeeded()
 
         let outputs = try await Content._makeProperty(
             property: property.content,

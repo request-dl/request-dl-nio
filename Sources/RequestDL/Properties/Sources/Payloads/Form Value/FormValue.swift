@@ -43,7 +43,7 @@ extension FormValue {
         property: _GraphValue<FormValue>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertIfNeeded()
         return .init(Leaf(FormNode {
             PartFormRawValue(Data("\(property.value)".utf8), forHeaders: [
                 kContentDisposition: kContentDispositionValue(

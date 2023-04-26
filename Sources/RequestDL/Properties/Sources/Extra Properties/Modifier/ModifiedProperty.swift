@@ -9,12 +9,6 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
     let content: Content
     let modifier: Modifier
 
-    private var abstractModifiedContent: Modifier.Body {
-        Internals.Log.failure(
-            .accessingAbstractContent()
-        )
-    }
-
     var body: Never {
         bodyException()
     }
@@ -23,22 +17,23 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
         property: _GraphValue<ModifiedProperty<Content, Modifier>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        let modifiedContent = _PropertyModifier_Content<Modifier> { inputs in
-            try await Content._makeProperty(
-                property: .root(property.content),
-                inputs: .init(
-                    root: Content.self,
-                    body: \.self,
-                    environment: inputs.environment
-                )
+        property.assertIfNeeded()
+
+        let modifiedContent = _PropertyModifier_Content<Modifier> { graph, inputs in
+            let id = ObjectIdentifier(Content.self)
+
+            return try await Content._makeProperty(
+                property: graph.detach(id, next: property.content),
+                inputs: inputs
             )
         }
 
+        let id = ObjectIdentifier(Modifier.Body.self)
+        let content = property.modifier.body(content: modifiedContent)
+
         return try await Modifier.Body._makeProperty(
-            property: property.dynamic {
-                $0.modifier.body(content: modifiedContent)
-            },
-            inputs: inputs[self, \.abstractModifiedContent]
+            property: property.detach(id, next: content),
+            inputs: inputs
         )
     }
 }

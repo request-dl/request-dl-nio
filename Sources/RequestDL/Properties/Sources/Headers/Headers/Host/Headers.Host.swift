@@ -49,7 +49,7 @@ extension Headers.Host {
         property: _GraphValue<Headers.Host>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertIfNeeded()
         return .init(Leaf(Headers.Node(
             property.value,
             forKey: "Host"

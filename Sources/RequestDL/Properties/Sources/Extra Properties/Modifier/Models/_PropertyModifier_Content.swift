@@ -8,9 +8,11 @@ import Foundation
 /// to be used directly by clients of this framework.
 public struct _PropertyModifier_Content<Modifier: PropertyModifier>: Property {
 
-    private let maker: (_PropertyInputs) async throws -> _PropertyOutputs
+    typealias Inputs = (_GraphValue<Self>, _PropertyInputs)
 
-    init(_ maker: @escaping (_PropertyInputs) async throws -> _PropertyOutputs) {
+    private let maker: (Inputs) async throws -> _PropertyOutputs
+
+    init(_ maker: @escaping (Inputs) async throws -> _PropertyOutputs) {
         self.maker = maker
     }
 
@@ -24,6 +26,7 @@ public struct _PropertyModifier_Content<Modifier: PropertyModifier>: Property {
         property: _GraphValue<_PropertyModifier_Content<Modifier>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        try await property.maker(inputs)
+        property.assertIfNeeded()
+        return try await property.maker((property, inputs))
     }
 }

@@ -34,7 +34,7 @@ extension Headers.ContentLength {
         property: _GraphValue<Headers.ContentLength>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertIfNeeded()
         return .init(Leaf(Headers.Node(
             property.bytes,
             forKey: "Content-Length"
