@@ -9,7 +9,7 @@ public struct _GraphValue<Content: Property> {
 
     private let id: AnyHashable
     private let content: Content
-    
+
     fileprivate let previous: _RawGraphValue?
     fileprivate var next: AnyHashable?
 
@@ -100,7 +100,7 @@ extension _GraphValue {
         previous?.assertNext(id)
     }
 
-    var hashValue: Int {
+    fileprivate func hash() -> Int {
         sequence(first: self as _RawGraphValue, next: { $0.previous })
             .map(\.next)
             .hashValue

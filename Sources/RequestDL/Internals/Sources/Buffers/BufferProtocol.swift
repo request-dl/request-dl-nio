@@ -57,4 +57,3 @@ extension BufferProtocol {
         return mutableSelf.readBytes(mutableSelf.readableBytes)
     }
 }
-
