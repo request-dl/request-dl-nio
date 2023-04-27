@@ -250,7 +250,7 @@ extension ResolveTests {
                             shutdownTimeout = nil,
                             pskHint = nil,
                             applicationProtocols = nil,
-                            keyLogCallback = nil,
+                            keyLogger = nil,
                             pskClientCallback = nil,
                             pskServerCallback = nil,
                             minimumTLSVersion = nil,

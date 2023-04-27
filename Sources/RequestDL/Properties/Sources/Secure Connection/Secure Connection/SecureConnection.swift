@@ -90,17 +90,42 @@ extension SecureConnection {
 
 extension SecureConnection {
 
+    /// Sets the key log object for the secure connection.
+    ///
+    /// - Parameter closure: The `SSLKeyLogger` object.
+    /// - Returns: A modified `SecureConnection` with the key logger set.
+    public func keyLogger(_ keyLogger: SSLKeyLogger) -> Self {
+        edit {
+            $0.secureConnection.keyLogger = keyLogger
+        }
+    }
+}
+
+extension SecureConnection {
+
+    private final class _KeyLog: SSLKeyLogger {
+
+        private let closure: @Sendable (NIOCore.ByteBuffer) -> Void
+
+        init(_ closure: @Sendable @escaping (NIOCore.ByteBuffer) -> Void) {
+            self.closure = closure
+        }
+
+        func callAsFunction(_ bytes: NIOCore.ByteBuffer) {
+            closure(bytes)
+        }
+    }
+
     /// Sets the key log closure for the secure connection.
     ///
     /// - Parameter closure: The closure that receives the key log.
     /// - Returns: A modified `SecureConnection` with the key log closure set.
+    @available(*, deprecated, renamed: "keyLogger(_:)")
     public func keyLog(
         _ closure: @Sendable @escaping (NIOCore.ByteBuffer) -> Void
     ) -> Self {
         edit {
-            $0.secureConnection.keyLogCallback = {
-                closure($0)
-            }
+            $0.secureConnection.keyLogger = _KeyLog(closure)
         }
     }
 }
