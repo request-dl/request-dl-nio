@@ -12,9 +12,22 @@ struct PropertyMirror<Content> {
         self.content = content
     }
 
-    func callAsFunction() -> [PropertyValue] {
-        Mirror(reflecting: content).children.compactMap {
-            $0.value as? PropertyValue
+    func callAsFunction() -> [Child] {
+        Mirror(reflecting: content).children.compactMap { child in
+            (child.value as? PropertyValue).map {
+                .init(
+                    label: child.label,
+                    value: $0
+                )
+            }
         }
+    }
+}
+
+extension PropertyMirror {
+
+    struct Child {
+        let label: String?
+        let value: PropertyValue
     }
 }

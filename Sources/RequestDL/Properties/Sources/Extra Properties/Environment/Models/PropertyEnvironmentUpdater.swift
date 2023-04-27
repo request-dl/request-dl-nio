@@ -15,8 +15,8 @@ struct PropertyEnvironmentUpdater<Content> {
     func callAsFunction(_ values: EnvironmentValues) {
         let mirror = PropertyMirror(content)
 
-        for propertyValue in mirror() {
-            if let environment = propertyValue as? EnvironmentPropertyValue {
+        for child in mirror() {
+            if let environment = child.value as? EnvironmentPropertyValue {
                 environment.setValue(for: values)
             }
         }

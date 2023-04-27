@@ -33,7 +33,7 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
             content: property.modifier
         )
 
-        updater(inputs)
+        let inputs = updater(inputs)
 
         let id = ObjectIdentifier(Modifier.Body.self)
         let content = property.modifier.body(content: modifiedContent)
