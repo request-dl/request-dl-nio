@@ -21,23 +21,6 @@ class InternalsSecureConnectionTests: XCTestCase {
         secureConnection = nil
     }
 
-    func testSecureConnection_whenKeyLog_shouldBeValid() async throws {
-        // Given
-        let data = Data("Hello World".utf8)
-
-        // When
-        secureConnection.keyLogCallback = { @Sendable in
-            var bytes = $0
-            let receivedData = bytes.readData(length: bytes.readableBytes)
-            precondition(data == receivedData)
-        }
-
-        let sut = try secureConnection.build()
-
-        // Then
-        sut.keyLogCallback?(.init(data: data))
-    }
-
     func testSecureConnection_whenTrustRoots_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
@@ -304,6 +287,37 @@ class InternalsSecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut.maximumTLSVersion, configuration.maximumTLSVersion)
         XCTAssertEqual(sut.cipherSuites, configuration.cipherSuites)
         XCTAssertEqual(sut.cipherSuiteValues, configuration.cipherSuiteValues)
+    }
+}
+
+extension InternalsSecureConnectionTests {
+
+    private final class KeyLogger: SSLKeyLogger {
+
+        private let data: @Sendable (Data?) -> Void
+
+        init(_ data: @Sendable @escaping (Data?) -> Void) {
+            self.data = data
+        }
+
+        func callAsFunction(_ bytes: ByteBuffer) {
+            data(bytes.getData(at: .zero, length: bytes.readableBytes))
+        }
+    }
+
+    func testSecureConnection_whenKeyLog_shouldBeValid() async throws {
+        // Given
+        let data = Data("Hello World".utf8)
+
+        // When
+        secureConnection.keyLogger = KeyLogger {
+            XCTAssertEqual($0, data)
+        }
+
+        let sut = try secureConnection.build()
+
+        // Then
+        sut.keyLogCallback?(.init(data: data))
     }
 }
 

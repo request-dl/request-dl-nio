@@ -24,7 +24,7 @@ extension Internals {
         var shutdownTimeout: TimeAmount?
         var pskHint: String?
         var applicationProtocols: [String]?
-        var keyLogCallback: NIOSSL.NIOSSLKeyLogCallback?
+        var keyLogger: SSLKeyLogger?
         var pskClientIdentityResolver: SSLPSKClientIdentityResolver?
         var pskServerIdentityResolver: SSLPSKServerIdentityResolver?
         var minimumTLSVersion: NIOSSL.TLSVersion?
@@ -135,8 +135,10 @@ extension Internals.SecureConnection {
             tlsConfiguration.applicationProtocols = applicationProtocols
         }
 
-        if let keyLogCallback {
-            tlsConfiguration.keyLogCallback = keyLogCallback
+        if let keyLogger {
+            tlsConfiguration.keyLogCallback = {
+                keyLogger($0)
+            }
         }
 
         if let pskClientIdentityResolver {
