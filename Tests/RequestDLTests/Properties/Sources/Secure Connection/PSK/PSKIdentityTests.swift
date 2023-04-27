@@ -206,4 +206,27 @@ extension PSKIdentityTests {
         // Then
         XCTAssertEqual(sut?.pskHint, hint)
     }
+
+    func testCertificate_whenSetPSKHintInferredAsClient() async throws {
+        // Given
+        let hint = "some.hint"
+
+        // When
+        let (session, _) = try await resolve(TestProperty {
+            RequestDL.SecureConnection {
+                RequestDL.PSKIdentity { description in
+                    PSKClientIdentity(
+                        key: .init([0, 1, 2]),
+                        identity: description.serverHint
+                    )
+                }
+                .hint(hint)
+            }
+        })
+
+        let sut = session.configuration.secureConnection
+
+        // Then
+        XCTAssertEqual(sut?.pskHint, hint)
+    }
 }
