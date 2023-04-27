@@ -27,8 +27,8 @@ final class DataTaskTests: XCTestCase {
                     Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
-            .extractPayload()
-            .result()
+                .extractPayload()
+                .result()
 
             let result = try HTTPResult<String>(data)
 
@@ -61,13 +61,36 @@ final class DataTaskTests: XCTestCase {
                 }
                 .verification(.fullVerification)
             }
-            .extractPayload()
-            .result()
+                .extractPayload()
+                .result()
 
             let result = try HTTPResult<String>(data)
 
             // Then
             XCTAssertEqual(result.response, output)
+        }
+    }
+}
+
+extension DataTaskTests {
+
+    private final class PSKClientIdentityResolver: SSLPSKClientIdentityResolver {
+
+        let key: String
+        let identity: String
+
+        init(key: String, identity: String) {
+            self.key = key
+            self.identity = identity
+        }
+
+        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
+            var bytes = NIOSSLSecureBytes()
+            bytes.append(key.utf8)
+            bytes.append(":\(identity)".utf8)
+            bytes.append(":\(identity)".utf8)
+            bytes.append(":pskHint".utf8)
+            return.init(key: bytes, identity: identity)
         }
     }
 
@@ -94,14 +117,12 @@ final class DataTaskTests: XCTestCase {
                 Path("index")
 
                 SecureConnection {
-                    PSKIdentity { _ in
-                        var bytes = NIOSSLSecureBytes()
-                        bytes.append(key.utf8)
-                        bytes.append(":\(identity)".utf8)
-                        bytes.append(":\(identity)".utf8)
-                        bytes.append(":pskHint".utf8)
-                        return.init(key: bytes, identity: identity)
-                    }
+                    PSKIdentity(
+                        PSKClientIdentityResolver(
+                            key: key,
+                            identity: identity
+                        )
+                    )
                     .hint("pskHint")
                 }
                 .verification(.none)

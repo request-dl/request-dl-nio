@@ -25,8 +25,8 @@ extension Internals {
         var pskHint: String?
         var applicationProtocols: [String]?
         var keyLogCallback: NIOSSL.NIOSSLKeyLogCallback?
-        var pskClientCallback: NIOSSL.NIOPSKClientIdentityCallback?
-        var pskServerCallback: NIOSSL.NIOPSKServerIdentityCallback?
+        var pskClientIdentityResolver: SSLPSKClientIdentityResolver?
+        var pskServerIdentityResolver: SSLPSKServerIdentityResolver?
         var minimumTLSVersion: NIOSSL.TLSVersion?
         var maximumTLSVersion: NIOSSL.TLSVersion?
         var cipherSuites: String?
@@ -139,12 +139,16 @@ extension Internals.SecureConnection {
             tlsConfiguration.keyLogCallback = keyLogCallback
         }
 
-        if let pskClientCallback {
-            tlsConfiguration.pskClientCallback = pskClientCallback
+        if let pskClientIdentityResolver {
+            tlsConfiguration.pskClientCallback = {
+                try pskClientIdentityResolver($0)
+            }
         }
 
-        if let pskServerCallback {
-            tlsConfiguration.pskServerCallback = pskServerCallback
+        if let pskServerIdentityResolver {
+            tlsConfiguration.pskServerCallback = {
+                try pskServerIdentityResolver($0, client: $1)
+            }
         }
 
         return tlsConfiguration

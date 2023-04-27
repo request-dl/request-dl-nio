@@ -8,18 +8,141 @@ import NIOSSL
 
 class PSKIdentityTests: XCTestCase {
 
+    func testIdentity_whenClientResolver() async throws {
+        // Given
+        let hint = "hint"
+        let identity = "host"
+        let key = NIOSSLSecureBytes([0, 1, 2])
+
+        // When
+        let (session, _) = try await resolve(TestProperty {
+            RequestDL.SecureConnection {
+                RequestDL.PSKIdentity(
+                    ClientResolver(
+                        key: key,
+                        identity: identity,
+                        received: {
+                            XCTAssertEqual($0, hint)
+                        }
+                    )
+                )
+            }
+        })
+
+        let sut = try session.configuration.secureConnection?.pskClientIdentityResolver?(hint)
+
+        // Then
+        XCTAssertEqual(sut?.key, key)
+        XCTAssertEqual(sut?.identity, identity)
+    }
+
+    func testIdentity_whenServerResolver() async throws {
+        // Given
+        let serverHint = "s.hint"
+        let clientIdentity = "c.identity"
+        let key = NIOSSLSecureBytes([0, 1, 2])
+
+        // When
+        let (session, _) = try await resolve(TestProperty {
+            RequestDL.SecureConnection {
+                RequestDL.PSKIdentity(
+                    ServerResolver(key) {
+                        XCTAssertEqual($0, serverHint)
+                        XCTAssertEqual($1, clientIdentity)
+                    }
+                )
+            }
+        })
+
+        let sut = try session.configuration.secureConnection?.pskServerIdentityResolver?(serverHint, client: clientIdentity)
+
+        // Then
+        XCTAssertEqual(sut?.key, key)
+    }
+
+    func testPSK_whenAccessBody_shouldBeNever() async throws {
+        // Given
+        let identity = "host"
+        let key = NIOSSLSecureBytes([0, 1, 2])
+
+        // When
+        let sut = RequestDL.PSKIdentity(
+            ClientResolver(
+                key: key,
+                identity: identity,
+                received: { _ in }
+            )
+        )
+
+        // Then
+        try await assertNever(sut.body)
+    }
+}
+
+extension PSKIdentityTests {
+
+    fileprivate final class ClientResolver: SSLPSKClientIdentityResolver {
+
+        let key: NIOSSLSecureBytes
+        let identity: String
+
+        let received: @Sendable (String) -> Void
+
+        init(
+            key: NIOSSLSecureBytes,
+            identity: String,
+            received: @Sendable @escaping (String) -> Void
+        ) {
+            self.key = key
+            self.identity = identity
+            self.received = received
+        }
+
+        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
+            received(hint)
+            return .init(
+                key: key,
+                identity: identity
+            )
+        }
+    }
+
+    fileprivate final class ServerResolver: SSLPSKServerIdentityResolver {
+
+        let key: NIOSSLSecureBytes
+        let received: @Sendable (String, String) -> Void
+
+        init(
+            _ key: NIOSSLSecureBytes,
+            received: @Sendable @escaping (String, String) -> Void
+        ) {
+            self.key = key
+            self.received = received
+        }
+
+        func callAsFunction(_ hint: String, client identity: String) throws -> PSKServerIdentityResponse {
+            received(hint, identity)
+            return .init(key: key)
+        }
+    }
+}
+
+@available(*, deprecated)
+extension PSKIdentityTests {
+
     func testCertificate_whenInitClient_shouldBeValid() async throws {
         // Given
         let hint = "hint"
         let identity = "host"
         let key = NIOSSLSecureBytes([0, 1, 2])
-        var receivedHint: String?
 
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(.client) { description in
-                    receivedHint = description.serverHint
+
+                    XCTAssertEqual(description.serverHint, hint)
+
                     return .init(
                         key: key,
                         identity: identity
@@ -28,10 +151,10 @@ class PSKIdentityTests: XCTestCase {
             }
         })
 
-        let sut = try session.configuration.secureConnection?.pskClientCallback?(hint)
+        let sut = try session.configuration.secureConnection?.pskClientIdentityResolver?(hint)
 
         // Then
-        XCTAssertEqual(receivedHint, hint)
+
         XCTAssertEqual(sut?.key, key)
         XCTAssertEqual(sut?.identity, identity)
     }
@@ -39,28 +162,25 @@ class PSKIdentityTests: XCTestCase {
     func testCertificate_whenInitServer_shouldBeValid() async throws {
         // Given
         let serverHint = "s.hint"
-        let clientHint = "c.hint"
+        let clientIdentity = "c.identity"
         let key = NIOSSLSecureBytes([0, 1, 2])
-
-        var receivedServerHint: String?
-        var receivedClientHint: String?
 
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(.server) { description in
-                    receivedServerHint = description.serverHint
-                    receivedClientHint = description.clientHint
+
+                    XCTAssertEqual(description.serverHint, serverHint)
+                    XCTAssertEqual(description.clientHint, clientIdentity)
+
                     return .init(key)
                 }
             }
         })
 
-        let sut = try session.configuration.secureConnection?.pskServerCallback?(serverHint, clientHint)
+        let sut = try session.configuration.secureConnection?.pskServerIdentityResolver?(serverHint, client: clientIdentity)
 
         // Then
-        XCTAssertEqual(receivedServerHint, serverHint)
-        XCTAssertEqual(receivedClientHint, clientHint)
         XCTAssertEqual(sut?.key, key)
     }
 
@@ -85,15 +205,5 @@ class PSKIdentityTests: XCTestCase {
 
         // Then
         XCTAssertEqual(sut?.pskHint, hint)
-    }
-
-    func testPSK_whenAccessBody_shouldBeNever() async throws {
-        // Given
-        let sut = RequestDL.PSKIdentity { _ in
-            .init(key: .init([0, 1, 2]), identity: "")
-        }
-
-        // Then
-        try await assertNever(sut.body)
     }
 }
