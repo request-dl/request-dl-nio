@@ -58,6 +58,9 @@ extension Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
+        let updater = GraphValueUpdater(property)
+        updater(inputs)
+
         return try await Body._makeProperty(
             property: property.body,
             inputs: inputs

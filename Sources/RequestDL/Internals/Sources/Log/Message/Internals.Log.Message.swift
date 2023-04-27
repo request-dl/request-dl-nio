@@ -239,6 +239,23 @@ extension Internals.Log.Message {
             """
         )
     }
+
+    static func environmentNilValue<KeyPath>(_ keyPath: KeyPath) -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            This can occur if the property wrapper's key path does not \
+            exist in the current environment, or if the environment has \
+            not been properly set up.
+
+            Please ensure that the environment is correctly configured \
+            and that the key path provided to the property wrapper is \
+            valid.
+            """,
+            parameters: [
+                String(describing: type(of: keyPath)): keyPath
+            ]
+        )
+    }
 }
 
 // MARK: - BaseURL

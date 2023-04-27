@@ -28,6 +28,13 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
             )
         }
 
+        let updater = GraphValueUpdater(
+            hashValue: property.pathwayHashValue,
+            content: property.modifier
+        )
+
+        updater(inputs)
+
         let id = ObjectIdentifier(Modifier.Body.self)
         let content = property.modifier.body(content: modifiedContent)
 
