@@ -21,53 +21,6 @@ class InternalsSecureConnectionTests: XCTestCase {
         secureConnection = nil
     }
 
-    func testSecureConnection_whenPSKClient_shouldBeValid() async throws {
-        // Given
-        let identity = "apple.com"
-
-        // When
-        secureConnection.pskClientCallback = { @Sendable in
-            .init(
-                key: .init(Data($0.utf8)),
-                identity: $0
-            )
-        }
-
-        let sut = try secureConnection.build()
-
-        // Then
-        let result = try sut.pskClientCallback.map { try $0(identity) }
-
-        XCTAssertEqual(
-            result?.identity,
-            identity
-        )
-
-        XCTAssertEqual(
-            result.map { Data($0.key) },
-            Data(identity.utf8)
-        )
-    }
-
-    func testSecureConnection_whenPSKServer_shouldBeValid() async throws {
-        // Given
-        let hint = "default"
-        let identity = "apple.com"
-
-        // When
-        secureConnection.pskServerCallback = { @Sendable in
-            .init(key: .init(Data([$0, $1].joined(separator: ",").utf8)))
-        }
-
-        let sut = try secureConnection.build()
-
-        // Then
-        XCTAssertEqual(
-            try sut.pskServerCallback.map { try Data($0(hint, identity).key) },
-            Data([hint, identity].joined(separator: ",").utf8)
-        )
-    }
-
     func testSecureConnection_whenTrustRoots_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
@@ -365,5 +318,74 @@ extension InternalsSecureConnectionTests {
 
         // Then
         sut.keyLogCallback?(.init(data: data))
+    }
+}
+
+extension InternalsSecureConnectionTests {
+
+    private final class ClientResolver: SSLPSKClientIdentityResolver {
+
+        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
+            .init(
+                key: .init(Data(hint.utf8)),
+                identity: hint
+            )
+        }
+    }
+
+    func testSecureConnection_whenPSKClient_shouldBeValid() async throws {
+        // Given
+        let identity = "apple.com"
+        let resolver = ClientResolver()
+
+        // When
+        secureConnection.pskClientIdentityResolver = resolver
+
+        let sut = try secureConnection.build()
+        let result = try sut.pskClientCallback.map { try $0(identity) }
+
+        // Then
+
+        XCTAssertEqual(
+            result?.identity,
+            identity
+        )
+
+        XCTAssertEqual(
+            result.map { Data($0.key) },
+            Data(identity.utf8)
+        )
+    }
+}
+
+extension InternalsSecureConnectionTests {
+
+    private final class ServerResolver: SSLPSKServerIdentityResolver {
+
+        func callAsFunction(
+            _ hint: String,
+            client identity: String
+        ) throws -> PSKServerIdentityResponse {
+            .init(key: .init(Data([hint, identity].joined(separator: ",").utf8)))
+        }
+    }
+
+    func testSecureConnection_whenPSKServer_shouldBeValid() async throws {
+        // Given
+        let hint = "default"
+        let identity = "apple.com"
+        let resolver = ServerResolver()
+
+        // When
+        secureConnection.pskServerIdentityResolver = resolver
+
+        let sut = try secureConnection.build()
+        let result = try sut.pskServerCallback.map { try Data($0(hint, identity).key) }
+
+        // Then
+        XCTAssertEqual(
+            result,
+            Data([hint, identity].joined(separator: ",").utf8)
+        )
     }
 }
