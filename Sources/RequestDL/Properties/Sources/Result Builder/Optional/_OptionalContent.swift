@@ -31,13 +31,15 @@ extension _OptionalContent {
         property: _GraphValue<_OptionalContent<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
         switch property.source {
         case .none:
             return .init(EmptyLeaf())
         case .some:
             return try await Content._makeProperty(
                 property: property.content,
-                inputs: inputs[self, \.content]
+                inputs: inputs
             )
         }
     }

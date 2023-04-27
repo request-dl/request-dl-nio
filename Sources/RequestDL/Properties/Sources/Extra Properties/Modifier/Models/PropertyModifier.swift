@@ -15,7 +15,7 @@ public protocol PropertyModifier {
 
     typealias Content = _PropertyModifier_Content<Self>
 
-    associatedtype Body : Property
+    associatedtype Body: Property
 
     /**
      Returns a modified `Property` type based on the given `Content`.

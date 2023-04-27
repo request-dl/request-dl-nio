@@ -27,12 +27,6 @@ public struct AsyncProperty<Content: Property>: Property {
 
     private let content: () async throws -> Content
 
-    private var abstractContent: Content {
-        Internals.Log.failure(
-            .accessingAbstractContent()
-        )
-    }
-
     /**
      Initializes with an asynchronous content provided.
 
@@ -56,11 +50,14 @@ extension AsyncProperty {
         property: _GraphValue<AsyncProperty<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        try await Content._makeProperty(
-            property: property.dynamic {
-                try await $0.content()
-            },
-            inputs: inputs[self, \.abstractContent]
+        property.assertPathway()
+
+        let id = ObjectIdentifier(Content.self)
+        let content = try await property.content()
+
+        return try await Content._makeProperty(
+            property: property.detach(id, next: content),
+            inputs: inputs
         )
     }
 }

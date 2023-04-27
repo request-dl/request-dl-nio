@@ -43,7 +43,7 @@ extension Headers.Referer {
         property: _GraphValue<Headers.Referer>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
         return .init(Leaf(Headers.Node(
             property.value,
             forKey: "Referer"

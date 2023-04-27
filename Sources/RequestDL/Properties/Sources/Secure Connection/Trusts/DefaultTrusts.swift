@@ -34,7 +34,7 @@ extension DefaultTrusts {
         property: _GraphValue<DefaultTrusts>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
         return .init(Leaf(SecureConnectionNode(Node())))
     }
 }

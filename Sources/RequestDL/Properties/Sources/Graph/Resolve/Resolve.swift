@@ -13,7 +13,9 @@ struct Resolve<Root: Property> {
     }
 
     private func inputs() -> _PropertyInputs {
-        .init(root: _Root.self, body: \.self)
+        .init(
+            environment: .init()
+        )
     }
 
     private func outputs() async throws -> _PropertyOutputs {

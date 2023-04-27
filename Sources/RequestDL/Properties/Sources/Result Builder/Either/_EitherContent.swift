@@ -57,16 +57,18 @@ extension _EitherContent {
         property: _GraphValue<_EitherContent<First, Second>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
         switch property.source {
         case .first:
             return try await First._makeProperty(
                 property: property.first,
-                inputs: inputs[self, \.first]
+                inputs: inputs
             )
         case .second:
             return try await Second._makeProperty(
                 property: property.second,
-                inputs: inputs[self, \.second]
+                inputs: inputs
             )
         }
     }

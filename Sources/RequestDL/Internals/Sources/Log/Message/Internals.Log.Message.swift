@@ -89,14 +89,6 @@ extension Internals.Log.Message {
             """
         )
     }
-
-    static func accessingAbstractContent() -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            There was an attempt to access a variable for which access was not expected.
-            """
-        )
-    }
 }
 
 // MARK: - Resolve
@@ -222,6 +214,29 @@ extension Internals.Log.Message {
                 String(describing: type(of: object)): object,
                 String(describing: type(of: encoding)): encoding
             ] as [String: Any]
+        )
+    }
+
+    static func accessingAbstractContent() -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            There was an attempt to access a variable for which access was not expected.
+            """
+        )
+    }
+
+    static func unexpectedGraphPathway() -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            You are attempting to modify the graph pathway, which is not \
+            allowed. Please do not call the _makeProperty function or \
+            attempt to change the default implementation, as this can lead \
+            to errors.
+
+            If you require a different implementation, please create a new \
+            function or modify an existing one that does not affect the \
+            graph pathway.
+            """
         )
     }
 }

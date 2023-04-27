@@ -105,7 +105,7 @@ extension PSKIdentity {
         property: _GraphValue<PSKIdentity<PSK>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
         return .init(Leaf(SecureConnectionNode(
             Node(
                 source: property.source,

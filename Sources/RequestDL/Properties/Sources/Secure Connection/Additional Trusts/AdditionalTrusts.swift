@@ -128,22 +128,19 @@ extension AdditionalTrusts {
         property: _GraphValue<AdditionalTrusts<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
         switch property.source {
         case .file(let file):
-            _ = inputs[self]
-
             return .init(Leaf(SecureConnectionNode(
                 Node(source: .file(file))
             )))
         case .bytes(let bytes):
-            _ = inputs[self]
-
             return .init(Leaf(SecureConnectionNode(
                 Node(source: .bytes(bytes))
             )))
         case .content:
-            var inputs = inputs[self, \.content]
-
+            var inputs = inputs
             inputs.environment.certificateProperty = .additionalTrust
 
             let outputs = try await Content._makeProperty(

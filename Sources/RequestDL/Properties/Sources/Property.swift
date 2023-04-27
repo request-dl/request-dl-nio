@@ -56,9 +56,11 @@ extension Property {
         property: _GraphValue<Self>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        try await Body._makeProperty(
+        property.assertPathway()
+
+        return try await Body._makeProperty(
             property: property.body,
-            inputs: inputs[self]
+            inputs: inputs
         )
     }
 }

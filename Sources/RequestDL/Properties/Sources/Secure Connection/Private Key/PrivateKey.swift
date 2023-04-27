@@ -150,7 +150,7 @@ extension PrivateKey {
         property: _GraphValue<PrivateKey<Password>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
         return .init(Leaf(SecureConnectionNode(
             Node(source: property.source)
         )))

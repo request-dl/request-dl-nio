@@ -59,7 +59,7 @@ extension Authorization {
         property: _GraphValue<Authorization>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
         return .init(Leaf(Node(
             type: property.type,
             token: property.token

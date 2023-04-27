@@ -73,7 +73,8 @@ extension FormFile {
         property: _GraphValue<FormFile>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
+
         return .init(Leaf(FormNode {
             let data = (try? Data(contentsOf: property.url)) ?? Data()
             return PartFormRawValue(data, forHeaders: [

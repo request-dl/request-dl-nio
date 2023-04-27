@@ -35,12 +35,6 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
 
     private let id: KeyPath<Data.Element, ID>
 
-    private var abstractContent: Content {
-        Internals.Log.failure(
-            .accessingAbstractContent()
-        )
-    }
-
     /**
      Creates a new instance of `ForEach`.
 
@@ -132,14 +126,17 @@ extension ForEach {
         property: _GraphValue<ForEach<Data, ID, Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
         var group = ChildrenNode()
 
         for element in property.data {
+            let id = element[keyPath: property.id]
+            let content = property.content(element)
+
             let output = try await Content._makeProperty(
-                property: property.dynamic {
-                    $0.content(element)
-                },
-                inputs: inputs[self, element[keyPath: property.id], \.abstractContent]
+                property: property.detach(id, next: content),
+                inputs: inputs
             )
 
             group.append(output.node)

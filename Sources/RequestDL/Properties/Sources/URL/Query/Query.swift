@@ -68,7 +68,7 @@ extension Query {
         property: _GraphValue<Query>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
-        _ = inputs[self]
+        property.assertPathway()
         return .init(Leaf(Node(
             key: property.key,
             value: "\(property.value)"

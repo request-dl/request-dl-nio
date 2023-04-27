@@ -24,14 +24,16 @@ extension _PartialContent {
         property: _GraphValue<_PartialContent<Accumulated, Next>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
         let accumulatedOutput = try await Accumulated._makeProperty(
             property: property.accumulated,
-            inputs: inputs[self, \.accumulated]
+            inputs: inputs
         )
 
         let nextOutput = try await Next._makeProperty(
             property: property.next,
-            inputs: inputs[self, \.next]
+            inputs: inputs
         )
 
         var children = ChildrenNode()
