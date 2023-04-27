@@ -288,6 +288,24 @@ class InternalsSecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut.cipherSuites, configuration.cipherSuites)
         XCTAssertEqual(sut.cipherSuiteValues, configuration.cipherSuiteValues)
     }
+
+    func testSecureConnection_whenEquals() async throws {
+        // Given
+        let lhs = Internals.SecureConnection(.client)
+        let rhs = Internals.SecureConnection(.client)
+
+        // Then
+        XCTAssertEqual(lhs, rhs)
+    }
+
+    func testSecureConnection_whenNotEquals() async throws {
+        // Given
+        let lhs = Internals.SecureConnection(.client)
+        let rhs = Internals.SecureConnection(.server)
+
+        // Then
+        XCTAssertNotEqual(lhs, rhs)
+    }
 }
 
 extension InternalsSecureConnectionTests {
