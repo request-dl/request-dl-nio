@@ -358,7 +358,7 @@ extension ResolveTests {
                         source = Source.node(
                             Node {
                                 source = Source.privateKey(
-                                    PrivateKey<Array<UInt8>> {
+                                    PrivateKey {
                                         source = Source.bytes([0, 2]),
                                         format = .pem,
                                         password = nil

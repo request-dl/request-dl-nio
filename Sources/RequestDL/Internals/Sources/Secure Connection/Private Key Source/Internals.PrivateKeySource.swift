@@ -7,10 +7,10 @@ import NIOSSL
 
 extension Internals {
 
-    enum PrivateKeySource {
+    enum PrivateKeySource: Equatable {
 
         case file(String)
-        case privateKey(PrivateKeyRepresentable)
+        case privateKey(PrivateKey)
     }
 }
 
@@ -22,20 +22,6 @@ extension Internals.PrivateKeySource {
             return .file(path)
         case .privateKey(let privateKey):
             return try .privateKey(privateKey.build())
-        }
-    }
-}
-
-extension Internals.PrivateKeySource: Equatable {
-
-    static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.file(let lhs), .file(let rhs)):
-            return lhs == rhs
-        case (.privateKey(let lhs), .privateKey(let rhs)):
-            return lhs.isEqual(to: rhs)
-        default:
-            return false
         }
     }
 }
