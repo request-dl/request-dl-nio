@@ -157,3 +157,29 @@ extension Internals.SecureConnection {
     }
     // swiftlint:enable cyclomatic_complexity function_body_length
 }
+
+extension Internals.SecureConnection: Equatable {
+
+    static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.context == rhs.context
+        && lhs.certificateChain == rhs.certificateChain
+        && lhs.certificateVerification == rhs.certificateVerification
+        && lhs.trustRoots == rhs.trustRoots
+        && lhs.additionalTrustRoots == rhs.additionalTrustRoots
+        && lhs.privateKey == rhs.privateKey
+        && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms
+        && lhs.verifySignatureAlgorithms == rhs.verifySignatureAlgorithms
+        && lhs.sendCANameList == rhs.sendCANameList
+        && lhs.renegotiationSupport == rhs.renegotiationSupport
+        && lhs.shutdownTimeout == rhs.shutdownTimeout
+        && lhs.pskHint == rhs.pskHint
+        && lhs.applicationProtocols == rhs.applicationProtocols
+        && lhs.keyLogger === rhs.keyLogger
+        && lhs.pskClientIdentityResolver === rhs.pskClientIdentityResolver
+        && lhs.pskServerIdentityResolver === rhs.pskServerIdentityResolver
+        && lhs.minimumTLSVersion == rhs.minimumTLSVersion
+        && lhs.maximumTLSVersion == rhs.maximumTLSVersion
+        && lhs.cipherSuites == rhs.cipherSuites
+        && lhs.cipherSuiteValues == rhs.cipherSuiteValues
+    }
+}
