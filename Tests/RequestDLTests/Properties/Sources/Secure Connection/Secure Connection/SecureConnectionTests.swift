@@ -302,15 +302,22 @@ class SecureConnectionTests: XCTestCase {
 extension SecureConnectionTests {
 
     func testSecure_whenUpdatesKeyLogWithClosure_shouldBeValid() async throws {
+        // Given
+        let bytes = Data.randomData(length: 1_024)
+
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
-                .keyLog { _ in }
+                .keyLog {
+                    XCTAssertEqual($0, .init(data: bytes))
+                }
         })
 
         let sut = session.configuration.secureConnection
 
         // Then
         XCTAssertNotNil(sut?.keyLogger)
+
+        sut?.keyLogger?(.init(data: bytes))
     }
 }
