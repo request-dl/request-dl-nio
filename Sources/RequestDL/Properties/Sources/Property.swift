@@ -59,7 +59,7 @@ extension Property {
         property.assertPathway()
 
         let updater = GraphValueUpdater(property)
-        updater(inputs)
+        let inputs = updater(inputs)
 
         return try await Body._makeProperty(
             property: property.body,

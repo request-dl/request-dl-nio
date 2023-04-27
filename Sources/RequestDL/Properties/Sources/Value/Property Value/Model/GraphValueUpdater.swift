@@ -22,8 +22,17 @@ struct GraphValueUpdater<Content> {
         self.content = content
     }
 
-    func callAsFunction(_ inputs: _PropertyInputs) {
+    func callAsFunction(_ inputs: _PropertyInputs) -> _PropertyInputs {
+        var inputs = inputs
+
         let environmentUpdater = PropertyEnvironmentUpdater(content)
         environmentUpdater(inputs.environment)
+
+        let namespaceUpdater = PropertyNamespaceUpdater(content)
+        if let namespaceID = namespaceUpdater(hashValue) {
+            inputs.namespaceID = namespaceID
+        }
+
+        return inputs
     }
 }

@@ -7,11 +7,12 @@ import Foundation
 @dynamicMemberLookup
 public struct _GraphValue<Content: Property> {
 
-    private let id: AnyHashable
     private let content: Content
 
-    fileprivate let previous: _RawGraphValue?
-    fileprivate var next: AnyHashable?
+    private let id: AnyHashable
+    private var nextID: AnyHashable?
+
+    private let previousValue: IdentifiedGraphValue?
 
     func pointer() -> Content {
         content
@@ -21,19 +22,19 @@ public struct _GraphValue<Content: Property> {
         .init(
             id: ObjectIdentifier(Content.self),
             content: content,
-            previous: nil
+            previousValue: nil
         )
     }
 
     private init(
         id: AnyHashable,
         content: Content,
-        previous: _RawGraphValue?
+        previousValue: IdentifiedGraphValue?
     ) {
         self.id = id
         self.content = content
-        self.previous = previous
-        self.next = nil
+        self.previousValue = previousValue
+        self.nextID = nil
     }
 
     subscript<Value>(dynamicMember keyPath: KeyPath<Content, Value>) -> Value {
@@ -60,32 +61,11 @@ extension _GraphValue {
         next: (ID) -> Next
     ) -> _GraphValue<Next> {
         var mutableSelf = self
-        mutableSelf.next = id
+        mutableSelf.nextID = id
         return .init(
             id: id,
             content: next(id),
-            previous: mutableSelf
-        )
-    }
-}
-
-private protocol _RawGraphValue {
-
-    var previous: _RawGraphValue? { get }
-    var next: AnyHashable? { get }
-
-    func assertNext(_ id: AnyHashable)
-}
-
-extension _GraphValue: _RawGraphValue {
-
-    fileprivate func assertNext(_ id: AnyHashable) {
-        if next == id {
-            return
-        }
-
-        Internals.Log.failure(
-            .unexpectedGraphPathway()
+            previousValue: mutableSelf._identified
         )
     }
 }
@@ -96,13 +76,28 @@ private struct _GraphDetached: Hashable {
 
 extension _GraphValue {
 
-    func assertPathway() {
-        previous?.assertNext(id)
+    private struct Identified: IdentifiedGraphValue {
+        let id: AnyHashable
+        let nextID: AnyHashable?
+        let previousValue: IdentifiedGraphValue?
     }
 
+    var _identified: IdentifiedGraphValue {
+        Identified(
+            id: id,
+            nextID: nextID,
+            previousValue: previousValue
+        )
+    }
+}
+
+extension _GraphValue {
+
     var pathwayHashValue: Int {
-        sequence(first: self as _RawGraphValue, next: { $0.previous })
-            .map(\.next)
-            .hashValue
+        _identified.pathwayHashValue
+    }
+
+    func assertPathway() {
+        _identified.assertPathway()
     }
 }
