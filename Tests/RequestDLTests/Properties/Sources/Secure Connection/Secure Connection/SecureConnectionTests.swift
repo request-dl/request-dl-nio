@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import NIOCore
 import NIOSSL
 @testable import RequestDL
 
@@ -32,7 +33,7 @@ class SecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut?.maximumTLSVersion, secureConnection.maximumTLSVersion)
         XCTAssertEqual(sut?.cipherSuites, secureConnection.cipherSuites)
         XCTAssertEqual(sut?.cipherSuiteValues, secureConnection.cipherSuiteValues)
-        XCTAssertNil(sut?.keyLogCallback)
+        XCTAssertNil(sut?.keyLogger)
     }
 
     func testSecure_whenUpdatesVerification_shouldBeValid() async throws {
@@ -276,7 +277,31 @@ class SecureConnectionTests: XCTestCase {
         })
     }
 
-    func testSecure_whenUpdatesKeyLog_shouldBeValid() async throws {
+    func testSecure_whenUpdatesKeyLogger() async throws {
+        // Given
+        final class KeyLogger: SSLKeyLogger {
+            func callAsFunction(_ bytes: NIOCore.ByteBuffer) {}
+        }
+
+        let logger = KeyLogger()
+
+        // When
+        let (session, _) = try await resolve(TestProperty {
+            RequestDL.SecureConnection {}
+                .keyLogger(logger)
+        })
+
+        let sut = session.configuration.secureConnection
+
+        // Then
+        XCTAssertTrue(sut?.keyLogger === logger)
+    }
+}
+
+@available(*, deprecated)
+extension SecureConnectionTests {
+
+    func testSecure_whenUpdatesKeyLogWithClosure_shouldBeValid() async throws {
         // When
         let (session, _) = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
@@ -286,6 +311,6 @@ class SecureConnectionTests: XCTestCase {
         let sut = session.configuration.secureConnection
 
         // Then
-        XCTAssertNotNil(sut?.keyLogCallback)
+        XCTAssertNotNil(sut?.keyLogger)
     }
 }
