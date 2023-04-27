@@ -87,3 +87,61 @@ extension PropertyModifierTests {
         ])
     }
 }
+
+extension PropertyModifierTests {
+
+    struct PathEnvironmentKey: EnvironmentKey {
+        static var defaultValue: String?
+    }
+
+    struct PathModifier: PropertyModifier {
+
+        @Environment(\.path) var path
+
+        func body(content: Content) -> some Property {
+            content
+
+            if let path {
+                Path(path)
+            }
+        }
+    }
+
+    func testModifier_whenPathEnvironmentSet() async throws {
+        // Given
+        let additionalPath = "api"
+        let modifier = PathModifier()
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL("www.google.com")
+                .modifier(modifier)
+                .environment(\.path, additionalPath)
+        })
+
+        // Then
+        XCTAssertEqual(request.url, "https://www.google.com/\(additionalPath)")
+    }
+
+    func testModifier_whenPathEnvironmentIsNotSet() async throws {
+        // Given
+        let modifier = PathModifier()
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL("www.google.com")
+                .modifier(modifier)
+        })
+
+        // Then
+        XCTAssertEqual(request.url, "https://www.google.com")
+    }
+}
+
+extension EnvironmentValues {
+
+    fileprivate var path: String? {
+        get { self[PropertyModifierTests.PathEnvironmentKey.self] }
+        set { self[PropertyModifierTests.PathEnvironmentKey.self] = newValue }
+    }
+}

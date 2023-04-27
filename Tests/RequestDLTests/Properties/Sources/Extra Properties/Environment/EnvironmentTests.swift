@@ -3,7 +3,7 @@
 */
 
 import XCTest
-@testable @_spi(Private) import RequestDL
+@testable import RequestDL
 
 class EnvironmentTests: XCTestCase {
 
@@ -13,19 +13,12 @@ class EnvironmentTests: XCTestCase {
 
     struct IntegerReceiver: Property {
 
+        @Environment(\.integer) var integer
         let value: (Int) -> Void
 
-        var body: Never {
-            bodyException()
-        }
-
-        static func _makeProperty(
-            property: _GraphValue<EnvironmentTests.IntegerReceiver>,
-            inputs: _PropertyInputs
-        ) async throws -> _PropertyOutputs {
-            property.assertPathway()
-            property.value(inputs.environment.integer)
-            return .init(EmptyLeaf())
+        var body: EmptyProperty {
+            value(integer)
+            return EmptyProperty()
         }
     }
 

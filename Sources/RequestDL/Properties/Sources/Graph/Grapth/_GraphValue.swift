@@ -100,7 +100,7 @@ extension _GraphValue {
         previous?.assertNext(id)
     }
 
-    fileprivate func hash() -> Int {
+    var pathwayHashValue: Int {
         sequence(first: self as _RawGraphValue, next: { $0.previous })
             .map(\.next)
             .hashValue
