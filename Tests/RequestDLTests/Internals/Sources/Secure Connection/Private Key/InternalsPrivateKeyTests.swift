@@ -35,37 +35,41 @@ class InternalsPrivateKeyTests: XCTestCase {
 
     func testPrivate_whenPEMWithPassword_shouldBeValid() async throws {
         // Given
-        let password = "password123"
+        let password = NIOSSLSecureBytes("password123".utf8)
         let certificates = Certificates().client(password: true)
 
         let data = try Data(contentsOf: certificates.privateKeyURL)
 
         // When
-        let resolved = try Internals.PrivateKey(Array(data), format: .pem) {
-            $0(Array(Data(password.utf8)))
-        }.build()
+        let resolved = try Internals.PrivateKey(
+            Array(data),
+            format: .pem,
+            password: password
+        ).build()
 
         // Then
         XCTAssertEqual(resolved, try .init(bytes: Array(data), format: .pem) {
-            $0(Array(Data(password.utf8)))
+            $0(password)
         })
     }
 
     func testPrivate_whenDERWithPassword_shouldBeValid() async throws {
         // Given
-        let password = "password123"
+        let password = NIOSSLSecureBytes("password123".utf8)
         let certificates = Certificates(.der).client(password: true)
 
         let data = try Data(contentsOf: certificates.privateKeyURL)
 
         // When
-        let resolved = try Internals.PrivateKey(Array(data), format: .der) {
-            $0(Array(Data(password.utf8)))
-        }.build()
+        let resolved = try Internals.PrivateKey(
+            Array(data),
+            format: .der,
+            password: password
+        ).build()
 
         // Then
         XCTAssertEqual(resolved, try .init(bytes: Array(data), format: .der) {
-            $0(Array(Data(password.utf8)))
+            $0(password)
         })
     }
 
@@ -96,35 +100,39 @@ class InternalsPrivateKeyTests: XCTestCase {
 
     func testPrivate_whenPEMFileWithPassword_shouldBeValid() async throws {
         // Given
-        let password = "password123"
+        let password = NIOSSLSecureBytes("password123".utf8)
         let certificates = Certificates().client(password: true)
         let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
 
         // When
-        let resolved = try Internals.PrivateKey(file, format: .pem) {
-            $0(Array(Data(password.utf8)))
-        }.build()
+        let resolved = try Internals.PrivateKey(
+            file,
+            format: .pem,
+            password: password
+        ).build()
 
         // Then
         XCTAssertEqual(resolved, try .init(file: file, format: .pem) {
-            $0(Array(Data(password.utf8)))
+            $0(password)
         })
     }
 
     func testPrivate_whenDERFileWithPassword_shouldBeValid() async throws {
         // Given
-        let password = "password123"
+        let password = NIOSSLSecureBytes("password123".utf8)
         let certificates = Certificates(.der).client(password: true)
         let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
 
         // When
-        let resolved = try Internals.PrivateKey(file, format: .der) {
-            $0(Array(Data(password.utf8)))
-        }.build()
+        let resolved = try Internals.PrivateKey(
+            file,
+            format: .der,
+            password: password
+        ).build()
 
         // Then
         XCTAssertEqual(resolved, try .init(file: file, format: .der) {
-            $0(Array(Data(password.utf8)))
+            $0(password)
         })
     }
 }
