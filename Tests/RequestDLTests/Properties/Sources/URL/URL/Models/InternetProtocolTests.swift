@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class InternetProtocolTests: XCTestCase {
+@RequestActor
+class InternetProtocolTests: XCTestCase {
 
     func testHttpRawValue() async throws {
         XCTAssertEqual(InternetProtocol.http, "http")

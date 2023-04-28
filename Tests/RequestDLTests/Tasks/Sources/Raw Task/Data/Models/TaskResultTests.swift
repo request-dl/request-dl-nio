@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class TaskResultTests: XCTestCase {
+@RequestActor
+class TaskResultTests: XCTestCase {
 
     func testResult() async throws {
         // Given

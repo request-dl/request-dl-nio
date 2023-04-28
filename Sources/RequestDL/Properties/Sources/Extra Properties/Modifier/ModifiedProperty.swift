@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: Property {
 
     let content: Content
@@ -13,6 +14,7 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
         bodyException()
     }
 
+    @RequestActor
     static func _makeProperty(
         property: _GraphValue<ModifiedProperty<Content, Modifier>>,
         inputs: _PropertyInputs

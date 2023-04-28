@@ -28,6 +28,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 public struct Payload<Provider>: Property {
 
     enum Source {
@@ -113,6 +114,7 @@ public struct Payload<Provider>: Property {
 
 extension Payload {
 
+    @RequestActor
     struct Node: PropertyNode {
 
         private let source: () -> Source
@@ -132,6 +134,7 @@ extension Payload {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Payload<Provider>>,
         inputs: _PropertyInputs

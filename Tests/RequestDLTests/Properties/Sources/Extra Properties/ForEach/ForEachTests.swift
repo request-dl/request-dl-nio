@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ForEachTests: XCTestCase {
+@RequestActor
+class ForEachTests: XCTestCase {
 
     struct Value: Identifiable {
         let id: String

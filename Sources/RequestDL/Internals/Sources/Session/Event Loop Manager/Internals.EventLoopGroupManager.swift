@@ -9,7 +9,8 @@ import _Concurrency
 
 extension Internals {
 
-    actor EventLoopGroupManager {
+    @RequestActor
+    class EventLoopGroupManager {
 
         static let shared = EventLoopGroupManager()
 

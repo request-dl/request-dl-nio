@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class StatusCodeSetTests: XCTestCase {
+@RequestActor
+class StatusCodeSetTests: XCTestCase {
 
     func testInit() async throws {
         let set = StatusCodeSet()

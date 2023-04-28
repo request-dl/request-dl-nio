@@ -9,6 +9,7 @@ extension Headers {
     /**
     A struct that represents the `Accept` header, used to specify the desired response content type for an HTTP request.
     */
+    @RequestActor
     public struct Accept: Property {
 
         private let type: RequestDL.ContentType
@@ -32,6 +33,7 @@ extension Headers {
 extension Headers.Accept {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Headers.Accept>,
         inputs: _PropertyInputs

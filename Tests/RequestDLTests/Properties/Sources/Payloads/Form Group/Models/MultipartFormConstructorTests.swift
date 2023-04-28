@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class MultipartFormConstructorTests: XCTestCase {
+@RequestActor
+class MultipartFormConstructorTests: XCTestCase {
 
     func testSingleMultipartConstructor() async throws {
         // Given

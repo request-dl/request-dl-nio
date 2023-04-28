@@ -5,6 +5,7 @@
 import Foundation
 
 @dynamicMemberLookup
+@RequestActor
 public struct _GraphValue<Content: Property> {
 
     private let content: Content

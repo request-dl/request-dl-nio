@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class NeverPropertyTests: XCTestCase {
+@RequestActor
+class NeverPropertyTests: XCTestCase {
 
     private struct NeverBuilds: Property {
 

@@ -5,6 +5,7 @@
 import Foundation
 
 @dynamicMemberLookup
+@RequestActor
 struct Leaf<Property: PropertyNode>: Node {
 
     private let property: Property
@@ -31,11 +32,11 @@ extension Leaf: PropertyNode {
 
 extension Leaf {
 
-    private var propertyDescription: String {
+    private nonisolated var propertyDescription: String {
         "property = \(property.nodeDescription)"
     }
 
-    var nodeDescription: String {
+    nonisolated var nodeDescription: String {
         let title = String(describing: type(of: self))
         let values = propertyDescription.debug_shiftLines()
         return "\(title) {\n\(values)\n}"

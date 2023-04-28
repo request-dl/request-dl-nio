@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 protocol PropertyNode: NodeStringConvertible {
 
     func make(_ make: inout Make) async throws
@@ -11,7 +12,7 @@ protocol PropertyNode: NodeStringConvertible {
 
 extension PropertyNode {
 
-    var nodeDescription: String {
+    nonisolated var nodeDescription: String {
         #if DEBUG
         return NodeDebug(self).describe()
         #else

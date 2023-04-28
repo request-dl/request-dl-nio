@@ -7,6 +7,7 @@ import Foundation
 extension Headers {
 
     /// A header property that accepts any value for the given key.
+    @RequestActor
     public struct `Any`: Property {
 
         let key: String
@@ -34,6 +35,7 @@ extension Headers {
 extension Headers.`Any` {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Headers.`Any`>,
         inputs: _PropertyInputs

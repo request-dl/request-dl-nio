@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersCacheTests: XCTestCase {
+@RequestActor
+class HeadersCacheTests: XCTestCase {
 
     func testDefaultValues() async throws {
         let cache = Headers.Cache()

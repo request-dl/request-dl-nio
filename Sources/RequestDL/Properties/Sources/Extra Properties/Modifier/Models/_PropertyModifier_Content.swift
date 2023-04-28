@@ -6,6 +6,7 @@ import Foundation
 
 /// This struct is marked as internal and is not intended
 /// to be used directly by clients of this framework.
+@RequestActor
 public struct _PropertyModifier_Content<Modifier: PropertyModifier>: Property {
 
     typealias Inputs = (_GraphValue<Self>, _PropertyInputs)
@@ -22,6 +23,7 @@ public struct _PropertyModifier_Content<Modifier: PropertyModifier>: Property {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<_PropertyModifier_Content<Modifier>>,
         inputs: _PropertyInputs

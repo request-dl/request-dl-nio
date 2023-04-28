@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+@RequestActor
 class InternalsCertificateFormatTests: XCTestCase {
 
     func testFormat_whenIsPEM_shouldBePEM() async throws {

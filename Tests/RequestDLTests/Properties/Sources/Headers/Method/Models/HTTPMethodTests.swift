@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HTTPMethodTests: XCTestCase {
+@RequestActor
+class HTTPMethodTests: XCTestCase {
 
     func testGetMethodRawValue() async throws {
         XCTAssertEqual(HTTPMethod.get, "GET")

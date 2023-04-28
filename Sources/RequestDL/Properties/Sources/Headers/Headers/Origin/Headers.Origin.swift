@@ -20,6 +20,7 @@ extension Headers {
      Headers.Origin("https://example.com")
      ```
      */
+    @RequestActor
     public struct Origin: Property {
 
         private let value: Any
@@ -57,6 +58,7 @@ extension Headers {
 extension Headers.Origin {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Headers.Origin>,
         inputs: _PropertyInputs

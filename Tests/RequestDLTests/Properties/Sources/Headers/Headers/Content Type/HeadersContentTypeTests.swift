@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersContentTypeTests: XCTestCase {
+@RequestActor
+class HeadersContentTypeTests: XCTestCase {
 
     func testHeadersJsonContentType() async throws {
         let property = TestProperty(Headers.ContentType(.json))

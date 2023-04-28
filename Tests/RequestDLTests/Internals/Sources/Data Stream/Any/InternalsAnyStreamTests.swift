@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class InternalsAnyStreamTests: XCTestCase {
 
     class StreamMock: StreamProtocol {

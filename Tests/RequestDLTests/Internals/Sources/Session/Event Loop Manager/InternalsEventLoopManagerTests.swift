@@ -7,6 +7,7 @@ import NIOCore
 import NIOPosix
 @testable import RequestDL
 
+@RequestActor
 class InternalsEventLoopManagerTests: XCTestCase {
 
     struct CustomProvider: SessionProvider {

@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class TrustsTests: XCTestCase {
 
     var client: CertificateResource!

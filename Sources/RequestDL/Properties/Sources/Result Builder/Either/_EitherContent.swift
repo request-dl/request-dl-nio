@@ -6,6 +6,7 @@ import Foundation
 
 /// This struct is marked as internal and is not intended
 /// to be used directly by clients of this framework.
+@RequestActor
 public struct _EitherContent<First: Property, Second: Property>: Property {
 
     private let _first: () -> First
@@ -53,6 +54,7 @@ extension _EitherContent {
 extension _EitherContent {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<_EitherContent<First, Second>>,
         inputs: _PropertyInputs

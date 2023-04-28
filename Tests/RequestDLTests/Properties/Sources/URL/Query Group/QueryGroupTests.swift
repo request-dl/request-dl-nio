@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class QueryGroupTests: XCTestCase {
+@RequestActor
+class QueryGroupTests: XCTestCase {
 
     func testGroupOfQueries() async throws {
         // Given

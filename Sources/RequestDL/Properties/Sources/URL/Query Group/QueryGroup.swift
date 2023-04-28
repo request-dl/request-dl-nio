@@ -19,6 +19,7 @@ Usage:
  }
  ```
  */
+@RequestActor
 public struct QueryGroup<Content: Property>: Property {
 
     let content: Content
@@ -67,6 +68,7 @@ extension QueryGroup {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<QueryGroup<Content>>,
         inputs: _PropertyInputs

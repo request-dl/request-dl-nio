@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 struct Resolve<Root: Property> {
 
     private let root: _GraphValue<_Root>
@@ -54,6 +55,7 @@ struct Resolve<Root: Property> {
 
 extension Resolve {
 
+    @RequestActor
     struct _Root: Property {
 
         let body: Root

@@ -4,16 +4,19 @@
 
 import Foundation
 
+@RequestActor
 protocol SecureConnectionCollectorPropertyNode {
 
     func make(_ collector: inout SecureConnectionNode.Collector)
 }
 
+@RequestActor
 protocol SecureConnectionPropertyNode {
 
     func make(_ secureConnection: inout Internals.SecureConnection)
 }
 
+@RequestActor
 struct SecureConnectionNode: PropertyNode {
 
     private let source: Source
@@ -49,6 +52,7 @@ extension SecureConnectionNode {
 
 extension SecureConnectionNode {
 
+    @RequestActor
     struct Contains {
 
         fileprivate let source: Source
@@ -63,6 +67,7 @@ extension SecureConnectionNode {
         }
     }
 
+    @RequestActor
     var contains: Contains {
         .init(source: source)
     }
@@ -70,6 +75,7 @@ extension SecureConnectionNode {
 
 extension SecureConnectionNode {
 
+    @RequestActor
     struct Passthrough {
 
         fileprivate let source: Source
@@ -84,6 +90,7 @@ extension SecureConnectionNode {
         }
     }
 
+    @RequestActor
     var passthrough: Passthrough {
         .init(source: source)
     }
@@ -91,6 +98,7 @@ extension SecureConnectionNode {
 
 extension SecureConnectionNode {
 
+    @RequestActor
     struct Collector {
 
         var certificateChain: [Internals.Certificate]?
@@ -151,6 +159,7 @@ extension SecureConnectionNode.Collector {
 
 extension Internals.SecureConnection {
 
+    @RequestActor
     func collector() -> SecureConnectionNode.Collector {
         .init(self)
     }

@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class PropertyBuilderTests: XCTestCase {
+@RequestActor
+class PropertyBuilderTests: XCTestCase {
 
     func testSingleBuildBlock() async throws {
         // Given

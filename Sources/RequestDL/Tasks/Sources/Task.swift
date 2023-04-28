@@ -17,6 +17,7 @@ import Foundation
  - Note: The Task protocol does not specify how the request is made or how the result is processed,
  it only provides a way to execute a request and receive its result asynchronously.
  */
+@RequestActor
 public protocol Task<Element> {
 
     associatedtype Element

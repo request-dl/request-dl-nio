@@ -11,6 +11,7 @@ import Foundation
  type, as well as a function `body(content:)` that takes in a `Content` parameter and returns
  a `Body`.
  */
+@RequestActor
 public protocol PropertyModifier {
 
     typealias Content = _PropertyModifier_Content<Self>

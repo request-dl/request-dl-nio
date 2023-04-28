@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+@RequestActor
 class PSKIdentityTests: XCTestCase {
 
     func testIdentity_whenClientResolver() async throws {

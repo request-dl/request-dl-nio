@@ -19,6 +19,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 public struct HeaderGroup<Content: Property>: Property {
 
     let content: Content
@@ -68,6 +69,7 @@ extension HeaderGroup {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<HeaderGroup<Content>>,
         inputs: _PropertyInputs

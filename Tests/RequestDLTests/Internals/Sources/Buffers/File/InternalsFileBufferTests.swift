@@ -6,6 +6,7 @@ import XCTest
 @testable import RequestDL
 
 // swiftlint:disable type_body_length file_length
+@RequestActor
 class InternalsFileBufferTests: XCTestCase {
 
     var fileURL: URL!

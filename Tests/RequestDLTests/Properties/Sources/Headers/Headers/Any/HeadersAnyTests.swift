@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersAnyTests: XCTestCase {
+@RequestActor
+class HeadersAnyTests: XCTestCase {
 
     func testSingleHeaderAny() async throws {
         let property = TestProperty(Headers.Any("password", forKey: "xxx-api-key"))

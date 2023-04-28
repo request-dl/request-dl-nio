@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsOneHierarchy_shouldBeValid() async throws {

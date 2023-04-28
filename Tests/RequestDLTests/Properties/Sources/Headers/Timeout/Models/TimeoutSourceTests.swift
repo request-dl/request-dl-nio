@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class TimeoutSourceTests: XCTestCase {
+@RequestActor
+class TimeoutSourceTests: XCTestCase {
 
     func testRequestTimeout() async throws {
         let requestTimeout = Timeout.Source.connect

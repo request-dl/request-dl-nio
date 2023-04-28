@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class AuthorizationTokenTypeTests: XCTestCase {
+@RequestActor
+class AuthorizationTokenTypeTests: XCTestCase {
 
     func testInitRawValueBasic() async throws {
         let type = Authorization.TokenType.basic

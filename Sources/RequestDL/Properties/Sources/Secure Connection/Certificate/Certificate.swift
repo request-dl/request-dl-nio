@@ -14,6 +14,7 @@ import Foundation
 /// let certData = Data(base64Encoded: "...")
 /// let cert = Certificate(certData!, format: .der)
 /// ```
+@RequestActor
 public struct Certificate: Property {
 
     private let source: CertificateNode.Source
@@ -68,6 +69,7 @@ public struct Certificate: Property {
 extension Certificate {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Certificate>,
         inputs: _PropertyInputs

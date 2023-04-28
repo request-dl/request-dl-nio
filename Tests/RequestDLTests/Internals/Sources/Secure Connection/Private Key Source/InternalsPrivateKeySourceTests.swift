@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class InternalsPrivateKeySourceTests: XCTestCase {
 
     var certificate: CertificateResource!

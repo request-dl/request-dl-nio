@@ -5,6 +5,7 @@
 import Foundation
 
 /// A struct representing the reading mode used for reading data.
+@RequestActor
 public struct ReadingMode: Property {
 
     private let mode: Internals.Response.ReadingMode
@@ -53,6 +54,7 @@ extension ReadingMode {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<ReadingMode>,
         inputs: _PropertyInputs

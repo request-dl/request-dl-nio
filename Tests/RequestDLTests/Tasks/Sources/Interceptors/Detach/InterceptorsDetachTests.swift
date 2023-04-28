@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class InterceptorsDetachTests: XCTestCase {
+@RequestActor
+class InterceptorsDetachTests: XCTestCase {
 
     func testDetach() async throws {
         // Given

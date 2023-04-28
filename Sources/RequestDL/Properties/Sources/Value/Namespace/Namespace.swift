@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 @propertyWrapper
 public struct Namespace: PropertyValue {
 

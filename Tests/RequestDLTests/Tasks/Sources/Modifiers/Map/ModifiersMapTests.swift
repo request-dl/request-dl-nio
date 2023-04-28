@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ModifiersMapTests: XCTestCase {
+@RequestActor
+class ModifiersMapTests: XCTestCase {
 
     func testMap() async throws {
         // Given

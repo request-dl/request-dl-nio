@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class InternalsAsyncResponseTests: XCTestCase {
 
     var upload: Internals.DataStream<Int>!

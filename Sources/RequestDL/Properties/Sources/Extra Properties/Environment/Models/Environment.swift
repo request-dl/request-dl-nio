@@ -43,6 +43,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 @propertyWrapper
 public struct Environment<Value>: PropertyValue {
 

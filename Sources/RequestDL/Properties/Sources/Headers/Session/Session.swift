@@ -23,6 +23,7 @@ import NIOCore
  }
  ```
  */
+@RequestActor
 public struct Session: Property {
 
     private var _configuration: Internals.Session.Configuration
@@ -190,6 +191,7 @@ extension Session {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Session>,
         inputs: _PropertyInputs

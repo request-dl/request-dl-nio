@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class TaskMethodsTests: XCTestCase {
+@RequestActor
+class TaskMethodsTests: XCTestCase {
 
     func testPinging() async throws {
         // Given

@@ -52,6 +52,7 @@ import Foundation
  The resulting URL of the above request would be `BaseURL/users/1234\/posts`.
  ```
  */
+@RequestActor
 public struct Path: Property {
 
     private let path: String
@@ -89,6 +90,7 @@ extension Path {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Path>,
         inputs: _PropertyInputs

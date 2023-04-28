@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeaderGroupTests: XCTestCase {
+@RequestActor
+class HeaderGroupTests: XCTestCase {
 
     func testHeaderGroupWithEmptyValue() async throws {
         let property = TestProperty(HeaderGroup {})

@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class TLSCipherTests: XCTestCase {
 
     func testCipher_TLS_RSA_WITH_AES_128_CBC_SHA() {

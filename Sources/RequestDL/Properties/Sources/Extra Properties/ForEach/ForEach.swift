@@ -24,6 +24,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Hashable, Content: Property {
 
     /// The sequence of data to be iterated over.
@@ -122,6 +123,7 @@ extension ForEach {
 extension ForEach {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<ForEach<Data, ID, Content>>,
         inputs: _PropertyInputs

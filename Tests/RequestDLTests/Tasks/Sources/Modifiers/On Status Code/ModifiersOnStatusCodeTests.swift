@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ModifiersOnStatusCodeTests: XCTestCase {
+@RequestActor
+class ModifiersOnStatusCodeTests: XCTestCase {
 
     struct AnyError: Error {}
 

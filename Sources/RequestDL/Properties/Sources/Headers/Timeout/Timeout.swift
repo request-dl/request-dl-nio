@@ -29,6 +29,7 @@ import Foundation
  before terminating the connection. The timeout parameter is the duration of time before the timeout
  occurs, and the source parameter specifies the type of timeout to be applied
  */
+@RequestActor
 public struct Timeout: Property {
 
     let timeout: UnitTime
@@ -76,6 +77,7 @@ extension Timeout {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Timeout>,
         inputs: _PropertyInputs

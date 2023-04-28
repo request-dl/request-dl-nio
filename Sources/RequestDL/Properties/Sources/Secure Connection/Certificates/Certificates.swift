@@ -10,6 +10,7 @@ import Foundation
 
  The receiver obtains the sender's certificates as Trust Roots.
  */
+@RequestActor
 public struct Certificates<Content: Property>: Property {
 
     enum Source {
@@ -122,6 +123,7 @@ extension Certificates {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Certificates<Content>>,
         inputs: _PropertyInputs

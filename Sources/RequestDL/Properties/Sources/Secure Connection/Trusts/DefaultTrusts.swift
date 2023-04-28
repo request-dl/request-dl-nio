@@ -7,6 +7,7 @@ import Foundation
 /**
  A structure that represents default trusts.
  */
+@RequestActor
 public struct DefaultTrusts: Property {
 
     /**
@@ -30,6 +31,7 @@ extension DefaultTrusts {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<DefaultTrusts>,
         inputs: _PropertyInputs

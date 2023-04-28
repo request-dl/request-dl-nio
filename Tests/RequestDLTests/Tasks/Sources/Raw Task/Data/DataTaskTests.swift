@@ -6,7 +6,8 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
-final class DataTaskTests: XCTestCase {
+@RequestActor
+class DataTaskTests: XCTestCase {
 
     func testDataTask() async throws {
         // Given

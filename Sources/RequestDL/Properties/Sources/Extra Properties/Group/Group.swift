@@ -21,6 +21,7 @@ import Foundation
 ///     }
 /// }
 /// ```
+@RequestActor
 public struct Group<Content: Property>: Property {
 
     /// The properties contained within the group.
@@ -42,6 +43,7 @@ public struct Group<Content: Property>: Property {
 extension Group {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Group<Content>>,
         inputs: _PropertyInputs

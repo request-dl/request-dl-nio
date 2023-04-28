@@ -6,7 +6,8 @@ import XCTest
 @testable import RequestDL
 
 #if DEBUG
-final class InterceptorsBreakpointTests: XCTestCase {
+@RequestActor
+class InterceptorsBreakpointTests: XCTestCase {
 
     func testBreakpoint() async throws {
         // Given

@@ -9,6 +9,7 @@ public enum Headers {}
 
 extension Headers {
 
+    @RequestActor
     struct Node: PropertyNode {
         let key: String
         let value: Any

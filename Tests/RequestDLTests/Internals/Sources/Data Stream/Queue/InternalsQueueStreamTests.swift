@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class InternalsQueueStreamTests: XCTestCase {
 
     var stream: Internals.QueueStream<Int>!

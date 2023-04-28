@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class InternalsAsyncBytesTests: XCTestCase {
 
     var stream: Internals.DataStream<Internals.DataBuffer>!

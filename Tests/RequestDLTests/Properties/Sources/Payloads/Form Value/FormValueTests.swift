@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class FormValueTests: XCTestCase {
+@RequestActor
+class FormValueTests: XCTestCase {
 
     func testSingleForm() async throws {
         // Given

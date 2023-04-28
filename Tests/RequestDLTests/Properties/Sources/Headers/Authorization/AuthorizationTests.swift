@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class AuthorizationTests: XCTestCase {
+@RequestActor
+class AuthorizationTests: XCTestCase {
 
     func testAuthorizationWithTypeAndToken() async throws {
         // Given

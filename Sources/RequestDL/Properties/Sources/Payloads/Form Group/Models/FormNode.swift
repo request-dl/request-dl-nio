@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 struct FormNode: PropertyNode {
 
     let factory: () -> PartFormRawValue
