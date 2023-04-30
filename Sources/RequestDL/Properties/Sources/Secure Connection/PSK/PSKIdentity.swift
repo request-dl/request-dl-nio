@@ -25,15 +25,6 @@ public struct PSKIdentity: Property {
         self.source = .client(resolver)
     }
 
-    /// Creates a PSK identity for server-side authentication with the given resolver.
-    ///
-    /// - Parameters:
-    ///   - resolver: The server PSK identity resolver.
-    @available(*, deprecated, message: "RequestDL is for client-side usage only")
-    public init(_ resolver: SSLPSKServerIdentityResolver) {
-        self.source = .server
-    }
-
     fileprivate func edit(_ edit: (inout Self) -> Void) -> Self {
         var mutableSelf = self
         edit(&mutableSelf)
@@ -110,6 +101,15 @@ extension PSKIdentity {
         self.init(ClientResolver(closure))
     }
 
+    /// Creates a PSK identity for server-side authentication with the given resolver.
+    ///
+    /// - Parameters:
+    ///   - resolver: The server PSK identity resolver.
+    @available(*, deprecated, message: "RequestDL is for client-side usage only")
+    public init(_ resolver: SSLPSKServerIdentityResolver) {
+        self.source = .server
+    }
+
     /// Creates a PSK identity for server-side authentication with the given type and closure that
     /// generates the PSK.
     ///
@@ -121,7 +121,7 @@ extension PSKIdentity {
         _ psk: PSKServer,
         _ closure: @Sendable @escaping (PSKServerDescription) throws -> PSKServerIdentity
     ) {
-        self.init(ServerResolver(closure))
+        self.source = .server
     }
 
     /// Creates a PSK identity for client-side authentication with the given type and closure that
@@ -153,20 +153,6 @@ extension PSKIdentity {
                 key: response.key,
                 identity: response.identity
             )
-        }
-    }
-
-    fileprivate final class ServerResolver: SSLPSKServerIdentityResolver {
-
-        private let resolver: @Sendable (PSKServerDescription) throws -> PSKServerIdentity
-
-        init(_ resolver: @Sendable @escaping (PSKServerDescription) throws -> PSKServerIdentity) {
-            self.resolver = resolver
-        }
-
-        func callAsFunction(_ hint: String, client identity: String) throws -> PSKServerIdentityResponse {
-            let response = try resolver(.init(serverHint: hint, clientHint: identity))
-            return .init(key: response.key)
         }
     }
 }
