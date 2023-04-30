@@ -40,7 +40,10 @@ extension Internals {
         }
 
         func request(_ request: Request) async throws -> SessionTask {
-            let client = try await manager.client(provider, for: configuration)
+            let client = try await manager.client(
+                provider: provider,
+                configuration: configuration
+            )
 
             let upload = DataStream<Int>()
             let head = DataStream<ResponseHead>()
@@ -75,7 +78,7 @@ extension Internals {
 
 extension Internals {
 
-    @RequestActor
+    @HTTPClientActor
     class SessionManager {
 
         static let lifetime: Int = 5_000_000_000
@@ -89,9 +92,9 @@ extension Internals {
             scheduleCleanup()
         }
 
-        func client(
-            _ provider: SessionProvider,
-            for configuration: Internals.Session.Configuration
+        private func _client(
+            provider: SessionProvider,
+            configuration: Internals.Session.Configuration
         ) async throws -> Internals.Client {
             if var items = table[provider.id] {
                 if let (index, item) = items.enumerated().first(where: { $1.configuration == configuration }) {
@@ -102,9 +105,9 @@ extension Internals {
             }
 
             let configurationBuilt = try configuration.build()
-            let providerBuilt = await EventLoopGroupManager.shared.provider(provider)
+            let providerBuilt = EventLoopGroupManager.shared.provider(provider)
 
-            let client = await Internals.Client(
+            let client = Internals.Client(
                 eventLoopGroupProvider: .shared(providerBuilt),
                 configuration: configurationBuilt
             )
@@ -118,6 +121,25 @@ extension Internals {
 
             table[provider.id] = items
             return client
+        }
+
+        func client(
+            provider: SessionProvider,
+            configuration: Internals.Session.Configuration
+        ) async throws -> Internals.Client {
+            if case .background = _Concurrency.Task.currentPriority {
+                return try await _client(
+                    provider: provider,
+                    configuration: configuration
+                )
+            } else {
+                return try await _Concurrency.Task(priority: .background) {
+                    try await _client(
+                        provider: provider,
+                        configuration: configuration
+                    )
+                }.value
+            }
         }
     }
 }
@@ -140,7 +162,7 @@ extension Internals.SessionManager {
             var optionalItems = items as [Internals.Item?]
 
             for (index, item) in items.enumerated() {
-                if await item.client.isRunning {
+                if item.client.isRunning {
                     optionalItems[index] = item.updatingReadAt()
                 } else if now.distance(to: item.readAt) > lifetime {
                     if (try? await item.client.shutdown()) ?? false {
@@ -247,7 +269,7 @@ class RequestManager {
     private weak var last: RequestOperation?
 
     init() {
-        let root = Root()
+        let root = Root(delegate: nil)
 
         self.root = root
         self.last = root
@@ -255,7 +277,7 @@ class RequestManager {
 
     func operation() -> RequestOperation {
         let last = last ?? root
-        let operation = RequestOperation()
+        let operation = RequestOperation(delegate: self)
         operation.connect(to: last)
         self.last = operation
         return operation
@@ -266,13 +288,31 @@ class RequestManager {
     }
 }
 
+extension RequestManager: RequestOperationDelegate {
+
+    func operationDidComplete(_ operation: RequestOperation) {
+        if operation === last {
+            last = last?.previous ?? root
+        }
+    }
+}
+
+@HTTPClientActor
+protocol RequestOperationDelegate: AnyObject {
+
+    func operationDidComplete(_ operation: RequestOperation)
+}
+
 @HTTPClientActor
 class RequestOperation {
 
     private(set) weak var previous: RequestOperation?
     private(set) var next: RequestOperation?
+    private weak var delegate: RequestOperationDelegate?
 
-    init() {}
+    init(delegate: RequestOperationDelegate?) {
+        self.delegate = delegate
+    }
 
     func connect(to operation: RequestOperation) {
         operation.next = self
@@ -281,6 +321,9 @@ class RequestOperation {
 
     func complete() {
         previous?.next = next
+        next?.previous = previous
+
+        delegate?.operationDidComplete(self)
     }
 }
 

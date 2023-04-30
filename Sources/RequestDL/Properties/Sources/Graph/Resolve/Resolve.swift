@@ -46,7 +46,7 @@ struct Resolve<Root: Property> {
 
         try await output.node._make(&make)
 
-        let session = try await Internals.Session(
+        let session = Internals.Session(
             provider: sessionNode?.provider ?? .shared,
             configuration: make.configuration
         )
