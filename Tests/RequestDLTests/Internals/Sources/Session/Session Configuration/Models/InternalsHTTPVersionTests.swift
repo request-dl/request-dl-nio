@@ -8,14 +8,43 @@ import AsyncHTTPClient
 
 class InternalsHTTPVersionTests: XCTestCase {
 
-    /*
-    enum HTTPVersion: Equatable {
-        case http1Only
-        case automatic
-    }
-     */
+    func testVersion_whenHTTP1Only() {
+        // Given
+        let version = Internals.HTTPVersion.http1Only
 
-    func testHelloWorld() {
-        XCTFail("Hello World")
+        // When
+        let sut = version.build()
+
+        // Then
+        XCTAssertEqual(sut, .http1Only)
+    }
+
+    func testVersion_whenAutomatic() {
+        // Given
+        let version = Internals.HTTPVersion.automatic
+
+        // When
+        let sut = version.build()
+
+        // Then
+        XCTAssertEqual(sut, .automatic)
+    }
+
+    func testVersion_whenEquals() {
+        // Given
+        let lhs = Internals.HTTPVersion.http1Only
+        let rhs = Internals.HTTPVersion.http1Only
+
+        // Then
+        XCTAssertEqual(lhs, rhs)
+    }
+
+    func testVersion_whenNotEquals() {
+        // Given
+        let lhs = Internals.HTTPVersion.http1Only
+        let rhs = Internals.HTTPVersion.automatic
+
+        // Then
+        XCTAssertNotEqual(lhs, rhs)
     }
 }
