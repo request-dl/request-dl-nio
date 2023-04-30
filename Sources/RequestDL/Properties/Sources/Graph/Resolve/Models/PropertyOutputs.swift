@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 public struct _PropertyOutputs {
 
     let node: Node
@@ -13,7 +14,6 @@ public struct _PropertyOutputs {
     }
 }
 
-@RequestActor
 extension _PropertyOutputs {
 
     static var empty: Self {

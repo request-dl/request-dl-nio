@@ -25,8 +25,7 @@ struct GraphNamespaceOperation<Content>: GraphValueOperation {
             labels.append(child.label ?? "nil")
             let namespaceID = Namespace.ID(
                 base: Content.self,
-                namespace: labels.joined(separator: "."),
-                hashValue: properties.pathway
+                namespace: labels.joined(separator: ".")
             )
 
             namespace.id = namespaceID

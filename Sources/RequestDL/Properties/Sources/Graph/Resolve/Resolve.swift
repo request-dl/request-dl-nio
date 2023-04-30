@@ -15,7 +15,9 @@ struct Resolve<Root: Property> {
 
     private func inputs() -> _PropertyInputs {
         .init(
-            environment: .init()
+            environment: .init(),
+            namespaceID: .global,
+            seedFactory: .init()
         )
     }
 
