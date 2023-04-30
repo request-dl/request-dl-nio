@@ -199,7 +199,7 @@ extension PSKIdentityTests {
         }
 
         // Then
-        let _ = try await resolve(TestProperty {
+        _ = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(
                     ServerResolver(.init()) { _, _ in }
@@ -221,7 +221,7 @@ extension PSKIdentityTests {
         }
 
         // Then
-        let _ = try await resolve(TestProperty {
+        _ = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(.server) { _ in
                     return .init(.init())

@@ -48,7 +48,6 @@ extension Node {
     }
 }
 
-
 extension Node {
 
     var nodeDescription: String {
