@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+// swiftlint:disable file_length
 @RequestActor
 class PrivateKeyTests: XCTestCase {
 
@@ -419,3 +420,4 @@ extension PrivateKeyTests {
         )
     }
 }
+// swiftlint:enable file_length

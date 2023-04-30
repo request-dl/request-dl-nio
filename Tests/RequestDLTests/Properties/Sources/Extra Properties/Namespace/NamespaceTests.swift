@@ -174,5 +174,3 @@ extension NamespaceTests {
         ))
     }
 }
-
-

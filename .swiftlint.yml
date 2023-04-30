@@ -29,6 +29,8 @@ type_name:
         - _DataPayload
         - _DictionaryPayload
         - _StringPayload
+    excluded:
+        - ID
 
 large_tuple:
     warning: 9
