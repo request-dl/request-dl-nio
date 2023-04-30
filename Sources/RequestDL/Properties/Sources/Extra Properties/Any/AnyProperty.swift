@@ -13,10 +13,8 @@ public struct AnyProperty: Property {
     /// Initializes a new instance of `AnyProperty` with the given property `Content`.
     public init<Content: Property>(_ property: Content) {
         self.makeProperty = { graph, inputs in
-            let id = ObjectIdentifier(Content.self)
-
-            return try await Content._makeProperty(
-                property: graph.detach(id, next: property),
+            try await Content._makeProperty(
+                property: graph.detach(next: property),
                 inputs: inputs
             )
         }
