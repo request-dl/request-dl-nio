@@ -6,6 +6,7 @@ import XCTest
 import NIOCore
 @testable import RequestDL
 
+@RequestActor
 class InternalsBodySequenceTests: XCTestCase {
 
     func testBodySequence_whenEmpty_shouldBeEmpty() async throws {

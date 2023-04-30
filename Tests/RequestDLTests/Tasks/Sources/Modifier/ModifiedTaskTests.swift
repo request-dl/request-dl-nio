@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ModifiedTaskTests: XCTestCase {
+@RequestActor
+class ModifiedTaskTests: XCTestCase {
 
     struct Modified<Body: Task>: TaskModifier {
 

@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class ReadingModeTests: XCTestCase {
 
     func testReadingByLength() async throws {

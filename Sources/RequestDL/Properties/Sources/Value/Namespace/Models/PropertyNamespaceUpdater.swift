@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 struct PropertyNamespaceUpdater<Content> {
 
     private let content: Content

@@ -7,6 +7,7 @@ import Foundation
 extension Headers {
 
     /// A property that represents the host of a network request.
+    @RequestActor
     public struct Host: Property {
 
         private let value: Any
@@ -45,6 +46,7 @@ extension Headers {
 extension Headers.Host {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Headers.Host>,
         inputs: _PropertyInputs

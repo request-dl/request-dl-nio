@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+@RequestActor
 class PSKServerCertificateTests: XCTestCase {
 
     func testPSK_whenInit_shouldBeValid() async throws {

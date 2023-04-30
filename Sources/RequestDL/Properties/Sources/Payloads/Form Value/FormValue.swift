@@ -7,6 +7,7 @@ import Foundation
 /// `FormValue` is a type of property that represents a single value in a multipart form-data request
 ///
 /// It can be used to represent simple values like strings and numbers.
+@RequestActor
 public struct FormValue: Property {
 
     let key: String
@@ -39,6 +40,7 @@ public struct FormValue: Property {
 extension FormValue {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<FormValue>,
         inputs: _PropertyInputs

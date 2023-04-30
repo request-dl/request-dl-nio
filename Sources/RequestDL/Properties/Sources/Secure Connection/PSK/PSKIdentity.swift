@@ -6,6 +6,7 @@ import Foundation
 import NIOSSL
 
 /// A struct representing a pre-shared key (PSK).
+@RequestActor
 public struct PSKIdentity: Property {
 
     private enum Source {
@@ -75,6 +76,7 @@ extension PSKIdentity {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<PSKIdentity>,
         inputs: _PropertyInputs

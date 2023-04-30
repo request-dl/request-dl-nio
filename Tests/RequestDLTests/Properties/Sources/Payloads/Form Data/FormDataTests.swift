@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class FormDataTests: XCTestCase {
+@RequestActor
+class FormDataTests: XCTestCase {
 
     struct Mock: Codable {
         let foo: String

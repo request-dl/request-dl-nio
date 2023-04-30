@@ -20,6 +20,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 public struct FormGroup<Content: Property>: Property {
 
     let content: Content
@@ -30,7 +31,7 @@ public struct FormGroup<Content: Property>: Property {
      - Parameters:
         - content: A property builder closure that creates a list of `Property` objects.
      */
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         self.content = content()
     }
 
@@ -63,6 +64,7 @@ extension FormGroup {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<FormGroup<Content>>,
         inputs: _PropertyInputs

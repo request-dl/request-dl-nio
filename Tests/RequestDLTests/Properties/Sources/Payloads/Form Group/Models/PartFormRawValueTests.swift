@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class PartFormRawValueTests: XCTestCase {
+@RequestActor
+class PartFormRawValueTests: XCTestCase {
 
     func testInitWithDataAndHeaders() async throws {
         // Given

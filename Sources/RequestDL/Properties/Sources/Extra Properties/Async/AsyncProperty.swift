@@ -23,6 +23,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 public struct AsyncProperty<Content: Property>: Property {
 
     private let content: () async throws -> Content
@@ -33,7 +34,7 @@ public struct AsyncProperty<Content: Property>: Property {
      - Parameters:
         - content: The content of the request to be built.
      */
-    public init(@PropertyBuilder content: @escaping () async throws -> Content) {
+    public init(@PropertyBuilder content: @RequestActor @escaping () async throws -> Content) {
         self.content = content
     }
 
@@ -46,6 +47,7 @@ public struct AsyncProperty<Content: Property>: Property {
 extension AsyncProperty {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<AsyncProperty<Content>>,
         inputs: _PropertyInputs

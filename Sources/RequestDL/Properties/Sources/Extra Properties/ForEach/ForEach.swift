@@ -24,6 +24,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Hashable, Content: Property {
 
     /// The sequence of data to be iterated over.
@@ -47,7 +48,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
     public init(
         _ data: Data,
         id: KeyPath<Data.Element, ID>,
-        @PropertyBuilder content: @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
     ) {
         self.data = data
         self.id = id
@@ -64,7 +65,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
      */
     public init(
         _ data: Data,
-        @PropertyBuilder content: @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
     ) where Data.Element: Identifiable, ID == Data.Element.ID {
         self.init(
             data,
@@ -91,7 +92,7 @@ extension ForEach {
      */
     public init<Bound>(
         _ data: Data,
-        @PropertyBuilder content: @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
     ) where Bound: Comparable & Hashable, Data == Range<Bound>, ID == Int {
         self.init(
             data,
@@ -109,7 +110,7 @@ extension ForEach {
      */
     public init<Bound>(
         _ data: Data,
-        @PropertyBuilder content: @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
     ) where Bound: Comparable & Hashable, Data == ClosedRange<Bound>, ID == Int {
         self.init(
             data,
@@ -122,6 +123,7 @@ extension ForEach {
 extension ForEach {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<ForEach<Data, ID, Content>>,
         inputs: _PropertyInputs

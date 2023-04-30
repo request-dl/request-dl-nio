@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ContentTypeTests: XCTestCase {
+@RequestActor
+class ContentTypeTests: XCTestCase {
 
     func testJsonTypeRawValue() async throws {
         XCTAssertEqual(ContentType.json, "application/json")

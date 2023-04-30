@@ -7,7 +7,8 @@ import XCTest
 import Combine
 @testable import RequestDL
 
-final class PublishedTaskTests: XCTestCase {
+@RequestActor
+class PublishedTaskTests: XCTestCase {
 
     enum PublisherResult {
         case success

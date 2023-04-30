@@ -6,7 +6,8 @@ import XCTest
 import AsyncHTTPClient
 @testable import RequestDL
 
-final class SessionTests: XCTestCase {
+@RequestActor
+class SessionTests: XCTestCase {
 
     func testSession_whenInitAsDefault_shouldBeValid() async throws {
         // Given

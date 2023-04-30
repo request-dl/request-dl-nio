@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class RequestMethodTests: XCTestCase {
+@RequestActor
+class RequestMethodTests: XCTestCase {
 
     func testGetHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.get))

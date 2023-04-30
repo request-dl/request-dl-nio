@@ -6,6 +6,7 @@ import Foundation
 import NIOCore
 
 /// Represents a secure connection with various configuration options.
+@RequestActor
 public struct SecureConnection<Content: Property>: Property {
 
     private let content: Content
@@ -19,7 +20,7 @@ public struct SecureConnection<Content: Property>: Property {
     ///   - content: A closure that provides the content of the secure connection.
     public init(
         _ context: SecureConnectionContext = .client,
-        @PropertyBuilder content: () -> Content
+        @PropertyBuilder content: @RequestActor () -> Content
     ) {
         self.secureConnection = .init(context.build())
         self.content = content()
@@ -253,6 +254,7 @@ extension SecureConnection {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<SecureConnection<Content>>,
         inputs: _PropertyInputs

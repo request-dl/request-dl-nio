@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class _StringPayloadTests: XCTestCase {
+@RequestActor
+class _StringPayloadTests: XCTestCase {
 
     func testStringPayload() async throws {
         // Given

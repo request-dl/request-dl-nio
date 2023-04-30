@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersRefererTests: XCTestCase {
+@RequestActor
+class HeadersRefererTests: XCTestCase {
 
     func testReferer() async throws {
         let property = TestProperty(Headers.Referer("https://www.example.com/"))

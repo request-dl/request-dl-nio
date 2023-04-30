@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+@RequestActor
 class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileNoPassword_shouldBeValid() async throws {

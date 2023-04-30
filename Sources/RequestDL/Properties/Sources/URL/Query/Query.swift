@@ -21,6 +21,7 @@ import Foundation
  .result()
  ```
 */
+@RequestActor
 public struct Query: Property {
 
     let key: String
@@ -64,6 +65,7 @@ extension Query {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Query>,
         inputs: _PropertyInputs

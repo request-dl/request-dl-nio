@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 struct GraphValueUpdater<Content> {
 
     private let hashValue: Int

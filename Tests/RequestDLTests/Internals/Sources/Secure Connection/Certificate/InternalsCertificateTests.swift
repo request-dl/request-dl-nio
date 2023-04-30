@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+@RequestActor
 class InternalsCertificateTests: XCTestCase {
 
     func testCertificate_whenPEMBytes_shouldBeValid() async throws {

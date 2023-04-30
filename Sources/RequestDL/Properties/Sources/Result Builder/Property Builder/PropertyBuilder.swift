@@ -34,6 +34,7 @@ import Foundation
  }
  ```
  */
+@RequestActor
 @resultBuilder
 public struct PropertyBuilder {
 

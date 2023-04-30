@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersContentLengthTests: XCTestCase {
+@RequestActor
+class HeadersContentLengthTests: XCTestCase {
 
     func testContentLength() async throws {
         let property = TestProperty(Headers.ContentLength(1_000_000))

@@ -5,6 +5,7 @@
 import Foundation
 
 /// A type-erasing wrapper that can represent any `Property` instance.
+@RequestActor
 public struct AnyProperty: Property {
 
     private let makeProperty: (_GraphValue<Self>, _PropertyInputs) async throws -> _PropertyOutputs
@@ -30,6 +31,7 @@ public struct AnyProperty: Property {
 extension AnyProperty {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<AnyProperty>,
         inputs: _PropertyInputs

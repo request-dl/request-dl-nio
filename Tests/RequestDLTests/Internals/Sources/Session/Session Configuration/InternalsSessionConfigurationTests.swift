@@ -7,6 +7,7 @@ import NIOCore
 import AsyncHTTPClient
 @testable import RequestDL
 
+@RequestActor
 class InternalsSessionConfigurationTests: XCTestCase {
 
     var configuration: Internals.Session.Configuration!

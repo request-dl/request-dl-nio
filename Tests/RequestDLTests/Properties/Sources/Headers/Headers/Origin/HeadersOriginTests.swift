@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersOriginTests: XCTestCase {
+@RequestActor
+class HeadersOriginTests: XCTestCase {
 
     func testHost() async throws {
         let property = TestProperty(Headers.Origin("google.com"))

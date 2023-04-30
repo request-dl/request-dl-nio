@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class _EncodablePayloadTests: XCTestCase {
+@RequestActor
+class _EncodablePayloadTests: XCTestCase {
 
     struct Mock: Codable {
         let foo: String

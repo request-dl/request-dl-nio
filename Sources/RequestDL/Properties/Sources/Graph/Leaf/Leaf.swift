@@ -5,6 +5,7 @@
 import Foundation
 
 @dynamicMemberLookup
+@RequestActor
 struct Leaf<Property: PropertyNode>: Node {
 
     private let property: Property

@@ -6,6 +6,7 @@ import XCTest
 import NIOPosix
 @testable import RequestDL
 
+@RequestActor
 class MultiThreadedEventLoopGroupTests: XCTestCase {
 
     func testMultiThreaded_whenObtainShared_shouldBeTheSameInSecondAccess() async throws {

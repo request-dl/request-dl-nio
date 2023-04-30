@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class HeadersAcceptTests: XCTestCase {
+@RequestActor
+class HeadersAcceptTests: XCTestCase {
 
     func testHeadersJsonAccept() async throws {
         let property = TestProperty(Headers.Accept(.json))

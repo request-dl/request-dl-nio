@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@RequestActor
 class InternalsResponseHeadTests: XCTestCase {
 
     func testResponse_whenHeadInit_shouldBeValid() async throws {

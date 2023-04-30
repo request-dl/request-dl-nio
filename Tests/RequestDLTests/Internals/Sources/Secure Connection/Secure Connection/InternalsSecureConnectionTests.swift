@@ -7,6 +7,7 @@ import NIOSSL
 import NIOCore
 @testable import RequestDL
 
+@RequestActor
 class InternalsSecureConnectionTests: XCTestCase {
 
     var secureConnection: Internals.SecureConnection!

@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 @propertyWrapper
 struct PropertyContainer<Value>: PropertyValue {
 

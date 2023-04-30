@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 protocol Node: NodeStringConvertible {
 
     mutating func next() -> Node?

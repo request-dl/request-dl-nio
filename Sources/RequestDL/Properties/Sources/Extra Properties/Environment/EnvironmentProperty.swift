@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 private struct EnvironmentProperty<Content: Property, Value>: Property {
 
     let content: Content
@@ -14,6 +15,7 @@ private struct EnvironmentProperty<Content: Property, Value>: Property {
         bodyException()
     }
 
+    @RequestActor
     static func _makeProperty(
         property: _GraphValue<EnvironmentProperty<Content, Value>>,
         inputs: _PropertyInputs

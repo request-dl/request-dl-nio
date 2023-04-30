@@ -7,6 +7,7 @@ import Foundation
 /**
  A structure representing additional trusts as a property.
  */
+@RequestActor
 public struct AdditionalTrusts<Content: Property>: Property {
 
     enum Source {
@@ -46,7 +47,7 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the AdditionalTrusts.
      */
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         source = .content(content())
     }
 
@@ -124,6 +125,7 @@ extension AdditionalTrusts {
     }
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<AdditionalTrusts<Content>>,
         inputs: _PropertyInputs

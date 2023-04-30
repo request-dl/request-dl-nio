@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class PayloadProviderTests: XCTestCase {
+@RequestActor
+class PayloadProviderTests: XCTestCase {
 
     struct PayloadProviderMock: PayloadProvider {
 

@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class AsyncPropertyTests: XCTestCase {
+@RequestActor
+class AsyncPropertyTests: XCTestCase {
 
     func testAsyncProperty() async throws {
         // Given

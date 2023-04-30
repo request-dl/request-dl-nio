@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ModifiersFlatMapTests: XCTestCase {
+@RequestActor
+class ModifiersFlatMapTests: XCTestCase {
 
     struct FlatMapError: Error {}
 

@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class StatusCodeTests: XCTestCase {
+@RequestActor
+class StatusCodeTests: XCTestCase {
 
     func testContinueRawValue() async throws {
         XCTAssertEqual(StatusCode.`continue`, 100)

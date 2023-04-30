@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class _OptionalContentTests: XCTestCase {
+@RequestActor
+class _OptionalContentTests: XCTestCase {
 
     func testConditionActiveBuilder() async throws {
         // Given

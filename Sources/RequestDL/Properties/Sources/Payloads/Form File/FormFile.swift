@@ -19,6 +19,7 @@ import Foundation
  )
  ```
 */
+@RequestActor
 public struct FormFile: Property {
 
     let url: URL
@@ -69,6 +70,7 @@ public struct FormFile: Property {
 extension FormFile {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<FormFile>,
         inputs: _PropertyInputs

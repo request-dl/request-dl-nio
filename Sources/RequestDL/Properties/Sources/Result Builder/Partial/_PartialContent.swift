@@ -6,6 +6,7 @@ import Foundation
 
 /// This struct is marked as internal and is not intended
 /// to be used directly by clients of this framework.
+@RequestActor
 public struct _PartialContent<Accumulated: Property, Next: Property>: Property {
 
     public let accumulated: Accumulated
@@ -20,6 +21,7 @@ public struct _PartialContent<Accumulated: Property, Next: Property>: Property {
 extension _PartialContent {
 
     /// This method is used internally and should not be called directly.
+    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<_PartialContent<Accumulated, Next>>,
         inputs: _PropertyInputs

@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class PathTests: XCTestCase {
+@RequestActor
+class PathTests: XCTestCase {
 
     func testSinglePath() async throws {
         // Given

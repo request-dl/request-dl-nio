@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class AbstractKeyPathTests: XCTestCase {
+@RequestActor
+class AbstractKeyPathTests: XCTestCase {
 
     func testKeyPath() async throws {
         // Given

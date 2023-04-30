@@ -6,6 +6,7 @@ import Foundation
 import XCTest
 @testable @_spi(Private) import RequestDL
 
+@RequestActor
 class NamespaceTests: XCTestCase {
 
     struct NamespaceSpy: Property {
@@ -16,6 +17,7 @@ class NamespaceTests: XCTestCase {
             bodyException()
         }
 
+        @RequestActor
         static func _makeProperty(
             property: _GraphValue<NamespaceTests.NamespaceSpy>,
             inputs: _PropertyInputs

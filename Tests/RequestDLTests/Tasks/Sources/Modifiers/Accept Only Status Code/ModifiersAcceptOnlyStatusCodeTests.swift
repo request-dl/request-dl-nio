@@ -5,7 +5,8 @@
 import XCTest
 @testable import RequestDL
 
-final class ModifiersStatusCodeTests: XCTestCase {
+@RequestActor
+class ModifiersStatusCodeTests: XCTestCase {
 
     func testSuccessStatusCodeSet() async throws {
         // Given
