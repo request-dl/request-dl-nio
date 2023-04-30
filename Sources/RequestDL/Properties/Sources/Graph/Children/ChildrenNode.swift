@@ -11,8 +11,8 @@ struct ChildrenNode: Node {
 
     init() {}
 
-    mutating func append(_ node: Node) {
-        if let group = node as? ChildrenNode {
+    mutating func append(_ node: Node, grouping: Bool = false) {
+        if grouping, let group = node as? ChildrenNode {
             nodes.append(contentsOf: group.nodes)
         } else {
             nodes.append(node)
