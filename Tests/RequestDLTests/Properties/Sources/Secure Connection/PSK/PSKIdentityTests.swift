@@ -165,7 +165,7 @@ extension PSKIdentityTests {
 }
 
 @available(*, deprecated)
-extension PSKIdentity {
+extension PSKIdentityTests {
 
     private final class ServerResolver: SSLPSKServerIdentityResolver {
 
