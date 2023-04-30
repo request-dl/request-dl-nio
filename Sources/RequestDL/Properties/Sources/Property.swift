@@ -61,7 +61,7 @@ extension Property {
         property.assertPathway()
 
         var inputs = inputs
-        
+
         let operation = GraphOperation(property)
         operation(&inputs)
 
