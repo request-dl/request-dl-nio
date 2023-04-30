@@ -7,6 +7,7 @@ import Foundation
 /**
  A structure that represents the description of a PSK server.
  */
+@available(*, deprecated, renamed: "SSLPSKServerIdentityResolver")
 public struct PSKServerDescription: PSKDescription {
 
     /// A string representing a hint for the server to use in order to locate the PSK identity.

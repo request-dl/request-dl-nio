@@ -5,26 +5,21 @@
 import XCTest
 @testable import RequestDL
 
+@available(*, deprecated)
 @RequestActor
 class SecureConnectionContextTests: XCTestCase {
 
-    func testContext_whenClient_shouldBeClient() async throws {
+    func testContext_whenClient() async throws {
         // Given
-        let context: SecureConnectionContext = .client
-
-        // When
-        let sut = context.build()
+        let sut: SecureConnectionContext = .client
 
         // Then
         XCTAssertEqual(sut, .client)
     }
 
-    func testContext_whenServer_shouldBeServer() async throws {
+    func testContext_whenServer() async throws {
         // Given
-        let context: SecureConnectionContext = .server
-
-        // When
-        let sut = context.build()
+        let sut: SecureConnectionContext = .server
 
         // Then
         XCTAssertEqual(sut, .server)

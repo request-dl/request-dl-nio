@@ -11,7 +11,6 @@ extension Internals {
 
     struct SecureConnection {
 
-        var context: Internals.Session.Context
         var certificateChain: CertificateChain?
         var certificateVerification: NIOSSL.CertificateVerification?
         var trustRoots: TrustRoots?
@@ -26,15 +25,12 @@ extension Internals {
         var applicationProtocols: [String]?
         var keyLogger: SSLKeyLogger?
         var pskClientIdentityResolver: SSLPSKClientIdentityResolver?
-        var pskServerIdentityResolver: SSLPSKServerIdentityResolver?
         var minimumTLSVersion: NIOSSL.TLSVersion?
         var maximumTLSVersion: NIOSSL.TLSVersion?
         var cipherSuites: String?
         var cipherSuiteValues: [NIOSSL.NIOTLSCipher]?
 
-        init(_ context: Internals.Session.Context) {
-            self.context = context
-        }
+        init() {}
     }
 }
 
@@ -43,31 +39,14 @@ extension Internals.SecureConnection {
     private func makeTLSConfigurationByContext() throws -> NIOSSL.TLSConfiguration {
         var tlsConfiguration: TLSConfiguration
 
-        switch context {
-        case .client:
-            tlsConfiguration = .makeClientConfiguration()
+        tlsConfiguration = .makeClientConfiguration()
 
-            if let certificateChain {
-                tlsConfiguration.certificateChain = try certificateChain.build()
-            }
+        if let certificateChain {
+            tlsConfiguration.certificateChain = try certificateChain.build()
+        }
 
-            if let privateKey {
-                tlsConfiguration.privateKey = try privateKey.build()
-            }
-        case .server:
-            guard
-                let source = try certificateChain?.build(),
-                let privateKey = try privateKey?.build()
-            else {
-                Internals.Log.failure(
-                    .cantResolveCertificatesForServer()
-                )
-            }
-
-            tlsConfiguration = .makeServerConfiguration(
-                certificateChain: source,
-                privateKey: privateKey
-            )
+        if let privateKey {
+            tlsConfiguration.privateKey = try privateKey.build()
         }
 
         return tlsConfiguration
@@ -147,12 +126,6 @@ extension Internals.SecureConnection {
             }
         }
 
-        if let pskServerIdentityResolver {
-            tlsConfiguration.pskServerCallback = {
-                try pskServerIdentityResolver($0, client: $1)
-            }
-        }
-
         return tlsConfiguration
     }
     // swiftlint:enable cyclomatic_complexity function_body_length
@@ -161,8 +134,7 @@ extension Internals.SecureConnection {
 extension Internals.SecureConnection: Equatable {
 
     static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.context == rhs.context
-        && lhs.certificateChain == rhs.certificateChain
+        lhs.certificateChain == rhs.certificateChain
         && lhs.certificateVerification == rhs.certificateVerification
         && lhs.trustRoots == rhs.trustRoots
         && lhs.additionalTrustRoots == rhs.additionalTrustRoots
@@ -176,7 +148,6 @@ extension Internals.SecureConnection: Equatable {
         && lhs.applicationProtocols == rhs.applicationProtocols
         && lhs.keyLogger === rhs.keyLogger
         && lhs.pskClientIdentityResolver === rhs.pskClientIdentityResolver
-        && lhs.pskServerIdentityResolver === rhs.pskServerIdentityResolver
         && lhs.minimumTLSVersion == rhs.minimumTLSVersion
         && lhs.maximumTLSVersion == rhs.maximumTLSVersion
         && lhs.cipherSuites == rhs.cipherSuites

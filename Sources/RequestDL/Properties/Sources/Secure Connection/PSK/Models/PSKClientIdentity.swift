@@ -6,6 +6,7 @@ import Foundation
 import NIOSSL
 
 /// A struct representing a pre-shared key (PSK) client.
+@available(*, deprecated, renamed: "SSLPSKClientIdentityResolver")
 public struct PSKClientIdentity {
 
     /// The PSK client key.
@@ -25,6 +26,7 @@ public struct PSKClientIdentity {
     }
 }
 
+@available(*, deprecated, renamed: "SSLPSKClientIdentityResolver")
 extension PSKClientIdentity {
 
     func build() -> NIOSSL.PSKClientIdentityResponse {

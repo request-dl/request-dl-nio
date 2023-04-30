@@ -13,17 +13,27 @@ public struct SecureConnection<Content: Property>: Property {
 
     private var secureConnection: Internals.SecureConnection
 
+    /// Initializes a secure connection with the given content.
+    ///
+    /// - Parameter content: A closure that provides the content of the secure connection.
+    public init(
+        @PropertyBuilder content: @RequestActor () -> Content
+    ) {
+        self.secureConnection = .init()
+        self.content = content()
+    }
+
     /// Initializes a secure connection with the given context and content.
     ///
     /// - Parameters:
     ///   - context: The secure connection context, default is `.client`.
     ///   - content: A closure that provides the content of the secure connection.
+    @available(*, deprecated, message: "RequestDL is for client-side usage only")
     public init(
-        _ context: SecureConnectionContext = .client,
+        _ context: SecureConnectionContext,
         @PropertyBuilder content: @RequestActor () -> Content
     ) {
-        self.secureConnection = .init(context.build())
-        self.content = content()
+        self.init(content: content)
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.

@@ -10,6 +10,7 @@ import Foundation
  `SecureConnectionContext` provides options to specify whether the secure connection is being used
  on the server or client side in Swift.
  */
+@available(*, deprecated, message: "RequestDL is for client-side usage only")
 public enum SecureConnectionContext {
 
     /// Indicates that the secure connection is being used on the server side.
@@ -17,16 +18,4 @@ public enum SecureConnectionContext {
 
     /// Indicates that the secure connection is being used on the client side.
     case client
-}
-
-extension SecureConnectionContext {
-
-    func build() -> Internals.Session.Context {
-        switch self {
-        case .server:
-            return .server
-        case .client:
-            return .client
-        }
-    }
 }
