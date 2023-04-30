@@ -71,9 +71,9 @@ extension Query {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(Node(
+        return .leaf(Node(
             key: property.key,
             value: "\(property.value)"
-        )))
+        ))
     }
 }

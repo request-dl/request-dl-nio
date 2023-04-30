@@ -72,7 +72,7 @@ extension FormData {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(FormNode {
+        return .leaf(FormNode {
             PartFormRawValue(property.buffer.getData() ?? Data(), forHeaders: [
                 kContentDisposition: kContentDispositionValue(
                     property.fileName,
@@ -80,6 +80,6 @@ extension FormData {
                 ),
                 "Content-Type": property.contentType
             ])
-        }))
+        })
     }
 }

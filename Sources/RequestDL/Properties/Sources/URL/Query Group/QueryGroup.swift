@@ -54,9 +54,9 @@ extension QueryGroup {
 
     struct Node: PropertyNode {
 
-        let leafs: [Leaf<Query.Node>]
+        let leafs: [LeafNode<Query.Node>]
 
-        fileprivate init(_ leafs: [Leaf<Query.Node>]) {
+        fileprivate init(_ leafs: [LeafNode<Query.Node>]) {
             self.leafs = leafs
         }
 
@@ -80,6 +80,6 @@ extension QueryGroup {
             inputs: inputs
         )
 
-        return .init(Leaf(Node(output.node.search(for: Query.Node.self))))
+        return .leaf(Node(output.node.search(for: Query.Node.self)))
     }
 }

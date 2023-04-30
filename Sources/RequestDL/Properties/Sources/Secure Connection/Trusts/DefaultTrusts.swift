@@ -37,6 +37,6 @@ extension DefaultTrusts {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(SecureConnectionNode(Node())))
+        return .leaf(SecureConnectionNode(Node()))
     }
 }

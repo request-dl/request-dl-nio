@@ -95,36 +95,36 @@ extension ResolveTests {
         """
         Resolve {
             ChildrenNode {
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         baseURL = https://apple.com
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         path = api
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         path = v2
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         key = Accept,
                         value = application/json,
                         next = nil
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         key = Content-Type,
                         value = application/json,
                         next = nil
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         timeout = UnitTime {
                             nanoseconds = 60
@@ -134,7 +134,7 @@ extension ResolveTests {
                         }
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         configuration = Configuration {
                             secureConnection = nil,
@@ -174,32 +174,32 @@ extension ResolveTests {
         """
         Resolve {
             ChildrenNode {
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         baseURL = https://apple.com
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         path = api
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         path = v2
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         nodes = [
-                            Leaf<Node> {
+                            LeafNode<Node> {
                                 property = Node {
                                     key = Accept,
                                     value = application/json,
                                     next = nil
                                 }
                             },
-                            Leaf<Node> {
+                            LeafNode<Node> {
                                 property = Node {
                                     key = Content-Type,
                                     value = application/json,
@@ -209,10 +209,10 @@ extension ResolveTests {
                         ]
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         leafs = [
-                            Leaf<Node> {
+                            LeafNode<Node> {
                                 property = Node {
                                     key = q,
                                     value = some question
@@ -230,12 +230,12 @@ extension ResolveTests {
         """
         Resolve {
             ChildrenNode {
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         baseURL = https://apple.com
                     }
                 },
-                Leaf<Node> {
+                LeafNode<Node> {
                     property = Node {
                         secureConnection = SecureConnection {
                             context = .client,
@@ -260,13 +260,13 @@ extension ResolveTests {
                             cipherSuiteValues = nil
                         },
                         nodes = [
-                            Leaf<SecureConnectionNode> {
+                            LeafNode<SecureConnectionNode> {
                                 property = SecureConnectionNode {
                                     source = Source.node(
                                         Node {
                                             source = Source.nodes(
                                                 [
-                                                    Leaf<SecureConnectionNode> {
+                                                    LeafNode<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
@@ -283,13 +283,13 @@ extension ResolveTests {
                                     )
                                 }
                             },
-                            Leaf<SecureConnectionNode> {
+                            LeafNode<SecureConnectionNode> {
                                 property = SecureConnectionNode {
                                     source = Source.node(
                                         Node {
                                             source = Source.nodes(
                                                 [
-                                                    Leaf<SecureConnectionNode> {
+                                                    LeafNode<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
@@ -300,7 +300,7 @@ extension ResolveTests {
                                                             )
                                                         }
                                                     },
-                                                    Leaf<SecureConnectionNode> {
+                                                    LeafNode<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
@@ -317,13 +317,13 @@ extension ResolveTests {
                                     )
                                 }
                             },
-                            Leaf<SecureConnectionNode> {
+                            LeafNode<SecureConnectionNode> {
                                 property = SecureConnectionNode {
                                     source = Source.node(
                                         Node {
                                             source = Source.nodes(
                                                 [
-                                                    Leaf<SecureConnectionNode> {
+                                                    LeafNode<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
@@ -334,7 +334,7 @@ extension ResolveTests {
                                                             )
                                                         }
                                                     },
-                                                    Leaf<SecureConnectionNode> {
+                                                    LeafNode<SecureConnectionNode> {
                                                         property = SecureConnectionNode {
                                                             source = Source.collectorNode(
                                                                 CertificateNode {
@@ -354,7 +354,7 @@ extension ResolveTests {
                         ]
                     }
                 },
-                Leaf<SecureConnectionNode> {
+                LeafNode<SecureConnectionNode> {
                     property = SecureConnectionNode {
                         source = Source.node(
                             Node {

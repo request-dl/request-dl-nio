@@ -83,9 +83,9 @@ extension Timeout {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(Node(
+        return .leaf(Node(
             timeout: property.timeout,
             source: property.source
-        )))
+        ))
     }
 }

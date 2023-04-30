@@ -28,7 +28,7 @@ class NamespaceTests: XCTestCase {
 
             property.callback(hashValue, inputs.namespaceID)
 
-            return .init(EmptyLeaf())
+            return .empty
         }
     }
 

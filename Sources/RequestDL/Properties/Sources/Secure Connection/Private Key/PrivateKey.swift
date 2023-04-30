@@ -233,8 +233,8 @@ extension PrivateKey {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(SecureConnectionNode(
+        return .leaf(SecureConnectionNode(
             Node(source: property.source)
-        )))
+        ))
     }
 }

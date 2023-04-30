@@ -50,13 +50,9 @@ extension Group {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let output = try await Content._makeProperty(
+        return try await Content._makeProperty(
             property: property.content,
             inputs: inputs
         )
-
-        var children = ChildrenNode()
-        children.append(output.node)
-        return .init(children)
     }
 }
