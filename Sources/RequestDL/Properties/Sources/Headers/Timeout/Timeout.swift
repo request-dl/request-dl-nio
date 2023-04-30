@@ -67,11 +67,11 @@ extension Timeout {
 
         func make(_ make: inout Make) async throws {
             if source.contains(.connect) {
-                make.configuration.timeout.connect = timeout.build()
+                make.configuration.timeout.connect = timeout
             }
 
             if source.contains(.read) {
-                make.configuration.timeout.read = timeout.build()
+                make.configuration.timeout.read = timeout
             }
         }
     }

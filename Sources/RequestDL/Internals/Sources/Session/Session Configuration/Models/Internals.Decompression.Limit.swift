@@ -5,18 +5,18 @@
 import Foundation
 import NIOHTTPCompression
 
-extension Session {
+extension Internals.Decompression {
 
-    public enum DecompressionLimit {
+    enum Limit: Equatable {
         case none
-        case ratio(Int)
         case size(Int)
+        case ratio(Int)
     }
 }
 
-extension Session.DecompressionLimit {
+extension Internals.Decompression.Limit {
 
-    func build() -> Internals.Decompression.Limit {
+    func build() -> NIOHTTPDecompression.DecompressionLimit {
         switch self {
         case .none:
             return .none

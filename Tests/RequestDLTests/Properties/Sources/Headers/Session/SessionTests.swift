@@ -90,8 +90,8 @@ class SessionTests: XCTestCase {
         }
 
         XCTAssertEqual(
-            String(describing: redirectConfiguration),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.disallow)
+            redirectConfiguration,
+            .disallow
         )
     }
 
@@ -113,11 +113,11 @@ class SessionTests: XCTestCase {
         }
 
         XCTAssertEqual(
-            String(describing: redirectConfiguration),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(
+            redirectConfiguration,
+            .follow(
                 max: max,
                 allowCycles: cycles
-            ))
+            )
         )
     }
 
@@ -159,8 +159,8 @@ class SessionTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            String(describing: session.configuration.decompression),
-            String(describing: HTTPClient.Decompression.enabled(limit: decompressionLimit.build()))
+            session.configuration.decompression,
+            .enabled(decompressionLimit.build())
         )
     }
 
