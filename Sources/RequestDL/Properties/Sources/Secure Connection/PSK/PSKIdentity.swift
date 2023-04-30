@@ -11,7 +11,7 @@ public struct PSKIdentity: Property {
 
     private enum Source {
         case client(SSLPSKClientIdentityResolver)
-        case server(SSLPSKServerIdentityResolver)
+        case server
     }
 
     private let source: Source
@@ -29,8 +29,9 @@ public struct PSKIdentity: Property {
     ///
     /// - Parameters:
     ///   - resolver: The server PSK identity resolver.
+    @available(*, deprecated, message: "RequestDL is for client-side usage only")
     public init(_ resolver: SSLPSKServerIdentityResolver) {
-        self.source = .server(resolver)
+        self.source = .server
     }
 
     fileprivate func edit(_ edit: (inout Self) -> Void) -> Self {
@@ -69,8 +70,10 @@ extension PSKIdentity {
             switch source {
             case .client(let resolver):
                 secureConnection.pskClientIdentityResolver = resolver
-            case .server(let resolver):
-                secureConnection.pskServerIdentityResolver = resolver
+            case .server:
+                Internals.Log.warning(
+                    .deprecatedServerConfiguration()
+                )
             }
         }
     }

@@ -35,15 +35,6 @@ extension Internals.Log.Message {
             ]
         )
     }
-
-    static func cantResolveCertificatesForServer() -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            The required resources for building the certificate chain \
-            or private key could not be found or accessed.
-            """
-        )
-    }
 }
 
 // MARK: [Internals] - Session
@@ -256,6 +247,17 @@ extension Internals.Log.Message {
             ]
         )
     }
+
+    static func deprecatedServerConfiguration() -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            We have disabled support for server configuration as RequestDL \
+            was not designed for this.
+
+            Please consider using client-side configuration only
+            """
+        )
+    }
 }
 
 // MARK: - BaseURL
@@ -340,6 +342,46 @@ extension Internals.Log.Message {
 
 extension Internals.Log {
 
+    private static func debugParameters(
+        parameters: [String: Any],
+        line: UInt,
+        file: StaticString
+    ) {
+        debug(
+            parameters
+                .reduce([String]()) {
+                    $0 + ["\($1.key) = \(String(describing: $1.value))"]
+                }
+                .joined(separator: "\n"),
+            separator: "",
+            line: line,
+            file: file
+        )
+    }
+
+    static func warning(
+        _ message: Message,
+        line: UInt = #line,
+        file: StaticString = #file
+    ) {
+        #if DEBUG
+        if !message.parameters.isEmpty {
+            debugParameters(
+                parameters: message.parameters,
+                line: line,
+                file: file
+            )
+        }
+        #endif
+
+        warning(
+            message.message,
+            separator: "",
+            line: line,
+            file: file
+        )
+    }
+
     static func failure(
         _ message: Message,
         line: UInt = #line,
@@ -347,15 +389,8 @@ extension Internals.Log {
     ) -> Never {
         #if DEBUG
         if !message.parameters.isEmpty {
-            let message = message.parameters
-                .reduce([String]()) {
-                    $0 + ["\($1.key) = \(String(describing: $1.value))"]
-                }
-                .joined(separator: "\n")
-
-            debug(
-                message,
-                separator: "",
+            debugParameters(
+                parameters: message.parameters,
                 line: line,
                 file: file
             )

@@ -11,6 +11,7 @@ import NIOSSL
  `SSLPSKServerIdentityResolver` defines a function that can be used to resolve a
  pre-shared key server identity based on given client hint and identity.
  */
+@available(*, deprecated, message: "RequestDL is for client-side usage only")
 public protocol SSLPSKServerIdentityResolver: Sendable, AnyObject {
 
     /**

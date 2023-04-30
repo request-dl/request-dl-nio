@@ -120,7 +120,7 @@ class InternalsSessionTests: XCTestCase {
                 fileBuffer
             ])
 
-            var secureConnection = Internals.SecureConnection(.client)
+            var secureConnection = Internals.SecureConnection()
             secureConnection.trustRoots = .certificates([
                 .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
             ])

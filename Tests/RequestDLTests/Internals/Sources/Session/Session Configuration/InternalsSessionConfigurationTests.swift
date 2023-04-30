@@ -24,7 +24,7 @@ class InternalsSessionConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetTLSConfiguration_shouldBeEqual() async throws {
         // Given
-        let secureConnection = Internals.SecureConnection(.client)
+        let secureConnection = Internals.SecureConnection()
 
         // When
         configuration.secureConnection = secureConnection

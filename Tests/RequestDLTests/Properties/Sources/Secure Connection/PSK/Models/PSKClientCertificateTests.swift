@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+@available(*, deprecated)
 @RequestActor
 class PSKClientCertificateTests: XCTestCase {
 

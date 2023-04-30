@@ -12,7 +12,7 @@ class SecureConnectionTests: XCTestCase {
 
     func testSecure_whenDefaultInit_shouldBeValid() async throws {
         // Given
-        let secureConnection = Internals.SecureConnection(.client)
+        let secureConnection = Internals.SecureConnection()
 
         // When
         let (session, _) = try await resolve(TestProperty {
@@ -22,7 +22,6 @@ class SecureConnectionTests: XCTestCase {
         let sut = session.configuration.secureConnection
 
         // Then
-        XCTAssertEqual(sut?.context, secureConnection.context)
         XCTAssertEqual(sut?.certificateVerification, secureConnection.certificateVerification)
         XCTAssertEqual(sut?.signingSignatureAlgorithms, secureConnection.signingSignatureAlgorithms)
         XCTAssertEqual(sut?.verifySignatureAlgorithms, secureConnection.verifySignatureAlgorithms)

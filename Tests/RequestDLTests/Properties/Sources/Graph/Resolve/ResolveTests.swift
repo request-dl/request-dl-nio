@@ -238,7 +238,6 @@ extension ResolveTests {
                 LeafNode<Node> {
                     property = Node {
                         secureConnection = SecureConnection {
-                            context = .client,
                             certificateChain = nil,
                             certificateVerification = nil,
                             trustRoots = nil,
@@ -253,7 +252,6 @@ extension ResolveTests {
                             applicationProtocols = nil,
                             keyLogger = nil,
                             pskClientIdentityResolver = nil,
-                            pskServerIdentityResolver = nil,
                             minimumTLSVersion = nil,
                             maximumTLSVersion = nil,
                             cipherSuites = nil,
