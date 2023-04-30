@@ -28,21 +28,32 @@ extension _PartialContent {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let accumulatedOutput = try await Accumulated._makeProperty(
+        let accumulated = try await Accumulated._makeProperty(
             property: property.accumulated,
             inputs: inputs
         )
 
-        let nextOutput = try await Next._makeProperty(
+        let next = try await Next._makeProperty(
             property: property.next,
             inputs: inputs
         )
 
         var children = ChildrenNode()
 
-        children.append(accumulatedOutput.node)
-        children.append(nextOutput.node)
+        children.append(accumulated.node, grouping: property.accumulated.isPartialContent)
+        children.append(next.node)
 
         return .init(children)
+    }
+}
+
+private protocol _PartialContentReference {}
+
+extension _PartialContent: _PartialContentReference {}
+
+extension Property {
+
+    fileprivate var isPartialContent: Bool {
+        self is _PartialContentReference
     }
 }
