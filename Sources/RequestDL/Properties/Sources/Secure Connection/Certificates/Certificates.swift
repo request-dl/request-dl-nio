@@ -49,7 +49,7 @@ public struct Certificates<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the Certificates.
      */
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         source = .content(content())
     }
 

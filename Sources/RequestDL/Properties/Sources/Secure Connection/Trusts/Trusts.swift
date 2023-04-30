@@ -47,7 +47,7 @@ public struct Trusts<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the Trusts.
      */
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         source = .content(content())
     }
 

@@ -31,7 +31,7 @@ public struct FormGroup<Content: Property>: Property {
      - Parameters:
         - content: A property builder closure that creates a list of `Property` objects.
      */
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         self.content = content()
     }
 

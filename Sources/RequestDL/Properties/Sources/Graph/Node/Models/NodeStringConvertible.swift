@@ -4,6 +4,7 @@
 
 import Foundation
 
+@RequestActor
 protocol NodeStringConvertible {
 
     var nodeDescription: String { get }

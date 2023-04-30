@@ -32,11 +32,11 @@ extension Leaf: PropertyNode {
 
 extension Leaf {
 
-    private nonisolated var propertyDescription: String {
+    private var propertyDescription: String {
         "property = \(property.nodeDescription)"
     }
 
-    nonisolated var nodeDescription: String {
+    var nodeDescription: String {
         let title = String(describing: type(of: self))
         let values = propertyDescription.debug_shiftLines()
         return "\(title) {\n\(values)\n}"

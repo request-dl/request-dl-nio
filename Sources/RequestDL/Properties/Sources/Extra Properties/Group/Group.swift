@@ -30,7 +30,7 @@ public struct Group<Content: Property>: Property {
     /// Creates a new `Group` property with the specified properties.
     ///
     /// - Parameter content: The properties to be contained within the group.
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         self.content = content()
     }
 

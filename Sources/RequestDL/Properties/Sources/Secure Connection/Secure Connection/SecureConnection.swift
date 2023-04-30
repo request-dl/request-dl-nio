@@ -20,7 +20,7 @@ public struct SecureConnection<Content: Property>: Property {
     ///   - content: A closure that provides the content of the secure connection.
     public init(
         _ context: SecureConnectionContext = .client,
-        @PropertyBuilder content: () -> Content
+        @PropertyBuilder content: @RequestActor () -> Content
     ) {
         self.secureConnection = .init(context.build())
         self.content = content()

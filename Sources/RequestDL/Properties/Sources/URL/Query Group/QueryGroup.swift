@@ -29,7 +29,7 @@ public struct QueryGroup<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the query group.
      */
-    public init(@PropertyBuilder content: () -> Content) {
+    public init(@PropertyBuilder content: @RequestActor () -> Content) {
         self.content = content()
     }
 
