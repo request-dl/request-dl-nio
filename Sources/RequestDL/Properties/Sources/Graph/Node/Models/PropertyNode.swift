@@ -12,7 +12,7 @@ protocol PropertyNode: NodeStringConvertible {
 
 extension PropertyNode {
 
-    nonisolated var nodeDescription: String {
+    var nodeDescription: String {
         #if DEBUG
         return NodeDebug(self).describe()
         #else
