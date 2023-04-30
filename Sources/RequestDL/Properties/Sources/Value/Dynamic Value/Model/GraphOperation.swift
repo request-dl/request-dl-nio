@@ -42,8 +42,7 @@ extension GraphOperation {
     var operations: [GraphValueOperation] {
         [
             GraphNamespaceOperation(mirror),
-            GraphEnvironmentOperation(mirror),
-            GraphStoredObjectOperation(mirror)
+            GraphEnvironmentOperation(mirror)
         ]
     }
 }

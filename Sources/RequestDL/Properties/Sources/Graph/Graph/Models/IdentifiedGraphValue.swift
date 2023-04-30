@@ -14,25 +14,13 @@ protocol IdentifiedGraphValue {
 
 extension IdentifiedGraphValue {
 
-    var pathwayHashValue: Int {
-        guard let previousValue else {
-            return id.hashValue
-        }
-
-        let graph = sequence(first: previousValue, next: { $0.previousValue })
-        var hashes = [AnyHashable]()
-
-        for value in graph {
-            if let nextID = value.nextID {
-                hashes.append(nextID)
-            } else if value.previousValue == nil {
-                hashes.append(value.id)
-            } else {
-                break
-            }
-        }
-
-        return hashes.hashValue
+    var pathway: Int {
+        sequence(
+            first: self as IdentifiedGraphValue,
+            next: { $0.previousValue }
+        )
+        .map(\.id)
+        .hashValue
     }
 
     func assertPathway() {

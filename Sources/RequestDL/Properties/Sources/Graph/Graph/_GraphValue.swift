@@ -94,8 +94,8 @@ extension _GraphValue {
 
 extension _GraphValue {
 
-    var pathwayHashValue: Int {
-        _identified.pathwayHashValue
+    var pathway: Int {
+        _identified.pathway
     }
 
     func assertPathway() {
