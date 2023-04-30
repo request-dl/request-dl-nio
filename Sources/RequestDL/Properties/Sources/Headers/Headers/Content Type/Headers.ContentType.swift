@@ -37,11 +37,11 @@ extension Headers.ContentType {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(
+        return .leaf(
             Headers.Node(
                 property.contentType.rawValue,
                 forKey: "Content-Type"
             )
-        ))
+        )
     }
 }

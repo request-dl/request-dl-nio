@@ -144,6 +144,6 @@ extension ForEach {
             group.append(output.node)
         }
 
-        return .init(group)
+        return .children(group)
     }
 }

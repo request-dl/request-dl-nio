@@ -99,7 +99,7 @@ extension Trusts {
         enum Source {
             case file(String)
             case bytes([UInt8])
-            case nodes([Leaf<SecureConnectionNode>])
+            case nodes([LeafNode<SecureConnectionNode>])
         }
 
         let source: Source
@@ -130,13 +130,13 @@ extension Trusts {
 
         switch property.source {
         case .file(let file):
-            return .init(Leaf(SecureConnectionNode(
+            return .leaf(SecureConnectionNode(
                 Node(source: .file(file))
-            )))
+            ))
         case .bytes(let bytes):
-            return .init(Leaf(SecureConnectionNode(
+            return .leaf(SecureConnectionNode(
                 Node(source: .bytes(bytes))
-            )))
+            ))
         case .content:
             var inputs = inputs
             inputs.environment.certificateProperty = .trust
@@ -146,12 +146,12 @@ extension Trusts {
                 inputs: inputs
             )
 
-            return .init(Leaf(SecureConnectionNode(
+            return .leaf(SecureConnectionNode(
                 Node(source: .nodes(outputs.node
                     .search(for: SecureConnectionNode.self)
                     .filter { $0.contains(CertificateNode.self) }
                 ))
-            )))
+            ))
         }
     }
 }

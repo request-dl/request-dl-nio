@@ -37,7 +37,7 @@ extension _OptionalContent {
 
         switch property.source {
         case .none:
-            return .init(EmptyLeaf())
+            return .empty
         case .some:
             return try await Content._makeProperty(
                 property: property.content,

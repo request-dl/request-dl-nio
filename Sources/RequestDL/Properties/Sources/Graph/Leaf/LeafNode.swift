@@ -6,7 +6,7 @@ import Foundation
 
 @dynamicMemberLookup
 @RequestActor
-struct Leaf<Property: PropertyNode>: Node {
+struct LeafNode<Property: PropertyNode>: Node {
 
     private let property: Property
 
@@ -23,14 +23,14 @@ struct Leaf<Property: PropertyNode>: Node {
     }
 }
 
-extension Leaf: PropertyNode {
+extension LeafNode: PropertyNode {
 
     func make(_ make: inout Make) async throws {
         try await property.make(&make)
     }
 }
 
-extension Leaf {
+extension LeafNode {
 
     private var propertyDescription: String {
         "property = \(property.nodeDescription)"
@@ -40,14 +40,5 @@ extension Leaf {
         let title = String(describing: type(of: self))
         let values = propertyDescription.debug_shiftLines()
         return "\(title) {\n\(values)\n}"
-    }
-}
-
-struct EmptyLeaf: Node {
-
-    init() {}
-
-    mutating func next() -> Node? {
-        nil
     }
 }

@@ -99,6 +99,6 @@ extension Path {
 
         let path = property.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-        return .init(Leaf(Node(path: path)))
+        return .leaf(Node(path: path))
     }
 }

@@ -59,7 +59,7 @@ extension HeaderGroup {
 
     private struct Node: PropertyNode {
 
-        let nodes: [Leaf<Headers.Node>]
+        let nodes: [LeafNode<Headers.Node>]
 
         func make(_ make: inout Make) async throws {
             for node in nodes {
@@ -81,6 +81,6 @@ extension HeaderGroup {
             inputs: inputs
         )
 
-        return .init(Leaf(Node(nodes: outputs.node.search(for: Headers.Node.self))))
+        return .leaf(Node(nodes: outputs.node.search(for: Headers.Node.self)))
     }
 }
