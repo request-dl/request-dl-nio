@@ -6,8 +6,8 @@ import Foundation
 
 protocol IdentifiedGraphValue {
 
-    var id: AnyHashable { get }
-    var nextID: AnyHashable? { get }
+    var id: GraphID { get }
+    var nextID: GraphID? { get }
 
     var previousValue: IdentifiedGraphValue? { get }
 }

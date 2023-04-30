@@ -10,8 +10,8 @@ public struct _GraphValue<Content: Property> {
 
     private let content: Content
 
-    private let id: AnyHashable
-    private var nextID: AnyHashable?
+    private let id: GraphID
+    private var nextID: GraphID?
 
     private let previousValue: IdentifiedGraphValue?
 
@@ -21,14 +21,14 @@ public struct _GraphValue<Content: Property> {
 
     static func root(_ content: Content) -> _GraphValue<Content> {
         .init(
-            id: ObjectIdentifier(Content.self),
+            id: .type(Content.self),
             content: content,
             previousValue: nil
         )
     }
 
     private init(
-        id: AnyHashable,
+        id: GraphID,
         content: Content,
         previousValue: IdentifiedGraphValue?
     ) {
@@ -41,45 +41,39 @@ public struct _GraphValue<Content: Property> {
     subscript<Value>(dynamicMember keyPath: KeyPath<Content, Value>) -> Value {
         content[keyPath: keyPath]
     }
-}
-
-extension _GraphValue {
 
     subscript<Next: Property>(dynamicMember keyPath: KeyPath<Content, Next>) -> _GraphValue<Next> {
-        access(keyPath) {
-            content[keyPath: $0]
+        access(id: .type(Next.self)) {
+            $0[keyPath: keyPath]
         }
     }
 
-    func detach<Next: Property>(_ id: AnyHashable, next: Next) -> _GraphValue<Next> {
-        access(_GraphDetached(id: id)) { _ in
-            next
-        }
+    func detach<Next: Property>(
+        id: GraphID = .type(Next.self),
+        next: Next
+    ) -> _GraphValue<Next> {
+        self.access(id: id) { _ in next }
     }
 
-    private func access<Next: Property, ID: Hashable>(
-        _ id: ID,
-        next: (ID) -> Next
+    private func access<Next: Property>(
+        id: GraphID,
+        next: (Content) -> Next
     ) -> _GraphValue<Next> {
         var mutableSelf = self
         mutableSelf.nextID = id
         return .init(
             id: id,
-            content: next(id),
+            content: next(content),
             previousValue: mutableSelf._identified
         )
     }
 }
 
-private struct _GraphDetached: Hashable {
-    let id: AnyHashable
-}
-
 extension _GraphValue {
 
     private struct Identified: IdentifiedGraphValue {
-        let id: AnyHashable
-        let nextID: AnyHashable?
+        let id: GraphID
+        let nextID: GraphID?
         let previousValue: IdentifiedGraphValue?
     }
 

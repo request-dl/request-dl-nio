@@ -54,11 +54,10 @@ extension AsyncProperty {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let id = ObjectIdentifier(Content.self)
         let content = try await property.content()
 
         return try await Content._makeProperty(
-            property: property.detach(id, next: content),
+            property: property.detach(next: content),
             inputs: inputs
         )
     }
