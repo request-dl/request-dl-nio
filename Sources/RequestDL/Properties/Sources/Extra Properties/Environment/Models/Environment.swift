@@ -45,9 +45,9 @@ import Foundation
  */
 @RequestActor
 @propertyWrapper
-public struct Environment<Value>: PropertyValue {
+public struct Environment<Value>: DynamicValue {
 
-    @PropertyContainer private var value: Value?
+    @_Container private var value: Value?
 
     private let keyPath: KeyPath<EnvironmentValues, Value>
 
@@ -93,9 +93,9 @@ public struct Environment<Value>: PropertyValue {
     }
 }
 
-extension Environment: EnvironmentPropertyValue {
+extension Environment: DynamicEnvironment {
 
-    func setValue(for values: EnvironmentValues) {
+    func update(_ values: EnvironmentValues) {
         value = values[keyPath: keyPath]
     }
 }
