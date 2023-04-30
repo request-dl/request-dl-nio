@@ -52,7 +52,7 @@ extension NamespaceTests {
 
     struct SingleNamespace<Content: Property>: Property {
 
-        @Namespace var projectNamespace
+        @Namespace var v1
 
         let content: Content
 
@@ -62,7 +62,7 @@ extension NamespaceTests {
 
         var body: some Property {
             content
-            Path("v1")
+            Path("\(v1)")
         }
     }
 
@@ -72,7 +72,7 @@ extension NamespaceTests {
         var hashValue: Int = .zero
 
         // When
-        _ = try await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             SingleNamespace {
                 NamespaceSpy {
                     hashValue = $0
@@ -82,9 +82,10 @@ extension NamespaceTests {
         })
 
         // Then
+        XCTAssertEqual(request.url, "https://www.apple.com/v1")
         XCTAssertEqual(namespaceID, Namespace.ID(
             base: SingleNamespace<NamespaceSpy>.self,
-            namespace: "_projectNamespace",
+            namespace: "_v1",
             hashValue: hashValue
         ))
     }
@@ -106,7 +107,7 @@ extension NamespaceTests {
 
         var body: some Property {
             content
-            Path("v1")
+            Path("\(multiple)/\(namespace)")
         }
     }
 
@@ -116,7 +117,7 @@ extension NamespaceTests {
         var hashValue: Int = .zero
 
         // When
-        _ = try await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             MultipleNamespace {
                 NamespaceSpy {
                     hashValue = $0
@@ -126,6 +127,7 @@ extension NamespaceTests {
         })
 
         // Then
+        XCTAssertEqual(request.url, "https://www.apple.com/multiple/namespace")
         XCTAssertEqual(namespaceID, Namespace.ID(
             base: MultipleNamespace<NamespaceSpy>.self,
             namespace: "_multiple._namespace",
@@ -144,6 +146,7 @@ extension NamespaceTests {
 
         func body(content: Content) -> some Property {
             content
+            Path("\(namespace)")
             NamespaceSpy(callback: callback)
         }
     }
@@ -154,7 +157,7 @@ extension NamespaceTests {
         var hashValue: Int = .zero
 
         // When
-        _ = try await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             Path("v1")
                 .modifier(NamespaceModifier {
                     hashValue = $0
@@ -163,6 +166,7 @@ extension NamespaceTests {
         })
 
         // Then
+        XCTAssertEqual(request.url, "https://www.apple.com/v1/namespace")
         XCTAssertEqual(namespaceID, Namespace.ID(
             base: NamespaceModifier.self,
             namespace: "_namespace",

@@ -8,14 +8,18 @@ extension Namespace {
 
     public struct ID: Hashable {
 
-        private let rawValue: String
+        private let base: AnyHashable
+        private let namespace: String
+        private let additionalHashValue: AnyHashable
 
         init<Base>(
             base: Base.Type,
             namespace: String,
             hashValue: Int
         ) {
-            self.rawValue = "\(base).\(namespace):\(hashValue)"
+            self.base = String(describing: base)
+            self.namespace = namespace
+            self.additionalHashValue = hashValue
         }
     }
 }
@@ -30,5 +34,18 @@ extension Namespace.ID {
             namespace: "_global",
             hashValue: .zero
         )
+    }
+}
+
+extension Namespace.ID: CustomStringConvertible {
+
+    private var namespaceDescription: String {
+        namespace.split(separator: ".").last.map {
+            String($0)
+        } ?? namespace
+    }
+
+    public var description: String {
+        String(namespaceDescription.dropFirst())
     }
 }
