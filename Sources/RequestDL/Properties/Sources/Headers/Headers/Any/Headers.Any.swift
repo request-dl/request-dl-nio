@@ -42,8 +42,8 @@ extension Headers.`Any` {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Headers.Node(
-            property.value,
-            forKey: property.key
+            key: property.key,
+            value: property.value
         ))
     }
 }

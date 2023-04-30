@@ -38,8 +38,8 @@ extension Headers.ContentLength {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Headers.Node(
-            property.bytes,
-            forKey: "Content-Length"
+            key: "Content-Length",
+            value: property.bytes
         ))
     }
 }

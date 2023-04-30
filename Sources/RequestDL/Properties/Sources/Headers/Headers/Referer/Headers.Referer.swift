@@ -47,8 +47,8 @@ extension Headers.Referer {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Headers.Node(
-            property.value,
-            forKey: "Referer"
+            key: "Referer",
+            value: property.value
         ))
     }
 }

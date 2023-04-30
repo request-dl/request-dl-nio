@@ -40,8 +40,8 @@ extension Headers.Accept {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Headers.Node(
-            property.type.rawValue,
-            forKey: "Accept"
+            key: "Accept",
+            value: property.type.rawValue
         ))
     }
 }

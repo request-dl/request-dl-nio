@@ -113,15 +113,13 @@ extension ResolveTests {
                 LeafNode<Node> {
                     property = Node {
                         key = Accept,
-                        value = application/json,
-                        next = nil
+                        value = application/json
                     }
                 },
                 LeafNode<Node> {
                     property = Node {
                         key = Content-Type,
-                        value = application/json,
-                        next = nil
+                        value = application/json
                     }
                 },
                 LeafNode<Node> {
@@ -195,15 +193,13 @@ extension ResolveTests {
                             LeafNode<Node> {
                                 property = Node {
                                     key = Accept,
-                                    value = application/json,
-                                    next = nil
+                                    value = application/json
                                 }
                             },
                             LeafNode<Node> {
                                 property = Node {
                                     key = Content-Type,
-                                    value = application/json,
-                                    next = nil
+                                    value = application/json
                                 }
                             }
                         ]

@@ -53,8 +53,8 @@ extension Headers.Host {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Headers.Node(
-            property.value,
-            forKey: "Host"
+            key: "Host",
+            value: property.value
         ))
     }
 }

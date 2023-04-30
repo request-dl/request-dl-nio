@@ -39,8 +39,8 @@ extension Headers.ContentType {
         property.assertPathway()
         return .leaf(
             Headers.Node(
-                property.contentType.rawValue,
-                forKey: "Content-Type"
+                key: "Content-Type",
+                value: property.contentType.rawValue
             )
         )
     }
