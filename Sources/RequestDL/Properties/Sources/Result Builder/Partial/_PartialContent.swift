@@ -43,6 +43,6 @@ extension _PartialContent {
         children.append(accumulatedOutput.node)
         children.append(nextOutput.node)
 
-        return .init(children)
+        return .children(children)
     }
 }

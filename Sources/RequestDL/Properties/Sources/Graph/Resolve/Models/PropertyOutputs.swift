@@ -8,7 +8,7 @@ public struct _PropertyOutputs {
 
     let node: Node
 
-    init(_ node: Node) {
+    fileprivate init(_ node: Node) {
         self.node = node
     }
 }
