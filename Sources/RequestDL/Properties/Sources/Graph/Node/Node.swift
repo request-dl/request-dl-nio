@@ -14,8 +14,8 @@ extension Node {
 
     func first<Property: PropertyNode>(
         of propertyNode: Property.Type
-    ) -> Leaf<Property>? {
-        if let leaf = self as? Leaf<Property> {
+    ) -> LeafNode<Property>? {
+        if let leaf = self as? LeafNode<Property> {
             return leaf
         }
 
@@ -32,13 +32,13 @@ extension Node {
 
     func search<Property: PropertyNode>(
         for propertyNode: Property.Type
-    ) -> [Leaf<Property>] {
-        if let leaf = self as? Leaf<Property> {
+    ) -> [LeafNode<Property>] {
+        if let leaf = self as? LeafNode<Property> {
             return [leaf]
         }
 
         var mutableSelf = self
-        var items = [Leaf<Property>]()
+        var items = [LeafNode<Property>]()
 
         while let node = mutableSelf.next() {
             items.append(contentsOf: node.search(for: propertyNode))
@@ -47,6 +47,7 @@ extension Node {
         return items
     }
 }
+
 
 extension Node {
 

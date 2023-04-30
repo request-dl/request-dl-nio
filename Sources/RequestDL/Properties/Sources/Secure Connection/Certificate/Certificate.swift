@@ -82,13 +82,13 @@ extension Certificate {
             )
         }
 
-        return .init(Leaf(SecureConnectionNode(
+        return .leaf(SecureConnectionNode(
             CertificateNode(
                 source: property.source,
                 property: certificateProperty,
                 format: property.format()
             )
-        )))
+        ))
     }
 }
 

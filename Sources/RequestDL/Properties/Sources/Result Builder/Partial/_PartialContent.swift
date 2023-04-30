@@ -43,7 +43,7 @@ extension _PartialContent {
         children.append(accumulated.node, grouping: property.accumulated.isPartialContent)
         children.append(next.node)
 
-        return .init(children)
+        return .children(children)
     }
 }
 

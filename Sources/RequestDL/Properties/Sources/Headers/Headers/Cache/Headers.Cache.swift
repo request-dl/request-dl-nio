@@ -69,10 +69,10 @@ extension Headers.Cache {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        return .init(Leaf(Headers.Node(
+        return .leaf(Headers.Node(
             property.contents.joined(separator: ", "),
             forKey: "Cache-Control"
-        )))
+        ))
     }
 }
 

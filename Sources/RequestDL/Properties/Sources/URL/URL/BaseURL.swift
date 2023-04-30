@@ -141,6 +141,6 @@ extension BaseURL {
             )
         }
 
-        return .init(Leaf(Node(baseURL)))
+        return .leaf(Node(baseURL))
     }
 }

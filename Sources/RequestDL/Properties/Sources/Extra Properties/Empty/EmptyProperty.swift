@@ -26,6 +26,6 @@ extension EmptyProperty {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(EmptyLeaf())
+        return .empty
     }
 }

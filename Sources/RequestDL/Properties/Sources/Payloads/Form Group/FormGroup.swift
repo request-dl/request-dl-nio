@@ -45,7 +45,7 @@ extension FormGroup {
 
     private struct Node: PropertyNode {
 
-        let nodes: [Leaf<FormNode>]
+        let nodes: [LeafNode<FormNode>]
 
         func make(_ make: inout Make) async throws {
             let multipart = nodes.map(\.factory).map { $0() }
@@ -78,6 +78,6 @@ extension FormGroup {
 
         let nodes = outputs.node.search(for: FormNode.self)
 
-        return .init(Leaf(Node(nodes: nodes)))
+        return .leaf(Node(nodes: nodes))
     }
 }

@@ -62,9 +62,9 @@ extension Authorization {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .init(Leaf(Node(
+        return .leaf(Node(
             type: property.type,
             token: property.token
-        )))
+        ))
     }
 }

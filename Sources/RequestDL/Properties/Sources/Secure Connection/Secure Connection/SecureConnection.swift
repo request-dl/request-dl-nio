@@ -242,7 +242,7 @@ extension SecureConnection {
     private struct Node: PropertyNode {
 
         let secureConnection: Internals.SecureConnection
-        let nodes: [Leaf<SecureConnectionNode>]
+        let nodes: [LeafNode<SecureConnectionNode>]
 
         func make(_ make: inout Make) async throws {
             make.configuration.secureConnection = secureConnection
@@ -266,9 +266,9 @@ extension SecureConnection {
             inputs: inputs
         )
 
-        return .init(Leaf(Node(
+        return .leaf(Node(
             secureConnection: property.secureConnection,
             nodes: outputs.node.search(for: SecureConnectionNode.self)
-        )))
+        ))
     }
 }

@@ -77,7 +77,7 @@ extension FormFile {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        return .init(Leaf(FormNode {
+        return .leaf(FormNode {
             let data = (try? Data(contentsOf: property.url)) ?? Data()
             return PartFormRawValue(data, forHeaders: [
                 kContentDisposition: kContentDispositionValue(
@@ -86,6 +86,6 @@ extension FormFile {
                 ),
                 "Content-Type": property.contentType
             ])
-        }))
+        })
     }
 }
