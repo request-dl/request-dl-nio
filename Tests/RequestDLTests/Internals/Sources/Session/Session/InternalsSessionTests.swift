@@ -13,7 +13,7 @@ class InternalsSessionTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
 
-        session = try await Internals.Session(
+        session = Internals.Session(
             provider: .shared,
             configuration: .init()
         )
@@ -124,7 +124,14 @@ class InternalsSessionTests: XCTestCase {
             secureConnection.trustRoots = .certificates([
                 .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
             ])
-            session.configuration.secureConnection = secureConnection
+
+            var configuration = session.configuration
+            configuration.secureConnection = secureConnection
+
+            let session = Internals.Session(
+                provider: session.provider,
+                configuration: configuration
+            )
 
             let task = try await session.request(request)
 

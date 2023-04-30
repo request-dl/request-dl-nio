@@ -34,20 +34,13 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
     func testManager_whenRegisterGroup_shouldBeResolved() async throws {
         // Given
-        var provider: CustomProvider! = CustomProvider()
+        let provider = CustomProvider()
 
         // When
-        weak var reference = provider.group()
-
-        try await manager.client(
-            .init(),
-            for: provider
-        ).shutdown()
+        let sut1 = await manager.provider(provider)
 
         // Then
-        provider = nil
-
-        XCTAssertNotNil(reference)
+        XCTAssertTrue(provider.group() === sut1)
     }
 
     func testManager_whenRegisterIdentifier_shouldBeResolvedOnlyOnce() async throws {
@@ -55,36 +48,11 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let client1 = manager.client(
-            .init(),
-            for: provider
-        )
-
-        let client2 = manager.client(
-            .init(),
-            for: provider
-        )
-
-        try await client1.shutdown()
-        try await client2.shutdown()
+        let sut1 = await manager.provider(provider)
+        let sut2 = await manager.provider(provider)
 
         // Then
-        XCTAssertTrue(client1.eventLoopGroup === client2.eventLoopGroup)
-    }
-
-    func testManager_whenCustomGroup_shouldBeValid() async throws {
-        // Given
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-
-        // When
-        let client = manager.client(
-            .init(),
-            for: .custom(group)
-        )
-
-        try await client.shutdown()
-
-        // Then
-        XCTAssertTrue(client.eventLoopGroup === group)
+        XCTAssertTrue(provider.group() === sut1)
+        XCTAssertTrue(provider.group() === sut2)
     }
 }

@@ -16,16 +16,24 @@ extension Internals {
 
         private var groups: [String: EventLoopGroup] = [:]
 
-        func client(
-            _ configuration: HTTPClient.Configuration,
-            for sessionProvider: SessionProvider
-        ) -> HTTPClient {
+        private func _provider(
+            _ sessionProvider: SessionProvider
+        ) async -> EventLoopGroup {
             let group = groups[sessionProvider.id] ?? sessionProvider.group()
             groups[sessionProvider.id] = group
-            return .init(
-                eventLoopGroupProvider: .shared(group),
-                configuration: configuration
-            )
+            return group
+        }
+
+        // SwiftNIO requires that event loop group be instantiated
+        // in background thread.
+        //
+        // Don't remove this method
+        func provider(
+            _ sessionProvider: SessionProvider
+        ) async -> EventLoopGroup {
+            await _Concurrency.Task(priority: .background) {
+                await _provider(sessionProvider)
+            }.value
         }
     }
 }
