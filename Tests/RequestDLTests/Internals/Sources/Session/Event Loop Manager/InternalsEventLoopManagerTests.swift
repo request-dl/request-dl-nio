@@ -55,12 +55,12 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let client1 = await manager.client(
+        let client1 = manager.client(
             .init(),
             for: provider
         )
 
-        let client2 = await manager.client(
+        let client2 = manager.client(
             .init(),
             for: provider
         )
@@ -77,7 +77,7 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
         // When
-        let client = await manager.client(
+        let client = manager.client(
             .init(),
             for: .custom(group)
         )

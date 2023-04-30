@@ -16,7 +16,7 @@ extension Internals {
 
         private var groups: [String: EventLoopGroup] = [:]
 
-        private func _makeClient(
+        func client(
             _ configuration: HTTPClient.Configuration,
             for sessionProvider: SessionProvider
         ) -> HTTPClient {
@@ -26,15 +26,6 @@ extension Internals {
                 eventLoopGroupProvider: .shared(group),
                 configuration: configuration
             )
-        }
-
-        nonisolated func client(
-            _ configuration: HTTPClient.Configuration,
-            for sessionProvider: SessionProvider
-        ) async -> HTTPClient {
-            await _Concurrency.Task(priority: .low) {
-                await _makeClient(configuration, for: sessionProvider)
-            }.value
         }
     }
 }
