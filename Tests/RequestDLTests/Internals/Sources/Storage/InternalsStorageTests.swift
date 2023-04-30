@@ -8,7 +8,7 @@ import XCTest
 @RequestActor
 class InternalsStorageTests: XCTestCase {
 
-    func testStorage_whenSetValue() {
+    func testStorage_whenSetValue() async throws {
         // Given
         let key = "key"
         let value = 1
