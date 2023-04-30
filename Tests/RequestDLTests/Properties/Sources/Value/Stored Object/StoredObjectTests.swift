@@ -61,10 +61,10 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 2)
-        XCTAssertNotEqual(request1.url, request2.url)
+        XCTAssertEqual(Factory.producer.index, 1)
+        XCTAssertEqual(request1.url, request2.url)
         XCTAssertEqual(request1.url, "https://www.google.com/0")
-        XCTAssertEqual(request2.url, "https://www.google.com/1")
+        XCTAssertEqual(request2.url, "https://www.google.com/0")
     }
 
     func testStored_whenPathWithEqualNamespace() async throws {

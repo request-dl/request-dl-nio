@@ -5,22 +5,23 @@
 import Foundation
 
 struct StoredObjectConfiguration: Hashable {
-    let namespaceID: Namespace.ID
-    let pathway: Int
+
+    let id: Namespace.ID
     let label: String
+    let seed: Seed
 
     private let base: ObjectIdentifier
 
     init<Base>(
-        namespaceID: Namespace.ID,
-        base: Base.Type,
-        pathway: Int,
-        label: String
+        id: Namespace.ID,
+        label: String,
+        seed: Seed,
+        base: Base.Type
     ) {
-        self.namespaceID = namespaceID
-        self.base = .init(base)
-        self.pathway = pathway
+        self.id = id
         self.label = label
+        self.seed = seed
+        self.base = .init(base)
     }
 }
 
@@ -30,10 +31,10 @@ extension StoredObjectConfiguration {
 
     static var global: Self {
         .init(
-            namespaceID: .global,
-            base: Root.self,
-            pathway: .zero,
-            label: "_"
+            id: .global,
+            label: "_",
+            seed: .zero,
+            base: Root.self
         )
     }
 }

@@ -51,10 +51,8 @@ extension Internals.Storage {
         let now = Date()
         let lifetime = Double(lifetime) / 1_000_000_000
 
-        for (key, value) in table {
-            if now.timeIntervalSince(value.readAt) > lifetime  {
-                table[key] = nil
-            }
+        table = table.filter {
+            now.timeIntervalSince($1.readAt) <= lifetime
         }
     }
 }

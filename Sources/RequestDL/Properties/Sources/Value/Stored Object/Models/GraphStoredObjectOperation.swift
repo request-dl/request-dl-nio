@@ -14,13 +14,14 @@ struct GraphStoredObjectOperation<Content>: GraphValueOperation {
 
     func callAsFunction(_ properties: inout GraphProperties) {
         let deepSearch = DynamicValueDeepSearch(mirror)
+        let id = properties.inputs.namespaceID
 
         for stored in deepSearch(DynamicStoredObject.self) {
             stored.value.update(.init(
-                namespaceID: properties.inputs.namespaceID,
-                base: Content.self,
-                pathway: properties.pathway,
-                label: stored.label
+                id: id,
+                label: stored.label,
+                seed: properties.inputs.seedFactory(id),
+                base: Content.self
             ))
         }
     }

@@ -6,20 +6,18 @@ import Foundation
 
 extension Namespace {
 
+    /// The ID used for namespace memory storage.
     public struct ID: Hashable {
 
-        private let base: AnyHashable
+        private let base: ObjectIdentifier
         private let namespace: String
-        private let additionalHashValue: AnyHashable
 
         init<Base>(
             base: Base.Type,
-            namespace: String,
-            hashValue: Int
+            namespace: String
         ) {
-            self.base = String(describing: base)
+            self.base = .init(base)
             self.namespace = namespace
-            self.additionalHashValue = hashValue
         }
     }
 }
@@ -31,8 +29,7 @@ extension Namespace.ID {
     static var global: Self {
         .init(
             base: Global.self,
-            namespace: "_global",
-            hashValue: .zero
+            namespace: "_global"
         )
     }
 }
