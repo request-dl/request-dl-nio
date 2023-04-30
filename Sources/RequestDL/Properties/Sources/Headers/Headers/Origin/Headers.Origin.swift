@@ -65,8 +65,8 @@ extension Headers.Origin {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Headers.Node(
-            property.value,
-            forKey: "Origin"
+            key: "Origin",
+            value: property.value
         ))
     }
 }

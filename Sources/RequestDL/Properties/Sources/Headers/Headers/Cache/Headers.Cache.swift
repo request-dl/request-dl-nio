@@ -70,8 +70,8 @@ extension Headers.Cache {
         property.assertPathway()
 
         return .leaf(Headers.Node(
-            property.contents.joined(separator: ", "),
-            forKey: "Cache-Control"
+            key: "Cache-Control",
+            value: property.contents.joined(separator: ", ")
         ))
     }
 }
