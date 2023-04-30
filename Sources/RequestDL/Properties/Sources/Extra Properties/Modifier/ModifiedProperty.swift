@@ -22,10 +22,8 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
         property.assertPathway()
 
         let modifiedContent = _PropertyModifier_Content<Modifier> { graph, inputs in
-            let id = ObjectIdentifier(Content.self)
-
-            return try await Content._makeProperty(
-                property: graph.detach(id, next: property.content),
+            try await Content._makeProperty(
+                property: graph.detach(next: property.content),
                 inputs: inputs
             )
         }
@@ -39,11 +37,10 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
 
         operation(&inputs)
 
-        let id = ObjectIdentifier(Modifier.Body.self)
         let content = property.modifier.body(content: modifiedContent)
 
         return try await Modifier.Body._makeProperty(
-            property: property.detach(id, next: content),
+            property: property.detach(next: content),
             inputs: inputs
         )
     }

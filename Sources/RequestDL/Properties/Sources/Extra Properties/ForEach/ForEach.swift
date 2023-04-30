@@ -137,7 +137,7 @@ extension ForEach {
             let content = property.content(element)
 
             let output = try await Content._makeProperty(
-                property: property.detach(id, next: content),
+                property: property.detach(id: .custom(id), next: content),
                 inputs: inputs
             )
 
