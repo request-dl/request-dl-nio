@@ -26,22 +26,14 @@ import NIOCore
 @RequestActor
 public struct Session: Property {
 
-    private var _configuration: Internals.Session.Configuration
-    var dnsOverride: [String: String]
+    private(set) var configuration: Internals.Session.Configuration
     let provider: SessionProvider
-
-    var configuration: Internals.Session.Configuration {
-        var configuration = _configuration
-        configuration.setValue(dnsOverride, forKey: \.dnsOverride)
-        return configuration
-    }
 
     fileprivate init(
         configuration: Internals.Session.Configuration,
         provider: SessionProvider
     ) {
-        self._configuration = configuration
-        self.dnsOverride = [:]
+        self.configuration = configuration
         self.provider = provider
     }
 
@@ -85,14 +77,10 @@ public struct Session: Property {
 
 private extension Session {
 
-    func edit(_ edit: (inout Self) -> Void) -> Self {
+    func edit(_ edit: (inout Internals.Session.Configuration) -> Void) -> Self {
         var mutableSelf = self
-        edit(&mutableSelf)
+        edit(&mutableSelf.configuration)
         return mutableSelf
-    }
-
-    func editConfiguration(_ edit: (inout Internals.Session.Configuration) -> Void) -> Self {
-        self.edit { edit(&$0._configuration) }
     }
 }
 
@@ -105,7 +93,7 @@ extension Session {
      - Returns: The modified `Session` instance with the waiting for connectivity flag configured.
      */
     public func waitsForConnectivity(_ flag: Bool) -> Self {
-        editConfiguration { $0.setValue(flag, forKey: \.networkFrameworkWaitForConnectivity) }
+        edit { $0.networkFrameworkWaitForConnectivity = flag }
     }
 
     /**
@@ -115,7 +103,7 @@ extension Session {
      - Returns: The modified `Session` instance with the maximum connections per host configured.
      */
     public func maximumConnectionsPerHost(_ maximum: Int) -> Self {
-        editConfiguration { $0.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = maximum }
+        edit { $0.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = maximum }
     }
 
     /**
@@ -124,7 +112,7 @@ extension Session {
      - Returns: The modified `Session` instance with redirect disabled.
      */
     public func disableRedirect() -> Self {
-        editConfiguration { $0.redirectConfiguration = .disallow }
+        edit { $0.redirectConfiguration = .disallow }
     }
 
     /**
@@ -136,7 +124,7 @@ extension Session {
      - Returns: The modified `Session` instance with redirect follow enabled.
      */
     public func enableRedirectFollow(max: Int, allowCycles: Bool) -> Self {
-        editConfiguration { $0.redirectConfiguration = .follow(max: max, allowCycles: allowCycles) }
+        edit { $0.redirectConfiguration = .follow(max: max, allowCycles: allowCycles) }
     }
 
     /**
@@ -145,7 +133,7 @@ extension Session {
      - Returns: The modified `Session` instance with unclean SSL shutdown ignored.
      */
     public func ignoreUncleanSSLShutdown() -> Self {
-        editConfiguration { $0.ignoreUncleanSSLShutdown = true }
+        edit { $0.ignoreUncleanSSLShutdown = true }
     }
 
     /**
@@ -154,7 +142,7 @@ extension Session {
      - Returns: The modified `Session` instance with decompression disabled.
      */
     public func disableDecompression() -> Self {
-        editConfiguration { $0.decompression = .disabled }
+        edit { $0.decompression = .disabled }
     }
 
     /**
@@ -164,7 +152,7 @@ extension Session {
      - Returns: The modified `Session` instance with the decompression limit configured.
      */
     public func decompressionLimit(_ decompressionLimit: DecompressionLimit) -> Self {
-        editConfiguration { $0.decompression = .enabled(limit: decompressionLimit.build()) }
+        edit { $0.decompression = .enabled(decompressionLimit.build()) }
     }
 
     /**

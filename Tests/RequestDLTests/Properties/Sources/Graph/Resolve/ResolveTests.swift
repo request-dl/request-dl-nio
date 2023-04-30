@@ -150,15 +150,11 @@ extension ResolveTests {
                             },
                             proxy = nil,
                             ignoreUncleanSSLShutdown = false,
-                            decompression = Decompression.enabled(
-                                DecompressionLimit {
-                                    limit = Limit.ratio(500)
-                                }
-                            ),
+                            decompression = Decompression.enabled(Limit.ratio(500)),
                             readingMode = ReadingMode.length(1024),
-                            updatingKeyPaths = Optional<(inout Configuration) -> ()> {
-                                some = (Function)
-                            }
+                            dnsOverride = [:],
+                            networkFrameworkWaitForConnectivity = nil,
+                            httpVersion = nil
                         },
                         provider = SharedSessionProvider()
                     }

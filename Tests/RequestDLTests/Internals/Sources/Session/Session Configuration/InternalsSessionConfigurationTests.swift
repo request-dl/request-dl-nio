@@ -37,7 +37,7 @@ class InternalsSessionConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetRedirectConfiguration_shouldBeEqual() async throws {
         // Given
-        let redirectConfiguration = HTTPClient.Configuration.RedirectConfiguration.disallow
+        let redirectConfiguration = Internals.RedirectConfiguration.disallow
 
         // When
         configuration.redirectConfiguration = redirectConfiguration
@@ -47,16 +47,16 @@ class InternalsSessionConfigurationTests: XCTestCase {
         // Then
         XCTAssertEqual(
             String(describing: configuration.redirectConfiguration),
-            String(describing: redirectConfiguration)
+            String(describing: redirectConfiguration.build())
         )
     }
 
     func testConfiguration_whenSetTimeout_shouldBeEqual() async throws {
         // Given
-        let connect = TimeAmount.seconds(60)
-        let read = TimeAmount.seconds(60)
+        let connect = UnitTime.seconds(60)
+        let read = UnitTime.seconds(60)
 
-        let timeout = HTTPClient.Configuration.Timeout(
+        let timeout = Internals.Timeout(
             connect: connect,
             read: read
         )
@@ -67,8 +67,8 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let configuration = try configuration.build()
 
         // Then
-        XCTAssertEqual(configuration.timeout.connect, connect)
-        XCTAssertEqual(configuration.timeout.read, read)
+        XCTAssertEqual(configuration.timeout.connect, connect.build())
+        XCTAssertEqual(configuration.timeout.read, read.build())
     }
 
     func testConfiguration_whenSetConnectionPool_shouldBeEqual() async throws {
@@ -102,7 +102,7 @@ class InternalsSessionConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetDecompression_shouldBeEqual() async throws {
         // Given
-        let decompression = HTTPClient.Decompression.enabled(limit: .size(16))
+        let decompression = Internals.Decompression.enabled(.size(16))
 
         // When
         configuration.decompression = decompression
@@ -112,7 +112,7 @@ class InternalsSessionConfigurationTests: XCTestCase {
         // Then
         XCTAssertEqual(
             String(describing: configuration.decompression),
-            String(describing: decompression)
+            String(describing: decompression.build())
         )
     }
 
@@ -129,15 +129,15 @@ class InternalsSessionConfigurationTests: XCTestCase {
 
     func testConfiguration_whenSetHttpVersion_shouldBeEqual() async throws {
         // Given
-        let version = HTTPClient.Configuration.HTTPVersion.http1Only
+        let version = Internals.HTTPVersion.http1Only
 
         // When
-        configuration.setValue(version, forKey: \.httpVersion)
+        configuration.httpVersion = version
 
         let configuration = try configuration.build()
 
         // Then
-        XCTAssertEqual(configuration.httpVersion, version)
+        XCTAssertEqual(configuration.httpVersion, version.build())
     }
 
     func testConfiguration_whenWaitForConnectivity_shouldBeEqual() async throws {
@@ -145,7 +145,7 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let waitForConnectivity = false
 
         // When
-        configuration.setValue(waitForConnectivity, forKey: \.networkFrameworkWaitForConnectivity)
+        configuration.networkFrameworkWaitForConnectivity = waitForConnectivity
 
         let configuration = try configuration.build()
 

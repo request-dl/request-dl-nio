@@ -19,7 +19,7 @@ class TimeoutTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.connect, timeout.build())
+        XCTAssertEqual(session.configuration.timeout.connect, timeout)
     }
 
     func testResourceTimeout() async throws {
@@ -31,7 +31,7 @@ class TimeoutTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.connect, timeout.build())
+        XCTAssertEqual(session.configuration.timeout.connect, timeout)
     }
 
     func testAllTimeout() async throws {
@@ -43,8 +43,8 @@ class TimeoutTests: XCTestCase {
         let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.read, timeout.build())
-        XCTAssertEqual(session.configuration.timeout.connect, timeout.build())
+        XCTAssertEqual(session.configuration.timeout.read, timeout)
+        XCTAssertEqual(session.configuration.timeout.connect, timeout)
     }
 
     func testDefaultTimeout() async throws {
