@@ -5,17 +5,15 @@
 import Foundation
 
 @RequestActor
-struct PropertyNamespaceUpdater<Content> {
+struct GraphNamespaceOperation<Content>: GraphValueOperation {
 
-    private let content: Content
+    private let mirror: DynamicValueMirror<Content>
 
-    init(_ content: Content) {
-        self.content = content
+    init(_ mirror: DynamicValueMirror<Content>) {
+        self.mirror = mirror
     }
 
-    func callAsFunction(_ hashValue: Int) -> Namespace.ID? {
-        let mirror = PropertyMirror(content)
-
+    func callAsFunction(_ properties: inout GraphProperties) {
         var labels = [String]()
         var latestID: Namespace.ID?
 
@@ -28,13 +26,15 @@ struct PropertyNamespaceUpdater<Content> {
             let namespaceID = Namespace.ID(
                 base: Content.self,
                 namespace: labels.joined(separator: "."),
-                hashValue: hashValue
+                hashValue: properties.pathway
             )
 
-            namespace._namespaceID = namespaceID
+            namespace.id = namespaceID
             latestID = namespaceID
         }
 
-        return latestID
+        if let namespaceID = latestID {
+            properties.inputs.namespaceID = namespaceID
+        }
     }
 }

@@ -6,42 +6,13 @@ import Foundation
 
 @RequestActor
 @propertyWrapper
-public struct Namespace: PropertyValue {
+public struct Namespace: DynamicValue {
 
-    @PropertyContainer var _namespaceID: ID?
+    @_Container var id: ID?
 
     public init() {}
 
     public var wrappedValue: ID {
-        _namespaceID ?? .global
-    }
-}
-
-extension Namespace {
-
-    public struct ID: Hashable {
-
-        private let rawValue: String
-
-        init<Base>(
-            base: Base.Type,
-            namespace: String,
-            hashValue: Int
-        ) {
-            self.rawValue = "\(base).\(namespace):\(hashValue)"
-        }
-    }
-}
-
-extension Namespace.ID {
-
-    private enum Global {}
-
-    static var global: Self {
-        .init(
-            base: Global.self,
-            namespace: "_global",
-            hashValue: .zero
-        )
+        id ?? .global
     }
 }

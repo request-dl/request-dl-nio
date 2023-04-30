@@ -4,5 +4,7 @@
 
 import Foundation
 
-public protocol PropertyValue {}
-
+struct GraphProperties {
+    var inputs: _PropertyInputs
+    let pathway: Int
+}

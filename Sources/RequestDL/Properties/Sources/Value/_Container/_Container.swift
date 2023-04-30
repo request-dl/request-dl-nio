@@ -6,7 +6,7 @@ import Foundation
 
 @RequestActor
 @propertyWrapper
-struct PropertyContainer<Value>: PropertyValue {
+struct _Container<Value>: DynamicValue {
 
     private let stored: Stored
 
@@ -25,7 +25,7 @@ struct PropertyContainer<Value>: PropertyValue {
     }
 }
 
-extension PropertyContainer {
+extension _Container {
 
     fileprivate class Stored {
         var value: Value
@@ -33,24 +33,5 @@ extension PropertyContainer {
         init(_ value: Value) {
             self.value = value
         }
-    }
-}
-
-extension PropertyValue {
-
-    func container<Value>(
-        _ valueType: Value.Type = Value.self
-    ) -> PropertyContainer<Value>? {
-        if let box = self as? PropertyContainer<Value> {
-            return box
-        }
-
-        for child in Mirror(reflecting: self).children {
-            if let property = child.value as? PropertyValue {
-                return property.container(valueType)
-            }
-        }
-
-        return nil
     }
 }

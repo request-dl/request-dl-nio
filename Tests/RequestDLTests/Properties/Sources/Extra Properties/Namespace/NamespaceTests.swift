@@ -22,11 +22,11 @@ class NamespaceTests: XCTestCase {
             property: _GraphValue<NamespaceTests.NamespaceSpy>,
             inputs: _PropertyInputs
         ) async throws -> _PropertyOutputs {
-            let hashValue = property._identified.previousValue?.previousValue?.pathwayHashValue ?? {
-                property.pathwayHashValue
+            let pathway = property._identified.previousValue?.pathway ?? {
+                property.pathway
             }()
 
-            property.callback(hashValue, inputs.namespaceID)
+            property.callback(pathway, inputs.namespaceID)
 
             return .empty
         }
