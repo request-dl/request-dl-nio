@@ -49,18 +49,23 @@ extension Query {
 
     struct Node: PropertyNode {
 
-        fileprivate let key: String
-        fileprivate let value: String
+        fileprivate let name: String
+        fileprivate let value: Any
+        fileprivate let queryStyle: QueryStyle
 
         func make(_ make: inout Make) async throws {
             guard let url = URL(string: make.request.url) else {
                 return
             }
 
-            make.request.url = url.appendingQueries([.init(
-                name: key,
-                value: value
-            )]).absoluteString
+            switch queryStyle.encode(value, for: name) {
+            case .item(let item):
+                make.request.url = url.appendingQueries(item()).absoluteString
+            case .collection(let collection):
+                make.request.url = url.appendingQueries(collection()).absoluteString
+            case .none:
+                break
+            }
         }
     }
 
@@ -72,8 +77,9 @@ extension Query {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(Node(
-            key: property.key,
-            value: "\(property.value)"
+            name: property.key,
+            value: property.value,
+            queryStyle: inputs.environment.queryStyle
         ))
     }
 }
