@@ -9,23 +9,31 @@ import _Concurrency
 
 extension Internals {
 
-    @RequestActor
+    @HTTPClientActor
     class EventLoopGroupManager {
 
         static let shared = EventLoopGroupManager()
 
         private var groups: [String: EventLoopGroup] = [:]
 
-        func client(
-            _ configuration: HTTPClient.Configuration,
-            for sessionProvider: SessionProvider
-        ) -> HTTPClient {
-            let group = groups[sessionProvider.id] ?? sessionProvider.group()
-            groups[sessionProvider.id] = group
-            return .init(
-                eventLoopGroupProvider: .shared(group),
-                configuration: configuration
-            )
+        private func _provider(
+            _ sessionProvider: SessionProvider
+        ) -> EventLoopGroup {
+            let group = self.groups[sessionProvider.id] ?? sessionProvider.group()
+            self.groups[sessionProvider.id] = group
+            return group
+        }
+
+        func provider(
+            _ sessionProvider: SessionProvider
+        ) async -> EventLoopGroup {
+            if case .background = _Concurrency.Task.currentPriority {
+                return _provider(sessionProvider)
+            } else {
+                return await _Concurrency.Task.detached(priority: .background) {
+                    await self._provider(sessionProvider)
+                }.value
+            }
         }
     }
 }

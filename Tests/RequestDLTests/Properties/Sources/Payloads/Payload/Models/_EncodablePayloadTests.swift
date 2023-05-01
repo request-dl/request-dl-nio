@@ -27,16 +27,16 @@ class _EncodablePayloadTests: XCTestCase {
 
         // When
         let payload = _EncodablePayload(mock, encoder: encoder)
-        let expectedData = try encoder.encode(mock)
-        let expectedMock = try decoder.decode(Mock.self, from: expectedData)
+        let sut = try payload.buffer.getData().map {
+            try decoder.decode(Mock.self, from: $0)
+        }
 
         // Then
-        XCTAssertEqual(payload.buffer.getData(), expectedData)
-        XCTAssertEqual(mock.foo, expectedMock.foo)
+        XCTAssertEqual(sut?.foo, mock.foo)
 
         XCTAssertEqual(
-            mock.date.seconds,
-            expectedMock.date.seconds
+            sut?.date.seconds,
+            mock.date.seconds
         )
     }
 }

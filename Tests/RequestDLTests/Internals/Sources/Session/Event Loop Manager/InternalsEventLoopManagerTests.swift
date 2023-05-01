@@ -24,7 +24,7 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        manager = Internals.EventLoopGroupManager()
+        manager = await Internals.EventLoopGroupManager()
     }
 
     override func tearDown() async throws {
@@ -34,20 +34,13 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
     func testManager_whenRegisterGroup_shouldBeResolved() async throws {
         // Given
-        var provider: CustomProvider! = CustomProvider()
+        let provider = CustomProvider()
 
         // When
-        weak var reference = provider.group()
-
-        try await manager.client(
-            .init(),
-            for: provider
-        ).shutdown()
+        let sut1 = await manager.provider(provider)
 
         // Then
-        provider = nil
-
-        XCTAssertNotNil(reference)
+        XCTAssertTrue(provider.group() === sut1)
     }
 
     func testManager_whenRegisterIdentifier_shouldBeResolvedOnlyOnce() async throws {
@@ -55,36 +48,24 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let client1 = manager.client(
-            .init(),
-            for: provider
-        )
-
-        let client2 = manager.client(
-            .init(),
-            for: provider
-        )
-
-        try await client1.shutdown()
-        try await client2.shutdown()
+        let sut1 = await manager.provider(provider)
+        let sut2 = await manager.provider(provider)
 
         // Then
-        XCTAssertTrue(client1.eventLoopGroup === client2.eventLoopGroup)
+        XCTAssertTrue(provider.group() === sut1)
+        XCTAssertTrue(provider.group() === sut2)
     }
 
-    func testManager_whenCustomGroup_shouldBeValid() async throws {
+    func testManager_whenRunningInBackground() async throws {
         // Given
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let provider = CustomProvider()
 
         // When
-        let client = manager.client(
-            .init(),
-            for: .custom(group)
-        )
-
-        try await client.shutdown()
+        let sut = await _Concurrency.Task.detached(priority: .background) {
+            await self.manager.provider(provider)
+        }.value
 
         // Then
-        XCTAssertTrue(client.eventLoopGroup === group)
+        XCTAssertTrue(sut === provider.group())
     }
 }

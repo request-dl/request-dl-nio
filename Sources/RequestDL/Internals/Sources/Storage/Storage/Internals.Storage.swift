@@ -52,7 +52,7 @@ extension Internals.Storage {
         let lifetime = Double(lifetime) / 1_000_000_000
 
         table = table.filter {
-            now.timeIntervalSince($1.readAt) <= lifetime
+            $1.readAt.distance(to: now) <= lifetime
         }
     }
 }
