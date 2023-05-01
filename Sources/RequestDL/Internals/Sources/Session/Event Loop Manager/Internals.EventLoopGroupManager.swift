@@ -30,8 +30,8 @@ extension Internals {
             if case .background = _Concurrency.Task.currentPriority {
                 return _provider(sessionProvider)
             } else {
-                return await _Concurrency.Task(priority: .background) {
-                    _provider(sessionProvider)
+                return await _Concurrency.Task.detached(priority: .background) {
+                    await self._provider(sessionProvider)
                 }.value
             }
         }
