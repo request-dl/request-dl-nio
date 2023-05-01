@@ -298,7 +298,7 @@ extension InternalsSecureConnectionTests {
 
 extension InternalsSecureConnectionTests {
 
-    private final class ClientResolver: SSLPSKClientIdentityResolver {
+    private final class ClientResolver: SSLPSKIdentityResolver {
 
         func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
             .init(
@@ -314,7 +314,7 @@ extension InternalsSecureConnectionTests {
         let resolver = ClientResolver()
 
         // When
-        secureConnection.pskClientIdentityResolver = resolver
+        secureConnection.pskIdentityResolver = resolver
 
         let sut = try secureConnection.build()
         let result = try sut.pskClientCallback.map { try $0(identity) }
