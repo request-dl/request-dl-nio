@@ -56,7 +56,7 @@ class InternalsClientManagerTests: XCTestCase {
 
     func testManager_expiringClients() async throws {
         // Given
-        let lifetime = 2_500_000_000
+        let lifetime: UInt64 = 2_500_000_000
         let manager = await Internals.ClientManager(lifetime: lifetime)
         let provider = Internals.SharedSessionProvider()
         let configuration = Internals.Session.Configuration()

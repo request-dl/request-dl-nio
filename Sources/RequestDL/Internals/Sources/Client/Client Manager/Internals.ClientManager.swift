@@ -10,15 +10,15 @@ extension Internals {
     @HTTPClientActor
     class ClientManager {
 
-        static let lifetime: Int = 5_000_000_000
+        static let lifetime: UInt64 = 5_000_000_000 * 60
         static let shared = ClientManager(lifetime: lifetime)
 
-        private let lifetime: Int
+        private let lifetime: UInt64
         private var table = [String: [Item]]()
 
         private var pendingOperations = [String: _Concurrency.Task<Void, Never>]()
 
-        init(lifetime: Int) {
+        init(lifetime: UInt64) {
             self.lifetime = lifetime
             scheduleCleanup()
         }
