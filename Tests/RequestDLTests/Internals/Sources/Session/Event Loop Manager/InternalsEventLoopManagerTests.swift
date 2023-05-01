@@ -24,7 +24,7 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        manager = Internals.EventLoopGroupManager()
+        manager = await Internals.EventLoopGroupManager()
     }
 
     override func tearDown() async throws {

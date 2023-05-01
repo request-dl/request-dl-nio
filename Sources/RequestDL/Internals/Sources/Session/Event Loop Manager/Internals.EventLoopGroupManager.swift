@@ -16,12 +16,24 @@ extension Internals {
 
         private var groups: [String: EventLoopGroup] = [:]
 
-        func provider(
+        private func _provider(
             _ sessionProvider: SessionProvider
         ) -> EventLoopGroup {
-            let group = groups[sessionProvider.id] ?? sessionProvider.group()
-            groups[sessionProvider.id] = group
+            let group = self.groups[sessionProvider.id] ?? sessionProvider.group()
+            self.groups[sessionProvider.id] = group
             return group
+        }
+
+        func provider(
+            _ sessionProvider: SessionProvider
+        ) async -> EventLoopGroup {
+            if case .background = _Concurrency.Task.currentPriority {
+                return _provider(sessionProvider)
+            } else {
+                return await _Concurrency.Task(priority: .background) {
+                    _provider(sessionProvider)
+                }.value
+            }
         }
     }
 }
