@@ -23,10 +23,6 @@ extension Internals {
             scheduleCleanup()
         }
 
-        func getClients(for id: String) -> [Item]? {
-            table[id]
-        }
-
         func client(
             provider: SessionProvider,
             configuration: Internals.Session.Configuration
@@ -95,7 +91,7 @@ extension Internals.ClientManager {
             for (index, item) in items.enumerated() {
                 if item.client.isRunning {
                     optionalItems[index] = item.updatingReadAt()
-                } else if now.distance(to: item.readAt) > lifetime {
+                } else if item.readAt.distance(to: now) > lifetime {
                     if (try? await item.client.shutdown()) ?? false {
                         optionalItems[index] = nil
                     }

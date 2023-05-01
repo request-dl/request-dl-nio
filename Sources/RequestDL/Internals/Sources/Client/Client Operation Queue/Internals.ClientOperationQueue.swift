@@ -28,7 +28,7 @@ extension Internals {
         }
 
         var isRunning: Bool {
-            last !== root
+            last == nil || last !== root
         }
     }
 }
