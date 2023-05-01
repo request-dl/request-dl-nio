@@ -55,4 +55,17 @@ class InternalsEventLoopManagerTests: XCTestCase {
         XCTAssertTrue(provider.group() === sut1)
         XCTAssertTrue(provider.group() === sut2)
     }
+
+    func testManager_whenRunningInBackground() async throws {
+        // Given
+        let provider = CustomProvider()
+
+        // When
+        let sut = await _Concurrency.Task.detached(priority: .background) {
+            await self.manager.provider(provider)
+        }.value
+
+        // Then
+        XCTAssertTrue(sut === provider.group())
+    }
 }
