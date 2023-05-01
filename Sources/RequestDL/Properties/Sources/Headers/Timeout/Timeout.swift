@@ -5,14 +5,14 @@
 import Foundation
 
 /**
- `Timeout` is a struct that defines the request timeout for a resource and request.
+ `Timeout` is a struct that defines the request timeout for a connect and read.
 
  Usage:
 
  To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
 
  ```swift
- Timeout(.seconds(40), for: .request)
+ Timeout(.seconds(40), for: .connect)
  ```
 
  In the example below, a request is made to Google's website with the timeout for all types.

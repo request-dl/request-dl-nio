@@ -12,6 +12,7 @@ import Foundation
  Example:
 
  ```swift
+ @RequestActor
  func makeRequest() -> AnyTask<TaskResult<Data>> {
      DataTask {
          BaseURL("google.com")

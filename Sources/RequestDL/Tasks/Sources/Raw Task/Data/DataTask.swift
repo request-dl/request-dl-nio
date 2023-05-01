@@ -13,7 +13,7 @@ import Foundation
  In the example below, a request is made to the Apple's website:
 
  ```swift
- func makeRequest() {
+ func makeRequest() async throws {
      try await DataTask {
          BaseURL("apple.com")
      }

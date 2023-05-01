@@ -14,6 +14,7 @@ import Foundation
 
  ```swift
  struct MyProperty: Property {
+
     @StoredObject var myObject = MyClass()
 
     var body: some Property {
