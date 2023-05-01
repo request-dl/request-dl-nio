@@ -24,7 +24,7 @@ extension Internals {
         var pskHint: String?
         var applicationProtocols: [String]?
         var keyLogger: SSLKeyLogger?
-        var pskClientIdentityResolver: SSLPSKClientIdentityResolver?
+        var pskIdentityResolver: SSLPSKIdentityResolver?
         var minimumTLSVersion: NIOSSL.TLSVersion?
         var maximumTLSVersion: NIOSSL.TLSVersion?
         var cipherSuites: String?
@@ -120,9 +120,9 @@ extension Internals.SecureConnection {
             }
         }
 
-        if let pskClientIdentityResolver {
+        if let pskIdentityResolver {
             tlsConfiguration.pskClientCallback = {
-                try pskClientIdentityResolver($0)
+                try pskIdentityResolver($0)
             }
         }
 
@@ -147,7 +147,7 @@ extension Internals.SecureConnection: Equatable {
         && lhs.pskHint == rhs.pskHint
         && lhs.applicationProtocols == rhs.applicationProtocols
         && lhs.keyLogger === rhs.keyLogger
-        && lhs.pskClientIdentityResolver === rhs.pskClientIdentityResolver
+        && lhs.pskIdentityResolver === rhs.pskIdentityResolver
         && lhs.minimumTLSVersion == rhs.minimumTLSVersion
         && lhs.maximumTLSVersion == rhs.maximumTLSVersion
         && lhs.cipherSuites == rhs.cipherSuites
