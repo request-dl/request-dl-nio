@@ -35,6 +35,7 @@ import Foundation
 
  ```swift
  struct DefaultHeader: Property {
+
      @Environment(\.contentType) var contentType: ContentType
 
      var body: some Property {
@@ -74,6 +75,7 @@ public struct Environment<Value>: DynamicValue {
 
      ```swift
          struct DefaultHeader: Property {
+
              @Environment(\.contentType) var contentType: ContentType
 
              var body: some Property {

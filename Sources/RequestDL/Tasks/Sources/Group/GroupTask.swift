@@ -32,7 +32,7 @@ import Foundation
 public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element: Hashable {
 
     private let data: Data
-    private let map: (Data.Element) -> Content
+    private let map: @RequestActor (Data.Element) -> Content
 
     /**
      Initializes a `GroupTask` instance.
@@ -41,7 +41,7 @@ public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element:
         - data: The type of the collection that contains the elements.
         - content: The closure map function that transform each element of data into of task.
      */
-    public init(_ data: Data, content: @escaping (Data.Element) -> Content) {
+    public init(_ data: Data, content: @RequestActor @escaping (Data.Element) -> Content) {
         self.data = data
         self.map = content
     }

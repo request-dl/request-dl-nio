@@ -13,7 +13,7 @@ import Foundation
  In the example below, a request is made to the Apple's website:
 
  ```swift
- func makeRequest() {
+ func makeRequest() async throws {
      let result = try await DownloadTask {
          BaseURL("apple.com")
      }
@@ -32,7 +32,7 @@ import Foundation
  It's possible to control the length of bytes read by using the `ReadingMode` property.
 
  ```swift
- func makeRequest() {
+ func makeRequest() async throws {
      let result = try await DownloadTask {
          BaseURL("apple.com")
          ReadingMode(separator: "\n")

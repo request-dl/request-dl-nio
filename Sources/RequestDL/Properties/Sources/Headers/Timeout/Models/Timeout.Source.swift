@@ -11,27 +11,22 @@ extension Timeout {
 
      Use the static properties of this struct to set the timeout interval for requests and resources.
 
-     1. `request`: The timeout request case. The default value is 60s.
-     2. `resource`: The timeout resources case. The default value is 7 days in seconds.
-     3. `all`: Defines the same timeout interval for both request and resource.
+     1. `connect`: The connect timeout case. The default value is 30s.
+     2. `read`: The read timeout case.
+     3. `all`: Defines the same timeout interval for both connect and read.
 
      In the example below, a request is made to the Google's website with the timeout for all types.
 
      ```swift
-     extension GoogleAPI {
-
-         func website() -> DataTask {
-             DataTask {
-                 BaseURL("google.com")
-                 Timeout(.seconds(60), for: .all)
-             }
-         }
+     DataTask {
+         BaseURL("google.com")
+         Timeout(.seconds(60), for: .all)
      }
      ```
      */
     public struct Source: OptionSet {
 
-        /// The timeout interval for the request.
+        /// The timeout interval for the connect.
         public static let connect = Source(rawValue: 1 << 0)
 
         /// The timeout interval for resource which determinate how long

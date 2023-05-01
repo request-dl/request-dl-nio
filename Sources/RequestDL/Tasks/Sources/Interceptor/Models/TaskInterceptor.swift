@@ -19,9 +19,8 @@ import Foundation
 
  ```swift
  struct MyInterceptor: TaskInterceptor {
-     typealias Element = String
 
-     func received(_ result: Result<Element, Error>) {
+     func received(_ result: Result<String, Error>) {
          switch result {
          case .success(let string):
              print("Intercepted task with string result: \(string)")
