@@ -10,7 +10,7 @@ extension Internals {
     @HTTPClientActor
     class ClientManager {
 
-        static let lifetime: Int = 5_000_000_000
+        static let lifetime: Int = 5_000_000_000 * 60
         static let shared = ClientManager(lifetime: lifetime)
 
         private let lifetime: Int

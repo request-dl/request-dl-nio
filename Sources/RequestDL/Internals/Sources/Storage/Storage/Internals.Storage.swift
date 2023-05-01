@@ -9,7 +9,7 @@ extension Internals {
     @RequestActor
     class Storage {
 
-        static let lifetime: Int = 5_000_000_000
+        static let lifetime: Int = 5_000_000_000 * 60
         static let shared = Storage(lifetime: lifetime)
 
         private let lifetime: Int
