@@ -30,7 +30,7 @@ class PSKIdentityTests: XCTestCase {
             }
         })
 
-        let sut = try session.configuration.secureConnection?.pskClientIdentityResolver?(hint)
+        let sut = try session.configuration.secureConnection?.pskIdentityResolver?(hint)
 
         // Then
         XCTAssertEqual(sut?.key, key)
@@ -58,7 +58,7 @@ class PSKIdentityTests: XCTestCase {
 
 extension PSKIdentityTests {
 
-    fileprivate final class ClientResolver: SSLPSKClientIdentityResolver {
+    fileprivate final class ClientResolver: SSLPSKIdentityResolver {
 
         let key: NIOSSLSecureBytes
         let identity: String
@@ -109,7 +109,7 @@ extension PSKIdentityTests {
             }
         })
 
-        let sut = try session.configuration.secureConnection?.pskClientIdentityResolver?(hint)
+        let sut = try session.configuration.secureConnection?.pskIdentityResolver?(hint)
 
         // Then
 
@@ -166,47 +166,6 @@ extension PSKIdentityTests {
 
 @available(*, deprecated)
 extension PSKIdentityTests {
-
-    private final class ServerResolver: SSLPSKServerIdentityResolver {
-
-        let key: NIOSSLSecureBytes
-        let received: @Sendable (String, String) -> Void
-
-        init(
-            _ key: NIOSSLSecureBytes,
-            received: @Sendable @escaping (String, String) -> Void
-        ) {
-            self.key = key
-            self.received = received
-        }
-
-        func callAsFunction(_ hint: String, client identity: String) throws -> PSKServerIdentityResponse {
-            received(hint, identity)
-            return .init(key: key)
-        }
-    }
-
-    func testIdentity_whenServerResolver() async throws {
-        // When
-        defer { Internals.Override.Print.restore() }
-        Internals.Override.Print.replace {
-            XCTAssertTrue(
-                $2.map { "\($0)" }
-                    .joined(separator: $0)
-                    .appending($1)
-                    .contains("⚠️ WARNING")
-            )
-        }
-
-        // Then
-        _ = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PSKIdentity(
-                    ServerResolver(.init()) { _, _ in }
-                )
-            }
-        })
-    }
 
     func testCertificate_whenInitServer_shouldBeValid() async throws {
         // When

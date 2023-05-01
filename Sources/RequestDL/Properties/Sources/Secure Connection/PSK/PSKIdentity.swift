@@ -10,8 +10,8 @@ import NIOSSL
 public struct PSKIdentity: Property {
 
     private enum Source {
-        case client(SSLPSKClientIdentityResolver)
-        case server
+        case resolver(SSLPSKIdentityResolver)
+        case deprecated
     }
 
     private let source: Source
@@ -21,8 +21,8 @@ public struct PSKIdentity: Property {
     ///
     /// - Parameters:
     ///   - resolver: The client PSK identity resolver.
-    public init(_ resolver: SSLPSKClientIdentityResolver) {
-        self.source = .client(resolver)
+    public init(_ resolver: SSLPSKIdentityResolver) {
+        self.source = .resolver(resolver)
     }
 
     fileprivate func edit(_ edit: (inout Self) -> Void) -> Self {
@@ -59,9 +59,9 @@ extension PSKIdentity {
             secureConnection.pskHint = hint
 
             switch source {
-            case .client(let resolver):
-                secureConnection.pskClientIdentityResolver = resolver
-            case .server:
+            case .resolver(let resolver):
+                secureConnection.pskIdentityResolver = resolver
+            case .deprecated:
                 Internals.Log.warning(
                     .deprecatedServerConfiguration()
                 )
@@ -101,15 +101,6 @@ extension PSKIdentity {
         self.init(ClientResolver(closure))
     }
 
-    /// Creates a PSK identity for server-side authentication with the given resolver.
-    ///
-    /// - Parameters:
-    ///   - resolver: The server PSK identity resolver.
-    @available(*, deprecated, message: "RequestDL is for client-side usage only")
-    public init(_ resolver: SSLPSKServerIdentityResolver) {
-        self.source = .server
-    }
-
     /// Creates a PSK identity for server-side authentication with the given type and closure that
     /// generates the PSK.
     ///
@@ -121,7 +112,7 @@ extension PSKIdentity {
         _ psk: PSKServer,
         _ closure: @Sendable @escaping (PSKServerDescription) throws -> PSKServerIdentity
     ) {
-        self.source = .server
+        self.source = .deprecated
     }
 
     /// Creates a PSK identity for client-side authentication with the given type and closure that
@@ -139,7 +130,7 @@ extension PSKIdentity {
 @available(*, deprecated)
 extension PSKIdentity {
 
-    fileprivate final class ClientResolver: SSLPSKClientIdentityResolver {
+    fileprivate final class ClientResolver: SSLPSKIdentityResolver {
 
         private let resolver: @Sendable (PSKClientDescription) throws -> PSKClientIdentity
 

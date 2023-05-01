@@ -8,10 +8,10 @@ import NIOSSL
 /**
  A protocol for resolving pre-shared key client identities.
 
- `SSLPSKClientIdentityResolver` defines a function that can be used to resolve
+ `SSLPSKIdentityResolver` defines a function that can be used to resolve
  a pre-shared key client identity based on a given hint.
  */
-public protocol SSLPSKClientIdentityResolver: Sendable, AnyObject {
+public protocol SSLPSKIdentityResolver: Sendable, AnyObject {
 
     /**
      Function for resolving a pre-shared key client identity.

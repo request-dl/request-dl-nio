@@ -243,7 +243,7 @@ extension ResolveTests {
                             pskHint = nil,
                             applicationProtocols = nil,
                             keyLogger = nil,
-                            pskClientIdentityResolver = nil,
+                            pskIdentityResolver = nil,
                             minimumTLSVersion = nil,
                             maximumTLSVersion = nil,
                             cipherSuites = nil,

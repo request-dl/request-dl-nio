@@ -75,7 +75,7 @@ class DataTaskTests: XCTestCase {
 
 extension DataTaskTests {
 
-    private final class PSKClientIdentityResolver: SSLPSKClientIdentityResolver {
+    private final class PSKClientIdentityResolver: SSLPSKIdentityResolver {
 
         let key: String
         let identity: String
