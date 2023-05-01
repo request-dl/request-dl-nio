@@ -23,7 +23,7 @@ class InternalsStorageTests: XCTestCase {
 
     func testStorage_whenExpiredLifetime() async throws {
         // Given
-        let lifetime = 2_500_000_000
+        let lifetime: UInt64 = 2_500_000_000
         let key = "key"
         let value = 1
 
