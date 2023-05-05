@@ -53,14 +53,10 @@ extension Query {
         fileprivate let value: String
 
         func make(_ make: inout Make) async throws {
-            guard let url = URL(string: make.request.url) else {
-                return
-            }
-
-            make.request.url = url.appendingQueries([.init(
+            make.request.queries.append(.init(
                 name: key,
                 value: value
-            )]).absoluteString
+            ))
         }
     }
 

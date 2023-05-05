@@ -43,7 +43,7 @@ class QueryTests: XCTestCase {
             number=123&\
             page=1&\
             api_key=password&\
-            array=%5B9,%20%22nine%22%5D
+            array=%5B9%2C%20%22nine%22%5D
             """
         )
     }

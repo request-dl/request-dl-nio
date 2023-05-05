@@ -81,11 +81,11 @@ extension Path {
         let path: String
 
         func make(_ make: inout Make) async throws {
-            guard let url = URL(string: make.request.url), !path.isEmpty else {
+            guard !path.isEmpty else {
                 return
             }
 
-            make.request.url = url.appendingPathComponent(path).absoluteString
+            make.request.pathComponents.append(path)
         }
     }
 
