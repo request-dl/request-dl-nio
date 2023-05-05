@@ -13,12 +13,12 @@ class ReadingModeTests: XCTestCase {
         let length = 1_024
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             ReadingMode(length: length)
         })
 
         // Then
-        XCTAssertEqual(session.configuration.readingMode, .length(length))
+        XCTAssertEqual(request.readingMode, .length(length))
     }
 
     func testReadingBySeparator() async throws {
@@ -26,11 +26,11 @@ class ReadingModeTests: XCTestCase {
         let separator = Array(Data("\n".utf8))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let (_, request) = try await resolve(TestProperty {
             ReadingMode(separator: separator)
         })
 
         // Then
-        XCTAssertEqual(session.configuration.readingMode, .separator(separator))
+        XCTAssertEqual(request.readingMode, .separator(separator))
     }
 }

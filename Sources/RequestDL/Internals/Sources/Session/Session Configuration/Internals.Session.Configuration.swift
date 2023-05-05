@@ -16,7 +16,6 @@ extension Internals.Session {
         var proxy: HTTPClient.Configuration.Proxy?
         var ignoreUncleanSSLShutdown: Bool = false
         var decompression: Internals.Decompression = .disabled
-        var readingMode: Internals.Response.ReadingMode = .length(1_024)
         var dnsOverride: [String: String] = [:]
         var networkFrameworkWaitForConnectivity: Bool?
         var httpVersion: Internals.HTTPVersion?

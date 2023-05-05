@@ -151,7 +151,6 @@ extension ResolveTests {
                             proxy = nil,
                             ignoreUncleanSSLShutdown = false,
                             decompression = Decompression.enabled(Limit.ratio(500)),
-                            readingMode = ReadingMode.length(1024),
                             dnsOverride = [:],
                             networkFrameworkWaitForConnectivity = nil,
                             httpVersion = nil

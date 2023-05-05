@@ -18,6 +18,7 @@ extension Internals {
         var headers: Headers
 
         var body: Body?
+        var readingMode: Internals.Response.ReadingMode
 
         init() {
             self.baseURL = ""
@@ -26,6 +27,7 @@ extension Internals {
             self.method = nil
             self.headers = .init()
             self.body = nil
+            self.readingMode = .length(1_024)
         }
     }
 }
