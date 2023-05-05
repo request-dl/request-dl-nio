@@ -116,15 +116,13 @@ extension BaseURL {
 
 extension BaseURL {
 
-    struct Node: PropertyNode {
+    private struct Node: PropertyNode {
 
-        let baseURL: URL
+        let baseURL: String
 
-        fileprivate init(_ baseURL: URL) {
-            self.baseURL = baseURL
+        func make(_ make: inout Make) async throws {
+            make.request.baseURL = baseURL
         }
-
-        func make(_ make: inout Make) async throws {}
     }
 
     /// This method is used internally and should not be called directly.
@@ -134,13 +132,6 @@ extension BaseURL {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-
-        guard let baseURL = URL(string: property.absoluteString) else {
-            Internals.Log.failure(
-                .failedToResolveURL(property.absoluteString)
-            )
-        }
-
-        return .leaf(Node(baseURL))
+        return .leaf(Node(baseURL: property.absoluteString))
     }
 }

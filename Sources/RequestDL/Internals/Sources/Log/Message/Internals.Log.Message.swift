@@ -83,24 +83,6 @@ extension Internals.Log.Message {
     }
 }
 
-// MARK: - Resolve
-extension Internals.Log.Message {
-
-    static func cantResolveBaseURLFromNodes<Node, Root>(
-        _ node: Node,
-        for root: Root.Type
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            Failed to find the required BaseURL object in the context.
-            """,
-            parameters: [
-                String(describing: root): node
-            ]
-        )
-    }
-}
-
 // MARK: - Secure Connection
 extension Internals.Log.Message {
 
@@ -281,17 +263,6 @@ extension Internals.Log.Message {
             """
             Unexpected format for host string: Could not extract the \
             host.
-            """,
-            parameters: [
-                String(describing: type(of: url)): url
-            ]
-        )
-    }
-
-    static func failedToResolveURL<URL>(_ url: URL) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            Failed to create URL from absolute string.
             """,
             parameters: [
                 String(describing: type(of: url)): url

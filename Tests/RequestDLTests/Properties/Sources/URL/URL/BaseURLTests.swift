@@ -149,7 +149,7 @@ class BaseURLTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(request.url, "ftp://apple.com")
+        XCTAssertEqual(request.url, "https://google.com")
     }
 
     func testNeverBody() async throws {

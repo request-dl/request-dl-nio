@@ -13,7 +13,7 @@ class InternalsRequestTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        request = .init(url: "")
+        request = .init()
     }
 
     override func tearDown() async throws {
@@ -26,7 +26,7 @@ class InternalsRequestTests: XCTestCase {
         let url = "https://google.com"
 
         // When
-        request = .init(url: url)
+        request.baseURL = url
 
         // Then
         XCTAssertEqual(request.url, url)

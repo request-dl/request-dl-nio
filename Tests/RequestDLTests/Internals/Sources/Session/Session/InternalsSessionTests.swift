@@ -26,7 +26,8 @@ class InternalsSessionTests: XCTestCase {
 
     func testSession_whenPerformingGet_shouldBeValid() async throws {
         // Given
-        let request = Internals.Request(url: "https://google.com")
+        var request = Internals.Request()
+        request.baseURL = "https://google.com"
 
         // When
         let task = try await session.request(request)
@@ -46,7 +47,8 @@ class InternalsSessionTests: XCTestCase {
         let length = 1_023
         let data = Data.randomData(length: length)
 
-        var request = Internals.Request(url: "https://google.com")
+        var request = Internals.Request()
+        request.baseURL = "https://google.com"
         request.method = "POST"
         request.body = Internals.Body(buffers: [
             Internals.DataBuffer(data)
@@ -71,7 +73,8 @@ class InternalsSessionTests: XCTestCase {
 
     func testSession_whenPerformingPostEmptyData_shouldBeValid() async throws {
         // Given
-        var request = Internals.Request(url: "https://google.com")
+        var request = Internals.Request()
+        request.baseURL = "https://google.com"
         request.method = "POST"
         request.body = Internals.Body(buffers: [])
 
@@ -114,7 +117,8 @@ class InternalsSessionTests: XCTestCase {
             port: 8888,
             response: message
         ).run { baseURL in
-            var request = Internals.Request(url: "https://\(baseURL)")
+            var request = Internals.Request()
+            request.baseURL = "https://\(baseURL)"
             request.method = "POST"
             request.body = Internals.Body(fragment, buffers: [
                 fileBuffer

@@ -2,6 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
+import Foundation
 import NIOCore
 import AsyncHTTPClient
 
@@ -9,13 +10,19 @@ extension Internals {
 
     struct Request {
 
-        var url: String
+        var baseURL: String
+        var pathComponents: [String]
+        var queries: [Query]
+
         var method: String?
         var headers: Headers
+
         var body: Body?
 
-        init(url: String) {
-            self.url = url
+        init() {
+            self.baseURL = ""
+            self.pathComponents = []
+            self.queries = []
             self.method = nil
             self.headers = .init()
             self.body = nil
@@ -32,5 +39,30 @@ extension Internals.Request {
             headers: headers.build(),
             body: body?.build()
         )
+    }
+}
+
+extension Internals.Request {
+
+    var url: String {
+        let pathAllowed = CharacterSet(charactersIn: "/")
+
+        let baseURL = baseURL
+            .trimmingCharacters(in: .urlHostAllowed.inverted)
+            .trimmingCharacters(in: pathAllowed)
+
+        let pathComponents = pathComponents
+            .joined(separator: "/")
+            .trimmingCharacters(in: .urlPathAllowed.inverted)
+            .trimmingCharacters(in: pathAllowed)
+
+        let queries = queries.joined()
+        let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"
+
+        if pathComponents.isEmpty {
+            return baseURL + queriesPathComponent
+        } else {
+            return "\(baseURL)/\(pathComponents)\(queriesPathComponent)"
+        }
     }
 }
