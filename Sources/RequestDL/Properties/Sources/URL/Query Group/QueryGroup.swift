@@ -39,7 +39,7 @@ public struct QueryGroup<Content: Property>: Property {
     }
 }
 
-extension QueryGroup where Content == ForEach<[String: Any], String, Query> {
+extension QueryGroup where Content == ForEach<[String: Any], String, Query<Any>> {
 
     public init(_ dictionary: [String: Any]) {
         self.init {
@@ -54,9 +54,9 @@ extension QueryGroup {
 
     struct Node: PropertyNode {
 
-        let leafs: [LeafNode<Query.Node>]
+        let leafs: [LeafNode<QueryNode>]
 
-        fileprivate init(_ leafs: [LeafNode<Query.Node>]) {
+        fileprivate init(_ leafs: [LeafNode<QueryNode>]) {
             self.leafs = leafs
         }
 
@@ -80,6 +80,6 @@ extension QueryGroup {
             inputs: inputs
         )
 
-        return .leaf(Node(output.node.search(for: Query.Node.self)))
+        return .leaf(Node(output.node.search(for: QueryNode.self)))
     }
 }

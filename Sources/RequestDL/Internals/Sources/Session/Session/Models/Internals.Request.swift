@@ -9,16 +9,24 @@ extension Internals {
 
     struct Request {
 
-        var url: String
+        var baseURL: String
+        var pathComponents: [String]
+        var queries: [Query]
+
         var method: String?
         var headers: Headers
-        var body: Body?
 
-        init(url: String) {
-            self.url = url
+        var body: Body?
+        var readingMode: Internals.Response.ReadingMode
+
+        init() {
+            self.baseURL = ""
+            self.pathComponents = []
+            self.queries = []
             self.method = nil
             self.headers = .init()
             self.body = nil
+            self.readingMode = .length(1_024)
         }
     }
 }
@@ -32,5 +40,32 @@ extension Internals.Request {
             headers: headers.build(),
             body: body?.build()
         )
+    }
+}
+
+import Foundation
+
+extension Internals.Request {
+
+    var url: String {
+        let pathCharacterSet = CharacterSet(charactersIn: "/")
+
+        let baseURL = baseURL
+            .trimmingCharacters(in: .urlHostAllowed.inverted)
+            .trimmingCharacters(in: pathCharacterSet)
+
+        let pathComponents = pathComponents
+            .joined(separator: "/")
+            .trimmingCharacters(in: .urlPathAllowed.inverted)
+            .trimmingCharacters(in: pathCharacterSet)
+
+        let queries = queries.joined()
+        let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"
+
+        if pathComponents.isEmpty {
+            return baseURL + queriesPathComponent
+        } else {
+            return "\(baseURL)/\(pathComponents)\(queriesPathComponent)"
+        }
     }
 }

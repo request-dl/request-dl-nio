@@ -31,16 +31,10 @@ struct Resolve<Root: Property> {
     func build() async throws -> (Internals.Session, Internals.Request) {
         let output = try await outputs()
 
-        guard let baseURLNode = output.node.first(of: BaseURL.Node.self) else {
-            Internals.Log.failure(
-                .cantResolveBaseURLFromNodes(output.node, for: Self.self)
-            )
-        }
-
         let sessionNode = output.node.first(of: Session.Node.self)
 
         var make = Make(
-            request: Internals.Request(url: baseURLNode.baseURL.absoluteString),
+            request: Internals.Request(),
             configuration: sessionNode?.configuration ?? .init()
         )
 

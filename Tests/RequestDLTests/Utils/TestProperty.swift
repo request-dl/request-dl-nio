@@ -17,7 +17,7 @@ struct TestProperty<Content: Property>: Property {
     }
 
     var body: some Property {
-        content
         BaseURL("www.apple.com")
+        content
     }
 }

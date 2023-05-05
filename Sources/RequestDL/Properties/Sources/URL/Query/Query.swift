@@ -22,10 +22,10 @@ import Foundation
  ```
 */
 @RequestActor
-public struct Query: Property {
+public struct Query<Value>: Property {
 
     let key: String
-    let value: Any
+    let value: Value
 
     /**
      Creates a new `Query` instance with a value and a key.
@@ -34,9 +34,9 @@ public struct Query: Property {
         - value: The value of the query parameter.
         - key: The key of the query parameter.
      */
-    public init(_ value: Any, forKey key: String) {
+    public init(_ value: Value, forKey key: String) {
         self.key = key
-        self.value = "\(value)"
+        self.value = value
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -47,28 +47,6 @@ public struct Query: Property {
 
 extension Query {
 
-    struct Node: PropertyNode {
-
-        fileprivate let name: String
-        fileprivate let value: Any
-        fileprivate let queryStyle: QueryStyle
-
-        func make(_ make: inout Make) async throws {
-            guard let url = URL(string: make.request.url) else {
-                return
-            }
-
-            switch queryStyle.encode(value, for: name) {
-            case .item(let item):
-                make.request.url = url.appendingQueries(item()).absoluteString
-            case .collection(let collection):
-                make.request.url = url.appendingQueries(collection()).absoluteString
-            case .none:
-                break
-            }
-        }
-    }
-
     /// This method is used internally and should not be called directly.
     @RequestActor
     public static func _makeProperty(
@@ -76,10 +54,21 @@ extension Query {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
+        return .leaf(QueryNode(
             name: property.key,
             value: property.value,
-            queryStyle: inputs.environment.queryStyle
+            urlEncoder: inputs.environment.urlEncoder
         ))
+    }
+}
+
+struct QueryNode: PropertyNode {
+
+    fileprivate let name: String
+    fileprivate let value: Any
+    fileprivate let urlEncoder: URLEncoder
+
+    func make(_ make: inout Make) async throws {
+        make.request.queries.append(contentsOf: urlEncoder.encode(value, for: name))
     }
 }

@@ -13,7 +13,7 @@ class InternalsRequestTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        request = .init(url: "")
+        request = .init()
     }
 
     override func tearDown() async throws {
@@ -26,7 +26,7 @@ class InternalsRequestTests: XCTestCase {
         let url = "https://google.com"
 
         // When
-        request = .init(url: url)
+        request.baseURL = url
 
         // Then
         XCTAssertEqual(request.url, url)
@@ -59,5 +59,21 @@ class InternalsRequestTests: XCTestCase {
         XCTAssertEqual(request.headers.count, 2)
         XCTAssertEqual(request.headers.getValue(forKey: key1), value1)
         XCTAssertEqual(request.headers.getValue(forKey: key2), value2)
+    }
+
+    func testRequest_whenSetReadingMode_shouldBeEqual() async throws {
+        // Given
+        let readingMode = Internals.Response.ReadingMode.separator([70])
+
+        // When
+        request.readingMode = readingMode
+
+        // Then
+        XCTAssertEqual(request.readingMode, readingMode)
+    }
+
+    func testRequest_whenUnsetReadingMode() async throws {
+        // Then
+        XCTAssertEqual(request.readingMode, .length(1_024))
     }
 }

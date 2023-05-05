@@ -49,7 +49,7 @@ extension ReadingMode {
         let mode: Internals.Response.ReadingMode
 
         func make(_ make: inout Make) async throws {
-            make.configuration.readingMode = mode
+            make.request.readingMode = mode
         }
     }
 

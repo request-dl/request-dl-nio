@@ -116,17 +116,6 @@ class InternalsSessionConfigurationTests: XCTestCase {
         )
     }
 
-    func testConfiguration_whenSetReadingMode_shouldBeEqual() async throws {
-        // Given
-        let readingMode = Internals.Response.ReadingMode.separator([70])
-
-        // When
-        configuration.readingMode = readingMode
-
-        // Then
-        XCTAssertEqual(configuration.readingMode, readingMode)
-    }
-
     func testConfiguration_whenSetHttpVersion_shouldBeEqual() async throws {
         // Given
         let version = Internals.HTTPVersion.http1Only
@@ -172,6 +161,5 @@ class InternalsSessionConfigurationTests: XCTestCase {
         )
         XCTAssertEqual(configuration.httpVersion, .automatic)
         XCTAssertTrue(configuration.networkFrameworkWaitForConnectivity)
-        XCTAssertEqual(self.configuration.readingMode, .length(1_024))
     }
 }
