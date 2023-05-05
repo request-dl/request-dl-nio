@@ -29,7 +29,6 @@ class SessionTests: XCTestCase {
             String(describing: sut.decompression),
             String(describing: configuration.decompression)
         )
-        XCTAssertEqual(sut.readingMode, configuration.readingMode)
         XCTAssertEqual(sut.connectionPool, configuration.connectionPool)
     }
 

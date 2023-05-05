@@ -13,12 +13,14 @@ extension Internals {
         var method: String?
         var headers: Headers
         var body: Body?
+        var readingMode: Internals.Response.ReadingMode
 
         init(url: String) {
             self.url = url
             self.method = nil
             self.headers = .init()
             self.body = nil
+            self.readingMode = .length(1_024)
         }
     }
 }
