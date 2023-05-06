@@ -6,7 +6,7 @@ import Foundation
 
 extension Internals {
 
-    struct Query {
+    struct Query: Equatable {
         let name: String
         let value: String
     }
