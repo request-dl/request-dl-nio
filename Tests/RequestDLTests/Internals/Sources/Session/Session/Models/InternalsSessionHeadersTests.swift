@@ -174,4 +174,21 @@ class InternalsHeadersTests: XCTestCase {
             "application/x-www-form-urlencoded; charset=utf-8"
         )
     }
+
+    func testHeaders_whenHashable() async throws {
+        // Given
+        let headers1 = Internals.Headers([
+            ("Content-Type", "application/json")
+        ])
+
+        let headers2 = Internals.Headers([
+            ("Accept", "text/html")
+        ])
+
+        // Given
+        let sut = Set(arrayLiteral: headers1, headers1, headers2)
+
+        // Then
+        XCTAssertEqual(sut, [headers1, headers2])
+    }
 }
