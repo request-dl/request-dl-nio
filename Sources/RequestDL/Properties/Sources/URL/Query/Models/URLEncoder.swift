@@ -4,29 +4,50 @@
 
 import Foundation
 
+/// A class that encodes values into query items for use in URL requests.
 public class URLEncoder {
 
+    /// The strategy for encoding dates.
     public var dateEncodingStrategy: DateEncodingStrategy = .iso8601
 
+    /// The strategy for encoding keys.
     public var keyEncodingStrategy: KeyEncodingStrategy = .literal
 
+    /// The strategy for encoding data.
     public var dataEncodingStrategy: DataEncodingStrategy = .base64
 
+    /// The strategy for encoding booleans.
     public var boolEncodingStrategy: BoolEncodingStrategy = .literal
 
+    /// The strategy for encoding optionals.
     public var optionalEncodingStrategy: OptionalEncodingStrategy = .literal
 
+    /// The strategy for encoding arrays.
     public var arrayEncodingStrategy: ArrayEncodingStrategy = .droppingIndex
 
+    /// The strategy for encoding dictionaries.
     public var dictionaryEncodingStrategy: DictionaryEncodingStrategy = .subscripted
 
+    /// The strategy for encoding whitespace.
     public var whitespaceEncodingStrategy: WhitespaceEncodingStrategy = .percentEscaping
 
+    /// Initializes a new instance of `URLEncoder`.
     public init() {}
 }
 
 extension URLEncoder {
 
+    /**
+     Encodes the given value for the specified key into an array of query items.
+
+     - Parameters:
+        - value: The value to encode.
+        - key: The key to associate with the value.
+
+     - Returns: An array of query items representing the encoded value and key.
+
+     - Throws: An error if encoding fails.
+     */
     public func encode(_ value: Any, forKey key: String) throws -> [QueryItem] {
         let items = try recursiveEncode(value, forKey: key).addingRFC3986PercentEncoding(
             withAllowedCharacters: .init(charactersIn: " ")
