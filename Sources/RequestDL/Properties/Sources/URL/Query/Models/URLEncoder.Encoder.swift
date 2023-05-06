@@ -26,7 +26,7 @@ extension URLEncoder {
         public func valueContainer() -> ValueContainer {
             .init(self)
         }
-        
+
         /// Creates a new key container for encoding a key.
         ///
         /// - Returns: A new key container.
