@@ -51,15 +51,8 @@ extension ContentType {
     /// Content type for form data with files.
     public static let formData: ContentType = "form-data"
 
-    /**
-     Content type for form data in the `x-www-form-urlencoded` format.
-
-     This type can be sent via URL parameters or in the body, but the correct submission format to
-     the API must be verified as per `key1=value1&key2=value2`.
-
-     - Warning: When using `Payload`, use init via String.
-     */
-    public static let formURLEncoded: ContentType = "application/x-www-form-urlencoded"
+    /// Content type for form data in the `x-www-form-urlencoded; charset=utf-8` format.
+    public static let formURLEncoded: ContentType = "application/x-www-form-urlencoded; charset=utf-8"
 
     /// Content type for plain text data.
     public static let text: ContentType = "text/plain"
