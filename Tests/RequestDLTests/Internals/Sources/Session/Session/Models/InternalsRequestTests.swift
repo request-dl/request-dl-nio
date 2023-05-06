@@ -61,7 +61,7 @@ class InternalsRequestTests: XCTestCase {
         XCTAssertEqual(request.headers.getValue(forKey: key2), value2)
     }
 
-    func testRequest_whenSetReadingMode_shouldBeEqual() async throws {
+    func testRequest_whenSetReadingMode() async throws {
         // Given
         let readingMode = Internals.Response.ReadingMode.separator([70])
 
