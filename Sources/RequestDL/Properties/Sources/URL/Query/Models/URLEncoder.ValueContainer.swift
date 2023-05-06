@@ -6,6 +6,7 @@ import Foundation
 
 extension URLEncoder {
 
+    /// A container for URL-encoded values.
     public struct ValueContainer {
 
         private var value: String?
@@ -15,16 +16,29 @@ extension URLEncoder {
             self.encoder = encoder
         }
 
+        /// Encodes the given value.
+        ///
+        /// - Parameter value: The value to be encoded.
+        ///
+        /// - Throws: An error if the value cannot be encoded.
         public mutating func encode(_ value: String) throws {
             self.value = value
             try encoder.setValue(value)
         }
 
+        /// Drops the key of the current container.
+        ///
+        /// - Throws: An error if the container does not have a key to drop.
         public mutating func dropKey() throws {
             self.value = nil
             try encoder.setValue(nil)
         }
 
+        /// Returns the unkeyed representation of the current value container.
+        ///
+        /// - Returns: The unkeyed representation of the current value container.
+        ///
+        /// - Throws: An error if the container cannot be represented as an unkeyed value.
         public func unkeyed() throws -> String {
             guard let value else {
                 throw URLEncoderError(.unset)

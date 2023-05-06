@@ -6,6 +6,7 @@ import Foundation
 
 extension URLEncoder {
 
+    /// The encoder for encoding a value or key.
     public class Encoder {
 
         fileprivate var key: Value
@@ -16,12 +17,19 @@ extension URLEncoder {
             value = .none
         }
 
+        /// The string representation of whitespace when encoding.
         public var whitespaceRepresentable: String?
 
+        /// Creates a new value container for encoding a value.
+        ///
+        /// - Returns: A new value container.
         public func valueContainer() -> ValueContainer {
             .init(self)
         }
-
+        
+        /// Creates a new key container for encoding a key.
+        ///
+        /// - Returns: A new key container.
         public func keyContainer() -> KeyContainer {
             .init(self)
         }
