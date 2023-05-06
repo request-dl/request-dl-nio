@@ -29,7 +29,7 @@ class HeadersContentTypeTests: XCTestCase {
     func testHeadersFormURLEncodedContentType() async throws {
         let property = TestProperty(Headers.ContentType(.formURLEncoded))
         let (_, request) = try await resolve(property)
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/x-www-form-urlencoded")
+        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/x-www-form-urlencoded; charset=utf-8")
     }
 
     func testHeadersTextContentType() async throws {
