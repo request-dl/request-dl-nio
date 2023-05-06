@@ -6,14 +6,18 @@ import Foundation
 
 extension URLEncoder {
 
+    /// Defines strategies for encoding dictionary key in a url encoded format
     public enum DictionaryEncodingStrategy: Sendable {
 
-        /// [key]
+        /// Encodes the dictionary key in square brackets with the key value inside, e.g. `[key]`.
+        /// This is the default.
         case subscripted
 
-        /// .key
+        /// Encodes the dictionary key as a dot followed by the key value, e.g. `.key`.
         case accessMember
 
+        /// Encodes the dictionary key using a custom closure that takes a `String` and an
+        /// `Encoder` as input parameters and throws an error.
         case custom(@Sendable (String, Encoder) throws -> Void)
     }
 }

@@ -6,12 +6,17 @@ import Foundation
 
 extension URLEncoder {
 
+    /// Defines strategies for encoding boolean in a url encoded format
     public enum BoolEncodingStrategy: Sendable {
 
+        /// Encodes the boolean value using the literal strings "true" or "false". This is the default.
         case literal
 
+        /// Encodes the boolean value using the integers 1 or 0, respectively.
         case numeric
 
+        /// Encodes the boolean value using a custom closure that takes a `Bool` and an `Encoder`
+        /// as input parameters and throws an error.
         case custom(@Sendable (Bool, Encoder) throws -> Void)
     }
 }

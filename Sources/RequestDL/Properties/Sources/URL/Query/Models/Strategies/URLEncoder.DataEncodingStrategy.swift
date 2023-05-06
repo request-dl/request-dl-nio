@@ -6,10 +6,14 @@ import Foundation
 
 extension URLEncoder {
 
+    /// Defines strategies for encoding data in a url encoded format
     public enum DataEncodingStrategy: Sendable {
 
+        /// Encodes the data as a Base64-encoded string. This is the default.
         case base64
 
+        /// Encodes the data using a custom closure that takes a `Data` and an `Encoder` as input
+        /// parameters and throws an error.
         case custom(@Sendable (Data, Encoder) throws -> Void)
     }
 }

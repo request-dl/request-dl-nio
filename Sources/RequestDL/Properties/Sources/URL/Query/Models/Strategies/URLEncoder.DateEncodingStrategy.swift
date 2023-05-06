@@ -6,16 +6,23 @@ import Foundation
 
 extension URLEncoder {
 
+    /// Defines strategies for encoding dates in a url encoded format
     public enum DateEncodingStrategy: Sendable {
 
+        /// Encodes the date as the number of seconds since January 1, 1970, as a `Double`.
         case secondsSince1970
 
+        /// Encodes the date as the number of milliseconds since January 1, 1970, as a `Int`.
         case millisecondsSince1970
 
+        /// Encodes the date as an ISO8601-formatted string. This is the default.
         case iso8601
 
+        /// Encodes the date using a given `DateFormatter` instance.
         case formatter(DateFormatter)
 
+        /// Encodes the date using a custom closure that takes a `Date` and an `Encoder`
+        /// as input parameters and throws an error.
         case custom(@Sendable (Date, Encoder) throws -> Void)
     }
 }

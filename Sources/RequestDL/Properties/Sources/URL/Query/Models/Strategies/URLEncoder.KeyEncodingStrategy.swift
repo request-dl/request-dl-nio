@@ -6,20 +6,29 @@ import Foundation
 
 extension URLEncoder {
 
+    /// Defines strategies for encoding key in a url encoded format
     public enum KeyEncodingStrategy: Sendable {
 
+        /// Uses the key as is. This is the default.
         case literal
 
+        /// Encodes the key in snake case format, e.g. "key_name".
         case snakeCased
 
+        /// Encodes the key in kebab case format, e.g. "key-name".
         case kebabCased
 
+        /// Capitalizes the first letter of the key, e.g. "KeyName".
         case capitalized
 
+        /// Encodes the key in all uppercase format, e.g. "KEYNAME".
         case uppercased
 
+        /// Encodes the key in all lowercase format, e.g. "keyname".
         case lowercased
 
+        /// Encodes the key using a custom closure that takes a `String` and an `Encoder`
+        /// as input parameters and throws an error.
         case custom(@Sendable (String, Encoder) throws -> Void)
     }
 }
