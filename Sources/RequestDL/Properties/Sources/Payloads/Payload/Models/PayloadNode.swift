@@ -43,9 +43,9 @@ private extension PayloadNode {
     func jsonObject(_ data: Data) throws -> Any {
         var readingOptions = JSONSerialization.ReadingOptions.fragmentsAllowed
 
-        if #available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *) {
-            readingOptions.insert(.json5Allowed)
-        }
+//        if #available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *) {
+//            readingOptions.insert(.json5Allowed)
+//        }
 
         return try JSONSerialization.jsonObject(with: data, options: readingOptions)
     }
