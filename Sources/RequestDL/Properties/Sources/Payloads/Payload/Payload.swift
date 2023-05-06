@@ -31,13 +31,9 @@ import Foundation
 @RequestActor
 public struct Payload<Provider>: Property {
 
-    enum Source {
-        case file(Internals.FileBuffer)
-        case data(Internals.DataBuffer)
-    }
-
+    private let isURLEncodedCompatible: Bool
     private let provider: Provider
-    private let source: (Provider) -> Source
+    private let buffer: (Provider) -> BufferProtocol
 
     /**
      Initializes a `Payload` with a dictionary.
@@ -50,8 +46,9 @@ public struct Payload<Provider>: Property {
         _ dictionary: [String: Any],
         options: JSONSerialization.WritingOptions = .prettyPrinted
     ) where Provider == _DictionaryPayload {
+        isURLEncodedCompatible = true
         provider = _DictionaryPayload(dictionary, options: options)
-        source = { .data($0.buffer) }
+        buffer = { $0.buffer }
     }
 
     /**
@@ -65,8 +62,9 @@ public struct Payload<Provider>: Property {
         _ value: T,
         encoder: JSONEncoder = .init()
     ) where Provider == _EncodablePayload<T> {
+        isURLEncodedCompatible = true
         provider = _EncodablePayload(value, encoder: encoder)
-        source = { .data($0.buffer) }
+        buffer = { $0.buffer }
     }
 
     /**
@@ -80,8 +78,9 @@ public struct Payload<Provider>: Property {
         _ string: String,
         using encoding: String.Encoding = .utf8
     ) where Provider == _StringPayload {
+        isURLEncodedCompatible = false
         provider = _StringPayload(string, using: encoding)
-        source = { .data($0.buffer) }
+        buffer = { $0.buffer }
     }
 
     /**
@@ -91,8 +90,9 @@ public struct Payload<Provider>: Property {
         - data: The raw data to be used as the body.
      */
     public init(_ data: Data) where Provider == _DataPayload {
+        isURLEncodedCompatible = false
         provider = _DataPayload(data)
-        source = { .data($0.buffer) }
+        buffer = { $0.buffer }
     }
 
     /**
@@ -102,8 +102,9 @@ public struct Payload<Provider>: Property {
         - fileURL: The file url to be used as the body.
      */
     public init(_ fileURL: URL) where Provider == _FilePayload {
+        isURLEncodedCompatible = false
         provider = _FilePayload(fileURL)
-        source = { .file($0.buffer) }
+        buffer = { $0.buffer }
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -114,25 +115,6 @@ public struct Payload<Provider>: Property {
 
 extension Payload {
 
-    @RequestActor
-    struct Node: PropertyNode {
-
-        private let source: () -> Source
-
-        fileprivate init(_ source: @escaping () -> Source) {
-            self.source = source
-        }
-
-        func make(_ make: inout Make) async throws {
-            switch source() {
-            case .data(let dataBuffer):
-                make.request.body = Internals.Body(buffers: [dataBuffer])
-            case .file(let fileBuffer):
-                make.request.body = Internals.Body(buffers: [fileBuffer])
-            }
-        }
-    }
-
     /// This method is used internally and should not be called directly.
     @RequestActor
     public static func _makeProperty(
@@ -140,8 +122,14 @@ extension Payload {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node {
-            property.source(property.provider)
-        })
+
+        let provider = property.provider
+        let buffer = property.buffer
+
+        return .leaf(PayloadNode(
+            isURLEncodedCompatible: property.isURLEncodedCompatible,
+            buffer: { buffer(provider) },
+            urlEncoder: inputs.environment.urlEncoder
+        ))
     }
 }

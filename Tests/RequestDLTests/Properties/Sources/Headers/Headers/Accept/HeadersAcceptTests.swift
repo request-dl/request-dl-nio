@@ -29,7 +29,7 @@ class HeadersAcceptTests: XCTestCase {
     func testHeadersFormURLEncodedAccept() async throws {
         let property = TestProperty(Headers.Accept(.formURLEncoded))
         let (_, request) = try await resolve(property)
-        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/x-www-form-urlencoded")
+        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/x-www-form-urlencoded; charset=utf-8")
     }
 
     func testHeadersTextAccept() async throws {

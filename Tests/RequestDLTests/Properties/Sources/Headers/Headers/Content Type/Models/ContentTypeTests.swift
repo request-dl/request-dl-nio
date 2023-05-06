@@ -21,7 +21,7 @@ class ContentTypeTests: XCTestCase {
     }
 
     func testFormURLEncodedTypeRawValue() async throws {
-        XCTAssertEqual(ContentType.formURLEncoded, "application/x-www-form-urlencoded")
+        XCTAssertEqual(ContentType.formURLEncoded, "application/x-www-form-urlencoded; charset=utf-8")
     }
 
     func testTextTypeRawValue() async throws {

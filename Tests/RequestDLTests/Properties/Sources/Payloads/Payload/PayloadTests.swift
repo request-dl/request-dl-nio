@@ -128,6 +128,122 @@ class PayloadTests: XCTestCase {
         XCTAssertEqual(payload, expectedPayload.buffer.getData())
     }
 
+    func testPayload_whenGETEncodableURLEncoded() async throws {
+        // Given
+        let array = ["foo", "bar"]
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            Headers.ContentType(.formURLEncoded)
+            RequestMethod(.get)
+            Payload(array)
+        })
+
+        let sut = request.queries
+            .joined()
+            .split(separator: "&")
+
+        // Then
+        XCTAssertEqual(sut.sorted(), [
+            "0=foo",
+            "1=bar"
+        ])
+    }
+
+    func testPayload_whenHEADEncodableURLEncoded() async throws {
+        // Given
+        let array = ["foo", "bar"]
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            Headers.ContentType(.formURLEncoded)
+            RequestMethod(.head)
+            Payload(array)
+        })
+
+        let sut = request.queries
+            .joined()
+            .split(separator: "&")
+
+        // Then
+        XCTAssertEqual(sut.sorted(), [
+            "0=foo",
+            "1=bar"
+        ])
+    }
+
+    func testPayload_whenPOSTEncodableURLEncoded() async throws {
+        // Given
+        let array = ["foo", "bar"]
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            Headers.ContentType(.formURLEncoded)
+            RequestMethod(.post)
+            Payload(array)
+        })
+
+        let sut = try await (request.body?.data())
+            .flatMap { String(data: $0, encoding: .utf8) }?
+            .split(separator: "&")
+
+        // Then
+        XCTAssertEqual(sut?.sorted(), [
+            "0=foo",
+            "1=bar"
+        ])
+    }
+
+    func testPayload_whenGETDictionaryURLEncoded() async throws {
+        // Given
+        let dictionary = [
+            "foo": "bar",
+            "key": "value"
+        ]
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            Headers.ContentType(.formURLEncoded)
+            RequestMethod(.get)
+            Payload(dictionary)
+        })
+
+        let sut = request.queries
+            .joined()
+            .split(separator: "&")
+
+        // Then
+        XCTAssertEqual(sut.sorted(), [
+            "foo=bar",
+            "key=value"
+        ])
+    }
+
+    func testPayload_whenPOSTDictionaryURLEncoded() async throws {
+        // Given
+        let dictionary = [
+            "foo": "bar",
+            "key": "value"
+        ]
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            Headers.ContentType(.formURLEncoded)
+            RequestMethod(.post)
+            Payload(dictionary)
+        })
+
+        let sut = try await (request.body?.data())
+            .flatMap { String(data: $0, encoding: .utf8) }?
+            .split(separator: "&")
+
+        // Then
+        XCTAssertEqual(sut?.sorted(), [
+            "foo=bar",
+            "key=value"
+        ])
+    }
+
     func testNeverBody() async throws {
         // Given
         let property = Payload(Data())
