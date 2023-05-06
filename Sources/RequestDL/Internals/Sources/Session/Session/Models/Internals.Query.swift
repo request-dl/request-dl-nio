@@ -15,8 +15,7 @@ extension Internals {
 extension [Internals.Query] {
 
     func joined() -> String {
-        map {
-            "\($0.name.addingQueryPercentEncoding())=\($0.value.addingQueryPercentEncoding())"
-        }.joined(separator: "&")
+        map { "\($0.name)=\($0.value)" }
+            .joined(separator: "&")
     }
 }

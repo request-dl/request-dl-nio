@@ -61,14 +61,3 @@ extension Query {
         ))
     }
 }
-
-struct QueryNode: PropertyNode {
-
-    fileprivate let name: String
-    fileprivate let value: Any
-    fileprivate let urlEncoder: URLEncoder
-
-    func make(_ make: inout Make) async throws {
-        make.request.queries.append(contentsOf: urlEncoder.encode(value, for: name))
-    }
-}

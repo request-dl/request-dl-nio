@@ -2,6 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
+import Foundation
 import NIOCore
 import AsyncHTTPClient
 
@@ -43,21 +44,19 @@ extension Internals.Request {
     }
 }
 
-import Foundation
-
 extension Internals.Request {
 
     var url: String {
-        let pathCharacterSet = CharacterSet(charactersIn: "/")
+        let pathAllowed = CharacterSet(charactersIn: "/")
 
         let baseURL = baseURL
             .trimmingCharacters(in: .urlHostAllowed.inverted)
-            .trimmingCharacters(in: pathCharacterSet)
+            .trimmingCharacters(in: pathAllowed)
 
         let pathComponents = pathComponents
             .joined(separator: "/")
             .trimmingCharacters(in: .urlPathAllowed.inverted)
-            .trimmingCharacters(in: pathCharacterSet)
+            .trimmingCharacters(in: pathAllowed)
 
         let queries = queries.joined()
         let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"

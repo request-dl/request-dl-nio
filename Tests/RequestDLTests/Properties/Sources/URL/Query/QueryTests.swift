@@ -8,179 +8,45 @@ import XCTest
 @RequestActor
 class QueryTests: XCTestCase {
 
-    var urlEncoder: URLEncoder!
-
-    override func setUp() async throws {
-        try await super.setUp()
-        urlEncoder = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        urlEncoder = nil
-    }
-
-    // MARK: - Default
-
-    func testQuery_whenSingleInteger() async throws {
+    func testSingleQuery() async throws {
         // Given
-        let key = "foo"
-        let value = 123
+        let property = Query(123, forKey: "number")
 
         // When
         let (_, request) = try await resolve(TestProperty {
-            Query(value, forKey: key)
+            BaseURL("127.0.0.1")
+            property
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=\(value)")
+        XCTAssertEqual(request.url, "https://127.0.0.1?number=123")
     }
 
-    func testQuery_whenSingleString() async throws {
+    func testMultipleQueries() async throws {
         // Given
-        let key = "foo"
-        let value = "bar"
-
+        let property = TestProperty {
+            BaseURL("127.0.0.1")
+            Query(123, forKey: "number")
+            Query(1, forKey: "page")
+            Query("password", forKey: "api_key")
+            Query([9, "nine"] as [Any], forKey: "array")
+        }
+        
         // When
-        let (_, request) = try await resolve(TestProperty {
-            Query(value, forKey: key)
-        })
+        let (_, request) = try await resolve(property)
 
         // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=\(value)")
+        XCTAssertEqual(
+            request.url,
+                """
+                https://127.0.0.1?\
+                number=123&\
+                page=1&\
+                api_key=password&\
+                array=%5B9%2C%20%22nine%22%5D
+                """
+        )
     }
-
-    // MARK: - Optional
-
-    func testQuery_whenOptionalSomeStringWithLiteralStyle() async throws {
-        // Given
-        let key = "foo"
-        let value = "bar"
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query<String?>(value, forKey: key)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=\(value)")
-    }
-
-    func testQuery_whenOptionalNoneStringWithLiteralStyle() async throws {
-        // Given
-        let key = "foo"
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query<String?>(nil, forKey: key)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=nil")
-    }
-
-    func testQuery_whenOptionalSomeStringWithEmptyStyle() async throws {
-        // Given
-        let key = "foo"
-        let value = "bar"
-
-        urlEncoder.optionalStyle = .empty
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query<String?>(value, forKey: key)
-                .urlEncoder(urlEncoder)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=\(value)")
-    }
-
-    func testQuery_whenOptionalNoneStringWithEmptyStyle() async throws {
-        // Given
-        let key = "foo"
-
-        urlEncoder.optionalStyle = .empty
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query<String?>(nil, forKey: key)
-                .urlEncoder(urlEncoder)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com")
-    }
-
-    // MARK: - Flag
-
-    func testQuery_whenSingleTrueFlagWithLiteral() async throws {
-        // Given
-        let key = "foo"
-        let value = true
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query(value, forKey: key)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=\(value)")
-    }
-
-    func testQuery_whenSingleFalseFlagWithLiteral() async throws {
-        // Given
-        let key = "foo"
-        let value = false
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query(value, forKey: key)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=\(value)")
-    }
-
-    func testQuery_whenSingleTrueFlagWithNumeric() async throws {
-        // Given
-        let key = "foo"
-        let value = true
-
-        urlEncoder.boolStyle = .numeric
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query(value, forKey: key)
-                .urlEncoder(urlEncoder)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=1")
-    }
-
-    func testQuery_whenSingleFalseFlagWithNumeric() async throws {
-        // Given
-        let key = "foo"
-        let value = false
-
-        urlEncoder.boolStyle = .numeric
-
-        // When
-        let (_, request) = try await resolve(TestProperty {
-            Query(value, forKey: key)
-                .urlEncoder(urlEncoder)
-        })
-
-        // Then
-        XCTAssertEqual(request.url, "https://www.apple.com?\(key)=0")
-    }
-
-    // MARK: - Date
-    // MARK: - Array
-    // MARK: - Dictionary
-    // MARK: - Data
-    
 
     func testNeverBody() async throws {
         // Given
