@@ -64,7 +64,7 @@ class InternalsHeadersTests: XCTestCase {
         XCTAssertEqual(headers.getValue(forKey: key), "\(value); \(addValue)")
     }
 
-    func testHeaders_whenSameKeysWithCaseDiference_shouldObtainSameValue() async throws {
+    func testHeaders_whenSameKeysWithCaseDifference_shouldObtainSameValue() async throws {
         // Given
         let key1 = "Content-Type"
         let key2 = "Content-type"
@@ -143,5 +143,35 @@ class InternalsHeadersTests: XCTestCase {
                 return false
             }
         })
+    }
+
+    func testHeaders_whenContainsValue() async throws {
+        // Given
+        let key = "Content-Type"
+        let value = "application/x-www-form-urlencoded; charset=utf-8"
+
+        // When
+        headers.setValue(value, forKey: key)
+
+        // Then
+        XCTAssertTrue(headers.contains("charset=utf-8", forKey: key))
+    }
+
+    func testHeaders_whenInitWithTuples() async throws {
+        // Given
+        let rawHeaders = [
+            ("Content-Type", "application/x-www-form-urlencoded"),
+            ("content-type", "charset=utf-8")
+        ]
+
+        // When
+        let headers = Internals.Headers(rawHeaders)
+
+        // Then
+        XCTAssertEqual(headers.count, 1)
+        XCTAssertEqual(
+            headers.getValue(forKey: "Content-Type"),
+            "application/x-www-form-urlencoded; charset=utf-8"
+        )
     }
 }
