@@ -151,7 +151,6 @@ extension ResolveTests {
                             proxy = nil,
                             ignoreUncleanSSLShutdown = false,
                             decompression = Decompression.enabled(Limit.ratio(500)),
-                            readingMode = ReadingMode.length(1024),
                             dnsOverride = [:],
                             networkFrameworkWaitForConnectivity = nil,
                             httpVersion = nil
@@ -204,10 +203,20 @@ extension ResolveTests {
                 LeafNode<Node> {
                     property = Node {
                         leafs = [
-                            LeafNode<Node> {
-                                property = Node {
-                                    key = q,
-                                    value = some question
+                            LeafNode<QueryNode> {
+                                property = QueryNode {
+                                    name = q,
+                                    value = some question,
+                                    urlEncoder = URLEncoder {
+                                        dateEncodingStrategy = .iso8601,
+                                        keyEncodingStrategy = .literal,
+                                        dataEncodingStrategy = .base64,
+                                        boolEncodingStrategy = .literal,
+                                        optionalEncodingStrategy = .literal,
+                                        arrayEncodingStrategy = .droppingIndex,
+                                        dictionaryEncodingStrategy = .subscripted,
+                                        whitespaceEncodingStrategy = .percentEscaping
+                                    }
                                 }
                             }
                         ]
