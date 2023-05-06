@@ -48,4 +48,3 @@ private extension URLEncoder.DictionaryEncodingStrategy {
         try container.encode(".\(key)")
     }
 }
-

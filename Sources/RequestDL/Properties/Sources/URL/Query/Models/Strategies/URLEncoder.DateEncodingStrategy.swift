@@ -73,4 +73,3 @@ private extension URLEncoder.DateEncodingStrategy {
         try container.encode(dateFormatter.string(from: date))
     }
 }
-

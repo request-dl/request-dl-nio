@@ -31,7 +31,7 @@ class QueryTests: XCTestCase {
             Query("password", forKey: "api_key")
             Query([9, "nine"] as [Any], forKey: "array")
         }
-        
+
         // When
         let (_, request) = try await resolve(property)
 

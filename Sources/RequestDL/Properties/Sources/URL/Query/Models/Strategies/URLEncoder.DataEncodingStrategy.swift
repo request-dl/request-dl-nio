@@ -37,4 +37,3 @@ private extension URLEncoder.DataEncodingStrategy {
         try container.encode(data.base64EncodedString())
     }
 }
-

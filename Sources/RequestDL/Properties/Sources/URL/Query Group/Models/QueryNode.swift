@@ -24,7 +24,7 @@ struct QueryNode: PropertyNode {
         let queries = try urlEncoder.encode(value, forKey: name).map {
             $0.build()
         }
-        
+
         make.request.queries.append(contentsOf: queries)
     }
 }
