@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+// swiftlint:disable file_length type_body_length
 class URLEncoderTests: XCTestCase {
 
     var urlEncoder: URLEncoder!
@@ -758,3 +759,4 @@ class URLEncoderTests: XCTestCase {
         XCTAssertEqual(sut, "foobar=onetwothree")
     }
 }
+// swiftlint:enable file_length type_body_length
