@@ -9,7 +9,7 @@ extension Internals {
 
     struct Headers: Sendable {
 
-        private var dictionary: [HeaderKey: String]
+        private var dictionary: [HeaderKey: [String]]
 
         init() {
             self.dictionary = [:]
@@ -23,43 +23,13 @@ extension Internals {
             self.init()
 
             for (name, value) in headers {
-                self[name] = value
+                addValue(value, forKey: name)
             }
         }
 
-        private subscript(_ key: String, appending: Bool) -> String? {
+        fileprivate subscript(_ key: String) -> [String]? {
             get { dictionary[.init(key)] }
-
-            set {
-                let key = HeaderKey(key)
-
-                if appending, let value = dictionary[key] {
-                    dictionary[key] = newValue.map {
-                        value + "; \($0)"
-                    }
-                } else {
-                    dictionary[key] = newValue
-                }
-            }
-        }
-
-        private(set) subscript(_ key: String) -> String? {
-            get { self[key, false] }
-            set {
-                self[key, false] = newValue
-            }
-        }
-
-        mutating func setValue(_ value: String, forKey key: String) {
-            self[key] = value
-        }
-
-        mutating func addValue(_ value: String, forKey key: String) {
-            self[key, true] = value
-        }
-
-        func getValue(forKey key: String) -> String? {
-            self[key]
+            set { dictionary[.init(key)] = newValue }
         }
 
         func build() -> NIOHTTP1.HTTPHeaders {
@@ -68,11 +38,41 @@ extension Internals {
     }
 }
 
+extension Internals.Headers {
+
+    mutating func setValue(_ value: String, forKey key: String) {
+        self[key] = splitHeaderValues(value)
+    }
+
+    mutating func addValue(_ value: String, forKey key: String) {
+        var array = self[key] ?? []
+        array.append(contentsOf: splitHeaderValues(value))
+        self[key] = array
+    }
+
+    private func splitHeaderValues(_ value: String) -> [String] {
+        value
+            .split(separator: ";")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    func getValue(forKey key: String) -> String? {
+        self[key]?.joined(separator: "; ")
+    }
+
+    func contains(_ value: String, forKey key: String) -> Bool {
+        self[key]?.first(where: {
+            $0.range(of: value, options: .caseInsensitive) != nil
+        }) != nil
+    }
+}
+
 extension Internals.Headers: Sequence {
 
     typealias Element = (String, String)
 
     struct Iterator: IteratorProtocol {
+
         fileprivate var dictionary: [Element]
 
         mutating func next() -> Element? {
@@ -86,7 +86,7 @@ extension Internals.Headers: Sequence {
 
     func makeIterator() -> Iterator {
         Iterator(dictionary: dictionary.map {
-            ($0.rawValue, $1)
+            ($0.rawValue, $1.joined(separator: "; "))
         })
     }
 }
