@@ -27,40 +27,43 @@ extension Internals {
             }
         }
 
-        private subscript(_ key: String) -> [String]? {
+        fileprivate subscript(_ key: String) -> [String]? {
             get { dictionary[.init(key)] }
             set { dictionary[.init(key)] = newValue }
-        }
-
-        private func splitHeaderValues(_ value: String) -> [String] {
-            value
-                .split(separator: ";")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-        }
-
-        mutating func setValue(_ value: String, forKey key: String) {
-            self[key] = splitHeaderValues(value)
-        }
-
-        mutating func addValue(_ value: String, forKey key: String) {
-            var array = self[key] ?? []
-            array.append(contentsOf: splitHeaderValues(value))
-            self[key] = array
-        }
-
-        func getValue(forKey key: String) -> String? {
-            self[key]?.joined(separator: "; ")
-        }
-
-        func contains(_ value: String, forKey key: String) -> Bool {
-            self[key]?.first(where: {
-                $0.range(of: value, options: .caseInsensitive) != nil
-            }) != nil
         }
 
         func build() -> NIOHTTP1.HTTPHeaders {
             .init(Array(self))
         }
+    }
+}
+
+extension Internals.Headers {
+
+    mutating func setValue(_ value: String, forKey key: String) {
+        self[key] = splitHeaderValues(value)
+    }
+
+    mutating func addValue(_ value: String, forKey key: String) {
+        var array = self[key] ?? []
+        array.append(contentsOf: splitHeaderValues(value))
+        self[key] = array
+    }
+
+    private func splitHeaderValues(_ value: String) -> [String] {
+        value
+            .split(separator: ";")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    func getValue(forKey key: String) -> String? {
+        self[key]?.joined(separator: "; ")
+    }
+
+    func contains(_ value: String, forKey key: String) -> Bool {
+        self[key]?.first(where: {
+            $0.range(of: value, options: .caseInsensitive) != nil
+        }) != nil
     }
 }
 
