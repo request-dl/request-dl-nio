@@ -111,7 +111,7 @@ class _PartialContentTests: XCTestCase {
                 >,
                 Path
             >,
-            Query
+            Query<String>
         >)
 
         XCTAssertEqual(
@@ -151,7 +151,7 @@ class _PartialContentTests: XCTestCase {
                     >,
                     Path
                 >,
-                Query
+                Query<String>
             >,
             Timeout
         >)
@@ -198,11 +198,11 @@ class _PartialContentTests: XCTestCase {
                         >,
                         Path
                     >,
-                    Query
+                    Query<String>
                 >,
                 Timeout
             >,
-            Query
+            Query<Int>
         >)
 
         XCTAssertEqual(
@@ -249,11 +249,11 @@ class _PartialContentTests: XCTestCase {
                             >,
                             Path
                         >,
-                        Query
+                        Query<String>
                     >,
                     Timeout
                 >,
-                Query
+                Query<Int>
             >,
             Path
         >)

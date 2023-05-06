@@ -22,10 +22,10 @@ import Foundation
  ```
 */
 @RequestActor
-public struct Query: Property {
+public struct Query<Value>: Property {
 
     let key: String
-    let value: Any
+    let value: Value
 
     /**
      Creates a new `Query` instance with a value and a key.
@@ -34,9 +34,9 @@ public struct Query: Property {
         - value: The value of the query parameter.
         - key: The key of the query parameter.
      */
-    public init(_ value: Any, forKey key: String) {
+    public init(_ value: Value, forKey key: String) {
         self.key = key
-        self.value = "\(value)"
+        self.value = value
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -47,19 +47,6 @@ public struct Query: Property {
 
 extension Query {
 
-    struct Node: PropertyNode {
-
-        fileprivate let key: String
-        fileprivate let value: String
-
-        func make(_ make: inout Make) async throws {
-            make.request.queries.append(.init(
-                name: key,
-                value: value
-            ))
-        }
-    }
-
     /// This method is used internally and should not be called directly.
     @RequestActor
     public static func _makeProperty(
@@ -67,9 +54,10 @@ extension Query {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            key: property.key,
-            value: "\(property.value)"
+        return .leaf(QueryNode(
+            name: property.key,
+            value: property.value,
+            urlEncoder: inputs.environment.urlEncoder
         ))
     }
 }
