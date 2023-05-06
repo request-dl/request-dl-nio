@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct URLEncoderEnvironmentKey: EnvironmentKey {
+private struct URLEncoderEnvironmentKey: EnvironmentKey {
     static var defaultValue = URLEncoder()
 }
 

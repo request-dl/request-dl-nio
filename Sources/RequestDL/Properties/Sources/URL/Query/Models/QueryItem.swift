@@ -4,9 +4,14 @@
 
 import Foundation
 
+///  A struct that represents a single query item in a URL request.
 public struct QueryItem {
-    let name: String
-    let value: String
+
+    /// The name of the query item.
+    public let name: String
+
+    /// The value associated with the query item.
+    public let value: String
 }
 
 extension QueryItem {
