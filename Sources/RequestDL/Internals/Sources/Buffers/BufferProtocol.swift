@@ -56,4 +56,51 @@ extension BufferProtocol {
         var mutableSelf = self
         return mutableSelf.readBytes(mutableSelf.readableBytes)
     }
+
+    func getData(at index: Int, length: Int) -> Data? {
+        var mutableSelf = self
+
+        guard index + length <= mutableSelf.writerIndex else {
+            return nil
+        }
+
+        mutableSelf.moveReaderIndex(to: index)
+        return mutableSelf.readData(length)
+    }
+
+    func getBytes(at index: Int, length: Int) -> [UInt8]? {
+        var mutableSelf = self
+
+        guard index + length <= mutableSelf.writerIndex else {
+            return nil
+        }
+
+        mutableSelf.moveReaderIndex(to: index)
+        return mutableSelf.readBytes(length)
+    }
+}
+
+extension BufferProtocol {
+
+    func setBytes<S: Sequence>(_ bytes: S) where S.Element == UInt8 {
+        var mutableSelf = self
+        mutableSelf.writeBytes(bytes)
+    }
+
+    func setData<Data: DataProtocol>(_ data: Data) {
+        var mutableSelf = self
+        mutableSelf.writeData(data)
+    }
+
+    func setBytes<S: Sequence>(_ bytes: S, at index: Int) where S.Element == UInt8 {
+        var mutableSelf = self
+        mutableSelf.moveWriterIndex(to: index)
+        mutableSelf.writeBytes(bytes)
+    }
+
+    func setData<Data: DataProtocol>(_ data: Data, at index: Int) {
+        var mutableSelf = self
+        mutableSelf.moveWriterIndex(to: index)
+        mutableSelf.writeData(data)
+    }
 }
