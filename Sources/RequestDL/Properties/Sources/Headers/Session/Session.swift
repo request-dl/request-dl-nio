@@ -26,23 +26,12 @@ import NIOCore
 @RequestActor
 public struct Session: Property {
 
-    private(set) var configuration: Internals.Session.Configuration
+    private(set) var configuration:( (inout Internals.Session.Configuration) -> Void)? = nil
     let provider: SessionProvider
-
-    fileprivate init(
-        configuration: Internals.Session.Configuration,
-        provider: SessionProvider
-    ) {
-        self.configuration = configuration
-        self.provider = provider
-    }
 
     /// Initializes a new Session object.
     public init() {
-        self.init(
-            configuration: .init(),
-            provider: .shared
-        )
+        provider = .shared
     }
 
     /**
@@ -56,17 +45,11 @@ public struct Session: Property {
         _ identifier: String,
         numberOfThreads: Int = 1
     ) {
-        self.init(
-            configuration: .init(),
-            provider: .identified(identifier, numberOfThreads: numberOfThreads)
-        )
+        provider = .identified(identifier, numberOfThreads: numberOfThreads)
     }
 
     public init(_ customLoopGroup: NIOCore.EventLoopGroup) {
-        self.init(
-            configuration: .init(),
-            provider: .custom(customLoopGroup)
-        )
+        provider = .custom(customLoopGroup)
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -77,9 +60,12 @@ public struct Session: Property {
 
 private extension Session {
 
-    func edit(_ edit: (inout Internals.Session.Configuration) -> Void) -> Self {
+    func edit(_ edit: @escaping (inout Internals.Session.Configuration) -> Void) -> Self {
         var mutableSelf = self
-        edit(&mutableSelf.configuration)
+        mutableSelf.configuration = {
+            configuration?(&$0)
+            edit(&$0)
+        }
         return mutableSelf
     }
 }
@@ -170,12 +156,15 @@ extension Session {
 
 extension Session {
 
-    struct Node: PropertyNode {
+    private struct Node: PropertyNode {
 
-        let configuration: Internals.Session.Configuration
+        let configuration: ((inout Internals.Session.Configuration) -> Void)?
         let provider: SessionProvider
 
-        func make(_ make: inout Make) async throws {}
+        func make(_ make: inout Make) async throws {
+            configuration?(&make.configuration)
+            make.provider = provider
+        }
     }
 
     /// This method is used internally and should not be called directly.
