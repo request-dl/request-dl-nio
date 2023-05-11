@@ -134,26 +134,8 @@ extension ResolveTests {
                 },
                 LeafNode<Node> {
                     property = Node {
-                        configuration = Configuration {
-                            secureConnection = nil,
-                            redirectConfiguration = nil,
-                            timeout = Timeout {
-                                connect = nil,
-                                read = nil
-                            },
-                            connectionPool = ConnectionPool {
-                                idleTimeout = TimeAmount {
-                                    nanoseconds = 60000000000
-                                },
-                                concurrentHTTP1ConnectionsPerHostSoftLimit = 8,
-                                retryConnectionEstablishment = true
-                            },
-                            proxy = nil,
-                            ignoreUncleanSSLShutdown = false,
-                            decompression = Decompression.enabled(Limit.ratio(500)),
-                            dnsOverride = [:],
-                            networkFrameworkWaitForConnectivity = nil,
-                            httpVersion = nil
+                        configuration = Optional<(inout Configuration) -> ()> {
+                            some = (Function)
                         },
                         provider = SharedSessionProvider()
                     }
