@@ -19,25 +19,25 @@ extension Internals {
             self.stream = .init()
         }
 
-        mutating func append(_ byteBuffer: ByteBuffer) {
+        mutating func append(_ incomeBytes: BufferProtocol) {
             guard var buffer = buffer else {
                 return
             }
 
             defer { self.buffer = buffer }
 
-            var byteBuffer = byteBuffer
+            var incomeBytes = incomeBytes
 
             switch readingMode {
             case .length(let length):
-                while byteBuffer.readableBytes > .zero {
-                    let receivedBytes = byteBuffer.readableBytes
+                while incomeBytes.readableBytes > .zero {
+                    let receivedBytes = incomeBytes.readableBytes
                     let currentBytes = buffer.readableBytes
 
                     let availableBytes = length - currentBytes
                     let readableBytes = receivedBytes > availableBytes ? availableBytes : receivedBytes
 
-                    if let data = byteBuffer.readData(length: readableBytes) {
+                    if let data = incomeBytes.readData(readableBytes) {
                         buffer.writeData(data)
                     }
 
@@ -45,7 +45,7 @@ extension Internals {
                         var dataBuffer = DataBuffer()
                         dataBuffer.writeBuffer(&buffer)
 
-                        stream.append(.success(dataBuffer))
+                        dispatch(.success(dataBuffer))
 
                         buffer.moveReaderIndex(to: .zero)
                         buffer.moveWriterIndex(to: .zero)
@@ -54,19 +54,19 @@ extension Internals {
             case .separator(let separator):
                 let length = separator.count
 
-                while let bytes = byteBuffer.readBytes(length: length) {
+                while let bytes = incomeBytes.readBytes(length) {
                     buffer.writeBytes(bytes)
 
                     guard bytes == separator else {
-                        let index = byteBuffer.readerIndex - (length - 1)
-                        byteBuffer.moveReaderIndex(to: index)
+                        let index = incomeBytes.readerIndex - (length - 1)
+                        incomeBytes.moveReaderIndex(to: index)
                         continue
                     }
 
                     var dataBuffer = DataBuffer()
                     dataBuffer.writeBuffer(&buffer)
 
-                    stream.append(.success(dataBuffer))
+                    dispatch(.success(dataBuffer))
 
                     buffer.moveReaderIndex(to: .zero)
                     buffer.moveWriterIndex(to: .zero)
@@ -80,7 +80,7 @@ extension Internals {
             }
 
             if let data = buffer.readData(buffer.readableBytes) {
-                stream.append(.success(.init(data)))
+                dispatch(.success(.init(data)))
             }
 
             self.buffer = nil
@@ -89,7 +89,11 @@ extension Internals {
 
         mutating func failed(_ error: Error) {
             buffer = nil
-            stream.append(.failure(error))
+            dispatch(.failure(error))
+        }
+
+        private mutating func dispatch(_ dataBuffer: Result<DataBuffer, Error>) {
+            stream.append(dataBuffer)
         }
     }
 }
