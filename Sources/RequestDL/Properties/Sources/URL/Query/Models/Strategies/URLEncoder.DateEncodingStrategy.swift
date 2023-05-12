@@ -19,7 +19,7 @@ extension URLEncoder {
         case iso8601
 
         /// Encodes the date using a given `DateFormatter` instance.
-        case formatter(DateFormatter)
+        @preconcurrency case formatter(DateFormatter)
 
         /// Encodes the date using a custom closure that takes a `Date` and an `Encoder`
         /// as input parameters and throws an error.
