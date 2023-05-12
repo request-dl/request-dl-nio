@@ -14,7 +14,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         var download = Internals.DownloadBuffer(readingMode: .length(1_024))
 
         // When
-        download.append(.init(data: data))
+        download.append(Internals.DataBuffer(data))
         download.close()
 
         // Then
@@ -30,7 +30,7 @@ class InternalsDownloadBufferTests: XCTestCase {
 
         // When
         download.failed(AnyError())
-        download.append(.init(data: data))
+        download.append(Internals.DataBuffer(data))
         download.close()
 
         var receivedData = Data()
@@ -61,10 +61,10 @@ class InternalsDownloadBufferTests: XCTestCase {
         var download = Internals.DownloadBuffer(readingMode: .length(length))
 
         // When
-        download.append(.init(data: part1))
-        download.append(.init(data: part2))
-        download.append(.init(data: part3))
-        download.append(.init(data: part4))
+        download.append(Internals.DataBuffer(part1))
+        download.append(Internals.DataBuffer(part2))
+        download.append(Internals.DataBuffer(part3))
+        download.append(Internals.DataBuffer(part4))
         download.close()
 
         // Then
@@ -85,8 +85,8 @@ class InternalsDownloadBufferTests: XCTestCase {
         var download = Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
 
         // When
-        download.append(.init(data: line1 + line2))
-        download.append(.init(data: line3))
+        download.append(Internals.DataBuffer(line1 + line2))
+        download.append(Internals.DataBuffer(line3))
         download.close()
 
         // Then
@@ -103,7 +103,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         var download = Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
 
         // When
-        download.append(.init(data: separator))
+        download.append(Internals.DataBuffer(separator))
         download.close()
 
         // Then
@@ -133,7 +133,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         var download = Internals.DownloadBuffer(readingMode: .length(length))
 
         // When
-        download.append(.init(data: data))
+        download.append(Internals.DataBuffer(data))
         download.close()
 
         // Then
