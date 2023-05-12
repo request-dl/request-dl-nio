@@ -32,7 +32,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
 
     /// A closure that takes an element of the data sequence as input and produces a property
     /// for that element.
-    public let content: (Data.Element) -> Content
+    public let content: @RequestActor (Data.Element) -> Content
 
     private let id: KeyPath<Data.Element, ID>
 
