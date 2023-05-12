@@ -31,17 +31,15 @@ struct Resolve<Root: Property> {
     func build() async throws -> (Internals.Session, Internals.Request) {
         let output = try await outputs()
 
-        let sessionNode = output.node.first(of: Session.Node.self)
-
         var make = Make(
-            request: Internals.Request(),
-            configuration: sessionNode?.configuration ?? .init()
+            configuration: .init(),
+            request: .init()
         )
 
         try await output.node._make(&make)
 
         let session = Internals.Session(
-            provider: sessionNode?.provider ?? .shared,
+            provider: make.provider ?? .shared,
             configuration: make.configuration
         )
 

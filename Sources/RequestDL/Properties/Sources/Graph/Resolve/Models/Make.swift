@@ -7,14 +7,15 @@ import Foundation
 @RequestActor
 struct Make {
 
-    var request: Internals.Request
+    var provider: SessionProvider?
     var configuration: Internals.Session.Configuration
+    var request: Internals.Request
 
     init(
-        request: Internals.Request,
-        configuration: Internals.Session.Configuration
+        configuration: Internals.Session.Configuration,
+        request: Internals.Request
     ) {
-        self.request = request
         self.configuration = configuration
+        self.request = request
     }
 }
