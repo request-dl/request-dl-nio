@@ -46,7 +46,7 @@ extension FormValue {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(FormNode {
+        return .leaf(FormNode(inputs.environment.payloadPartLength) {
             PartFormRawValue(Data("\(property.value)".utf8), forHeaders: [
                 kContentDisposition: kContentDispositionValue(
                     nil,

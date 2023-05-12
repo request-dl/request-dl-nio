@@ -129,7 +129,8 @@ extension Payload {
         return .leaf(PayloadNode(
             isURLEncodedCompatible: property.isURLEncodedCompatible,
             buffer: { buffer(provider) },
-            urlEncoder: inputs.environment.urlEncoder
+            urlEncoder: inputs.environment.urlEncoder,
+            partLength: inputs.environment.payloadPartLength
         ))
     }
 }
