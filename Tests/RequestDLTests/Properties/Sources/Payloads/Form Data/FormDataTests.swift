@@ -145,4 +145,24 @@ class FormDataTests: XCTestCase {
         // Then
         try await assertNever(property.body)
     }
+
+    func testData_whenPartLengthSet() async throws {
+        // Given
+        let length = 1_024
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            FormData(
+                Mock(foo: "bar", date: Date()),
+                forKey: "data",
+                fileName: "contents.json"
+            )
+            .payloadPartLength(length)
+        })
+
+        let sut = try await request.body?.buffers()
+
+        // Then
+        XCTAssertEqual(sut?.count, 1)
+    }
 }

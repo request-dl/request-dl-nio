@@ -251,4 +251,20 @@ class PayloadTests: XCTestCase {
         // Then
         try await assertNever(property.body)
     }
+
+    func testPayload_whenPartLengthSet() async throws {
+        // Given
+        let length = 2
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            Payload("abc", using: .utf8)
+                .payloadPartLength(length)
+        })
+
+        let sut = try await request.body?.buffers()
+
+        // Then
+        XCTAssertEqual(sut?.count, 2)
+    }
 }

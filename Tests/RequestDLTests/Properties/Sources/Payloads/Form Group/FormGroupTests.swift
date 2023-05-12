@@ -176,5 +176,24 @@ class FormGroupTests: XCTestCase {
         // Then
         try await assertNever(property.body)
     }
+
+    func testGroup_whenPartLengthSet() async throws {
+        // Given
+        let length = 1_024
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            FormGroup {
+                FormValue("foo", forKey: "key1")
+                FormValue("bar", forKey: "key2")
+            }
+            .payloadPartLength(length)
+        })
+
+        let sut = try await request.body?.buffers()
+
+        // Then
+        XCTAssertEqual(sut?.count, 1)
+    }
 }
 // swiftlint:enable function_body_length
