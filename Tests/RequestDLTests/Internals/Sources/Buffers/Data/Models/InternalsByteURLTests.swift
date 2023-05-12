@@ -6,7 +6,6 @@ import XCTest
 import NIOCore
 @testable import RequestDL
 
-@RequestActor
 class InternalsByteURLTests: XCTestCase {
 
     func testByteURL_whenInitEmpty() {
