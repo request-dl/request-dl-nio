@@ -42,6 +42,8 @@ extension Internals.Body {
             return eventLoop.makeSucceededVoidFuture()
         })).get()
 
+        try await group.shutdownGracefully()
+
         return buffers
     }
 }

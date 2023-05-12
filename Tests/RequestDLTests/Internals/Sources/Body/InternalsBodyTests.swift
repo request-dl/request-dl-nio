@@ -43,4 +43,22 @@ class InternalsBodyTests: XCTestCase {
             [Data(string.utf8)]
         )
     }
+
+    func testRequestBody_whenDataIsEmpty() async throws {
+        // Given
+        let string = ""
+
+        let body = Internals.Body(buffers: [
+            Internals.DataBuffer(string)
+        ])
+
+        // When
+        let buffers = try await body.buffers()
+
+        // Then
+        XCTAssertEqual(
+            buffers.resolveData(),
+            []
+        )
+    }
 }

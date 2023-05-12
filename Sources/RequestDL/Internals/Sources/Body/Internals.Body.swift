@@ -53,13 +53,17 @@ extension Internals.Body {
         writer: HTTPClient.Body.StreamWriter,
         body: Internals.BodySequence
     ) -> EventLoopFuture<Void> {
+        guard !body.isEmpty else {
+            Internals.Log.failure(.emptyRequestBody())
+        }
+
         let sequence = Internals.StreamWriterSequence(
             writer: writer,
             body: body
         ).makeIterator()
 
         guard let first = sequence.next() else {
-            Internals.Log.failure(.emptyRequestBody())
+            return writer.write(.byteBuffer(.init()))
         }
 
         return first.flatMapWithEventLoop {
