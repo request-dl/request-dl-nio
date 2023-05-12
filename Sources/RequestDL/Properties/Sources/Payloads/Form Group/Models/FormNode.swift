@@ -7,9 +7,11 @@ import Foundation
 @RequestActor
 struct FormNode: PropertyNode {
 
+    let partLength: Int?
     let factory: () -> PartFormRawValue
 
-    init(_ factory: @escaping () -> PartFormRawValue) {
+    init(_ partLength: Int?, _ factory: @escaping () -> PartFormRawValue) {
+        self.partLength = partLength
         self.factory = factory
     }
 
@@ -21,7 +23,7 @@ struct FormNode: PropertyNode {
             forKey: "Content-Type"
         )
 
-        make.request.body = Internals.Body(buffers: [
+        make.request.body = Internals.Body(partLength, buffers: [
             Internals.DataBuffer(constructor.body)
         ])
     }

@@ -10,6 +10,7 @@ struct PayloadNode: PropertyNode {
     let isURLEncodedCompatible: Bool
     let buffer: () -> BufferProtocol
     let urlEncoder: URLEncoder
+    let partLength: Int?
 
     func make(_ make: inout Make) async throws {
         guard
@@ -17,7 +18,7 @@ struct PayloadNode: PropertyNode {
             isURLEncoded(make.request.headers),
             let data = buffer().getData()
         else {
-            make.request.body = Internals.Body(buffers: [buffer()])
+            make.request.body = Internals.Body(partLength, buffers: [buffer()])
             return
         }
 
@@ -29,7 +30,7 @@ struct PayloadNode: PropertyNode {
         case let value as [Any]:
             try makeArrayURLEncoded(value, in: &make)
         default:
-            make.request.body = Internals.Body(buffers: [buffer()])
+            make.request.body = Internals.Body(partLength, buffers: [buffer()])
         }
     }
 }

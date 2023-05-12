@@ -170,4 +170,30 @@ class FormFileTests: XCTestCase {
         // Then
         try await assertNever(property.body)
     }
+
+    func testFile_whenPartLengthSet() async throws {
+        // Given
+        let length = 1_024
+        let value = "foo"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bar")
+
+        try Data(value.utf8).write(to: url)
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            FormFile(
+                url,
+                forKey: "document",
+                fileName: nil,
+                type: nil
+            )
+            .payloadPartLength(length)
+        })
+
+        let sut = try await request.body?.buffers()
+
+        // Then
+        XCTAssertEqual(sut?.count, 1)
+    }
 }

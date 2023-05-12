@@ -45,6 +45,7 @@ extension FormGroup {
 
     private struct Node: PropertyNode {
 
+        let partLength: Int?
         let nodes: [LeafNode<FormNode>]
 
         func make(_ make: inout Make) async throws {
@@ -57,7 +58,7 @@ extension FormGroup {
                 forKey: "Content-Type"
             )
 
-            make.request.body = Internals.Body(buffers: [
+            make.request.body = Internals.Body(partLength, buffers: [
                 Internals.DataBuffer(constructor.body)
             ])
         }
@@ -78,6 +79,9 @@ extension FormGroup {
 
         let nodes = outputs.node.search(for: FormNode.self)
 
-        return .leaf(Node(nodes: nodes))
+        return .leaf(Node(
+            partLength: inputs.environment.payloadPartLength,
+            nodes: nodes
+        ))
     }
 }
