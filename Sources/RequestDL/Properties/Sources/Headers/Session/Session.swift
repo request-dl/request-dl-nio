@@ -26,7 +26,7 @@ import NIOCore
 @RequestActor
 public struct Session: Property {
 
-    private(set) var configuration:( (inout Internals.Session.Configuration) -> Void)? = nil
+    private(set) var configuration: ((inout Internals.Session.Configuration) -> Void)?
     let provider: SessionProvider
 
     /// Initializes a new Session object.

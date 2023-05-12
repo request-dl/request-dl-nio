@@ -507,6 +507,32 @@ class InternalsDataBufferTests: XCTestCase {
         XCTAssertNil(data)
     }
 
+    func testDataBuffer_whenReadDataOutOfBounds() async throws {
+        // Given
+        var dataBuffer = Internals.DataBuffer(
+            Data.randomData(length: 64)
+        )
+
+        // When
+        let data = dataBuffer.readData(72)
+
+        // Then
+        XCTAssertNil(data)
+    }
+
+    func testDataBuffer_whenReadBytesOutOfBounds() async throws {
+        // Given
+        var dataBuffer = Internals.DataBuffer(
+            Data.randomData(length: 64)
+        )
+
+        // When
+        let bytes = dataBuffer.readBytes(72)
+
+        // Then
+        XCTAssertNil(bytes)
+    }
+
     func testDataBuffer_whenInitWithByteURLAlreadySetByteBuffer() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
@@ -563,30 +589,126 @@ class InternalsDataBufferTests: XCTestCase {
         XCTAssertEqual(dataBuffer.getBytes(), Array(data[64 ..< data.count]))
     }
 
-    func testDataBuffer_whenReadDataOutOfBounds() async throws {
+    func testDataBuffer_whenGetBytesAtIndexWithLength() async throws {
         // Given
-        var dataBuffer = Internals.DataBuffer(
-            Data.randomData(length: 64)
-        )
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
 
         // When
-        let data = dataBuffer.readData(72)
+        dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        XCTAssertNil(data)
+
+        XCTAssertEqual(
+            dataBuffer.getBytes(at: 32, length: 64),
+            Array(data[32 ..< 96])
+        )
     }
 
-    func testDataBuffer_whenReadBytesOutOfBounds() async throws {
+    func testDataBuffer_whenGetDataAtIndexWithLength() async throws {
         // Given
-        var dataBuffer = Internals.DataBuffer(
-            Data.randomData(length: 64)
-        )
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
 
         // When
-        let bytes = dataBuffer.readBytes(72)
+        dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        XCTAssertNil(bytes)
+
+        XCTAssertEqual(
+            dataBuffer.getData(at: 32, length: 64),
+            data[32 ..< 96]
+        )
+    }
+
+    func testDataBuffer_whenSetDataWhenMovingWriterIndex() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
+
+        let writeData = Data.randomData(length: 64)
+
+        // When
+        dataBuffer.moveWriterIndex(to: data.count - 32)
+        dataBuffer.setData(writeData)
+
+        // Then
+        XCTAssertEqual(dataBuffer.writableBytes, writeData.count)
+
+        dataBuffer.moveReaderIndex(to: dataBuffer.writerIndex)
+        dataBuffer.moveWriterIndex(to: dataBuffer.writerIndex + dataBuffer.writableBytes)
+
+        XCTAssertEqual(
+            dataBuffer.readData(writeData.count),
+            writeData
+        )
+    }
+
+    func testDataBuffer_whenSetDataAtWriterIndex() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
+
+        let writeData = Data.randomData(length: 64)
+
+        // When
+        dataBuffer.setData(writeData, at: data.count - 32)
+
+        // Then
+        XCTAssertEqual(dataBuffer.writableBytes, writeData.count - 32)
+
+        dataBuffer.moveReaderIndex(to: dataBuffer.writerIndex - 32)
+        dataBuffer.moveWriterIndex(to: dataBuffer.writerIndex + dataBuffer.writableBytes)
+
+        XCTAssertEqual(
+            dataBuffer.readData(writeData.count),
+            writeData
+        )
+    }
+
+    func testDataBuffer_whenSetBytesWhenMovingWriterIndex() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
+
+        let writeBytes = Array(Data.randomData(length: 64))
+
+        // When
+        dataBuffer.moveWriterIndex(to: data.count - 32)
+        dataBuffer.setBytes(writeBytes)
+
+        // Then
+        XCTAssertEqual(dataBuffer.writableBytes, writeBytes.count)
+
+        dataBuffer.moveReaderIndex(to: dataBuffer.writerIndex)
+        dataBuffer.moveWriterIndex(to: dataBuffer.writerIndex + dataBuffer.writableBytes)
+
+        XCTAssertEqual(
+            dataBuffer.readBytes(writeBytes.count),
+            writeBytes
+        )
+    }
+
+    func testDataBuffer_whenSetBytesAtWriterIndex() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        var dataBuffer = Internals.DataBuffer(data)
+
+        let writeBytes = Array(Data.randomData(length: 64))
+
+        // When
+        dataBuffer.setBytes(writeBytes, at: data.count - 32)
+
+        // Then
+        XCTAssertEqual(dataBuffer.writableBytes, writeBytes.count - 32)
+
+        dataBuffer.moveReaderIndex(to: dataBuffer.writerIndex - 32)
+        dataBuffer.moveWriterIndex(to: dataBuffer.writerIndex + dataBuffer.writableBytes)
+
+        XCTAssertEqual(
+            dataBuffer.readBytes(writeBytes.count),
+            writeBytes
+        )
     }
 }
 // swiftlint:enable type_body_length file_length
