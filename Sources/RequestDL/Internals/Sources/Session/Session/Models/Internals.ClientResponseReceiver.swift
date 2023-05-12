@@ -94,7 +94,9 @@ extension Internals {
                 unexpectedStateOrPhase()
             }
 
-            download.append(buffer)
+            download.append(Internals.DataBuffer(
+                Internals.ByteURL(buffer)
+            ))
 
             state = .downloading
             phase = .download

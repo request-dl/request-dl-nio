@@ -135,8 +135,9 @@ extension Internals.DataBuffer {
 extension Internals.DataBuffer {
 
     mutating func readData(_ length: Int) -> Data? {
-        precondition(length >= .zero)
-        precondition(readerIndex + length <= writerIndex)
+        guard length >= .zero, readerIndex + length <= writerIndex else {
+            return nil
+        }
 
         do {
             try storage.moveReaderIndex(to: readerIndex)
@@ -149,8 +150,9 @@ extension Internals.DataBuffer {
     }
 
     mutating func readBytes(_ length: Int) -> [UInt8]? {
-        precondition(length >= .zero)
-        precondition(readerIndex + length <= writerIndex)
+        guard length >= .zero, readerIndex + length <= writerIndex else {
+            return nil
+        }
 
         do {
             try storage.moveReaderIndex(to: readerIndex)

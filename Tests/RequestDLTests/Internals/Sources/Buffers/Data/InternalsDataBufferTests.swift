@@ -507,6 +507,46 @@ class InternalsDataBufferTests: XCTestCase {
         XCTAssertNil(data)
     }
 
+    func testDataBuffer_whenReadDataOutOfBounds() async throws {
+        // Given
+        var dataBuffer = Internals.DataBuffer(
+            Data.randomData(length: 64)
+        )
+
+        // When
+        let data = dataBuffer.readData(72)
+
+        // Then
+        XCTAssertNil(data)
+    }
+
+    func testDataBuffer_whenReadBytesOutOfBounds() async throws {
+        // Given
+        var dataBuffer = Internals.DataBuffer(
+            Data.randomData(length: 64)
+        )
+
+        // When
+        let bytes = dataBuffer.readBytes(72)
+
+        // Then
+        XCTAssertNil(bytes)
+    }
+
+    func testDataBuffer_whenInitWithByteURLAlreadySetByteBuffer() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
+        let byteBuffer = ByteBuffer(data: data)
+        let byteURL = Internals.ByteURL(byteBuffer)
+
+        // When
+        var dataBuffer = Internals.DataBuffer(byteURL)
+
+        // Then
+        XCTAssertEqual(dataBuffer.writerIndex, data.count)
+        XCTAssertEqual(dataBuffer.readData(data.count), data)
+    }
+
     func testDataBuffer_whenGetData() async throws {
         // Given
         let data = Data.randomData(length: 1_024)

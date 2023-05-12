@@ -514,6 +514,32 @@ class InternalsFileBufferTests: XCTestCase {
         XCTAssertNil(data)
     }
 
+    func testFileBuffer_whenReadDataOutOfBounds() async throws {
+        // Given
+        var fileBuffer = Internals.FileBuffer(
+            Data.randomData(length: 64)
+        )
+
+        // When
+        let data = fileBuffer.readData(72)
+
+        // Then
+        XCTAssertNil(data)
+    }
+
+    func testFileBuffer_whenReadBytesOutOfBounds() async throws {
+        // Given
+        var fileBuffer = Internals.FileBuffer(
+            Data.randomData(length: 64)
+        )
+
+        // When
+        let bytes = fileBuffer.readBytes(72)
+
+        // Then
+        XCTAssertNil(bytes)
+    }
+
     func testFileBuffer_whenGetData() async throws {
         // Given
         let data = Data.randomData(length: 1_024)

@@ -188,4 +188,21 @@ class SessionTests: XCTestCase {
         // Then
         try await assertNever(property.body)
     }
+
+    func testSession_whenCollidesPrefersLastDeclared() async throws {
+        // Given
+        let property = TestProperty {
+            Session()
+                .decompressionLimit(.size(200))
+            Session()
+                .waitsForConnectivity(true)
+        }
+
+        // When
+        let (session, _) = try await resolve(property)
+
+        // Then
+        XCTAssertEqual(session.configuration.decompression, .enabled(.size(200)))
+        XCTAssertEqual(session.configuration.networkFrameworkWaitForConnectivity, true)
+    }
 }
