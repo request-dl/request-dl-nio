@@ -14,6 +14,10 @@ extension Internals {
         let fragmentSize: Int
         private let buffers: [BufferProtocol]
 
+        var isEmpty: Bool {
+            buffers.isEmpty
+        }
+
         init(
             buffers: [BufferProtocol],
             size fragment: Int?
