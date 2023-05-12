@@ -186,7 +186,7 @@ class InternalsHeadersTests: XCTestCase {
         ])
 
         // Given
-        let sut = Set(arrayLiteral: headers1, headers1, headers2)
+        let sut = Set([headers1, headers1, headers2])
 
         // Then
         XCTAssertEqual(sut, [headers1, headers2])
