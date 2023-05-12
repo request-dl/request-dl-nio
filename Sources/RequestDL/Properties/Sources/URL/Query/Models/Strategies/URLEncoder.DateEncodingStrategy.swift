@@ -2,7 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 extension URLEncoder {
 
@@ -19,7 +23,7 @@ extension URLEncoder {
         case iso8601
 
         /// Encodes the date using a given `DateFormatter` instance.
-        @preconcurrency case formatter(DateFormatter)
+        case formatter(DateFormatter)
 
         /// Encodes the date using a custom closure that takes a `Date` and an `Encoder`
         /// as input parameters and throws an error.
