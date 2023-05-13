@@ -26,21 +26,9 @@ import Foundation
  let customContentType: ContentType = "application/custom"
  ```
  */
-public struct ContentType: Hashable {
+public struct ContentType: Sendable, Hashable {
 
-    let rawValue: String
-
-    /**
-     Initializes a `ContentType` instance with a given string value.
-
-     - Parameter rawValue: The string value of the content type.
-     */
-    public init<S: StringProtocol>(_ rawValue: S) {
-        self.rawValue = String(rawValue)
-    }
-}
-
-extension ContentType {
+    // MARK: - Public static properties
 
     /// Content type for JSON data.
     public static let json: ContentType = "application/json"
@@ -92,9 +80,23 @@ extension ContentType {
 
     /// Content type for PDF files.
     public static let pdf: ContentType = "application/pdf"
-}
 
-extension ContentType {
+    // MARK: - Internal properties
+
+    let rawValue: String
+
+    // MARK: - Inits
+
+    /**
+     Initializes a `ContentType` instance with a given string value.
+
+     - Parameter rawValue: The string value of the content type.
+     */
+    public init<S: StringProtocol>(_ rawValue: S) {
+        self.rawValue = String(rawValue)
+    }
+
+    // MARK: - Internal static methods
 
     static var allCases: [ContentType] {
         [
@@ -106,6 +108,8 @@ extension ContentType {
         ]
     }
 }
+
+// MARK: - ExpressibleByStringLiteral
 
 extension ContentType: ExpressibleByStringLiteral {
 
@@ -121,6 +125,8 @@ extension ContentType: ExpressibleByStringLiteral {
         self.rawValue = value
     }
 }
+
+// MARK: - LosslessStringConvertible
 
 extension ContentType: LosslessStringConvertible {
 

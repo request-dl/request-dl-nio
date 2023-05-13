@@ -5,12 +5,11 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiedTaskTests: XCTestCase {
 
     struct Modified<Body: Task>: TaskModifier {
 
-        let callback: () -> Void
+        let callback: @Sendable () -> Void
 
         func task(_ task: Body) async throws -> Body.Element {
             callback()
@@ -20,16 +19,16 @@ class ModifiedTaskTests: XCTestCase {
 
     func testModified() async throws {
         // Given
-        var taskModified = false
+        let taskModified = SendableBox(false)
 
         // When
         _ = try await MockedTask(data: Data.init)
             .modify(Modified {
-                taskModified = true
+                taskModified(true)
             })
             .result()
 
         // Then
-        XCTAssertTrue(taskModified)
+        XCTAssertTrue(taskModified())
     }
 }

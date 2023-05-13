@@ -6,7 +6,7 @@ import Foundation
 
 extension Internals {
 
-    struct ResponseHead: Hashable {
+    struct ResponseHead: Sendable, Codable, Hashable {
         let url: String
         let status: Status
         let version: Version
@@ -17,12 +17,12 @@ extension Internals {
 
 extension Internals.ResponseHead {
 
-    struct Version: Hashable {
+    struct Version: Sendable, Codable, Hashable {
         let minor: Int
         let major: Int
     }
 
-    struct Status: Hashable {
+    struct Status: Sendable, Codable, Hashable {
         let code: UInt
         let reason: String
     }

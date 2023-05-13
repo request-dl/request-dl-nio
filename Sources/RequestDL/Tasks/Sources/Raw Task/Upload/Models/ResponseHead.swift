@@ -5,7 +5,9 @@
 import Foundation
 
 /// A structure representing the head of an HTTP response.
-public struct ResponseHead: Hashable {
+public struct ResponseHead: Sendable, Hashable {
+
+    // MARK: - Public properties
 
     /// The URL of the response.
     public let url: URL?
@@ -21,6 +23,8 @@ public struct ResponseHead: Hashable {
 
     /// A boolean value indicating whether the connection should be kept alive after the response.
     public let isKeepAlive: Bool
+
+    // MARK: - Inits
 
     /// Initializes a new instance of `ResponseHead`.
     ///
@@ -59,13 +63,17 @@ public struct ResponseHead: Hashable {
 extension ResponseHead {
 
     /// A structure representing the status of an HTTP response.
-    public struct Status: Hashable {
+    public struct Status: Sendable, Hashable {
+
+        // MARK: - Public properties
 
         /// The HTTP status code of the response.
         public let code: UInt
 
         /// The reason phrase associated with the HTTP status code.
         public let reason: String
+
+        // MARK: - Inits
 
         /// Initializes a new instance of `Status`.
         ///
@@ -89,13 +97,17 @@ extension ResponseHead {
     }
 
     /// A structure representing the version of the HTTP protocol used in an HTTP response.
-    public struct Version: Hashable {
+    public struct Version: Sendable, Hashable {
+
+        // MARK: - Public properties
 
         /// The minor version number of the HTTP protocol used in the response.
         public let minor: Int
 
         /// The major version number of the HTTP protocol used in the response.
         public let major: Int
+
+        // MARK: - Inits
 
         /// Initializes a new instance of `Version`.
         ///

@@ -15,8 +15,7 @@ extension Headers {
      Headers.Referer("https://www.example.com/")
      ```
      */
-    @RequestActor
-    public struct Referer: Property {
+        public struct Referer: Property {
 
         private let value: String
 
@@ -40,8 +39,7 @@ extension Headers {
 extension Headers.Referer {
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<Headers.Referer>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

@@ -14,11 +14,26 @@ import Foundation
 /// let certData = Data(base64Encoded: "...")
 /// let cert = Certificate(certData!, format: .der)
 /// ```
-@RequestActor
 public struct Certificate: Property {
+
+    public enum Format: Sendable, Hashable {
+        case pem
+        case der
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
 
     private let source: CertificateNode.Source
     private let format: Format
+
+    // MARK: - Inits
 
     /// Creates a `Certificate` property with the specified bytes and format.
     ///
@@ -60,16 +75,9 @@ public struct Certificate: Property {
         )
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Certificate {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Certificate>,
         inputs: _PropertyInputs
@@ -92,13 +100,7 @@ extension Certificate {
     }
 }
 
-extension Certificate {
-
-    public enum Format: Hashable {
-        case pem
-        case der
-    }
-}
+// MARK: - Certificate.Format extension
 
 extension Certificate.Format {
 

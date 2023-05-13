@@ -19,7 +19,6 @@ Usage:
  }
  ```
  */
-@RequestActor
 public struct QueryGroup<Content: Property>: Property {
 
     let content: Content
@@ -29,7 +28,7 @@ public struct QueryGroup<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the query group.
      */
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 
@@ -68,8 +67,7 @@ extension QueryGroup {
     }
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<QueryGroup<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

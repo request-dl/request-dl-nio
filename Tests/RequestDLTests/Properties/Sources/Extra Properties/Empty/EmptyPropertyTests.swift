@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class EmptyPropertyTests: XCTestCase {
 
     func testEmptyBuilder() async throws {

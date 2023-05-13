@@ -5,7 +5,6 @@
 import Foundation
 
 /// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
-@RequestActor
 public struct FormData: Property {
 
     let buffer: Internals.DataBuffer
@@ -66,8 +65,7 @@ public struct FormData: Property {
 extension FormData {
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<FormData>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

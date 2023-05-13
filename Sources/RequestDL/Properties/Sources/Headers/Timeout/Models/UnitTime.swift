@@ -1,6 +1,6 @@
 /*
  See LICENSE for this package's licensing information.
-*/
+ */
 
 import Foundation
 import NIOCore
@@ -22,37 +22,18 @@ import NIOCore
  */
 public struct UnitTime: Hashable, Sendable {
 
+    // MARK: - Public properties
+
     /// The time interval in nanoseconds.
     public let nanoseconds: Int64
+
+    // MARK: - Inits
 
     fileprivate init(_ nanoseconds: Int64) {
         self.nanoseconds = nanoseconds
     }
-}
 
-extension UnitTime: ExpressibleByIntegerLiteral {
-
-    public init(integerLiteral value: Int64) {
-        self.init(value)
-    }
-}
-
-extension UnitTime: LosslessStringConvertible {
-
-    public init?(_ description: String) {
-        guard let nanoseconds = Int64(description) else {
-            return nil
-        }
-
-        self.nanoseconds = nanoseconds
-    }
-
-    public var description: String {
-        String(nanoseconds)
-    }
-}
-
-extension UnitTime {
+    // MARK: - Public static methods
 
     /**
      Creates a `UnitTime` representing the specified number of nanoseconds.
@@ -113,7 +94,40 @@ extension UnitTime {
     public static func hours(_ amount: Int64) -> UnitTime {
         amount * 3_600_000_000_000
     }
+
+    // MARK: - Internal methods
+    func build() -> NIOCore.TimeAmount {
+        .nanoseconds(Int64(nanoseconds))
+    }
 }
+
+// MARK: - ExpressibleByIntegerLiteral
+
+extension UnitTime: ExpressibleByIntegerLiteral {
+
+    public init(integerLiteral value: Int64) {
+        self.init(value)
+    }
+}
+
+// MARK: - LosslessStringConvertible
+
+extension UnitTime: LosslessStringConvertible {
+
+    public init?(_ description: String) {
+        guard let nanoseconds = Int64(description) else {
+            return nil
+        }
+
+        self.nanoseconds = nanoseconds
+    }
+
+    public var description: String {
+        String(nanoseconds)
+    }
+}
+
+// MARK: - Comparable
 
 extension UnitTime: Comparable {
 
@@ -121,6 +135,8 @@ extension UnitTime: Comparable {
         lhs.nanoseconds < rhs.nanoseconds
     }
 }
+
+// MARK: - AdditiveArithmetic
 
 extension UnitTime: AdditiveArithmetic {
 
@@ -148,8 +164,8 @@ extension UnitTime: AdditiveArithmetic {
      Multiplies a unit of time by an integer value.
 
      - Parameters:
-        - lhs: The integer value to multiply.
-        - rhs: The unit of time to multiply.
+     - lhs: The integer value to multiply.
+     - rhs: The unit of time to multiply.
      - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
      */
     public static func * <T: BinaryInteger>(lhs: T, rhs: UnitTime) -> UnitTime {
@@ -160,18 +176,11 @@ extension UnitTime: AdditiveArithmetic {
      Multiplies a unit of time by an integer value.
 
      - Parameters:
-        - lhs: The unit of time to multiply.
-        - rhs: The integer value to multiply.
+     - lhs: The unit of time to multiply.
+     - rhs: The integer value to multiply.
      - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
      */
     public static func * <T: BinaryInteger>(lhs: UnitTime, rhs: T) -> UnitTime {
         .init(lhs.nanoseconds * Int64(rhs))
-    }
-}
-
-extension UnitTime {
-
-    func build() -> NIOCore.TimeAmount {
-        .nanoseconds(Int64(nanoseconds))
     }
 }

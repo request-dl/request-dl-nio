@@ -21,11 +21,21 @@ import Foundation
  .result()
  ```
 */
-@RequestActor
-public struct Query<Value>: Property {
+public struct Query<Value: Sendable>: Property {
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     let key: String
     let value: Value
+
+    // MARK: - Inits
 
     /**
      Creates a new `Query` instance with a value and a key.
@@ -39,16 +49,9 @@ public struct Query<Value>: Property {
         self.value = value
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Query {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Query>,
         inputs: _PropertyInputs

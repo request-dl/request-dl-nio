@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeadersTests: XCTestCase {
 
     func testMultipleHeadersWithoutGroup() async throws {

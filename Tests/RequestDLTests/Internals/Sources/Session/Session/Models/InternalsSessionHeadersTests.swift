@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsHeadersTests: XCTestCase {
 
     var headers: Internals.Headers!

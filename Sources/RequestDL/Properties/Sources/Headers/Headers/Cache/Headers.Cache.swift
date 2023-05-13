@@ -18,8 +18,7 @@ extension Headers {
          .stored(true)
      ```
      */
-    @RequestActor
-    public struct Cache: Property {
+        public struct Cache: Property {
 
         var isCached = true
 
@@ -62,8 +61,7 @@ extension Headers {
 extension Headers.Cache {
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<Headers.Cache>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

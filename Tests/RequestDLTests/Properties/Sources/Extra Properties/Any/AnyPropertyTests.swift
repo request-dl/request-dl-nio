@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class AnyPropertyTests: XCTestCase {
 
     func testAnyPropertyErasingQuery() async throws {

@@ -53,7 +53,6 @@ import Foundation
  parameter. `Property` protocol contains information about the request such as its URL, headers,
  body and etc.
  */
-@RequestActor
 public struct DownloadTask<Content: Property>: Task {
 
     private let content: Content
@@ -63,7 +62,7 @@ public struct DownloadTask<Content: Property>: Task {
 
      - Parameter content: The content of the request.
      */
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 }

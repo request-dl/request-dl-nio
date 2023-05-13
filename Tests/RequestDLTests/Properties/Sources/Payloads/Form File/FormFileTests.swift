@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class FormFileTests: XCTestCase {
 
     func testFileFormWithFileNameAndContentType() async throws {

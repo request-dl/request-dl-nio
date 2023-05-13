@@ -7,13 +7,17 @@ import NIOCore
 
 extension Internals {
 
-    struct AsyncResponse: AsyncSequence {
+    struct AsyncResponse: Sendable, AsyncSequence {
 
         typealias Element = Response
+
+        // MARK: - Private properties
 
         private let upload: AsyncThrowingStream<Int, Error>
         private let head: AsyncThrowingStream<Internals.ResponseHead, Error>
         private let download: Internals.DataStream<Internals.DataBuffer>
+
+        // MARK: - Inits
 
         init(
             upload: Internals.DataStream<Int>,
@@ -25,6 +29,8 @@ extension Internals {
             self.download = download
         }
 
+        // MARK: - Internal methods
+
         func makeAsyncIterator() -> Iterator {
             Iterator(
                 upload: upload.makeAsyncIterator(),
@@ -33,15 +39,20 @@ extension Internals {
         }
     }
 }
+
 extension Internals.AsyncResponse {
 
     struct Iterator: AsyncIteratorProtocol {
+
+        // MARK: - Internal properties
 
         let upload: AsyncThrowingStream<Int, Error>.AsyncIterator?
         let download: (
             head: AsyncThrowingStream<Internals.ResponseHead, Error>,
             bytes: Internals.DataStream<Internals.DataBuffer>
         )?
+
+        // MARK: - Internal methods
 
         mutating func next() async throws -> Element? {
             if var upload = upload, let part = try await upload.next() {

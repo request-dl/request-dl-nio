@@ -11,11 +11,34 @@ import Foundation
  */
 public struct HTTPHeaders: Hashable, Sendable {
 
-    private var headers: Internals.Headers
+    // MARK: - Public methods
 
-    init(_ headers: Internals.Headers) {
-        self.headers = headers
+    /**
+     Indicates whether the `HTTPHeaders` instance is empty.
+     */
+    public var isEmpty: Bool {
+        headers.isEmpty
     }
+
+    /**
+     Returns the number of headers in the `HTTPHeaders` instance.
+    */
+    public var count: Int {
+        headers.count
+    }
+
+    /**
+     Returns an array of header keys in the `HTTPHeaders` instance.
+    */
+    public var keys: [String] {
+        headers.map(\.0)
+    }
+
+    // MARK: - Private properties
+
+    fileprivate var headers: Internals.Headers
+
+    // MARK: - Inits
 
     /**
      Initializes an empty `HTTPHeaders` instance.
@@ -42,6 +65,12 @@ public struct HTTPHeaders: Hashable, Sendable {
         self.init(Array(dictionary))
     }
 
+    init(_ headers: Internals.Headers) {
+        self.headers = headers
+    }
+
+    // MARK: - Public methods
+
     /**
      Retrieves the value for a given header key.
 
@@ -63,31 +92,35 @@ public struct HTTPHeaders: Hashable, Sendable {
     public mutating func setValue(_ value: String, forKey key: String) {
         headers.setValue(value, forKey: key)
     }
-}
 
-extension HTTPHeaders {
-
-    /**
-     Indicates whether the `HTTPHeaders` instance is empty.
-     */
-    public var isEmpty: Bool {
-        headers.isEmpty
-    }
-
-    /**
-     Returns the number of headers in the `HTTPHeaders` instance.
-    */
-    public var count: Int {
-        headers.count
+    public func makeIterator() -> Iterator {
+        .init(headers: headers.makeIterator())
     }
 }
 
-extension HTTPHeaders {
+extension HTTPHeaders: Sequence {
 
-    /**
-     Returns an array of header keys in the `HTTPHeaders` instance.
-    */
-    public var keys: [String] {
-        headers.map(\.0)
+    public typealias Element = (String, String)
+
+    public struct Iterator: IteratorProtocol {
+
+        // MARK: - Private properties
+
+        fileprivate var headers: Internals.Headers.Iterator
+
+        // MARK: - Public methods
+
+        public mutating func next() -> Element? {
+            headers.next()
+        }
+    }
+}
+
+// MARK: - Internals.Headers extension
+
+extension Internals.Headers {
+
+    init(_ headers: HTTPHeaders) {
+        self = headers.headers
     }
 }

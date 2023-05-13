@@ -5,21 +5,20 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InterceptorsDetachTests: XCTestCase {
 
     func testDetach() async throws {
         // Given
-        var taskDetached = false
+        let taskDetached = SendableBox(false)
 
         // When
         _ = try await MockedTask(data: Data.init)
             .detach { _ in
-                taskDetached = true
+                taskDetached(true)
             }
             .result()
 
         // Then
-        XCTAssertTrue(taskDetached)
+        XCTAssertTrue(taskDetached())
     }
 }

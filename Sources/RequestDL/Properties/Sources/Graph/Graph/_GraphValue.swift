@@ -5,8 +5,19 @@
 import Foundation
 
 @dynamicMemberLookup
-@RequestActor
-public struct _GraphValue<Content: Property> {
+public struct _GraphValue<Content: Property>: Sendable {
+
+    // MARK: - Internal properties
+
+    var pathway: Int {
+        _identified.pathway
+    }
+
+    func assertPathway() {
+        _identified.assertPathway()
+    }
+
+    // MARK: - Private properties
 
     private let content: Content
 
@@ -15,17 +26,7 @@ public struct _GraphValue<Content: Property> {
 
     private let previousValue: IdentifiedGraphValue?
 
-    func pointer() -> Content {
-        content
-    }
-
-    static func root(_ content: Content) -> _GraphValue<Content> {
-        .init(
-            id: .type(Content.self),
-            content: content,
-            previousValue: nil
-        )
-    }
+    // MARK: - Inits
 
     private init(
         id: GraphID,
@@ -37,6 +38,18 @@ public struct _GraphValue<Content: Property> {
         self.previousValue = previousValue
         self.nextID = nil
     }
+
+    // MARK: - Internal static methods
+
+    static func root(_ content: Content) -> _GraphValue<Content> {
+        .init(
+            id: .type(Content.self),
+            content: content,
+            previousValue: nil
+        )
+    }
+
+    // MARK: - Internal methods
 
     subscript<Value>(dynamicMember keyPath: KeyPath<Content, Value>) -> Value {
         content[keyPath: keyPath]
@@ -55,6 +68,12 @@ public struct _GraphValue<Content: Property> {
         self.access(id: id) { _ in next }
     }
 
+    func pointer() -> Content {
+        content
+    }
+
+    // MARK: - Private methods
+
     private func access<Next: Property>(
         id: GraphID,
         next: (Content) -> Next
@@ -68,6 +87,8 @@ public struct _GraphValue<Content: Property> {
         )
     }
 }
+
+// MARK: - IdentifiedGraphValue
 
 extension _GraphValue {
 
@@ -83,16 +104,5 @@ extension _GraphValue {
             nextID: nextID,
             previousValue: previousValue
         )
-    }
-}
-
-extension _GraphValue {
-
-    var pathway: Int {
-        _identified.pathway
-    }
-
-    func assertPathway() {
-        _identified.assertPathway()
     }
 }

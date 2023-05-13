@@ -26,19 +26,9 @@ import Foundation
  let customStatusCode: StatusCode = 99
  ```
 */
-public struct StatusCode: Hashable {
+public struct StatusCode: Sendable, Hashable {
 
-    let rawValue: UInt
-
-    /// Initializes a status code with the provided integer value.
-    ///
-    /// - Parameter rawValue: The integer value of the status code.
-    public init(_ rawValue: UInt) {
-        self.rawValue = rawValue
-    }
-}
-
-extension StatusCode {
+    // MARK: - Public static 1xx properties
 
     /// The 101 Switching Continue status code.
     public static let `continue`: StatusCode = 100
@@ -48,9 +38,8 @@ extension StatusCode {
 
     /// The 102 Processing status code.
     public static let processing: StatusCode = 102
-}
 
-extension StatusCode {
+    // MARK: - Public static 2xx properties
 
     /// The 200 OK status code.
     public static let ok: StatusCode = 200
@@ -81,9 +70,8 @@ extension StatusCode {
 
     /// The 226 IM Used status code.
     public static let imUsed: StatusCode = 226
-}
 
-extension StatusCode {
+    // MARK: - Public static 3xx properties
 
     /// The 300 Multiple Choices status code.
     public static let multipleChoices: StatusCode = 300
@@ -108,9 +96,8 @@ extension StatusCode {
 
     /// The 308 Permanent Redirect status code.
     public static let permanentRedirect: StatusCode = 308
-}
 
-extension StatusCode {
+    // MARK: - Public static 4xx properties
 
     /// The 400 Bad Request status code.
     public static let badRequest: StatusCode = 400
@@ -198,9 +185,8 @@ extension StatusCode {
 
     /// The 451 Unavailable For Legal Reasons status code.
     public static let unavailableForLegalReasons: StatusCode = 451
-}
 
-extension StatusCode {
+    // MARK: - Public static 5xx properties
 
     /// The 500 Internal Server Error status code.
     public static let internalServerError: StatusCode = 500
@@ -234,7 +220,22 @@ extension StatusCode {
 
     /// The 511 Network Authentication Required status code.
     public static let networkAuthenticationRequired: StatusCode = 511
+
+    // MARK: - Internal properties
+
+    let rawValue: UInt
+
+    // MARK: - Inits
+
+    /// Initializes a status code with the provided integer value.
+    ///
+    /// - Parameter rawValue: The integer value of the status code.
+    public init(_ rawValue: UInt) {
+        self.rawValue = rawValue
+    }
 }
+
+// MARK: - ExpressibleByIntegerLiteral
 
 extension StatusCode: ExpressibleByIntegerLiteral {
 
@@ -245,6 +246,8 @@ extension StatusCode: ExpressibleByIntegerLiteral {
         self.init(UInt(value))
     }
 }
+
+// MARK: - LosslessStringConvertible
 
 extension StatusCode: LosslessStringConvertible {
 
@@ -261,12 +264,16 @@ extension StatusCode: LosslessStringConvertible {
     }
 }
 
+// MARK: - Comparable
+
 extension StatusCode: Comparable {
 
     public static func < (_ lhs: StatusCode, _ rhs: StatusCode) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
 }
+
+// MARK: - Strideable
 
 extension StatusCode: Strideable {
 

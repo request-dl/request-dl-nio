@@ -35,7 +35,6 @@ import Foundation
  }
  ```
  */
-@RequestActor
 public struct BaseURL: Property {
 
     let internetProtocol: InternetProtocol
@@ -126,8 +125,7 @@ extension BaseURL {
     }
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<BaseURL>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

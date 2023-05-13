@@ -4,21 +4,25 @@
 
 import Foundation
 
-@RequestActor
-public struct _PropertyOutputs {
+public struct _PropertyOutputs: Sendable {
 
-    let node: Node
-
-    fileprivate init(_ node: Node) {
-        self.node = node
-    }
-}
-
-extension _PropertyOutputs {
+    // MARK: - Internal static properties
 
     static var empty: Self {
         .init(EmptyLeafNode())
     }
+
+    // MARK: - Internal properties
+
+    let node: Node
+
+    // MARK: - Inits
+
+    fileprivate init(_ node: Node) {
+        self.node = node
+    }
+
+    // MARK: - Internal static methods
 
     static func leaf<Property: PropertyNode>(_ property: Property) -> Self {
         .init(LeafNode(property))

@@ -5,7 +5,6 @@
 import Foundation
 
 /// A representation of an Authorization header.
-@RequestActor
 public struct Authorization: Property {
 
     private let type: TokenType
@@ -88,8 +87,7 @@ extension Authorization {
     }
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<Authorization>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

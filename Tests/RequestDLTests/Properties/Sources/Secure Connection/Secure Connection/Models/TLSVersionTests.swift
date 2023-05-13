@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class TLSVersionTests: XCTestCase {
 
     func testVersion_whenV1_shouldBeV1() async throws {

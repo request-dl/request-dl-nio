@@ -6,10 +6,16 @@ import Foundation
 
 struct ChildrenNode: Node {
 
+    // MARK: - Private properties
+
     private var nodes: [Node] = []
     private var index: Int = .zero
 
+    // MARK: - Inits
+
     init() {}
+
+    // MARK: - Internal methods
 
     mutating func append(_ node: Node, grouping: Bool = false) {
         if grouping, let group = node as? ChildrenNode {

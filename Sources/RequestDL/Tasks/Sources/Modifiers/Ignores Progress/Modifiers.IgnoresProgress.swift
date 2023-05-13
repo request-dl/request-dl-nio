@@ -6,9 +6,13 @@ import Foundation
 
 extension Modifiers {
 
-    public struct IgnoresProgress<Content: Task, Output>: TaskModifier {
+    public struct IgnoresProgress<Content: Task, Output: Sendable>: TaskModifier {
 
-        let process: (Content.Element) async throws -> Output
+        // MARK: - Internal properties
+
+        let process: @Sendable (Content.Element) async throws -> Output
+
+        // MARK: - Inits
 
         fileprivate init() where Content.Element == AsyncResponse, Output == TaskResult<Data> {
             self.process = {
@@ -37,62 +41,63 @@ extension Modifiers {
             }
         }
 
+        // MARK: - Public methods
+
         public func task(_ task: Content) async throws -> Output {
             try await process(task.result())
         }
-    }
-}
 
-extension Modifiers.IgnoresProgress {
+        // MARK: - Private static methods
 
-    fileprivate static func ignoresUpload(_ content: AsyncResponse) async throws -> TaskResult<AsyncBytes> {
+        private static func ignoresUpload(_ content: AsyncResponse) async throws -> TaskResult<AsyncBytes> {
 
-        for try await step in content {
-            switch step {
-            case .upload:
-                break
-            case .download(let head, let bytes):
-                return .init(head: head, payload: bytes)
+            for try await step in content {
+                switch step {
+                case .upload:
+                    break
+                case .download(let head, let bytes):
+                    return .init(head: head, payload: bytes)
+                }
             }
+
+            Internals.Log.failure(
+                .missingStagesOfRequest(content)
+            )
         }
 
-        Internals.Log.failure(
-            .missingStagesOfRequest(content)
-        )
-    }
+        private static func ignoresDownload(_ content: AsyncBytes) async throws -> Data {
+            var receivedData = Data()
 
-    fileprivate static func ignoresDownload(_ content: AsyncBytes) async throws -> Data {
-        var receivedData = Data()
+            for try await data in content {
+                receivedData.append(data)
+            }
 
-        for try await data in content {
-            receivedData.append(data)
+            return receivedData
         }
-
-        return receivedData
     }
 }
 
-extension Task<AsyncResponse> {
+// MARK: - Task extension
 
-    public func ignoresProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<Data>>> {
+extension Task {
+
+    public func ignoresProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<Data>>>
+    where Element == AsyncResponse {
         modify(Modifiers.IgnoresProgress())
     }
 
-    public func ignoresUploadProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<AsyncBytes>>> {
+    public func ignoresUploadProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<AsyncBytes>>>
+    where Element == AsyncResponse {
         modify(Modifiers.IgnoresProgress())
     }
-}
 
-extension Task<TaskResult<AsyncBytes>> {
-
-    public func ignoresDownloadProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<Data>>> {
+    public func ignoresDownloadProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<Data>>>
+    where Element == TaskResult<AsyncBytes> {
         modify(Modifiers.IgnoresProgress())
     }
-}
 
-extension Task<AsyncBytes> {
-
-    public func ignoresDownloadProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, Data>> {
+    public func ignoresDownloadProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, Data>>
+    where Element == AsyncBytes {
         modify(Modifiers.IgnoresProgress())
     }
 }

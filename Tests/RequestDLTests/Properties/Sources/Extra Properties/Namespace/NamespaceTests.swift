@@ -6,18 +6,16 @@ import Foundation
 import XCTest
 @testable @_spi(Private) import RequestDL
 
-@RequestActor
 class NamespaceTests: XCTestCase {
 
     struct NamespaceSpy: Property {
 
-        let callback: (Namespace.ID) -> Void
+        let callback: @Sendable (Namespace.ID) -> Void
 
         var body: Never {
             bodyException()
         }
 
-        @RequestActor
         static func _makeProperty(
             property: _GraphValue<NamespaceTests.NamespaceSpy>,
             inputs: _PropertyInputs
@@ -29,17 +27,17 @@ class NamespaceTests: XCTestCase {
 
     func testNamespace_whenNotSet() async throws {
         // Given
-        var namespaceID: Namespace.ID?
+        let namespaceID = SendableBox<Namespace.ID?>(nil)
 
         // When
         _ = try await resolve(TestProperty {
             NamespaceSpy {
-                namespaceID = $0
+                namespaceID($0)
             }
         })
 
         // Then
-        XCTAssertEqual(namespaceID, .global)
+        XCTAssertEqual(namespaceID(), .global)
     }
 }
 
@@ -63,20 +61,20 @@ extension NamespaceTests {
 
     func testNamespace_whenSet() async throws {
         // Given
-        var namespaceID: Namespace.ID?
+        let namespaceID = SendableBox<Namespace.ID?>(nil)
 
         // When
         let resolved = try await resolve(TestProperty {
             SingleNamespace {
                 NamespaceSpy {
-                    namespaceID = $0
+                    namespaceID($0)
                 }
             }
         })
 
         // Then
         XCTAssertEqual(resolved.request.url, "https://www.apple.com/v1")
-        XCTAssertEqual(namespaceID, Namespace.ID(
+        XCTAssertEqual(namespaceID(), Namespace.ID(
             base: SingleNamespace<NamespaceSpy>.self,
             namespace: "_v1"
         ))
@@ -104,13 +102,13 @@ extension NamespaceTests {
 
     func testNamespace_whenSetWithMultiple() async throws {
         // Given
-        var namespaceID: Namespace.ID?
+        let namespaceID = SendableBox<Namespace.ID?>(nil)
 
         // When
         let resolved = try await resolve(TestProperty {
             MultipleNamespace {
                 NamespaceSpy {
-                    namespaceID = $0
+                    namespaceID($0)
                 }
             }
         })
@@ -121,7 +119,7 @@ extension NamespaceTests {
             "https://www.apple.com/multiple/namespace"
         )
 
-        XCTAssertEqual(namespaceID, Namespace.ID(
+        XCTAssertEqual(namespaceID(), Namespace.ID(
             base: MultipleNamespace<NamespaceSpy>.self,
             namespace: "_multiple._namespace"
         ))
@@ -134,7 +132,7 @@ extension NamespaceTests {
 
         @Namespace var namespace
 
-        let callback: (Namespace.ID) -> Void
+        let callback: @Sendable (Namespace.ID) -> Void
 
         func body(content: Content) -> some Property {
             content
@@ -145,13 +143,13 @@ extension NamespaceTests {
 
     func testNamespace_whenModifier() async throws {
         // Given
-        var namespaceID: Namespace.ID?
+        let namespaceID = SendableBox<Namespace.ID?>(nil)
 
         // When
         let resolved = try await resolve(TestProperty {
             Path("v1")
                 .modifier(NamespaceModifier {
-                    namespaceID = $0
+                    namespaceID($0)
                 })
         })
 
@@ -161,7 +159,7 @@ extension NamespaceTests {
             "https://www.apple.com/v1/namespace"
         )
 
-        XCTAssertEqual(namespaceID, Namespace.ID(
+        XCTAssertEqual(namespaceID(), Namespace.ID(
             base: NamespaceModifier.self,
             namespace: "_namespace"
         ))

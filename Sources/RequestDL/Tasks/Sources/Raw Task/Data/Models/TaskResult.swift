@@ -25,8 +25,8 @@ public struct TaskResult<Element: Sendable>: TaskResultPrimitive {
     /// The payload of the task result.
     public let payload: Element
 
-    // MARK: - Public inits
-    
+    // MARK: - Inits
+
     /**
      Initializes a new instance of the TaskResult struct.
 

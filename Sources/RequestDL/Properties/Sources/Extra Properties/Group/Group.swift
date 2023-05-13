@@ -21,7 +21,6 @@ import Foundation
 ///     }
 /// }
 /// ```
-@RequestActor
 public struct Group<Content: Property>: Property {
 
     /// The properties contained within the group.
@@ -30,7 +29,7 @@ public struct Group<Content: Property>: Property {
     /// Creates a new `Group` property with the specified properties.
     ///
     /// - Parameter content: The properties to be contained within the group.
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 
@@ -43,8 +42,7 @@ public struct Group<Content: Property>: Property {
 extension Group {
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<Group<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

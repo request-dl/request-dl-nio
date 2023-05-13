@@ -8,7 +8,9 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    struct Request {
+    struct Request: Sendable {
+
+        // MARK: - Internal properties
 
         var baseURL: String
         var pathComponents: [String]
@@ -20,6 +22,8 @@ extension Internals {
         var body: Body?
         var readingMode: Internals.Response.ReadingMode
 
+        // MARK: - Inits
+
         init() {
             self.baseURL = ""
             self.pathComponents = []
@@ -29,18 +33,17 @@ extension Internals {
             self.body = nil
             self.readingMode = .length(1_024)
         }
-    }
-}
 
-extension Internals.Request {
+        // MARK: - Internal methods
 
-    func build() throws -> HTTPClient.Request {
-        try HTTPClient.Request(
-            url: url,
-            method: method.map { .init(rawValue: $0) } ?? .GET,
-            headers: headers.build(),
-            body: body?.build()
-        )
+        func build() throws -> HTTPClient.Request {
+            try HTTPClient.Request(
+                url: url,
+                method: method.map { .init(rawValue: $0) } ?? .GET,
+                headers: headers.build(),
+                body: body?.build()
+            )
+        }
     }
 }
 

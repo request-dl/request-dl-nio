@@ -19,7 +19,6 @@ import Foundation
  }
  ```
  */
-@RequestActor
 public struct HeaderGroup<Content: Property>: Property {
 
     let content: Content
@@ -29,7 +28,7 @@ public struct HeaderGroup<Content: Property>: Property {
 
      - Parameter content: A closure that returns the `Content` containing the header properties.
      */
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
 
@@ -72,8 +71,7 @@ extension HeaderGroup {
     }
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<HeaderGroup<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

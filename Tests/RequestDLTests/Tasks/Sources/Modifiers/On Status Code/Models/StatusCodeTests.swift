@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class StatusCodeTests: XCTestCase {
 
     func testContinueRawValue() async throws {

@@ -7,8 +7,7 @@ import Foundation
 extension Headers {
 
     /// A type representing the Content-Length header in an HTTP message.
-    @RequestActor
-    public struct ContentLength: Property {
+        public struct ContentLength: Property {
 
         private let bytes: Int
 
@@ -31,8 +30,7 @@ extension Headers {
 extension Headers.ContentLength {
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<Headers.ContentLength>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class MockedTaskTests: XCTestCase {
 
     func testMock() async throws {

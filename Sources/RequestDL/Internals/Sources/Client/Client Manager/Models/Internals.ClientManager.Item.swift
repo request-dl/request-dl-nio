@@ -6,31 +6,35 @@ import Foundation
 
 extension Internals.ClientManager {
 
-    struct Item {
+    struct Item: Sendable {
+
+        // MARK: - Internal properties
+
         let configuration: Internals.Session.Configuration
         let client: Internals.Client
         let readAt: Date
-    }
-}
 
-extension Internals.ClientManager.Item {
+        // MARK: - Internal static methods
 
-    static func createNew(
-        configuration: Internals.Session.Configuration,
-        client: Internals.Client
-    ) -> Internals.ClientManager.Item {
-        .init(
-            configuration: configuration,
-            client: client,
-            readAt: .init()
-        )
-    }
+        static func createNew(
+            configuration: Internals.Session.Configuration,
+            client: Internals.Client
+        ) -> Internals.ClientManager.Item {
+            .init(
+                configuration: configuration,
+                client: client,
+                readAt: .init()
+            )
+        }
 
-    func updatingReadAt() -> Internals.ClientManager.Item {
-        .init(
-            configuration: configuration,
-            client: client,
-            readAt: .init()
-        )
+        // MARK: - Internal methods
+
+        func updatingReadAt() -> Internals.ClientManager.Item {
+            .init(
+                configuration: configuration,
+                client: client,
+                readAt: .init()
+            )
+        }
     }
 }

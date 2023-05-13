@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternetProtocolTests: XCTestCase {
 
     func testHttpRawValue() async throws {

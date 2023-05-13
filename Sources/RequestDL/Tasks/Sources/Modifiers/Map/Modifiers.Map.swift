@@ -25,9 +25,13 @@ extension Modifiers {
      In this example, the `Task` produces `Data` elements, but you can use the `map`
      modifier to decode them into `MyModel` instances instead.
      */
-    public struct Map<Content: Task, NewElement>: TaskModifier {
+    public struct Map<Content: Task, NewElement: Sendable>: TaskModifier {
 
-        let transform: (Content.Element) throws -> NewElement
+        // MARK: - Internal properties
+
+        let transform: @Sendable (Content.Element) throws -> NewElement
+
+        // MARK: - Public methods
 
         /**
          Transforms the element of the given `Task` using the provided closure.
@@ -42,6 +46,8 @@ extension Modifiers {
     }
 }
 
+// MARK: - Task extension
+
 extension Task {
 
     /**
@@ -51,7 +57,7 @@ extension Task {
      - Returns: A modified `Task` with the transformed element.
      */
     public func map<NewElement>(
-        _ transform: @escaping (Element) throws -> NewElement
+        _ transform: @escaping @Sendable (Element) throws -> NewElement
     ) -> ModifiedTask<Modifiers.Map<Self, NewElement>> {
         modify(Modifiers.Map(transform: transform))
     }

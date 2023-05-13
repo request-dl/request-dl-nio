@@ -5,13 +5,22 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsAnyStreamTests: XCTestCase {
 
-    class StreamMock: StreamProtocol {
+    final class StreamMock: StreamProtocol {
 
-        var value: Result<Int, Error>?
-        var isOpen: Bool = true
+        private let _value = SendableBox<Result<Int, Error>?>(nil)
+        private let _isOpen = SendableBox<Bool>(true)
+
+        var value: Result<Int, Error>? {
+            get { _value() }
+            set { _value(newValue) }
+        }
+
+        var isOpen: Bool {
+            get { _isOpen() }
+            set { _isOpen(newValue) }
+        }
 
         func append(_ value: Result<Int?, Error>) {
             switch value {

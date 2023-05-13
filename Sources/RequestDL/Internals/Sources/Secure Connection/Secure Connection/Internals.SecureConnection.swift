@@ -9,7 +9,9 @@ import NIOCore
 
 extension Internals {
 
-    struct SecureConnection {
+    struct SecureConnection: Sendable {
+
+        // MARK: - Internal properties
 
         var certificateChain: CertificateChain?
         var certificateVerification: NIOSSL.CertificateVerification?
@@ -30,106 +32,111 @@ extension Internals {
         var cipherSuites: String?
         var cipherSuiteValues: [NIOSSL.NIOTLSCipher]?
 
+        // MARK: - Inits
+
         init() {}
+
+        // MARK: - Internal methods
+
+        // swiftlint:disable cyclomatic_complexity function_body_length
+        func build() throws -> NIOSSL.TLSConfiguration {
+            var tlsConfiguration = try makeTLSConfigurationByContext()
+
+            if let minimumTLSVersion {
+                tlsConfiguration.minimumTLSVersion = minimumTLSVersion
+            }
+
+            if let maximumTLSVersion {
+                tlsConfiguration.maximumTLSVersion = maximumTLSVersion
+            }
+
+            if let cipherSuites {
+                tlsConfiguration.cipherSuites = cipherSuites
+            }
+
+            if let cipherSuiteValues {
+                tlsConfiguration.cipherSuiteValues = cipherSuiteValues
+            }
+
+            if let trustRoots {
+                tlsConfiguration.trustRoots = try trustRoots.build()
+            }
+
+            if let additionalTrustRoots {
+                tlsConfiguration.additionalTrustRoots = try additionalTrustRoots.map {
+                    try $0.build()
+                }
+            }
+
+            if let certificateVerification {
+                tlsConfiguration.certificateVerification = certificateVerification
+            }
+
+            if let signingSignatureAlgorithms {
+                tlsConfiguration.signingSignatureAlgorithms = signingSignatureAlgorithms
+            }
+
+            if let verifySignatureAlgorithms {
+                tlsConfiguration.verifySignatureAlgorithms = verifySignatureAlgorithms
+            }
+
+            if let sendCANameList {
+                tlsConfiguration.sendCANameList = sendCANameList
+            }
+
+            if let renegotiationSupport {
+                tlsConfiguration.renegotiationSupport = renegotiationSupport
+            }
+
+            if let shutdownTimeout {
+                tlsConfiguration.shutdownTimeout = shutdownTimeout
+            }
+
+            if let pskHint {
+                tlsConfiguration.pskHint = pskHint
+            }
+
+            if let applicationProtocols {
+                tlsConfiguration.applicationProtocols = applicationProtocols
+            }
+
+            if let keyLogger {
+                tlsConfiguration.keyLogCallback = {
+                    keyLogger($0)
+                }
+            }
+
+            if let pskIdentityResolver {
+                tlsConfiguration.pskClientCallback = {
+                    try pskIdentityResolver($0)
+                }
+            }
+
+            return tlsConfiguration
+        }
+        // swiftlint:enable cyclomatic_complexity function_body_length
+
+        // MARK: - Private methods
+
+        private func makeTLSConfigurationByContext() throws -> NIOSSL.TLSConfiguration {
+            var tlsConfiguration: TLSConfiguration
+
+            tlsConfiguration = .makeClientConfiguration()
+
+            if let certificateChain {
+                tlsConfiguration.certificateChain = try certificateChain.build()
+            }
+
+            if let privateKey {
+                tlsConfiguration.privateKey = try privateKey.build()
+            }
+
+            return tlsConfiguration
+        }
     }
 }
 
-extension Internals.SecureConnection {
-
-    private func makeTLSConfigurationByContext() throws -> NIOSSL.TLSConfiguration {
-        var tlsConfiguration: TLSConfiguration
-
-        tlsConfiguration = .makeClientConfiguration()
-
-        if let certificateChain {
-            tlsConfiguration.certificateChain = try certificateChain.build()
-        }
-
-        if let privateKey {
-            tlsConfiguration.privateKey = try privateKey.build()
-        }
-
-        return tlsConfiguration
-    }
-
-    // swiftlint:disable cyclomatic_complexity function_body_length
-    func build() throws -> NIOSSL.TLSConfiguration {
-        var tlsConfiguration = try makeTLSConfigurationByContext()
-
-        if let minimumTLSVersion {
-            tlsConfiguration.minimumTLSVersion = minimumTLSVersion
-        }
-
-        if let maximumTLSVersion {
-            tlsConfiguration.maximumTLSVersion = maximumTLSVersion
-        }
-
-        if let cipherSuites {
-            tlsConfiguration.cipherSuites = cipherSuites
-        }
-
-        if let cipherSuiteValues {
-            tlsConfiguration.cipherSuiteValues = cipherSuiteValues
-        }
-
-        if let trustRoots {
-            tlsConfiguration.trustRoots = try trustRoots.build()
-        }
-
-        if let additionalTrustRoots {
-            tlsConfiguration.additionalTrustRoots = try additionalTrustRoots.map {
-                try $0.build()
-            }
-        }
-
-        if let certificateVerification {
-            tlsConfiguration.certificateVerification = certificateVerification
-        }
-
-        if let signingSignatureAlgorithms {
-            tlsConfiguration.signingSignatureAlgorithms = signingSignatureAlgorithms
-        }
-
-        if let verifySignatureAlgorithms {
-            tlsConfiguration.verifySignatureAlgorithms = verifySignatureAlgorithms
-        }
-
-        if let sendCANameList {
-            tlsConfiguration.sendCANameList = sendCANameList
-        }
-
-        if let renegotiationSupport {
-            tlsConfiguration.renegotiationSupport = renegotiationSupport
-        }
-
-        if let shutdownTimeout {
-            tlsConfiguration.shutdownTimeout = shutdownTimeout
-        }
-
-        if let pskHint {
-            tlsConfiguration.pskHint = pskHint
-        }
-
-        if let applicationProtocols {
-            tlsConfiguration.applicationProtocols = applicationProtocols
-        }
-
-        if let keyLogger {
-            tlsConfiguration.keyLogCallback = {
-                keyLogger($0)
-            }
-        }
-
-        if let pskIdentityResolver {
-            tlsConfiguration.pskClientCallback = {
-                try pskIdentityResolver($0)
-            }
-        }
-
-        return tlsConfiguration
-    }
-    // swiftlint:enable cyclomatic_complexity function_body_length
-}
+// MARK: - Equatable
 
 extension Internals.SecureConnection: Equatable {
 

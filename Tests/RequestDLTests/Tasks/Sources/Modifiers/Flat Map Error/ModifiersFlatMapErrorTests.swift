@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiersFlatMapErrorTests: XCTestCase {
 
     struct FlatMapError: Error {}
@@ -14,17 +13,17 @@ class ModifiersFlatMapErrorTests: XCTestCase {
 
     func testFlatMap() async throws {
         // Given
-        var flatMapCalled = false
+        let flatMapCalled = SendableBox(false)
 
         // When
         _ = try await MockedTask(data: Data.init)
             .flatMapError { _ in
-                flatMapCalled = true
+                flatMapCalled(true)
             }
             .result()
 
         // Then
-        XCTAssertFalse(flatMapCalled)
+        XCTAssertFalse(flatMapCalled())
     }
 
     func testFlatMapWithError() async throws {
@@ -43,14 +42,14 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         // Given
         let error = FlatMapError()
         let transformedError = TransformedError()
-        var mapError = false
+        let mapError = SendableBox(false)
 
         // When
         do {
             _ = try await MockedTask(data: Data.init)
                 .flatMap { _ in throw error }
                 .flatMapError(FlatMapError.self) { _ in
-                    mapError = true
+                    mapError(true)
                     throw transformedError
                 }
                 .result()
@@ -59,6 +58,6 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(mapError)
+        XCTAssertTrue(mapError())
     }
 }

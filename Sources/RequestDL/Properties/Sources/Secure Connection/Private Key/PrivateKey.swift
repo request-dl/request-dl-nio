@@ -6,7 +6,6 @@ import Foundation
 import NIOSSL
 
 /// A struct representing a private key for `SecureConnection` configuration.
-@RequestActor
 public struct PrivateKey: Property {
 
     fileprivate enum Source {
@@ -227,8 +226,7 @@ extension PrivateKey {
     }
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
+        public static func _makeProperty(
         property: _GraphValue<PrivateKey>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

@@ -7,10 +7,25 @@ import Foundation
 extension Namespace {
 
     /// The ID used for namespace memory storage.
-    public struct ID: Hashable {
+    public struct ID: Sendable, Hashable {
+
+        private enum Global {}
+
+        // MARK: - Internal static properties
+
+        static var global: Self {
+            .init(
+                base: Global.self,
+                namespace: "_global"
+            )
+        }
+
+        // MARK: - Private properties
 
         private let base: ObjectIdentifier
         private let namespace: String
+
+        // MARK: - Inits
 
         init<Base>(
             base: Base.Type,
@@ -22,17 +37,7 @@ extension Namespace {
     }
 }
 
-extension Namespace.ID {
-
-    private enum Global {}
-
-    static var global: Self {
-        .init(
-            base: Global.self,
-            namespace: "_global"
-        )
-    }
-}
+// MARK: - CustomStringConvertible
 
 extension Namespace.ID: CustomStringConvertible {
 

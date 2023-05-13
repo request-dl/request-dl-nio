@@ -4,7 +4,6 @@
 
 import Foundation
 
-@RequestActor
 struct DynamicValueMirror<Content> {
 
     private let reflected: Mirror

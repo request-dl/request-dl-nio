@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class EnvironmentTests: XCTestCase {
 
     struct IntegerEnvironmentKey: EnvironmentKey {
@@ -15,7 +14,7 @@ class EnvironmentTests: XCTestCase {
     struct IntegerReceiver: Property {
 
         @Environment(\.integer) var integer
-        let value: (Int) -> Void
+        let value: @Sendable (Int) -> Void
 
         var body: EmptyProperty {
             value(integer)
@@ -27,9 +26,10 @@ class EnvironmentTests: XCTestCase {
         // Given
         let expectation = expectation(description: "integer.receiver")
 
-        var value: Int?
+        let value = SendableBox<Int?>(nil)
+
         let receiver = IntegerReceiver {
-            value = $0
+            value($0)
             expectation.fulfill()
         }
 
@@ -41,16 +41,17 @@ class EnvironmentTests: XCTestCase {
         await fulfillment(of: [expectation])
 
         // Then
-        XCTAssertEqual(value, IntegerEnvironmentKey.defaultValue)
+        XCTAssertEqual(value(), IntegerEnvironmentKey.defaultValue)
     }
 
     func testEnvironment_whenIntegerSet_shouldBeUpdated() async throws {
         // Given
         let expectation = expectation(description: "integer.receiver")
 
-        var receivedValue: Int?
+        let receivedValue = SendableBox<Int?>(nil)
+
         let receiver = IntegerReceiver {
-            receivedValue = $0
+            receivedValue($0)
             expectation.fulfill()
         }
 
@@ -65,7 +66,7 @@ class EnvironmentTests: XCTestCase {
         await fulfillment(of: [expectation])
 
         // Then
-        XCTAssertEqual(receivedValue, value)
+        XCTAssertEqual(receivedValue(), value)
     }
 }
 

@@ -4,7 +4,6 @@
 
 import Foundation
 
-@RequestActor
 struct GraphNamespaceOperation<Content>: GraphValueOperation {
 
     private let mirror: DynamicValueMirror<Content>

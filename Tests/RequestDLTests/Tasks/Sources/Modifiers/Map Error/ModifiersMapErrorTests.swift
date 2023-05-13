@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiersMapErrorTests: XCTestCase {
 
     struct AnyError: Error {}

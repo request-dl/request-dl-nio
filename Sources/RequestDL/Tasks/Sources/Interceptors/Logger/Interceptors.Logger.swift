@@ -23,10 +23,14 @@ extension Interceptors {
 
      - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
-    public struct Logger<Element>: TaskInterceptor {
+    public struct Logger<Element: Sendable>: TaskInterceptor {
+
+        // MARK: - Internal properties
 
         let isActive: Bool
-        let results: (Element) -> [String]
+        let results: @Sendable (Element) -> [String]
+
+        // MARK: - Public methods
 
         /**
         Called when the task result is received.
@@ -48,6 +52,8 @@ extension Interceptors {
     }
 }
 
+// MARK: - Task extension
+
 extension Task {
 
     /**
@@ -64,9 +70,6 @@ extension Task {
             }
         ))
     }
-}
-
-extension Task<TaskResult<Data>> {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -74,7 +77,10 @@ extension Task<TaskResult<Data>> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
+    public func logInConsole(
+        _ isActive: Bool
+    ) -> InterceptedTask<Interceptors.Logger<Element>, Self>
+    where Element == TaskResult<Data> {
         intercept(Interceptors.Logger(
             isActive: isActive,
             results: {[
@@ -83,9 +89,6 @@ extension Task<TaskResult<Data>> {
             ]}
         ))
     }
-}
-
-extension Task<Data> {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -93,7 +96,10 @@ extension Task<Data> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
+    public func logInConsole(
+        _ isActive: Bool
+    ) -> InterceptedTask<Interceptors.Logger<Element>, Self>
+    where Element == Data {
         intercept(Interceptors.Logger(
             isActive: isActive,
             results: {

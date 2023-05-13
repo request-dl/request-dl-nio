@@ -7,7 +7,11 @@ import Semaphore
 
 struct AsyncLock: Sendable {
 
+    // MARK: - Private properties
+
     private let asyncSemaphore = AsyncSemaphore(value: 1)
+
+    // MARK: - Internal methods
 
     func withLock<Value: Sendable>(
         _ body: @Sendable () async throws -> Value

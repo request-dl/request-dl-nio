@@ -7,7 +7,6 @@ import NIOSSL
 import NIOCore
 @testable import RequestDL
 
-@RequestActor
 class InternalsSecureConnectionTests: XCTestCase {
 
     var secureConnection: Internals.SecureConnection!
@@ -271,7 +270,7 @@ extension InternalsSecureConnectionTests {
 
         private let data: @Sendable (Data?) -> Void
 
-        init(_ data: @Sendable @escaping (Data?) -> Void) {
+        init(_ data: @escaping @Sendable (Data?) -> Void) {
             self.data = data
         }
 

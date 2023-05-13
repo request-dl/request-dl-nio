@@ -9,11 +9,15 @@ import NIOPosix
 
 extension Internals {
 
-    struct Session {
+    struct Session: Sendable {
+
+        // MARK: - Internal properties
 
         let provider: SessionProvider
         let configuration: Internals.Session.Configuration
         let manager: Internals.ClientManager
+
+        // MARK: - Inits
 
         init(
             provider: SessionProvider,
@@ -23,6 +27,8 @@ extension Internals {
             self.configuration = configuration
             self.manager = .shared
         }
+
+        // MARK: - Internal methods
 
         func request(_ request: Request) async throws -> SessionTask {
             let client = try await manager.client(

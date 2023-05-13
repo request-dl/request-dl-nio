@@ -6,13 +6,38 @@ import Foundation
 
 /// This struct is marked as internal and is not intended
 /// to be used directly by clients of this framework.
-@RequestActor
 public struct _EitherContent<First: Property, Second: Property>: Property {
 
-    private let _first: () -> First
-    private let _second: () -> Second
+    private enum Source: Hashable {
+        case first
+        case second
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
+
+    var first: First {
+        _first()
+    }
+
+    var second: Second {
+        _second()
+    }
+
+    // MARK: - Private properties
+
+    private let _first: @Sendable () -> First
+    private let _second: @Sendable () -> Second
 
     private let source: Source
+
+    // MARK: - Inits
 
     init(first: First) {
         source = .first
@@ -34,27 +59,9 @@ public struct _EitherContent<First: Property, Second: Property>: Property {
         }
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension _EitherContent {
-
-    var first: First {
-        _first()
-    }
-
-    var second: Second {
-        _second()
-    }
-}
-
-extension _EitherContent {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<_EitherContent<First, Second>>,
         inputs: _PropertyInputs
@@ -73,13 +80,5 @@ extension _EitherContent {
                 inputs: inputs
             )
         }
-    }
-}
-
-extension _EitherContent {
-
-    fileprivate enum Source: Hashable {
-        case first
-        case second
     }
 }
