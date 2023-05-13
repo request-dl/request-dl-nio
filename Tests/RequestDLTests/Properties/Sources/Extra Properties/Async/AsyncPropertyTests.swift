@@ -17,7 +17,7 @@ class AsyncPropertyTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             AsyncProperty {
                 if let apiKey = await apiKey {
                     Authorization(.bearer, token: apiKey)
@@ -26,7 +26,10 @@ class AsyncPropertyTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer 123ddf4")
+        XCTAssertEqual(
+            resolved.request.headers.getValue(forKey: "Authorization"),
+            "Bearer 123ddf4"
+        )
     }
 
     func testNeverBody() async throws {

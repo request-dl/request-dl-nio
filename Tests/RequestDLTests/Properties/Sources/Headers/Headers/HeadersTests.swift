@@ -16,12 +16,12 @@ class HeadersTests: XCTestCase {
             Headers.Any(name: "xxx-api-key", value: "password")
         }
 
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "text/javascript")
-        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "application/json")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "127.0.0.1:8080")
-        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "text/javascript")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "127.0.0.1:8080")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password")
     }
 
     func testCollisionHeaders() async throws {
@@ -33,11 +33,11 @@ class HeadersTests: XCTestCase {
             Headers.Any(name: "xxx-api-key", value: "password123")
         }
 
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "image/webp")
-        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/jpeg")
-        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password123")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "image/webp")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "image/jpeg")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password123")
     }
 
     func testCollisionHeadersWithGroup() async throws {
@@ -52,11 +52,11 @@ class HeadersTests: XCTestCase {
             }
         }
 
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "image/webp")
-        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/jpeg")
-        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password123")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "image/webp")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "image/jpeg")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password123")
     }
 
     func testCombinedHeadersWithGroup() async throws {
@@ -72,13 +72,13 @@ class HeadersTests: XCTestCase {
             Headers.Origin("google.com")
         }
 
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Host"), "127.0.0.1:8080")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "image/webp")
-        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
-        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "image/jpeg")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "google.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Host"), "127.0.0.1:8080")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "image/webp")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "image/jpeg")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "google.com")
     }
 
     func testInvalidGroup() async throws {
@@ -91,9 +91,9 @@ class HeadersTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(request.url, "https://127.0.0.1")
+        XCTAssertEqual(resolved.request.url, "https://127.0.0.1")
     }
 }

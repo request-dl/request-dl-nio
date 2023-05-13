@@ -66,7 +66,7 @@ extension NamespaceTests {
         var namespaceID: Namespace.ID?
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             SingleNamespace {
                 NamespaceSpy {
                     namespaceID = $0
@@ -75,7 +75,7 @@ extension NamespaceTests {
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://www.apple.com/v1")
+        XCTAssertEqual(resolved.request.url, "https://www.apple.com/v1")
         XCTAssertEqual(namespaceID, Namespace.ID(
             base: SingleNamespace<NamespaceSpy>.self,
             namespace: "_v1"
@@ -107,7 +107,7 @@ extension NamespaceTests {
         var namespaceID: Namespace.ID?
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             MultipleNamespace {
                 NamespaceSpy {
                     namespaceID = $0
@@ -116,7 +116,11 @@ extension NamespaceTests {
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://www.apple.com/multiple/namespace")
+        XCTAssertEqual(
+            resolved.request.url,
+            "https://www.apple.com/multiple/namespace"
+        )
+
         XCTAssertEqual(namespaceID, Namespace.ID(
             base: MultipleNamespace<NamespaceSpy>.self,
             namespace: "_multiple._namespace"
@@ -144,7 +148,7 @@ extension NamespaceTests {
         var namespaceID: Namespace.ID?
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Path("v1")
                 .modifier(NamespaceModifier {
                     namespaceID = $0
@@ -152,7 +156,11 @@ extension NamespaceTests {
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://www.apple.com/v1/namespace")
+        XCTAssertEqual(
+            resolved.request.url,
+            "https://www.apple.com/v1/namespace"
+        )
+
         XCTAssertEqual(namespaceID, Namespace.ID(
             base: NamespaceModifier.self,
             namespace: "_namespace"

@@ -19,13 +19,13 @@ class FormGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
-        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
+        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            await request.body?.data() ?? Data(),
+            await resolved.request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 
@@ -74,13 +74,13 @@ class FormGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
-        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
+        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            await request.body?.data() ?? Data(),
+            await resolved.request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 
@@ -141,13 +141,13 @@ class FormGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
-        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
+        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            await request.body?.data() ?? Data(),
+            await resolved.request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 
@@ -182,7 +182,7 @@ class FormGroupTests: XCTestCase {
         let length = 1_024
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             FormGroup {
                 FormValue(key: "key1", value: "foo")
                 FormValue(key: "key2", value: "bar")
@@ -190,7 +190,7 @@ class FormGroupTests: XCTestCase {
             .payloadPartLength(length)
         })
 
-        let sut = try await request.body?.buffers()
+        let sut = try await resolved.request.body?.buffers()
 
         // Then
         XCTAssertEqual(sut?.count, 1)

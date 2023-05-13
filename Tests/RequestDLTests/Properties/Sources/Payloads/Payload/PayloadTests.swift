@@ -24,9 +24,9 @@ class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(dictionary, options: options))
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
         let expectedPayload = _DictionaryPayload(dictionary, options: options)
-        let payload = try await request.body?.data()
+        let payload = try await resolved.request.body?.data()
 
         let payloadDecoded = try payload.map {
             try JSONSerialization.jsonObject(with: $0)
@@ -51,9 +51,9 @@ class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(foo, using: encoding))
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
         let expectedPayload = _StringPayload(foo, using: encoding)
-        let payload = try await request.body?.data()
+        let payload = try await resolved.request.body?.data()
 
         // Then
         XCTAssertEqual(payload, expectedPayload.buffer.getData())
@@ -65,9 +65,9 @@ class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(data))
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
         let expectedPayload = _DataPayload(data)
-        let payload = try await request.body?.data()
+        let payload = try await resolved.request.body?.data()
 
         // Then
         XCTAssertEqual(payload, expectedPayload.buffer.getData())
@@ -87,12 +87,12 @@ class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(mock, encoder: encoder))
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
         let expectedPayload = _EncodablePayload(mock, encoder: encoder)
 
         let expectedData = expectedPayload.buffer.getData() ?? Data()
         let expectedMock = try decoder.decode(Mock.self, from: expectedData)
-        let payloadMock = try await (request.body?.data()).map {
+        let payloadMock = try await (resolved.request.body?.data()).map {
             try decoder.decode(Mock.self, from: $0)
         }
 
@@ -120,9 +120,9 @@ class PayloadTests: XCTestCase {
 
         // When
         let property = TestProperty(Payload(url))
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
         let expectedPayload = _FilePayload(url)
-        let payload = try await request.body?.data()
+        let payload = try await resolved.request.body?.data()
 
         // Then
         XCTAssertEqual(payload, expectedPayload.buffer.getData())
@@ -133,13 +133,13 @@ class PayloadTests: XCTestCase {
         let array = ["foo", "bar"]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.ContentType(.formURLEncoded)
             RequestMethod(.get)
             Payload(array)
         })
 
-        let sut = request.queries
+        let sut = resolved.request.queries
             .joined()
             .split(separator: "&")
 
@@ -155,13 +155,13 @@ class PayloadTests: XCTestCase {
         let array = ["foo", "bar"]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.ContentType(.formURLEncoded)
             RequestMethod(.head)
             Payload(array)
         })
 
-        let sut = request.queries
+        let sut = resolved.request.queries
             .joined()
             .split(separator: "&")
 
@@ -177,13 +177,13 @@ class PayloadTests: XCTestCase {
         let array = ["foo", "bar"]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.ContentType(.formURLEncoded)
             RequestMethod(.post)
             Payload(array)
         })
 
-        let sut = try await (request.body?.data())
+        let sut = try await (resolved.request.body?.data())
             .flatMap { String(data: $0, encoding: .utf8) }?
             .split(separator: "&")
 
@@ -202,13 +202,13 @@ class PayloadTests: XCTestCase {
         ]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.ContentType(.formURLEncoded)
             RequestMethod(.get)
             Payload(dictionary)
         })
 
-        let sut = request.queries
+        let sut = resolved.request.queries
             .joined()
             .split(separator: "&")
 
@@ -227,13 +227,13 @@ class PayloadTests: XCTestCase {
         ]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.ContentType(.formURLEncoded)
             RequestMethod(.post)
             Payload(dictionary)
         })
 
-        let sut = try await (request.body?.data())
+        let sut = try await (resolved.request.body?.data())
             .flatMap { String(data: $0, encoding: .utf8) }?
             .split(separator: "&")
 
@@ -257,12 +257,12 @@ class PayloadTests: XCTestCase {
         let length = 2
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Payload("abc", using: .utf8)
                 .payloadPartLength(length)
         })
 
-        let sut = try await request.body?.buffers()
+        let sut = try await resolved.request.body?.buffers()
 
         // Then
         XCTAssertEqual(sut?.count, 2)

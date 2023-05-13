@@ -13,10 +13,13 @@ class AuthorizationTests: XCTestCase {
         let auth = Authorization(.bearer, token: "myToken")
 
         // When
-        let (_, request) = try await resolve(TestProperty(auth))
+        let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer myToken")
+        XCTAssertEqual(
+            resolved.request.headers.getValue(forKey: "Authorization"),
+            "Bearer myToken"
+        )
     }
 
     func testAuthorizationWithTypeAndLosslessStringToken() async throws {
@@ -24,20 +27,26 @@ class AuthorizationTests: XCTestCase {
         let auth = Authorization(.bearer, token: 123)
 
         // When
-        let (_, request) = try await resolve(TestProperty(auth))
+        let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer 123")
+        XCTAssertEqual(
+            resolved.request.headers.getValue(forKey: "Authorization"),
+            "Bearer 123"
+        )
     }
 
     func testAuthorizationWithUsernameAndPassword() async throws {
         let auth = Authorization(username: "myUser", password: "myPassword")
 
         // When
-        let (_, request) = try await resolve(TestProperty(auth))
+        let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Basic bXlVc2VyOm15UGFzc3dvcmQ=")
+        XCTAssertEqual(
+            resolved.request.headers.getValue(forKey: "Authorization"),
+            "Basic bXlVc2VyOm15UGFzc3dvcmQ="
+        )
     }
 
     func testNeverBody() async throws {
@@ -57,9 +66,12 @@ extension AuthorizationTests {
         let auth = Authorization(.bearer, token: "myToken" as Any)
 
         // When
-        let (_, request) = try await resolve(TestProperty(auth))
+        let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer myToken")
+        XCTAssertEqual(
+            resolved.request.headers.getValue(forKey: "Authorization"),
+            "Bearer myToken"
+        )
     }
 }

@@ -13,7 +13,7 @@ class DefaultTrustsTests: XCTestCase {
         let property = DefaultTrusts()
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             SecureConnection {
                 property
             }
@@ -21,7 +21,7 @@ class DefaultTrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
+            resolved.session.configuration.secureConnection?.trustRoots,
             .default
         )
     }

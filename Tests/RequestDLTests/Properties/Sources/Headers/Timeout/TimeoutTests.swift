@@ -14,12 +14,12 @@ class TimeoutTests: XCTestCase {
         let timeout = UnitTime.seconds(75)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Timeout(timeout, for: requestTimeout)
         })
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.connect, timeout)
+        XCTAssertEqual(resolved.session.configuration.timeout.connect, timeout)
     }
 
     func testResourceTimeout() async throws {
@@ -28,10 +28,10 @@ class TimeoutTests: XCTestCase {
         let timeout = UnitTime.seconds(1_999)
 
         // When
-        let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
+        let resolved = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.connect, timeout)
+        XCTAssertEqual(resolved.session.configuration.timeout.connect, timeout)
     }
 
     func testAllTimeout() async throws {
@@ -40,27 +40,27 @@ class TimeoutTests: XCTestCase {
         let timeout = UnitTime.seconds(75)
 
         // When
-        let (session, _) = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
+        let resolved = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        XCTAssertEqual(session.configuration.timeout.read, timeout)
-        XCTAssertEqual(session.configuration.timeout.connect, timeout)
+        XCTAssertEqual(resolved.session.configuration.timeout.read, timeout)
+        XCTAssertEqual(resolved.session.configuration.timeout.connect, timeout)
     }
 
     func testDefaultTimeout() async throws {
         let defaultConfiguration = Internals.Session.Configuration()
 
         // When
-        let (session, _) = try await resolve(TestProperty {})
+        let resolved = try await resolve(TestProperty {})
 
         // Then
         XCTAssertEqual(
-            session.configuration.timeout.read,
+            resolved.session.configuration.timeout.read,
             defaultConfiguration.timeout.read
         )
 
         XCTAssertEqual(
-            session.configuration.timeout.connect,
+            resolved.session.configuration.timeout.connect,
             defaultConfiguration.timeout.connect
         )
     }

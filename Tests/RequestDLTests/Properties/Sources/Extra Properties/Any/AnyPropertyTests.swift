@@ -13,13 +13,13 @@ class AnyPropertyTests: XCTestCase {
         let property = Query(123, forKey: "number")
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             AnyProperty(property)
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://127.0.0.1?number=123")
+        XCTAssertEqual(resolved.request.url, "https://127.0.0.1?number=123")
     }
 
     func testAnyProperty_whenCertificate() async throws {
@@ -28,7 +28,7 @@ class AnyPropertyTests: XCTestCase {
         let path = certificate.certificateURL.absolutePath(percentEncoded: false)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             SecureConnection {
                 AdditionalTrusts {
                     AnyProperty(Certificate(path))
@@ -36,7 +36,7 @@ class AnyPropertyTests: XCTestCase {
             }
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.additionalTrustRoots, [

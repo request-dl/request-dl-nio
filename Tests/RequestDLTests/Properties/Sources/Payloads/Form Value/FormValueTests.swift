@@ -14,15 +14,15 @@ class FormValueTests: XCTestCase {
         let value = "value"
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             FormValue(key: key, value: value)
         })
 
-        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
+        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            await request.body?.data() ?? Data(),
+            await resolved.request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 
@@ -44,15 +44,15 @@ class FormValueTests: XCTestCase {
         let value = 123
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             FormValue(key: key, value: value)
         })
 
-        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
+        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            await request.body?.data() ?? Data(),
+            await resolved.request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 
@@ -87,13 +87,13 @@ extension FormValueTests {
         let property = FormValue(value, forKey: key)
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
-        let contentTypeHeader = request.headers.getValue(forKey: "Content-Type")
+        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
         let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
 
         let multipartForm = try MultipartFormParser(
-            await request.body?.data() ?? Data(),
+            await resolved.request.body?.data() ?? Data(),
             boundary: boundary
         ).parse()
 

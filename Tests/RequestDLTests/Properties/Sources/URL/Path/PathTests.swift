@@ -14,14 +14,14 @@ class PathTests: XCTestCase {
         let host = "google.com"
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL(host)
             Path(path)
         })
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://\(host)/\(path)"
         )
     }
@@ -32,14 +32,14 @@ class PathTests: XCTestCase {
         let path = 123
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL(host)
             Path(path)
         })
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://\(host)/\(path)"
         )
     }
@@ -50,14 +50,14 @@ class PathTests: XCTestCase {
         let host = "google.com"
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL(host)
             Path(path)
         })
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://\(host)/\(path)"
         )
     }
@@ -71,7 +71,7 @@ class PathTests: XCTestCase {
         let characterSetRule = CharacterSet(charactersIn: "/")
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL(host)
             Path(path1)
             Path(path2)
@@ -83,7 +83,7 @@ class PathTests: XCTestCase {
         let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
 
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
         )
     }

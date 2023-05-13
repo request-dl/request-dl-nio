@@ -19,7 +19,7 @@ class ForEachTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             ForEach(paths) { path in
                 Path(path.id)
@@ -28,7 +28,7 @@ class ForEachTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://127.0.0.1/api/v1/users"
         )
     }
@@ -38,7 +38,7 @@ class ForEachTests: XCTestCase {
         let paths = ["api", "v1", "users"]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             ForEach(paths, id: \.self) { path in
                 Path(path)
@@ -47,7 +47,7 @@ class ForEachTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://127.0.0.1/api/v1/users"
         )
     }
@@ -57,7 +57,7 @@ class ForEachTests: XCTestCase {
         let range = 0 ..< 3
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             ForEach(range) { index in
                 Path("\(index)")
@@ -66,7 +66,7 @@ class ForEachTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
@@ -76,7 +76,7 @@ class ForEachTests: XCTestCase {
         let range = 0 ... 3
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             ForEach(range) { index in
                 Path("\(index)")
@@ -85,7 +85,7 @@ class ForEachTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }

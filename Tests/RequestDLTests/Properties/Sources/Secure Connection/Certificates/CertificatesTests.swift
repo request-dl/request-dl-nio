@@ -22,7 +22,7 @@ class CertificatesTests: XCTestCase {
         let server = try Array(Data(contentsOf: server.certificateURL))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Certificates {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
@@ -34,7 +34,7 @@ class CertificatesTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.certificateChain,
+            resolved.session.configuration.secureConnection?.certificateChain,
             .certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
                 .init(server, format: .pem),
@@ -64,7 +64,7 @@ class CertificatesTests: XCTestCase {
         try data.write(to: fileURL)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Certificates(fileURL.absolutePath(percentEncoded: false))
             }
@@ -72,7 +72,7 @@ class CertificatesTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.certificateChain,
+            resolved.session.configuration.secureConnection?.certificateChain,
             .file(fileURL.absolutePath(percentEncoded: false))
         )
     }
@@ -86,7 +86,7 @@ class CertificatesTests: XCTestCase {
         let bytes = Array(data)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Certificates(bytes)
             }
@@ -94,7 +94,7 @@ class CertificatesTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.certificateChain,
+            resolved.session.configuration.secureConnection?.certificateChain,
             .bytes(bytes)
         )
     }

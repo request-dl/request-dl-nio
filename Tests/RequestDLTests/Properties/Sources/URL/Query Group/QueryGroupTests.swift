@@ -16,14 +16,14 @@ class QueryGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             property
         })
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             """
             https://127.0.0.1?\
             number=123&\
@@ -41,14 +41,14 @@ class QueryGroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             property
         })
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             """
             https://127.0.0.1?\
             number=123&\
@@ -56,7 +56,7 @@ class QueryGroupTests: XCTestCase {
             """
         )
 
-        XCTAssertNil(request.headers.getValue(forKey: "api_key"))
+        XCTAssertNil(resolved.request.headers.getValue(forKey: "api_key"))
     }
 
     func testQueries_whenInitWithDictionary_shouldBeValid() async throws {
@@ -67,12 +67,12 @@ class QueryGroupTests: XCTestCase {
         ]
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
             QueryGroup(queries)
         })
 
-        let queryItems = URL(string: request.url)
+        let queryItems = URL(string: resolved.request.url)
             .flatMap {
                 URLComponents(url: $0, resolvingAgainstBaseURL: true)
             }

@@ -17,7 +17,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -25,8 +25,8 @@ class _PartialContentTests: XCTestCase {
             Headers.Origin
         >)
 
-        XCTAssertEqual(request.url, "https://google.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.url, "https://google.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
     }
 
     func testTupleThreeElementsBuilder() async throws {
@@ -39,7 +39,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -50,9 +50,9 @@ class _PartialContentTests: XCTestCase {
             Headers.ContentType
         >)
 
-        XCTAssertEqual(request.url, "https://google.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.url, "https://google.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
     func testTupleFourElementsBuilder() async throws {
@@ -66,7 +66,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -80,9 +80,9 @@ class _PartialContentTests: XCTestCase {
             Path
         >)
 
-        XCTAssertEqual(request.url, "https://google.com/search")
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.url, "https://google.com/search")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
     func testTupleFiveElementsBuilder() async throws {
@@ -97,7 +97,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -115,12 +115,12 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
     func testTupleSixElementsBuilder() async throws {
@@ -136,7 +136,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -157,15 +157,15 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
 
-        XCTAssertEqual(session.configuration.timeout.read, .nanoseconds(40))
-        XCTAssertEqual(session.configuration.timeout.connect, .nanoseconds(40))
+        XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
+        XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
     }
 
     func testTupleSevenElementsBuilder() async throws {
@@ -182,7 +182,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -206,15 +206,15 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://google.com/search?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
 
-        XCTAssertEqual(session.configuration.timeout.read, .nanoseconds(40))
-        XCTAssertEqual(session.configuration.timeout.connect, .nanoseconds(40))
+        XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
+        XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
     }
 
     func testTupleEightElementsBuilder() async throws {
@@ -232,7 +232,7 @@ class _PartialContentTests: XCTestCase {
         }
 
         // When
-        let (session, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _PartialContent<
@@ -259,15 +259,15 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://google.com/search/results?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
 
-        XCTAssertEqual(session.configuration.timeout.read, .nanoseconds(40))
-        XCTAssertEqual(session.configuration.timeout.connect, .nanoseconds(40))
+        XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
+        XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
     }
 
     func testNeverBody() async throws {

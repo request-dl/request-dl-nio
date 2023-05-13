@@ -15,8 +15,8 @@ class SessionTests: XCTestCase {
         let configuration = Internals.Session.Configuration()
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
-        let sut = session.configuration
+        let resolved = try await resolve(TestProperty { property })
+        let sut = resolved.session.configuration
 
         // Then
         XCTAssertEqual(sut.connectionPool, configuration.connectionPool)
@@ -51,10 +51,13 @@ class SessionTests: XCTestCase {
             .waitsForConnectivity(waitsForConnectivity)
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(try session.configuration.build().networkFrameworkWaitForConnectivity, waitsForConnectivity)
+        XCTAssertEqual(
+            try resolved.session.configuration.build().networkFrameworkWaitForConnectivity,
+            waitsForConnectivity
+        )
     }
 
     func testSession_whenMaxConnectionsPerHost_shouldBeValid() async throws {
@@ -65,11 +68,11 @@ class SessionTests: XCTestCase {
             .maximumConnectionsPerHost(maximumConnections)
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
-            session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit,
+            resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit,
             maximumConnections
         )
     }
@@ -80,10 +83,10 @@ class SessionTests: XCTestCase {
             .disableRedirect()
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
-        guard let redirectConfiguration = session.configuration.redirectConfiguration else {
+        guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
             XCTFail("Redirect Configuration is nil")
             return
         }
@@ -103,10 +106,10 @@ class SessionTests: XCTestCase {
             .enableRedirectFollow(max: max, allowCycles: cycles)
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
-        guard let redirectConfiguration = session.configuration.redirectConfiguration else {
+        guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
             XCTFail("Redirect Configuration is nil")
             return
         }
@@ -126,10 +129,10 @@ class SessionTests: XCTestCase {
             .ignoreUncleanSSLShutdown()
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertTrue(session.configuration.ignoreUncleanSSLShutdown)
+        XCTAssertTrue(resolved.session.configuration.ignoreUncleanSSLShutdown)
     }
 
     func testSession_whenDecompressionDisabled_shouldBeValid() async throws {
@@ -138,11 +141,11 @@ class SessionTests: XCTestCase {
             .disableDecompression()
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
-            String(describing: session.configuration.decompression),
+            String(describing: resolved.session.configuration.decompression),
             String(describing: HTTPClient.Decompression.disabled)
         )
     }
@@ -154,11 +157,11 @@ class SessionTests: XCTestCase {
             .decompressionLimit(decompressionLimit)
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
-            session.configuration.decompression,
+            resolved.session.configuration.decompression,
             .enabled(decompressionLimit.build())
         )
     }
@@ -172,11 +175,11 @@ class SessionTests: XCTestCase {
             .overrideDNS(destination, from: origin)
 
         // When
-        let (session, _) = try await resolve(TestProperty { property })
+        let resolved = try await resolve(TestProperty { property })
 
         // Then
         XCTAssertEqual(
-            try session.configuration.build().dnsOverride,
+            try resolved.session.configuration.build().dnsOverride,
             [origin: destination]
         )
     }
@@ -199,10 +202,10 @@ class SessionTests: XCTestCase {
         }
 
         // When
-        let (session, _) = try await resolve(property)
+        let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(session.configuration.decompression, .enabled(.size(200)))
-        XCTAssertEqual(session.configuration.networkFrameworkWaitForConnectivity, true)
+        XCTAssertEqual(resolved.session.configuration.decompression, .enabled(.size(200)))
+        XCTAssertEqual(resolved.session.configuration.networkFrameworkWaitForConnectivity, true)
     }
 }

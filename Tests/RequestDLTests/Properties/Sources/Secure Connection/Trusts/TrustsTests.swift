@@ -22,7 +22,7 @@ class TrustsTests: XCTestCase {
         let server = try Array(Data(contentsOf: server.certificateURL))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Trusts {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
@@ -33,7 +33,7 @@ class TrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
+            resolved.session.configuration.secureConnection?.trustRoots,
             .certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
                 .init(server, format: .pem)
@@ -57,7 +57,7 @@ class TrustsTests: XCTestCase {
         try data.write(to: fileURL)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Trusts(fileURL.absolutePath(percentEncoded: false))
             }
@@ -65,7 +65,7 @@ class TrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
+            resolved.session.configuration.secureConnection?.trustRoots,
             .file(fileURL.absolutePath(percentEncoded: false))
         )
     }
@@ -79,7 +79,7 @@ class TrustsTests: XCTestCase {
         let bytes = Array(data)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Trusts(bytes)
             }
@@ -87,7 +87,7 @@ class TrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.trustRoots,
+            resolved.session.configuration.secureConnection?.trustRoots,
             .bytes(bytes)
         )
     }

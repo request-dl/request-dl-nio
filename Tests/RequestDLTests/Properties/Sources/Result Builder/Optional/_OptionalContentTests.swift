@@ -20,12 +20,12 @@ class _OptionalContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _OptionalContent<BaseURL>)
-        XCTAssertEqual(request.url, "https://google.com")
-        XCTAssertTrue(request.headers.isEmpty)
+        XCTAssertEqual(resolved.request.url, "https://google.com")
+        XCTAssertTrue(resolved.request.headers.isEmpty)
     }
 
     func testConditionDisableBuilder() async throws {
@@ -40,11 +40,11 @@ class _OptionalContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(result))
+        let resolved = try await resolve(TestProperty(result))
 
         // Then
         XCTAssertTrue(result is _OptionalContent<BaseURL>)
-        XCTAssertNotEqual(request.url, "https://google.com")
+        XCTAssertNotEqual(resolved.request.url, "https://google.com")
     }
 
     func testNeverBody() async throws {

@@ -15,10 +15,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testHttpsURL() async throws {
@@ -28,10 +28,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testFtpURL() async throws {
@@ -41,10 +41,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testSmtpURL() async throws {
@@ -54,10 +54,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testImapURL() async throws {
@@ -67,10 +67,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testPopURL() async throws {
@@ -80,10 +80,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testDnsURL() async throws {
@@ -93,10 +93,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testSshURL() async throws {
@@ -106,10 +106,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testTelnetURL() async throws {
@@ -119,10 +119,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(internetProtocol, host: host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
     }
 
     func testDefaultURLWithoutProtocol() async throws {
@@ -131,10 +131,10 @@ class BaseURLTests: XCTestCase {
 
         // When
         let baseURL = BaseURL(host)
-        let (_, request) = try await resolve(baseURL)
+        let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(request.url, "https://google.com.br")
+        XCTAssertEqual(resolved.request.url, "https://google.com.br")
     }
 
     func testCollisionBaseURL() async throws {
@@ -143,13 +143,13 @@ class BaseURLTests: XCTestCase {
         let host2 = "google.com"
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL(.ftp, host: host1)
             BaseURL(host2)
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://google.com")
+        XCTAssertEqual(resolved.request.url, "https://google.com")
     }
 
     func testNeverBody() async throws {

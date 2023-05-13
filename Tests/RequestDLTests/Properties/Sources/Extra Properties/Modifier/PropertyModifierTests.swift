@@ -33,13 +33,16 @@ class PropertyModifierTests: XCTestCase {
         let modifier = CustomModifier(includesContent: true)
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("apple.com")
                 .modifier(modifier)
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://apple.com/api/v2?id=123")
+        XCTAssertEqual(
+            resolved.request.url,
+            "https://apple.com/api/v2?id=123"
+        )
     }
 
     func testModifier_whenNotIncludesContent() async throws {
@@ -47,13 +50,16 @@ class PropertyModifierTests: XCTestCase {
         let modifier = CustomModifier(includesContent: false)
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("apple.com")
                 .modifier(modifier)
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://google.com/api/v2?id=123")
+        XCTAssertEqual(
+            resolved.request.url,
+            "https://google.com/api/v2?id=123"
+        )
     }
 }
 
@@ -73,14 +79,14 @@ extension PropertyModifierTests {
         let certificatePath = resource.certificateURL.absolutePath(percentEncoded: false)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             SecureConnection {
                 Certificate(certificatePath)
                     .modifier(AdditionalTrustsFaker())
             }
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.additionalTrustRoots, [
@@ -114,14 +120,17 @@ extension PropertyModifierTests {
         let modifier = PathModifier()
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("www.google.com")
                 .modifier(modifier)
                 .environment(\.path, additionalPath)
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://www.google.com/\(additionalPath)")
+        XCTAssertEqual(
+            resolved.request.url,
+            "https://www.google.com/\(additionalPath)"
+        )
     }
 
     func testModifier_whenPathEnvironmentIsNotSet() async throws {
@@ -129,13 +138,16 @@ extension PropertyModifierTests {
         let modifier = PathModifier()
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL("www.google.com")
                 .modifier(modifier)
         })
 
         // Then
-        XCTAssertEqual(request.url, "https://www.google.com")
+        XCTAssertEqual(
+            resolved.request.url,
+            "https://www.google.com"
+        )
     }
 }
 

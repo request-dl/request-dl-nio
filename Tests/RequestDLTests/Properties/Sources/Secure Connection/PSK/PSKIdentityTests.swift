@@ -16,7 +16,7 @@ class PSKIdentityTests: XCTestCase {
         let key = NIOSSLSecureBytes([0, 1, 2])
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(
                     ClientResolver(
@@ -30,7 +30,7 @@ class PSKIdentityTests: XCTestCase {
             }
         })
 
-        let sut = try session.configuration.secureConnection?.pskIdentityResolver?(hint)
+        let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(hint)
 
         // Then
         XCTAssertEqual(sut?.key, key)
@@ -95,7 +95,7 @@ extension PSKIdentityTests {
         let key = NIOSSLSecureBytes([0, 1, 2])
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(.client) { description in
 
@@ -109,7 +109,7 @@ extension PSKIdentityTests {
             }
         })
 
-        let sut = try session.configuration.secureConnection?.pskIdentityResolver?(hint)
+        let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(hint)
 
         // Then
 
@@ -122,7 +122,7 @@ extension PSKIdentityTests {
         let hint = "some.hint"
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity(.client) { description in
                     PSKClientIdentity(
@@ -134,7 +134,7 @@ extension PSKIdentityTests {
             }
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.pskHint, hint)
@@ -145,7 +145,7 @@ extension PSKIdentityTests {
         let hint = "some.hint"
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PSKIdentity { description in
                     PSKClientIdentity(
@@ -157,7 +157,7 @@ extension PSKIdentityTests {
             }
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.pskHint, hint)
