@@ -67,7 +67,7 @@ let package = Package(
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl")
             ],
             resources: [.process("Resources")]
         )

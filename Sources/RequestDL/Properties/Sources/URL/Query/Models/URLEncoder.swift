@@ -79,7 +79,6 @@ public final class URLEncoder: @unchecked Sendable {
 
     fileprivate var _whitespaceEncodingStrategy: WhitespaceEncodingStrategy = .percentEscaping
 
-
     // MARK: - Inits
 
     /// Initializes a new instance of `URLEncoder`.
