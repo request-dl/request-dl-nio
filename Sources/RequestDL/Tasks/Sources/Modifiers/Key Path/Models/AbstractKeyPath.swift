@@ -14,8 +14,6 @@ import Foundation
 @dynamicMemberLookup
 public struct AbstractKeyPath {
 
-    init() {}
-
     /**
      A subscript that allows accessing a member of a AbstractKeyPath instance dynamically.
 

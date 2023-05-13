@@ -21,19 +21,9 @@ extension Modifiers {
      */
     public struct KeyPath<Content: Task>: TaskModifier {
 
-        let keyPath: String
-        private let data: (Content.Element) -> Data
-        private let element: (Content.Element, Data) -> Content.Element
-
-        fileprivate init(
-            keyPath: Swift.KeyPath<AbstractKeyPath, String>,
-            data: @escaping (Content.Element) -> Data,
-            element: @escaping (Content.Element, Data) -> Content.Element
-        ) {
-            self.keyPath = AbstractKeyPath()[keyPath: keyPath]
-            self.data = data
-            self.element = element
-        }
+        let keyPath: Swift.KeyPath<AbstractKeyPath, String>
+        fileprivate let data: (Content.Element) -> Data
+        fileprivate let element: (Content.Element, Data) -> Content.Element
 
         /**
          Transforms the result of the task by extracting a sub-value using the given key path.
@@ -51,6 +41,8 @@ extension Modifiers {
                     options: []
                 ) as? [String: Any]
             else { throw KeyPathInvalidDataError() }
+
+            let keyPath = AbstractKeyPath()[keyPath: keyPath]
 
             guard let value = dictionary[keyPath] else {
                 throw KeyPathNotFound(keyPath: keyPath)

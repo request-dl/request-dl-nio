@@ -6,11 +6,7 @@ import Foundation
 
 struct RawTask<Content: Property>: Task {
 
-    private let content: Content
-
-    init(content: Content) {
-        self.content = content
-    }
+    let content: Content
 }
 
 extension RawTask {

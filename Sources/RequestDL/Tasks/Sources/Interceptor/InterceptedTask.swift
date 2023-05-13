@@ -21,11 +21,6 @@ public struct InterceptedTask<
 
     let task: Content
     let interceptor: Interceptor
-
-    init(_ task: Content, _ interceptor: Interceptor) {
-        self.task = task
-        self.interceptor = interceptor
-    }
 }
 
 extension InterceptedTask {

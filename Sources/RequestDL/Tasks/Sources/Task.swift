@@ -46,7 +46,7 @@ extension Task {
     public func intercept<Interceptor: TaskInterceptor>(
         _ interceptor: Interceptor
     ) -> InterceptedTask<Interceptor, Self> {
-        InterceptedTask(self, interceptor)
+        InterceptedTask(task: self, interceptor: interceptor)
     }
 
     /**
@@ -61,6 +61,6 @@ extension Task {
     public func modify<Modifier: TaskModifier>(
         _ modifier: Modifier
     ) -> ModifiedTask<Modifier> where Modifier.Body == Self {
-        ModifiedTask(self, modifier)
+        ModifiedTask(task: self, modifier: modifier)
     }
 }
