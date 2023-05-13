@@ -5,12 +5,11 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsClientManagerTests: XCTestCase {
 
     func testManager_whenRegister_shouldBeEqual() async throws {
         // Given
-        let manager = await Internals.ClientManager.shared
+        let manager = Internals.ClientManager.shared
         let provider = Internals.SharedSessionProvider()
         let configuration = Internals.Session.Configuration()
 
@@ -31,7 +30,7 @@ class InternalsClientManagerTests: XCTestCase {
 
     func testManager_whenRegisterWithDifferentConfiguration_shouldBeNotEqual() async throws {
         // Given
-        let manager = await Internals.ClientManager.shared
+        let manager = Internals.ClientManager.shared
         let provider = Internals.SharedSessionProvider()
 
         let configuration1 = Internals.Session.Configuration()
@@ -57,7 +56,7 @@ class InternalsClientManagerTests: XCTestCase {
     func testManager_expiringClients() async throws {
         // Given
         let lifetime: UInt64 = 2_500_000_000
-        let manager = await Internals.ClientManager(lifetime: lifetime)
+        let manager = Internals.ClientManager(lifetime: lifetime)
         let provider = Internals.SharedSessionProvider()
         let configuration = Internals.Session.Configuration()
 

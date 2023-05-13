@@ -7,21 +7,6 @@ import AsyncHTTPClient
 import NIOCore
 import NIOPosix
 
-class SessionTask {
-
-    let response: Internals.AsyncResponse
-    private var eventLoopFuture: EventLoopFuture<Void>?
-    private var complete: Bool = false
-
-    init(_ response: Internals.AsyncResponse) {
-        self.response = response
-    }
-
-    func attach(_ eventLoopFuture: EventLoopFuture<Void>) {
-        self.eventLoopFuture = eventLoopFuture
-    }
-}
-
 extension Internals {
 
     struct Session {
@@ -64,7 +49,7 @@ extension Internals {
 
             let request = try request.build()
 
-            let eventLoopFuture = await client.execute(
+            let eventLoopFuture = client.execute(
                 request: request,
                 delegate: delegate
             )

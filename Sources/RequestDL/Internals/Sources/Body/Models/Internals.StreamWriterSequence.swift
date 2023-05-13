@@ -34,25 +34,39 @@ extension Internals {
 
 extension Internals.StreamWriterSequence {
 
-    class Iterator: IteratorProtocol {
+    // TODO: - Remove @unchecked
+    // HTTPClient.Body.StreamWriter is @preconcurrency
+    struct Iterator: IteratorProtocol, @unchecked Sendable {
 
+        // MARK: - Private properties
+
+        private let lock = Lock()
         private let writer: HTTPClient.Body.StreamWriter
-        private var iterator: Internals.BodySequence.Iterator
+
+        // MARK: - Unsafe properties
+
+        private var _iterator: Internals.BodySequence.Iterator
+
+        // MARK: - Inits
 
         init(
             writer: HTTPClient.Body.StreamWriter,
             iterator: Internals.BodySequence.Iterator
         ) {
             self.writer = writer
-            self.iterator = iterator
+            self._iterator = iterator
         }
 
-        func next() -> Element? {
-            guard let item = iterator.next() else {
-                return nil
-            }
+        // MARK: - Methods
 
-            return writer.write(.byteBuffer(item))
+        mutating func next() -> Element? {
+            lock.withLock {
+                guard let item = _iterator.next() else {
+                    return nil
+                }
+
+                return writer.write(.byteBuffer(item))
+            }
         }
     }
 }

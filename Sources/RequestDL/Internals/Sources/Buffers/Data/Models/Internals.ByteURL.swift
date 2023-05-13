@@ -7,21 +7,43 @@ import NIOCore
 
 extension Internals {
 
-    final class ByteURL {
+    final class ByteURL: @unchecked Sendable {
 
-        lazy var buffer = NIOCore.ByteBuffer()
-        var writtenBytes: Int = .zero
+        // MARK: - Internal properties
+
+        var buffer: NIOCore.ByteBuffer {
+            get { lock.withLock { _buffer } }
+            set { lock.withLock { _buffer = newValue } }
+        }
+
+        var writtenBytes: Int {
+            get { lock.withLock { _writtenBytes } }
+            set { lock.withLock { _writtenBytes = newValue } }
+        }
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private lazy var _buffer = NIOCore.ByteBuffer()
+        private var _writtenBytes: Int = .zero
+
+        // MARK: - Inits
 
         init() {}
 
         /// This should only be used to wraps a ByteBuffer that
         /// will be managed exclusive by ByteURL
         init(_ buffer: NIOCore.ByteBuffer) {
-            self.buffer = buffer
-            self.writtenBytes = buffer.writerIndex
+            self._buffer = buffer
+            self._writtenBytes = buffer.writerIndex
         }
     }
 }
+
+// MARK: - Hashable
 
 extension Internals.ByteURL: Hashable {
 
@@ -33,6 +55,8 @@ extension Internals.ByteURL: Hashable {
         hasher.combine(ObjectIdentifier(self))
     }
 }
+
+// MARK: - Data extension
 
 extension Data {
 

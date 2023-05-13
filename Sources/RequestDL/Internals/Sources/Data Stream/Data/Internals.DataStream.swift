@@ -6,77 +6,92 @@ import Foundation
 
 extension Internals {
 
-    class DataStream<Value> {
+    final class DataStream<Value: Sendable>: @unchecked Sendable {
 
-        private var queue: AnyStream<Value>
-        private let operationQueue: OperationQueue
-        private var isQueueing = false
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private var _stream: AnyStream<Value>
+
+        // MARK: - Inits
 
         init() {
-            self.queue = .init(QueueStream())
-            self.operationQueue = OperationQueue()
-
-            operationQueue.qualityOfService = .background
-            operationQueue.maxConcurrentOperationCount = 1
+            _stream = .init(QueueStream())
         }
 
+        // MARK: - Internal static methods
+
+        static func empty() -> Internals.DataStream<Value> {
+            let stream = Internals.DataStream<Value>()
+            stream.close()
+            return stream
+        }
+
+        static func constant(_ value: Value) -> Internals.DataStream<Value> {
+            let stream = Internals.DataStream<Value>()
+            stream.append(.success(value))
+            stream.close()
+            return stream
+        }
+
+        // MARK: - Internal methods
+
         func append(_ value: Result<Value, Error>) {
-            operationQueue.addOperation {
+            lock.withLockVoid {
                 switch value {
                 case .success(let value):
-                    self.queue.append(.success(value))
+                    _stream.append(.success(value))
                 case .failure(let error):
-                    self.queue.append(.failure(error))
+                    _stream.append(.failure(error))
                 }
             }
         }
 
         func close() {
-            operationQueue.addOperation {
-                self.queue.append(.success(nil))
+            lock.withLockVoid {
+                _stream.append(.success(nil))
             }
         }
 
-        func observe(_ closure: @escaping (Result<Value?, Error>) -> Void) {
-            isQueueing = true
-            operationQueue.addOperation {
-                let queue = self.queue
+        func asyncStream() -> AsyncThrowingStream<Value, Error> {
+            AsyncThrowingStream { [self] continuation in
+                observe {
+                    switch $0 {
+                    case .failure(let error):
+                        continuation.finish(throwing: error)
+                    case .success(let value):
+                        if let value = value {
+                            continuation.yield(value)
+                        } else {
+                            continuation.finish(throwing: nil)
+                        }
+                    }
+                }
+            }
+        }
+
+        /// This method is available internally for tests only
+        func observe(_ closure: @escaping @Sendable (Result<Value?, Error>) -> Void) {
+            lock.withLockVoid {
+                let _stream = _stream
                 let dispatchStream = DispatchStream(closure)
 
                 do {
-                    while let value = try queue.next() {
+                    while let value = try _stream.next() {
                         dispatchStream.append(.success(value))
                     }
                 } catch {
                     dispatchStream.append(.failure(error))
                 }
 
-                if !queue.isOpen && dispatchStream.isOpen {
+                if !_stream.isOpen && dispatchStream.isOpen {
                     dispatchStream.append(.success(nil))
                 }
 
-                self.queue = .init(dispatchStream)
-                self.isQueueing = false
-            }
-        }
-    }
-}
-
-extension Internals.DataStream {
-
-    func asyncStream() -> AsyncThrowingStream<Value, Error> {
-        AsyncThrowingStream { [self] continuation in
-            self.observe {
-                switch $0 {
-                case .failure(let error):
-                    continuation.finish(throwing: error)
-                case .success(let value):
-                    if let value = value {
-                        continuation.yield(value)
-                    } else {
-                        continuation.finish(throwing: nil)
-                    }
-                }
+                self._stream = .init(dispatchStream)
             }
         }
     }

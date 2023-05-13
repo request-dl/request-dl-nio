@@ -6,38 +6,58 @@ import Foundation
 
 extension Internals {
 
-    @HTTPClientActor
-    class ClientOperationQueue {
+    final class ClientOperationQueue: @unchecked Sendable {
+
+        // MARK: - Internal properties
+
+        var isRunning: Bool {
+            lock.withLock {
+                _last == nil || _last !== root
+            }
+        }
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
 
         private let root: Root
-        private weak var last: ClientOperation?
+
+        // MARK: - Unsafe properties
+
+        private weak var _last: ClientOperation?
+
+        // MARK: - Inits
 
         init() {
             let root = Root(delegate: nil)
 
             self.root = root
-            self.last = root
+            self._last = root
         }
+
+        // MARK: - Internals methods
 
         func operation() -> ClientOperation {
-            let last = last ?? root
-            let operation = ClientOperation(delegate: self)
-            operation.connect(to: last)
-            self.last = operation
-            return operation
-        }
-
-        var isRunning: Bool {
-            last == nil || last !== root
+            lock.withLock {
+                let last = _last ?? root
+                let operation = ClientOperation(delegate: self)
+                operation.connect(to: last)
+                self._last = operation
+                return operation
+            }
         }
     }
 }
 
+// MARK: - QueueClientOperationDelegate
+
 extension Internals.ClientOperationQueue: QueueClientOperationDelegate {
 
     func operationDidComplete(_ operation: Internals.ClientOperation) {
-        if operation === last {
-            last = last?.previous ?? root
+        lock.withLock {
+            if operation === _last {
+                _last = _last?.previous ?? root
+            }
         }
     }
 }

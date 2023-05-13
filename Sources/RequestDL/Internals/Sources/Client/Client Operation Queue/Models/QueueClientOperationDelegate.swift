@@ -4,8 +4,7 @@
 
 import Foundation
 
-@HTTPClientActor
-protocol QueueClientOperationDelegate: AnyObject {
+protocol QueueClientOperationDelegate: AnyObject, Sendable {
 
     func operationDidComplete(_ operation: Internals.ClientOperation)
 }

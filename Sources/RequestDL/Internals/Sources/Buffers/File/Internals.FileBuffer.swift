@@ -169,145 +169,180 @@ extension Internals.FileBuffer {
 
 extension Internals.FileBuffer {
 
-    fileprivate class Storage {
+    fileprivate final class Storage: @unchecked Sendable {
 
-        private let url: URL
-
-        private var _inputStream: FileHandle?
-        private var _outputStream: FileHandle?
+        // MARK: - Internals properties
 
         var writerIndex: Int {
-            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
-                return (try? _outputStream?.offset()).map(Int.init) ?? .zero
-            } else {
-                return (_outputStream?.offsetInFile).map(Int.init) ?? .zero
+            lock.withLock {
+                if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
+                    return (try? _storedOutputStream?.offset()).map(Int.init) ?? .zero
+                } else {
+                    return (_storedOutputStream?.offsetInFile).map(Int.init) ?? .zero
+                }
             }
         }
 
         var readerIndex: Int {
-            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
-                return (try? _inputStream?.offset()).map(Int.init) ?? .zero
-            } else {
-                return (_inputStream?.offsetInFile).map(Int.init) ?? .zero
+            lock.withLock {
+                if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
+                    return (try? _storedInputStream?.offset()).map(Int.init) ?? .zero
+                } else {
+                    return (_storedInputStream?.offsetInFile).map(Int.init) ?? .zero
+                }
             }
         }
+
+        var writtenBytes: Int {
+            lock.withLock {
+                (try? FileManager.default.attributesOfItem(atPath: path)[.size]) as? Int ?? .zero
+            }
+        }
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+        private let url: URL
 
         private var path: String {
             url.absolutePath(percentEncoded: false)
         }
 
-        var writtenBytes: Int {
-            (try? FileManager.default.attributesOfItem(atPath: path)[.size]) as? Int ?? .zero
-        }
+        // MARK: - Unsafe properties
 
-        var inputStream: FileHandle {
+        private lazy var _fileExists: Bool = {
+            FileManager.default.fileExists(atPath: path)
+        }()
+
+        private var _storedInputStream: FileHandle?
+        private var _storedOutputStream: FileHandle?
+
+        private var _inputStream: FileHandle {
             get throws {
-                if let stream = _inputStream {
+                if let stream = _storedInputStream {
                     return stream
                 }
 
                 let stream = try FileHandle(forReadingFrom: url)
-                _inputStream = stream
+                _storedInputStream = stream
                 return stream
             }
         }
 
-        var outputStream: FileHandle {
+        private var _outputStream: FileHandle {
             get throws {
-                if let stream = _outputStream {
+                if let stream = _storedOutputStream {
                     return stream
                 }
 
                 let stream = try FileHandle(forWritingTo: url)
-                _outputStream = stream
+                _storedOutputStream = stream
                 return stream
             }
         }
 
-        private lazy var fileExists: Bool = {
-            FileManager.default.fileExists(atPath: path)
-        }()
-
-        func createFileIfNeeded() {
-            guard !fileExists else {
-                return
-            }
-
-            fileExists = FileManager.default.createFile(atPath: path, contents: nil)
-        }
+        // MARK: - Inits
 
         init(_ url: URL) {
             self.url = url
         }
 
-        func writeData<Data: DataProtocol>(_ data: Data) {
-            createFileIfNeeded()
+        // MARK: - Internal methods
 
-            if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
-                try? outputStream.write(contentsOf: data)
-            } else {
-                try? outputStream.write(Foundation.Data(data))
+        func writeData<Data: DataProtocol>(_ data: Data) {
+            lock.withLock {
+                _createFileIfNeeded()
+
+                if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+                    try? _outputStream.write(contentsOf: data)
+                } else {
+                    try? _outputStream.write(Foundation.Data(data))
+                }
             }
         }
 
         func writeBytes<S: Sequence>(_ bytes: S) where S.Element == UInt8 {
-            createFileIfNeeded()
+            lock.withLock {
+                _createFileIfNeeded()
 
-            if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
-                try? outputStream.write(contentsOf: Data(bytes))
-            } else {
-                try? outputStream.write(Data(bytes))
+                if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+                    try? _outputStream.write(contentsOf: Data(bytes))
+                } else {
+                    try? _outputStream.write(Data(bytes))
+                }
             }
         }
 
         func readData(_ length: Int) -> Data? {
-            guard fileExists else {
+            lock.withLock {
+                _readData(length)
+            }
+        }
+
+        func readBytes(_ length: Int) -> [UInt8]? {
+            lock.withLock {
+                guard _fileExists, let data = _readData(length) else {
+                    return nil
+                }
+
+                let count = data.count / MemoryLayout<UInt8>.size
+                var bytes = [UInt8](repeating: 0, count: count)
+                data.copyBytes(to: &bytes, count: count)
+
+                return bytes
+            }
+        }
+
+        func moveReaderIndex(to index: Int) throws {
+            try lock.withLockVoid {
+                guard _fileExists else {
+                    return
+                }
+
+                try _inputStream.seek(toOffset: UInt64(index))
+            }
+        }
+
+        func moveWriterIndex(to index: Int) throws {
+            try lock.withLockVoid {
+                guard _fileExists else {
+                    return
+                }
+
+                try _outputStream.seek(toOffset: UInt64(index))
+            }
+        }
+
+        // MARK: - Unsafe methods
+
+        private func _createFileIfNeeded() {
+            guard !_fileExists else {
+                return
+            }
+
+            _fileExists = FileManager.default.createFile(atPath: path, contents: nil)
+        }
+
+        private func _readData(_ length: Int) -> Data? {
+            guard _fileExists else {
                 return nil
             }
 
             let data: Data?
 
             if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
-                data = (try? inputStream.read(upToCount: length))
+                data = (try? _inputStream.read(upToCount: length))
             } else {
-                data = (try? inputStream.readData(ofLength: length))
+                data = (try? _inputStream.readData(ofLength: length))
             }
 
             return data
         }
 
-        func readBytes(_ length: Int) -> [UInt8]? {
-            guard fileExists, let data = readData(length) else {
-                return nil
-            }
-
-            let count = data.count / MemoryLayout<UInt8>.size
-            var bytes = [UInt8](repeating: 0, count: count)
-            data.copyBytes(to: &bytes, count: count)
-
-            return bytes
-        }
-
-        func moveReaderIndex(to index: Int) throws {
-            guard fileExists else {
-                return
-            }
-
-            try inputStream.seek(toOffset: UInt64(index))
-        }
-
-        func moveWriterIndex(to index: Int) throws {
-            guard fileExists else {
-                return
-            }
-
-            try outputStream.seek(toOffset: UInt64(index))
-        }
-
         deinit {
             do {
-                try _inputStream?.close()
-                try _outputStream?.close()
+                try _storedInputStream?.close()
+                try _storedOutputStream?.close()
             } catch {
                 Internals.Log.failure(error)
             }

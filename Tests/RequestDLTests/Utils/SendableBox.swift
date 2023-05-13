@@ -3,17 +3,9 @@
 */
 
 import Foundation
+@testable import RequestDL
 
-@propertyWrapper
-struct _Container<Value>: DynamicValue {
-
-    // MARK: - Internal properties
-
-    var wrappedValue: Value {
-        get { storage.value }
-        nonmutating
-        set { storage.value = newValue }
-    }
+struct SendableBox<Value: Sendable>: Sendable {
 
     // MARK: - Private properties
 
@@ -21,20 +13,26 @@ struct _Container<Value>: DynamicValue {
 
     // MARK: - Inits
 
-    init(wrappedValue: Value) {
-        self.storage = .init(wrappedValue)
+    init(_ value: Value) {
+        storage = .init(value)
     }
 
-    init() where Value: ExpressibleByNilLiteral {
-        self.storage = .init(.init(nilLiteral: ()))
+    // MARK: - Internal methods
+
+    func callAsFunction(_ value: Value) {
+        storage.value = value
+    }
+
+    func callAsFunction() -> Value {
+        storage.value
     }
 }
 
-extension _Container {
+extension SendableBox {
 
     fileprivate final class Storage: @unchecked Sendable {
 
-        // MARK: - Internal properties
+        // MARK: - Internals properties
 
         var value: Value {
             get { lock.withLock { _value } }

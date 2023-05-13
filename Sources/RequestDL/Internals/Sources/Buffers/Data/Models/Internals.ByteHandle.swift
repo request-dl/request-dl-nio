@@ -7,13 +7,21 @@ import NIOCore
 
 extension Internals {
 
-    class ByteHandle {
+    final class ByteHandle: @unchecked Sendable {
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
 
         private let mode: Mode
         private let url: ByteURL
-        private var isClosed = false
 
-        private var index: UInt64 = .zero
+        // MARK: - Unsafe properties
+
+        private var _isClosed = false
+        private var _index: UInt64 = .zero
+
+        // MARK: - Inits
 
         init(forWritingTo url: ByteURL) {
             self.mode = .write
@@ -24,88 +32,92 @@ extension Internals {
             self.mode = .read
             self.url = url
         }
-    }
-}
 
-extension Internals.ByteHandle {
+        // MARK: - Methods
 
-    func seek(toOffset offset: UInt64) throws {
-        precondition(offset >= .zero)
+        func seek(toOffset offset: UInt64) throws {
+            try lock.withLockVoid {
+                precondition(offset >= .zero)
 
-        guard !isClosed else {
-            throw ClosedError()
-        }
+                guard !_isClosed else {
+                    throw ClosedError()
+                }
 
-        index = offset
-    }
-
-    func offset() throws -> UInt64 {
-        guard !isClosed else {
-            throw ClosedError()
-        }
-
-        return index
-    }
-}
-
-extension Internals.ByteHandle {
-
-    func read(upToCount count: Int) throws -> Data? {
-        precondition(count >= .zero)
-        guard !isClosed else {
-            throw ClosedError()
-        }
-
-        switch mode {
-        case .write:
-            return nil
-        case .read:
-            guard count > .zero else {
-                return nil
+                _index = offset
             }
-
-            let index = Int(index)
-            precondition(count + index <= url.writtenBytes)
-
-            url.buffer.moveWriterIndex(to: url.writtenBytes)
-            url.buffer.moveReaderIndex(to: index)
-
-            let data = url.buffer.readData(length: count)
-            self.index = UInt64((data == nil ? .zero : count) + index)
-            return data
-        }
-    }
-
-    func write<T: DataProtocol>(contentsOf data: T) throws {
-        guard !isClosed else {
-            throw ClosedError()
         }
 
-        switch mode {
-        case .write:
-            let index = Int(index)
+        func offset() throws -> UInt64 {
+            try lock.withLock {
+                guard !_isClosed else {
+                    throw ClosedError()
+                }
 
-            url.buffer.moveReaderIndex(to: .zero)
-            url.buffer.moveWriterIndex(to: index)
-
-            let written = url.buffer.writeData(data)
-            url.writtenBytes = max(url.writtenBytes, url.buffer.writerIndex)
-
-            self.index += UInt64(written)
-        case .read:
-            return
-        }
-    }
-}
-
-extension Internals.ByteHandle {
-
-    func close() throws {
-        guard !isClosed else {
-            throw ClosedError()
+                return _index
+            }
         }
 
-        isClosed = true
+        func read(upToCount count: Int) throws -> Data? {
+            try lock.withLock {
+                precondition(count >= .zero)
+
+                guard !_isClosed else {
+                    throw ClosedError()
+                }
+
+                switch mode {
+                case .write:
+                    return nil
+                case .read:
+                    guard count > .zero else {
+                        return nil
+                    }
+
+                    let index = Int(_index)
+                    precondition(count + index <= url.writtenBytes)
+
+                    url.buffer.moveWriterIndex(to: url.writtenBytes)
+                    url.buffer.moveReaderIndex(to: index)
+
+                    let data = url.buffer.readData(length: count)
+                    _index = UInt64((data == nil ? .zero : count) + index)
+                    return data
+                }
+            }
+        }
+
+        func write<T: DataProtocol>(contentsOf data: T) throws {
+            try lock.withLockVoid {
+                guard !_isClosed else {
+                    throw ClosedError()
+                }
+
+                switch mode {
+                case .write:
+                    let index = Int(_index)
+
+                    url.buffer.moveReaderIndex(to: .zero)
+                    url.buffer.moveWriterIndex(to: index)
+
+                    let written = url.buffer.writeData(data)
+                    url.writtenBytes = max(url.writtenBytes, url.buffer.writerIndex)
+
+                    self._index += UInt64(written)
+                case .read:
+                    return
+                }
+            }
+        }
+
+        func close() throws {
+            try lock.withLockVoid {
+                guard !_isClosed else {
+                    throw ClosedError()
+                }
+
+                _isClosed = true
+            }
+        }
     }
 }
 

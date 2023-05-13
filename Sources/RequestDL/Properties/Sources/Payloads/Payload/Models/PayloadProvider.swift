@@ -4,9 +4,9 @@
 
 import Foundation
 
-protocol PayloadProvider {
+protocol PayloadProvider<Buffer>: Sendable {
 
-    associatedtype Buffer
+    associatedtype Buffer: Sendable
 
     var buffer: Buffer { get }
 }

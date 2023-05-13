@@ -167,89 +167,124 @@ extension Internals.DataBuffer {
 
 extension Internals.DataBuffer {
 
-    fileprivate class Storage {
+    fileprivate final class Storage: @unchecked Sendable {
 
-        private let url: Internals.ByteURL
-
-        private var _inputStream: Internals.ByteHandle?
-        private var _outputStream: Internals.ByteHandle?
+        // MARK: - Internal properties
 
         var writerIndex: Int {
-            (try? _outputStream?.offset()).map(Int.init) ?? .zero
+            lock.withLock {
+                (try? _storedOutputStream?.offset()).map(Int.init) ?? .zero
+            }
         }
 
         var readerIndex: Int {
-            return (try? _inputStream?.offset()).map(Int.init) ?? .zero
+            lock.withLock {
+                (try? _storedInputStream?.offset()).map(Int.init) ?? .zero
+            }
         }
 
         var writtenBytes: Int {
-            url.writtenBytes
+            lock.withLock {
+                url.writtenBytes
+            }
         }
 
-        var inputStream: Internals.ByteHandle {
+        // MARK: - Private properties
+
+        private let lock = Lock()
+        private let url: Internals.ByteURL
+
+        // MARK: - Unsafe properties
+
+        private var _storedInputStream: Internals.ByteHandle?
+        private var _storedOutputStream: Internals.ByteHandle?
+
+        private var _inputStream: Internals.ByteHandle {
             get throws {
-                if let stream = _inputStream {
+                if let stream = _storedInputStream {
                     return stream
                 }
 
                 let stream = Internals.ByteHandle(forReadingFrom: url)
-                _inputStream = stream
+                _storedInputStream = stream
                 return stream
             }
         }
 
-        var outputStream: Internals.ByteHandle {
+        private var _outputStream: Internals.ByteHandle {
             get throws {
-                if let stream = _outputStream {
+                if let stream = _storedOutputStream {
                     return stream
                 }
 
                 let stream = Internals.ByteHandle(forWritingTo: url)
-                _outputStream = stream
+                _storedOutputStream = stream
                 return stream
             }
         }
+
+        // MARK: - Inits
 
         init(_ url: Internals.ByteURL) {
             self.url = url
         }
 
+        // MARK: - Internals methods
+
         func writeData<Data: DataProtocol>(_ data: Data) {
-            try? outputStream.write(contentsOf: data)
+            lock.withLockVoid {
+                try? _outputStream.write(contentsOf: data)
+            }
         }
 
         func writeBytes<S: Sequence>(_ bytes: S) where S.Element == UInt8 {
-            try? outputStream.write(contentsOf: Data(bytes))
+            lock.withLockVoid {
+                try? _outputStream.write(contentsOf: Data(bytes))
+            }
         }
 
         func readData(_ length: Int) -> Data? {
-            (try? inputStream.read(upToCount: length))
+            lock.withLock {
+                _readData(length)
+            }
         }
 
         func readBytes(_ length: Int) -> [UInt8]? {
-            guard let data = readData(length) else {
-                return nil
+            lock.withLock {
+                guard let data = _readData(length) else {
+                    return nil
+                }
+
+                let count = data.count / MemoryLayout<UInt8>.size
+                var bytes = [UInt8](repeating: 0, count: count)
+                data.copyBytes(to: &bytes, count: count)
+
+                return bytes
             }
-
-            let count = data.count / MemoryLayout<UInt8>.size
-            var bytes = [UInt8](repeating: 0, count: count)
-            data.copyBytes(to: &bytes, count: count)
-
-            return bytes
         }
 
         func moveReaderIndex(to index: Int) throws {
-            try inputStream.seek(toOffset: UInt64(index))
+            try lock.withLockVoid {
+                try _inputStream.seek(toOffset: UInt64(index))
+            }
         }
 
         func moveWriterIndex(to index: Int) throws {
-            try outputStream.seek(toOffset: UInt64(index))
+            try lock.withLockVoid {
+                try _outputStream.seek(toOffset: UInt64(index))
+            }
+        }
+
+        // MARK: - Unsafe methods
+
+        private func _readData(_ length: Int) -> Data? {
+            try? _inputStream.read(upToCount: length)
         }
 
         deinit {
             do {
-                try _inputStream?.close()
-                try _outputStream?.close()
+                try _storedInputStream?.close()
+                try _storedOutputStream?.close()
             } catch {
                 Internals.Log.failure(error)
             }

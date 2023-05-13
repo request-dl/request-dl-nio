@@ -9,18 +9,27 @@ import NIOHTTP1
 
 extension Internals {
 
-    class ClientResponseReceiver: HTTPClientResponseDelegate {
+    class ClientResponseReceiver: @unchecked Sendable, HTTPClientResponseDelegate {
 
         typealias Response = Void
 
-        let url: String
-        let upload: DataStream<Int>
-        let head: DataStream<ResponseHead>
-        var download: DownloadBuffer
+        // MARK: - Private properties
 
-        var phase: Phase = .upload
-        var state: State = .idle
-        var reference: StreamReference = .none
+        private let lock = Lock()
+
+        private let url: String
+        private let upload: DataStream<Int>
+        private let head: DataStream<ResponseHead>
+
+        // MARK: - Unsafe properties
+
+        private var _download: DownloadBuffer
+
+        private var _phase: Phase = .upload
+        private var _state: State = .idle
+        private var _reference: StreamReference = .none
+
+        // MARK: - Inits
 
         init(
             url: String,
@@ -31,146 +40,160 @@ extension Internals {
             self.url = url
             self.upload = upload
             self.head = head
-            self.download = download
+            self._download = download
         }
 
+        // MARK: - Internal methods
+
         func didSendRequestPart(task: HTTPClient.Task<Response>, _ part: IOData) {
-            guard [.idle, .uploading].contains(state) && phase == .upload else {
-                return
+            lock.withLockVoid {
+                guard [.idle, .uploading].contains(_state) && _phase == .upload else {
+                    return
+                }
+
+                _state = .uploading
+                _reference = .upload
+
+                upload.append(.success(part.readableBytes))
             }
-
-            state = .uploading
-            reference = .upload
-
-            upload.append(.success(part.readableBytes))
         }
 
         func didSendRequest(task: HTTPClient.Task<Response>) {
-            guard [.idle, .uploading].contains(state) && phase == .upload else {
-                return
+            lock.withLockVoid {
+                guard [.idle, .uploading].contains(_state) && _phase == .upload else {
+                    return
+                }
+
+                _state = .uploading
+                _phase = .upload
+                _reference = .head
+
+                upload.close()
             }
-
-            state = .uploading
-            phase = .upload
-            reference = .head
-
-            upload.close()
         }
 
         func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void> {
-            guard
-                ([.idle, .uploading].contains(state) && phase == .upload)
-                    || [.head].contains(state) && phase == .download
-            else {
-                unexpectedStateOrPhase()
+            lock.withLock {
+                guard
+                    ([.idle, .uploading].contains(_state) && _phase == .upload)
+                        || [.head].contains(_state) && _phase == .download
+                else {
+                    _unexpectedStateOrPhase()
+                }
+
+                let responseHead = ResponseHead(
+                    url: url,
+                    status: ResponseHead.Status(
+                        code: head.status.code,
+                        reason: head.status.reasonPhrase
+                    ),
+                    version: ResponseHead.Version(
+                        minor: head.version.minor,
+                        major: head.version.major
+                    ),
+                    headers: Headers(head.headers),
+                    isKeepAlive: head.isKeepAlive
+                )
+
+                self.head.append(.success(responseHead))
+                self.upload.close()
+                self.head.close()
+
+                _state = .head
+                _phase = .download
+                _reference = .download
+
+                return task.eventLoop.makeSucceededVoidFuture()
             }
-
-            self.head.append(.success(ResponseHead(
-                url: url,
-                status: ResponseHead.Status(
-                    code: head.status.code,
-                    reason: head.status.reasonPhrase
-                ),
-                version: ResponseHead.Version(
-                    minor: head.version.minor,
-                    major: head.version.major
-                ),
-                headers: Headers(head.headers),
-                isKeepAlive: head.isKeepAlive
-            )))
-
-            self.upload.close()
-            self.head.close()
-
-            state = .head
-            phase = .download
-            reference = .download
-
-            return task.eventLoop.makeSucceededVoidFuture()
         }
 
         func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void> {
-            guard [.head, .downloading].contains(state) && phase == .download else {
-                unexpectedStateOrPhase()
+            lock.withLock {
+                guard [.head, .downloading].contains(_state) && _phase == .download else {
+                    _unexpectedStateOrPhase()
+                }
+
+                _download.append(Internals.DataBuffer(
+                    Internals.ByteURL(buffer)
+                ))
+
+                _state = .downloading
+                _phase = .download
+                _reference = .download
+
+                head.close()
+
+                return task.eventLoop.makeSucceededVoidFuture()
             }
-
-            download.append(Internals.DataBuffer(
-                Internals.ByteURL(buffer)
-            ))
-
-            state = .downloading
-            phase = .download
-            reference = .download
-
-            head.close()
-
-            return task.eventLoop.makeSucceededVoidFuture()
         }
 
         func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
-            guard [.head, .downloading, .end].contains(state) && phase == .download else {
-                unexpectedStateOrPhase()
+            lock.withLock {
+                guard [.head, .downloading, .end].contains(_state) && _phase == .download else {
+                    _unexpectedStateOrPhase()
+                }
+
+                _state = .end
+                _phase = .download
+                _reference = .lockout
+
+                _download.close()
+                head.close()
+                upload.close()
             }
-
-            state = .end
-            phase = .download
-            reference = .lockout
-
-            download.close()
-            head.close()
-            upload.close()
         }
 
         func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
-            defer {
-                state = .failure
-                upload.close()
-                head.close()
-                download.close()
-            }
-
-            switch state {
-            case .idle:
-                guard reference <= .head else {
-                    fallthrough
-                }
-                head.append(.failure(error))
-            case .uploading:
-                guard reference <= .upload else {
-                    fallthrough
+            lock.withLockVoid {
+                defer {
+                    _state = .failure
+                    upload.close()
+                    head.close()
+                    _download.close()
                 }
 
-                upload.append(.failure(error))
-            case .head:
-                guard reference <= .head else {
-                    fallthrough
-                }
+                switch _state {
+                case .idle:
+                    guard _reference <= .head else {
+                        fallthrough
+                    }
+                    head.append(.failure(error))
+                case .uploading:
+                    guard _reference <= .upload else {
+                        fallthrough
+                    }
 
-                head.append(.failure(error))
-            case .downloading:
-                guard reference <= .download else {
-                    fallthrough
-                }
+                    upload.append(.failure(error))
+                case .head:
+                    guard _reference <= .head else {
+                        fallthrough
+                    }
 
-                download.failed(error)
-            case .end, .failure:
-                unexpectedStateOrPhase(error: error)
+                    head.append(.failure(error))
+                case .downloading:
+                    guard _reference <= .download else {
+                        fallthrough
+                    }
+
+                    _download.failed(error)
+                case .end, .failure:
+                    _unexpectedStateOrPhase(error: error)
+                }
             }
         }
-    }
-}
 
-extension Internals.ClientResponseReceiver {
+        // MARK: - Unsafe methods
 
-    func unexpectedStateOrPhase(error: Error? = nil, line: UInt = #line) -> Never {
-        Internals.Log.failure(
-            .unexpectedStateOrPhase(
-                state: state,
-                phase: phase,
-                error: error
-            ),
-            line: line
-        )
+        private func _unexpectedStateOrPhase(error: Error? = nil, line: UInt = #line) -> Never {
+            Internals.Log.failure(
+                .unexpectedStateOrPhase(
+                    state: _state,
+                    phase: _phase,
+                    error: error
+                ),
+                line: line
+            )
+        }
     }
 }
 

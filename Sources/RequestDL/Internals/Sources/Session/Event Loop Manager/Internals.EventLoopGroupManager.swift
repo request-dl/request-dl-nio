@@ -5,34 +5,48 @@
 import Foundation
 import NIOCore
 import AsyncHTTPClient
-import _Concurrency
+import Semaphore
 
 extension Internals {
 
-    @HTTPClientActor
-    class EventLoopGroupManager {
+    final class EventLoopGroupManager: @unchecked Sendable {
+
+        // MARK: - Internal static properties
 
         static let shared = EventLoopGroupManager()
 
-        private var groups: [String: EventLoopGroup] = [:]
+        // MARK: - Private properties
 
-        private func _provider(
-            _ sessionProvider: SessionProvider
-        ) -> EventLoopGroup {
-            let group = self.groups[sessionProvider.id] ?? sessionProvider.group()
-            self.groups[sessionProvider.id] = group
-            return group
-        }
+        private let lock = AsyncLock()
+
+        // MARK: - Unsafe properties
+
+        @preconcurrency
+        private var _groups: [String: EventLoopGroup] = [:]
+
+        // MARK: - Internal methods
 
         func provider(
             _ sessionProvider: SessionProvider
         ) async -> EventLoopGroup {
             if case .background = _Concurrency.Task.currentPriority {
-                return _provider(sessionProvider)
+                return await _provider(sessionProvider)
             } else {
                 return await _Concurrency.Task.detached(priority: .background) {
                     await self._provider(sessionProvider)
                 }.value
+            }
+        }
+
+        // MARK: - Unsafe methods
+
+        private func _provider(
+            _ sessionProvider: SessionProvider
+        ) async -> EventLoopGroup {
+            await lock.withLock {
+                let group = _groups[sessionProvider.id] ?? sessionProvider.group()
+                _groups[sessionProvider.id] = group
+                return group
             }
         }
     }

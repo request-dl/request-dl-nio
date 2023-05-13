@@ -43,6 +43,7 @@ extension Internals.Body {
         eventLoop: EventLoop
     ) -> EventLoopFuture<Void> {
         eventLoop.makeFutureWithTask {
+            var iterator = iterator
             while let next = iterator.next() {
                 try await next.get()
             }
@@ -57,7 +58,7 @@ extension Internals.Body {
             Internals.Log.failure(.emptyRequestBody())
         }
 
-        let sequence = Internals.StreamWriterSequence(
+        var sequence = Internals.StreamWriterSequence(
             writer: writer,
             body: body
         ).makeIterator()

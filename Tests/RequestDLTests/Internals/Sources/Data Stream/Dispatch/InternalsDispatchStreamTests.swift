@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class DispatchStreamTests: XCTestCase {
 
     var values: [Result<Int?, Error>]!
