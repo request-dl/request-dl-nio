@@ -26,6 +26,24 @@ class PathTests: XCTestCase {
         )
     }
 
+    func testPath_whenInitWithLosslessValue() async throws {
+        // Given
+        let host = "google.com"
+        let path = 123
+
+        // When
+        let (_, request) = try await resolve(TestProperty {
+            BaseURL(host)
+            Path(path)
+        })
+
+        // Then
+        XCTAssertEqual(
+            request.url,
+            "https://\(host)/\(path)"
+        )
+    }
+
     func testSingleInstanceWithMultiplePath() async throws {
         // Given
         let path = "api/v1/users/10/detail"
