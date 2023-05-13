@@ -25,16 +25,8 @@ extension Interceptors {
      */
     public struct Logger<Element>: TaskInterceptor {
 
-        let isLogActive: Bool
+        let isActive: Bool
         let results: (Element) -> [String]
-
-        init(
-            isActive: Bool,
-            results: @escaping (Element) -> [String]
-        ) {
-            isLogActive = isActive
-            self.results = results
-        }
 
         /**
         Called when the task result is received.
@@ -42,7 +34,7 @@ extension Interceptors {
         - Parameter result: The result of the task execution.
         */
         public func received(_ result: Result<Element, Error>) {
-            guard isLogActive else {
+            guard isActive else {
                 return
             }
 

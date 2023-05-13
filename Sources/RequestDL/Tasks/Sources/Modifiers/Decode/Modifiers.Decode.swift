@@ -27,20 +27,8 @@ extension Modifiers {
 
         let type: Element.Type
         let decoder: JSONDecoder
-        private let data: (Content.Element) -> Data
-        private let output: (Content.Element, Element) -> Output
-
-        fileprivate init(
-            type: Element.Type,
-            decoder: JSONDecoder,
-            data: @escaping (Content.Element) -> Data,
-            output: @escaping (Content.Element, Element) -> Output
-        ) {
-            self.type = type
-            self.decoder = decoder
-            self.data = data
-            self.output = output
-        }
+        fileprivate let data: (Content.Element) -> Data
+        fileprivate let output: (Content.Element, Element) -> Output
 
         /**
          Decodes the data of the specified `Task` instance into an instance of the `Element`
