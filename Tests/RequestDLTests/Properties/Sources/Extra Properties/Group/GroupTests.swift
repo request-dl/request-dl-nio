@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class GroupTests: XCTestCase {
 
     func testSingleGroup() async throws {

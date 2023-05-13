@@ -48,16 +48,10 @@ import Foundation
  }
  ```
  */
-@RequestActor
 @propertyWrapper
 public struct Namespace: DynamicValue {
 
-    @_Container var id: ID?
-
-    /**
-     Instantiates a namespace identifier for `Property` objects.
-     */
-    public init() {}
+    // MARK: - Public properties
 
     /**
      The identifier for the namespace that automatically is used to store objects inside
@@ -66,4 +60,15 @@ public struct Namespace: DynamicValue {
     public var wrappedValue: ID {
         id ?? .global
     }
+
+    // MARK: - Internal properties
+
+    @_Container var id: ID?
+
+    // MARK: - Inits
+
+    /**
+     Instantiates a namespace identifier for `Property` objects.
+     */
+    public init() {}
 }

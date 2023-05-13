@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeadersHostTests: XCTestCase {
 
     func testHost() async throws {

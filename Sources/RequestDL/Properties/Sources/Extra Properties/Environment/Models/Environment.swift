@@ -44,22 +44,10 @@ import Foundation
  }
  ```
  */
-@RequestActor
 @propertyWrapper
-public struct Environment<Value>: DynamicValue {
+public struct Environment<Value: Sendable>: DynamicValue {
 
-    @_Container private var value: Value?
-
-    private let keyPath: KeyPath<EnvironmentValues, Value>
-
-    /**
-     Initializes a new instance of the `Environment` property wrapper.
-
-     - Parameter keyPath: The key path that points to the value in the `EnvironmentValues` object.
-     */
-    public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
-        self.keyPath = keyPath
-    }
+    // MARK: - Public properties
 
     /**
      The wrapped value that provides access to the value stored in the `EnvironmentValues` object.
@@ -93,11 +81,32 @@ public struct Environment<Value>: DynamicValue {
 
         return value
     }
+
+    // MARK: - Private properties
+
+    @_Container private var value: Value?
+
+    private let keyPath: @Sendable (EnvironmentValues) -> Value
+
+    // MARK: - Inits
+
+    /**
+     Initializes a new instance of the `Environment` property wrapper.
+
+     - Parameter keyPath: The key path that points to the value in the `EnvironmentValues` object.
+     */
+    public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
+        self.keyPath = {
+            $0[keyPath: keyPath]
+        }
+    }
 }
+
+// MARK: - DynamicEnvironment
 
 extension Environment: DynamicEnvironment {
 
     func update(_ values: EnvironmentValues) {
-        value = values[keyPath: keyPath]
+        value = keyPath(values)
     }
 }

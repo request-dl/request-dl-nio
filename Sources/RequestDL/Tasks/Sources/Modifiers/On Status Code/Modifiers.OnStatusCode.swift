@@ -19,8 +19,12 @@ extension Modifiers {
      */
     public struct OnStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
 
-        let contains: (StatusCode) -> Bool
-        let transform: (Content.Element) throws -> Void
+        // MARK: - Internal properties
+
+        let contains: @Sendable (StatusCode) -> Bool
+        let transform: @Sendable (Content.Element) throws -> Void
+
+        // MARK: - Public methods
 
         /**
          A function that modifies the task and returns the result.
@@ -41,11 +45,13 @@ extension Modifiers {
     }
 }
 
+// MARK: - Task extension
+
 extension Task where Element: TaskResultPrimitive {
 
     private func onStatusCode(
-        _ transform: @escaping (Element) throws -> Void,
-        contains: @escaping (StatusCode) -> Bool
+        _ transform: @escaping @Sendable (Element) throws -> Void,
+        contains: @escaping @Sendable (StatusCode) -> Bool
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
         modify(.init(
             contains: contains,
@@ -66,7 +72,7 @@ extension Task where Element: TaskResultPrimitive {
      */
     public func onStatusCode(
         _ statusCode: Range<StatusCode>,
-        _ transform: @escaping (Element) throws -> Void
+        _ transform: @escaping @Sendable (Element) throws -> Void
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
         onStatusCode(transform) {
             statusCode.contains($0)
@@ -86,7 +92,7 @@ extension Task where Element: TaskResultPrimitive {
      */
     public func onStatusCode(
         _ statusCode: StatusCodeSet,
-        _ transform: @escaping (Element) throws -> Void
+        _ transform: @escaping @Sendable (Element) throws -> Void
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
         onStatusCode(transform) {
             statusCode.contains($0)
@@ -106,7 +112,7 @@ extension Task where Element: TaskResultPrimitive {
      */
     public func onStatusCode(
         _ statusCode: StatusCode,
-        _ transform: @escaping (Element) throws -> Void
+        _ transform: @escaping @Sendable (Element) throws -> Void
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
         onStatusCode(transform) {
             statusCode == $0

@@ -4,9 +4,7 @@
 
 import Foundation
 
-@RequestActor
-struct Resolved {
-
+struct Resolved: Sendable {
     let session: Internals.Session
     let request: Internals.Request
 }

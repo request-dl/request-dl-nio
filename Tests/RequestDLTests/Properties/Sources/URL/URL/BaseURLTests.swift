@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class BaseURLTests: XCTestCase {
 
     func testHttpURL() async throws {

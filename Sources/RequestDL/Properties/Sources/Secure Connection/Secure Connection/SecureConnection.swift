@@ -6,49 +6,68 @@ import Foundation
 import NIOCore
 
 /// Represents a secure connection with various configuration options.
-@RequestActor
 public struct SecureConnection<Content: Property>: Property {
 
-    private let content: Content
+    private struct Node: PropertyNode {
 
-    private var secureConnection: Internals.SecureConnection
+        let secureConnection: Internals.SecureConnection
+        let nodes: [LeafNode<SecureConnectionNode>]
 
-    /// Initializes a secure connection with the given content.
-    ///
-    /// - Parameter content: A closure that provides the content of the secure connection.
-    public init(
-        @PropertyBuilder content: @RequestActor () -> Content
-    ) {
-        self.secureConnection = .init()
-        self.content = content()
+        func make(_ make: inout Make) async throws {
+            make.configuration.secureConnection = secureConnection
+
+            for node in nodes {
+                try await node.make(&make)
+            }
+        }
     }
 
-    /// Initializes a secure connection with the given context and content.
-    ///
-    /// - Parameters:
-    ///   - context: The secure connection context, default is `.client`.
-    ///   - content: A closure that provides the content of the secure connection.
-    @available(*, deprecated, message: "RequestDL is for client-side usage only")
-    public init(
-        _ context: SecureConnectionContext,
-        @PropertyBuilder content: @RequestActor () -> Content
-    ) {
-        self.init(content: content)
-    }
+    // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
 
-    func edit(_ edit: (inout Self) -> Void) -> Self {
-        var mutableSelf = self
-        edit(&mutableSelf)
-        return mutableSelf
-    }
-}
+    // MARK: - Private properties
 
-extension SecureConnection {
+    private let content: Content
+
+    private var secureConnection: Internals.SecureConnection
+
+    // MARK: - Inits
+
+    /// Initializes a secure connection with the given content.
+    ///
+    /// - Parameter content: A closure that provides the content of the secure connection.
+    public init(
+        @PropertyBuilder content: () -> Content
+    ) {
+        self.secureConnection = .init()
+        self.content = content()
+    }
+
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<SecureConnection<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
+        )
+
+        return .leaf(Node(
+            secureConnection: property.secureConnection,
+            nodes: outputs.node.search(for: SecureConnectionNode.self)
+        ))
+    }
+
+    // MARK: - Public methods
 
     /// Sets the minimum TLS version for the secure connection.
     ///
@@ -97,9 +116,6 @@ extension SecureConnection {
             maximum: range.upperBound
         )
     }
-}
-
-extension SecureConnection {
 
     /// Sets the key log object for the secure connection.
     ///
@@ -110,38 +126,6 @@ extension SecureConnection {
             $0.secureConnection.keyLogger = keyLogger
         }
     }
-}
-
-extension SecureConnection {
-
-    private final class _KeyLog: SSLKeyLogger {
-
-        private let closure: @Sendable (NIOCore.ByteBuffer) -> Void
-
-        init(_ closure: @Sendable @escaping (NIOCore.ByteBuffer) -> Void) {
-            self.closure = closure
-        }
-
-        func callAsFunction(_ bytes: NIOCore.ByteBuffer) {
-            closure(bytes)
-        }
-    }
-
-    /// Sets the key log closure for the secure connection.
-    ///
-    /// - Parameter closure: The closure that receives the key log.
-    /// - Returns: A modified `SecureConnection` with the key log closure set.
-    @available(*, deprecated, renamed: "keyLogger(_:)")
-    public func keyLog(
-        _ closure: @Sendable @escaping (NIOCore.ByteBuffer) -> Void
-    ) -> Self {
-        edit {
-            $0.secureConnection.keyLogger = _KeyLog(closure)
-        }
-    }
-}
-
-extension SecureConnection {
 
     /// Sets the timeout for shutting down the secure connection.
     ///
@@ -150,9 +134,6 @@ extension SecureConnection {
     public func shutdownTimeout(_ timeout: UnitTime) -> Self {
         edit { $0.secureConnection.shutdownTimeout = timeout.build() }
     }
-}
-
-extension SecureConnection {
 
     /// Sets the renegotiation support for the secure connection.
     ///
@@ -161,9 +142,6 @@ extension SecureConnection {
     public func renegotiationSupport(_ renegotiationSupport: RenegotiationSupport) -> Self {
         edit { $0.secureConnection.renegotiationSupport = renegotiationSupport.build() }
     }
-}
-
-extension SecureConnection {
 
     /// Sets the signing signature algorithms for the secure connection.
     ///
@@ -188,9 +166,6 @@ extension SecureConnection {
             }
         }
     }
-}
-
-extension SecureConnection {
 
     /// Sets the certificate verification setting for the secure connection.
     ///
@@ -199,9 +174,6 @@ extension SecureConnection {
     public func verification(_ verification: CertificateVerification) -> Self {
         edit { $0.secureConnection.certificateVerification = verification.build() }
     }
-}
-
-extension SecureConnection {
 
     /// Sets the application protocols for the secure connection.
     ///
@@ -210,9 +182,6 @@ extension SecureConnection {
     public func applicationProtocols(_ protocols: String...) -> Self {
         edit { $0.secureConnection.applicationProtocols = protocols }
     }
-}
-
-extension SecureConnection {
 
     /// Disables or enables sending the CA name list during handshake for the secure connection.
     ///
@@ -221,9 +190,6 @@ extension SecureConnection {
     public func sendCANameListDisabled(_ isDisabled: Bool) -> Self {
         edit { $0.secureConnection.sendCANameList = !isDisabled }
     }
-}
-
-extension SecureConnection {
 
     /// Sets the cipher suites for the secure connection using string representations.
     ///
@@ -245,40 +211,56 @@ extension SecureConnection {
             }
         }
     }
+
+    // MARK: - Internal methods
+
+    func edit(_ edit: (inout Self) -> Void) -> Self {
+        var mutableSelf = self
+        edit(&mutableSelf)
+        return mutableSelf
+    }
 }
+
+// MARK: - Deprecated
 
 extension SecureConnection {
 
-    private struct Node: PropertyNode {
+    private final class _KeyLog: SSLKeyLogger {
 
-        let secureConnection: Internals.SecureConnection
-        let nodes: [LeafNode<SecureConnectionNode>]
+        private let closure: @Sendable (NIOCore.ByteBuffer) -> Void
 
-        func make(_ make: inout Make) async throws {
-            make.configuration.secureConnection = secureConnection
+        init(_ closure: @escaping @Sendable (NIOCore.ByteBuffer) -> Void) {
+            self.closure = closure
+        }
 
-            for node in nodes {
-                try await node.make(&make)
-            }
+        func callAsFunction(_ bytes: NIOCore.ByteBuffer) {
+            closure(bytes)
         }
     }
 
-    /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
-        property: _GraphValue<SecureConnection<Content>>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
+    /// Initializes a secure connection with the given context and content.
+    ///
+    /// - Parameters:
+    ///   - context: The secure connection context, default is `.client`.
+    ///   - content: A closure that provides the content of the secure connection.
+    @available(*, deprecated, message: "RequestDL is for client-side usage only")
+    public init(
+        _ context: SecureConnectionContext,
+        @PropertyBuilder content: () -> Content
+    ) {
+        self.init(content: content)
+    }
 
-        let outputs = try await Content._makeProperty(
-            property: property.content,
-            inputs: inputs
-        )
-
-        return .leaf(Node(
-            secureConnection: property.secureConnection,
-            nodes: outputs.node.search(for: SecureConnectionNode.self)
-        ))
+    /// Sets the key log closure for the secure connection.
+    ///
+    /// - Parameter closure: The closure that receives the key log.
+    /// - Returns: A modified `SecureConnection` with the key log closure set.
+    @available(*, deprecated, renamed: "keyLogger(_:)")
+    public func keyLog(
+        _ closure: @escaping @Sendable (NIOCore.ByteBuffer) -> Void
+    ) -> Self {
+        edit {
+            $0.secureConnection.keyLogger = _KeyLog(closure)
+        }
     }
 }

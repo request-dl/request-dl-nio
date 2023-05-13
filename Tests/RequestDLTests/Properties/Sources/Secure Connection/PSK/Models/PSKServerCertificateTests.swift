@@ -7,7 +7,6 @@ import NIOSSL
 @testable import RequestDL
 
 @available(*, deprecated)
-@RequestActor
 class PSKServerCertificateTests: XCTestCase {
 
     func testPSK_whenInit_shouldBeValid() async throws {

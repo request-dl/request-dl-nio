@@ -7,17 +7,27 @@ import NIOCore
 
 extension Internals {
 
-    struct DownloadBuffer {
+    struct DownloadBuffer: Sendable {
+
+        // MARK: - Internal properties
+
+        let stream: DataStream<DataBuffer>
+
+        // MARK: - Private properties
+
+        private let readingMode: Internals.Response.ReadingMode
 
         private var buffer: DataBuffer?
-        private let readingMode: Internals.Response.ReadingMode
-        let stream: DataStream<DataBuffer>
+
+        // MARK: - Inits
 
         init(readingMode: Internals.Response.ReadingMode) {
             self.buffer = DataBuffer()
             self.readingMode = readingMode
             self.stream = .init()
         }
+
+        // MARK: - Internal methods
 
         mutating func append(_ incomeBytes: BufferProtocol) {
             guard var buffer = buffer else {
@@ -92,15 +102,19 @@ extension Internals {
             dispatch(.failure(error))
         }
 
+        // MARK: - Private methods
+
         private mutating func dispatch(_ dataBuffer: Result<DataBuffer, Error>) {
             stream.append(dataBuffer)
         }
     }
 }
 
+// MARK: - Internals.Response extension
+
 extension Internals.Response {
 
-    enum ReadingMode: Hashable {
+    enum ReadingMode: Sendable, Hashable {
         case length(Int)
         case separator([UInt8])
     }

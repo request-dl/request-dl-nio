@@ -6,32 +6,48 @@ import Foundation
 
 extension Internals {
 
-    class DispatchStream<Value>: StreamProtocol {
+    final class DispatchStream<Value: Sendable>: StreamProtocol, @unchecked Sendable {
 
-        private var closure: ((Result<Value?, Error>) -> Void)?
+        // MARK: - Internal properties
 
         var isOpen: Bool {
-            closure != nil
+            lock.withLock {
+                _closure != nil
+            }
         }
 
-        init(_ closure: @escaping (Result<Value?, Error>) -> Void) {
-            self.closure = closure
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private var _closure: (@Sendable (Result<Value?, Error>) -> Void)?
+
+        // MARK: - Inits
+
+        init(_ closure: @escaping @Sendable (Result<Value?, Error>) -> Void) {
+            self._closure = closure
         }
+
+        // MARK: - Internal methods
 
         func append(_ value: Result<Value?, Error>) {
-            guard let closure = closure else {
-                return
-            }
+            lock.withLockVoid {
+                guard let closure = _closure else {
+                    return
+                }
 
-            switch value {
-            case .failure(let failure):
-                closure(.failure(failure))
-                self.closure = nil
-            case .success(let value):
-                closure(.success(value))
+                switch value {
+                case .failure(let failure):
+                    closure(.failure(failure))
+                    self._closure = nil
+                case .success(let value):
+                    closure(.success(value))
 
-                if value == nil {
-                    self.closure = nil
+                    if value == nil {
+                        self._closure = nil
+                    }
                 }
             }
         }

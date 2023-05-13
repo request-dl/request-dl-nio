@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeadersContentLengthTests: XCTestCase {
 
     func testContentLength() async throws {

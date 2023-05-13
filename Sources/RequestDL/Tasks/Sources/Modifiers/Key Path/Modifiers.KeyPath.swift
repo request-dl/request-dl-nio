@@ -21,9 +21,16 @@ extension Modifiers {
      */
     public struct KeyPath<Content: Task>: TaskModifier {
 
-        let keyPath: Swift.KeyPath<AbstractKeyPath, String>
-        fileprivate let data: (Content.Element) -> Data
-        fileprivate let element: (Content.Element, Data) -> Content.Element
+        // MARK: - Internal properties
+
+        let keyPath: @Sendable (AbstractKeyPath) -> String
+
+        // MARK: - Private properties
+
+        fileprivate let data: @Sendable (Content.Element) -> Data
+        fileprivate let element: @Sendable (Content.Element, Data) -> Content.Element
+
+        // MARK: - Public methods
 
         /**
          Transforms the result of the task by extracting a sub-value using the given key path.
@@ -42,7 +49,7 @@ extension Modifiers {
                 ) as? [String: Any]
             else { throw KeyPathInvalidDataError() }
 
-            let keyPath = AbstractKeyPath()[keyPath: keyPath]
+            let keyPath = keyPath(AbstractKeyPath())
 
             guard let value = dictionary[keyPath] else {
                 throw KeyPathNotFound(keyPath: keyPath)
@@ -56,6 +63,8 @@ extension Modifiers {
     }
 }
 
+// MARK: - Task extension
+
 extension Task<TaskResult<Data>> {
 
     /**
@@ -67,7 +76,7 @@ extension Task<TaskResult<Data>> {
      */
     public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
         modify(Modifiers.KeyPath(
-            keyPath: keyPath,
+            keyPath: { $0[keyPath: keyPath] },
             data: \.payload,
             element: {
                 TaskResult(
@@ -90,7 +99,7 @@ extension Task<Data> {
      */
     public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
         modify(Modifiers.KeyPath(
-            keyPath: keyPath,
+            keyPath: { $0[keyPath: keyPath] },
             data: { $0 },
             element: { $1 }
         ))

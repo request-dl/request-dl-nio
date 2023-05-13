@@ -19,7 +19,27 @@ import Foundation
  */
 public struct RequestMethod: Property {
 
+    private struct Node: PropertyNode {
+
+        let httpMethod: String
+
+        func make(_ make: inout Make) async throws {
+            make.request.method = .init(httpMethod)
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
+
     let httpMethod: HTTPMethod
+
+    // MARK: - Inits
 
     /**
      Initializes a `RequestMethod` instance with the specified HTTP request method.
@@ -38,25 +58,9 @@ public struct RequestMethod: Property {
         self.httpMethod = httpMethod
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension RequestMethod {
-
-    private struct Node: PropertyNode {
-
-        let httpMethod: String
-
-        func make(_ make: inout Make) async throws {
-            make.request.method = .init(httpMethod)
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<RequestMethod>,
         inputs: _PropertyInputs

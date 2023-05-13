@@ -7,7 +7,6 @@ import NIOCore
 import NIOSSL
 @testable import RequestDL
 
-@RequestActor
 class SecureConnectionTests: XCTestCase {
 
     func testSecure_whenDefaultInit_shouldBeValid() async throws {

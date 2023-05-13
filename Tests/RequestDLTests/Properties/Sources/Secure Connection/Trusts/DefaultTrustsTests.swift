@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class DefaultTrustsTests: XCTestCase {
 
     func testTrusts_whenDefault_shouldBeDefault() async throws {

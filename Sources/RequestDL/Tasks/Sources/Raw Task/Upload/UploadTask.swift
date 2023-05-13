@@ -37,22 +37,24 @@ import Foundation
  parameter. `Property` protocol contains information about the request such as its URL, headers,
  body and etc.
  */
-@RequestActor
 public struct UploadTask<Content: Property>: Task {
 
+    // MARK: - Private properties
+
     private let content: Content
+
+    // MARK: - Inits
 
     /**
      Initializes a `UploadTask` instance.
 
      - Parameter content: The content of the request.
      */
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
-}
 
-extension UploadTask {
+    // MARK: - Public methods
 
     /**
      Returns a task result that encapsulates the asynchronous response for a request.

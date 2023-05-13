@@ -4,18 +4,15 @@
 
 import Foundation
 
-public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
+public struct _EncodablePayload<Object: Encodable>: PayloadProvider, @unchecked Sendable {
 
-    private let object: Object
-    private let encoder: JSONEncoder
+    // MARK: - Internal properties
 
-    init(
-        _ object: Object,
-        encoder: JSONEncoder = .init()
-    ) {
-        self.object = object
-        self.encoder = encoder
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
+
+    // MARK: - Private properties
 
     private var data: Data {
         do {
@@ -27,7 +24,16 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider {
         }
     }
 
-    var buffer: Internals.DataBuffer {
-        Internals.DataBuffer(data)
+    private let object: Object
+    private let encoder: JSONEncoder
+
+    // MARK: - Inits
+
+    init(
+        _ object: Object,
+        encoder: JSONEncoder = .init()
+    ) {
+        self.object = object
+        self.encoder = encoder
     }
 }

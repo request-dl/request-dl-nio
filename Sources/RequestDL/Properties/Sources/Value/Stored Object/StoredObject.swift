@@ -32,17 +32,17 @@ import Foundation
 @propertyWrapper
 public struct StoredObject<Object: AnyObject>: DynamicValue {
 
-    @_Container private var configuration: StoredObjectConfiguration?
-    private let thunk: () -> Object
+    private struct Key: Sendable, Hashable {
 
-    /**
-     Initializes a new `StoredObject` with the given object.
+        let configuration: StoredObjectConfiguration
 
-     - Parameter wrappedValue: The object that will be stored in memory.
-     */
-    public init(wrappedValue thunk: @autoclosure @escaping () -> Object) {
-        self.thunk = thunk
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(configuration)
+            hasher.combine(ObjectIdentifier(Object.self))
+        }
     }
+
+    // MARK: - Public properties
 
     /// The stored object in memory.
     public var wrappedValue: Object {
@@ -56,20 +56,25 @@ public struct StoredObject<Object: AnyObject>: DynamicValue {
         Internals.Storage.shared.setValue(value, forKey: key)
         return value
     }
-}
 
-extension StoredObject {
+    // MARK: - Private properties
 
-    fileprivate struct Key: Hashable {
+    @_Container private var configuration: StoredObjectConfiguration?
+    private let thunk: @Sendable () -> Object
 
-        let configuration: StoredObjectConfiguration
+    // MARK: - Inits
 
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(configuration)
-            hasher.combine(ObjectIdentifier(Object.self))
-        }
+    /**
+     Initializes a new `StoredObject` with the given object.
+
+     - Parameter wrappedValue: The object that will be stored in memory.
+     */
+    public init(wrappedValue thunk: @autoclosure @escaping @Sendable () -> Object) {
+        self.thunk = thunk
     }
 }
+
+// MARK: - DynamicStoredObject
 
 extension StoredObject: DynamicStoredObject {
 

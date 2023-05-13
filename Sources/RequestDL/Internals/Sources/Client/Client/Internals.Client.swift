@@ -8,23 +8,39 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    @HTTPClientActor
-    class Client {
+    final class Client: @unchecked Sendable {
+
+        // MARK: - Internal properties
+
+        var isRunning: Bool {
+            manager.isRunning
+        }
+
+        // MARK: - Private properties
+
+        private let lock = AsyncLock()
 
         private let manager = Internals.ClientOperationQueue()
         private let _client: HTTPClient
-        private var isClosed: Bool
+
+        // MARK: - Unsafe properties
+
+        private var _isClosed: Bool
+
+        // MARK: - Inits
 
         init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration
         ) {
-            isClosed = false
+            _isClosed = false
             _client = .init(
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
         }
+
+        // MARK: - Internal methods
 
         func execute<Delegate: HTTPClientResponseDelegate>(
             request: HTTPClient.Request,
@@ -37,23 +53,23 @@ extension Internals {
                 delegate: delegate
             ).futureResult.always { _ in
                 _Concurrency.Task {
-                    await operation.complete()
+                    await self.lock.withLockVoid {
+                        operation.complete()
+                    }
                 }
             }
         }
 
         func shutdown() async throws -> Bool {
-            guard !isRunning && !isClosed else {
-                return false
+            try await lock.withLock {
+                guard !isRunning && !_isClosed else {
+                    return false
+                }
+
+                try await _client.shutdown()
+                _isClosed = true
+                return true
             }
-
-            try await _client.shutdown()
-            isClosed = true
-            return true
-        }
-
-        var isRunning: Bool {
-            manager.isRunning
         }
     }
 }

@@ -9,21 +9,11 @@ import NIOSSL
 ///
 /// TLSCipher defines various commonly used cipher suites for securing communication over TLS
 /// (Transport Layer Security) protocol.
-public struct TLSCipher: RawRepresentable, Hashable, Sendable {
+public struct TLSCipher: Sendable, RawRepresentable, Hashable {
 
-    public let rawValue: UInt16
+    // MARK: - Public static property
 
-    public init(rawValue: UInt16) {
-        self.rawValue = rawValue
-    }
-
-    init(_ cipher: NIOSSL.NIOTLSCipher) {
-        self.init(rawValue: cipher.rawValue)
-    }
-}
-
-// swiftlint:disable identifier_name
-extension TLSCipher {
+    // swiftlint:disable identifier_name
 
     public static let TLS_RSA_WITH_AES_128_CBC_SHA: TLSCipher = {
         TLSCipher(.TLS_RSA_WITH_AES_128_CBC_SHA)
@@ -108,10 +98,24 @@ extension TLSCipher {
     public static let TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256: TLSCipher = {
         TLSCipher(.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256)
     }()
-}
-// swiftlint:enable identifier_name
 
-extension TLSCipher {
+    // swiftlint:enable identifier_name
+
+    // MARK: - Public properties
+
+    public let rawValue: UInt16
+
+    // MARK: - Inits
+
+    public init(rawValue: UInt16) {
+        self.rawValue = rawValue
+    }
+
+    init(_ cipher: NIOSSL.NIOTLSCipher) {
+        self.init(rawValue: cipher.rawValue)
+    }
+
+    // MARK: - Internal methods
 
     func build() -> NIOSSL.NIOTLSCipher {
         .init(rawValue: rawValue)

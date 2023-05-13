@@ -7,32 +7,31 @@ import NIOSSL
 
 extension Internals.Certificate {
 
-    enum Format: Hashable {
+    enum Format: Sendable, Hashable {
+
         case der
         case pem
-    }
-}
 
-extension Internals.Certificate.Format {
+        // MARK: - Internal properties
 
-    var pathExtension: String {
-        switch self {
-        case .der:
-            return "cer"
-        case .pem:
-            return "pem"
+        var pathExtension: String {
+            switch self {
+            case .der:
+                return "cer"
+            case .pem:
+                return "pem"
+            }
         }
-    }
-}
 
-extension Internals.Certificate.Format {
+        // MARK: - Internal methods
 
-    func build() -> NIOSSLSerializationFormats {
-        switch self {
-        case .der:
-            return .der
-        case .pem:
-            return .pem
+        func build() -> NIOSSLSerializationFormats {
+            switch self {
+            case .der:
+                return .der
+            case .pem:
+                return .pem
+            }
         }
     }
 }

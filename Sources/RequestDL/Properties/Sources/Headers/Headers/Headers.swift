@@ -9,14 +9,16 @@ public enum Headers {}
 
 extension Headers {
 
-    @RequestActor
     struct Node: PropertyNode {
+
+        // MARK: - Internal properties
 
         let key: String
         let value: String
 
+        // MARK: - Internal methods
+
         func make(_ make: inout Make) async throws {
-            let value = value
             if !value.isEmpty {
                 make.request.headers.setValue(value, forKey: key)
             }

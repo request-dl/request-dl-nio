@@ -4,22 +4,138 @@
 
 import Foundation
 
-@RequestActor
-protocol SecureConnectionCollectorPropertyNode {
+protocol SecureConnectionCollectorPropertyNode: Sendable {
 
     func make(_ collector: inout SecureConnectionNode.Collector)
 }
 
-@RequestActor
-protocol SecureConnectionPropertyNode {
+protocol SecureConnectionPropertyNode: Sendable {
 
     func make(_ secureConnection: inout Internals.SecureConnection)
 }
 
-@RequestActor
 struct SecureConnectionNode: PropertyNode {
 
+    struct Collector: Sendable {
+
+        // MARK: - Internal properties
+
+        var certificateChain: [Internals.Certificate]?
+
+        var trustRoots: [Internals.Certificate]?
+
+        var additionalTrustRoots: [Internals.Certificate]?
+
+        // MARK: - Private properties
+
+        fileprivate var secureConnection: Internals.SecureConnection
+
+        // MARK: - Inits
+
+        fileprivate init(_ secureConnection: Internals.SecureConnection) {
+            self.secureConnection = secureConnection
+        }
+
+        // MARK: - Internal methods
+
+        func callAsFunction<Value>(_ keyPath: KeyPath<Self, Value>) -> Internals.SecureConnection {
+            var secureConnection = secureConnection
+
+            switch keyPath {
+            case \.certificateChain:
+                setCertificateChain(&secureConnection)
+            case \.trustRoots:
+                setTrustRoots(&secureConnection)
+            case \.additionalTrustRoots:
+                setAdditionalTrustRoots(&secureConnection)
+            default:
+                setCertificateChain(&secureConnection)
+                setTrustRoots(&secureConnection)
+                setAdditionalTrustRoots(&secureConnection)
+            }
+
+            return secureConnection
+        }
+
+        // MARK: - Private methods
+
+        private func setCertificateChain(_ secureConnection: inout Internals.SecureConnection) {
+            if let certificateChain {
+                secureConnection.certificateChain = .certificates(certificateChain)
+            }
+        }
+
+        private func setTrustRoots(_ secureConnection: inout Internals.SecureConnection) {
+            if let trustRoots {
+                secureConnection.trustRoots = .certificates(trustRoots)
+            }
+        }
+
+        private func setAdditionalTrustRoots(_ secureConnection: inout Internals.SecureConnection) {
+            if let additionalTrustRoots {
+                var sc_additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
+                sc_additionalTrustRoots.append(.certificates(additionalTrustRoots))
+                secureConnection.additionalTrustRoots = sc_additionalTrustRoots
+            }
+        }
+    }
+
+    struct Contains: Sendable {
+
+        // MARK: - Private properties
+
+        fileprivate let source: Source
+
+        // MARK: - Internal methods
+
+        func callAsFunction<Property>(_ type: Property.Type) -> Bool {
+            switch source {
+            case .collectorNode(let property):
+                return property is Property
+            case .node(let property):
+                return property is Property
+            }
+        }
+    }
+
+    struct Passthrough: Sendable {
+
+        // MARK: - Private properties
+
+        fileprivate let source: Source
+
+        // MARK: - Internal methods
+
+        func callAsFunction(_ collector: inout Collector) {
+            switch source {
+            case .node(let node):
+                node.make(&collector.secureConnection)
+            case .collectorNode(let node):
+                node.make(&collector)
+            }
+        }
+    }
+
+    fileprivate enum Source: Sendable {
+        case collectorNode(SecureConnectionCollectorPropertyNode)
+        case node(SecureConnectionPropertyNode)
+    }
+
+    // MARK: - Internal properties
+
+    var contains: Contains {
+        .init(source: source)
+    }
+
+    var passthrough: Passthrough {
+        .init(source: source)
+    }
+
+    // MARK: - Private properties
+
     private let source: Source
+
+    // MARK: - Inits
 
     init(_ node: SecureConnectionCollectorPropertyNode) {
         self.source = .collectorNode(node)
@@ -28,6 +144,8 @@ struct SecureConnectionNode: PropertyNode {
     init(_ node: SecureConnectionPropertyNode) {
         self.source = .node(node)
     }
+
+    // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
         guard let secureConnection = make.configuration.secureConnection else {
@@ -42,124 +160,10 @@ struct SecureConnectionNode: PropertyNode {
     }
 }
 
-extension SecureConnectionNode {
-
-    fileprivate enum Source {
-        case collectorNode(SecureConnectionCollectorPropertyNode)
-        case node(SecureConnectionPropertyNode)
-    }
-}
-
-extension SecureConnectionNode {
-
-    @RequestActor
-    struct Contains {
-
-        fileprivate let source: Source
-
-        func callAsFunction<Property>(_ type: Property.Type) -> Bool {
-            switch source {
-            case .collectorNode(let property):
-                return property is Property
-            case .node(let property):
-                return property is Property
-            }
-        }
-    }
-
-    @RequestActor
-    var contains: Contains {
-        .init(source: source)
-    }
-}
-
-extension SecureConnectionNode {
-
-    @RequestActor
-    struct Passthrough {
-
-        fileprivate let source: Source
-
-        func callAsFunction(_ collector: inout Collector) {
-            switch source {
-            case .node(let node):
-                node.make(&collector.secureConnection)
-            case .collectorNode(let node):
-                node.make(&collector)
-            }
-        }
-    }
-
-    @RequestActor
-    var passthrough: Passthrough {
-        .init(source: source)
-    }
-}
-
-extension SecureConnectionNode {
-
-    @RequestActor
-    struct Collector {
-
-        var certificateChain: [Internals.Certificate]?
-
-        var trustRoots: [Internals.Certificate]?
-
-        var additionalTrustRoots: [Internals.Certificate]?
-
-        fileprivate var secureConnection: Internals.SecureConnection
-
-        fileprivate init(_ secureConnection: Internals.SecureConnection) {
-            self.secureConnection = secureConnection
-        }
-    }
-}
-
-extension SecureConnectionNode.Collector {
-
-    private func setCertificateChain(_ secureConnection: inout Internals.SecureConnection) {
-        if let certificateChain {
-            secureConnection.certificateChain = .certificates(certificateChain)
-        }
-    }
-
-    private func setTrustRoots(_ secureConnection: inout Internals.SecureConnection) {
-        if let trustRoots {
-            secureConnection.trustRoots = .certificates(trustRoots)
-        }
-    }
-
-    private func setAdditionalTrustRoots(_ secureConnection: inout Internals.SecureConnection) {
-        if let additionalTrustRoots {
-            var sc_additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
-            sc_additionalTrustRoots.append(.certificates(additionalTrustRoots))
-            secureConnection.additionalTrustRoots = sc_additionalTrustRoots
-        }
-    }
-
-    func callAsFunction<Value>(_ keyPath: KeyPath<Self, Value>) -> Internals.SecureConnection {
-        var secureConnection = secureConnection
-
-        switch keyPath {
-        case \.certificateChain:
-            setCertificateChain(&secureConnection)
-        case \.trustRoots:
-            setTrustRoots(&secureConnection)
-        case \.additionalTrustRoots:
-            setAdditionalTrustRoots(&secureConnection)
-        default:
-            setCertificateChain(&secureConnection)
-            setTrustRoots(&secureConnection)
-            setAdditionalTrustRoots(&secureConnection)
-        }
-
-        return secureConnection
-    }
-}
+// MARK: - Internals.SecureConnection extension
 
 extension Internals.SecureConnection {
 
-    @RequestActor
     func collector() -> SecureConnectionNode.Collector {
         .init(self)
     }

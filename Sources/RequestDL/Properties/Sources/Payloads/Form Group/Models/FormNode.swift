@@ -4,16 +4,21 @@
 
 import Foundation
 
-@RequestActor
 struct FormNode: PropertyNode {
 
-    let partLength: Int?
-    let factory: () -> PartFormRawValue
+    // MARK: - Internal properties
 
-    init(_ partLength: Int?, _ factory: @escaping () -> PartFormRawValue) {
+    let partLength: Int?
+    let factory: @Sendable () -> PartFormRawValue
+
+    // MARK: - Inits
+
+    init(_ partLength: Int?, _ factory: @escaping @Sendable () -> PartFormRawValue) {
         self.partLength = partLength
         self.factory = factory
     }
+
+    // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
         let constructor = MultipartFormConstructor([factory()])

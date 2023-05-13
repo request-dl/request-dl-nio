@@ -4,9 +4,9 @@
 
 import Foundation
 
-protocol URLSingleEncodingStrategy {
+protocol URLSingleEncodingStrategy: Sendable {
 
-    associatedtype Value
+    associatedtype Value: Sendable
 
     func encode(_ value: Value, in encoder: URLEncoder.Encoder) throws
 }

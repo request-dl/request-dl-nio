@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiersProgressTests: XCTestCase {
 
     class UploadProgressMonitor: UploadProgress {

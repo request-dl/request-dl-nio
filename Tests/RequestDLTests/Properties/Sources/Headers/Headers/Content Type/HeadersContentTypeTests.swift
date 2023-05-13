@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeadersContentTypeTests: XCTestCase {
 
     func testHeadersJsonContentType() async throws {

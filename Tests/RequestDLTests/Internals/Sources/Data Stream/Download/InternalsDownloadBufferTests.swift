@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsDownloadBufferTests: XCTestCase {
 
     func testDownload_whenAppendingTotalLength_shouldContainsOneFragment() async throws {

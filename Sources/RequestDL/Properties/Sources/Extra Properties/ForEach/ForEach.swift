@@ -24,17 +24,25 @@ import Foundation
  }
  ```
  */
-@RequestActor
-public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Hashable, Content: Property {
+public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable, Content: Property {
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
 
     /// The sequence of data to be iterated over.
     public let data: Data
 
     /// A closure that takes an element of the data sequence as input and produces a property
     /// for that element.
-    public let content: @RequestActor (Data.Element) -> Content
+    public let content: @Sendable (Data.Element) -> Content
 
-    private let id: KeyPath<Data.Element, ID>
+    // MARK: - Private properties
+
+    private let id: @Sendable (Data.Element) -> ID
 
     /**
      Creates a new instance of `ForEach`.
@@ -48,10 +56,10 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
     public init(
         _ data: Data,
         id: KeyPath<Data.Element, ID>,
-        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
     ) {
         self.data = data
-        self.id = id
+        self.id = { $0[keyPath: id] }
         self.content = content
     }
 
@@ -65,7 +73,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
      */
     public init(
         _ data: Data,
-        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
     ) where Data.Element: Identifiable, ID == Data.Element.ID {
         self.init(
             data,
@@ -73,14 +81,6 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence, ID: Has
             content: content
         )
     }
-
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension ForEach {
 
     /**
       Creates a new instance of `ForEach` for a `Range` of `Int`.
@@ -92,7 +92,7 @@ extension ForEach {
      */
     public init<Bound>(
         _ data: Data,
-        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
     ) where Bound: Comparable & Hashable, Data == Range<Bound>, ID == Int {
         self.init(
             data,
@@ -110,7 +110,7 @@ extension ForEach {
      */
     public init<Bound>(
         _ data: Data,
-        @PropertyBuilder content: @RequestActor @escaping (Data.Element) -> Content
+        @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
     ) where Bound: Comparable & Hashable, Data == ClosedRange<Bound>, ID == Int {
         self.init(
             data,
@@ -118,12 +118,10 @@ extension ForEach {
             content: content
         )
     }
-}
 
-extension ForEach {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<ForEach<Data, ID, Content>>,
         inputs: _PropertyInputs
@@ -133,7 +131,7 @@ extension ForEach {
         var group = ChildrenNode()
 
         for element in property.data {
-            let id = element[keyPath: property.id]
+            let id = property.id(element)
             let content = property.content(element)
 
             let output = try await Content._makeProperty(

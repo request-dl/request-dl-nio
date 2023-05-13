@@ -5,7 +5,7 @@
 import Foundation
 import NIOCore
 
-protocol SessionProvider {
+protocol SessionProvider: Sendable {
 
     var id: String { get }
 

@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class PayloadTests: XCTestCase {
 
     struct Mock: Codable, Equatable {

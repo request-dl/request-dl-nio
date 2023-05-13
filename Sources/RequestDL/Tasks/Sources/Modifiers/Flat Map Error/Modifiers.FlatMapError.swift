@@ -17,7 +17,11 @@ extension Modifiers {
      */
     public struct FlatMapError<Content: Task>: TaskModifier {
 
-        let transform: (Error) throws -> Void
+        // MARK: - Internal properties
+
+        let transform: @Sendable (Error) throws -> Void
+
+        // MARK: - Public methods
 
         /**
          Transforms the result of a `Task` to a new element type.
@@ -36,6 +40,8 @@ extension Modifiers {
         }
     }
 }
+
+// MARK: - Task extension
 
 extension Task {
 
@@ -61,7 +67,7 @@ extension Task {
      `transform` closure.
      */
     public func flatMapError(
-        _ transform: @escaping (Error) throws -> Void
+        _ transform: @escaping @Sendable (Error) throws -> Void
     ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
         modify(Modifiers.FlatMapError(transform: transform))
     }
@@ -91,7 +97,7 @@ extension Task {
      */
     public func flatMapError<Failure: Error>(
         _ type: Failure.Type,
-        _ transform: @escaping (Failure) throws -> Void
+        _ transform: @escaping @Sendable (Failure) throws -> Void
     ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
         flatMapError {
             if let error = $0 as? Failure {

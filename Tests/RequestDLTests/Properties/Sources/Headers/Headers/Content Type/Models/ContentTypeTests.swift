@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ContentTypeTests: XCTestCase {
 
     func testJsonTypeRawValue() async throws {

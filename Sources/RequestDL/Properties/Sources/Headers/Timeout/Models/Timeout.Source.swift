@@ -24,7 +24,9 @@ extension Timeout {
      }
      ```
      */
-    public struct Source: OptionSet {
+    public struct Source: Sendable, OptionSet {
+
+        // MARK: - Public static properties
 
         /// The timeout interval for the connect.
         public static let connect = Source(rawValue: 1 << 0)
@@ -36,14 +38,18 @@ extension Timeout {
         /// Defines same timeout interval for `request` and `resource`
         public static let all: Self = [.connect, .read]
 
-        public let rawValue: Int
+        // MARK: - Public properties
+
+        public let rawValue: UInt8
+
+        // MARK: - Inits
 
         /**
          Initializes a new timeout source with the given raw value.
 
          - parameter rawValue: The raw value to use for the timeout source.
          */
-        public init(rawValue: Int) {
+        public init(rawValue: UInt8) {
             self.rawValue = rawValue
         }
     }

@@ -19,11 +19,12 @@ public struct InterceptedTask<
 
     public typealias Element = Content.Element
 
+    // MARK: - Internal properties
+
     let task: Content
     let interceptor: Interceptor
-}
 
-extension InterceptedTask {
+    // MARK: - Public methods
 
     /**
      Returns the result of the task.

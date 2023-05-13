@@ -6,10 +6,11 @@ import Foundation
 
 struct RawTask<Content: Property>: Task {
 
-    let content: Content
-}
+    // MARK: - Internal methods
 
-extension RawTask {
+    let content: Content
+
+    // MARK: - Internal methods
 
     func result() async throws -> AsyncResponse {
         let resolved = try await Resolve(content).build()

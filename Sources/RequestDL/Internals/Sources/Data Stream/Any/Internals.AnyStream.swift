@@ -6,11 +6,21 @@ import Foundation
 
 extension Internals {
 
-    class AnyStream<Value>: StreamProtocol {
+    final class AnyStream<Value: Sendable>: StreamProtocol {
 
-        private let openClosure: () -> Bool
-        private let appendClosure: (Result<Value?, Error>) -> Void
-        private var nextClosure: () throws -> Value?
+        // MARK: - Internal properties
+
+        var isOpen: Bool {
+            openClosure()
+        }
+
+        // MARK: - Private properties
+
+        private let openClosure: @Sendable () -> Bool
+        private let appendClosure: @Sendable (Result<Value?, Error>) -> Void
+        private let nextClosure: @Sendable () throws -> Value?
+
+        // MARK: - Inits
 
         init<Stream: StreamProtocol>(_ stream: Stream) where Stream.Value == Value {
             openClosure = {
@@ -26,9 +36,7 @@ extension Internals {
             }
         }
 
-        var isOpen: Bool {
-            openClosure()
-        }
+        // MARK: - Internal methods
 
         func append(_ value: Result<Value?, Error>) {
             appendClosure(value)

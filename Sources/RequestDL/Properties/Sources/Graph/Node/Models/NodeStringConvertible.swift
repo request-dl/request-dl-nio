@@ -4,8 +4,7 @@
 
 import Foundation
 
-@RequestActor
-protocol NodeStringConvertible {
+protocol NodeStringConvertible: Sendable {
 
     var nodeDescription: String { get }
 }

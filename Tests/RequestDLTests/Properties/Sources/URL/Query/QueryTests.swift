@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class QueryTests: XCTestCase {
 
     func testSingleQuery() async throws {

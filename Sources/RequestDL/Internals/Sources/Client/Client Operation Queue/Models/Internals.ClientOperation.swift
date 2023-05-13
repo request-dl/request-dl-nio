@@ -6,27 +6,52 @@ import Foundation
 
 extension Internals {
 
-    @HTTPClientActor
-    class ClientOperation {
+    class ClientOperation: @unchecked Sendable {
 
-        private(set) weak var previous: ClientOperation?
-        private(set) var next: ClientOperation?
-        private weak var delegate: QueueClientOperationDelegate?
+        // MARK: - Internal properties
 
-        init(delegate: QueueClientOperationDelegate?) {
-            self.delegate = delegate
+        private(set) weak var previous: ClientOperation? {
+            get { lock.withLock { _previous } }
+            set { lock.withLock { _previous = newValue } }
         }
 
+        private(set) var next: ClientOperation? {
+            get { lock.withLock { _next } }
+            set { lock.withLock { _next = newValue } }
+        }
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private weak var _previous: ClientOperation?
+        private var _next: ClientOperation?
+        private weak var _delegate: QueueClientOperationDelegate?
+
+        // MARK: - Init
+
+        init(delegate: QueueClientOperationDelegate?) {
+            self._delegate = delegate
+        }
+
+        // MARK: - Internal methods
+
         func connect(to operation: ClientOperation) {
-            operation.next = self
-            self.previous = operation
+            lock.withLockVoid {
+                operation.next = self
+                self._previous = operation
+            }
         }
 
         func complete() {
-            previous?.next = next
-            next?.previous = previous
+            lock.withLockVoid {
+                _previous?.next = _next
+                _next?.previous = _previous
+            }
 
-            delegate?.operationDidComplete(self)
+            _delegate?.operationDidComplete(self)
         }
     }
 }

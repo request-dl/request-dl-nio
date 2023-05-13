@@ -4,13 +4,16 @@
 
 import Foundation
 
-@RequestActor
 struct PayloadNode: PropertyNode {
 
+    // MARK: - Internal properties
+
     let isURLEncodedCompatible: Bool
-    let buffer: () -> BufferProtocol
+    let buffer: @Sendable () -> BufferProtocol
     let urlEncoder: URLEncoder
     let partLength: Int?
+
+    // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
         guard
@@ -33,15 +36,14 @@ struct PayloadNode: PropertyNode {
             make.request.body = Internals.Body(partLength, buffers: [buffer()])
         }
     }
-}
 
-private extension PayloadNode {
+    // MARK: - Private methods
 
-    func isURLEncoded(_ headers: Internals.Headers) -> Bool {
+    private func isURLEncoded(_ headers: Internals.Headers) -> Bool {
         headers.contains("x-www-form-urlencoded", forKey: "Content-Type")
     }
 
-    func jsonObject(_ data: Data) throws -> Any {
+    private func jsonObject(_ data: Data) throws -> Any {
         var readingOptions = JSONSerialization.ReadingOptions.fragmentsAllowed
 
         #if canImport(Darwin)
@@ -52,11 +54,8 @@ private extension PayloadNode {
 
         return try JSONSerialization.jsonObject(with: data, options: readingOptions)
     }
-}
 
-private extension PayloadNode {
-
-    func makeDictionaryURLEncoded(_ value: [String: Any], in make: inout Make) throws {
+    private func makeDictionaryURLEncoded(_ value: [String: Any], in make: inout Make) throws {
         var queries = [QueryItem]()
 
         for (key, value) in value {
@@ -67,7 +66,7 @@ private extension PayloadNode {
         makeQueries(queries, in: &make)
     }
 
-    func makeArrayURLEncoded(_ value: [Any], in make: inout Make) throws {
+    private func makeArrayURLEncoded(_ value: [Any], in make: inout Make) throws {
         var queries = [QueryItem]()
 
         for (index, value) in value.enumerated() {

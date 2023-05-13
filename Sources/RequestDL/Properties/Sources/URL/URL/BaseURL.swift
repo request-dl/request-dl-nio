@@ -35,11 +35,48 @@ import Foundation
  }
  ```
  */
-@RequestActor
 public struct BaseURL: Property {
+
+    private struct Node: PropertyNode {
+
+        let baseURL: String
+
+        func make(_ make: inout Make) async throws {
+            make.request.baseURL = baseURL
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     let internetProtocol: InternetProtocol
     let host: String
+
+    // MARK: - Private properties
+
+    private var absoluteString: String {
+        if host.contains("://") {
+            Internals.Log.failure(
+                .invalidHost(host)
+            )
+        }
+
+        guard let host = host.split(separator: "/").first else {
+            Internals.Log.failure(
+                .unexpectedHost(host)
+            )
+        }
+
+        return "\(internetProtocol.rawValue)://\(host)"
+    }
+
+    // MARK: - Init
 
     /**
      Creates a BaseURL by combining the internet protocol and the string host.
@@ -89,44 +126,9 @@ public struct BaseURL: Property {
         self.init(.https, host: host)
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension BaseURL {
-
-    fileprivate var absoluteString: String {
-        if host.contains("://") {
-            Internals.Log.failure(
-                .invalidHost(host)
-            )
-        }
-
-        guard let host = host.split(separator: "/").first else {
-            Internals.Log.failure(
-                .unexpectedHost(host)
-            )
-        }
-
-        return "\(internetProtocol.rawValue)://\(host)"
-    }
-}
-
-extension BaseURL {
-
-    private struct Node: PropertyNode {
-
-        let baseURL: String
-
-        func make(_ make: inout Make) async throws {
-            make.request.baseURL = baseURL
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<BaseURL>,
         inputs: _PropertyInputs

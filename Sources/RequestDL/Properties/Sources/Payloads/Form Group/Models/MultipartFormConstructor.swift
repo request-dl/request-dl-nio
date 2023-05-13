@@ -4,14 +4,12 @@
 
 import Foundation
 
-struct MultipartFormConstructor {
+struct MultipartFormConstructor: Sendable {
 
-    let boundary: String
-    let multipart: [PartFormRawValue]
+    // MARK: - Internal properties
 
-    fileprivate init(_ boundary: String, multipart: [PartFormRawValue]) {
-        self.boundary = boundary
-        self.multipart = multipart
+    var eol: Character {
+        "\r\n"
     }
 
     var body: Data {
@@ -35,30 +33,11 @@ struct MultipartFormConstructor {
 
         return data
     }
-}
 
-extension MultipartFormConstructor {
+    let boundary: String
+    let multipart: [PartFormRawValue]
 
-    fileprivate func buildData(for multipart: PartFormRawValue) -> Data {
-        let headers = multipart.headers
-            .reduce([String]()) { $0 + ["\($1.key): \($1.value)"] }
-            .joined(separator: "\(eol)")
-
-        var data = Data("\(headers)\(eol)".utf8)
-        data.append(Data("\(eol)".utf8))
-        data.append(multipart.data)
-        return data
-    }
-}
-
-extension MultipartFormConstructor {
-
-    var eol: Character {
-        "\r\n"
-    }
-}
-
-extension MultipartFormConstructor {
+    // MARK: - Private static properties
 
     private static var boundary: String {
         let prefix = UInt64.random(in: .min ... .max)
@@ -67,7 +46,27 @@ extension MultipartFormConstructor {
         return "\(String(prefix, radix: 16)):\(String(sufix, radix: 16))"
     }
 
+    // MARK: - Inits
+
     init(_ multipart: [PartFormRawValue]) {
         self.init(Self.boundary, multipart: multipart)
+    }
+
+    fileprivate init(_ boundary: String, multipart: [PartFormRawValue]) {
+        self.boundary = boundary
+        self.multipart = multipart
+    }
+
+    // MARK: - Private methods
+
+    private func buildData(for multipart: PartFormRawValue) -> Data {
+        let headers = multipart.headers
+            .reduce([String]()) { $0 + ["\($1.key): \($1.value)"] }
+            .joined(separator: "\(eol)")
+
+        var data = Data("\(headers)\(eol)".utf8)
+        data.append(Data("\(eol)".utf8))
+        data.append(multipart.data)
+        return data
     }
 }

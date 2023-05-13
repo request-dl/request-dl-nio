@@ -23,10 +23,20 @@ import Foundation
  }
  ```
  */
-@RequestActor
 public struct AsyncProperty<Content: Property>: Property {
 
-    private let content: () async throws -> Content
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
+
+    private let content: @Sendable () async throws -> Content
+
+    // MARK: - Inits
 
     /**
      Initializes with an asynchronous content provided.
@@ -34,20 +44,13 @@ public struct AsyncProperty<Content: Property>: Property {
      - Parameters:
         - content: The content of the request to be built.
      */
-    public init(@PropertyBuilder content: @RequestActor @escaping () async throws -> Content) {
+    public init(@PropertyBuilder content: @escaping @Sendable () async throws -> Content) {
         self.content = content
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension AsyncProperty {
+    // MARK: - Static public methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<AsyncProperty<Content>>,
         inputs: _PropertyInputs

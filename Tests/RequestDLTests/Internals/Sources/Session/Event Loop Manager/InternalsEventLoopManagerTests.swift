@@ -7,7 +7,6 @@ import NIOCore
 import NIOPosix
 @testable import RequestDL
 
-@RequestActor
 class InternalsEventLoopManagerTests: XCTestCase {
 
     struct CustomProvider: SessionProvider {
@@ -24,7 +23,7 @@ class InternalsEventLoopManagerTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        manager = await Internals.EventLoopGroupManager()
+        manager = Internals.EventLoopGroupManager()
     }
 
     override func tearDown() async throws {

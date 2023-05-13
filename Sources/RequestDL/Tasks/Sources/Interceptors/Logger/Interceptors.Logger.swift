@@ -23,10 +23,14 @@ extension Interceptors {
 
      - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
-    public struct Logger<Element>: TaskInterceptor {
+    public struct Logger<Element: Sendable>: TaskInterceptor {
+
+        // MARK: - Internal properties
 
         let isActive: Bool
-        let results: (Element) -> [String]
+        let results: @Sendable (Element) -> [String]
+
+        // MARK: - Public methods
 
         /**
         Called when the task result is received.
@@ -47,6 +51,8 @@ extension Interceptors {
         }
     }
 }
+
+// MARK: - Task extension
 
 extension Task {
 

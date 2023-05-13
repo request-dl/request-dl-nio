@@ -29,9 +29,13 @@ import Foundation
 */
 public struct MockedTask: Task {
 
+    // MARK: - Private properties
+
     private let statusCode: StatusCode
     private let headers: [String: String]?
     private let data: Data
+
+    // MARK: - Inits
 
     /**
      Initializes a new `MockedTask` with the given status code, headers and closure that returns the mocked data.
@@ -50,9 +54,8 @@ public struct MockedTask: Task {
         self.headers = headers
         self.data = data()
     }
-}
 
-extension MockedTask {
+    // MARK: - Public methods
 
     /**
      Executes the mocked task and returns a `TaskResult` encapsulating the mock data.

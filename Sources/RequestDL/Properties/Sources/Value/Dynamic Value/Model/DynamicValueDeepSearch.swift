@@ -4,14 +4,24 @@
 
 import Foundation
 
-@RequestActor
-struct DynamicValueDeepSearch<Content> {
+struct DynamicValueDeepSearch<Content>: Sendable {
+
+    struct Child<Value> {
+        let label: String
+        let value: Value
+    }
+
+    // MARK: - Private properties
 
     private let mirror: DynamicValueMirror<Content>
+
+    // MARK: - Inits
 
     init(_ mirror: DynamicValueMirror<Content>) {
         self.mirror = mirror
     }
+
+    // MARK: - Internal methods
 
     func callAsFunction<Value>(_ type: Value.Type) -> [Child<Value>] {
         mirror().reduce([]) { reduced, child in
@@ -33,13 +43,5 @@ struct DynamicValueDeepSearch<Content> {
                 }
             }
         }
-    }
-}
-
-extension DynamicValueDeepSearch {
-
-    struct Child<Value> {
-        let label: String
-        let value: Value
     }
 }

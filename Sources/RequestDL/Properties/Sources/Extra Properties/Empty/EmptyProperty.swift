@@ -5,22 +5,23 @@
 import Foundation
 
 /// A struct representing an empty property.
-@RequestActor
 public struct EmptyProperty: Property {
 
-    /// Initializes an empty request.
-    public init() {}
+    // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
-}
 
-extension EmptyProperty {
+    // MARK: - Inits
+
+    /// Initializes an empty request.
+    public init() {}
+
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<EmptyProperty>,
         inputs: _PropertyInputs

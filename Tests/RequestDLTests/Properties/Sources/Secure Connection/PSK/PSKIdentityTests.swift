@@ -6,7 +6,6 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
-@RequestActor
 class PSKIdentityTests: XCTestCase {
 
     func testIdentity_whenClientResolver() async throws {
@@ -68,7 +67,7 @@ extension PSKIdentityTests {
         init(
             key: NIOSSLSecureBytes,
             identity: String,
-            received: @Sendable @escaping (String) -> Void
+            received: @escaping @Sendable (String) -> Void
         ) {
             self.key = key
             self.identity = identity

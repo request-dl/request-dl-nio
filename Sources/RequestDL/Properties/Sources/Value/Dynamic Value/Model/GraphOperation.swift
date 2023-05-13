@@ -4,11 +4,24 @@
 
 import Foundation
 
-@RequestActor
-struct GraphOperation<Content> {
+struct GraphOperation<Content>: Sendable {
+
+    // MARK: - Internal properties
+
+    var operations: [GraphValueOperation] {
+        [
+            GraphNamespaceOperation(mirror),
+            GraphEnvironmentOperation(mirror),
+            GraphStoredObjectOperation(mirror)
+        ]
+    }
+
+    // MARK: - Private properties
 
     private let pathway: Int
     private let mirror: DynamicValueMirror<Content>
+
+    // MARK: - Inits
 
     init(_ property: _GraphValue<Content>) where Content: Property {
         self.pathway = property.pathway
@@ -23,6 +36,8 @@ struct GraphOperation<Content> {
         self.mirror = .init(content)
     }
 
+    // MARK: - Internal methods
+
     func callAsFunction(_ inputs: inout _PropertyInputs) {
         var properties = GraphProperties(
             inputs: inputs,
@@ -34,16 +49,5 @@ struct GraphOperation<Content> {
         }
 
         inputs = properties.inputs
-    }
-}
-
-extension GraphOperation {
-
-    var operations: [GraphValueOperation] {
-        [
-            GraphNamespaceOperation(mirror),
-            GraphEnvironmentOperation(mirror),
-            GraphStoredObjectOperation(mirror)
-        ]
     }
 }

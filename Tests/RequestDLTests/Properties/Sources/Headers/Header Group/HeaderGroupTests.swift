@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeaderGroupTests: XCTestCase {
 
     func testHeaderGroupWithEmptyValue() async throws {

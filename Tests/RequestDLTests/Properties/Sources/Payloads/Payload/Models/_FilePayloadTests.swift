@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class _FilePayloadTests: XCTestCase {
 
     func testFilePayload() async throws {

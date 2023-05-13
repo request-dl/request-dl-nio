@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class KeyPathNotFoundTests: XCTestCase {
 
     func testError() async throws {

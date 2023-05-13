@@ -7,45 +7,43 @@ import NIOSSL
 
 extension Internals {
 
-    enum AdditionalTrustRoots: Hashable {
+    enum AdditionalTrustRoots: Sendable, Hashable {
 
         case file(String)
 
         case bytes([UInt8])
 
         case certificates([Internals.Certificate])
-    }
-}
 
-extension Internals.AdditionalTrustRoots {
+        // MARK: - Inits
 
-    init() {
-        self = .certificates([])
-    }
-
-    mutating func append(_ certificate: Internals.Certificate) {
-        guard case .certificates(let certificates) = self else {
-            Internals.Log.failure(
-                .expectingCertificatesCase(self)
-            )
+        init() {
+            self = .certificates([])
         }
 
-        self = .certificates(certificates + [certificate])
-    }
-}
+        // MARK: - Internal methods
 
-extension Internals.AdditionalTrustRoots {
+        mutating func append(_ certificate: Internals.Certificate) {
+            guard case .certificates(let certificates) = self else {
+                Internals.Log.failure(
+                    .expectingCertificatesCase(self)
+                )
+            }
 
-    func build() throws -> NIOSSLAdditionalTrustRoots {
-        switch self {
-        case .file(let file):
-            return .file(file)
-        case .bytes(let bytes):
-            return try .certificates(NIOSSLCertificate.fromPEMBytes(bytes))
-        case .certificates(let certificates):
-            return .certificates(try certificates.map {
-                try $0.build()
-            })
+            self = .certificates(certificates + [certificate])
+        }
+
+        func build() throws -> NIOSSLAdditionalTrustRoots {
+            switch self {
+            case .file(let file):
+                return .file(file)
+            case .bytes(let bytes):
+                return try .certificates(NIOSSLCertificate.fromPEMBytes(bytes))
+            case .certificates(let certificates):
+                return .certificates(try certificates.map {
+                    try $0.build()
+                })
+            }
         }
     }
 }

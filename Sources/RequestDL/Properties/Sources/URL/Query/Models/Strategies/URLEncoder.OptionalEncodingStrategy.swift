@@ -20,7 +20,7 @@ import Foundation
 extension URLEncoder {
 
     /// Defines strategies for encoding none optional in a url encoded format
-    public enum OptionalEncodingStrategy: Sendable {
+    public enum OptionalEncodingStrategy: URLEncodingStrategy {
 
         /// Drops the key and value from the encoded string, leaving no trace of it.
         case droppingKey
@@ -34,39 +34,37 @@ extension URLEncoder {
         /// Encodes the value using a custom closure that takes an `Encoder` as input parameter
         /// and throws an error.
         case custom(@Sendable (Encoder) throws -> Void)
-    }
-}
 
-extension URLEncoder.OptionalEncodingStrategy: URLEncodingStrategy {
+        // MARK: - Internal methods
 
-    func encode(in encoder: URLEncoder.Encoder) throws {
-        switch self {
-        case .droppingKey:
-            try encodeDroppingKey(in: encoder)
-        case .droppingValue:
-            try encodeDroppingValue(in: encoder)
-        case .literal:
-            try encodeLiteral(in: encoder)
-        case .custom(let closure):
-            try closure(encoder)
+        func encode(in encoder: URLEncoder.Encoder) throws {
+            switch self {
+            case .droppingKey:
+                try encodeDroppingKey(in: encoder)
+            case .droppingValue:
+                try encodeDroppingValue(in: encoder)
+            case .literal:
+                try encodeLiteral(in: encoder)
+            case .custom(let closure):
+                try closure(encoder)
+            }
         }
-    }
-}
 
-private extension URLEncoder.OptionalEncodingStrategy {
+        // MARK: - Private methods
 
-    func encodeDroppingKey(in encoder: URLEncoder.Encoder) throws {
-        var container = encoder.valueContainer()
-        try container.dropKey()
-    }
+        private func encodeDroppingKey(in encoder: URLEncoder.Encoder) throws {
+            var container = encoder.valueContainer()
+            try container.dropKey()
+        }
 
-    func encodeDroppingValue(in encoder: URLEncoder.Encoder) throws {
-        var container = encoder.valueContainer()
-        try container.encode("")
-    }
+        private func encodeDroppingValue(in encoder: URLEncoder.Encoder) throws {
+            var container = encoder.valueContainer()
+            try container.encode("")
+        }
 
-    func encodeLiteral(in encoder: URLEncoder.Encoder) throws {
-        var container = encoder.valueContainer()
-        try container.encode("nil")
+        private func encodeLiteral(in encoder: URLEncoder.Encoder) throws {
+            var container = encoder.valueContainer()
+            try container.encode("nil")
+        }
     }
 }

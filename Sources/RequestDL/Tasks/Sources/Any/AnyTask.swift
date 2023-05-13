@@ -12,7 +12,6 @@ import Foundation
  Example:
 
  ```swift
- @RequestActor
  func makeRequest() -> AnyTask<TaskResult<Data>> {
      DataTask {
          BaseURL("google.com")
@@ -21,13 +20,19 @@ import Foundation
  }
  ```
  */
-public struct AnyTask<Element>: Task {
+public struct AnyTask<Element: Sendable>: Task {
 
-    private let wrapper: () async throws -> Element
+    // MARK: - Private properties
+
+    private let wrapper: @Sendable () async throws -> Element
+
+    // MARK: - Inits
 
     init<T: Task>(_ task: T) where T.Element == Element {
         wrapper = { try await task.result() }
     }
+
+    // MARK: - Public methods
 
     /**
      Returns the result of the wrapped task.
@@ -40,6 +45,8 @@ public struct AnyTask<Element>: Task {
         try await wrapper()
     }
 }
+
+// MARK: - Task extension
 
 extension Task {
 

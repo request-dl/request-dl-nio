@@ -6,49 +6,7 @@ import Foundation
 import NIOSSL
 
 /// A struct representing a pre-shared key (PSK).
-@RequestActor
 public struct PSKIdentity: Property {
-
-    private enum Source {
-        case resolver(SSLPSKIdentityResolver)
-        case deprecated
-    }
-
-    private let source: Source
-    private var hint: String?
-
-    /// Creates a PSK identity for client-side authentication with the given resolver.
-    ///
-    /// - Parameters:
-    ///   - resolver: The client PSK identity resolver.
-    public init(_ resolver: SSLPSKIdentityResolver) {
-        self.source = .resolver(resolver)
-    }
-
-    fileprivate func edit(_ edit: (inout Self) -> Void) -> Self {
-        var mutableSelf = self
-        edit(&mutableSelf)
-        return mutableSelf
-    }
-
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension PSKIdentity {
-
-    /// Adds a hint to the PSK.
-    ///
-    /// - Parameter hint: A hint string to be associated with the identity.
-    /// - Returns: The PSK instance with the hint added.
-    public func hint(_ hint: String) -> Self {
-        edit { $0.hint = hint }
-    }
-}
-
-extension PSKIdentity {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -69,8 +27,36 @@ extension PSKIdentity {
         }
     }
 
+    private enum Source: Sendable {
+        case resolver(SSLPSKIdentityResolver)
+        case deprecated
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
+
+    private let source: Source
+    private var hint: String?
+
+    // MARK: - Inits
+
+    /// Creates a PSK identity for client-side authentication with the given resolver.
+    ///
+    /// - Parameters:
+    ///   - resolver: The client PSK identity resolver.
+    public init(_ resolver: SSLPSKIdentityResolver) {
+        self.source = .resolver(resolver)
+    }
+
+    // MARK: - Public static methods
+
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<PSKIdentity>,
         inputs: _PropertyInputs
@@ -83,7 +69,27 @@ extension PSKIdentity {
             )
         ))
     }
+
+    // MARK: - Public methods
+
+    /// Adds a hint to the PSK.
+    ///
+    /// - Parameter hint: A hint string to be associated with the identity.
+    /// - Returns: The PSK instance with the hint added.
+    public func hint(_ hint: String) -> Self {
+        edit { $0.hint = hint }
+    }
+
+    // MARK: - Private methods
+
+    private func edit(_ edit: (inout Self) -> Void) -> Self {
+        var mutableSelf = self
+        edit(&mutableSelf)
+        return mutableSelf
+    }
 }
+
+// MARK: - Deprecated
 
 extension PSKIdentity {
 
@@ -96,7 +102,7 @@ extension PSKIdentity {
     @available(*, deprecated, renamed: "init(_:)")
     public init(
         _ psk: PSKClient,
-        _ closure: @Sendable @escaping (PSKClientDescription) throws -> PSKClientIdentity
+        _ closure: @escaping @Sendable (PSKClientDescription) throws -> PSKClientIdentity
     ) {
         self.init(ClientResolver(closure))
     }
@@ -110,7 +116,7 @@ extension PSKIdentity {
     @available(*, deprecated, renamed: "init(_:)")
     public init(
         _ psk: PSKServer,
-        _ closure: @Sendable @escaping (PSKServerDescription) throws -> PSKServerIdentity
+        _ closure: @escaping @Sendable (PSKServerDescription) throws -> PSKServerIdentity
     ) {
         self.source = .deprecated
     }
@@ -121,7 +127,7 @@ extension PSKIdentity {
     /// - Parameter closure: A closure that generates a PSK client for a given client description.
     @available(*, deprecated, renamed: "init(_:)")
     public init(
-        _ closure: @Sendable @escaping (PSKClientDescription) throws -> PSKClientIdentity
+        _ closure: @escaping @Sendable (PSKClientDescription) throws -> PSKClientIdentity
     ) {
         self.init(.client, closure)
     }
@@ -134,7 +140,7 @@ extension PSKIdentity {
 
         private let resolver: @Sendable (PSKClientDescription) throws -> PSKClientIdentity
 
-        init(_ resolver: @Sendable @escaping (PSKClientDescription) throws -> PSKClientIdentity) {
+        init(_ resolver: @escaping @Sendable (PSKClientDescription) throws -> PSKClientIdentity) {
             self.resolver = resolver
         }
 

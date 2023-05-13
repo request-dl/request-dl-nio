@@ -5,12 +5,11 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InterceptedTaskTests: XCTestCase {
 
     struct Intercepted<Element>: TaskInterceptor {
 
-        let callback: () -> Void
+        let callback: @Sendable () -> Void
 
         func received(_ result: Result<Element, Error>) {
             callback()
@@ -20,18 +19,18 @@ class InterceptedTaskTests: XCTestCase {
     func testInterceptor() async throws {
         // Given
         let expectation = expectation(description: "Interceptor callback")
-        var taskIntercepted = false
+        let taskIntercepted = SendableBox(false)
 
         // When
         _ = try await MockedTask(data: Data.init)
             .intercept(Intercepted {
-                taskIntercepted = true
+                taskIntercepted(true)
                 expectation.fulfill()
             })
             .result()
 
         // Then
         await fulfillment(of: [expectation], timeout: 3)
-        XCTAssertTrue(taskIntercepted)
+        XCTAssertTrue(taskIntercepted())
     }
 }

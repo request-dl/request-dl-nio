@@ -5,18 +5,9 @@
 import Foundation
 
 /// HTTP methods for making requests.
-public struct HTTPMethod: Hashable {
+public struct HTTPMethod: Sendable, Hashable {
 
-    let rawValue: String
-
-    /// Initializes an HTTP method with the specified raw value.
-    /// - Parameter rawValue: The raw string value of the HTTP method.
-    public init<S: StringProtocol>(_ rawValue: S) {
-        self.rawValue = String(rawValue)
-    }
-}
-
-extension HTTPMethod {
+    // MARK: - Public static properties
 
     /// HTTP GET method.
     public static let get: HTTPMethod = "GET"
@@ -44,7 +35,21 @@ extension HTTPMethod {
 
     /// HTTP TRACE method.
     public static let trace: HTTPMethod = "TRACE"
+
+    // MARK: - Internal properties
+
+    let rawValue: String
+
+    // MARK: - Inits
+
+    /// Initializes an HTTP method with the specified raw value.
+    /// - Parameter rawValue: The raw string value of the HTTP method.
+    public init<S: StringProtocol>(_ rawValue: S) {
+        self.rawValue = String(rawValue)
+    }
 }
+
+// MARK: - ExpressibleByStringLiteral
 
 extension HTTPMethod: ExpressibleByStringLiteral {
 
@@ -54,6 +59,8 @@ extension HTTPMethod: ExpressibleByStringLiteral {
         self.init(value)
     }
 }
+
+// MARK: - LosslessStringConvertible
 
 extension HTTPMethod: LosslessStringConvertible {
 

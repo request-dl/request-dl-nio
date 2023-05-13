@@ -6,7 +6,6 @@ import XCTest
 import NIOCore
 @testable import RequestDL
 
-@RequestActor
 class InternalsRequestTests: XCTestCase {
 
     private var request: Internals.Request!

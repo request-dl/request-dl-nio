@@ -29,10 +29,14 @@ import Foundation
  You can get the result individually or by using the `\.keys`, `\.values` properties of dictionary or by using
  the `subscript` method.
  */
-public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element: Hashable {
+public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element: Hashable, Data: Sendable {
+
+    // MARK: - Private properties
 
     private let data: Data
-    private let map: @RequestActor (Data.Element) -> Content
+    private let transform: @Sendable (Data.Element) -> Content
+
+    // MARK: - Inits
 
     /**
      Initializes a `GroupTask` instance.
@@ -41,45 +45,44 @@ public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element:
         - data: The type of the collection that contains the elements.
         - content: The closure map function that transform each element of data into of task.
      */
-    public init(_ data: Data, content: @RequestActor @escaping (Data.Element) -> Content) {
+    public init(_ data: Data, content transform: @escaping @Sendable (Data.Element) -> Content) {
         self.data = data
-        self.map = content
+        self.transform = transform
     }
-}
 
-extension GroupTask {
+    // MARK: - Public methods
 
     /**
-    Retrieves the results of the task group that encapsulates the results of each individual task.
+      Retrieves the results of the task group that encapsulates the results of each individual task.
 
-    - Returns: A `GroupResult` object that combines the result of each individual task by `ID`.
-    - Throws: An error if the operation failed for any reason.
-    */
-    public func result() async throws -> GroupResult<Data.Element, Content.Element> {
-        await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
-            for element in data {
-                group.addTask {
-                    do {
-                        return (element, .success(try await map(element).result()))
-                    } catch {
-                        return (element, .failure(error))
-                    }
-                }
-            }
+      - Returns: A `GroupResult` object that combines the result of each individual task by `ID`.
+      - Throws: An error if the operation failed for any reason.
+      */
+      public func result() async throws -> GroupResult<Data.Element, Content.Element> {
+          await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
+              for element in data {
+                  group.addTask {
+                      do {
+                          return (element, .success(try await transform(element).result()))
+                      } catch {
+                          return (element, .failure(error))
+                      }
+                  }
+              }
 
-            var results = GroupResult<Data.Element, Content.Element>()
+              var results = GroupResult<Data.Element, Content.Element>()
 
-            for await (key, value) in group {
-                results[key] = value
-            }
+              for await (key, value) in group {
+                  results[key] = value
+              }
 
-            return results
-        }
-    }
+              return results
+          }
+      }
 }
 
 /**
  Typealias for a dictionary where the keys are IDs of type `Hashable`, and the values are Results
  of type `Element` or `Error`.
  */
-public typealias GroupResult<ID: Hashable, Element> = [ID: Result<Element, Error>]
+public typealias GroupResult<ID: Hashable, Element: Sendable> = [ID: Result<Element, Error>]

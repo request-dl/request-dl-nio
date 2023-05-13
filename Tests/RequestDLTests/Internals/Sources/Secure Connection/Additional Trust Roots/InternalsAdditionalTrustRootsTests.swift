@@ -6,7 +6,6 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
-@RequestActor
 class InternalsAdditionalTrustRootsTests: XCTestCase {
 
     var client: CertificateResource!

@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsSessionTests: XCTestCase {
 
     var session: Internals.Session!

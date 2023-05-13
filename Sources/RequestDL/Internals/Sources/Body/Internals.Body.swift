@@ -8,9 +8,13 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    struct Body {
+    struct Body: Sendable {
+
+        // MARK: - Private properties
 
         private let _body: Internals.BodySequence
+
+        // MARK: - Inits
 
         init(
             _ size: Int? = nil,
@@ -21,53 +25,52 @@ extension Internals {
                 size: size
             )
         }
-    }
-}
 
-extension Internals.Body {
+        // MARK: - Internal methods
 
-    func build() -> HTTPClient.Body {
-        .stream(length: _body.size) {
-            Self.connect(
-                writer: $0,
-                body: _body
-            )
-        }
-    }
-}
-
-extension Internals.Body {
-
-    private static func consume(
-        iterator: Internals.StreamWriterSequence.Iterator,
-        eventLoop: EventLoop
-    ) -> EventLoopFuture<Void> {
-        eventLoop.makeFutureWithTask {
-            while let next = iterator.next() {
-                try await next.get()
+        func build() -> HTTPClient.Body {
+            .stream(length: _body.size) {
+                Self.connect(
+                    writer: $0,
+                    body: _body
+                )
             }
         }
-    }
 
-    fileprivate static func connect(
-        writer: HTTPClient.Body.StreamWriter,
-        body: Internals.BodySequence
-    ) -> EventLoopFuture<Void> {
-        guard !body.isEmpty else {
-            Internals.Log.failure(.emptyRequestBody())
+        // MARK: - Private static methods
+
+        private static func connect(
+            writer: HTTPClient.Body.StreamWriter,
+            body: Internals.BodySequence
+        ) -> EventLoopFuture<Void> {
+            guard !body.isEmpty else {
+                Internals.Log.failure(.emptyRequestBody())
+            }
+
+            var sequence = Internals.StreamWriterSequence(
+                writer: writer,
+                body: body
+            ).makeIterator()
+
+            guard let first = sequence.next() else {
+                return writer.write(.byteBuffer(.init()))
+            }
+
+            return first.flatMapWithEventLoop {
+                consume(iterator: sequence, eventLoop: $1)
+            }
         }
 
-        let sequence = Internals.StreamWriterSequence(
-            writer: writer,
-            body: body
-        ).makeIterator()
-
-        guard let first = sequence.next() else {
-            return writer.write(.byteBuffer(.init()))
-        }
-
-        return first.flatMapWithEventLoop {
-            consume(iterator: sequence, eventLoop: $1)
+        private static func consume(
+            iterator: Internals.StreamWriterSequence.Iterator,
+            eventLoop: EventLoop
+        ) -> EventLoopFuture<Void> {
+            eventLoop.makeFutureWithTask {
+                var iterator = iterator
+                while let next = iterator.next() {
+                    try await next.get()
+                }
+            }
         }
     }
 }

@@ -7,7 +7,6 @@ import NIOSSL
 @testable import RequestDL
 
 @available(*, deprecated)
-@RequestActor
 class PSKServerDescriptionTests: XCTestCase {
 
     func test() async throws {
