@@ -87,7 +87,7 @@ private extension URLEncoder.KeyEncodingStrategy {
         var key = key
         if let index = key.firstIndex(where: { $0.isLetter }) {
             let uppercasedLetter = key[index].uppercased()
-            key.replaceSubrange(index..<key.index(after: index), with: "\(uppercasedLetter)")
+            key.replaceSubrange(index..<key.index(after: index), with: uppercasedLetter)
         }
 
         try container.encode(key)

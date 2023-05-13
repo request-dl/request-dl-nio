@@ -26,7 +26,7 @@ extension Bundle {
 
         if !nameWithExtension.contains(".") {
             return .init(
-                name: "\(nameWithExtension)",
+                name: String(nameWithExtension),
                 extension: nil,
                 subdirectory: components.isEmpty ? nil : components.joined(separator: "/")
             )

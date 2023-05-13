@@ -19,7 +19,7 @@ extension Internals {
         }
 
         var id: String {
-            return "\(_id).\(numberOfThreads)"
+            "\(_id).\(numberOfThreads)"
         }
 
         func group() -> EventLoopGroup {
