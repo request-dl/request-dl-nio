@@ -40,12 +40,16 @@ public struct Authorization: Property {
     /// - Parameters:
     ///    - username: The username to be used for authentication.
     ///    - password: The password to be used for authentication.
-    public init(username: String, password: String) {
+    public init<Username: StringProtocol, Password: StringProtocol>(
+        username: Username,
+        password: Password
+    ) {
         self.type = .basic
         self.token = {
-            Data("\(username):\(password)".utf8)
-                .base64EncodedString()
-        }()
+            Data(String(username).utf8)
+            + Data(":".utf8)
+            + Data(String(password).utf8)
+        }().base64EncodedString()
     }
 
     /// Returns an exception since `Never` is a type that can never be constructed.

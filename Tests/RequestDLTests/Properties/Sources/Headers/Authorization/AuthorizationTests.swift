@@ -8,7 +8,7 @@ import XCTest
 @RequestActor
 class AuthorizationTests: XCTestCase {
 
-    func testAuthorizationWithTypeAndToken() async throws {
+    func testAuthorizationWithTypeAndStringToken() async throws {
         // Given
         let auth = Authorization(.bearer, token: "myToken")
 
@@ -17,6 +17,17 @@ class AuthorizationTests: XCTestCase {
 
         // Then
         XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer myToken")
+    }
+
+    func testAuthorizationWithTypeAndLosslessStringToken() async throws {
+        // Given
+        let auth = Authorization(.bearer, token: 123)
+
+        // When
+        let (_, request) = try await resolve(TestProperty(auth))
+
+        // Then
+        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer 123")
     }
 
     func testAuthorizationWithUsernameAndPassword() async throws {
@@ -35,5 +46,20 @@ class AuthorizationTests: XCTestCase {
 
         // Then
         try await assertNever(property.body)
+    }
+}
+
+@available(*, deprecated)
+extension AuthorizationTests {
+
+    func testAuthorizationWithTypeAndAnyToken() async throws {
+        // Given
+        let auth = Authorization(.bearer, token: "myToken" as Any)
+
+        // When
+        let (_, request) = try await resolve(TestProperty(auth))
+
+        // Then
+        XCTAssertEqual(request.headers.getValue(forKey: "Authorization"), "Bearer myToken")
     }
 }
