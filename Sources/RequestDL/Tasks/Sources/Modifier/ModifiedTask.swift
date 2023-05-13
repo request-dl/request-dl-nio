@@ -18,11 +18,6 @@ public struct ModifiedTask<Modifier: TaskModifier>: Task {
 
     let task: Modifier.Body
     let modifier: Modifier
-
-    init(_ task: Modifier.Body, _ modifier: Modifier) {
-        self.task = task
-        self.modifier = modifier
-    }
 }
 
 extension ModifiedTask {

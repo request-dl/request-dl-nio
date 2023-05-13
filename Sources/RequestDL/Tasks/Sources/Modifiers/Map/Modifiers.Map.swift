@@ -27,11 +27,8 @@ extension Modifiers {
      */
     public struct Map<Content: Task, NewElement>: TaskModifier {
 
-        let mapHandler: (Content.Element) throws -> NewElement
+        let transform: (Content.Element) throws -> NewElement
 
-        init(mapHandler: @escaping (Content.Element) throws -> NewElement) {
-            self.mapHandler = mapHandler
-        }
         /**
          Transforms the element of the given `Task` using the provided closure.
 
@@ -40,7 +37,7 @@ extension Modifiers {
          - Throws: The error thrown by the closure, if any.
          */
         public func task(_ task: Content) async throws -> NewElement {
-            try mapHandler(await task.result())
+            try transform(await task.result())
         }
     }
 }
@@ -50,12 +47,12 @@ extension Task {
     /**
      Transforms the element of the `Task` using the provided closure.
 
-     - Parameter mapHandler: The closure that transforms the original element.
+     - Parameter transform: The closure that transforms the original element.
      - Returns: A modified `Task` with the transformed element.
      */
     public func map<NewElement>(
-        _ mapHandler: @escaping (Element) throws -> NewElement
+        _ transform: @escaping (Element) throws -> NewElement
     ) -> ModifiedTask<Modifiers.Map<Self, NewElement>> {
-        modify(Modifiers.Map(mapHandler: mapHandler))
+        modify(Modifiers.Map(transform: transform))
     }
 }

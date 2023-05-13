@@ -26,11 +26,7 @@ extension Interceptors {
      */
     public struct Detach<Element>: TaskInterceptor {
 
-        let detachHandler: (Result<Element, Error>) -> Void
-
-        init(detachHandler: @escaping (Result<Element, Error>) -> Void) {
-            self.detachHandler = detachHandler
-        }
+        let closure: (Result<Element, Error>) -> Void
 
         /**
          A function called with the result of the task.
@@ -39,7 +35,7 @@ extension Interceptors {
          or an `Error`.
          */
         public func received(_ result: Result<Element, Error>) {
-            detachHandler(result)
+            closure(result)
         }
     }
 }
@@ -49,13 +45,13 @@ extension Task {
     /**
      Returns a new `InterceptedTask` object that runs the current task on a separate thread.
 
-     - Parameter handler: A closure that is called with the result of the task when it is complete.
+     - Parameter closure: A closure that is called with the result of the task when it is complete.
 
      - Returns: A new `InterceptedTask` object.
      */
     public func detach(
-        _ handler: @escaping (Result<Element, Error>) -> Void
+        _ closure: @escaping (Result<Element, Error>) -> Void
     ) -> InterceptedTask<Interceptors.Detach<Element>, Self> {
-        intercept(Interceptors.Detach(detachHandler: handler))
+        intercept(Interceptors.Detach(closure: closure))
     }
 }

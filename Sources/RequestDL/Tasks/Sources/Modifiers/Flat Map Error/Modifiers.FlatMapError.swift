@@ -17,11 +17,7 @@ extension Modifiers {
      */
     public struct FlatMapError<Content: Task>: TaskModifier {
 
-        let flatMapErrorHandler: (Error) throws -> Void
-
-        init(flatMapErrorHandler: @escaping (Error) throws -> Void) {
-            self.flatMapErrorHandler = flatMapErrorHandler
-        }
+        let transform: (Error) throws -> Void
 
         /**
          Transforms the result of a `Task` to a new element type.
@@ -34,7 +30,7 @@ extension Modifiers {
             do {
                 return try await task.result()
             } catch {
-                try flatMapErrorHandler(error)
+                try transform(error)
                 throw error
             }
         }
@@ -58,16 +54,16 @@ extension Task {
          }
      ```
 
-     - Parameter flatMapErrorHandler: A closure that takes an `Error` parameter and
+     - Parameter transform: A closure that takes an `Error` parameter and
      returns `Void` to be executed when an error occurs.
 
      - Returns: A `ModifiedTask` with the error-handling behavior specified by the
-     `flatMapErrorHandler` closure.
+     `transform` closure.
      */
     public func flatMapError(
-        _ flatMapErrorHandler: @escaping (Error) throws -> Void
+        _ transform: @escaping (Error) throws -> Void
     ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
-        modify(Modifiers.FlatMapError(flatMapErrorHandler: flatMapErrorHandler))
+        modify(Modifiers.FlatMapError(transform: transform))
     }
 
     /**
@@ -87,19 +83,19 @@ extension Task {
 
      - Parameter type: The type of error to handle.
 
-     - Parameter flatMapErrorHandler: A closure that takes a parameter of the specified error
+     - Parameter transform: A closure that takes a parameter of the specified error
      type and returns `Void` to be executed when an error of that type occurs.
 
      - Returns: A `ModifiedTask` with the error-handling behavior specified by the
-     `flatMapErrorHandler` closure.
+     `transform` closure.
      */
     public func flatMapError<Failure: Error>(
         _ type: Failure.Type,
-        _ flatMapErrorHandler: @escaping (Failure) throws -> Void
+        _ transform: @escaping (Failure) throws -> Void
     ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
         flatMapError {
             if let error = $0 as? Failure {
-                try flatMapErrorHandler(error)
+                try transform(error)
             }
         }
     }

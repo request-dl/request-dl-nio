@@ -26,8 +26,6 @@ extension Interceptors {
      */
     public struct Breakpoint<Element>: TaskInterceptor {
 
-        init() {}
-
         /**
          Called when a result is received.
 

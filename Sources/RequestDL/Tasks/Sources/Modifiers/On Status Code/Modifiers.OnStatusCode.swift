@@ -19,16 +19,8 @@ extension Modifiers {
      */
     public struct OnStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
 
-        private let contains: (StatusCode) -> Bool
-        private let mapHandler: (Content.Element) throws -> Void
-
-        init(
-            contains: @escaping (StatusCode) -> Bool,
-            map: @escaping (Content.Element) throws -> Void
-        ) {
-            self.contains = contains
-            self.mapHandler = map
-        }
+        let contains: (StatusCode) -> Bool
+        let transform: (Content.Element) throws -> Void
 
         /**
          A function that modifies the task and returns the result.
@@ -43,7 +35,7 @@ extension Modifiers {
                 return result
             }
 
-            try mapHandler(result)
+            try transform(result)
             return result
         }
     }
@@ -52,12 +44,12 @@ extension Modifiers {
 extension Task where Element: TaskResultPrimitive {
 
     private func onStatusCode(
-        _ map: @escaping (Element) throws -> Void,
+        _ transform: @escaping (Element) throws -> Void,
         contains: @escaping (StatusCode) -> Bool
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
         modify(.init(
             contains: contains,
-            map: map
+            transform: transform
         ))
     }
 
@@ -67,16 +59,16 @@ extension Task where Element: TaskResultPrimitive {
 
      - Parameters:
         - statusCode: The range of status codes that satisfy the specified condition.
-        - mapHandler: The closure to be executed when the HTTP status code of the
+        - transform: The closure to be executed when the HTTP status code of the
      response satisfies the specified condition.
 
      - Returns: The modified task with the `OnStatusCode` modifier applied.
      */
     public func onStatusCode(
         _ statusCode: Range<StatusCode>,
-        _ mapHandler: @escaping (Element) throws -> Void
+        _ transform: @escaping (Element) throws -> Void
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
-        onStatusCode(mapHandler) {
+        onStatusCode(transform) {
             statusCode.contains($0)
         }
     }
@@ -87,16 +79,16 @@ extension Task where Element: TaskResultPrimitive {
 
      - Parameters:
         - statusCode: The set of status codes that satisfy the specified condition.
-        - mapHandler: The closure to be executed when the HTTP status code of the response
+        - transform: The closure to be executed when the HTTP status code of the response
      satisfies the specified condition.
 
      - Returns: The modified task with the `OnStatusCode` modifier applied.
      */
     public func onStatusCode(
         _ statusCode: StatusCodeSet,
-        _ mapHandler: @escaping (Element) throws -> Void
+        _ transform: @escaping (Element) throws -> Void
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
-        onStatusCode(mapHandler) {
+        onStatusCode(transform) {
             statusCode.contains($0)
         }
     }
@@ -107,16 +99,16 @@ extension Task where Element: TaskResultPrimitive {
 
      - Parameters:
         - statusCode: The status code that satisfies the specified condition.
-        - mapHandler: The closure to be executed when the HTTP status code of the response
+        - transform: The closure to be executed when the HTTP status code of the response
      satisfies the specified condition.
 
      - Returns: The modified task with the `OnStatusCode` modifier applied.
      */
     public func onStatusCode(
         _ statusCode: StatusCode,
-        _ mapHandler: @escaping (Element) throws -> Void
+        _ transform: @escaping (Element) throws -> Void
     ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
-        onStatusCode(mapHandler) {
+        onStatusCode(transform) {
             statusCode == $0
         }
     }

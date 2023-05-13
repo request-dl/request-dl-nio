@@ -25,8 +25,6 @@ extension Modifiers {
      */
     public struct ExtractPayload<Content: Task, Element>: TaskModifier where Content.Element == TaskResult<Element> {
 
-        init() {}
-
         /**
          Modifies the task to extract only the payload from a task result.
 

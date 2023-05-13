@@ -39,7 +39,7 @@ extension Headers.ContentLength {
         property.assertPathway()
         return .leaf(Headers.Node(
             key: "Content-Length",
-            value: property.bytes
+            value: String(property.bytes)
         ))
     }
 }

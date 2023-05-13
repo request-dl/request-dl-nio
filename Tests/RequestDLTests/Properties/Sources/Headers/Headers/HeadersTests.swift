@@ -13,7 +13,7 @@ class HeadersTests: XCTestCase {
             Headers.ContentType(.javascript)
             Headers.Accept(.json)
             Headers.Origin("127.0.0.1:8080")
-            Headers.Any("password", forKey: "xxx-api-key")
+            Headers.Any(name: "xxx-api-key", value: "password")
         }
 
         let (_, request) = try await resolve(property)
@@ -29,8 +29,8 @@ class HeadersTests: XCTestCase {
             Headers.ContentType(.javascript)
             Headers.ContentType(.webp)
             Headers.Accept(.jpeg)
-            Headers.Any("password", forKey: "xxx-api-key")
-            Headers.Any("password123", forKey: "xxx-api-key")
+            Headers.Any(name: "xxx-api-key", value: "password")
+            Headers.Any(name: "xxx-api-key", value: "password123")
         }
 
         let (_, request) = try await resolve(property)
@@ -44,11 +44,11 @@ class HeadersTests: XCTestCase {
         let property = TestProperty {
             Headers.ContentType(.javascript)
             Headers.Accept(.jpeg)
-            Headers.Any("password", forKey: "xxx-api-key")
+            Headers.Any(name: "xxx-api-key", value: "password")
 
             HeaderGroup {
                 Headers.ContentType(.webp)
-                Headers.Any("password123", forKey: "xxx-api-key")
+                Headers.Any(name: "xxx-api-key", value: "password123")
             }
         }
 
@@ -65,7 +65,7 @@ class HeadersTests: XCTestCase {
 
             HeaderGroup {
                 Headers.ContentType(.webp)
-                Headers.Any("password", forKey: "xxx-api-key")
+                Headers.Any(name: "xxx-api-key", value: "password")
             }
 
             Headers.Accept(.jpeg)
