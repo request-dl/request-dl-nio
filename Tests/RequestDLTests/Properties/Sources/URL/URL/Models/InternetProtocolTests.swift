@@ -43,4 +43,17 @@ class InternetProtocolTests: XCTestCase {
     func testTelnetRawValue() async throws {
         XCTAssertEqual(InternetProtocol.telnet, "telnet")
     }
+
+    func testProtocol_withStringLossless() async throws {
+        // Given
+        let internetProtocol = InternetProtocol.dns
+
+        // When
+        let string = String(internetProtocol)
+        let losslessInternetProtocol = InternetProtocol(string)
+
+        // Then
+        XCTAssertEqual(string, internetProtocol.description)
+        XCTAssertEqual(losslessInternetProtocol, internetProtocol)
+    }
 }

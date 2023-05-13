@@ -9,7 +9,7 @@ extension Internals {
 
     struct PrivateKey: Sendable, Equatable {
 
-        enum Source: Equatable {
+        enum Source: Hashable {
             case file(String)
             case bytes([UInt8])
         }

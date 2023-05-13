@@ -7,7 +7,7 @@ import NIOHTTP1
 
 extension Internals {
 
-    struct Headers: Sendable {
+    struct Headers: Sendable, Hashable {
 
         private var dictionary: [HeaderKey: [String]]
 
@@ -121,19 +121,5 @@ private extension Internals.Headers {
         func hash(into hasher: inout Hasher) {
             hash.hash(into: &hasher)
         }
-    }
-}
-
-extension Internals.Headers: Equatable {
-
-    static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.dictionary == rhs.dictionary
-    }
-}
-
-extension Internals.Headers: Hashable {
-
-    func hash(into hasher: inout Hasher) {
-        dictionary.hash(into: &hasher)
     }
 }

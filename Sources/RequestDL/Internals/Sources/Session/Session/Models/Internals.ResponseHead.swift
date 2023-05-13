@@ -6,7 +6,7 @@ import Foundation
 
 extension Internals {
 
-    struct ResponseHead: Equatable {
+    struct ResponseHead: Hashable {
         let url: String
         let status: Status
         let version: Version
@@ -17,12 +17,12 @@ extension Internals {
 
 extension Internals.ResponseHead {
 
-    struct Version: Equatable {
+    struct Version: Hashable {
         let minor: Int
         let major: Int
     }
 
-    struct Status: Equatable {
+    struct Status: Hashable {
         let code: UInt
         let reason: String
     }

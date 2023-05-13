@@ -7,7 +7,7 @@ import NIOHTTPCompression
 
 extension Session {
 
-    public enum DecompressionLimit {
+    public enum DecompressionLimit: Hashable {
         case none
         case ratio(Int)
         case size(Int)

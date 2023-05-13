@@ -75,4 +75,17 @@ class ContentTypeTests: XCTestCase {
     func testPdfTypeRawValue() async throws {
         XCTAssertEqual(ContentType.pdf, "application/pdf")
     }
+
+    func testContentType_withStringLossless() async throws {
+        // Given
+        let contentType = ContentType.pdf
+
+        // When
+        let string = String(contentType)
+        let losslessContentType = ContentType(string)
+
+        // Then
+        XCTAssertEqual(string, contentType.description)
+        XCTAssertEqual(losslessContentType, contentType)
+    }
 }

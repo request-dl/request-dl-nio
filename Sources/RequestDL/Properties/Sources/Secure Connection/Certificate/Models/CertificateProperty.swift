@@ -4,7 +4,7 @@
 
 import Foundation
 
-enum CertificateProperty {
+enum CertificateProperty: Hashable {
     case chain
     case trust
     case additionalTrust

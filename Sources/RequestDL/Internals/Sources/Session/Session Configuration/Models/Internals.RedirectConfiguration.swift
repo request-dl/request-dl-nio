@@ -7,7 +7,7 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    enum RedirectConfiguration: Equatable {
+    enum RedirectConfiguration: Hashable {
         case disallow
         case follow(max: Int, allowCycles: Bool)
     }

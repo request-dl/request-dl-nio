@@ -100,7 +100,7 @@ extension Internals {
 
 extension Internals.Response {
 
-    enum ReadingMode: Equatable {
+    enum ReadingMode: Hashable {
         case length(Int)
         case separator([UInt8])
     }

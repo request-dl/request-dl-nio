@@ -10,7 +10,7 @@ import NIOSSL
 
  `CertificateVerification` provides options to specify how certificates should be verified in Swift.
  */
-public enum CertificateVerification: Sendable {
+public enum CertificateVerification: Sendable, Hashable {
 
     /// Indicates that all certificate verification is disabled.
     case none

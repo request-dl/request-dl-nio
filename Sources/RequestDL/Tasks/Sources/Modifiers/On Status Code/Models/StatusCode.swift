@@ -26,7 +26,7 @@ import Foundation
  let customStatusCode: StatusCode = 99
  ```
 */
-public struct StatusCode {
+public struct StatusCode: Hashable {
 
     let rawValue: UInt
 
@@ -236,17 +236,6 @@ extension StatusCode {
     public static let networkAuthenticationRequired: StatusCode = 511
 }
 
-extension StatusCode: Hashable {
-
-    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.rawValue == rhs.rawValue
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        rawValue.hash(into: &hasher)
-    }
-}
-
 extension StatusCode: ExpressibleByIntegerLiteral {
 
     /// Creates a new `StatusCode` instance with the specified integer literal value.
@@ -254,6 +243,21 @@ extension StatusCode: ExpressibleByIntegerLiteral {
     /// - Parameter value: The integer literal value.
     public init(integerLiteral value: IntegerLiteralType) {
         self.init(UInt(value))
+    }
+}
+
+extension StatusCode: LosslessStringConvertible {
+
+    public init?(_ description: String) {
+        guard let rawValue = UInt(description) else {
+            return nil
+        }
+
+        self.init(rawValue)
+    }
+
+    public var description: String {
+        String(rawValue)
     }
 }
 

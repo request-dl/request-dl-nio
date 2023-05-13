@@ -174,4 +174,17 @@ class UnitTimeTests: XCTestCase {
         // Then
         XCTAssertEqual(lhs * value, .hours(2))
     }
+
+    func testUnitTime_withStringLossless() async throws {
+        // Given
+        let unitTime = UnitTime.seconds(1)
+
+        // When
+        let string = String(unitTime)
+        let losslessUnitTime = UnitTime(string)
+
+        // Then
+        XCTAssertEqual(string, unitTime.description)
+        XCTAssertEqual(losslessUnitTime, unitTime)
+    }
 }

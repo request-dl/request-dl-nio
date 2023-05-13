@@ -37,6 +37,21 @@ extension UnitTime: ExpressibleByIntegerLiteral {
     }
 }
 
+extension UnitTime: LosslessStringConvertible {
+
+    public init?(_ description: String) {
+        guard let nanoseconds = Int64(description) else {
+            return nil
+        }
+
+        self.nanoseconds = nanoseconds
+    }
+
+    public var description: String {
+        String(nanoseconds)
+    }
+}
+
 extension UnitTime {
 
     /**

@@ -5,7 +5,7 @@
 import Foundation
 
 /// HTTP methods for making requests.
-public struct HTTPMethod {
+public struct HTTPMethod: Hashable {
 
     let rawValue: String
 
@@ -46,25 +46,18 @@ extension HTTPMethod {
     public static let trace: HTTPMethod = "TRACE"
 }
 
-extension HTTPMethod: Equatable {
-
-    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.rawValue == rhs.rawValue
-    }
-}
-
-extension HTTPMethod: Hashable {
-
-    public func hash(into hasher: inout Hasher) {
-        rawValue.hash(into: &hasher)
-    }
-}
-
 extension HTTPMethod: ExpressibleByStringLiteral {
 
     /// Initializes an HTTP method with the specified string literal value.
     /// - Parameter value: The string literal value of the HTTP method.
     public init(stringLiteral value: StringLiteralType) {
         self.init(value)
+    }
+}
+
+extension HTTPMethod: LosslessStringConvertible {
+
+    public var description: String {
+        rawValue
     }
 }

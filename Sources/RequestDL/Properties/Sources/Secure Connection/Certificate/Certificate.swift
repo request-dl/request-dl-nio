@@ -94,7 +94,7 @@ extension Certificate {
 
 extension Certificate {
 
-    public enum Format {
+    public enum Format: Hashable {
         case pem
         case der
     }

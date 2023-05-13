@@ -7,7 +7,7 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    enum HTTPVersion: Equatable {
+    enum HTTPVersion: Hashable {
         case http1Only
         case automatic
     }

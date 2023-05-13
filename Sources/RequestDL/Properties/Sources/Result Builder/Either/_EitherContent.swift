@@ -78,7 +78,7 @@ extension _EitherContent {
 
 extension _EitherContent {
 
-    fileprivate enum Source {
+    fileprivate enum Source: Hashable {
         case first
         case second
     }
