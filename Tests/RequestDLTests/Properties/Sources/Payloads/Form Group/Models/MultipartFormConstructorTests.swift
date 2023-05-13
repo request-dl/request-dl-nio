@@ -44,7 +44,7 @@ class MultipartFormConstructorTests: XCTestCase {
         let value2 = CharacterSet.alphanumerics.description
         let form2 = PartFormRawValue(Data(value2.utf8), forHeaders: [
             "Content-Disposition": "form-data; name=\"document\"; filename=\"document.pdf\"",
-            "Content-Type": ContentType.pdf
+            "Content-Type": "\(ContentType.pdf)"
         ])
 
         // When

@@ -18,7 +18,7 @@ extension Headers {
     @RequestActor
     public struct Referer: Property {
 
-        private let value: Any
+        private let value: String
 
         /**
          Initialize the `Referer` header with a URL that specifies the resource from which
@@ -27,7 +27,7 @@ extension Headers {
          - Parameter url: The URL of the resource.
          */
         public init<S: StringProtocol>(_ url: S) {
-            self.value = url
+            self.value = String(url)
         }
 
         /// Returns an exception since `Never` is a type that can never be constructed.

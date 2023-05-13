@@ -11,11 +11,12 @@ extension Headers {
 
     @RequestActor
     struct Node: PropertyNode {
+
         let key: String
-        let value: Any
+        let value: String
 
         func make(_ make: inout Make) async throws {
-            let value = "\(value)"
+            let value = value
             if !value.isEmpty {
                 make.request.headers.setValue(value, forKey: key)
             }

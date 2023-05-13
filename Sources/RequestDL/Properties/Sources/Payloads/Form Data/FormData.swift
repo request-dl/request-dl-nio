@@ -78,7 +78,7 @@ extension FormData {
                     property.fileName,
                     forKey: property.key
                 ),
-                "Content-Type": property.contentType
+                "Content-Type": "\(property.contentType)"
             ])
         })
     }

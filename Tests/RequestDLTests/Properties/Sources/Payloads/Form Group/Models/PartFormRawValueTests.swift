@@ -12,9 +12,9 @@ class PartFormRawValueTests: XCTestCase {
         // Given
         let data = "Test data".data(using: .utf8) ?? Data()
 
-        let headers: [String: Any] = [
+        let headers: [String: String] = [
             "Content-Type": "text/plain",
-            "Content-Length": 9,
+            "Content-Length": "9",
             "Custom-Header": "custom-value"
         ]
 
@@ -24,9 +24,9 @@ class PartFormRawValueTests: XCTestCase {
         // Then
         XCTAssertEqual(part.data, data)
         XCTAssertEqual(part.headers.count, 3)
-        XCTAssertEqual(part.headers["Content-Type"] as? String, "text/plain")
-        XCTAssertEqual(part.headers["Content-Length"] as? Int, 9)
-        XCTAssertEqual(part.headers["Custom-Header"] as? String, "custom-value")
+        XCTAssertEqual(part.headers["Content-Type"], "text/plain")
+        XCTAssertEqual(part.headers["Content-Length"], "9")
+        XCTAssertEqual(part.headers["Custom-Header"], "custom-value")
     }
 
     func testContentDispositionValue_withFileName() async throws {

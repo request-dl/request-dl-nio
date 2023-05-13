@@ -49,7 +49,10 @@ extension HeaderGroup where Content == ForEach<[String: Any], String, Headers.`A
     public init(_ dictionary: [String: Any]) {
         self.init {
             ForEach(dictionary, id: \.key) {
-                Headers.Any($0.value, forKey: $0.key)
+                Headers.Any(
+                    name: $0.key,
+                    value: "\($0.value)"
+                )
             }
         }
     }
