@@ -32,14 +32,14 @@ class PathTests: XCTestCase {
         let path = 123
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             BaseURL(host)
             Path(path)
         })
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://\(host)/\(path)"
         )
     }
