@@ -71,7 +71,7 @@ private extension PayloadNode {
         var queries = [QueryItem]()
 
         for (index, value) in value.enumerated() {
-            let encodedQueries = try urlEncoder.encode(value, forKey: "\(index)")
+            let encodedQueries = try urlEncoder.encode(value, forKey: String(index))
             queries.append(contentsOf: encodedQueries)
         }
 

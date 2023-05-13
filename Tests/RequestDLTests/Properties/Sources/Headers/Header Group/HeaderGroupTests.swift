@@ -50,7 +50,7 @@ class HeaderGroupTests: XCTestCase {
             Headers.ContentType(.javascript)
             Headers.Accept(.json)
             Headers.Origin("127.0.0.1:8080")
-            Headers.Any("password", forKey: "xxx-api-key")
+            Headers.Any(name: "xxx-api-key", value: "password")
         })
 
         let resolved = try await resolve(property)

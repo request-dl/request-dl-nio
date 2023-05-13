@@ -15,7 +15,7 @@ class FormGroupTests: XCTestCase {
         let value = 1
 
         let property = FormGroup {
-            FormValue(value, forKey: key)
+            FormValue(key: key, value: value)
         }
 
         // When
@@ -56,7 +56,7 @@ class FormGroupTests: XCTestCase {
         let value3 = try resourceFile3.url()
 
         let property = FormGroup {
-            FormValue(value1, forKey: key1)
+            FormValue(key: key1, value: value1)
 
             FormData(
                 value2,
@@ -136,8 +136,8 @@ class FormGroupTests: XCTestCase {
         let value2 = 124
 
         let property = FormGroup {
-            FormValue(value1, forKey: key)
-            FormValue(value2, forKey: key)
+            FormValue(key: key, value: value1)
+            FormValue(key: key, value: value2)
         }
 
         // When
@@ -184,8 +184,8 @@ class FormGroupTests: XCTestCase {
         // When
         let resolved = try await resolve(TestProperty {
             FormGroup {
-                FormValue("foo", forKey: "key1")
-                FormValue("bar", forKey: "key2")
+                FormValue(key: "key1", value: "foo")
+                FormValue(key: "key2", value: "bar")
             }
             .payloadPartLength(length)
         })

@@ -61,7 +61,7 @@ extension Headers.`Any` {
      */
     @available(*, deprecated, message: "Prefers the string init")
     public init<S: StringProtocol>(_ value: Any, forKey key: S) {
-        self.key = "\(key)"
+        self.key = String(key)
         self.value = "\(value)"
     }
 }
