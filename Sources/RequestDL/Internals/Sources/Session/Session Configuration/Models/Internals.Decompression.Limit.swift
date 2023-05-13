@@ -7,7 +7,7 @@ import NIOHTTPCompression
 
 extension Internals.Decompression {
 
-    enum Limit: Hashable {
+    enum Limit: Sendable, Hashable {
         case none
         case size(Int)
         case ratio(Int)

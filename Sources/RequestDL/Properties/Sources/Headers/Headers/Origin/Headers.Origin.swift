@@ -20,7 +20,7 @@ extension Headers {
      Headers.Origin("https://example.com")
      ```
      */
-        public struct Origin: Property {
+    public struct Origin: Property {
 
         private let value: String
 
@@ -57,7 +57,7 @@ extension Headers {
 extension Headers.Origin {
 
     /// This method is used internally and should not be called directly.
-        public static func _makeProperty(
+    public static func _makeProperty(
         property: _GraphValue<Headers.Origin>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

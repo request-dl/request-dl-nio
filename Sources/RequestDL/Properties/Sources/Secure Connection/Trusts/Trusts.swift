@@ -9,13 +9,46 @@ import Foundation
  */
 public struct Trusts<Content: Property>: Property {
 
-    enum Source {
+    private struct Node: SecureConnectionPropertyNode {
+
+        enum Source: Sendable {
+            case file(String)
+            case bytes([UInt8])
+            case nodes([LeafNode<SecureConnectionNode>])
+        }
+
+        let source: Source
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            switch source {
+            case .file(let file):
+                secureConnection.trustRoots = .file(file)
+            case .bytes(let bytes):
+                secureConnection.trustRoots = .bytes(bytes)
+            case .nodes(let nodes):
+                var collector = secureConnection.collector()
+                for node in nodes {
+                    node.passthrough(&collector)
+                }
+                secureConnection = collector(\.trustRoots)
+            }
+        }
+    }
+
+    private enum Source: Sendable {
         case file(String)
         case bytes([UInt8])
         case content(Content)
     }
 
-    let source: Source
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     var content: Content {
         guard case .content(let content) = source else {
@@ -26,6 +59,12 @@ public struct Trusts<Content: Property>: Property {
 
         return content
     }
+
+    // MARK: - Private properties
+
+    private let source: Source
+
+    // MARK: - Inits
 
     /**
      Initializes a new instance of the Trusts struct.
@@ -85,42 +124,10 @@ public struct Trusts<Content: Property>: Property {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Trusts {
-
-    private struct Node: SecureConnectionPropertyNode {
-
-        enum Source {
-            case file(String)
-            case bytes([UInt8])
-            case nodes([LeafNode<SecureConnectionNode>])
-        }
-
-        let source: Source
-
-        func make(_ secureConnection: inout Internals.SecureConnection) {
-            switch source {
-            case .file(let file):
-                secureConnection.trustRoots = .file(file)
-            case .bytes(let bytes):
-                secureConnection.trustRoots = .bytes(bytes)
-            case .nodes(let nodes):
-                var collector = secureConnection.collector()
-                for node in nodes {
-                    node.passthrough(&collector)
-                }
-                secureConnection = collector(\.trustRoots)
-            }
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-        public static func _makeProperty(
+    public static func _makeProperty(
         property: _GraphValue<Trusts<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

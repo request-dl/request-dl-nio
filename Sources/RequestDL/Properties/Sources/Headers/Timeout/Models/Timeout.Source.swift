@@ -43,7 +43,7 @@ extension Timeout {
         public let rawValue: UInt8
 
         // MARK: - Inits
-
+        
         /**
          Initializes a new timeout source with the given raw value.
 

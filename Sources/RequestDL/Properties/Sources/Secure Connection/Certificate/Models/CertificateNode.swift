@@ -30,7 +30,7 @@ struct CertificateNode: SecureConnectionCollectorPropertyNode {
 
 extension CertificateNode {
 
-    enum Source: Hashable {
+    enum Source: Sendable, Hashable {
         case bytes([UInt8])
         case file(String)
     }

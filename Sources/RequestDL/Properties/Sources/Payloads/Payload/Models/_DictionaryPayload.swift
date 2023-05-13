@@ -14,9 +14,6 @@ public struct _DictionaryPayload: PayloadProvider, @unchecked Sendable {
 
     // MARK: - Private properties
 
-    private let dictionary: [String: Any]
-    private let options: JSONSerialization.WritingOptions
-
     private var data: Data {
         do {
             return try JSONSerialization.data(
@@ -33,6 +30,9 @@ public struct _DictionaryPayload: PayloadProvider, @unchecked Sendable {
             )
         }
     }
+
+    private let dictionary: [String: Any]
+    private let options: JSONSerialization.WritingOptions
 
     // MARK: - Inits
 

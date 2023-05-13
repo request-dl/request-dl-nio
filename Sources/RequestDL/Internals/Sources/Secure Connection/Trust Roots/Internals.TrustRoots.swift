@@ -7,7 +7,7 @@ import NIOSSL
 
 extension Internals {
 
-    enum TrustRoots: Hashable {
+    enum TrustRoots: Sendable, Hashable {
 
         case `default`
 

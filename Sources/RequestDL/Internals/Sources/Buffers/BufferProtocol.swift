@@ -43,20 +43,39 @@ protocol BufferProtocol: Sendable {
     mutating func moveReaderIndex(to index: Int)
 
     mutating func moveWriterIndex(to index: Int)
+
+    func getData() -> Data?
+
+    func getBytes() -> [UInt8]?
+
+    func getData(at index: Int, length: Int) -> Data?
+
+    func getBytes(at index: Int, length: Int) -> [UInt8]?
+
+    func setData<Data: DataProtocol>(_ data: Data)
+
+    func setBytes<S: Sequence>(_ bytes: S) where S.Element == UInt8
+
+    func setData<Data: DataProtocol>(_ data: Data, at index: Int)
+
+    func setBytes<S: Sequence>(_ bytes: S, at index: Int) where S.Element == UInt8
 }
 
 extension BufferProtocol {
 
+    @Sendable
     func getData() -> Data? {
         var mutableSelf = self
         return mutableSelf.readData(mutableSelf.readableBytes)
     }
 
+    @Sendable
     func getBytes() -> [UInt8]? {
         var mutableSelf = self
         return mutableSelf.readBytes(mutableSelf.readableBytes)
     }
 
+    @Sendable
     func getData(at index: Int, length: Int) -> Data? {
         var mutableSelf = self
 

@@ -70,6 +70,9 @@ extension Task {
             }
         ))
     }
+}
+
+extension Task<TaskResult<Data>> {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -77,10 +80,7 @@ extension Task {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(
-        _ isActive: Bool
-    ) -> InterceptedTask<Interceptors.Logger<Element>, Self>
-    where Element == TaskResult<Data> {
+    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
         intercept(Interceptors.Logger(
             isActive: isActive,
             results: {[
@@ -89,6 +89,9 @@ extension Task {
             ]}
         ))
     }
+}
+
+extension Task<Data> {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -96,10 +99,7 @@ extension Task {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(
-        _ isActive: Bool
-    ) -> InterceptedTask<Interceptors.Logger<Element>, Self>
-    where Element == Data {
+    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
         intercept(Interceptors.Logger(
             isActive: isActive,
             results: {

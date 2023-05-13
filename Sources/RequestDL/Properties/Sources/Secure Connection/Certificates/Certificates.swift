@@ -12,7 +12,7 @@ import Foundation
  */
 public struct Certificates<Content: Property>: Property {
 
-    enum Source {
+    enum Source: Sendable {
         case file(String)
         case bytes([UInt8])
         case content(Content)
@@ -97,7 +97,7 @@ extension Certificates {
 
     private struct Node: SecureConnectionPropertyNode {
 
-        enum Source {
+        enum Source: Sendable {
             case file(String)
             case bytes([UInt8])
             case nodes([LeafNode<SecureConnectionNode>])
@@ -122,7 +122,7 @@ extension Certificates {
     }
 
     /// This method is used internally and should not be called directly.
-        public static func _makeProperty(
+    public static func _makeProperty(
         property: _GraphValue<Certificates<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

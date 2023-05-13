@@ -7,7 +7,7 @@ import NIOSSL
 
 extension Internals {
 
-    enum PrivateKeySource: Equatable {
+    enum PrivateKeySource: Sendable, Equatable {
 
         case file(String)
         case privateKey(PrivateKey)

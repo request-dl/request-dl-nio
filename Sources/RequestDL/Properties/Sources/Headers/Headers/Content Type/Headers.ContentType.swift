@@ -7,7 +7,7 @@ import Foundation
 extension Headers {
 
     /// A property that sets the `Content-Type` header field in an HTTP request.
-        public struct ContentType: Property {
+    public struct ContentType: Property {
 
         private let contentType: RequestDL.ContentType
 
@@ -30,7 +30,7 @@ extension Headers {
 extension Headers.ContentType {
 
     /// This method is used internally and should not be called directly.
-        public static func _makeProperty(
+    public static func _makeProperty(
         property: _GraphValue<Headers.ContentType>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

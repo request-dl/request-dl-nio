@@ -13,7 +13,7 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
         bodyException()
     }
 
-        static func _makeProperty(
+    static func _makeProperty(
         property: _GraphValue<ModifiedProperty<Content, Modifier>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

@@ -8,7 +8,7 @@ import NIOSSL
 /// A struct representing a private key for `SecureConnection` configuration.
 public struct PrivateKey: Property {
 
-    fileprivate enum Source {
+    fileprivate enum Source: Sendable {
         case file(String)
         case privateKey(Internals.PrivateKey)
     }
@@ -226,7 +226,7 @@ extension PrivateKey {
     }
 
     /// This method is used internally and should not be called directly.
-        public static func _makeProperty(
+    public static func _makeProperty(
         property: _GraphValue<PrivateKey>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {

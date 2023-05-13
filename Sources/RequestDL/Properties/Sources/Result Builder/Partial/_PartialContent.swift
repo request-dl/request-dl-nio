@@ -20,7 +20,7 @@ public struct _PartialContent<Accumulated: Property, Next: Property>: Property {
 extension _PartialContent {
 
     /// This method is used internally and should not be called directly.
-        public static func _makeProperty(
+    public static func _makeProperty(
         property: _GraphValue<_PartialContent<Accumulated, Next>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
