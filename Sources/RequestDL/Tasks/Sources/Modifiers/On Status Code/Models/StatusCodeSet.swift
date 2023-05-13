@@ -5,7 +5,7 @@
 import Foundation
 
 /// A set of HTTP status codes.
-public struct StatusCodeSet: SetAlgebra, Sendable {
+public struct StatusCodeSet: Sendable, SetAlgebra {
 
     public typealias Element = StatusCode
 

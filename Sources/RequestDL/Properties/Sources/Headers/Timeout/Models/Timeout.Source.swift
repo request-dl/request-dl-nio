@@ -24,7 +24,7 @@ extension Timeout {
      }
      ```
      */
-    public struct Source: OptionSet, Sendable {
+    public struct Source: Sendable, OptionSet {
 
         // MARK: - Public static properties
 

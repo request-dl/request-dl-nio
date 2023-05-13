@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol StreamProtocol<Value>: AnyObject, Sendable {
+protocol StreamProtocol<Value>: Sendable, AnyObject {
 
     associatedtype Value: Sendable
 

@@ -10,7 +10,7 @@ import NIOSSL
 
  `TLSVersion` provides options to specify different versions of the TLS protocol in Swift.
  */
-public enum TLSVersion: Int, Hashable, Sendable {
+public enum TLSVersion: Int {
 
     /// The TLS 1.0 version.
     case v1

@@ -20,7 +20,7 @@ import NIOCore
  `microseconds(_:)`, `milliseconds(_:)`, `seconds(_:)`, `minutes(_:)`, and
  `hours(_:)`.
  */
-public struct UnitTime: Hashable, Sendable {
+public struct UnitTime: Sendable, Hashable {
 
     // MARK: - Public properties
 

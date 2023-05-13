@@ -6,7 +6,7 @@ import Foundation
 import NIOSSL
 
 /// Represents the signature algorithms used in `SecureConnection` configuration.
-public struct SignatureAlgorithm: RawRepresentable, Hashable, Sendable {
+public struct SignatureAlgorithm: Sendable, RawRepresentable, Hashable {
 
     // MARK: - Public static properties
 

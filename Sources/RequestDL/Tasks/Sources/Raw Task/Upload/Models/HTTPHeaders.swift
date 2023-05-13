@@ -9,9 +9,9 @@ import Foundation
 
  `HTTPHeaders` provides methods and properties for working with HTTP headers in Swift.
  */
-public struct HTTPHeaders: Sequence, Hashable, Sendable {
+public struct HTTPHeaders: Sendable, Sequence, Hashable {
 
-    public struct Iterator: IteratorProtocol {
+    public struct Iterator: Sendable, IteratorProtocol {
 
         // MARK: - Private properties
 

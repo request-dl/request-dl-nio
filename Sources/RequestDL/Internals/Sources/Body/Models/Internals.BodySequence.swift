@@ -8,7 +8,7 @@ import NIOFoundationCompat
 
 extension Internals {
 
-    struct BodySequence: Sequence, Sendable {
+    struct BodySequence: Sendable, Sequence {
 
         // MARK: - Internal properties
 
@@ -59,7 +59,7 @@ extension Internals {
 
 extension Internals.BodySequence {
 
-    struct Iterator: IteratorProtocol, Sendable {
+    struct Iterator: Sendable, IteratorProtocol {
 
         // MARK: - Internal properties
 

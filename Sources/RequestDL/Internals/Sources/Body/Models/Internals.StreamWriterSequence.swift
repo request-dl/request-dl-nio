@@ -8,7 +8,7 @@ import NIOCore
 
 extension Internals {
 
-    struct StreamWriterSequence: Sequence, Sendable {
+    struct StreamWriterSequence: Sendable, Sequence {
 
         typealias Element = EventLoopFuture<Void>
 
@@ -40,7 +40,7 @@ extension Internals {
 
 extension Internals.StreamWriterSequence {
 
-    struct Iterator: IteratorProtocol, Sendable {
+    struct Iterator: Sendable, IteratorProtocol {
 
         // MARK: - Private properties
 
