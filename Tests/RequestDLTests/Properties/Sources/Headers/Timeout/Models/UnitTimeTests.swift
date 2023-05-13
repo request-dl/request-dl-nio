@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class UnitTimeTests: XCTestCase {
 
     func testUnitTime_whenNanoseconds_shouldBeValid() async throws {

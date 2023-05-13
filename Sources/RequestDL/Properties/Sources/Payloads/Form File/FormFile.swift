@@ -19,13 +19,23 @@ import Foundation
  )
  ```
 */
-@RequestActor
 public struct FormFile: Property {
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     let url: URL
     let key: String
     let fileName: String
     let contentType: ContentType
+
+    // MARK: - Inits
 
     /**
      Initializes a new `FormFile` instance with a file located at the specified URL.
@@ -61,16 +71,9 @@ public struct FormFile: Property {
         }()
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension FormFile {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<FormFile>,
         inputs: _PropertyInputs

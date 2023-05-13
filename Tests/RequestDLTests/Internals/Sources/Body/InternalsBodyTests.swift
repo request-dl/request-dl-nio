@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsBodyTests: XCTestCase {
 
     func testRequestBody_whenFragmentByOne_shouldContainsAllCharacters() async throws {

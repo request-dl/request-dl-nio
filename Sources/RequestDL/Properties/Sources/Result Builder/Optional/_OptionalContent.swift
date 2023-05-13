@@ -6,29 +6,32 @@ import Foundation
 
 /// This struct is marked as internal and is not intended
 /// to be used directly by clients of this framework.
-@RequestActor
 public struct _OptionalContent<Content: Property>: Property {
 
-    private let source: Content?
-
-    public var content: Content {
-        source.unsafelyUnwrapped
-    }
-
-    init(_ content: Content?) {
-        self.source = content
-    }
+    // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
     }
-}
 
-extension _OptionalContent {
+    public var content: Content {
+        source.unsafelyUnwrapped
+    }
+
+    // MARK: - Private properties
+
+    private let source: Content?
+
+    // MARK: - Inits
+
+    init(_ content: Content?) {
+        self.source = content
+    }
+
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<_OptionalContent<Content>>,
         inputs: _PropertyInputs

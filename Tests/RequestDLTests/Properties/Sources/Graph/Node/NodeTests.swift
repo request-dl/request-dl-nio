@@ -5,10 +5,9 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class NodeTests: XCTestCase {
 
-    struct Node<Value>: PropertyNode {
+    struct Node<Value: Sendable>: PropertyNode {
         let value: Value
 
         func make(_ make: inout Make) async throws {}

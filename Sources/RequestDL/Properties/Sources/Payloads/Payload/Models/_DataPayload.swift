@@ -6,13 +6,19 @@ import Foundation
 
 public struct _DataPayload: PayloadProvider {
 
-    private let data: Data
-
-    init(_ data: Data) {
-        self.data = data
-    }
+    // MARK: - Internal properties
 
     var buffer: Internals.DataBuffer {
         Internals.DataBuffer(data)
+    }
+
+    // MARK: - Private properties
+
+    private let data: Data
+
+    // MARK: - Inits
+
+    init(_ data: Data) {
+        self.data = data
     }
 }

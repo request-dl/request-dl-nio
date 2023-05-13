@@ -11,7 +11,7 @@ import NIOSSL
  `RenegotiationSupport` is used as a property inside the SecureConnection structure to specify the
  rules for renegotiation support in the context of Transport Layer Security (TLS) in Swift.
 */
-public enum RenegotiationSupport: Hashable {
+public enum RenegotiationSupport: Sendable, Hashable {
 
     /// Indicates that renegotiation is not supported.
     case none
@@ -21,9 +21,8 @@ public enum RenegotiationSupport: Hashable {
 
     /// Indicates that renegotiation is supported always.
     case always
-}
 
-extension RenegotiationSupport {
+    // MARK: - Internal methods
 
     func build() -> NIOSSL.NIORenegotiationSupport {
         switch self {

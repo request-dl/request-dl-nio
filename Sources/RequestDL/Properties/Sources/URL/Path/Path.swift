@@ -52,10 +52,33 @@ import Foundation
  The resulting URL of the above request would be `BaseURL/users/1234\/posts`.
  ```
  */
-@RequestActor
 public struct Path: Property {
 
+    private struct Node: PropertyNode {
+
+        let path: String
+
+        func make(_ make: inout Make) async throws {
+            guard !path.isEmpty else {
+                return
+            }
+
+            make.request.pathComponents.append(path)
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
+
     private let path: String
+
+    // MARK: - Inits
 
     /**
      Instantiate the Path with a string.
@@ -78,29 +101,9 @@ public struct Path: Property {
         self.path = String(path)
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Path {
-
-    private struct Node: PropertyNode {
-
-        let path: String
-
-        func make(_ make: inout Make) async throws {
-            guard !path.isEmpty else {
-                return
-            }
-
-            make.request.pathComponents.append(path)
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Path>,
         inputs: _PropertyInputs

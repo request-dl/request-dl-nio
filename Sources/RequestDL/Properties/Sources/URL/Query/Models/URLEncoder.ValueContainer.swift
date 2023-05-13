@@ -7,14 +7,20 @@ import Foundation
 extension URLEncoder {
 
     /// A container for URL-encoded values.
-    public struct ValueContainer {
+    public struct ValueContainer: Sendable {
+
+        // MARK: - Private properties
 
         private var value: String?
         private let encoder: URLEncoder.Encoder
 
+        // MARK: - Inits
+
         init(_ encoder: URLEncoder.Encoder) {
             self.encoder = encoder
         }
+
+        // MARK: - Public methods
 
         /// Encodes the given value.
         ///

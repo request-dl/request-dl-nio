@@ -32,8 +32,7 @@ import Foundation
  headers for all requests. We can use many different objects to configure requests in
  order to meet specific application requirements.
  */
-@RequestActor
-public protocol Property {
+public protocol Property: Sendable {
 
     associatedtype Body: Property
 
@@ -53,7 +52,6 @@ public protocol Property {
 extension Property {
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Self>,
         inputs: _PropertyInputs

@@ -4,8 +4,9 @@
 
 import Foundation
 
-protocol StreamProtocol<Value>: AnyObject {
-    associatedtype Value
+protocol StreamProtocol<Value>: Sendable, AnyObject {
+
+    associatedtype Value: Sendable
 
     var isOpen: Bool { get }
 

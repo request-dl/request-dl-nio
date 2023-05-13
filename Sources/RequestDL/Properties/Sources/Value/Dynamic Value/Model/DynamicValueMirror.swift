@@ -4,14 +4,24 @@
 
 import Foundation
 
-@RequestActor
 struct DynamicValueMirror<Content> {
 
+    struct Child {
+        let label: String?
+        let value: DynamicValue
+    }
+
+    // MARK: - Private properties
+
     private let reflected: Mirror
+
+    // MARK: - Inits
 
     init(_ content: Content) {
         reflected = Mirror(reflecting: content)
     }
+
+    // MARK: - Internal methods
 
     func callAsFunction() -> [Child] {
         reflected.children.compactMap { child in
@@ -22,13 +32,5 @@ struct DynamicValueMirror<Content> {
                 )
             }
         }
-    }
-}
-
-extension DynamicValueMirror {
-
-    struct Child {
-        let label: String?
-        let value: DynamicValue
     }
 }

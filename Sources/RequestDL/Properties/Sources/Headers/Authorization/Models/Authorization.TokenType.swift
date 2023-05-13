@@ -28,9 +28,21 @@ import Foundation
  */
 extension Authorization {
 
-    public struct TokenType: Hashable {
+    public struct TokenType: Sendable, Hashable {
+
+        // MARK: - Public static properties
+
+        /// The `Bearer` authorization type
+        public static let bearer: Authorization.TokenType = "Bearer"
+
+        /// The `Basic` authorization type
+        public static let basic: Authorization.TokenType = "Basic"
+
+        // MARK: - Internal properties
 
         let rawValue: String
+
+        // MARK: - Inits
 
         /**
          Initializes a `Authorization.TokenType` instance with a given string value.
@@ -43,14 +55,7 @@ extension Authorization {
     }
 }
 
-extension Authorization.TokenType {
-
-    /// The `Bearer` authorization type
-    public static let bearer: Authorization.TokenType = "Bearer"
-
-    /// The `Basic` authorization type
-    public static let basic: Authorization.TokenType = "Basic"
-}
+// MARK: - ExpressibleByStringLiteral
 
 extension Authorization.TokenType: ExpressibleByStringLiteral {
 
@@ -66,6 +71,8 @@ extension Authorization.TokenType: ExpressibleByStringLiteral {
         self.rawValue = value
     }
 }
+
+// MARK: - LosslessStringConvertible
 
 extension Authorization.TokenType: LosslessStringConvertible {
 

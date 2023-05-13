@@ -9,11 +9,17 @@ import Foundation
  for a view hierarchy. It is accessible via a subscript on a view's `Environment`
  property.
  */
-public struct EnvironmentValues {
+public struct EnvironmentValues: Sendable {
 
-    private var values = [AnyHashable: Any]()
+    // MARK: - Private properties
+
+    private var values = [ObjectIdentifier: Sendable]()
+
+    // MARK: - Inits
 
     init() {}
+
+    // MARK: - Public methods
 
     /**
      Subscript for retrieving an `Value` for a given `EnvironmentKey` type.

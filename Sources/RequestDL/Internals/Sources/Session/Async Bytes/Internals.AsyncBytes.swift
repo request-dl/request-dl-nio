@@ -7,45 +7,45 @@ import NIOCore
 
 extension Internals {
 
-    struct AsyncBytes: AsyncSequence {
+    struct AsyncBytes: Sendable, AsyncSequence {
 
         typealias Element = Data
 
         typealias AsyncStream = AsyncThrowingStream<Element, Error>
 
+        // MARK: - Private properties
+
         fileprivate let seed: ObjectIdentifier
         fileprivate let asyncStream: AsyncThrowingStream<Internals.DataBuffer, Error>
+
+        // MARK: - Inits
 
         init(_ dataStream: Internals.DataStream<DataBuffer>) {
             self.seed = ObjectIdentifier(dataStream)
             self.asyncStream = dataStream.asyncStream()
         }
 
+        // MARK: - Internal methods
+
         func makeAsyncIterator() -> Iterator {
             Iterator(asyncStream.makeAsyncIterator())
         }
-    }
-}
 
-extension Internals.AsyncBytes {
+        // MARK: - Private methods
 
-    struct Iterator: AsyncIteratorProtocol {
+        fileprivate func data() async throws -> Data {
+            var items = [Data]()
 
-        var iterator: AsyncThrowingStream<Internals.DataBuffer, Error>.AsyncIterator
-
-        init(_ iterator: AsyncThrowingStream<Internals.DataBuffer, Error>.AsyncIterator) {
-            self.iterator = iterator
-        }
-
-        mutating func next() async throws -> Data? {
-            guard var dataBuffer = try await iterator.next() else {
-                return nil
+            for try await data in self {
+                items.append(data)
             }
 
-            return dataBuffer.readData(dataBuffer.readableBytes)
+            return items.reduce(Data(), +)
         }
     }
 }
+
+// MARK: - Hashable
 
 extension Internals.AsyncBytes: Hashable {
 
@@ -60,16 +60,31 @@ extension Internals.AsyncBytes: Hashable {
 
 extension Internals.AsyncBytes {
 
-    fileprivate func data() async throws -> Data {
-        var items = [Data]()
+    struct Iterator: AsyncIteratorProtocol {
 
-        for try await data in self {
-            items.append(data)
+        // MARK: - Internal properties
+
+        var iterator: AsyncThrowingStream<Internals.DataBuffer, Error>.AsyncIterator
+
+        // MARK: - Inits
+
+        init(_ iterator: AsyncThrowingStream<Internals.DataBuffer, Error>.AsyncIterator) {
+            self.iterator = iterator
         }
 
-        return items.reduce(Data(), +)
+        // MARK: - Internal methods
+
+        mutating func next() async throws -> Data? {
+            guard var dataBuffer = try await iterator.next() else {
+                return nil
+            }
+
+            return dataBuffer.readData(dataBuffer.readableBytes)
+        }
     }
 }
+
+// MARK: - Data extension
 
 extension Data {
 

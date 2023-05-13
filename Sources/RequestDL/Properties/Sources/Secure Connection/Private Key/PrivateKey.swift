@@ -6,19 +6,39 @@ import Foundation
 import NIOSSL
 
 /// A struct representing a private key for `SecureConnection` configuration.
-@RequestActor
 public struct PrivateKey: Property {
 
-    fileprivate enum Source {
+    private struct Node: SecureConnectionPropertyNode {
+
+        let source: Source
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            switch source {
+            case .file(let file):
+                secureConnection.privateKey = .file(file)
+            case .privateKey(let privateKey):
+                secureConnection.privateKey = .privateKey(privateKey)
+            }
+        }
+    }
+
+    fileprivate enum Source: Sendable {
         case file(String)
         case privateKey(Internals.PrivateKey)
     }
 
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
+
     private let source: Source
 
-    private init(_ source: Source) {
-        self.source = source
-    }
+    // MARK: - Inits
 
     /// Creates a private key from a file with the specified format without password.
     ///
@@ -122,13 +142,26 @@ public struct PrivateKey: Property {
         )
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
+    private init(_ source: Source) {
+        self.source = source
+    }
+
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<PrivateKey>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+        return .leaf(SecureConnectionNode(
+            Node(source: property.source)
+        ))
     }
 }
 
-@available(*, deprecated, message: "Updates the password closure with NIOSSLSecureBytes")
+// MARK: - Deprecated
+
 extension PrivateKey {
 
     /// Creates a private key from a file with the specified format, and allows for providing a password
@@ -139,6 +172,7 @@ extension PrivateKey {
     ///   - format: The format of the private key file. Default is `.pem`.
     ///   - password: A closure that will be called with a password callback closure as its argument.
     ///   The password callback closure should be invoked with the password for the private key.
+    @available(*, deprecated, message: "Updates the password closure with NIOSSLSecureBytes")
     public init<Password: Collection>(
         _ file: String,
         format: Certificate.Format = .pem,
@@ -164,6 +198,7 @@ extension PrivateKey {
     ///   - format: The format of the private key bytes. Default is `.pem`.
     ///   - password: A closure that will be called with a password callback closure as its argument.
     ///   The password callback closure should be invoked with the password for the private key.
+    @available(*, deprecated, message: "Updates the password closure with NIOSSLSecureBytes")
     public init<Password: Collection>(
         _ bytes: [UInt8],
         format: Certificate.Format = .pem,
@@ -190,6 +225,7 @@ extension PrivateKey {
     ///   - format: The format of the private key file. Default is `.pem`.
     ///   - password: A closure that will be called with a password callback closure as its argument.
     ///   The password callback closure should be invoked with the password for the private key.
+    @available(*, deprecated, message: "Updates the password closure with NIOSSLSecureBytes")
     public init<Password: Collection>(
         _ file: String,
         in bundle: Bundle,
@@ -207,34 +243,5 @@ extension PrivateKey {
             format: format,
             password: passwordBytes
         )
-    }
-}
-
-extension PrivateKey {
-
-    private struct Node: SecureConnectionPropertyNode {
-
-        let source: Source
-
-        func make(_ secureConnection: inout Internals.SecureConnection) {
-            switch source {
-            case .file(let file):
-                secureConnection.privateKey = .file(file)
-            case .privateKey(let privateKey):
-                secureConnection.privateKey = .privateKey(privateKey)
-            }
-        }
-    }
-
-    /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
-        property: _GraphValue<PrivateKey>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-        return .leaf(SecureConnectionNode(
-            Node(source: property.source)
-        ))
     }
 }

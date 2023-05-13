@@ -6,13 +6,19 @@ import Foundation
 
 public struct _FilePayload: PayloadProvider {
 
-    private let file: URL
-
-    init(_ file: URL) {
-        self.file = file
-    }
+    // MARK: - Internal properties
 
     var buffer: Internals.FileBuffer {
         Internals.FileBuffer(file)
+    }
+
+    // MARK: - Private properties
+
+    private let file: URL
+
+    // MARK: - Inits
+
+    init(_ file: URL) {
+        self.file = file
     }
 }

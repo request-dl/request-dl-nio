@@ -7,7 +7,6 @@ import NIOSSL
 @testable import RequestDL
 
 // swiftlint:disable file_length
-@RequestActor
 class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileNoPassword_shouldBeValid() async throws {

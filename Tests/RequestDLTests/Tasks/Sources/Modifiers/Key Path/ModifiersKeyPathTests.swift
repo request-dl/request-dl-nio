@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiersKeyPathTests: XCTestCase {
 
     func testKeyPath() async throws {

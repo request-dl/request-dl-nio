@@ -4,8 +4,7 @@
 
 import Foundation
 
-@RequestActor
-protocol PropertyNode: NodeStringConvertible {
+protocol PropertyNode: Sendable, NodeStringConvertible {
 
     func make(_ make: inout Make) async throws
 }

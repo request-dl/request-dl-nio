@@ -7,11 +7,21 @@ import Foundation
 /// `FormValue` is a type of property that represents a single value in a multipart form-data request
 ///
 /// It can be used to represent simple values like strings and numbers.
-@RequestActor
 public struct FormValue: Property {
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     let key: String
     let value: String
+
+    // MARK: - Inits
 
     /**
      Creates a new instance of `FormValue` to represent a value with a corresponding key in a form.
@@ -49,11 +59,26 @@ public struct FormValue: Property {
         self.value = String(value)
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<FormValue>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+        return .leaf(FormNode(inputs.environment.payloadPartLength) {
+            PartFormRawValue(Data(property.value.utf8), forHeaders: [
+                kContentDisposition: kContentDispositionValue(
+                    nil,
+                    forKey: property.key
+                )
+            ])
+        })
     }
 }
+
+// MARK: - Deprecated
 
 extension FormValue {
 
@@ -76,25 +101,5 @@ extension FormValue {
             key: key,
             value: "\(value)"
         )
-    }
-}
-
-extension FormValue {
-
-    /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
-        property: _GraphValue<FormValue>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-        return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            PartFormRawValue(Data("\(property.value)".utf8), forHeaders: [
-                kContentDisposition: kContentDispositionValue(
-                    nil,
-                    forKey: property.key
-                )
-            ])
-        })
     }
 }

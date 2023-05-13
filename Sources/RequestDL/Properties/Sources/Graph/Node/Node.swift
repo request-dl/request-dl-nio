@@ -4,10 +4,32 @@
 
 import Foundation
 
-@RequestActor
-protocol Node: NodeStringConvertible {
+protocol Node: Sendable, NodeStringConvertible {
 
     mutating func next() -> Node?
+}
+
+extension Node {
+
+    var nodeDescription: String {
+        let title = String(describing: type(of: self))
+        var mutableSelf = self
+        var children = [String]()
+
+        while let node = mutableSelf.next() {
+            children.append(node.nodeDescription)
+        }
+
+        if children.isEmpty {
+            return title
+        }
+
+        let childrenDescription = children
+            .joined(separator: ",\n")
+            .debug_shiftLines()
+
+        return "\(title) {\n\(childrenDescription)\n}"
+    }
 }
 
 extension Node {
@@ -45,28 +67,5 @@ extension Node {
         }
 
         return items
-    }
-}
-
-extension Node {
-
-    var nodeDescription: String {
-        let title = String(describing: type(of: self))
-        var mutableSelf = self
-        var children = [String]()
-
-        while let node = mutableSelf.next() {
-            children.append(node.nodeDescription)
-        }
-
-        if children.isEmpty {
-            return title
-        }
-
-        let childrenDescription = children
-            .joined(separator: ",\n")
-            .debug_shiftLines()
-
-        return "\(title) {\n\(childrenDescription)\n}"
     }
 }

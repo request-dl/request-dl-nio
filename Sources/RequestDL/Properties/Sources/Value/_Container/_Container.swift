@@ -4,34 +4,55 @@
 
 import Foundation
 
-@RequestActor
 @propertyWrapper
 struct _Container<Value>: DynamicValue {
 
-    private let stored: Stored
+    // MARK: - Internal properties
+
+    var wrappedValue: Value {
+        get { storage.value }
+        nonmutating
+        set { storage.value = newValue }
+    }
+
+    // MARK: - Private properties
+
+    private let storage: Storage
+
+    // MARK: - Inits
 
     init(wrappedValue: Value) {
-        self.stored = .init(wrappedValue)
+        self.storage = .init(wrappedValue)
     }
 
     init() where Value: ExpressibleByNilLiteral {
-        self.stored = .init(.init(nilLiteral: ()))
-    }
-
-    var wrappedValue: Value {
-        get { stored.value }
-        nonmutating
-        set { stored.value = newValue }
+        self.storage = .init(.init(nilLiteral: ()))
     }
 }
 
 extension _Container {
 
-    fileprivate class Stored {
-        var value: Value
+    fileprivate final class Storage: @unchecked Sendable {
+
+        // MARK: - Internal properties
+
+        var value: Value {
+            get { lock.withLock { _value } }
+            set { lock.withLock { _value = newValue } }
+        }
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private var _value: Value
+
+        // MARK: - Inits
 
         init(_ value: Value) {
-            self.value = value
+            self._value = value
         }
     }
 }

@@ -6,7 +6,6 @@ import XCTest
 @testable import RequestDL
 
 // swiftlint:disable function_body_length
-@RequestActor
 class FormGroupTests: XCTestCase {
 
     func testSingleForm() async throws {

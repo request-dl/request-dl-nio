@@ -6,13 +6,33 @@ import Foundation
 
 struct NodeDebug {
 
+    // MARK: - Private properties
+
+    private var isType: Bool {
+        [.class, .enum, .struct].contains(mirror.displayStyle)
+    }
+
+    private func defaultDebugDescription() -> String {
+        String(describing: object)
+    }
+
+    private var children: [(label: String?, value: Any)] {
+        mirror.children.map {
+            ($0.label, $0.value)
+        }
+    }
+
     private let object: Any
     private let mirror: Mirror
+
+    // MARK: - Inits
 
     init(_ object: Any) {
         self.object = object
         self.mirror = .init(reflecting: object)
     }
+
+    // MARK: - Internal methods
 
     func describe() -> String {
         if isType, let customDebug = object as? CustomDebugStringConvertible {
@@ -42,17 +62,24 @@ struct NodeDebug {
             }
         }
     }
-}
 
-extension NodeDebug {
+    // MARK: - Private static methods
 
-    fileprivate var children: [(label: String?, value: Any)] {
-        mirror.children.map {
-            ($0.label, $0.value)
-        }
+    private static func format(_ output: String, _ title: String, _ value: String) -> String {
+        reverse(String(
+            format: reverse(output).replacingOccurrences(of: "@%", with: "%@"),
+            reverse(value),
+            reverse(title)
+        ))
     }
 
-    fileprivate func reducedChildren() -> [String] {
+    private static func reverse(_ string: String) -> String {
+        String(string.reversed())
+    }
+
+    // MARK: - Private methods
+
+    private func reducedChildren() -> [String] {
         children.map {
             let value = NodeDebug($1).describe()
 
@@ -81,11 +108,8 @@ extension NodeDebug {
             }
         }
     }
-}
 
-extension NodeDebug {
-
-    fileprivate func outputFormat() -> String {
+    private func outputFormat() -> String {
         switch mirror.displayStyle {
         case .enum:
             return "%@.%@"
@@ -97,34 +121,8 @@ extension NodeDebug {
             return "%@ {\n%@\n}"
         }
     }
-}
 
-extension NodeDebug {
-
-    private static func reverse(_ string: String) -> String {
-        String(string.reversed())
-    }
-
-    fileprivate static func format(_ output: String, _ title: String, _ value: String) -> String {
-        reverse(String(
-            format: reverse(output).replacingOccurrences(of: "@%", with: "%@"),
-            reverse(value),
-            reverse(title)
-        ))
-    }
-}
-
-extension NodeDebug {
-
-    fileprivate var isType: Bool {
-        [.class, .enum, .struct].contains(mirror.displayStyle)
-    }
-
-    fileprivate func defaultDebugDescription() -> String {
-        String(describing: object)
-    }
-
-    fileprivate func titleFormatted() -> String {
+    private func titleFormatted() -> String {
         let title = String(describing: type(of: object))
 
         switch mirror.displayStyle {

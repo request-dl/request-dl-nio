@@ -10,15 +10,21 @@ extension Internals {
 
     struct SharedSessionProvider: SessionProvider {
 
+        // MARK: - Internal properties
+
         var id: String {
             "\(ObjectIdentifier(Self.self))"
         }
+
+        // MARK: - Internal methods
 
         func group() -> EventLoopGroup {
             MultiThreadedEventLoopGroup.shared
         }
     }
 }
+
+// MARK: - SessionProvider extension
 
 extension SessionProvider where Self == Internals.SharedSessionProvider {
 

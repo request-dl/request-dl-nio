@@ -6,7 +6,6 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
-@RequestActor
 class InternalsPrivateKeyTests: XCTestCase {
 
     func testPrivate_whenPEM_shouldBeValid() async throws {

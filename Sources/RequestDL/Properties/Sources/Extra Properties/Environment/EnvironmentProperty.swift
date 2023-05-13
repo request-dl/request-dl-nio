@@ -4,26 +4,27 @@
 
 import Foundation
 
-@RequestActor
-private struct EnvironmentProperty<Content: Property, Value>: Property {
+private struct EnvironmentProperty<Content: Property>: Property {
 
-    let content: Content
-    let keyPath: WritableKeyPath<EnvironmentValues, Value>
-    let value: Value
+    // MARK: - Internal properties
 
     var body: Never {
         bodyException()
     }
 
-    @RequestActor
+    let content: Content
+    let setter: @Sendable (inout EnvironmentValues) -> Void
+
+    // MARK: - Internal static methods
+
     static func _makeProperty(
-        property: _GraphValue<EnvironmentProperty<Content, Value>>,
+        property: _GraphValue<EnvironmentProperty<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
         var inputs = inputs
-        inputs.environment[keyPath: property.keyPath] = property.value
+        property.setter(&inputs.environment)
 
         return try await Content._makeProperty(
             property: property.content,
@@ -31,6 +32,8 @@ private struct EnvironmentProperty<Content: Property, Value>: Property {
         )
     }
 }
+
+// MARK: - Property extension
 
 extension Property {
 
@@ -47,10 +50,8 @@ extension Property {
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         _ value: Value
     ) -> some Property {
-        EnvironmentProperty(
-            content: self,
-            keyPath: keyPath,
-            value: value
-        )
+        EnvironmentProperty(content: self) {
+            $0[keyPath: keyPath] = value
+        }
     }
 }

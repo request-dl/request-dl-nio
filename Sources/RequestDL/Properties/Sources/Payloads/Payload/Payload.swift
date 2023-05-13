@@ -28,12 +28,22 @@ import Foundation
  }
  ```
  */
-@RequestActor
-public struct Payload<Provider>: Property {
+public struct Payload<Provider: Sendable>: Property {
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
 
     private let isURLEncodedCompatible: Bool
     private let provider: Provider
-    private let buffer: (Provider) -> BufferProtocol
+    private let buffer: @Sendable (Provider) -> BufferProtocol
+
+    // MARK: - Inits
 
     /**
      Initializes a `Payload` with a dictionary.
@@ -107,16 +117,9 @@ public struct Payload<Provider>: Property {
         buffer = { $0.buffer }
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Payload {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Payload<Provider>>,
         inputs: _PropertyInputs

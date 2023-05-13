@@ -17,10 +17,9 @@ import Foundation
  - Note: The Task protocol does not specify how the request is made or how the result is processed,
  it only provides a way to execute a request and receive its result asynchronously.
  */
-@RequestActor
-public protocol Task<Element> {
+public protocol Task<Element>: Sendable {
 
-    associatedtype Element
+    associatedtype Element: Sendable
 
     /**
      Runs the task and gets the result asynchronously.
@@ -31,6 +30,8 @@ public protocol Task<Element> {
      */
     func result() async throws -> Element
 }
+
+// MARK: - Task extension
 
 extension Task {
 

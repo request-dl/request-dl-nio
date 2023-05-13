@@ -6,11 +6,13 @@ import Foundation
 
 extension Internals {
 
-    struct Query: Equatable {
+    struct Query: Sendable, Equatable {
         let name: String
         let value: String
     }
 }
+
+// MARK: - [Internals.Query] extension
 
 extension [Internals.Query] {
 

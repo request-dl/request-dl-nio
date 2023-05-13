@@ -6,20 +6,9 @@ import Foundation
 import NIOSSL
 
 /// Represents the signature algorithms used in `SecureConnection` configuration.
-public struct SignatureAlgorithm: RawRepresentable, Hashable, Sendable {
+public struct SignatureAlgorithm: Sendable, RawRepresentable, Hashable {
 
-    public let rawValue: UInt16
-
-    public init(rawValue: UInt16) {
-        self.rawValue = rawValue
-    }
-
-    private init(_ signatureAlgorithm: NIOSSL.SignatureAlgorithm) {
-        self.init(rawValue: signatureAlgorithm.rawValue)
-    }
-}
-
-extension SignatureAlgorithm {
+    // MARK: - Public static properties
 
     /// RSA PKCS1 with SHA-1 signature algorithm.
     public static let rsaPkcs1Sha1 = SignatureAlgorithm(.rsaPkcs1Sha1)
@@ -56,9 +45,22 @@ extension SignatureAlgorithm {
 
     /// Ed25519 signature algorithm.
     public static let ed25519 = SignatureAlgorithm(.ed25519)
-}
 
-extension SignatureAlgorithm {
+    // MARK: - Public properties
+
+    public let rawValue: UInt16
+
+    // MARK: - Inits
+
+    public init(rawValue: UInt16) {
+        self.rawValue = rawValue
+    }
+
+    private init(_ signatureAlgorithm: NIOSSL.SignatureAlgorithm) {
+        self.init(rawValue: signatureAlgorithm.rawValue)
+    }
+
+    // MARK: - Internal methods
 
     func build() -> NIOSSL.SignatureAlgorithm {
         .init(rawValue: rawValue)

@@ -20,6 +20,10 @@ let package = Package(
     ],
     dependencies: [
         .package(
+            url: "https://github.com/swift-server/async-http-client",
+            from: "1.17.0"
+        ),
+        .package(
             url: "https://github.com/apple/swift-docc-plugin.git",
             from: "1.2.0"
         ),
@@ -28,29 +32,31 @@ let package = Package(
             from: "2.53.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-ssl.git",
-            from: "2.24.0"
-        ),
-        .package(
             url: "https://github.com/apple/swift-nio-extras.git",
             from: "1.19.0"
         ),
         .package(
-            url: "https://github.com/swift-server/async-http-client",
-            from: "1.17.0"
+            url: "https://github.com/apple/swift-nio-ssl.git",
+            from: "2.24.0"
+        ),
+        .package(
+            url: "https://github.com/groue/Semaphore",
+            from: "0.0.8"
         )
     ],
     targets: [
         .target(
             name: "RequestDL",
             dependencies: [
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOFoundationCompat", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
-                .product(name: "AsyncHTTPClient", package: "async-http-client")
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                "Semaphore"
             ]
         ),
 
@@ -58,10 +64,10 @@ let package = Package(
             name: "RequestDLTests",
             dependencies: [
                 "RequestDL",
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "AsyncHTTPClient", package: "async-http-client")
+                .product(name: "NIOSSL", package: "swift-nio-ssl")
             ],
             resources: [.process("Resources")]
         )

@@ -21,9 +21,18 @@ extension Modifiers {
          }
      ```
      */
-    public struct FlatMap<Content: Task, NewElement>: TaskModifier {
+    public struct FlatMap<Content: Task, NewElement: Sendable>: TaskModifier {
 
-        let transform: (Result<Content.Element, Error>) throws -> NewElement
+        enum Map: Sendable {
+            case original(Content.Element)
+            case processed(NewElement)
+        }
+
+        // MARK: - Internal properties
+
+        let transform: @Sendable (Result<Content.Element, Error>) throws -> NewElement
+
+        // MARK: - Public methods
 
         /**
          Transforms the result of a `Task` to a new element type.
@@ -45,35 +54,28 @@ extension Modifiers {
                 }
             }
         }
-    }
-}
 
-private extension Modifiers.FlatMap {
+        // MARK: - Private methods
 
-    enum Map {
-        case original(Content.Element)
-        case processed(NewElement)
-    }
-}
-
-private extension Modifiers.FlatMap {
-
-    func mapResponseIntoResult(_ task: Content) async -> Result<Map, Error> {
-        do {
-            return .success(.original(try await task.result()))
-        } catch {
-            return mapErrorIntoResult(error)
+        private func mapResponseIntoResult(_ task: Content) async -> Result<Map, Error> {
+            do {
+                return .success(.original(try await task.result()))
+            } catch {
+                return mapErrorIntoResult(error)
+            }
         }
-    }
 
-    func mapErrorIntoResult(_ error: Error) -> Result<Map, Error> {
-        do {
-            return .success(.processed(try transform(.failure(error))))
-        } catch {
-            return .failure(error)
+        private func mapErrorIntoResult(_ error: Error) -> Result<Map, Error> {
+            do {
+                return .success(.processed(try transform(.failure(error))))
+            } catch {
+                return .failure(error)
+            }
         }
     }
 }
+
+// MARK: - Task extension
 
 extension Task {
 
@@ -84,7 +86,7 @@ extension Task {
      - Returns: A new `Task` that returns the flat-mapped element of type `NewElement`.
      */
     public func flatMap<NewElement>(
-        _ transform: @escaping (Result<Element, Error>) throws -> NewElement
+        _ transform: @escaping @Sendable (Result<Element, Error>) throws -> NewElement
     ) -> ModifiedTask<Modifiers.FlatMap<Self, NewElement>> {
         modify(Modifiers.FlatMap(transform: transform))
     }

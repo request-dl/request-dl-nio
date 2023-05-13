@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiersDecodeTests: XCTestCase {
 
     struct MockModel: Codable {

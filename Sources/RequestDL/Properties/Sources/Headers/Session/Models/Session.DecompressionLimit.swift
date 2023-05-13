@@ -7,23 +7,23 @@ import NIOHTTPCompression
 
 extension Session {
 
-    public enum DecompressionLimit: Hashable {
+    public enum DecompressionLimit: Sendable, Hashable {
+
         case none
         case ratio(Int)
         case size(Int)
-    }
-}
 
-extension Session.DecompressionLimit {
+        // MARK: - Internal methods
 
-    func build() -> Internals.Decompression.Limit {
-        switch self {
-        case .none:
-            return .none
-        case .ratio(let value):
-            return .ratio(value)
-        case .size(let value):
-            return .size(value)
+        func build() -> Internals.Decompression.Limit {
+            switch self {
+            case .none:
+                return .none
+            case .ratio(let value):
+                return .ratio(value)
+            case .size(let value):
+                return .size(value)
+            }
         }
     }
 }

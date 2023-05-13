@@ -39,4 +39,4 @@ import Foundation
  }
  ```
 */
-public protocol DynamicValue {}
+public protocol DynamicValue: Sendable {}

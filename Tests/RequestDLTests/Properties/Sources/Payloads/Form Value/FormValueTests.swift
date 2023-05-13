@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class FormValueTests: XCTestCase {
 
     func testValue_whenInitWithStringValue() async throws {

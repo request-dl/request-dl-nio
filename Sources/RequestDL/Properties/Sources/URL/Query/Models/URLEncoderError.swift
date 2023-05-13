@@ -6,17 +6,18 @@ import Foundation
 
 public struct URLEncoderError: Error {
 
-    let errorType: ErrorType
-
-    init(_ errorType: ErrorType) {
-        self.errorType = errorType
-    }
-}
-
-extension URLEncoderError {
-
     enum ErrorType {
         case unset
         case alreadySet
+    }
+
+    // MARK: - Internal properties
+
+    let errorType: ErrorType
+
+    // MARK: - Inits
+
+    init(_ errorType: ErrorType) {
+        self.errorType = errorType
     }
 }

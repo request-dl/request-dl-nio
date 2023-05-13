@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class _PartialContentTests: XCTestCase {
 
     func testTupleTwoElementsBuilder() async throws {

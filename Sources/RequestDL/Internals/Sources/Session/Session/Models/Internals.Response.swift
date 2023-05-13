@@ -6,7 +6,7 @@ import Foundation
 
 extension Internals {
 
-    enum Response: Equatable {
+    enum Response: Sendable, Equatable {
         case upload(Int)
         case download(Internals.ResponseHead, Internals.AsyncBytes)
     }

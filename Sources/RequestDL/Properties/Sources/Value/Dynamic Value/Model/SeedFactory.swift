@@ -4,24 +4,40 @@
 
 import Foundation
 
-@RequestActor
-struct SeedFactory {
+struct SeedFactory: Sendable {
 
-    private let box = Box()
+    private final class Storage: @unchecked Sendable {
+
+        // MARK: - Internal properties
+
+        var seeds: [Namespace.ID: Seed] {
+            get { lock.withLock { _seeds } }
+            set { lock.withLock { _seeds = newValue } }
+        }
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private var _seeds = [Namespace.ID: Seed]()
+    }
+
+    // MARK: - Private properties
+
+    private let storage = Storage()
+
+    // MARK: - Inits
 
     init() {}
 
+    // MARK: - Internal methods
+
     func callAsFunction(_ id: Namespace.ID) -> Seed {
-        let currentSeed = box.seeds[id] ?? .init(-1)
+        let currentSeed = storage.seeds[id] ?? .init(-1)
         let seed = currentSeed.next()
-        box.seeds[id] = seed
+        storage.seeds[id] = seed
         return seed
-    }
-}
-
-extension SeedFactory {
-
-    fileprivate class Box {
-        var seeds = [Namespace.ID: Seed]()
     }
 }

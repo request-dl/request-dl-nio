@@ -7,18 +7,54 @@ import Foundation
 /**
  A structure representing additional trusts as a property.
  */
-@RequestActor
 public struct AdditionalTrusts<Content: Property>: Property {
 
-    enum Source {
+    private struct Node: SecureConnectionPropertyNode {
+
+        enum Source {
+            case file(String)
+            case bytes([UInt8])
+            case nodes([LeafNode<SecureConnectionNode>])
+        }
+
+        let source: Source
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            switch source {
+            case .file(let file):
+                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
+                additionalTrustRoots.append(.file(file))
+                secureConnection.additionalTrustRoots = additionalTrustRoots
+            case .bytes(let bytes):
+                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
+                additionalTrustRoots.append(.bytes(bytes))
+                secureConnection.additionalTrustRoots = additionalTrustRoots
+            case .nodes(let nodes):
+                var collector = secureConnection.collector()
+                for node in nodes {
+                    node.passthrough(&collector)
+                }
+                secureConnection = collector(\.additionalTrustRoots)
+            }
+        }
+    }
+
+    private enum Source {
         case file(String)
         case bytes([UInt8])
         case content(Content)
     }
 
-    let source: Source
+    // MARK: - Public properties
 
-    var content: Content {
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
+
+    private var content: Content {
         guard case .content(let content) = source else {
             Internals.Log.failure(
                 .unexpectedCertificateSource(source)
@@ -27,6 +63,10 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
         return content
     }
+
+    private let source: Source
+
+    // MARK: - Inits
 
     /**
      Initializes a new instance of the AdditionalTrusts struct.
@@ -47,7 +87,7 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the AdditionalTrusts.
      */
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
@@ -86,46 +126,9 @@ public struct AdditionalTrusts<Content: Property>: Property {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension AdditionalTrusts {
-
-    private struct Node: SecureConnectionPropertyNode {
-
-        enum Source {
-            case file(String)
-            case bytes([UInt8])
-            case nodes([LeafNode<SecureConnectionNode>])
-        }
-
-        let source: Source
-
-        func make(_ secureConnection: inout Internals.SecureConnection) {
-            switch source {
-            case .file(let file):
-                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
-                additionalTrustRoots.append(.file(file))
-                secureConnection.additionalTrustRoots = additionalTrustRoots
-            case .bytes(let bytes):
-                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
-                additionalTrustRoots.append(.bytes(bytes))
-                secureConnection.additionalTrustRoots = additionalTrustRoots
-            case .nodes(let nodes):
-                var collector = secureConnection.collector()
-                for node in nodes {
-                    node.passthrough(&collector)
-                }
-                secureConnection = collector(\.additionalTrustRoots)
-            }
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<AdditionalTrusts<Content>>,
         inputs: _PropertyInputs

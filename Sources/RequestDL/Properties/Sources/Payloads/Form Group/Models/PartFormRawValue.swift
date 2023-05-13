@@ -4,10 +4,14 @@
 
 import Foundation
 
-struct PartFormRawValue {
+struct PartFormRawValue: Sendable {
+
+    // MARK: - Internal properties
 
     let data: Data
     let headers: [String: String]
+
+    // MARK: - Inits
 
     init(_ data: Data, forHeaders headers: [String: String]) {
         self.data = data

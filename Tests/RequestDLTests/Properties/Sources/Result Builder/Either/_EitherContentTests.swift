@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class _EitherContentTests: XCTestCase {
 
     func testConditionalFirstBuilder() async throws {
@@ -61,7 +60,7 @@ class _EitherContentTests: XCTestCase {
     }
 }
 
-func assertNever<T>(_ closure: @autoclosure @escaping () throws -> T) async throws {
+func assertNever<T>(_ closure: @autoclosure @escaping @Sendable () throws -> T) async throws {
     try await withUnsafeThrowingContinuation { continuation in
         Internals.Override.FatalError.replace { message, file, line in
             Internals.Override.FatalError.restore()

@@ -4,29 +4,19 @@
 
 import Foundation
 
-@RequestActor
-struct Resolve<Root: Property> {
+struct Resolve<Root: Property>: Sendable {
+
+    // MARK: - Private properties
 
     private let root: _GraphValue<_Root>
+
+    // MARK: - Inits
 
     init(_ root: Root) {
         self.root = .root(.init(body: root))
     }
 
-    private func inputs() -> _PropertyInputs {
-        .init(
-            environment: .init(),
-            namespaceID: .global,
-            seedFactory: .init()
-        )
-    }
-
-    private func outputs() async throws -> _PropertyOutputs {
-        try await _Root._makeProperty(
-            property: root,
-            inputs: inputs()
-        )
-    }
+    // MARK: - Internal methods
 
     func build() async throws -> Resolved {
         let output = try await outputs()
@@ -48,32 +38,6 @@ struct Resolve<Root: Property> {
             request: make.request
         )
     }
-}
-
-extension Resolve {
-
-    @RequestActor
-    struct _Root: Property {
-
-        let body: Root
-    }
-}
-
-extension Node {
-
-    fileprivate func _make(_ make: inout Make) async throws {
-        if let property = self as? PropertyNode {
-            try await property.make(&make)
-        }
-
-        var mutableSelf = self
-        while let next = mutableSelf.next() {
-            try await next._make(&make)
-        }
-    }
-}
-
-extension Resolve {
 
     func description() async throws -> String {
         let title = "Resolve"
@@ -94,4 +58,44 @@ extension Resolve {
 //    func printDescription() async throws {
 //        Internals.Log.debug(try await debugDescription)
 //    }
+
+    // MARK: - Private methods
+
+    private func inputs() -> _PropertyInputs {
+        .init(
+            environment: .init(),
+            namespaceID: .global,
+            seedFactory: .init()
+        )
+    }
+
+    private func outputs() async throws -> _PropertyOutputs {
+        try await _Root._makeProperty(
+            property: root,
+            inputs: inputs()
+        )
+    }
+}
+
+extension Resolve {
+
+    struct _Root: Property {
+        let body: Root
+    }
+}
+
+// MARK: - Node extension
+
+extension Node {
+
+    fileprivate func _make(_ make: inout Make) async throws {
+        if let property = self as? PropertyNode {
+            try await property.make(&make)
+        }
+
+        var mutableSelf = self
+        while let next = mutableSelf.next() {
+            try await next._make(&make)
+        }
+    }
 }

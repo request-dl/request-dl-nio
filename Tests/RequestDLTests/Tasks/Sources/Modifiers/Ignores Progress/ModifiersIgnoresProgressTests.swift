@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ModifiersIgnoresProgressTests: XCTestCase {
 
     func testIgnores_whenUploadStep_shouldBeValid() async throws {

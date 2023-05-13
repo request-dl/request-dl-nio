@@ -26,21 +26,9 @@ import Foundation
  let customInternetProtocol: InternetProtocol = "www"
  ```
  */
-public struct InternetProtocol: Hashable {
+public struct InternetProtocol: Sendable, Hashable {
 
-    let rawValue: String
-
-    /**
-     Initializes a `ContentType` instance with a given string value.
-
-     - Parameter rawValue: The string value of the content type.
-     */
-    public init<S: StringProtocol>(_ rawValue: S) {
-        self.rawValue = String(rawValue)
-    }
-}
-
-extension InternetProtocol {
+    // MARK: - Public static methods
 
     /// The HTTP protocol.
     public static let http: InternetProtocol = "http"
@@ -68,7 +56,24 @@ extension InternetProtocol {
 
     /// The Telnet protocol.
     public static let telnet: InternetProtocol = "telnet"
+
+    // MARK: - Internal properties
+
+    let rawValue: String
+
+    // MARK: - Inits
+
+    /**
+     Initializes a `ContentType` instance with a given string value.
+
+     - Parameter rawValue: The string value of the content type.
+     */
+    public init<S: StringProtocol>(_ rawValue: S) {
+        self.rawValue = String(rawValue)
+    }
 }
+
+// MARK: - ExpressibleByStringLiteral
 
 extension InternetProtocol: ExpressibleByStringLiteral {
 
@@ -84,6 +89,8 @@ extension InternetProtocol: ExpressibleByStringLiteral {
         self.init(value)
     }
 }
+
+// MARK: - LosslessStringConvertible
 
 extension InternetProtocol: LosslessStringConvertible {
 

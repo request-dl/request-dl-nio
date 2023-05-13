@@ -34,9 +34,8 @@ import Foundation
  }
  ```
  */
-@RequestActor
 @resultBuilder
-public struct PropertyBuilder {
+public struct PropertyBuilder: Sendable {
 
     /**
      The buildBlock method that returns an empty `EmptyProperty`.

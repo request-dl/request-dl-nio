@@ -26,7 +26,11 @@ extension Interceptors {
      */
     public struct Detach<Element>: TaskInterceptor {
 
-        let closure: (Result<Element, Error>) -> Void
+        // MARK: - Internal properties
+
+        let closure: @Sendable (Result<Element, Error>) -> Void
+
+        // MARK: - Public methods
 
         /**
          A function called with the result of the task.
@@ -40,6 +44,8 @@ extension Interceptors {
     }
 }
 
+// MARK: - Task extension
+
 extension Task {
 
     /**
@@ -50,7 +56,7 @@ extension Task {
      - Returns: A new `InterceptedTask` object.
      */
     public func detach(
-        _ closure: @escaping (Result<Element, Error>) -> Void
+        _ closure: @escaping @Sendable (Result<Element, Error>) -> Void
     ) -> InterceptedTask<Interceptors.Detach<Element>, Self> {
         intercept(Interceptors.Detach(closure: closure))
     }

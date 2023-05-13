@@ -6,9 +6,13 @@ import Foundation
 
 extension Modifiers {
 
-    public struct Progress<Content: Task, Output>: TaskModifier {
+    public struct Progress<Content: Task, Output: Sendable>: TaskModifier {
 
-        private let process: (Content.Element) async throws -> Output
+        // MARK: - Private properties
+
+        private let process: @Sendable (Content.Element) async throws -> Output
+
+        // MARK: - Inits
 
         fileprivate init(
             _ progress: RequestDL.Progress
@@ -65,48 +69,51 @@ extension Modifiers {
             }
         }
 
+        // MARK: - Public methods
+
         public func task(_ task: Content) async throws -> Output {
             try await process(task.result())
         }
-    }
-}
 
-extension Modifiers.Progress {
+        // MARK: - Private static methods
 
-    fileprivate static func upload(
-        _ progress: RequestDL.UploadProgress,
-        content: AsyncResponse
-    ) async throws -> TaskResult<AsyncBytes> {
+        private static func upload(
+            _ progress: RequestDL.UploadProgress,
+            content: AsyncResponse
+        ) async throws -> TaskResult<AsyncBytes> {
 
-        for try await step in content {
-            switch step {
-            case .upload(let bytesLength):
-                progress.upload(bytesLength)
-            case .download(let head, let bytes):
-                return .init(head: head, payload: bytes)
+            for try await step in content {
+                switch step {
+                case .upload(let bytesLength):
+                    progress.upload(bytesLength)
+                case .download(let head, let bytes):
+                    return .init(head: head, payload: bytes)
+                }
             }
+
+            Internals.Log.failure(
+                .missingStagesOfRequest(content)
+            )
         }
 
-        Internals.Log.failure(
-            .missingStagesOfRequest(content)
-        )
-    }
+        private static func download(
+            _ progress: RequestDL.DownloadProgress,
+            length: Int?,
+            content: AsyncBytes
+        ) async throws -> Data {
+            var receivedData = Data()
 
-    fileprivate static func download(
-        _ progress: RequestDL.DownloadProgress,
-        length: Int?,
-        content: AsyncBytes
-    ) async throws -> Data {
-        var receivedData = Data()
+            for try await data in content {
+                progress.download(data, length: length)
+                receivedData.append(data)
+            }
 
-        for try await data in content {
-            progress.download(data, length: length)
-            receivedData.append(data)
+            return receivedData
         }
-
-        return receivedData
     }
 }
+
+// MARK: - Task extensions
 
 extension Task<AsyncResponse> {
 

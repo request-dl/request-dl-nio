@@ -6,7 +6,6 @@ import XCTest
 @testable import RequestDL
 
 @available(*, deprecated)
-@RequestActor
 class SecureConnectionContextTests: XCTestCase {
 
     func testContext_whenClient() async throws {

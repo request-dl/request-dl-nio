@@ -5,16 +5,17 @@
 import Foundation
 
 ///  A struct that represents a single query item in a URL request.
-public struct QueryItem {
+public struct QueryItem: Sendable {
+
+    // MARK: - Public properties
 
     /// The name of the query item.
     public let name: String
 
     /// The value associated with the query item.
     public let value: String
-}
 
-extension QueryItem {
+    // MARK: - Internal methods
 
     func build() -> Internals.Query {
         .init(
@@ -23,6 +24,8 @@ extension QueryItem {
         )
     }
 }
+
+// MARK: - [QueryItem] extension
 
 extension [QueryItem] {
 

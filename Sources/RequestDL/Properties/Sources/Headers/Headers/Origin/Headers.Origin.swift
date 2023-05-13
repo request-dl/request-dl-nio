@@ -20,17 +20,27 @@ extension Headers {
      Headers.Origin("https://example.com")
      ```
      */
-    @RequestActor
     public struct Origin: Property {
 
+        // MARK: - Public properties
+
+        /// Returns an exception since `Never` is a type that can never be constructed.
+        public var body: Never {
+            bodyException()
+        }
+
+        // MARK: - Private properties
+
         private let value: String
+
+        // MARK: - Inits
 
         /**
          Initializes a `Origin` property with the given `host` and `port`.
 
          - Parameters:
-            - host: A `StringProtocol` representing the host.
-            - port: A `StringProtocol` representing the port.
+         - host: A `StringProtocol` representing the host.
+         - port: A `StringProtocol` representing the port.
          */
         public init<Host, Port>(
             _ host: Host,
@@ -48,25 +58,18 @@ extension Headers {
             self.value = String(origin)
         }
 
-        /// Returns an exception since `Never` is a type that can never be constructed.
-        public var body: Never {
-            bodyException()
+        // MARK: - Static public methods
+
+        /// This method is used internally and should not be called directly.
+        public static func _makeProperty(
+            property: _GraphValue<Headers.Origin>,
+            inputs: _PropertyInputs
+        ) async throws -> _PropertyOutputs {
+            property.assertPathway()
+            return .leaf(Headers.Node(
+                key: "Origin",
+                value: property.value
+            ))
         }
-    }
-}
-
-extension Headers.Origin {
-
-    /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
-        property: _GraphValue<Headers.Origin>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-        return .leaf(Headers.Node(
-            key: "Origin",
-            value: property.value
-        ))
     }
 }

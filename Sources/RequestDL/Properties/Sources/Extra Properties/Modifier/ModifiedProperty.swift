@@ -4,17 +4,19 @@
 
 import Foundation
 
-@RequestActor
 private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: Property {
 
-    let content: Content
-    let modifier: Modifier
+    // MARK: - Internal properties
 
     var body: Never {
         bodyException()
     }
 
-    @RequestActor
+    let content: Content
+    let modifier: Modifier
+
+    // MARK: - Internal static methods
+
     static func _makeProperty(
         property: _GraphValue<ModifiedProperty<Content, Modifier>>,
         inputs: _PropertyInputs
@@ -45,6 +47,8 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
         )
     }
 }
+
+// MARK: - Property extension
 
 extension Property {
 

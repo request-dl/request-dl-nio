@@ -22,9 +22,8 @@ public enum CertificateVerification: Sendable, Hashable {
     /// Specifies that certificate validation will be performed against the trust store and includes verification
     /// against the hostname of the service being contacted
     case fullVerification
-}
 
-extension CertificateVerification {
+    // MARK: - Internal methods
 
     func build() -> NIOSSL.CertificateVerification {
         switch self {

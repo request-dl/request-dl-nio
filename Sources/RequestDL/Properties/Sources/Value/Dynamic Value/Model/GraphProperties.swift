@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct GraphProperties {
+struct GraphProperties: Sendable {
     var inputs: _PropertyInputs
     let pathway: Int
 }

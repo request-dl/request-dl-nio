@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsStorageTests: XCTestCase {
 
     func testStorage_whenSetValue() async throws {

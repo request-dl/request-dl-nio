@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class InternalsDataStreamTests: XCTestCase {
 
     var stream: Internals.DataStream<Int>!
@@ -22,20 +21,22 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenInit_shouldBeEmpty() async throws {
         // Given
-        var values: [Result<Int?, Error>] = []
+        let values = SendableBox([Result<Int?, Error>]())
 
         // When
         stream.observe {
-            values.append($0)
+            var _values = values()
+            _values.append($0)
+            values(_values)
         }
 
         // Then
-        XCTAssertTrue(values.isEmpty)
+        XCTAssertTrue(values().isEmpty)
     }
 
     func testStream_whenAppendValues_shouldReceiveAll() async throws {
         // Given
-        var values: [Result<Int?, Error>] = []
+        let values = SendableBox<[Result<Int?, Error>]>([])
         let expectation = expectation(description: "stream.values")
 
         expectation.expectedFulfillmentCount = 6
@@ -46,7 +47,9 @@ class InternalsDataStreamTests: XCTestCase {
         stream.append(.success(2))
 
         stream.observe {
-            values.append($0)
+            var _values = values()
+            _values.append($0)
+            values(_values)
             expectation.fulfill()
         }
 
@@ -58,14 +61,14 @@ class InternalsDataStreamTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 5)
 
         XCTAssertEqual(
-            try values.compactMap { try $0.get() },
+            try values().compactMap { try $0.get() },
             Array(0...5)
         )
     }
 
     func testStream_whenAppendErrorWithValues_shouldReceiveSome() async throws {
         // Given
-        var values: [Result<Int?, Error>] = []
+        let values = SendableBox<[Result<Int?, Error>]>([])
         let expectation = expectation(description: "stream.values")
 
         expectation.expectedFulfillmentCount = 2
@@ -74,7 +77,9 @@ class InternalsDataStreamTests: XCTestCase {
         stream.append(.success(0))
 
         stream.observe {
-            values.append($0)
+            var _values = values()
+            _values.append($0)
+            values(_values)
             expectation.fulfill()
         }
 
@@ -84,14 +89,16 @@ class InternalsDataStreamTests: XCTestCase {
         // Then
         await fulfillment(of: [expectation], timeout: 5)
 
-        XCTAssertEqual(values.count, 2)
-        XCTAssertEqual(try values[0].get(), 0)
-        XCTAssertThrowsError(try values[1].get())
+        let _values = values()
+
+        XCTAssertEqual(_values.count, 2)
+        XCTAssertEqual(try _values[0].get(), 0)
+        XCTAssertThrowsError(try _values[1].get())
     }
 
     func testStream_whenAppendValuesAndClose_shouldReceiveSome() async throws {
         // Given
-        var values: [Result<Int?, Error>] = []
+        let values = SendableBox<[Result<Int?, Error>]>([])
         let expectation = expectation(description: "stream.values")
 
         expectation.expectedFulfillmentCount = 3
@@ -101,7 +108,9 @@ class InternalsDataStreamTests: XCTestCase {
         stream.append(.success(1))
 
         stream.observe {
-            values.append($0)
+            var _values = values()
+            _values.append($0)
+            values(_values)
             expectation.fulfill()
         }
 
@@ -111,10 +120,12 @@ class InternalsDataStreamTests: XCTestCase {
         // Then
         await fulfillment(of: [expectation], timeout: 5)
 
-        XCTAssertEqual(values.count, 3)
-        XCTAssertEqual(try values[0].get(), 0)
-        XCTAssertEqual(try values[1].get(), 1)
-        XCTAssertNil(try values[2].get())
+        let _values = values()
+
+        XCTAssertEqual(_values.count, 3)
+        XCTAssertEqual(try _values[0].get(), 0)
+        XCTAssertEqual(try _values[1].get(), 1)
+        XCTAssertNil(try _values[2].get())
     }
 
     func testStream_whenAppendingValues_shouldAwaitSequence() async throws {

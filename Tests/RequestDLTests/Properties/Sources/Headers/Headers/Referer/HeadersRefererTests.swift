@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeadersRefererTests: XCTestCase {
 
     func testReferer() async throws {

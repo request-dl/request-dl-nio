@@ -10,16 +10,48 @@ import Foundation
 
  The receiver obtains the sender's certificates as Trust Roots.
  */
-@RequestActor
 public struct Certificates<Content: Property>: Property {
 
-    enum Source {
+    private struct Node: SecureConnectionPropertyNode {
+
+        enum Source: Sendable {
+            case file(String)
+            case bytes([UInt8])
+            case nodes([LeafNode<SecureConnectionNode>])
+        }
+
+        let source: Source
+
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            switch source {
+            case .file(let file):
+                secureConnection.certificateChain = .file(file)
+            case .bytes(let bytes):
+                secureConnection.certificateChain = .bytes(bytes)
+            case .nodes(let nodes):
+                var collector = secureConnection.collector()
+                for node in nodes {
+                    node.passthrough(&collector)
+                }
+                secureConnection = collector(\.certificateChain)
+            }
+        }
+    }
+
+    enum Source: Sendable {
         case file(String)
         case bytes([UInt8])
         case content(Content)
     }
 
-    let source: Source
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     var content: Content {
         guard case .content(let content) = source else {
@@ -30,6 +62,10 @@ public struct Certificates<Content: Property>: Property {
 
         return content
     }
+
+    let source: Source
+
+    // MARK: - Inits
 
     /**
      Initializes a new instance of the Certificates struct.
@@ -49,7 +85,7 @@ public struct Certificates<Content: Property>: Property {
 
      - Parameter content: A closure that returns the content of the Certificates.
      */
-    public init(@PropertyBuilder content: @RequestActor () -> Content) {
+    public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
@@ -88,42 +124,9 @@ public struct Certificates<Content: Property>: Property {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Certificates {
-
-    private struct Node: SecureConnectionPropertyNode {
-
-        enum Source {
-            case file(String)
-            case bytes([UInt8])
-            case nodes([LeafNode<SecureConnectionNode>])
-        }
-
-        let source: Source
-
-        func make(_ secureConnection: inout Internals.SecureConnection) {
-            switch source {
-            case .file(let file):
-                secureConnection.certificateChain = .file(file)
-            case .bytes(let bytes):
-                secureConnection.certificateChain = .bytes(bytes)
-            case .nodes(let nodes):
-                var collector = secureConnection.collector()
-                for node in nodes {
-                    node.passthrough(&collector)
-                }
-                secureConnection = collector(\.certificateChain)
-            }
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Certificates<Content>>,
         inputs: _PropertyInputs

@@ -10,7 +10,11 @@ extension Modifiers {
     /// error handling and transformation.
     public struct MapError<Content: Task>: TaskModifier {
 
-        let transform: (Error) throws -> Element
+        // MARK: - Internal properties
+
+        let transform: @Sendable (Error) throws -> Element
+
+        // MARK: - Public methods
 
         /**
          A mapping function that transforms the error of the task result to a new error.
@@ -28,6 +32,8 @@ extension Modifiers {
     }
 }
 
+// MARK: - Task extension
+
 extension Task {
 
     /**
@@ -38,7 +44,7 @@ extension Task {
      - Returns: A new `Task` with the mapped error.
      */
     public func mapError(
-        _ transform: @escaping (Error) throws -> Element
+        _ transform: @escaping @Sendable (Error) throws -> Element
     ) -> ModifiedTask<Modifiers.MapError<Self>> {
         modify(Modifiers.MapError(transform: transform))
     }

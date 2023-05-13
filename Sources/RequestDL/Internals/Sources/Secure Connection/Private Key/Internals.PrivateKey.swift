@@ -14,9 +14,13 @@ extension Internals {
             case bytes([UInt8])
         }
 
+        // MARK: - Internal properties
+
         let source: Source
         let format: Internals.Certificate.Format
         let password: NIOSSLSecureBytes?
+
+        // MARK: - Inits
 
         init(_ file: String, format: Internals.Certificate.Format) {
             self.source = .file(file)
@@ -41,30 +45,29 @@ extension Internals {
             self.format = format
             self.password = password
         }
-    }
-}
 
-extension Internals.PrivateKey {
+        // MARK: - Internal methods
 
-    func build() throws -> NIOSSLPrivateKey {
-        let format = format.build()
+        func build() throws -> NIOSSLPrivateKey {
+            let format = format.build()
 
-        switch source {
-        case .bytes(let bytes):
-            if let password {
-                return try .init(bytes: bytes, format: format) {
-                    $0(Array(password))
+            switch source {
+            case .bytes(let bytes):
+                if let password {
+                    return try .init(bytes: bytes, format: format) {
+                        $0(Array(password))
+                    }
+                } else {
+                    return try .init(bytes: bytes, format: format)
                 }
-            } else {
-                return try .init(bytes: bytes, format: format)
-            }
-        case .file(let file):
-            if let password {
-                return try .init(file: file, format: format) {
-                    $0(Array(password))
+            case .file(let file):
+                if let password {
+                    return try .init(file: file, format: format) {
+                        $0(Array(password))
+                    }
+                } else {
+                    return try .init(file: file, format: format)
                 }
-            } else {
-                return try .init(file: file, format: format)
             }
         }
     }

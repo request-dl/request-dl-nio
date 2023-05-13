@@ -6,16 +6,13 @@ import Foundation
 
 public struct _StringPayload: PayloadProvider {
 
-    private let string: String
-    private let encoding: String.Encoding
+    // MARK: - Internal properties
 
-    init(
-        _ string: String,
-        using encoding: String.Encoding
-    ) {
-        self.string = string
-        self.encoding = encoding
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
+
+    // MARK: - Private properties
 
     private var data: Data {
         if let data = string.data(using: encoding) {
@@ -30,7 +27,16 @@ public struct _StringPayload: PayloadProvider {
         )
     }
 
-    var buffer: Internals.DataBuffer {
-        Internals.DataBuffer(data)
+    private let string: String
+    private let encoding: String.Encoding
+
+    // MARK: - Inits
+
+    init(
+        _ string: String,
+        using encoding: String.Encoding
+    ) {
+        self.string = string
+        self.encoding = encoding
     }
 }

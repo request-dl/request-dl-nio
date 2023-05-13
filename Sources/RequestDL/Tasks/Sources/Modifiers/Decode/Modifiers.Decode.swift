@@ -23,12 +23,19 @@ extension Modifiers {
      The decoding operation is performed using a `JSONDecoder`. By default, the decoding is
      performed assuming that the data is in plain format, i.e., not an array or dictionary.
      */
-    public struct Decode<Content: Task, Element: Decodable, Output>: TaskModifier {
+    public struct Decode<Content: Task, Element: Decodable, Output: Sendable>: TaskModifier {
+
+        // MARK: - Internal properties
 
         let type: Element.Type
         let decoder: JSONDecoder
-        fileprivate let data: (Content.Element) -> Data
-        fileprivate let output: (Content.Element, Element) -> Output
+
+        // MARK: - Private properties
+
+        fileprivate let data: @Sendable (Content.Element) -> Data
+        fileprivate let output: @Sendable (Content.Element, Element) -> Output
+
+        // MARK: - Public methods
 
         /**
          Decodes the data of the specified `Task` instance into an instance of the `Element`
@@ -46,7 +53,9 @@ extension Modifiers {
     }
 }
 
-extension Task<TaskResult<Data>> {
+// MARK: - Task extensions
+
+extension Task {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
@@ -60,7 +69,8 @@ extension Task<TaskResult<Data>> {
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, T, TaskResult<T>>> {
+    ) -> ModifiedTask<Modifiers.Decode<Self, T, TaskResult<T>>>
+    where Element == TaskResult<Data> {
         modify(Modifiers.Decode(
             type: type,
             decoder: decoder,
@@ -73,9 +83,6 @@ extension Task<TaskResult<Data>> {
             }
         ))
     }
-}
-
-extension Task<Data> {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
@@ -89,7 +96,8 @@ extension Task<Data> {
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, T, T>> {
+    ) -> ModifiedTask<Modifiers.Decode<Self, T, T>>
+    where Element == Data {
         modify(Modifiers.Decode(
             type: type,
             decoder: decoder,

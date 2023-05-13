@@ -29,11 +29,37 @@ import Foundation
  before terminating the connection. The timeout parameter is the duration of time before the timeout
  occurs, and the source parameter specifies the type of timeout to be applied
  */
-@RequestActor
 public struct Timeout: Property {
+
+    private struct Node: PropertyNode {
+
+        let timeout: UnitTime
+        let source: Source
+
+        func make(_ make: inout Make) async throws {
+            if source.contains(.connect) {
+                make.configuration.timeout.connect = timeout
+            }
+
+            if source.contains(.read) {
+                make.configuration.timeout.read = timeout
+            }
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
 
     let timeout: UnitTime
     let source: Source
+
+    // MARK: - Inits
 
     /**
      Initializes a new instance of `Timeout`.
@@ -52,32 +78,9 @@ public struct Timeout: Property {
         self.source = source
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Timeout {
-
-    private struct Node: PropertyNode {
-
-        let timeout: UnitTime
-        let source: Source
-
-        func make(_ make: inout Make) async throws {
-            if source.contains(.connect) {
-                make.configuration.timeout.connect = timeout
-            }
-
-            if source.contains(.read) {
-                make.configuration.timeout.read = timeout
-            }
-        }
-    }
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
-    @RequestActor
     public static func _makeProperty(
         property: _GraphValue<Timeout>,
         inputs: _PropertyInputs

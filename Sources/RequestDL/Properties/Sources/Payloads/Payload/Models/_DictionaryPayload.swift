@@ -4,18 +4,15 @@
 
 import Foundation
 
-public struct _DictionaryPayload: PayloadProvider {
+public struct _DictionaryPayload: PayloadProvider, @unchecked Sendable {
 
-    private let dictionary: [String: Any]
-    private let options: JSONSerialization.WritingOptions
+    // MARK: - Internals properties
 
-    init(
-        _ dictionary: [String: Any],
-        options: JSONSerialization.WritingOptions
-    ) {
-        self.dictionary = dictionary
-        self.options = options
+    var buffer: Internals.DataBuffer {
+        Internals.DataBuffer(data)
     }
+
+    // MARK: - Private properties
 
     private var data: Data {
         do {
@@ -34,7 +31,16 @@ public struct _DictionaryPayload: PayloadProvider {
         }
     }
 
-    var buffer: Internals.DataBuffer {
-        Internals.DataBuffer(data)
+    private let dictionary: [String: Any]
+    private let options: JSONSerialization.WritingOptions
+
+    // MARK: - Inits
+
+    init(
+        _ dictionary: [String: Any],
+        options: JSONSerialization.WritingOptions
+    ) {
+        self.dictionary = dictionary
+        self.options = options
     }
 }

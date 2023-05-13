@@ -6,7 +6,6 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
-@RequestActor
 class DataTaskTests: XCTestCase {
 
     func testDataTask() async throws {
@@ -62,8 +61,8 @@ class DataTaskTests: XCTestCase {
                 }
                 .verification(.fullVerification)
             }
-                .extractPayload()
-                .result()
+            .extractPayload()
+            .result()
 
             let result = try HTTPResult<String>(data)
 

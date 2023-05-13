@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class HeadersAnyTests: XCTestCase {
 
     func testAny_whenInitWithStringValue() async throws {

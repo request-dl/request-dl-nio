@@ -5,7 +5,77 @@
 import Foundation
 
 /// A structure representing the head of an HTTP response.
-public struct ResponseHead: Hashable {
+public struct ResponseHead: Sendable, Hashable {
+
+    /// A structure representing the status of an HTTP response.
+    public struct Status: Sendable, Hashable {
+
+        // MARK: - Public properties
+
+        /// The HTTP status code of the response.
+        public let code: UInt
+
+        /// The reason phrase associated with the HTTP status code.
+        public let reason: String
+
+        // MARK: - Inits
+
+        /// Initializes a new instance of `Status`.
+        ///
+        /// - Parameters:
+        ///   - code: The HTTP status code of the response.
+        ///   - reason: The reason phrase associated with the HTTP status code.
+        public init(
+            code: UInt,
+            reason: String
+        ) {
+            self.code = code
+            self.reason = reason
+        }
+
+        init(_ status: Internals.ResponseHead.Status) {
+            self.init(
+                code: status.code,
+                reason: status.reason
+            )
+        }
+    }
+
+    /// A structure representing the version of the HTTP protocol used in an HTTP response.
+    public struct Version: Sendable, Hashable {
+
+        // MARK: - Public properties
+
+        /// The minor version number of the HTTP protocol used in the response.
+        public let minor: Int
+
+        /// The major version number of the HTTP protocol used in the response.
+        public let major: Int
+
+        // MARK: - Inits
+
+        /// Initializes a new instance of `Version`.
+        ///
+        /// - Parameters:
+        ///   - minor: The minor version number of the HTTP protocol used in the response.
+        ///   - major: The major version number of the HTTP protocol used in the response.
+        public init(
+            minor: Int,
+            major: Int
+        ) {
+            self.minor = minor
+            self.major = major
+        }
+
+        init(_ version: Internals.ResponseHead.Version) {
+            self.init(
+                minor: version.minor,
+                major: version.major
+            )
+        }
+    }
+
+    // MARK: - Public properties
 
     /// The URL of the response.
     public let url: URL?
@@ -21,6 +91,8 @@ public struct ResponseHead: Hashable {
 
     /// A boolean value indicating whether the connection should be kept alive after the response.
     public let isKeepAlive: Bool
+
+    // MARK: - Inits
 
     /// Initializes a new instance of `ResponseHead`.
     ///
@@ -53,68 +125,5 @@ public struct ResponseHead: Hashable {
             headers: .init(head.headers),
             isKeepAlive: head.isKeepAlive
         )
-    }
-}
-
-extension ResponseHead {
-
-    /// A structure representing the status of an HTTP response.
-    public struct Status: Hashable {
-
-        /// The HTTP status code of the response.
-        public let code: UInt
-
-        /// The reason phrase associated with the HTTP status code.
-        public let reason: String
-
-        /// Initializes a new instance of `Status`.
-        ///
-        /// - Parameters:
-        ///   - code: The HTTP status code of the response.
-        ///   - reason: The reason phrase associated with the HTTP status code.
-        public init(
-            code: UInt,
-            reason: String
-        ) {
-            self.code = code
-            self.reason = reason
-        }
-
-        init(_ status: Internals.ResponseHead.Status) {
-            self.init(
-                code: status.code,
-                reason: status.reason
-            )
-        }
-    }
-
-    /// A structure representing the version of the HTTP protocol used in an HTTP response.
-    public struct Version: Hashable {
-
-        /// The minor version number of the HTTP protocol used in the response.
-        public let minor: Int
-
-        /// The major version number of the HTTP protocol used in the response.
-        public let major: Int
-
-        /// Initializes a new instance of `Version`.
-        ///
-        /// - Parameters:
-        ///   - minor: The minor version number of the HTTP protocol used in the response.
-        ///   - major: The major version number of the HTTP protocol used in the response.
-        public init(
-            minor: Int,
-            major: Int
-        ) {
-            self.minor = minor
-            self.major = major
-        }
-
-        init(_ version: Internals.ResponseHead.Version) {
-            self.init(
-                minor: version.minor,
-                major: version.major
-            )
-        }
     }
 }

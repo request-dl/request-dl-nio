@@ -5,11 +5,34 @@
 import Foundation
 
 /// A representation of an Authorization header.
-@RequestActor
 public struct Authorization: Property {
+
+    private struct Node: PropertyNode {
+
+        let type: TokenType
+        let token: String
+
+        func make(_ make: inout Make) async throws {
+            make.request.headers.setValue(
+                "\(type.rawValue) \(token)",
+                forKey: "Authorization"
+            )
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
 
     private let type: TokenType
     private let token: String
+
+    // MARK: - Inits
 
     /**
      Initializes a new instance of `Authorization` with the specified token type and token.
@@ -52,11 +75,22 @@ public struct Authorization: Property {
         }().base64EncodedString()
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<Authorization>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+        return .leaf(Node(
+            type: property.type,
+            token: property.token
+        ))
     }
 }
+
+// MARK: - Deprecated
 
 extension Authorization {
 
@@ -69,34 +103,5 @@ extension Authorization {
     public init(_ type: TokenType, token: Any) {
         self.type = type
         self.token = "\(token)"
-    }
-}
-
-extension Authorization {
-
-    private struct Node: PropertyNode {
-
-        let type: TokenType
-        let token: String
-
-        func make(_ make: inout Make) async throws {
-            make.request.headers.setValue(
-                "\(type.rawValue) \(token)",
-                forKey: "Authorization"
-            )
-        }
-    }
-
-    /// This method is used internally and should not be called directly.
-    @RequestActor
-    public static func _makeProperty(
-        property: _GraphValue<Authorization>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-        return .leaf(Node(
-            type: property.type,
-            token: property.token
-        ))
     }
 }

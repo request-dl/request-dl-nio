@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-@RequestActor
 class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsOneHierarchy_shouldBeValid() async throws {
@@ -134,7 +133,7 @@ extension ResolveTests {
                 },
                 LeafNode<Node> {
                     property = Node {
-                        configuration = Optional<(inout Configuration) -> ()> {
+                        configuration = Optional<@Sendable (inout Configuration) -> ()> {
                             some = (Function)
                         },
                         provider = SharedSessionProvider()
@@ -190,14 +189,19 @@ extension ResolveTests {
                                     name = q,
                                     value = some question,
                                     urlEncoder = URLEncoder {
-                                        dateEncodingStrategy = .iso8601,
-                                        keyEncodingStrategy = .literal,
-                                        dataEncodingStrategy = .base64,
-                                        boolEncodingStrategy = .literal,
-                                        optionalEncodingStrategy = .literal,
-                                        arrayEncodingStrategy = .droppingIndex,
-                                        dictionaryEncodingStrategy = .subscripted,
-                                        whitespaceEncodingStrategy = .percentEscaping
+                                        lock = Lock {
+                                            lock = NIOLock {
+                                                _storage = NIOConcurrencyHelpers.LockStorage<()>
+                                            }
+                                        },
+                                        _dateEncodingStrategy = .iso8601,
+                                        _keyEncodingStrategy = .literal,
+                                        _dataEncodingStrategy = .base64,
+                                        _boolEncodingStrategy = .literal,
+                                        _optionalEncodingStrategy = .literal,
+                                        _arrayEncodingStrategy = .droppingIndex,
+                                        _dictionaryEncodingStrategy = .subscripted,
+                                        _whitespaceEncodingStrategy = .percentEscaping
                                     }
                                 }
                             }
