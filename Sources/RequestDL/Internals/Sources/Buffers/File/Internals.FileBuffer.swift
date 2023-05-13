@@ -6,7 +6,7 @@ import Foundation
 
 extension Internals {
 
-    // TODO: - Refactor
+    // swiftlint:disable type_body_length
 
     struct FileBuffer: BufferProtocol {
 
@@ -343,4 +343,6 @@ extension Internals {
             }
         }
     }
+
+    // swiftlint:enable type_body_length
 }

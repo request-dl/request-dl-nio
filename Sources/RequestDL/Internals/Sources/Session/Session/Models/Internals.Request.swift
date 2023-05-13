@@ -11,7 +11,7 @@ extension Internals {
     struct Request: Sendable {
 
         // MARK: - Internal properties
-        
+
         var url: String {
             let pathAllowed = CharacterSet(charactersIn: "/")
 

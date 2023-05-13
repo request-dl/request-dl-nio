@@ -10,15 +10,19 @@ extension Internals {
 
         private final class Root: Internals.ClientOperation {
 
+            ///
             override func complete() {
-                /**
-                 * This function intentionally has no implementation and is meant to be used as a permanent
-                 * root for a `ClientOperationQueue`. By not implementing the function, we can ensure
-                 * that the root operation is always present in memory and is held by the queue.
+                /*
+                 * This function intentionally has no implementation and is
+                 * meant to be used as a permanent root for a
+                 * `ClientOperationQueue`. By not implementing the function, we
+                 * can ensure that the root operation is always present in
+                 * memory and is held by the queue.
                  *
-                 * The default implementation updates the next and previous references that point to this
-                 * operation, but since the root is intended to exist indefinitely, we do not want to modify these
-                 * references.
+                 * The default implementation updates the next and previous
+                 * references that point to this operation, but since the root
+                 * is intended to exist indefinitely, we do not want to modify
+                 * these references.
                  */
             }
         }

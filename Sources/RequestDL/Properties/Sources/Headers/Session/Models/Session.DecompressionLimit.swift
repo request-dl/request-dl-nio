@@ -8,13 +8,13 @@ import NIOHTTPCompression
 extension Session {
 
     public enum DecompressionLimit: Sendable, Hashable {
-        
+
         case none
         case ratio(Int)
         case size(Int)
-        
+
         // MARK: - Internal methods
-        
+
         func build() -> Internals.Decompression.Limit {
             switch self {
             case .none:

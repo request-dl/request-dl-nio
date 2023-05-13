@@ -80,7 +80,7 @@ extension Headers {
         }
 
         // MARK: - Public methods
-        
+
         /**
          Sets the "no-cache" flag to the given value.
 
@@ -228,6 +228,8 @@ extension Headers {
 
         // MARK: - Private methods
 
+        // swiftlint:disable cyclomatic_complexity
+
         private func makeContents() -> [String] {
             var contents = [String]()
 
@@ -285,5 +287,7 @@ extension Headers {
 
             return contents
         }
+
+        // swiftlint:enable cyclomatic_complexity
     }
 }

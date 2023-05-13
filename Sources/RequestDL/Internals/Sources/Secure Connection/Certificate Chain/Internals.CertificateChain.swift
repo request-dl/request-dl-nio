@@ -16,7 +16,7 @@ extension Internals {
         case file(String)
 
         // MARK: - Inits
-        
+
         init() {
             self = .certificates([])
         }

@@ -6,8 +6,6 @@ import Foundation
 
 extension Internals {
 
-    // TODO: - Refactor
-
     struct DataBuffer: BufferProtocol {
 
         private final class Storage: @unchecked Sendable {
