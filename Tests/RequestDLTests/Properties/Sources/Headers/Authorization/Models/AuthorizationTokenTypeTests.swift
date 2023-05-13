@@ -33,4 +33,17 @@ class AuthorizationTokenTypeTests: XCTestCase {
 
         XCTAssertEqual(sut, [.bearer, .basic])
     }
+
+    func testToken_withStringLossless() async throws {
+        // Given
+        let token = Authorization.TokenType.basic
+
+        // When
+        let string = String(token)
+        let losslessToken = Authorization.TokenType(string)
+
+        // Then
+        XCTAssertEqual(string, token.description)
+        XCTAssertEqual(losslessToken, token)
+    }
 }

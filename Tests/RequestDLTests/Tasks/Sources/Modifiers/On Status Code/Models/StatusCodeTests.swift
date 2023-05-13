@@ -251,4 +251,17 @@ class StatusCodeTests: XCTestCase {
     func testNetworkAuthenticationRequiredRawValue() async throws {
         XCTAssertEqual(StatusCode.networkAuthenticationRequired, 511)
     }
+
+    func testStatusCode_withStringLossless() async throws {
+        // Given
+        let statusCode = StatusCode.ok
+
+        // When
+        let string = String(statusCode)
+        let losslessStatusCode = StatusCode(string)
+
+        // Then
+        XCTAssertEqual(string, statusCode.description)
+        XCTAssertEqual(losslessStatusCode, statusCode)
+    }
 }

@@ -43,4 +43,17 @@ class HTTPMethodTests: XCTestCase {
     func testPatchMethodRawValue() async throws {
         XCTAssertEqual(HTTPMethod.patch, "PATCH")
     }
+
+    func testMethod_withStringLossless() async throws {
+        // Given
+        let method = HTTPMethod.trace
+
+        // When
+        let string = String(method)
+        let losslessMethod = HTTPMethod(string)
+
+        // Then
+        XCTAssertEqual(string, method.description)
+        XCTAssertEqual(losslessMethod, method)
+    }
 }
