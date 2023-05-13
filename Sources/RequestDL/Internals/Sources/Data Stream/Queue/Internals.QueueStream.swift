@@ -8,6 +8,33 @@ extension Internals {
 
     final class QueueStream<Value: Sendable>: StreamProtocol, @unchecked Sendable {
 
+        private final class Node: @unchecked Sendable {
+
+            // MARK: - Internal properties
+
+            let value: Value
+
+            var next: Node? {
+                get { lock.withLock { _next } }
+                set { lock.withLockVoid { _next = newValue } }
+            }
+
+            // MARK: - Private properties
+
+            private let lock = Lock()
+
+            // MARK: - Unsafe properties
+
+            private var _next: Node?
+
+            // MARK: - Inits
+
+            init(_ value: Value) {
+                self.value = value
+                self._next = nil
+            }
+        }
+
         // MARK: - Internal properties
 
         var isOpen: Bool {
@@ -72,36 +99,6 @@ extension Internals {
                 self._root = root.next
                 return root.value
             }
-        }
-    }
-}
-
-extension Internals.QueueStream {
-
-    fileprivate final class Node: @unchecked Sendable {
-
-        // MARK: - Internal properties
-
-        let value: Value
-
-        var next: Node? {
-            get { lock.withLock { _next } }
-            set { lock.withLockVoid { _next = newValue } }
-        }
-
-        // MARK: - Private properties
-
-        private let lock = Lock()
-
-        // MARK: - Unsafe properties
-
-        private var _next: Node?
-
-        // MARK: - Inits
-
-        init(_ value: Value) {
-            self.value = value
-            self._next = nil
         }
     }
 }

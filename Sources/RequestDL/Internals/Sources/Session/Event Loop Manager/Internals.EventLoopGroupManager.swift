@@ -5,7 +5,6 @@
 import Foundation
 import NIOCore
 import AsyncHTTPClient
-import Semaphore
 
 extension Internals {
 

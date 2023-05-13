@@ -4,7 +4,6 @@
 
 import Foundation
 import NIOCore
-import Semaphore
 
 extension Internals {
 

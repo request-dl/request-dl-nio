@@ -8,6 +8,21 @@ extension Internals {
 
     final class ClientOperationQueue: @unchecked Sendable {
 
+        private final class Root: Internals.ClientOperation {
+
+            override func complete() {
+                /**
+                 * This function intentionally has no implementation and is meant to be used as a permanent
+                 * root for a `ClientOperationQueue`. By not implementing the function, we can ensure
+                 * that the root operation is always present in memory and is held by the queue.
+                 *
+                 * The default implementation updates the next and previous references that point to this
+                 * operation, but since the root is intended to exist indefinitely, we do not want to modify these
+                 * references.
+                 */
+            }
+        }
+
         // MARK: - Internal properties
 
         var isRunning: Bool {
@@ -58,24 +73,6 @@ extension Internals.ClientOperationQueue: QueueClientOperationDelegate {
             if operation === _last {
                 _last = _last?.previous ?? root
             }
-        }
-    }
-}
-
-extension Internals.ClientOperationQueue {
-
-    fileprivate final class Root: Internals.ClientOperation {
-
-        override func complete() {
-            /**
-             * This function intentionally has no implementation and is meant to be used as a permanent
-             * root for a `ClientOperationQueue`. By not implementing the function, we can ensure
-             * that the root operation is always present in memory and is held by the queue.
-             *
-             * The default implementation updates the next and previous references that point to this
-             * operation, but since the root is intended to exist indefinitely, we do not want to modify these
-             * references.
-             */
         }
     }
 }

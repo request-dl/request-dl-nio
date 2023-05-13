@@ -9,6 +9,44 @@ extension Internals {
 
     struct AsyncResponse: Sendable, AsyncSequence {
 
+        struct Iterator: AsyncIteratorProtocol {
+
+            // MARK: - Internal properties
+
+            let upload: AsyncThrowingStream<Int, Error>.AsyncIterator?
+            let download: (
+                head: AsyncThrowingStream<Internals.ResponseHead, Error>,
+                bytes: Internals.DataStream<Internals.DataBuffer>
+            )?
+
+            // MARK: - Internal methods
+
+            mutating func next() async throws -> Element? {
+                if var upload = upload, let part = try await upload.next() {
+                    self = .init(
+                        upload: upload,
+                        download: download
+                    )
+                    return .upload(part)
+                }
+
+                guard let (heads, data) = download else {
+                    return nil
+                }
+
+                var lastHead: Internals.ResponseHead?
+
+                for try await head in heads {
+                    lastHead = head
+                }
+
+                self = .init(upload: nil, download: nil)
+                return lastHead.map {
+                    .download($0, .init(data))
+                }
+            }
+        }
+
         typealias Element = Response
 
         // MARK: - Private properties
@@ -36,47 +74,6 @@ extension Internals {
                 upload: upload.makeAsyncIterator(),
                 download: (head, download)
             )
-        }
-    }
-}
-
-extension Internals.AsyncResponse {
-
-    struct Iterator: AsyncIteratorProtocol {
-
-        // MARK: - Internal properties
-
-        let upload: AsyncThrowingStream<Int, Error>.AsyncIterator?
-        let download: (
-            head: AsyncThrowingStream<Internals.ResponseHead, Error>,
-            bytes: Internals.DataStream<Internals.DataBuffer>
-        )?
-
-        // MARK: - Internal methods
-
-        mutating func next() async throws -> Element? {
-            if var upload = upload, let part = try await upload.next() {
-                self = .init(
-                    upload: upload,
-                    download: download
-                )
-                return .upload(part)
-            }
-
-            guard let (heads, data) = download else {
-                return nil
-            }
-
-            var lastHead: Internals.ResponseHead?
-
-            for try await head in heads {
-                lastHead = head
-            }
-
-            self = .init(upload: nil, download: nil)
-            return lastHead.map {
-                .download($0, .init(data))
-            }
         }
     }
 }

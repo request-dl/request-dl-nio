@@ -63,19 +63,16 @@ protocol BufferProtocol: Sendable {
 
 extension BufferProtocol {
 
-    @Sendable
     func getData() -> Data? {
         var mutableSelf = self
         return mutableSelf.readData(mutableSelf.readableBytes)
     }
 
-    @Sendable
     func getBytes() -> [UInt8]? {
         var mutableSelf = self
         return mutableSelf.readBytes(mutableSelf.readableBytes)
     }
 
-    @Sendable
     func getData(at index: Int, length: Int) -> Data? {
         var mutableSelf = self
 

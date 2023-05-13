@@ -7,7 +7,26 @@ import NIOHTTP1
 
 extension Internals {
 
-    struct Headers: Sendable, Codable, Hashable {
+    struct Headers: Sendable, Sequence, Codable, Hashable {
+
+        struct Iterator: IteratorProtocol {
+
+            // MARK: - Private properties
+
+            fileprivate var dictionary: [Element]
+
+            // MARK: - Internal methods
+
+            mutating func next() -> Element? {
+                guard dictionary.first != nil else {
+                    return nil
+                }
+
+                return dictionary.removeFirst()
+            }
+        }
+
+        typealias Element = (String, String)
 
         private struct HeaderKey: Sendable, Hashable, Codable {
 
@@ -114,28 +133,6 @@ extension Internals {
             value
                 .split(separator: ";")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
-        }
-    }
-}
-
-extension Internals.Headers: Sequence {
-
-    typealias Element = (String, String)
-
-    struct Iterator: IteratorProtocol {
-
-        // MARK: - Private properties
-
-        fileprivate var dictionary: [Element]
-
-        // MARK: - Internal methods
-
-        mutating func next() -> Element? {
-            guard dictionary.first != nil else {
-                return nil
-            }
-
-            return dictionary.removeFirst()
         }
     }
 }

@@ -110,6 +110,8 @@ extension Internals {
     }
 }
 
+// MARK: - Internals.Response extension
+
 extension Internals.Response {
 
     enum ReadingMode: Sendable, Hashable {
