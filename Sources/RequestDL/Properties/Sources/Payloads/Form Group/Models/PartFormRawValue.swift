@@ -7,9 +7,9 @@ import Foundation
 struct PartFormRawValue {
 
     let data: Data
-    let headers: [String: Any]
+    let headers: [String: String]
 
-    init(_ data: Data, forHeaders headers: [String: Any]) {
+    init(_ data: Data, forHeaders headers: [String: String]) {
         self.data = data
         self.headers = headers
     }

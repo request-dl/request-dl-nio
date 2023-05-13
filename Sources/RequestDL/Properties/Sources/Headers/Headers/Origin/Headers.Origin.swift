@@ -23,7 +23,7 @@ extension Headers {
     @RequestActor
     public struct Origin: Property {
 
-        private let value: Any
+        private let value: String
 
         /**
          Initializes a `Origin` property with the given `host` and `port`.
@@ -45,7 +45,7 @@ extension Headers {
          - Parameter host: A `StringProtocol` representing the host.
          */
         public init<S: StringProtocol>(_ origin: S) {
-            self.value = origin
+            self.value = String(origin)
         }
 
         /// Returns an exception since `Never` is a type that can never be constructed.
