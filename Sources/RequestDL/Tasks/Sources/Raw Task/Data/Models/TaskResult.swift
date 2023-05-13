@@ -7,7 +7,7 @@ import Foundation
 /**
  A protocol that defines the properties and methods required for a primitive task result.
  */
-public protocol TaskResultPrimitive {
+public protocol TaskResultPrimitive: Sendable {
 
     var head: ResponseHead { get }
 }
@@ -15,7 +15,9 @@ public protocol TaskResultPrimitive {
 /**
  A structure that represents the result of a task.
 */
-public struct TaskResult<Element>: TaskResultPrimitive {
+public struct TaskResult<Element: Sendable>: TaskResultPrimitive {
+
+    // MARK: - Public properties
 
     /// The response head of the task result.
     public let head: ResponseHead
@@ -23,6 +25,8 @@ public struct TaskResult<Element>: TaskResultPrimitive {
     /// The payload of the task result.
     public let payload: Element
 
+    // MARK: - Public inits
+    
     /**
      Initializes a new instance of the TaskResult struct.
 

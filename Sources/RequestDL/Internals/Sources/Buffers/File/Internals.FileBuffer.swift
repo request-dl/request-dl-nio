@@ -6,6 +6,8 @@ import Foundation
 
 extension Internals {
 
+    // TODO: - Refactor
+
     struct FileBuffer: BufferProtocol {
 
         private let storage: Storage

@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol BufferProtocol {
+protocol BufferProtocol: Sendable {
 
     var readerIndex: Int { get }
     var writerIndex: Int { get }

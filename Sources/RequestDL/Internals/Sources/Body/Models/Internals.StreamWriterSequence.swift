@@ -4,16 +4,20 @@
 
 import Foundation
 import NIOCore
-import AsyncHTTPClient
+@preconcurrency import AsyncHTTPClient
 
 extension Internals {
 
-    struct StreamWriterSequence: Sequence {
+    struct StreamWriterSequence: Sequence, Sendable {
 
         typealias Element = EventLoopFuture<Void>
 
+        // MARK: - Internal properties
+
         let writer: HTTPClient.Body.StreamWriter
         let body: BodySequence
+
+        // MARK: - Inits
 
         init(
             writer: HTTPClient.Body.StreamWriter,
@@ -22,6 +26,8 @@ extension Internals {
             self.writer = writer
             self.body = body
         }
+
+        // MARK: - Internal methods
 
         func makeIterator() -> Iterator {
             Iterator(
@@ -34,9 +40,7 @@ extension Internals {
 
 extension Internals.StreamWriterSequence {
 
-    // TODO: - Remove @unchecked
-    // HTTPClient.Body.StreamWriter is @preconcurrency
-    struct Iterator: IteratorProtocol, @unchecked Sendable {
+    struct Iterator: IteratorProtocol, Sendable {
 
         // MARK: - Private properties
 

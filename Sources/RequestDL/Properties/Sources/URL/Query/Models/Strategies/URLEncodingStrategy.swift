@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol URLEncodingStrategy {
+protocol URLEncodingStrategy: Sendable {
 
     func encode(in encoder: URLEncoder.Encoder) throws
 }

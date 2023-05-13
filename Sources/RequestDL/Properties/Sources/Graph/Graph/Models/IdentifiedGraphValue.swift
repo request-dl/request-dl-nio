@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol IdentifiedGraphValue {
+protocol IdentifiedGraphValue: Sendable {
 
     var id: GraphID { get }
     var nextID: GraphID? { get }

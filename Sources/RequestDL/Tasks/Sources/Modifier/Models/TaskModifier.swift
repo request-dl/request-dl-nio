@@ -13,14 +13,13 @@ import Foundation
  The `task` function takes in a `Body` task and returns an `Element` value after applying
  the modification logic.
  */
-@RequestActor
-public protocol TaskModifier<Element> {
+public protocol TaskModifier<Element>: Sendable {
 
     /// The type of task being modified.
     associatedtype Body: Task
 
     /// The type of the returned element after modification.
-    associatedtype Element
+    associatedtype Element: Sendable
 
     /**
      Modifies the given task and returns an element of a specific type.

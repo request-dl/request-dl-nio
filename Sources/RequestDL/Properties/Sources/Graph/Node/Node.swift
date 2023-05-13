@@ -4,8 +4,7 @@
 
 import Foundation
 
-@RequestActor
-protocol Node: NodeStringConvertible {
+protocol Node: Sendable, NodeStringConvertible {
 
     mutating func next() -> Node?
 }

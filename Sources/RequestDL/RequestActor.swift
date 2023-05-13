@@ -4,6 +4,7 @@
 
 import Foundation
 
+@available(*, deprecated)
 @globalActor
 public actor RequestActor {
 

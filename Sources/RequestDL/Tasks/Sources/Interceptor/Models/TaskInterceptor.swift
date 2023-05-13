@@ -34,9 +34,9 @@ import Foundation
  - Warning: It is the responsibility of the interceptor to handle errors that may occur
  during the task execution.
  */
-public protocol TaskInterceptor<Element> {
+public protocol TaskInterceptor<Element>: Sendable {
 
-    associatedtype Element
+    associatedtype Element: Sendable
 
     /**
      This method is part of the `TaskInterceptor` protocol, which allows an object to

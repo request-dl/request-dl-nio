@@ -4,8 +4,7 @@
 
 import Foundation
 
-@RequestActor
-protocol GraphValueOperation {
+protocol GraphValueOperation: Sendable {
 
     func callAsFunction(_ properties: inout GraphProperties)
 }

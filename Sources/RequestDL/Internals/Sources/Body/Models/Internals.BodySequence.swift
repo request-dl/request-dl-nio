@@ -8,15 +8,22 @@ import NIOFoundationCompat
 
 extension Internals {
 
-    struct BodySequence: Sequence {
+    struct BodySequence: Sequence, Sendable {
+
+        // MARK: - Internal properties
 
         let size: Int
         let fragmentSize: Int
-        private let buffers: [BufferProtocol]
 
         var isEmpty: Bool {
             buffers.isEmpty
         }
+
+        // MARK: - Private properties
+
+        private let buffers: [BufferProtocol]
+
+        // MARK: - Inits
 
         init(
             buffers: [BufferProtocol],
@@ -38,6 +45,8 @@ extension Internals {
             }()
         }
 
+        // MARK: - Internal methods
+
         func makeIterator() -> Iterator {
             Iterator(
                 buffers: buffers,
@@ -50,12 +59,19 @@ extension Internals {
 
 extension Internals.BodySequence {
 
-    struct Iterator: IteratorProtocol {
+    struct Iterator: IteratorProtocol, Sendable {
 
-        private var bytes: NIOCore.ByteBuffer
-        private(set) var buffers: [BufferProtocol]
+        // MARK: - Internal properties
+
         let size: Int
         let fragment: Int
+        private(set) var buffers: [BufferProtocol]
+
+        // MARK: - Private properties
+
+        private var bytes: NIOCore.ByteBuffer
+
+        // MARK: - Inits
 
         init(
             buffers: [BufferProtocol],
@@ -69,6 +85,8 @@ extension Internals.BodySequence {
             bytes.moveReaderIndex(to: .zero)
             bytes.moveWriterIndex(to: .zero)
         }
+
+        // MARK: - Internal methods
 
         mutating func next() -> NIOCore.ByteBuffer? {
             guard fragment > .zero else {
