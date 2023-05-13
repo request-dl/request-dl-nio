@@ -189,6 +189,11 @@ extension ResolveTests {
                                     name = q,
                                     value = some question,
                                     urlEncoder = URLEncoder {
+                                        lock = Lock {
+                                            lock = NIOLock {
+                                                _storage = NIOConcurrencyHelpers.LockStorage<()>
+                                            }
+                                        },
                                         _dateEncodingStrategy = .iso8601,
                                         _keyEncodingStrategy = .literal,
                                         _dataEncodingStrategy = .base64,
@@ -196,12 +201,7 @@ extension ResolveTests {
                                         _optionalEncodingStrategy = .literal,
                                         _arrayEncodingStrategy = .droppingIndex,
                                         _dictionaryEncodingStrategy = .subscripted,
-                                        _whitespaceEncodingStrategy = .percentEscaping,
-                                        lock = Lock {
-                                            lock = NIOLock {
-                                                _storage = NIOConcurrencyHelpers.LockStorage<()>
-                                            }
-                                        }
+                                        _whitespaceEncodingStrategy = .percentEscaping
                                     }
                                 }
                             }

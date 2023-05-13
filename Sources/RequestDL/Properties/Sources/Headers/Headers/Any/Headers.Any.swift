@@ -9,8 +9,19 @@ extension Headers {
     /// A header property that accepts any value for the given key.
     public struct `Any`: Property {
 
+        // MARK: - Public properties
+
+        /// Returns an exception since `Never` is a type that can never be constructed.
+        public var body: Never {
+            bodyException()
+        }
+
+        // MARK: - Internal properties
+
         let key: String
         let value: String
+
+        // MARK: - Inits
 
         /**
          Initializes a new instance of `Headers.Any` for the given value and name.
@@ -42,9 +53,17 @@ extension Headers {
             self.value = String(value)
         }
 
-        /// Returns an exception since `Never` is a type that can never be constructed.
-        public var body: Never {
-            bodyException()
+        // MARK: - Public static methods
+
+        public static func _makeProperty(
+            property: _GraphValue<Headers.`Any`>,
+            inputs: _PropertyInputs
+        ) async throws -> _PropertyOutputs {
+            property.assertPathway()
+            return .leaf(Headers.Node(
+                key: property.key,
+                value: property.value
+            ))
         }
     }
 }
