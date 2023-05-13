@@ -22,26 +22,6 @@ import Foundation
  */
 public struct FormGroup<Content: Property>: Property {
 
-    let content: Content
-
-    /**
-     Initializes a new instance of `Form` with the specified list of properties.
-
-     - Parameters:
-        - content: A property builder closure that creates a list of `Property` objects.
-     */
-    public init(@PropertyBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension FormGroup {
-
     private struct Node: PropertyNode {
 
         let partLength: Int?
@@ -62,6 +42,31 @@ extension FormGroup {
             ])
         }
     }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
+
+    let content: Content
+
+    // MARK: - Inits
+
+    /**
+     Initializes a new instance of `Form` with the specified list of properties.
+
+     - Parameters:
+        - content: A property builder closure that creates a list of `Property` objects.
+     */
+    public init(@PropertyBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(

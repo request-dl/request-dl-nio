@@ -1,6 +1,6 @@
 /*
  See LICENSE for this package's licensing information.
-*/
+ */
 
 import Foundation
 import NIOSSL
@@ -16,40 +16,38 @@ extension Internals {
         case bytes([UInt8])
 
         case certificates([Internals.Certificate])
-    }
-}
 
-extension Internals.TrustRoots {
+        // MARK: - Inits
 
-    init() {
-        self = .certificates([])
-    }
-
-    mutating func append(_ certificate: Internals.Certificate) {
-        guard case .certificates(let certificates) = self else {
-            Internals.Log.failure(
-                .expectingCertificatesCase(self)
-            )
+        init() {
+            self = .certificates([])
         }
 
-        self = .certificates(certificates + [certificate])
-    }
-}
+        // MARK: - Internal methods
 
-extension Internals.TrustRoots {
+        mutating func append(_ certificate: Internals.Certificate) {
+            guard case .certificates(let certificates) = self else {
+                Internals.Log.failure(
+                    .expectingCertificatesCase(self)
+                )
+            }
 
-    func build() throws -> NIOSSLTrustRoots {
-        switch self {
-        case .default:
-            return .default
-        case .file(let file):
-            return .file(file)
-        case .bytes(let bytes):
-            return .certificates(try NIOSSLCertificate.fromPEMBytes(bytes))
-        case .certificates(let certificates):
-            return .certificates(try certificates.map {
-                try $0.build()
-            })
+            self = .certificates(certificates + [certificate])
+        }
+
+        func build() throws -> NIOSSLTrustRoots {
+            switch self {
+            case .default:
+                return .default
+            case .file(let file):
+                return .file(file)
+            case .bytes(let bytes):
+                return .certificates(try NIOSSLCertificate.fromPEMBytes(bytes))
+            case .certificates(let certificates):
+                return .certificates(try certificates.map {
+                    try $0.build()
+                })
+            }
         }
     }
 }

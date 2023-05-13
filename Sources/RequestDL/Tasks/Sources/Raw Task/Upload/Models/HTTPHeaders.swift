@@ -9,7 +9,22 @@ import Foundation
 
  `HTTPHeaders` provides methods and properties for working with HTTP headers in Swift.
  */
-public struct HTTPHeaders: Hashable, Sendable {
+public struct HTTPHeaders: Sequence, Hashable, Sendable {
+
+    public struct Iterator: IteratorProtocol {
+
+        // MARK: - Private properties
+
+        fileprivate var headers: Internals.Headers.Iterator
+
+        // MARK: - Public methods
+
+        public mutating func next() -> Element? {
+            headers.next()
+        }
+    }
+
+    public typealias Element = (String, String)
 
     // MARK: - Public methods
 
@@ -95,24 +110,6 @@ public struct HTTPHeaders: Hashable, Sendable {
 
     public func makeIterator() -> Iterator {
         .init(headers: headers.makeIterator())
-    }
-}
-
-extension HTTPHeaders: Sequence {
-
-    public typealias Element = (String, String)
-
-    public struct Iterator: IteratorProtocol {
-
-        // MARK: - Private properties
-
-        fileprivate var headers: Internals.Headers.Iterator
-
-        // MARK: - Public methods
-
-        public mutating func next() -> Element? {
-            headers.next()
-        }
     }
 }
 

@@ -11,6 +11,28 @@ extension Internals {
     struct Request: Sendable {
 
         // MARK: - Internal properties
+        
+        var url: String {
+            let pathAllowed = CharacterSet(charactersIn: "/")
+
+            let baseURL = baseURL
+                .trimmingCharacters(in: .urlHostAllowed.inverted)
+                .trimmingCharacters(in: pathAllowed)
+
+            let pathComponents = pathComponents
+                .joined(separator: "/")
+                .trimmingCharacters(in: .urlPathAllowed.inverted)
+                .trimmingCharacters(in: pathAllowed)
+
+            let queries = queries.joined()
+            let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"
+
+            if pathComponents.isEmpty {
+                return baseURL + queriesPathComponent
+            } else {
+                return "\(baseURL)/\(pathComponents)\(queriesPathComponent)"
+            }
+        }
 
         var baseURL: String
         var pathComponents: [String]
@@ -43,31 +65,6 @@ extension Internals {
                 headers: headers.build(),
                 body: body?.build()
             )
-        }
-    }
-}
-
-extension Internals.Request {
-
-    var url: String {
-        let pathAllowed = CharacterSet(charactersIn: "/")
-
-        let baseURL = baseURL
-            .trimmingCharacters(in: .urlHostAllowed.inverted)
-            .trimmingCharacters(in: pathAllowed)
-
-        let pathComponents = pathComponents
-            .joined(separator: "/")
-            .trimmingCharacters(in: .urlPathAllowed.inverted)
-            .trimmingCharacters(in: pathAllowed)
-
-        let queries = queries.joined()
-        let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"
-
-        if pathComponents.isEmpty {
-            return baseURL + queriesPathComponent
-        } else {
-            return "\(baseURL)/\(pathComponents)\(queriesPathComponent)"
         }
     }
 }

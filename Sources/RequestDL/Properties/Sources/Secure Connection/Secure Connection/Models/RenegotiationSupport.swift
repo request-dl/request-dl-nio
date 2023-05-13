@@ -21,9 +21,8 @@ public enum RenegotiationSupport: Sendable, Hashable {
 
     /// Indicates that renegotiation is supported always.
     case always
-}
 
-extension RenegotiationSupport {
+    // MARK: - Internal methods
 
     func build() -> NIOSSL.NIORenegotiationSupport {
         switch self {

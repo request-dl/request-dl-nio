@@ -12,35 +12,16 @@ A publisher that wraps a Task instance and publishes its output asynchronously.
 */
 public struct PublishedTask<Output>: Publisher {
 
-    public typealias Failure = Error
-
-    private let wrapper: () async throws -> Output
-
-    init<Content: Task>(_ content: Content) where Content.Element == Output {
-        self.wrapper = { try await content.result() }
-    }
-
-    /**
-     Subscribes the given `Subscriber` to this publisher.
-
-     - Parameter subscriber: The `Subscriber` to receive values and completion.
-     */
-    public func receive<S>(
-        subscriber: S
-    ) where S: Subscriber, Failure == S.Failure, Output == S.Input {
-        let subscription = Subscription(wrapper: wrapper, subscriber: subscriber)
-        subscriber.receive(subscription: subscription)
-    }
-}
-
-extension PublishedTask {
-
     class Subscription<S: Subscriber>: Combine.Subscription where S.Failure == Error {
 
+        // MARK: - Private properties
+
         private var task: _Concurrency.Task<Void, Never>?
+        private var subscriber: S?
 
         private let wrapper: () async throws -> S.Input
-        private var subscriber: S?
+
+        // MARK: - Inits
 
         init(
             wrapper: @escaping () async throws -> S.Input,
@@ -49,6 +30,8 @@ extension PublishedTask {
             self.wrapper = wrapper
             self.subscriber = subscriber
         }
+
+        // MARK: - Internal properties
 
         func request(_ demand: Subscribers.Demand) {
             guard let subscriber else {
@@ -70,7 +53,35 @@ extension PublishedTask {
             task = nil
         }
     }
+
+    public typealias Failure = Error
+
+    // MARK: - Private properties
+
+    private let wrapper: () async throws -> Output
+
+    // MARK: - Inits
+
+    init<Content: Task>(_ content: Content) where Content.Element == Output {
+        self.wrapper = { try await content.result() }
+    }
+
+    // MARK: - Public methods
+
+    /**
+     Subscribes the given `Subscriber` to this publisher.
+
+     - Parameter subscriber: The `Subscriber` to receive values and completion.
+     */
+    public func receive<S>(
+        subscriber: S
+    ) where S: Subscriber, Failure == S.Failure, Output == S.Input {
+        let subscription = Subscription(wrapper: wrapper, subscriber: subscriber)
+        subscriber.receive(subscription: subscription)
+    }
 }
+
+// MARK: - Task extension
 
 extension Task {
 

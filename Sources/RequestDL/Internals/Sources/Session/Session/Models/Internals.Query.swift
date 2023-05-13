@@ -12,6 +12,8 @@ extension Internals {
     }
 }
 
+// MARK: - [Internals.Query] extension
+
 extension [Internals.Query] {
 
     func joined() -> String {

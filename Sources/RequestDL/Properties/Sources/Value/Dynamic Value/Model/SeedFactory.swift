@@ -6,27 +6,7 @@ import Foundation
 
 struct SeedFactory: Sendable {
 
-    // MARK: - Private properties
-
-    private let storage = Storage()
-
-    // MARK: - Inits
-
-    init() {}
-
-    // MARK: - Internal methods
-
-    func callAsFunction(_ id: Namespace.ID) -> Seed {
-        let currentSeed = storage.seeds[id] ?? .init(-1)
-        let seed = currentSeed.next()
-        storage.seeds[id] = seed
-        return seed
-    }
-}
-
-extension SeedFactory {
-
-    fileprivate final class Storage: @unchecked Sendable {
+    private final class Storage: @unchecked Sendable {
 
         // MARK: - Internal properties
 
@@ -42,5 +22,22 @@ extension SeedFactory {
         // MARK: - Unsafe properties
 
         private var _seeds = [Namespace.ID: Seed]()
+    }
+
+    // MARK: - Private properties
+
+    private let storage = Storage()
+
+    // MARK: - Inits
+
+    init() {}
+
+    // MARK: - Internal methods
+
+    func callAsFunction(_ id: Namespace.ID) -> Seed {
+        let currentSeed = storage.seeds[id] ?? .init(-1)
+        let seed = currentSeed.next()
+        storage.seeds[id] = seed
+        return seed
     }
 }

@@ -16,101 +16,6 @@ protocol SecureConnectionPropertyNode: Sendable {
 
 struct SecureConnectionNode: PropertyNode {
 
-    // MARK: - Private properties
-
-    private let source: Source
-
-    // MARK: - Inits
-
-    init(_ node: SecureConnectionCollectorPropertyNode) {
-        self.source = .collectorNode(node)
-    }
-
-    init(_ node: SecureConnectionPropertyNode) {
-        self.source = .node(node)
-    }
-
-    // MARK: - Internal methods
-
-    func make(_ make: inout Make) async throws {
-        guard let secureConnection = make.configuration.secureConnection else {
-            Internals.Log.failure(
-                .cantCreateCertificateOutsideSecureConnection()
-            )
-        }
-
-        var collector = secureConnection.collector()
-        passthrough(&collector)
-        make.configuration.secureConnection = collector(\.self)
-    }
-}
-
-extension SecureConnectionNode {
-
-    fileprivate enum Source: Sendable {
-        case collectorNode(SecureConnectionCollectorPropertyNode)
-        case node(SecureConnectionPropertyNode)
-    }
-}
-
-// MARK: - Contains
-
-extension SecureConnectionNode {
-
-    struct Contains: Sendable {
-
-        // MARK: - Private properties
-
-        fileprivate let source: Source
-
-        // MARK: - Internal methods
-
-        func callAsFunction<Property>(_ type: Property.Type) -> Bool {
-            switch source {
-            case .collectorNode(let property):
-                return property is Property
-            case .node(let property):
-                return property is Property
-            }
-        }
-    }
-
-    var contains: Contains {
-        .init(source: source)
-    }
-}
-
-// MARK: - Passthrough
-
-extension SecureConnectionNode {
-
-    struct Passthrough: Sendable {
-
-        // MARK: - Private properties
-
-        fileprivate let source: Source
-
-        // MARK: - Internal methods
-
-        func callAsFunction(_ collector: inout Collector) {
-            switch source {
-            case .node(let node):
-                node.make(&collector.secureConnection)
-            case .collectorNode(let node):
-                node.make(&collector)
-            }
-        }
-    }
-
-    var passthrough: Passthrough {
-        .init(source: source)
-    }
-}
-
-// MARK: - Collector
-
-extension SecureConnectionNode {
-
     struct Collector: Sendable {
 
         // MARK: - Internal properties
@@ -173,6 +78,85 @@ extension SecureConnectionNode {
                 secureConnection.additionalTrustRoots = sc_additionalTrustRoots
             }
         }
+    }
+
+    struct Contains: Sendable {
+
+        // MARK: - Private properties
+
+        fileprivate let source: Source
+
+        // MARK: - Internal methods
+
+        func callAsFunction<Property>(_ type: Property.Type) -> Bool {
+            switch source {
+            case .collectorNode(let property):
+                return property is Property
+            case .node(let property):
+                return property is Property
+            }
+        }
+    }
+
+    struct Passthrough: Sendable {
+
+        // MARK: - Private properties
+
+        fileprivate let source: Source
+
+        // MARK: - Internal methods
+
+        func callAsFunction(_ collector: inout Collector) {
+            switch source {
+            case .node(let node):
+                node.make(&collector.secureConnection)
+            case .collectorNode(let node):
+                node.make(&collector)
+            }
+        }
+    }
+
+    fileprivate enum Source: Sendable {
+        case collectorNode(SecureConnectionCollectorPropertyNode)
+        case node(SecureConnectionPropertyNode)
+    }
+
+    // MARK: - Internal properties
+
+    var contains: Contains {
+        .init(source: source)
+    }
+
+    var passthrough: Passthrough {
+        .init(source: source)
+    }
+
+    // MARK: - Private properties
+
+    private let source: Source
+
+    // MARK: - Inits
+
+    init(_ node: SecureConnectionCollectorPropertyNode) {
+        self.source = .collectorNode(node)
+    }
+
+    init(_ node: SecureConnectionPropertyNode) {
+        self.source = .node(node)
+    }
+
+    // MARK: - Internal methods
+
+    func make(_ make: inout Make) async throws {
+        guard let secureConnection = make.configuration.secureConnection else {
+            Internals.Log.failure(
+                .cantCreateCertificateOutsideSecureConnection()
+            )
+        }
+
+        var collector = secureConnection.collector()
+        passthrough(&collector)
+        make.configuration.secureConnection = collector(\.self)
     }
 }
 

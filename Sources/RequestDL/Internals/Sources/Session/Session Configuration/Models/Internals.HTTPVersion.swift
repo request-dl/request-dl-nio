@@ -8,19 +8,19 @@ import AsyncHTTPClient
 extension Internals {
 
     enum HTTPVersion: Sendable, Hashable {
+
         case http1Only
         case automatic
-    }
-}
 
-extension Internals.HTTPVersion {
+        // MARK: - Internal methods
 
-    func build() -> HTTPClient.Configuration.HTTPVersion {
-        switch self {
-        case .http1Only:
-            return .http1Only
-        case .automatic:
-            return .automatic
+        func build() -> HTTPClient.Configuration.HTTPVersion {
+            switch self {
+            case .http1Only:
+                return .http1Only
+            case .automatic:
+                return .automatic
+            }
         }
     }
 }

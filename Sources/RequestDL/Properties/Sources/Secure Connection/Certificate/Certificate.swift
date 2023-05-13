@@ -19,6 +19,38 @@ public struct Certificate: Property {
     public enum Format: Sendable, Hashable {
         case pem
         case der
+
+        func callAsFunction() -> Internals.Certificate.Format {
+            switch self {
+            case .der:
+                return .der
+            case .pem:
+                return .pem
+            }
+        }
+
+        func resolve(for path: String, in bundle: Bundle) -> String {
+            let resourceName: String = {
+                let pathExtension = ".\(self().pathExtension)"
+
+                if path.hasSuffix(pathExtension) {
+                    return path
+                } else {
+                    return "\(path)\(pathExtension)"
+                }
+            }()
+
+            guard let resourceURL = bundle.resolveURL(forResourceName: resourceName) else {
+                Internals.Log.failure(
+                    .cantOpenCertificateFile(
+                        resourceName,
+                        bundle
+                    )
+                )
+            }
+
+            return resourceURL.absolutePath(percentEncoded: false)
+        }
     }
 
     // MARK: - Public properties
@@ -97,42 +129,5 @@ public struct Certificate: Property {
                 format: property.format()
             )
         ))
-    }
-}
-
-// MARK: - Certificate.Format extension
-
-extension Certificate.Format {
-
-    func callAsFunction() -> Internals.Certificate.Format {
-        switch self {
-        case .der:
-            return .der
-        case .pem:
-            return .pem
-        }
-    }
-
-    func resolve(for path: String, in bundle: Bundle) -> String {
-        let resourceName: String = {
-            let pathExtension = ".\(self().pathExtension)"
-
-            if path.hasSuffix(pathExtension) {
-                return path
-            } else {
-                return "\(path)\(pathExtension)"
-            }
-        }()
-
-        guard let resourceURL = bundle.resolveURL(forResourceName: resourceName) else {
-            Internals.Log.failure(
-                .cantOpenCertificateFile(
-                    resourceName,
-                    bundle
-                )
-            )
-        }
-
-        return resourceURL.absolutePath(percentEncoded: false)
     }
 }

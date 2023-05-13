@@ -8,6 +8,11 @@ extension Internals {
 
     final class Storage: @unchecked Sendable {
 
+        private struct Register: Sendable {
+            let readAt = Date()
+            let value: Sendable
+        }
+
         // MARK: - Internal static properties
 
         static let lifetime: UInt64 = 5_000_000_000 * 60
@@ -70,13 +75,5 @@ extension Internals {
                 }
             }
         }
-    }
-}
-
-extension Internals.Storage {
-
-    fileprivate struct Register: Sendable {
-        let readAt = Date()
-        let value: Sendable
     }
 }

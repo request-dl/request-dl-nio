@@ -11,8 +11,12 @@ extension Headers {
 
     struct Node: PropertyNode {
 
+        // MARK: - Internal properties
+
         let key: String
         let value: String
+
+        // MARK: - Internal methods
 
         func make(_ make: inout Make) async throws {
             if !value.isEmpty {

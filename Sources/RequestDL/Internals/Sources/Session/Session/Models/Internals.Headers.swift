@@ -9,6 +9,36 @@ extension Internals {
 
     struct Headers: Sendable, Codable, Hashable {
 
+        private struct HeaderKey: Sendable, Hashable, Codable {
+
+            // MARK: - Internal properties
+
+            let rawValue: String
+
+            // MARK: - Private properties
+
+            private var hash: Int
+
+            // MARK: - Inits
+
+            init(_ rawValue: String) {
+                self.rawValue = rawValue
+                self.hash = rawValue.lowercased().hashValue
+            }
+
+            // MARK: - Internal static methods
+
+            static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+                lhs.hash == rhs.hash
+            }
+
+            // MARK: - Internal methods
+
+            func hash(into hasher: inout Hasher) {
+                hash.hash(into: &hasher)
+            }
+        }
+
         // MARK: - Internal properties
 
         var isEmpty: Bool {
@@ -106,39 +136,6 @@ extension Internals.Headers: Sequence {
             }
 
             return dictionary.removeFirst()
-        }
-    }
-}
-
-private extension Internals.Headers {
-
-    struct HeaderKey: Sendable, Hashable, Codable {
-
-        // MARK: - Internal properties
-
-        let rawValue: String
-
-        // MARK: - Private properties
-
-        private var hash: Int
-
-        // MARK: - Inits
-
-        init(_ rawValue: String) {
-            self.rawValue = rawValue
-            self.hash = rawValue.lowercased().hashValue
-        }
-
-        // MARK: - Internal static methods
-
-        static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-            lhs.hash == rhs.hash
-        }
-
-        // MARK: - Internal methods
-
-        func hash(into hasher: inout Hasher) {
-            hash.hash(into: &hasher)
         }
     }
 }

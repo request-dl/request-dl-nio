@@ -6,11 +6,17 @@ import Foundation
 
 struct GraphNamespaceOperation<Content>: GraphValueOperation {
 
+    // MARK: - Private properties
+
     private let mirror: DynamicValueMirror<Content>
+
+    // MARK: - Inits
 
     init(_ mirror: DynamicValueMirror<Content>) {
         self.mirror = mirror
     }
+
+    // MARK: - Internal methods
 
     func callAsFunction(_ properties: inout GraphProperties) {
         var labels = [String]()

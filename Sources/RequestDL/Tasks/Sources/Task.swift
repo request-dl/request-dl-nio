@@ -31,6 +31,8 @@ public protocol Task<Element>: Sendable {
     func result() async throws -> Element
 }
 
+// MARK: - Task extension
+
 extension Task {
 
     /**

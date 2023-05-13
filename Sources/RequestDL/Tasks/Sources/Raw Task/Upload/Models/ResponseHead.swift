@@ -7,61 +7,6 @@ import Foundation
 /// A structure representing the head of an HTTP response.
 public struct ResponseHead: Sendable, Hashable {
 
-    // MARK: - Public properties
-
-    /// The URL of the response.
-    public let url: URL?
-
-    /// The status of the response.
-    public let status: Status
-
-    /// The version of the HTTP protocol used in the response.
-    public let version: Version
-
-    /// The headers of the response.
-    public let headers: HTTPHeaders
-
-    /// A boolean value indicating whether the connection should be kept alive after the response.
-    public let isKeepAlive: Bool
-
-    // MARK: - Inits
-
-    /// Initializes a new instance of `ResponseHead`.
-    ///
-    /// - Parameters:
-    ///   - url: The URL of the response.
-    ///   - status: The status of the response.
-    ///   - version: The version of the HTTP protocol used in the response.
-    ///   - headers: The headers of the response.
-    ///   - isKeepAlive: A boolean value indicating whether the connection should be kept alive after
-    ///   the response.
-    public init(
-        url: URL?,
-        status: Status,
-        version: Version,
-        headers: HTTPHeaders,
-        isKeepAlive: Bool
-    ) {
-        self.url = url
-        self.status = status
-        self.version = version
-        self.headers = headers
-        self.isKeepAlive = isKeepAlive
-    }
-
-    init(_ head: Internals.ResponseHead) {
-        self.init(
-            url: .init(string: head.url),
-            status: .init(head.status),
-            version: .init(head.version),
-            headers: .init(head.headers),
-            isKeepAlive: head.isKeepAlive
-        )
-    }
-}
-
-extension ResponseHead {
-
     /// A structure representing the status of an HTTP response.
     public struct Status: Sendable, Hashable {
 
@@ -128,5 +73,57 @@ extension ResponseHead {
                 major: version.major
             )
         }
+    }
+
+    // MARK: - Public properties
+
+    /// The URL of the response.
+    public let url: URL?
+
+    /// The status of the response.
+    public let status: Status
+
+    /// The version of the HTTP protocol used in the response.
+    public let version: Version
+
+    /// The headers of the response.
+    public let headers: HTTPHeaders
+
+    /// A boolean value indicating whether the connection should be kept alive after the response.
+    public let isKeepAlive: Bool
+
+    // MARK: - Inits
+
+    /// Initializes a new instance of `ResponseHead`.
+    ///
+    /// - Parameters:
+    ///   - url: The URL of the response.
+    ///   - status: The status of the response.
+    ///   - version: The version of the HTTP protocol used in the response.
+    ///   - headers: The headers of the response.
+    ///   - isKeepAlive: A boolean value indicating whether the connection should be kept alive after
+    ///   the response.
+    public init(
+        url: URL?,
+        status: Status,
+        version: Version,
+        headers: HTTPHeaders,
+        isKeepAlive: Bool
+    ) {
+        self.url = url
+        self.status = status
+        self.version = version
+        self.headers = headers
+        self.isKeepAlive = isKeepAlive
+    }
+
+    init(_ head: Internals.ResponseHead) {
+        self.init(
+            url: .init(string: head.url),
+            status: .init(head.status),
+            version: .init(head.version),
+            headers: .init(head.headers),
+            isKeepAlive: head.isKeepAlive
+        )
     }
 }

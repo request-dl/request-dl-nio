@@ -16,11 +16,12 @@ public struct ModifiedTask<Modifier: TaskModifier>: Task {
 
     public typealias Element = Modifier.Element
 
+    // MARK: - Internal properties
+
     let task: Modifier.Body
     let modifier: Modifier
-}
 
-extension ModifiedTask {
+    // MARK: - Public properties
 
     /**
      Returns the result of the task.

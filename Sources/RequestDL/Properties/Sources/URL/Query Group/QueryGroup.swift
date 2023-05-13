@@ -21,36 +21,6 @@ Usage:
  */
 public struct QueryGroup<Content: Property>: Property {
 
-    let content: Content
-
-    /**
-     Creates a new query group from the content.
-
-     - Parameter content: A closure that returns the content of the query group.
-     */
-    public init(@PropertyBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension QueryGroup where Content == ForEach<[String: Any], String, Query<Any>> {
-
-    public init(_ dictionary: [String: Any]) {
-        self.init {
-            ForEach(dictionary, id: \.key) {
-                Query($0.value, forKey: $0.key)
-            }
-        }
-    }
-}
-
-extension QueryGroup {
-
     struct Node: PropertyNode {
 
         let leafs: [LeafNode<QueryNode>]
@@ -66,6 +36,30 @@ extension QueryGroup {
         }
     }
 
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
+
+    let content: Content
+
+    // MARK: - Inits
+
+    /**
+     Creates a new query group from the content.
+
+     - Parameter content: A closure that returns the content of the query group.
+     */
+    public init(@PropertyBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    // MARK: - Public static methods
+
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<QueryGroup<Content>>,
@@ -79,5 +73,16 @@ extension QueryGroup {
         )
 
         return .leaf(Node(output.node.search(for: QueryNode.self)))
+    }
+}
+
+extension QueryGroup where Content == ForEach<[String: Any], String, Query<Any>> {
+
+    public init(_ dictionary: [String: Any]) {
+        self.init {
+            ForEach(dictionary, id: \.key) {
+                Query($0.value, forKey: $0.key)
+            }
+        }
     }
 }

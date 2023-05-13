@@ -49,6 +49,8 @@ extension Headers {
     }
 }
 
+// MARK: - Deprecated
+
 extension Headers.`Any` {
 
     /**
@@ -62,20 +64,5 @@ extension Headers.`Any` {
     public init<S: StringProtocol>(_ value: Any, forKey key: S) {
         self.key = String(key)
         self.value = "\(value)"
-    }
-}
-
-extension Headers.`Any` {
-
-    /// This method is used internally and should not be called directly.
-    public static func _makeProperty(
-        property: _GraphValue<Headers.`Any`>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-        return .leaf(Headers.Node(
-            key: property.key,
-            value: property.value
-        ))
     }
 }

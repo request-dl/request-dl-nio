@@ -9,21 +9,31 @@ extension Internals {
 
     struct CustomSessionProvider: SessionProvider {
 
+        // MARK: - Internal properties
+
+        var id: String {
+            "\(ObjectIdentifier(_group))"
+        }
+
+        // MARK: - Private properties
+
         private let _group: EventLoopGroup
+
+        // MARK: - Inits
 
         init(_ group: EventLoopGroup) {
             self._group = group
         }
 
-        var id: String {
-            "\(ObjectIdentifier(_group))"
-        }
+        // MARK: - Internal methods
 
         func group() -> EventLoopGroup {
             _group
         }
     }
 }
+
+// MARK: - SessionProvider extension
 
 extension SessionProvider where Self == Internals.CustomSessionProvider {
 

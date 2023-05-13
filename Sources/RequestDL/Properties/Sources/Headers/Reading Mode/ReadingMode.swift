@@ -7,7 +7,27 @@ import Foundation
 /// A struct representing the reading mode used for reading data.
 public struct ReadingMode: Property {
 
+    private struct Node: PropertyNode {
+
+        let mode: Internals.Response.ReadingMode
+
+        func make(_ make: inout Make) async throws {
+            make.request.readingMode = mode
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Private properties
+
     private let mode: Internals.Response.ReadingMode
+
+    // MARK: - Inits
 
     /// Creates a reading mode with a fixed length for reading data.
     ///
@@ -35,23 +55,8 @@ public struct ReadingMode: Property {
         self.init(separator: Array(Data(separator.utf8)))
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension ReadingMode {
-
-    private struct Node: PropertyNode {
-
-        let mode: Internals.Response.ReadingMode
-
-        func make(_ make: inout Make) async throws {
-            make.request.readingMode = mode
-        }
-    }
-
+    // MARK: - Public static methods
+    
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
         property: _GraphValue<ReadingMode>,

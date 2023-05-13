@@ -11,17 +11,16 @@ extension Internals {
 
         case file(String)
         case privateKey(PrivateKey)
-    }
-}
 
-extension Internals.PrivateKeySource {
+        // MARK: - Internal methods
 
-    func build() throws -> NIOSSL.NIOSSLPrivateKeySource {
-        switch self {
-        case .file(let path):
-            return .file(path)
-        case .privateKey(let privateKey):
-            return try .privateKey(privateKey.build())
+        func build() throws -> NIOSSL.NIOSSLPrivateKeySource {
+            switch self {
+            case .file(let path):
+                return .file(path)
+            case .privateKey(let privateKey):
+                return try .privateKey(privateKey.build())
+            }
         }
     }
 }

@@ -10,9 +10,13 @@ import Foundation
  */
 public struct KeyPathNotFound: TaskError, LocalizedError {
 
-    let keyPath: String
+    // MARK: - Public properties
 
     public var errorDescription: String? {
         "Unable to resolve the KeyPath.\(keyPath) in the current Task result"
     }
+
+    // MARK: - Internal properties
+
+    let keyPath: String
 }

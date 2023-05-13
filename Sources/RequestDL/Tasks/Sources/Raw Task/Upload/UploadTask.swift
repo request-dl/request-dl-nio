@@ -39,7 +39,11 @@ import Foundation
  */
 public struct UploadTask<Content: Property>: Task {
 
+    // MARK: - Private properties
+
     private let content: Content
+
+    // MARK: - Inits
 
     /**
      Initializes a `UploadTask` instance.
@@ -49,9 +53,8 @@ public struct UploadTask<Content: Property>: Task {
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
-}
 
-extension UploadTask {
+    // MARK: - Public methods
 
     /**
      Returns a task result that encapsulates the asynchronous response for a request.

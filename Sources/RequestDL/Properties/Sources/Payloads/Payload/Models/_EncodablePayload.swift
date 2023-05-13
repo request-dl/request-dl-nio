@@ -14,9 +14,6 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider, @unchecked 
 
     // MARK: - Private properties
 
-    private let object: Object
-    private let encoder: JSONEncoder
-
     private var data: Data {
         do {
             return try encoder.encode(object)
@@ -26,6 +23,9 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider, @unchecked 
             )
         }
     }
+
+    private let object: Object
+    private let encoder: JSONEncoder
 
     // MARK: - Inits
 

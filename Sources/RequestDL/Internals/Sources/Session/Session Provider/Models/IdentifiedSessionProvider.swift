@@ -10,23 +10,34 @@ extension Internals {
 
     struct IdentifiedSessionProvider: SessionProvider {
 
-        private let _id: String
+        // MARK: - Internal properties
+
+        var id: String {
+            "\(storedID).\(numberOfThreads)"
+        }
+
         let numberOfThreads: Int
 
+        // MARK: - Private properties
+
+        private let storedID: String
+
+        // MARK: - Inits
+
         init(id: String, numberOfThreads: Int) {
-            self._id = id
+            self.storedID = id
             self.numberOfThreads = numberOfThreads
         }
 
-        var id: String {
-            "\(_id).\(numberOfThreads)"
-        }
+        // MARK: - Internal methods
 
         func group() -> EventLoopGroup {
             MultiThreadedEventLoopGroup(numberOfThreads: numberOfThreads)
         }
     }
 }
+
+// MARK: - SessionProvider extension
 
 extension SessionProvider where Self == Internals.IdentifiedSessionProvider {
 

@@ -55,7 +55,11 @@ import Foundation
  */
 public struct DownloadTask<Content: Property>: Task {
 
+    // MARK: - Private properties
+
     private let content: Content
+
+    // MARK: - Inits
 
     /**
      Initializes a `DownloadTask` instance.
@@ -65,9 +69,8 @@ public struct DownloadTask<Content: Property>: Task {
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
-}
 
-extension DownloadTask {
+    // MARK: - Public methods
 
     /**
      Returns a task result that encapsulates the async response bytes for a request.

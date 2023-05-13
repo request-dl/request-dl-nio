@@ -9,27 +9,6 @@ import Foundation
  */
 public struct AsyncBytes: AsyncSequence, Hashable {
 
-    /// The type of the elements in the asynchronous sequence.
-    public typealias Element = Data
-
-    fileprivate let asyncBytes: Internals.AsyncBytes
-
-    init(_ asyncBytes: Internals.AsyncBytes) {
-        self.asyncBytes = asyncBytes
-    }
-
-    /**
-     Returns an async iterator over the elements of the sequence.
-
-     - Returns: An async iterator for the asynchronous bytes.
-     */
-    public func makeAsyncIterator() -> AsyncIterator {
-        .init(iterator: asyncBytes.makeAsyncIterator())
-    }
-}
-
-extension AsyncBytes {
-
     /**
      A structure that defines an async iterator for the asynchronous bytes.
      */
@@ -46,7 +25,32 @@ extension AsyncBytes {
             try await iterator.next()
         }
     }
+
+    public typealias Element = Data
+
+    // MARK: - Private properties
+
+    fileprivate let asyncBytes: Internals.AsyncBytes
+
+    // MARK: - Inits
+
+    init(_ asyncBytes: Internals.AsyncBytes) {
+        self.asyncBytes = asyncBytes
+    }
+
+    // MARK: - Public methods
+
+    /**
+     Returns an async iterator over the elements of the sequence.
+
+     - Returns: An async iterator for the asynchronous bytes.
+     */
+    public func makeAsyncIterator() -> AsyncIterator {
+        .init(iterator: asyncBytes.makeAsyncIterator())
+    }
 }
+
+// MARK: - Data extensions
 
 extension Data {
 

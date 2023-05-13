@@ -27,7 +27,11 @@ import Foundation
  */
 public struct DataTask<Content: Property>: Task {
 
+    // MARK: - Private properties
+
     private let content: Content
+
+    // MARK: - Inits
 
     /**
      Initializes a `DataTask` instance.
@@ -37,9 +41,8 @@ public struct DataTask<Content: Property>: Task {
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
-}
 
-extension DataTask {
+    // MARK: - Public methods
 
     /**
      Returns a task result that encapsulates the response data for a request.

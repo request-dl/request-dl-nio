@@ -7,10 +7,21 @@ import Foundation
 /// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
 public struct FormData: Property {
 
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
+
     let buffer: Internals.DataBuffer
     let fileName: String
     let key: String
     let contentType: ContentType
+
+    // MARK: - Inits
 
     /**
      Creates a new `FormData` instance with the specified parameters.
@@ -56,13 +67,7 @@ public struct FormData: Property {
         self.contentType = .json
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension FormData {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(

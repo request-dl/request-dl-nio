@@ -21,7 +21,29 @@ import Foundation
  */
 public struct HeaderGroup<Content: Property>: Property {
 
+    private struct Node: PropertyNode {
+
+        let nodes: [LeafNode<Headers.Node>]
+
+        func make(_ make: inout Make) async throws {
+            for node in nodes {
+                try await node.make(&make)
+            }
+        }
+    }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Internal properties
+
     let content: Content
+
+    // MARK: - Inits
 
     /**
      Initializes a new `HeaderGroup` with a closure that contains the header properties.
@@ -32,9 +54,21 @@ public struct HeaderGroup<Content: Property>: Property {
         self.content = content()
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<HeaderGroup<Content>>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
+        let outputs = try await Content._makeProperty(
+            property: property.content,
+            inputs: inputs
+        )
+
+        return .leaf(Node(nodes: outputs.node.search(for: Headers.Node.self)))
     }
 }
 
@@ -54,34 +88,5 @@ extension HeaderGroup where Content == ForEach<[String: Any], String, Headers.`A
                 )
             }
         }
-    }
-}
-
-extension HeaderGroup {
-
-    private struct Node: PropertyNode {
-
-        let nodes: [LeafNode<Headers.Node>]
-
-        func make(_ make: inout Make) async throws {
-            for node in nodes {
-                try await node.make(&make)
-            }
-        }
-    }
-
-    /// This method is used internally and should not be called directly.
-    public static func _makeProperty(
-        property: _GraphValue<HeaderGroup<Content>>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-
-        let outputs = try await Content._makeProperty(
-            property: property.content,
-            inputs: inputs
-        )
-
-        return .leaf(Node(nodes: outputs.node.search(for: Headers.Node.self)))
     }
 }

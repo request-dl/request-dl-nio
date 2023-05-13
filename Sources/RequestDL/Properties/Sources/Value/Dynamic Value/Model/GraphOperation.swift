@@ -6,6 +6,16 @@ import Foundation
 
 struct GraphOperation<Content>: Sendable {
 
+    // MARK: - Internal properties
+
+    var operations: [GraphValueOperation] {
+        [
+            GraphNamespaceOperation(mirror),
+            GraphEnvironmentOperation(mirror),
+            GraphStoredObjectOperation(mirror)
+        ]
+    }
+
     // MARK: - Private properties
 
     private let pathway: Int
@@ -39,16 +49,5 @@ struct GraphOperation<Content>: Sendable {
         }
 
         inputs = properties.inputs
-    }
-}
-
-extension GraphOperation {
-
-    var operations: [GraphValueOperation] {
-        [
-            GraphNamespaceOperation(mirror),
-            GraphEnvironmentOperation(mirror),
-            GraphStoredObjectOperation(mirror)
-        ]
     }
 }

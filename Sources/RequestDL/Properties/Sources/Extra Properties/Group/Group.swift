@@ -23,8 +23,17 @@ import Foundation
 /// ```
 public struct Group<Content: Property>: Property {
 
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
     /// The properties contained within the group.
     public let content: Content
+
+    // MARK: - Inits
 
     /// Creates a new `Group` property with the specified properties.
     ///
@@ -33,13 +42,7 @@ public struct Group<Content: Property>: Property {
         self.content = content()
     }
 
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension Group {
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(

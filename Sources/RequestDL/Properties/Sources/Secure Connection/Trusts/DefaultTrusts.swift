@@ -9,25 +9,28 @@ import Foundation
  */
 public struct DefaultTrusts: Property {
 
-    /**
-     Initializes a new instance of the DefaultTrusts structure.
-     */
-    public init() {}
-
-    /// Returns an exception since `Never` is a type that can never be constructed.
-    public var body: Never {
-        bodyException()
-    }
-}
-
-extension DefaultTrusts {
-
     private struct Node: SecureConnectionPropertyNode {
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
             secureConnection.trustRoots = .default
         }
     }
+
+    // MARK: - Public properties
+
+    /// Returns an exception since `Never` is a type that can never be constructed.
+    public var body: Never {
+        bodyException()
+    }
+
+    // MARK: - Inits
+
+    /**
+     Initializes a new instance of the DefaultTrusts structure.
+     */
+    public init() {}
+
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(

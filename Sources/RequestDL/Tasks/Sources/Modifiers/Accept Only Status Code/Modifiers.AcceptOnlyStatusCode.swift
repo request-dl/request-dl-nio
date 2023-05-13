@@ -9,7 +9,11 @@ extension Modifiers {
     /// A modifier that accepts only a specific set of status codes as a successful result.
     public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
 
+        // MARK: - Internal properties
+
         let statusCodes: StatusCodeSet
+
+        // MARK: - Public methods
 
         /**
          Modifies a task to accept only the specified status codes.
@@ -32,6 +36,8 @@ extension Modifiers {
         }
     }
 }
+
+// MARK: - Task extension
 
 extension Task where Element: TaskResultPrimitive {
 

@@ -59,7 +59,7 @@ public struct FormValue: Property {
         self.value = String(value)
     }
 
-    // MARK: - Static public methods
+    // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
