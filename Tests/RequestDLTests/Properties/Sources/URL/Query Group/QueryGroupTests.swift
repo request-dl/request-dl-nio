@@ -37,7 +37,7 @@ class QueryGroupTests: XCTestCase {
         let property = QueryGroup {
             Query(123, forKey: "number")
             Query(1, forKey: "page")
-            Headers.Any("password", forKey: "api_key")
+            Headers.Any(name: "api_key", value: "password")
         }
 
         // When
