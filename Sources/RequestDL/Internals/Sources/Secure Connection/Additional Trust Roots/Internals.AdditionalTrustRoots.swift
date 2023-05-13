@@ -7,7 +7,7 @@ import NIOSSL
 
 extension Internals {
 
-    enum AdditionalTrustRoots: Equatable {
+    enum AdditionalTrustRoots: Hashable {
 
         case file(String)
 

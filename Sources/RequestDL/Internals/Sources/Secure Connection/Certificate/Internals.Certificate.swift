@@ -7,9 +7,9 @@ import NIOSSL
 
 extension Internals {
 
-    struct Certificate: Equatable {
+    struct Certificate: Hashable {
 
-        enum Source: Equatable {
+        enum Source: Hashable {
             case file(String)
             case bytes([UInt8])
         }

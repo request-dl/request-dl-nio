@@ -13,7 +13,7 @@ import Foundation
  - `download`: Represents a download step with an associated `ResponseHead` object and an
  `AsyncBytes` object.
  */
-public enum Response {
+public enum Response: Hashable {
 
     /**
      Represents an upload step with an associated progress value.

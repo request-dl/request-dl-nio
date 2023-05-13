@@ -7,7 +7,7 @@ import Foundation
 /**
  A structure that represents asynchronous bytes.
  */
-public struct AsyncBytes: AsyncSequence {
+public struct AsyncBytes: AsyncSequence, Hashable {
 
     /// The type of the elements in the asynchronous sequence.
     public typealias Element = Data

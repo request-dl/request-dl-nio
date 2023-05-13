@@ -47,10 +47,14 @@ extension Internals.AsyncBytes {
     }
 }
 
-extension Internals.AsyncBytes: Equatable {
+extension Internals.AsyncBytes: Hashable {
 
     static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         lhs.seed == rhs.seed
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(seed)
     }
 }
 

@@ -26,7 +26,7 @@ import Foundation
  let customContentType: ContentType = "application/custom"
  ```
  */
-public struct ContentType {
+public struct ContentType: Hashable {
 
     let rawValue: String
 
@@ -107,20 +107,6 @@ extension ContentType {
     }
 }
 
-extension ContentType: Equatable {
-
-    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.rawValue == rhs.rawValue
-    }
-}
-
-extension ContentType: Hashable {
-
-    public func hash(into hasher: inout Hasher) {
-        rawValue.hash(into: &hasher)
-    }
-}
-
 extension ContentType: ExpressibleByStringLiteral {
 
     /**
@@ -132,11 +118,11 @@ extension ContentType: ExpressibleByStringLiteral {
      - Note: Use this initializer to create a `ContentType` instance from a string literal.
      */
     public init(stringLiteral value: StringLiteralType) {
-        self.init(value)
+        self.rawValue = value
     }
 }
 
-extension ContentType: CustomStringConvertible {
+extension ContentType: LosslessStringConvertible {
 
     public var description: String {
         rawValue

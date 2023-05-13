@@ -82,7 +82,7 @@ extension URLEncoder.Encoder {
 
 extension URLEncoder.Encoder {
 
-    fileprivate enum Value: Equatable {
+    fileprivate enum Value: Hashable {
         case some(String)
         case drop
         case none

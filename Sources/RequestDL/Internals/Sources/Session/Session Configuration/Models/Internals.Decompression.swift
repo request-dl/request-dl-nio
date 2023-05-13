@@ -7,7 +7,7 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    enum Decompression: Equatable {
+    enum Decompression: Hashable {
         case disabled
         case enabled(Internals.Decompression.Limit)
     }

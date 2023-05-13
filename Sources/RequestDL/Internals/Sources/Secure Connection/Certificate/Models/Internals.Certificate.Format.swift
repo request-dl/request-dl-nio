@@ -7,7 +7,7 @@ import NIOSSL
 
 extension Internals.Certificate {
 
-    enum Format {
+    enum Format: Hashable {
         case der
         case pem
     }

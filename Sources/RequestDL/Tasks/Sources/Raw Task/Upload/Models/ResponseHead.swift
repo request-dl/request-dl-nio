@@ -5,7 +5,7 @@
 import Foundation
 
 /// A structure representing the head of an HTTP response.
-public struct ResponseHead: Equatable {
+public struct ResponseHead: Hashable {
 
     /// The URL of the response.
     public let url: URL?
@@ -59,7 +59,7 @@ public struct ResponseHead: Equatable {
 extension ResponseHead {
 
     /// A structure representing the status of an HTTP response.
-    public struct Status: Equatable {
+    public struct Status: Hashable {
 
         /// The HTTP status code of the response.
         public let code: UInt
@@ -89,7 +89,7 @@ extension ResponseHead {
     }
 
     /// A structure representing the version of the HTTP protocol used in an HTTP response.
-    public struct Version: Equatable {
+    public struct Version: Hashable {
 
         /// The minor version number of the HTTP protocol used in the response.
         public let minor: Int

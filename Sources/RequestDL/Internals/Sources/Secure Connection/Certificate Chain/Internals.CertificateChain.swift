@@ -7,7 +7,7 @@ import NIOSSL
 
 extension Internals {
 
-    enum CertificateChain: Equatable {
+    enum CertificateChain: Hashable {
 
         case certificates([Internals.Certificate])
 

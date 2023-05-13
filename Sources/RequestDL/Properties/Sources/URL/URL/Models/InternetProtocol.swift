@@ -26,7 +26,7 @@ import Foundation
  let customInternetProtocol: InternetProtocol = "www"
  ```
  */
-public struct InternetProtocol {
+public struct InternetProtocol: Hashable {
 
     let rawValue: String
 
@@ -70,20 +70,6 @@ extension InternetProtocol {
     public static let telnet: InternetProtocol = "telnet"
 }
 
-extension InternetProtocol: Equatable {
-
-    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.rawValue == rhs.rawValue
-    }
-}
-
-extension InternetProtocol: Hashable {
-
-    public func hash(into hasher: inout Hasher) {
-        rawValue.hash(into: &hasher)
-    }
-}
-
 extension InternetProtocol: ExpressibleByStringLiteral {
 
     /**
@@ -99,7 +85,7 @@ extension InternetProtocol: ExpressibleByStringLiteral {
     }
 }
 
-extension InternetProtocol: CustomStringConvertible {
+extension InternetProtocol: LosslessStringConvertible {
 
     public var description: String {
         rawValue
