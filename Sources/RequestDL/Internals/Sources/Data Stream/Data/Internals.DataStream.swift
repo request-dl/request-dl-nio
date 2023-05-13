@@ -22,21 +22,6 @@ extension Internals {
             _stream = .init(QueueStream())
         }
 
-        // MARK: - Internal static methods
-
-        static func empty() -> Internals.DataStream<Value> {
-            let stream = Internals.DataStream<Value>()
-            stream.close()
-            return stream
-        }
-
-        static func constant(_ value: Value) -> Internals.DataStream<Value> {
-            let stream = Internals.DataStream<Value>()
-            stream.append(.success(value))
-            stream.close()
-            return stream
-        }
-
         // MARK: - Internal methods
 
         func append(_ value: Result<Value, Error>) {

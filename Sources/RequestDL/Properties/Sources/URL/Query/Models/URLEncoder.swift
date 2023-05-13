@@ -63,21 +63,21 @@ public final class URLEncoder: @unchecked Sendable {
 
     // MARK: - Unsafe properties
 
-    fileprivate var _dateEncodingStrategy: DateEncodingStrategy = .iso8601
+    private var _dateEncodingStrategy: DateEncodingStrategy = .iso8601
 
-    fileprivate var _keyEncodingStrategy: KeyEncodingStrategy = .literal
+    private var _keyEncodingStrategy: KeyEncodingStrategy = .literal
 
-    fileprivate var _dataEncodingStrategy: DataEncodingStrategy = .base64
+    private var _dataEncodingStrategy: DataEncodingStrategy = .base64
 
-    fileprivate var _boolEncodingStrategy: BoolEncodingStrategy = .literal
+    private var _boolEncodingStrategy: BoolEncodingStrategy = .literal
 
-    fileprivate var _optionalEncodingStrategy: OptionalEncodingStrategy = .literal
+    private var _optionalEncodingStrategy: OptionalEncodingStrategy = .literal
 
-    fileprivate var _arrayEncodingStrategy: ArrayEncodingStrategy = .droppingIndex
+    private var _arrayEncodingStrategy: ArrayEncodingStrategy = .droppingIndex
 
-    fileprivate var _dictionaryEncodingStrategy: DictionaryEncodingStrategy = .subscripted
+    private var _dictionaryEncodingStrategy: DictionaryEncodingStrategy = .subscripted
 
-    fileprivate var _whitespaceEncodingStrategy: WhitespaceEncodingStrategy = .percentEscaping
+    private var _whitespaceEncodingStrategy: WhitespaceEncodingStrategy = .percentEscaping
 
     // MARK: - Inits
 
