@@ -15,11 +15,11 @@ class SecureConnectionTests: XCTestCase {
         let secureConnection = Internals.SecureConnection()
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.certificateVerification, secureConnection.certificateVerification)
@@ -41,12 +41,12 @@ class SecureConnectionTests: XCTestCase {
         let verification: RequestDL.CertificateVerification = .noHostnameVerification
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .verification(verification)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.certificateVerification, verification.build())
@@ -58,12 +58,12 @@ class SecureConnectionTests: XCTestCase {
         let algorithm2 = RequestDL.SignatureAlgorithm.rsaPssRsaeSha512
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .signingSignatureAlgorithms(algorithm1, algorithm2)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.signingSignatureAlgorithms, [algorithm1, algorithm2].map {
@@ -77,12 +77,12 @@ class SecureConnectionTests: XCTestCase {
         let algorithm2 = RequestDL.SignatureAlgorithm.ecdsaSecp521R1Sha512
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .verifySignatureAlgorithms(algorithm1, algorithm2)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.verifySignatureAlgorithms, [algorithm1, algorithm2].map {
@@ -95,12 +95,12 @@ class SecureConnectionTests: XCTestCase {
         let isDisabled = true
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .sendCANameListDisabled(isDisabled)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.sendCANameList, !isDisabled)
@@ -111,12 +111,12 @@ class SecureConnectionTests: XCTestCase {
         let renegotiationSupport: NIORenegotiationSupport = .always
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .renegotiationSupport(.always)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.renegotiationSupport, renegotiationSupport)
@@ -127,12 +127,12 @@ class SecureConnectionTests: XCTestCase {
         let timeout = UnitTime.seconds(60)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .shutdownTimeout(timeout)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.shutdownTimeout, timeout.build())
@@ -144,12 +144,12 @@ class SecureConnectionTests: XCTestCase {
         let protocol2 = "https"
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .applicationProtocols(protocol1, protocol2)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.applicationProtocols, [protocol1, protocol2])
@@ -161,12 +161,12 @@ class SecureConnectionTests: XCTestCase {
         let maxVersion: RequestDL.TLSVersion = .v1_3
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .version(minVersion ... maxVersion)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.minimumTLSVersion, minVersion.build())
@@ -179,12 +179,12 @@ class SecureConnectionTests: XCTestCase {
         let maxVersion: RequestDL.TLSVersion = .v1_3
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .version(minVersion ..< maxVersion)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.minimumTLSVersion, minVersion.build())
@@ -196,12 +196,12 @@ class SecureConnectionTests: XCTestCase {
         let maxVersion: RequestDL.TLSVersion = .v1_1
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .version(maximum: maxVersion)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.maximumTLSVersion, maxVersion.build())
@@ -212,12 +212,12 @@ class SecureConnectionTests: XCTestCase {
         let minVersion: RequestDL.TLSVersion = .v1_3
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .version(minimum: minVersion)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.minimumTLSVersion, minVersion.build())
@@ -229,12 +229,12 @@ class SecureConnectionTests: XCTestCase {
         let maxVersion: RequestDL.TLSVersion = .v1_2
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .version(minimum: minVersion, maximum: maxVersion)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.minimumTLSVersion, minVersion.build())
@@ -247,12 +247,12 @@ class SecureConnectionTests: XCTestCase {
         let suite2 = "TLS_CHACHA20_POLY1305_SHA256"
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .cipherSuites(suite1, suite2)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.cipherSuites, [suite1, suite2].joined(separator: ":"))
@@ -264,12 +264,12 @@ class SecureConnectionTests: XCTestCase {
         let suite2: RequestDL.TLSCipher = .TLS_CHACHA20_POLY1305_SHA256
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .cipherSuites(suite1, suite2)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut?.cipherSuiteValues, [suite1, suite2].map {
@@ -286,12 +286,12 @@ class SecureConnectionTests: XCTestCase {
         let logger = KeyLogger()
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .keyLogger(logger)
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertTrue(sut?.keyLogger === logger)
@@ -314,11 +314,11 @@ extension SecureConnectionTests {
         let secureConnection = Internals.SecureConnection()
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             SecureConnection(.client) {}
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertEqual(sut, secureConnection)
@@ -329,14 +329,14 @@ extension SecureConnectionTests {
         let bytes = Data.randomData(length: 1_024)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {}
                 .keyLog {
                     XCTAssertEqual($0, .init(data: bytes))
                 }
         })
 
-        let sut = session.configuration.secureConnection
+        let sut = resolved.session.configuration.secureConnection
 
         // Then
         XCTAssertNotNil(sut?.keyLogger)

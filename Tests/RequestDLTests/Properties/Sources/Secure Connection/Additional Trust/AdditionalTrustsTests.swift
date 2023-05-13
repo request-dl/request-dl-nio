@@ -22,7 +22,7 @@ class AdditionalTrustsTests: XCTestCase {
         let server = try Array(Data(contentsOf: server.certificateURL))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.AdditionalTrusts {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
@@ -33,7 +33,7 @@ class AdditionalTrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.additionalTrustRoots,
+            resolved.session.configuration.secureConnection?.additionalTrustRoots,
             .init([.certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
                 .init(server, format: .pem)
@@ -57,7 +57,7 @@ class AdditionalTrustsTests: XCTestCase {
         try data.write(to: fileURL)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.AdditionalTrusts(fileURL.absolutePath(percentEncoded: false))
             }
@@ -65,7 +65,7 @@ class AdditionalTrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.additionalTrustRoots,
+            resolved.session.configuration.secureConnection?.additionalTrustRoots,
             .init([.file(fileURL.absolutePath(percentEncoded: false))])
         )
     }
@@ -79,7 +79,7 @@ class AdditionalTrustsTests: XCTestCase {
         let bytes = Array(data)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.AdditionalTrusts(bytes)
             }
@@ -87,7 +87,7 @@ class AdditionalTrustsTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.additionalTrustRoots,
+            resolved.session.configuration.secureConnection?.additionalTrustRoots,
             .init([.bytes(bytes)])
         )
     }

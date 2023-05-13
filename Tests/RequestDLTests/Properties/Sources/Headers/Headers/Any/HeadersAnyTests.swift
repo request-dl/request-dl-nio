@@ -14,7 +14,7 @@ class HeadersAnyTests: XCTestCase {
         let value = "password"
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.Any(
                 name: name,
                 value: value
@@ -22,7 +22,7 @@ class HeadersAnyTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: name), value)
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: name), value)
     }
 
     func testAny_whenInitWithLosslessValue() async throws {
@@ -31,7 +31,7 @@ class HeadersAnyTests: XCTestCase {
         let value = 123
 
         // When
-        let (_, request) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             Headers.Any(
                 name: name,
                 value: value
@@ -39,7 +39,7 @@ class HeadersAnyTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: name), "\(value)")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: name), "\(value)")
     }
 
     func testNeverBody() async throws {
@@ -56,8 +56,8 @@ extension HeadersAnyTests {
 
     func testSingleHeaderAny() async throws {
         let property = TestProperty(Headers.Any("password", forKey: "xxx-api-key"))
-        let (_, request) = try await resolve(property)
-        XCTAssertEqual(request.headers.getValue(forKey: "xxx-api-key"), "password")
+        let resolved = try await resolve(property)
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password")
     }
 
     func testHeadersAny() async throws {
@@ -66,9 +66,9 @@ extension HeadersAnyTests {
             Headers.Any("gzip", forKey: "Content-Encoding")
         }
 
-        let (_, request) = try await resolve(property)
+        let resolved = try await resolve(property)
 
-        XCTAssertEqual(request.headers.getValue(forKey: "Accept"), "text/html")
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Encoding"), "gzip")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "text/html")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Encoding"), "gzip")
     }
 }

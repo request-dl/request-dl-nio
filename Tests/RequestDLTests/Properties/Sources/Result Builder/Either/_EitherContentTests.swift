@@ -22,12 +22,12 @@ class _EitherContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _EitherContent<BaseURL, RequestDL.Headers.Origin>)
-        XCTAssertEqual(request.url, "https://google.com")
-        XCTAssertTrue(request.headers.isEmpty)
+        XCTAssertEqual(resolved.request.url, "https://google.com")
+        XCTAssertTrue(resolved.request.headers.isEmpty)
     }
 
     func testConditionalSecondBuilder() async throws {
@@ -44,12 +44,12 @@ class _EitherContentTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(result)
+        let resolved = try await resolve(result)
 
         // Then
         XCTAssertTrue(result is _EitherContent<RequestDL.Headers.Origin, BaseURL>)
-        XCTAssertEqual(request.url, "https://127.0.0.1")
-        XCTAssertTrue(request.headers.isEmpty)
+        XCTAssertEqual(resolved.request.url, "https://127.0.0.1")
+        XCTAssertTrue(resolved.request.headers.isEmpty)
     }
 
     func testNeverBody() async throws {

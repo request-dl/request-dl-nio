@@ -16,11 +16,11 @@ class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is Headers.ContentType)
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 
     #if !os(Linux)
@@ -34,11 +34,11 @@ class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertTrue(request.headers.isEmpty)
+        XCTAssertTrue(resolved.request.headers.isEmpty)
     }
     #endif
 
@@ -52,10 +52,10 @@ class PropertyBuilderTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertEqual(request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
     }
 }

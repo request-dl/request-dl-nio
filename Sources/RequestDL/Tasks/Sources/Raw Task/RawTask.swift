@@ -12,7 +12,10 @@ struct RawTask<Content: Property>: Task {
 extension RawTask {
 
     func result() async throws -> AsyncResponse {
-        let (session, request) = try await Resolve(content).build()
-        return try await .init(session.request(request).response)
+        let resolved = try await Resolve(content).build()
+
+        return try await .init(resolved.session.request(
+            resolved.request
+        ).response)
     }
 }

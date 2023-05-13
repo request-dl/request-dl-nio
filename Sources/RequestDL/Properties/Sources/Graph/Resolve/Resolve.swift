@@ -28,7 +28,7 @@ struct Resolve<Root: Property> {
         )
     }
 
-    func build() async throws -> (Internals.Session, Internals.Request) {
+    func build() async throws -> Resolved {
         let output = try await outputs()
 
         var make = Make(
@@ -43,7 +43,10 @@ struct Resolve<Root: Property> {
             configuration: make.configuration
         )
 
-        return (session, make.request)
+        return Resolved(
+            session: session,
+            request: make.request
+        )
     }
 }
 

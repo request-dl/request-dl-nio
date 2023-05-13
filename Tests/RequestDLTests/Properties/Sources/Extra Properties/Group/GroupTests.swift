@@ -15,10 +15,10 @@ class GroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertEqual(request.url, "https://google.com")
+        XCTAssertEqual(resolved.request.url, "https://google.com")
     }
 
     func testMultipleGroup() async throws {
@@ -30,11 +30,11 @@ class GroupTests: XCTestCase {
         }
 
         // When
-        let (_, request) = try await resolve(TestProperty(property))
+        let resolved = try await resolve(TestProperty(property))
 
         // Then
         XCTAssertEqual(
-            request.url,
+            resolved.request.url,
             "https://google.com/api/v1?available_methods=all"
         )
     }

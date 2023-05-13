@@ -31,7 +31,7 @@ class HeadersCacheTests: XCTestCase {
         let cache = Headers.Cache()
 
         // When
-        let (_, request) = try await resolve(TestProperty(cache))
+        let resolved = try await resolve(TestProperty(cache))
 
         // Then
         XCTAssertTrue(cache.isCached)
@@ -48,7 +48,7 @@ class HeadersCacheTests: XCTestCase {
         XCTAssertFalse(cache.needsProxyRevalidate)
         XCTAssertFalse(cache.isImmutable)
 
-        XCTAssertTrue(request.headers.isEmpty)
+        XCTAssertTrue(resolved.request.headers.isEmpty)
     }
 
     func testModifiedCacheWithAllProperties() async throws {
@@ -71,7 +71,7 @@ class HeadersCacheTests: XCTestCase {
             .immutable()
 
         // When
-        let (_, request) = try await resolve(TestProperty(modifiedCache))
+        let resolved = try await resolve(TestProperty(modifiedCache))
 
         // Then
         XCTAssertFalse(modifiedCache.isCached)
@@ -89,7 +89,7 @@ class HeadersCacheTests: XCTestCase {
         XCTAssertTrue(modifiedCache.isImmutable)
 
         XCTAssertEqual(
-            request.headers.getValue(forKey: "Cache-Control"),
+            resolved.request.headers.getValue(forKey: "Cache-Control"),
             """
             no-cache, no-store, no-transform, only-if-cached, private, max-age=1000, \
             s-maxage=16000, max-stale=300, stale-while-revalidate=120, stale-if-error=86400, \
@@ -104,10 +104,10 @@ class HeadersCacheTests: XCTestCase {
             .public(true)
 
         // When
-        let (_, request) = try await resolve(TestProperty(cache))
+        let resolved = try await resolve(TestProperty(cache))
 
         // Then
-        XCTAssertEqual(request.headers.getValue(forKey: "Cache-Control"), "public")
+        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Cache-Control"), "public")
     }
 
     func testNeverBody() async throws {

@@ -15,7 +15,7 @@ class PrivateKeyTests: XCTestCase {
         let resource = Certificates(.pem).client()
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
             }
@@ -23,7 +23,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .file(resource.privateKeyURL.absolutePath(percentEncoded: false))
         )
     }
@@ -33,7 +33,7 @@ class PrivateKeyTests: XCTestCase {
         let resource = Certificates(.der).client()
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .der)
             }
@@ -41,7 +41,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(Internals.PrivateKey(
                 resource.privateKeyURL.absolutePath(percentEncoded: false),
                 format: .der
@@ -55,7 +55,7 @@ class PrivateKeyTests: XCTestCase {
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(bytes, format: .pem)
             }
@@ -63,7 +63,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(Internals.PrivateKey(bytes, format: .pem))
         )
     }
@@ -74,7 +74,7 @@ class PrivateKeyTests: XCTestCase {
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(bytes, format: .der)
             }
@@ -82,7 +82,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(Internals.PrivateKey(
                 bytes,
                 format: .der
@@ -97,7 +97,7 @@ class PrivateKeyTests: XCTestCase {
         let file = resource.privateKeyURL.lastPathComponent
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(file, in: .module, format: .pem)
             }
@@ -105,7 +105,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             Bundle.module.resolveURL(forResourceName: file).map {
                 .file($0.absolutePath(percentEncoded: false))
             }
@@ -118,7 +118,7 @@ class PrivateKeyTests: XCTestCase {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
@@ -130,7 +130,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
@@ -147,7 +147,7 @@ class PrivateKeyTests: XCTestCase {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
@@ -159,7 +159,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
@@ -177,7 +177,7 @@ class PrivateKeyTests: XCTestCase {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(
                     bytes,
@@ -189,7 +189,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     bytes,
@@ -207,7 +207,7 @@ class PrivateKeyTests: XCTestCase {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(
                     bytes,
@@ -219,7 +219,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     bytes,
@@ -238,7 +238,7 @@ class PrivateKeyTests: XCTestCase {
         let file = resource.privateKeyURL.lastPathComponent
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(
                     file,
@@ -251,7 +251,7 @@ class PrivateKeyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             Bundle.module.resolveURL(forResourceName: file).map {
                 .privateKey(
                     Internals.PrivateKey(
@@ -285,7 +285,7 @@ extension PrivateKeyTests {
         let password = Array(Data("password".utf8))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .pem) {
                     $0(password)
@@ -295,7 +295,7 @@ extension PrivateKeyTests {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
@@ -312,7 +312,7 @@ extension PrivateKeyTests {
         let password = Array(Data("password".utf8))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .der) {
                     $0(password)
@@ -322,7 +322,7 @@ extension PrivateKeyTests {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
@@ -340,7 +340,7 @@ extension PrivateKeyTests {
         let password = Array(Data("password".utf8))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(bytes, format: .pem) {
                     $0(password)
@@ -350,7 +350,7 @@ extension PrivateKeyTests {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     bytes,
@@ -368,7 +368,7 @@ extension PrivateKeyTests {
         let password = Array(Data("password".utf8))
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(bytes, format: .der) {
                     $0(password)
@@ -378,7 +378,7 @@ extension PrivateKeyTests {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             .privateKey(
                 Internals.PrivateKey(
                     bytes,
@@ -397,7 +397,7 @@ extension PrivateKeyTests {
         let file = resource.privateKeyURL.lastPathComponent
 
         // When
-        let (session, _) = try await resolve(TestProperty {
+        let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.PrivateKey(file, in: .module, format: .pem) {
                     $0(password)
@@ -407,7 +407,7 @@ extension PrivateKeyTests {
 
         // Then
         XCTAssertEqual(
-            session.configuration.secureConnection?.privateKey,
+            resolved.session.configuration.secureConnection?.privateKey,
             Bundle.module.resolveURL(forResourceName: file).map {
                 .privateKey(
                     Internals.PrivateKey(
