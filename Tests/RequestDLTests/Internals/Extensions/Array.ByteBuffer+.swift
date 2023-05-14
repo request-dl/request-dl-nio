@@ -16,7 +16,7 @@ extension Array<ByteBuffer> {
     }
 }
 
-extension Array where Element: BufferProtocol {
+extension Array where Element: _BufferRepresentable {
 
     func resolveData() -> [Data] {
         compactMap {

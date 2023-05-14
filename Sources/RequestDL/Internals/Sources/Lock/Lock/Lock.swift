@@ -9,17 +9,17 @@ struct Lock: Sendable {
 
     // MARK: - Private properties
 
-    private let lock = NIOLock()
+    private let _lock = NIOLock()
 
     // MARK: - Internal methods
 
     func withLock<Value>(_ body: () throws -> Value) rethrows -> Value {
-        try lock.withLock(body)
+        try _lock.withLock(body)
     }
 
     func withLockVoid(
         _ body: () throws -> Void
     ) rethrows {
-        try lock.withLockVoid(body)
+        try _lock.withLockVoid(body)
     }
 }

@@ -116,7 +116,7 @@ extension InternalsBodySequenceTests {
 
     func makeBodySequence(
         size: Int? = nil,
-        _ buffers: [BufferProtocol]
+        _ buffers: [Internals.AnyBuffer]
     ) -> Internals.BodySequence {
         return .init(
             buffers: buffers,

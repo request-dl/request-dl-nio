@@ -25,6 +25,8 @@ extension Data {
             buffer.writeData(Data(repeating: .min, count: length - buffer.readableBytes))
         }
 
+        precondition(buffer.readableBytes == length)
+
         guard let data = buffer.readData(buffer.readableBytes) else {
             return Data()
         }

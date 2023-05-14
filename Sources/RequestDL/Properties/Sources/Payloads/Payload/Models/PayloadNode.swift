@@ -9,7 +9,7 @@ struct PayloadNode: PropertyNode {
     // MARK: - Internal properties
 
     let isURLEncodedCompatible: Bool
-    let buffer: @Sendable () -> BufferProtocol
+    let buffer: @Sendable () -> Internals.AnyBuffer
     let urlEncoder: URLEncoder
     let partLength: Int?
 

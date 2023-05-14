@@ -21,12 +21,12 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let buffers: [BufferProtocol]
+        private let buffers: [Internals.AnyBuffer]
 
         // MARK: - Inits
 
         init(
-            buffers: [BufferProtocol],
+            buffers: [Internals.AnyBuffer],
             size fragment: Int?
         ) {
             let size = buffers.lazy
@@ -65,7 +65,7 @@ extension Internals.BodySequence {
 
         let size: Int
         let fragment: Int
-        private(set) var buffers: [BufferProtocol]
+        private(set) var buffers: [Internals.AnyBuffer]
 
         // MARK: - Private properties
 
@@ -74,7 +74,7 @@ extension Internals.BodySequence {
         // MARK: - Inits
 
         init(
-            buffers: [BufferProtocol],
+            buffers: [Internals.AnyBuffer],
             size: Int,
             fragment: Int
         ) {

@@ -8,7 +8,7 @@ public struct _DictionaryPayload: PayloadProvider, @unchecked Sendable {
 
     // MARK: - Internals properties
 
-    var buffer: Internals.DataBuffer {
+    var buffer: Internals.AnyBuffer {
         Internals.DataBuffer(data)
     }
 

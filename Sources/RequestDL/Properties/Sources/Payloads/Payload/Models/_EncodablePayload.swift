@@ -8,7 +8,7 @@ public struct _EncodablePayload<Object: Encodable>: PayloadProvider, @unchecked 
 
     // MARK: - Internal properties
 
-    var buffer: Internals.DataBuffer {
+    var buffer: Internals.AnyBuffer {
         Internals.DataBuffer(data)
     }
 

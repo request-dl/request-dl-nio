@@ -8,7 +8,7 @@ public struct _FilePayload: PayloadProvider {
 
     // MARK: - Internal properties
 
-    var buffer: Internals.FileBuffer {
+    var buffer: Internals.AnyBuffer {
         Internals.FileBuffer(file)
     }
 
