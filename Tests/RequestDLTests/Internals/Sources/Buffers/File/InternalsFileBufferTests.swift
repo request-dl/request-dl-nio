@@ -702,5 +702,28 @@ class InternalsFileBufferTests: XCTestCase {
             writeBytes
         )
     }
+
+    func testFileBuffer_whenRacingImmutable() async throws {
+        // Given
+        let fileBuffer = Internals.FileBuffer(Data.randomData(length: 1_024))
+
+        // When
+        let datas = await withTaskGroup(of: Data?.self) { group in
+            for i in 0 ..< 1_024 {
+                group.addTask {
+                    return fileBuffer.getData(at: i, length: 1_024 - i)
+                }
+            }
+
+            var datas = [Data?]()
+            for await data in group {
+                datas.append(data)
+            }
+            return datas
+        }
+
+        // Then
+        XCTAssertEqual(Set(datas.compactMap { $0 }).count, 1_024)
+    }
 }
 // swiftlint:enable type_body_length file_length
