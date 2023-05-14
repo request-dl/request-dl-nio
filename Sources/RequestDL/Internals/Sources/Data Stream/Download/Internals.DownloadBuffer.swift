@@ -18,7 +18,7 @@ extension Internals {
         private let readingMode: Internals.Response.ReadingMode
 
         private var buffer: DataBuffer?
-        private var cacheStream: DataStream<DataBuffer>?
+        private var cacheStream: Internals.AsyncStream<DataBuffer>?
 
         // MARK: - Inits
 
@@ -104,7 +104,7 @@ extension Internals {
             dispatch(.failure(error))
         }
 
-        mutating func cacheStream(_ cacheStream: DataStream<DataBuffer>) {
+        mutating func cacheStream(_ cacheStream: Internals.AsyncStream<DataBuffer>) {
             self.cacheStream = cacheStream
         }
 

@@ -22,7 +22,7 @@ extension Internals {
 
         enum Output {
             case task(SessionTask)
-            case cache(((Internals.ResponseHead) -> Internals.DataStream<Internals.DataBuffer>?)?)
+            case cache(((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?)
         }
 
         let request: Internals.Request
@@ -195,12 +195,12 @@ extension Internals {
         private func cacheIfNeeded(
             dataCache: DataCache,
             request: Internals.Request
-        ) async throws -> ((Internals.ResponseHead) -> Internals.DataStream<Internals.DataBuffer>?)? {
+        ) async throws -> ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)? {
             guard request.isCacheEnabled else {
                 return nil
             }
 
-            return { head -> Internals.DataStream<Internals.DataBuffer>? in
+            return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 // TODO: - Accepts nil as zero
                 guard
                     let contentLengthValue = head.headers.getValue(forKey: "Content-Length"),
@@ -208,10 +208,10 @@ extension Internals {
                 else { return nil }
 
                 // TODO: - Needs optimizations
-                let stream = Internals.DataStream<Internals.DataBuffer>()
+                let asyncBuffers = Internals.AsyncStream<Internals.DataBuffer>()
 
                 _Concurrency.Task(priority: .background) {
-                    guard var buffer = dataCache.allocateBuffer(
+                    guard var cacheBuffer = dataCache.allocateBuffer(
                         key: request.url,
                         cachedResponse: .init(
                             response: head,
@@ -221,15 +221,15 @@ extension Internals {
                     ) else { return }
 
                     do {
-                        for try await dataBuffer in stream.asyncStream() {
-                            buffer.writeBuffer(dataBuffer)
+                        for try await buffer in asyncBuffers {
+                            cacheBuffer.writeBuffer(buffer)
                         }
                     } catch {
                         dataCache.remove(forKey: request.url)
                     }
                 }
 
-                return stream
+                return asyncBuffers
             }
         }
     }

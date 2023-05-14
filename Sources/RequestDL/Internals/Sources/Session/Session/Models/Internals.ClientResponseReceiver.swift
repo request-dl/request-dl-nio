@@ -37,7 +37,7 @@ extension Internals {
             upload: DataStream<Int>,
             head: DataStream<ResponseHead>,
             download: DownloadBuffer,
-            cache: ((ResponseHead) -> DataStream<DataBuffer>?)?
+            cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
         ) {
             self.url = url
             self.upload = upload

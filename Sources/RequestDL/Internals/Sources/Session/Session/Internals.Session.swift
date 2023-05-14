@@ -61,7 +61,7 @@ extension Internals {
         private func execute(
             client: Internals.Client,
             request: Internals.Request,
-            cache: ((Internals.ResponseHead) -> Internals.DataStream<Internals.DataBuffer>?)?
+            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?
         ) async throws -> SessionTask {
             let upload = Internals.DataStream<Int>()
             let head = Internals.DataStream<Internals.ResponseHead>()
