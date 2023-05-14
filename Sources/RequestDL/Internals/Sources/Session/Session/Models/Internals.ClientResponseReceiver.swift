@@ -18,8 +18,8 @@ extension Internals {
         private let lock = Lock()
 
         private let url: String
-        private let upload: DataStream<Int>
-        private let head: DataStream<ResponseHead>
+        private let upload: Internals.AsyncStream<Int>
+        private let head: Internals.AsyncStream<ResponseHead>
 
         // MARK: - Unsafe properties
 
@@ -33,8 +33,8 @@ extension Internals {
 
         init(
             url: String,
-            upload: DataStream<Int>,
-            head: DataStream<ResponseHead>,
+            upload: Internals.AsyncStream<Int>,
+            head: Internals.AsyncStream<ResponseHead>,
             download: DownloadBuffer
         ) {
             self.url = url

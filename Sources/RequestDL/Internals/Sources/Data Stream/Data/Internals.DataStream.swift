@@ -6,6 +6,7 @@ import Foundation
 
 extension Internals {
 
+    @available(*, deprecated)
     final class DataStream<Value: Sendable>: @unchecked Sendable {
 
         // MARK: - Private properties

@@ -7,9 +7,25 @@ import Semaphore
 
 struct AsyncLock: Sendable {
 
+    enum State {
+        case locked
+        case unlocked
+    }
+
     // MARK: - Private properties
 
-    private let asyncSemaphore = AsyncSemaphore(value: 1)
+    private let asyncSemaphore: AsyncSemaphore
+
+    // MARK: - Inits
+
+    init(_ state: State = .unlocked) {
+        switch state {
+        case .locked:
+            asyncSemaphore = .init(value: .zero)
+        case .unlocked:
+            asyncSemaphore = .init(value: 1)
+        }
+    }
 
     // MARK: - Internal methods
 
@@ -27,6 +43,14 @@ struct AsyncLock: Sendable {
     ) async rethrows {
         await asyncSemaphore.wait()
         try await body()
+        asyncSemaphore.signal()
+    }
+
+    func lock() async {
+        await asyncSemaphore.wait()
+    }
+
+    func unlock() {
         asyncSemaphore.signal()
     }
 }

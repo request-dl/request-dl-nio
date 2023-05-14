@@ -6,6 +6,7 @@ import Foundation
 
 extension Internals {
 
+    @available(*, deprecated)
     final class AnyStream<Value: Sendable>: StreamProtocol {
 
         // MARK: - Internal properties
