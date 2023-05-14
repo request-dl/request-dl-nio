@@ -5,6 +5,6 @@
 import Foundation
 
 extension Internals {
-    
-    typealias DataBuffer = Buffer<ByteStreamBuffer>
+
+    typealias AnyBuffer = any _BufferRepresentable
 }

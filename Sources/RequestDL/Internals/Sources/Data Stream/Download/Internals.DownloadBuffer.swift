@@ -29,7 +29,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        mutating func append(_ incomeBytes: BufferProtocol) {
+        mutating func append(_ incomeBytes: Internals.AnyBuffer) {
             guard var buffer = buffer else {
                 return
             }

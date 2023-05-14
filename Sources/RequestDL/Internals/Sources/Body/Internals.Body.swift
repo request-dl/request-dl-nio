@@ -18,7 +18,7 @@ extension Internals {
 
         init(
             _ size: Int? = nil,
-            buffers: [BufferProtocol]
+            buffers: [Internals.AnyBuffer]
         ) {
             _body = .init(
                 buffers: buffers,

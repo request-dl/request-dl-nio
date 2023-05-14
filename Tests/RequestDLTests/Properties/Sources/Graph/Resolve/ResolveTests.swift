@@ -190,7 +190,7 @@ extension ResolveTests {
                                     value = some question,
                                     urlEncoder = URLEncoder {
                                         lock = Lock {
-                                            lock = NIOLock {
+                                            _lock = NIOLock {
                                                 _storage = NIOConcurrencyHelpers.LockStorage<()>
                                             }
                                         },

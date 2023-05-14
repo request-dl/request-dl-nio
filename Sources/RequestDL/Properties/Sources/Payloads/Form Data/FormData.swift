@@ -16,7 +16,7 @@ public struct FormData: Property {
 
     // MARK: - Internal properties
 
-    let buffer: Internals.DataBuffer
+    let buffer: Internals.AnyBuffer
     let fileName: String
     let key: String
     let contentType: ContentType

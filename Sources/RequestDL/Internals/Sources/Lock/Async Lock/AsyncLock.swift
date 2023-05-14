@@ -29,4 +29,12 @@ struct AsyncLock: Sendable {
         try await body()
         asyncSemaphore.signal()
     }
+
+    func lock() async {
+        await asyncSemaphore.wait()
+    }
+
+    func unlock() {
+        asyncSemaphore.signal()
+    }
 }

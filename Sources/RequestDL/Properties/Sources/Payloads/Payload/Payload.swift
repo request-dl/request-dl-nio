@@ -41,7 +41,7 @@ public struct Payload<Provider: Sendable>: Property {
 
     private let isURLEncodedCompatible: Bool
     private let provider: Provider
-    private let buffer: @Sendable (Provider) -> BufferProtocol
+    private let buffer: @Sendable (Provider) -> Internals.AnyBuffer
 
     // MARK: - Inits
 
