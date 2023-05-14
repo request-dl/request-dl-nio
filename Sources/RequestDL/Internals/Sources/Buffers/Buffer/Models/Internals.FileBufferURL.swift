@@ -56,7 +56,7 @@ extension Internals {
 
             let directoryURL = url.deletingLastPathComponent()
 
-            if directoryURL.hasDirectoryPath, (try? directoryURL.checkResourceIsReachable()) ?? false  {
+            if directoryURL.hasDirectoryPath, (try? directoryURL.checkResourceIsReachable()) ?? false {
                 try? FileManager.default.createDirectory(
                     at: directoryURL,
                     withIntermediateDirectories: true

@@ -709,9 +709,9 @@ class InternalsFileBufferTests: XCTestCase {
 
         // When
         let datas = await withTaskGroup(of: Data?.self) { group in
-            for i in 0 ..< 1_024 {
+            for index in 0 ..< 1_024 {
                 group.addTask {
-                    return fileBuffer.getData(at: i, length: 1_024 - i)
+                    return fileBuffer.getData(at: index, length: 1_024 - index)
                 }
             }
 
