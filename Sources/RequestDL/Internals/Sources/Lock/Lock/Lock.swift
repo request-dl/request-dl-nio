@@ -22,12 +22,4 @@ struct Lock: Sendable {
     ) rethrows {
         try _lock.withLockVoid(body)
     }
-
-    func lock() {
-        _lock.lock()
-    }
-
-    func unlock() {
-        _lock.unlock()
-    }
 }
