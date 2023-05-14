@@ -34,6 +34,11 @@ extension Internals {
             }
         }
 
+        var isCacheEnabled: Bool {
+            body == nil && !cachePolicy.isEmpty &&
+            (method == nil || method == "GET")
+        }
+
         var baseURL: String
         var pathComponents: [String]
         var queries: [Query]
@@ -43,6 +48,8 @@ extension Internals {
 
         var body: Body?
         var readingMode: Internals.Response.ReadingMode
+        var cachePolicy: DataCache.Policy.Set
+        var localCacheStrategy: CacheStrategy
 
         // MARK: - Inits
 
@@ -54,6 +61,8 @@ extension Internals {
             self.headers = .init()
             self.body = nil
             self.readingMode = .length(1_024)
+            self.cachePolicy = []
+            self.localCacheStrategy = .ignoresStored
         }
 
         // MARK: - Internal methods

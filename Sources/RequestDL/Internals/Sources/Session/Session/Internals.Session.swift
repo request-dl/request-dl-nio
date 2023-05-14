@@ -30,24 +30,52 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func request(_ request: Request) async throws -> SessionTask {
+        func execute(
+            request: Request,
+            dataCache: DataCache
+        ) async throws -> SessionTask {
             let client = try await manager.client(
                 provider: provider,
                 configuration: configuration
             )
 
-            let upload = DataStream<Int>()
-            let head = DataStream<ResponseHead>()
-            let download = DownloadBuffer(readingMode: request.readingMode)
+            let cacheControl = CacheControl(
+                request: request,
+                dataCache: dataCache
+            )
 
-            let delegate = ClientResponseReceiver(
+            switch await cacheControl(client) {
+            case .task(let sessionTask):
+                return sessionTask
+            case .cache(let cache):
+                return try await execute(
+                    client: client,
+                    request: request,
+                    cache: cache
+                )
+            }
+        }
+
+        // MARK: - Private methods
+
+        private func execute(
+            client: Internals.Client,
+            request: Internals.Request,
+            cache: ((Internals.ResponseHead) -> Internals.DataStream<Internals.DataBuffer>?)?
+        ) async throws -> SessionTask {
+            let upload = Internals.DataStream<Int>()
+            let head = Internals.DataStream<Internals.ResponseHead>()
+            let download = Internals.DownloadBuffer(readingMode: request.readingMode)
+
+            let delegate = Internals.ClientResponseReceiver(
                 url: request.url,
                 upload: upload,
                 head: head,
-                download: download
+                download: download,
+                cache: cache
             )
 
-            let response = AsyncResponse(
+            let response = Internals.AsyncResponse(
                 upload: upload,
                 head: head,
                 download: download.stream

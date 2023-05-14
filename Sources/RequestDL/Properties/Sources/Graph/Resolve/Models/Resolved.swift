@@ -7,4 +7,5 @@ import Foundation
 struct Resolved: Sendable {
     let session: Internals.Session
     let request: Internals.Request
+    let dataCache: DataCache
 }

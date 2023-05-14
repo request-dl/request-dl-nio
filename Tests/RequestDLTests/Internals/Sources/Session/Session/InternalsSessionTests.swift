@@ -29,7 +29,10 @@ class InternalsSessionTests: XCTestCase {
         request.baseURL = "https://google.com"
 
         // When
-        let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
         let result = try await Array(task.response)
 
         // Then
@@ -54,7 +57,10 @@ class InternalsSessionTests: XCTestCase {
         ])
 
         // When
-        let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
         let result = try await Array(task.response)
 
         // Then
@@ -78,7 +84,10 @@ class InternalsSessionTests: XCTestCase {
         request.body = Internals.Body(buffers: [])
 
         // When
-        let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
         let result = try await Array(task.response)
 
         // Then
@@ -136,7 +145,10 @@ class InternalsSessionTests: XCTestCase {
                 configuration: configuration
             )
 
-            let task = try await session.request(request)
+            let task = try await session.execute(
+                request: request,
+                dataCache: .init()
+            )
 
             var parts: [Int] = []
             var download: (Internals.ResponseHead, Data)?

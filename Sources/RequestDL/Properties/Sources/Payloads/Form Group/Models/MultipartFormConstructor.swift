@@ -6,6 +6,15 @@ import Foundation
 
 struct MultipartFormConstructor: Sendable {
 
+    // MARK: - Private static properties
+
+    private static var boundary: String {
+        let prefix = UInt64.random(in: .min ... .max)
+        let sufix = UInt64.random(in: .min ... .max)
+
+        return "\(String(prefix, radix: 16)):\(String(sufix, radix: 16))"
+    }
+
     // MARK: - Internal properties
 
     var eol: Character {
@@ -36,15 +45,6 @@ struct MultipartFormConstructor: Sendable {
 
     let boundary: String
     let multipart: [PartFormRawValue]
-
-    // MARK: - Private static properties
-
-    private static var boundary: String {
-        let prefix = UInt64.random(in: .min ... .max)
-        let sufix = UInt64.random(in: .min ... .max)
-
-        return "\(String(prefix, radix: 16)):\(String(sufix, radix: 16))"
-    }
 
     // MARK: - Inits
 

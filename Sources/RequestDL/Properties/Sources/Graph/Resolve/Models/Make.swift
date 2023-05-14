@@ -11,6 +11,7 @@ struct Make: Sendable {
     var provider: SessionProvider?
     var configuration: Internals.Session.Configuration
     var request: Internals.Request
+    var cacheConfiguration: Internals.CacheConfiguration
 
     // MARK: - Inits
 
@@ -21,5 +22,6 @@ struct Make: Sendable {
         self.provider = nil
         self.configuration = configuration
         self.request = request
+        self.cacheConfiguration = .init()
     }
 }
