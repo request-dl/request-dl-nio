@@ -4,18 +4,6 @@
 
 import Foundation
 
-@available(*, deprecated)
-protocol StreamProtocol<Value>: Sendable, AnyObject {
-
-    associatedtype Value: Sendable
-
-    var isOpen: Bool { get }
-
-    func append(_ value: Result<Value?, Error>)
-
-    func next() throws -> Value?
-}
-
 extension Internals {
 
     struct AsyncStream<Element: Sendable>: Sendable, Hashable, AsyncSequence {
@@ -25,6 +13,8 @@ extension Internals {
             // MARK: - Private properties
 
             fileprivate var node: () async -> Node?
+
+            // MARK: - Internal methods
 
             mutating func next() async throws -> Element? {
                 guard let node = await node() else {
@@ -47,7 +37,7 @@ extension Internals {
             // MARK: - Private properties
 
             private let lock = AsyncLock()
-            private let stateLock = AsyncLock(.locked)
+            private let rootSignal = AsyncSignal()
 
             // MARK: - Unsafe properties
 
@@ -73,11 +63,11 @@ extension Internals {
                     } else {
                         _root = next
                         _last = next
-                        stateLock.unlock()
+                        rootSignal.signal()
+                    }
 
-                        if case .failure = value {
-                            await _close(false)
-                        }
+                    if case .failure = value {
+                        await _close()
                     }
                 }
             }
@@ -89,7 +79,7 @@ extension Internals {
             }
 
             func root() async -> Node? {
-                await stateLock.lock()
+                await rootSignal.wait()
 
                 return await lock.withLock {
                     _root
@@ -98,7 +88,7 @@ extension Internals {
 
             // MARK: - Unsafe methods
 
-            private func _close(_ unlockState: Bool = true) async {
+            private func _close() async {
                 guard !_isClosed else {
                     return
                 }
@@ -106,8 +96,8 @@ extension Internals {
                 _isClosed = true
                 await (_last ?? _root)?.close()
 
-                if unlockState {
-                    stateLock.unlock()
+                if _root == nil {
+                    rootSignal.signal()
                 }
             }
         }
@@ -121,12 +111,12 @@ extension Internals {
             // MARK: - Private properties
 
             private let lock = AsyncLock()
-            private let stateLock = AsyncLock(.locked)
+            private let nextSignal = AsyncSignal()
 
             // MARK: - Unsafe properties
 
             private var _next: Node?
-            private var _isClosed = false
+            private var _isClosed: Bool = false
 
             // MARK: - Inits
 
@@ -138,7 +128,7 @@ extension Internals {
             // MARK: - Internal methods
 
             func next() async -> Node? {
-                await stateLock.lock()
+                await nextSignal.wait()
 
                 return await lock.withLock {
                     _next
@@ -147,32 +137,24 @@ extension Internals {
 
             func append(_ node: Node) async {
                 await lock.withLock {
-                    if let next = _next {
-                        await next.append(node)
-                    } else {
-                        guard !_isClosed else {
-                            return
-                        }
-
-                        _next = node
-                        _isClosed = true
-                        stateLock.unlock()
+                    guard _next == nil else {
+                        fatalError()
                     }
+
+                    _next = node
+                    _isClosed = true
+                    nextSignal.signal()
                 }
             }
 
             func close() async {
                 await lock.withLock {
-                    if let next = _next {
-                        await next.close()
-                    } else {
-                        guard !_isClosed else {
-                            return
-                        }
-
-                        _isClosed = true
-                        stateLock.unlock()
+                    guard !_isClosed else {
+                        return
                     }
+
+                    _isClosed = true
+                    nextSignal.signal()
                 }
             }
         }
