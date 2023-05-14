@@ -63,8 +63,8 @@ extension Internals {
             request: Internals.Request,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?
         ) async throws -> SessionTask {
-            let upload = Internals.DataStream<Int>()
-            let head = Internals.DataStream<Internals.ResponseHead>()
+            let upload = Internals.AsyncStream<Int>()
+            let head = Internals.AsyncStream<Internals.ResponseHead>()
             let download = Internals.DownloadBuffer(readingMode: request.readingMode)
 
             let delegate = Internals.ClientResponseReceiver(

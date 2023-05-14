@@ -11,7 +11,7 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        let stream: DataStream<DataBuffer>
+        let stream: Internals.AsyncStream<DataBuffer>
 
         // MARK: - Private properties
 
