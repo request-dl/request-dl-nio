@@ -13,10 +13,10 @@ extension Internals {
 
             // MARK: - Internal properties
 
-            let upload: AsyncThrowingStream<Int, Error>.AsyncIterator?
+            let upload: AsyncStream<Int>.AsyncIterator?
             let download: (
-                head: AsyncThrowingStream<Internals.ResponseHead, Error>,
-                bytes: Internals.DataStream<Internals.DataBuffer>
+                head: Internals.AsyncStream<Internals.ResponseHead>,
+                bytes: Internals.AsyncStream<Internals.DataBuffer>
             )?
 
             // MARK: - Internal methods
@@ -51,19 +51,19 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let upload: AsyncThrowingStream<Int, Error>
-        private let head: AsyncThrowingStream<Internals.ResponseHead, Error>
-        private let download: Internals.DataStream<Internals.DataBuffer>
+        private let upload: Internals.AsyncStream<Int>
+        private let head: Internals.AsyncStream<Internals.ResponseHead>
+        private let download: Internals.AsyncStream<Internals.DataBuffer>
 
         // MARK: - Inits
 
         init(
-            upload: Internals.DataStream<Int>,
-            head: Internals.DataStream<Internals.ResponseHead>,
-            download: Internals.DataStream<Internals.DataBuffer>
+            upload: Internals.AsyncStream<Int>,
+            head: Internals.AsyncStream<Internals.ResponseHead>,
+            download: Internals.AsyncStream<Internals.DataBuffer>
         ) {
-            self.upload = upload.asyncStream()
-            self.head = head.asyncStream()
+            self.upload = upload
+            self.head = head
             self.download = download
         }
 

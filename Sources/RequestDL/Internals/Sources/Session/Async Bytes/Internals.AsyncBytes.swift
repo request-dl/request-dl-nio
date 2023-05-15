@@ -7,28 +7,47 @@ import NIOCore
 
 extension Internals {
 
-    struct AsyncBytes: Sendable, AsyncSequence {
+    struct AsyncBytes: Sendable, Hashable, AsyncSequence {
+
+        struct Iterator: AsyncIteratorProtocol {
+
+            // MARK: - Internal properties
+
+            var iterator: Internals.AsyncStream<Internals.DataBuffer>.AsyncIterator
+
+            // MARK: - Inits
+
+            init(_ iterator: Internals.AsyncStream<Internals.DataBuffer>.AsyncIterator) {
+                self.iterator = iterator
+            }
+
+            // MARK: - Internal methods
+
+            mutating func next() async throws -> Data? {
+                guard var dataBuffer = try await iterator.next() else {
+                    return nil
+                }
+
+                return dataBuffer.readData(dataBuffer.readableBytes)
+            }
+        }
 
         typealias Element = Data
 
-        typealias AsyncStream = AsyncThrowingStream<Element, Error>
-
         // MARK: - Private properties
 
-        fileprivate let seed: ObjectIdentifier
-        fileprivate let asyncStream: AsyncThrowingStream<Internals.DataBuffer, Error>
+        fileprivate let asyncBuffers: Internals.AsyncStream<Internals.DataBuffer>
 
         // MARK: - Inits
 
-        init(_ dataStream: Internals.DataStream<DataBuffer>) {
-            self.seed = ObjectIdentifier(dataStream)
-            self.asyncStream = dataStream.asyncStream()
+        init(_ asyncBuffers: Internals.AsyncStream<DataBuffer>) {
+            self.asyncBuffers = asyncBuffers
         }
 
         // MARK: - Internal methods
 
         func makeAsyncIterator() -> Iterator {
-            Iterator(asyncStream.makeAsyncIterator())
+            Iterator(asyncBuffers.makeAsyncIterator())
         }
 
         // MARK: - Private methods
@@ -41,45 +60,6 @@ extension Internals {
             }
 
             return items.reduce(Data(), +)
-        }
-    }
-}
-
-// MARK: - Hashable
-
-extension Internals.AsyncBytes: Hashable {
-
-    static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.seed == rhs.seed
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(seed)
-    }
-}
-
-extension Internals.AsyncBytes {
-
-    struct Iterator: AsyncIteratorProtocol {
-
-        // MARK: - Internal properties
-
-        var iterator: AsyncThrowingStream<Internals.DataBuffer, Error>.AsyncIterator
-
-        // MARK: - Inits
-
-        init(_ iterator: AsyncThrowingStream<Internals.DataBuffer, Error>.AsyncIterator) {
-            self.iterator = iterator
-        }
-
-        // MARK: - Internal methods
-
-        mutating func next() async throws -> Data? {
-            guard var dataBuffer = try await iterator.next() else {
-                return nil
-            }
-
-            return dataBuffer.readData(dataBuffer.readableBytes)
         }
     }
 }
