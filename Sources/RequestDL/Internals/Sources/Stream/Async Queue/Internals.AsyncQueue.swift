@@ -29,7 +29,7 @@ extension Internals {
 
         func addOperation(_ operation: @escaping () async -> Void) {
             lock.withLock {
-                _operations.append(operation)
+                _operations.insert(operation, at: .zero)
                 _runIfNeeded()
             }
         }
@@ -49,12 +49,10 @@ extension Internals {
             isStateLock ? () : lock.lock()
             defer { isStateLock ? () : lock.unlock() }
 
-            guard let operation = _operations.first else {
+            guard let operation = _operations.popLast() else {
                 _isRunning = false
                 return
             }
-
-            _operations.removeFirst()
 
             _Concurrency.Task(priority: priority) {
                 await operation()
