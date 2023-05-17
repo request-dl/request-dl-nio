@@ -32,8 +32,8 @@ class MockedTaskTests: XCTestCase {
         XCTAssertEqual(result.payload, data)
 
         XCTAssertEqual(response.headers.count, headers.count)
-        XCTAssertTrue(headers.keys.allSatisfy {
-            headers[$0] == response.headers.getValue(forKey: $0)
+        XCTAssertTrue(headers.allSatisfy {
+            response.headers.contains($1, for: $0)
         })
     }
 

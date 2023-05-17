@@ -10,7 +10,7 @@ class HeadersContentLengthTests: XCTestCase {
     func testContentLength() async throws {
         let property = TestProperty(Headers.ContentLength(1_000_000))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Length"), "1000000")
+        XCTAssertEqual(resolved.request.headers["Content-Length"], ["1000000"])
     }
 
     func testNeverBody() async throws {

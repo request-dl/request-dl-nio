@@ -19,7 +19,7 @@ class PropertyBuilderTests: XCTestCase {
 
         // Then
         XCTAssertTrue(property is Headers.ContentType)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
     }
 
     #if !os(Linux)
@@ -55,6 +55,6 @@ class PropertyBuilderTests: XCTestCase {
 
         // Then
         XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
     }
 }

@@ -15,7 +15,7 @@ class InternalsResponseHeadTests: XCTestCase {
         var headers = Internals.Headers()
         let isKeepAlive = true
 
-        headers.setValue("text/html", forKey: "Content-Type")
+        headers.set(name: "Content-Type", value: "text/html")
 
         // When
         let responseHead = Internals.ResponseHead(

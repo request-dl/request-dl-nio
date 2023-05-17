@@ -29,10 +29,10 @@ class InternalsHeadersTests: XCTestCase {
         let value = "application/json"
 
         // When
-        headers.setValue(value, forKey: key)
+        headers.set(name: key, value: value)
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), value)
+        XCTAssertEqual(headers[key], [value])
     }
 
     func testHeaders_whenAddValue_shouldContainsTwoValues() async throws {
@@ -42,11 +42,11 @@ class InternalsHeadersTests: XCTestCase {
         let addValue = "text/html"
 
         // When
-        headers.setValue(value, forKey: key)
-        headers.addValue(addValue, forKey: key)
+        headers.set(name: key, value: value)
+        headers.add(name: key, value: addValue)
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), "\(value); \(addValue)")
+        XCTAssertEqual(headers[key], ["\(value)", "\(addValue)"])
     }
 
     func testHeaders_whenAddValue_shouldContainsValue() async throws {
@@ -56,11 +56,11 @@ class InternalsHeadersTests: XCTestCase {
         let addValue = "text/html"
 
         // When
-        headers.setValue(value, forKey: key)
-        headers.addValue(addValue, forKey: key)
+        headers.set(name: key, value: value)
+        headers.add(name: key, value: addValue)
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), "\(value); \(addValue)")
+        XCTAssertEqual(headers[key], [value, addValue])
     }
 
     func testHeaders_whenSameKeysWithCaseDifference_shouldObtainSameValue() async throws {
@@ -70,11 +70,11 @@ class InternalsHeadersTests: XCTestCase {
         let value = "application/json"
 
         // When
-        headers.setValue(value, forKey: key1)
-        let value2 = headers.getValue(forKey: key2)
+        headers.set(name: key1, value: value)
+        let value2 = headers[key2]
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key1), value2)
+        XCTAssertEqual(headers[key1], value2)
     }
 
     func testHeaders_whenMultipleKeys_shouldIterateOverThem() async throws {
@@ -89,9 +89,9 @@ class InternalsHeadersTests: XCTestCase {
         let value3 = "https://google.com"
 
         // When
-        headers.setValue(value1, forKey: key1)
-        headers.setValue(value2, forKey: key2)
-        headers.setValue(value3, forKey: key3)
+        headers.set(name: key1, value: value1)
+        headers.set(name: key2, value: value2)
+        headers.set(name: key3, value: value3)
 
         // Then
         XCTAssertEqual(headers.count, 3)
@@ -122,55 +122,53 @@ class InternalsHeadersTests: XCTestCase {
         let value3 = "application/xml"
 
         // When
-        headers.setValue(value1, forKey: key1)
-        headers.setValue(value2, forKey: key2)
-        headers.addValue(value3, forKey: key3)
+        headers.set(name: key1, value: value1)
+        headers.set(name: key2, value: value2)
+        headers.add(name: key3, value: value3)
 
         let httpHeaders = headers.build()
         let headers = Internals.Headers(httpHeaders)
 
         // Then
-        XCTAssertEqual(headers.count, 2)
+        XCTAssertEqual(headers.count, 3)
 
-        XCTAssertTrue(Array(headers).allSatisfy {
-            switch $0 {
-            case key1:
-                return $1 == "\(value1); \(value3)"
-            case key2:
-                return $1 == value2
-            default:
-                return false
-            }
-        })
+        XCTAssertTrue(headers.contains(value1, for: key1))
+        XCTAssertTrue(headers.contains(value2, for: key2))
+        XCTAssertTrue(headers.contains(value3, for: key3))
     }
 
-    func testHeaders_whenContainsValue() async throws {
+    func testHeaders_whenContainsStructureValue() async throws {
         // Given
         let key = "Content-Type"
         let value = "application/x-www-form-urlencoded; charset=utf-8"
 
         // When
-        headers.setValue(value, forKey: key)
+        headers.set(name: key, value: value)
 
         // Then
-        XCTAssertTrue(headers.contains("charset=utf-8", forKey: key))
+        XCTAssertTrue(headers.contains(value, for: key))
     }
 
     func testHeaders_whenInitWithTuples() async throws {
         // Given
         let rawHeaders = [
-            ("Content-Type", "application/x-www-form-urlencoded"),
-            ("content-type", "charset=utf-8")
+            ("Content-type", "application/json"),
+            ("Content-Type", "application/x-www-form-urlencoded; charset=utf-8"),
+            ("Accept", "text/html")
         ]
 
         // When
         let headers = Internals.Headers(rawHeaders)
 
         // Then
-        XCTAssertEqual(headers.count, 1)
+        XCTAssertEqual(headers.count, 3)
         XCTAssertEqual(
-            headers.getValue(forKey: "Content-Type"),
-            "application/x-www-form-urlencoded; charset=utf-8"
+            headers["Content-Type"],
+            [rawHeaders[0].1, rawHeaders[1].1]
+        )
+        XCTAssertEqual(
+            headers["Accept"],
+            [rawHeaders[2].1]
         )
     }
 

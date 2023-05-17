@@ -24,23 +24,23 @@ class HeaderGroupTests: XCTestCase {
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Content-Type"),
-            "application/json"
+            resolved.request.headers["Content-Type"],
+            ["application/json"]
         )
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "text/html"
+            resolved.request.headers["Accept"],
+            ["text/html"]
         )
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Origin"),
-            "127.0.0.1:8080"
+            resolved.request.headers["Origin"],
+            ["127.0.0.1:8080"]
         )
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "xxx-api-key"),
-            "password"
+            resolved.request.headers["xxx-api-key"],
+            ["password"]
         )
     }
 
@@ -55,23 +55,23 @@ class HeaderGroupTests: XCTestCase {
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Content-Type"),
-            "text/javascript"
+            resolved.request.headers["Content-Type"],
+            ["text/javascript"]
         )
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "application/json"
+            resolved.request.headers["Accept"],
+            ["application/json"]
         )
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Origin"),
-            "127.0.0.1:8080"
+            resolved.request.headers["Origin"],
+            ["127.0.0.1:8080"]
         )
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "xxx-api-key"),
-            "password"
+            resolved.request.headers["xxx-api-key"],
+            ["password"]
         )
     }
 

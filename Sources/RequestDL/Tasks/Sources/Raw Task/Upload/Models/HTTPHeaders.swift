@@ -9,7 +9,7 @@ import Foundation
 
  `HTTPHeaders` provides methods and properties for working with HTTP headers in Swift.
  */
-public struct HTTPHeaders: Sendable, Sequence, Hashable {
+public struct HTTPHeaders: Sendable, Sequence, Hashable, ExpressibleByDictionaryLiteral {
 
     public struct Iterator: Sendable, IteratorProtocol {
 
@@ -24,7 +24,10 @@ public struct HTTPHeaders: Sendable, Sequence, Hashable {
         }
     }
 
-    public typealias Element = (String, String)
+    public typealias Key = String
+    public typealias Value = String
+
+    public typealias Element = (name: String, value: String)
 
     // MARK: - Public methods
 
@@ -71,6 +74,10 @@ public struct HTTPHeaders: Sendable, Sequence, Hashable {
         self.headers = .init(headers)
     }
 
+    public init(dictionaryLiteral elements: (String, String)...) {
+        self.init(elements)
+    }
+
     /**
      Initializes an `HTTPHeaders` instance with a dictionary representing header key-value pairs.
 
@@ -86,6 +93,26 @@ public struct HTTPHeaders: Sendable, Sequence, Hashable {
 
     // MARK: - Public methods
 
+    public subscript(_ key: String) -> [String]? {
+        headers[key]
+    }
+
+    public mutating func set(name: String, value: String) {
+        headers.set(name: name, value: value)
+    }
+
+    public mutating func add(name: String, value: String) {
+        headers.add(name: name, value: value)
+    }
+
+    public func contains(name: String) -> Bool {
+        headers.contains(name: name)
+    }
+
+    public func contains(_ value: String, for name: String) -> Bool {
+        headers.contains(value, for: name)
+    }
+
     /**
      Retrieves the value for a given header key.
 
@@ -93,8 +120,9 @@ public struct HTTPHeaders: Sendable, Sequence, Hashable {
 
      - Returns: The value associated with the given header key, or `nil` if the header key is not found.
      */
+    @available(*, deprecated, renamed: "subscript(_:)")
     public func getValue(forKey key: String) -> String? {
-        headers.getValue(forKey: key)
+        headers[key]?.joined(separator: ", ")
     }
 
     /**
@@ -104,12 +132,45 @@ public struct HTTPHeaders: Sendable, Sequence, Hashable {
         - value: The value to set for the header.
         - key: The key of the header.
      */
+    @available(*, deprecated, renamed: "set(name:value:)")
     public mutating func setValue(_ value: String, forKey key: String) {
-        headers.setValue(value, forKey: key)
+        headers.set(name: key, value: value)
     }
 
     public func makeIterator() -> Iterator {
         .init(headers: headers.makeIterator())
+    }
+}
+
+extension HTTPHeaders: RandomAccessCollection {
+
+    public struct Index: Comparable {
+
+        fileprivate let index: Internals.Headers.Index
+
+        public static func < (_ lhs: Self, _ rhs: Self) -> Bool {
+            lhs.index < rhs.index
+        }
+    }
+
+    public var startIndex: Index {
+        .init(index: headers.startIndex)
+    }
+
+    public var endIndex: Index {
+        .init(index: headers.endIndex)
+    }
+
+    public subscript(position: Index) -> (name: String, value: String) {
+        headers[position.index]
+    }
+
+    public func index(before i: Index) -> Index {
+        .init(index: headers.index(before: i.index))
+    }
+
+    public func index(after i: Index) -> Index {
+        .init(index: headers.index(after: i.index))
     }
 }
 

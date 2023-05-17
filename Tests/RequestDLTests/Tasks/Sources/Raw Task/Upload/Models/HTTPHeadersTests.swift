@@ -29,10 +29,10 @@ class HTTPHeadersTests: XCTestCase {
         let value = "application/json"
 
         // When
-        headers.setValue(value, forKey: key)
+        headers.set(name: key, value: value)
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), value)
+        XCTAssertEqual(headers[key], [value])
     }
 
     func testHeaders_whenAddValue_shouldContainsTwoValues() async throws {
@@ -41,10 +41,10 @@ class HTTPHeadersTests: XCTestCase {
         let value = "application/json; text/html"
 
         // When
-        headers.setValue(value, forKey: key)
+        headers.set(name: key, value: value)
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), value)
+        XCTAssertEqual(headers[key], [value])
     }
 
     func testHeaders_whenSameKeysWithCaseDifference_shouldObtainSameValue() async throws {
@@ -54,11 +54,11 @@ class HTTPHeadersTests: XCTestCase {
         let value = "application/json"
 
         // When
-        headers.setValue(value, forKey: key1)
-        let value2 = headers.getValue(forKey: key2)
+        headers.set(name: key1, value: value)
+        let value2 = headers[key2]
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key1), value2)
+        XCTAssertEqual(headers[key1], value2)
     }
 
     func testHeaders_whenMultipleKeys_shouldIterateOverThem() async throws {
@@ -73,9 +73,9 @@ class HTTPHeadersTests: XCTestCase {
         let value3 = "https://google.com"
 
         // When
-        headers.setValue(value1, forKey: key1)
-        headers.setValue(value2, forKey: key2)
-        headers.setValue(value3, forKey: key3)
+        headers.set(name: key1, value: value1)
+        headers.set(name: key2, value: value2)
+        headers.set(name: key3, value: value3)
 
         // Then
         XCTAssertEqual(headers.count, 3)
@@ -97,8 +97,7 @@ class HTTPHeadersTests: XCTestCase {
     func testHeaders_whenInitWithTuples() async throws {
         // Given
         let rawHeaders = [
-            ("Content-Type", "application/x-www-form-urlencoded"),
-            ("content-type", "charset=utf-8")
+            ("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
         ]
 
         // When
@@ -107,8 +106,8 @@ class HTTPHeadersTests: XCTestCase {
         // Then
         XCTAssertEqual(headers.count, 1)
         XCTAssertEqual(
-            headers.getValue(forKey: "Content-Type"),
-            "application/x-www-form-urlencoded; charset=utf-8"
+            headers["Content-Type"],
+            ["application/x-www-form-urlencoded; charset=utf-8"]
         )
     }
 
