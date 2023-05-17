@@ -7,7 +7,7 @@ import XCTest
 
 class InternalsAsyncBytesTests: XCTestCase {
 
-    var stream: Internals.DataStream<Internals.DataBuffer>!
+    var stream: Internals.AsyncStream<Internals.DataBuffer>!
 
     override func setUp() async throws {
         try await super.setUp()

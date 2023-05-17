@@ -36,8 +36,8 @@ extension Internals {
                 configuration: configuration
             )
 
-            let upload = DataStream<Int>()
-            let head = DataStream<ResponseHead>()
+            let upload = AsyncStream<Int>()
+            let head = AsyncStream<ResponseHead>()
             let download = DownloadBuffer(readingMode: request.readingMode)
 
             let delegate = ClientResponseReceiver(

@@ -7,9 +7,9 @@ import XCTest
 
 class InternalsAsyncResponseTests: XCTestCase {
 
-    var upload: Internals.DataStream<Int>!
-    var head: Internals.DataStream<Internals.ResponseHead>!
-    var download: Internals.DataStream<Internals.DataBuffer>!
+    var upload: Internals.AsyncStream<Int>!
+    var head: Internals.AsyncStream<Internals.ResponseHead>!
+    var download: Internals.AsyncStream<Internals.DataBuffer>!
     var response: Internals.AsyncResponse!
 
     override func setUp() async throws {

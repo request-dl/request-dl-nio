@@ -66,7 +66,7 @@ class InternalsClientManagerTests: XCTestCase {
             configuration: configuration
         )
 
-        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime * 2))
+        try await _Concurrency.Task.sleep(nanoseconds: lifetime * 3)
 
         let sut2 = try await manager.client(
             provider: provider,

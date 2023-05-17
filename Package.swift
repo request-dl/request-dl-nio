@@ -38,10 +38,6 @@ let package = Package(
         .package(
             url: "https://github.com/apple/swift-nio-ssl.git",
             from: "2.24.0"
-        ),
-        .package(
-            url: "https://github.com/groue/Semaphore",
-            from: "0.0.8"
         )
     ],
     targets: [
@@ -55,8 +51,7 @@ let package = Package(
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                "Semaphore"
+                .product(name: "NIOSSL", package: "swift-nio-ssl")
             ]
         ),
 
