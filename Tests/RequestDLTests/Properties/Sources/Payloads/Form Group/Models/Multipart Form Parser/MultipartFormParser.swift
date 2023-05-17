@@ -7,11 +7,11 @@ import XCTest
 
 struct MultipartFormParser {
 
-    let data: Data
+    let buffers: [Internals.AnyBuffer]
     let boundary: String
 
-    init(_ data: Data, boundary: String) {
-        self.data = data
+    init(_ buffers: [Internals.AnyBuffer], boundary: String) {
+        self.buffers = buffers
         self.boundary = boundary
     }
 }
@@ -33,7 +33,7 @@ extension MultipartFormParser {
 extension MultipartFormParser {
 
     func rawData() throws -> RawData {
-        .init(from: data)
+        .init(from: buffers.reduce(Data()) { $0 + ($1.getData() ?? Data()) })
     }
 
     func breakIntoChunks(_ rawData: RawData) throws -> [[RawData]] {

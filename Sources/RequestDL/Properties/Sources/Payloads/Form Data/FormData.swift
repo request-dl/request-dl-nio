@@ -5,6 +5,7 @@
 import Foundation
 
 /// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
+@available(*, deprecated, renamed: "Form")
 public struct FormData: Property {
 
     // MARK: - Public properties
@@ -76,13 +77,13 @@ public struct FormData: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            PartFormRawValue(property.buffer.getData() ?? Data(), forHeaders: [
-                kContentDisposition: kContentDispositionValue(
-                    property.fileName,
-                    forKey: property.key
-                ),
-                "Content-Type": "\(property.contentType)"
-            ])
+            MultipartItem(
+                name: property.key,
+                filename: property.fileName,
+                contentType: property.contentType,
+                additionalHeaders: nil,
+                data: property.buffer
+            )
         })
     }
 }

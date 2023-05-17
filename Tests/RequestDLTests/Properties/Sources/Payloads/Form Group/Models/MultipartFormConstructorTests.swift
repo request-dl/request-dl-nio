@@ -10,15 +10,16 @@ class MultipartFormConstructorTests: XCTestCase {
     func testSingleMultipartConstructor() async throws {
         // Given
         let value = "foo"
-        let form = PartFormRawValue(Data(value.utf8), forHeaders: [
-            "Content-Disposition": "form-data; name=\"string\""
-        ])
+        let item = MultipartItem(
+            name: "string",
+            data: Internals.DataBuffer(value.utf8)
+        )
 
         // When
-        let constructor = MultipartFormConstructor([form])
+        let constructor = MultipartBuilder([item])
 
         let multipartForm = try MultipartFormParser(
-            constructor.body,
+            constructor(),
             boundary: constructor.boundary
         ).parse()
 
@@ -36,21 +37,24 @@ class MultipartFormConstructorTests: XCTestCase {
     func testMultipleMultipartConstructor() async throws {
         // Given
         let value1 = "foo"
-        let form1 = PartFormRawValue(Data(value1.utf8), forHeaders: [
-            "Content-Disposition": "form-data; name=\"string\""
-        ])
+        let form1 = MultipartItem(
+            name: "string",
+            data: Internals.DataBuffer(value1.utf8)
+        )
 
         let value2 = CharacterSet.alphanumerics.description
-        let form2 = PartFormRawValue(Data(value2.utf8), forHeaders: [
-            "Content-Disposition": "form-data; name=\"document\"; filename=\"document.pdf\"",
-            "Content-Type": "\(ContentType.pdf)"
-        ])
+        let form2 = MultipartItem(
+            name: "document",
+            filename: "document.pdf",
+            contentType: .pdf,
+            data: Internals.DataBuffer(value2.utf8)
+        )
 
         // When
-        let constructor = MultipartFormConstructor([form1, form2])
+        let constructor = MultipartBuilder([form1, form2])
 
         let multipartForm = try MultipartFormParser(
-            constructor.body,
+            constructor(),
             boundary: constructor.boundary
         ).parse()
 

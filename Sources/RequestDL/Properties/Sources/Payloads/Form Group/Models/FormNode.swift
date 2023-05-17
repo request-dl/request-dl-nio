@@ -9,11 +9,11 @@ struct FormNode: PropertyNode {
     // MARK: - Internal properties
 
     let partLength: Int?
-    let factory: @Sendable () -> PartFormRawValue
+    let factory: @Sendable () -> MultipartItem
 
     // MARK: - Inits
 
-    init(_ partLength: Int?, _ factory: @escaping @Sendable () -> PartFormRawValue) {
+    init(_ partLength: Int?, _ factory: @escaping @Sendable () -> MultipartItem) {
         self.partLength = partLength
         self.factory = factory
     }
@@ -21,15 +21,13 @@ struct FormNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        let constructor = MultipartFormConstructor([factory()])
+        let constructor = MultipartBuilder([factory()])
 
-        make.request.headers.setValue(
-            "multipart/form-data; boundary=\"\(constructor.boundary)\"",
-            forKey: "Content-Type"
+        make.request.headers.set(
+            name: "Content-Type",
+            value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
         )
 
-        make.request.body = Internals.Body(partLength, buffers: [
-            Internals.DataBuffer(constructor.body)
-        ])
+        make.request.body = Internals.Body(partLength, buffers: constructor())
     }
 }

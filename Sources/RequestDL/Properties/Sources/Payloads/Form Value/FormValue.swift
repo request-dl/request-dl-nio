@@ -7,6 +7,7 @@ import Foundation
 /// `FormValue` is a type of property that represents a single value in a multipart form-data request
 ///
 /// It can be used to represent simple values like strings and numbers.
+@available(*, deprecated, renamed: "Form")
 public struct FormValue: Property {
 
     // MARK: - Public properties
@@ -68,18 +69,19 @@ public struct FormValue: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            PartFormRawValue(Data(property.value.utf8), forHeaders: [
-                kContentDisposition: kContentDispositionValue(
-                    nil,
-                    forKey: property.key
-                )
-            ])
+            MultipartItem(
+                name: property.key,
+                filename: nil,
+                contentType: nil,
+                additionalHeaders: nil,
+                data: Internals.DataBuffer(property.value.utf8)
+            )
         })
     }
 }
 
 // MARK: - Deprecated
-
+@available(*, deprecated)
 extension FormValue {
 
     /**

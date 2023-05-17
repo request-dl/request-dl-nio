@@ -19,6 +19,7 @@ import Foundation
  )
  ```
 */
+@available(*, deprecated, renamed: "Form")
 public struct FormFile: Property {
 
     // MARK: - Public properties
@@ -82,13 +83,13 @@ public struct FormFile: Property {
 
         return .leaf(FormNode(inputs.environment.payloadPartLength) {
             let data = (try? Data(contentsOf: property.url)) ?? Data()
-            return PartFormRawValue(data, forHeaders: [
-                kContentDisposition: kContentDispositionValue(
-                    property.fileName,
-                    forKey: property.key
-                ),
-                "Content-Type": "\(property.contentType)"
-            ])
+            return MultipartItem(
+                name: property.key,
+                filename: property.fileName,
+                contentType: property.contentType,
+                additionalHeaders: nil,
+                data: Internals.DataBuffer(data)
+            )
         })
     }
 }

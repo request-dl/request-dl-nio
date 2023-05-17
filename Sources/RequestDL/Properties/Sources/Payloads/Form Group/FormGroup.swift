@@ -28,18 +28,16 @@ public struct FormGroup<Content: Property>: Property {
         let nodes: [LeafNode<FormNode>]
 
         func make(_ make: inout Make) async throws {
-            let multipart = nodes.map(\.factory).map { $0() }
+            let multipart = nodes.lazy.map(\.factory).map { $0() }
 
-            let constructor = MultipartFormConstructor(multipart)
+            let constructor = MultipartBuilder(Array(multipart))
 
-            make.request.headers.setValue(
-                "multipart/form-data; boundary=\"\(constructor.boundary)\"",
-                forKey: "Content-Type"
+            make.request.headers.set(
+                name: "Content-Type",
+                value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
             )
 
-            make.request.body = Internals.Body(partLength, buffers: [
-                Internals.DataBuffer(constructor.body)
-            ])
+            make.request.body = Internals.Body(partLength, buffers: constructor())
         }
     }
 
