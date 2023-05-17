@@ -190,6 +190,7 @@ public struct DataCache: Sendable {
         if let cachedData = storage.memoryStorage[key] {
             return cachedData
         }
+
         return storage.diskStorage[key]
     }
 

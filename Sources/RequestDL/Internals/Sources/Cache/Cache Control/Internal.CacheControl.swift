@@ -81,7 +81,7 @@ extension Internals {
             )
 
             _Concurrency.Task(priority: .background) {
-                var download = download
+                let download = download
                 download.append(cachedData.buffer)
                 download.close()
             }

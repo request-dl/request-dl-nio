@@ -10,7 +10,7 @@ class InternalsDownloadBufferTests: XCTestCase {
     func testDownload_whenAppendingTotalLength_shouldContainsOneFragment() async throws {
         // Given
         let data = Data(repeating: .min, count: 1_024)
-        var download = Internals.DownloadBuffer(readingMode: .length(1_024))
+        let download = Internals.DownloadBuffer(readingMode: .length(1_024))
 
         // When
         download.append(Internals.DataBuffer(data))
@@ -25,7 +25,7 @@ class InternalsDownloadBufferTests: XCTestCase {
     func testDownload_whenAppendingErrorBeforeData_shouldBeEmpty() async throws {
         // Given
         let data = Data(repeating: .min, count: 1_024)
-        var download = Internals.DownloadBuffer(readingMode: .length(1_024))
+        let download = Internals.DownloadBuffer(readingMode: .length(1_024))
 
         // When
         download.failed(AnyError())
@@ -57,7 +57,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         let part3 = Data(repeating: 128, count: length / 4)
         let part4 = Data(repeating: 16, count: length * 2)
 
-        var download = Internals.DownloadBuffer(readingMode: .length(length))
+        let download = Internals.DownloadBuffer(readingMode: .length(length))
 
         // When
         download.append(Internals.DataBuffer(part1))
@@ -81,7 +81,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         let line2 = Data("1;2;4;8;16,".utf8)
         let line3 = Data("32;64;128;256;512".utf8)
 
-        var download = Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
+        let download = Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
 
         // When
         download.append(Internals.DataBuffer(line1 + line2))
@@ -99,7 +99,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         // Given
         let separator = Data(",".utf8)
 
-        var download = Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
+        let download = Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
 
         // When
         download.append(Internals.DataBuffer(separator))
@@ -114,7 +114,7 @@ class InternalsDownloadBufferTests: XCTestCase {
 
     func testDownload_whenEmpty_shouldBeEmpty() async throws {
         // Given
-        var download = Internals.DownloadBuffer(readingMode: .length(1_024))
+        let download = Internals.DownloadBuffer(readingMode: .length(1_024))
 
         // When
         download.close()
@@ -129,7 +129,7 @@ class InternalsDownloadBufferTests: XCTestCase {
         // Given
         let length = 4_096
         let data = Data(repeating: 64, count: 100_000_000)
-        var download = Internals.DownloadBuffer(readingMode: .length(length))
+        let download = Internals.DownloadBuffer(readingMode: .length(length))
 
         // When
         download.append(Internals.DataBuffer(data))
