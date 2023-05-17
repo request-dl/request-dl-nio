@@ -21,7 +21,7 @@ extension Internals {
         let url: String
         let status: Status
         let version: Version
-        let headers: Headers
+        let headers: HTTPHeaders
         let isKeepAlive: Bool
     }
 }

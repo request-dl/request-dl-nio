@@ -122,7 +122,7 @@ public struct ResponseHead: Sendable, Hashable {
             url: .init(string: head.url),
             status: .init(head.status),
             version: .init(head.version),
-            headers: .init(head.headers),
+            headers: head.headers,
             isKeepAlive: head.isKeepAlive
         )
     }
