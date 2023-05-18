@@ -34,7 +34,7 @@ class FormValueTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            ["form-data; name=\"\(key)\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
@@ -66,7 +66,7 @@ class FormValueTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            ["form-data; name=\"\(key)\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data("\(value)".utf8))
@@ -109,7 +109,7 @@ extension FormValueTests {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            ["form-data; name=\"\(key)\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))

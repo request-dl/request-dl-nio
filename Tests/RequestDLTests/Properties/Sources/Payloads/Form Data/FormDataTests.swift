@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@available(*, deprecated)
 class FormDataTests: XCTestCase {
 
     struct Mock: Codable {
@@ -42,12 +43,12 @@ class FormDataTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(property.key)\"; filename=\"\(property.fileName)\""
+            ["form-data; name=\"\(property.name)\"; filename=\"\(property.filename)\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Type"],
-            property.contentType.rawValue
+            [String(ContentType.text)]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
@@ -82,12 +83,12 @@ class FormDataTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(property.key)\"; filename=\"\""
+            ["form-data; name=\"\(property.key)\"; filename=\"\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Type"],
-            property.contentType.rawValue
+            [String(property.contentType)]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))

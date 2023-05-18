@@ -22,25 +22,6 @@ import Foundation
  */
 public struct FormGroup<Content: Property>: Property {
 
-    private struct Node: PropertyNode {
-
-        let partLength: Int?
-        let nodes: [LeafNode<FormNode>]
-
-        func make(_ make: inout Make) async throws {
-            let multipart = nodes.lazy.map(\.factory).map { $0() }
-
-            let constructor = MultipartBuilder(Array(multipart))
-
-            make.request.headers.set(
-                name: "Content-Type",
-                value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
-            )
-
-            make.request.body = Internals.Body(partLength, buffers: constructor())
-        }
-    }
-
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -80,9 +61,9 @@ public struct FormGroup<Content: Property>: Property {
 
         let nodes = outputs.node.search(for: FormNode.self)
 
-        return .leaf(Node(
-            partLength: inputs.environment.payloadPartLength,
-            nodes: nodes
+        return .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            items: nodes.lazy.map(\.items).reduce([], +)
         ))
     }
 }

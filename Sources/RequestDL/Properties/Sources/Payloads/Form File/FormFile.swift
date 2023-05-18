@@ -60,16 +60,7 @@ public struct FormFile: Property {
         self.fileName = fileName ?? {
             url.lastPathComponent
         }()
-        self.contentType = type ?? {
-            guard
-                !url.pathExtension.isEmpty,
-                let contentType = ContentType.allCases.first(where: {
-                    $0.rawValue.contains(url.pathExtension)
-                })
-            else { return "application/octet-stream" }
-
-            return contentType
-        }()
+        self.contentType = type ?? .octetStream
     }
 
     // MARK: - Public static methods
@@ -81,15 +72,19 @@ public struct FormFile: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            let data = (try? Data(contentsOf: property.url)) ?? Data()
-            return MultipartItem(
+        let factory = FilePayloadFactory(
+            url: property.url,
+            contentType: property.contentType
+        )
+
+        return try .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            item: FormItem(
                 name: property.key,
                 filename: property.fileName,
-                contentType: property.contentType,
                 additionalHeaders: nil,
-                data: Internals.DataBuffer(data)
+                factory: factory
             )
-        })
+        ))
     }
 }

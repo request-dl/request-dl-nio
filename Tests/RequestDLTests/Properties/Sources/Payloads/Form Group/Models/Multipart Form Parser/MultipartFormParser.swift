@@ -95,8 +95,8 @@ extension MultipartFormParser {
 
 extension MultipartFormParser {
 
-    func headers(_ lines: [RawData]) throws -> [String: String] {
-        var headers = [String: String]()
+    func headers(_ lines: [RawData]) throws -> HTTPHeaders {
+        var headers = HTTPHeaders()
 
         for line in lines {
             var key: String = ""
@@ -124,7 +124,7 @@ extension MultipartFormParser {
                 throw MultipartFormParserError.duplicatedHeaders
             }
 
-            headers[key] = value.trimmingCharacters(in: .whitespaces)
+            headers.add(name: key, value: value)
         }
 
         guard !headers.isEmpty else {

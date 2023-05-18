@@ -43,12 +43,12 @@ class FormFileTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(property.key)\"; filename=\"\(property.fileName)\""
+            ["form-data; name=\"\(property.key)\"; filename=\"\(property.fileName)\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Type"],
-            property.contentType.rawValue
+            [String(property.contentType)]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
@@ -89,12 +89,12 @@ class FormFileTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(property.key)\"; filename=\"\""
+            ["form-data; name=\"\(property.key)\"; filename=\"\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Type"],
-            property.contentType.rawValue
+            [String(property.contentType)]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))

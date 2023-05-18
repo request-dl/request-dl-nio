@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-class MultipartFormConstructorTests: XCTestCase {
+class MultipartBuilderTests: XCTestCase {
 
     func testSingleMultipartConstructor() async throws {
         // Given
@@ -28,7 +28,7 @@ class MultipartFormConstructorTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"string\""
+            ["form-data; name=\"string\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
@@ -63,19 +63,19 @@ class MultipartFormConstructorTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"string\""
+            ["form-data; name=\"string\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value1.utf8))
 
         XCTAssertEqual(
             multipartForm.items[1].headers["Content-Disposition"],
-            "form-data; name=\"document\"; filename=\"document.pdf\""
+            ["form-data; name=\"document\"; filename=\"document.pdf\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[1].headers["Content-Type"],
-            "application/pdf"
+            ["application/pdf"]
         )
 
         XCTAssertEqual(multipartForm.items[1].contents, Data(value2.utf8))

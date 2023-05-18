@@ -6,55 +6,110 @@ import Foundation
 
 struct PayloadNode: PropertyNode {
 
+    enum Source {
+        case data(DataPayloadFactory)
+        case url(FilePayloadFactory)
+        case string(StringPayloadFactory)
+        case encoded(EncodablePayloadFactory)
+        case json(JSONPayloadFactory)
+
+        var isURLEncodedCompatible: Bool {
+            switch self {
+            case .encoded, .json:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
     // MARK: - Internal properties
 
-    let isURLEncodedCompatible: Bool
-    let buffer: @Sendable () -> Internals.AnyBuffer
+    let source: Source
     let urlEncoder: URLEncoder
     let partLength: Int?
 
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        guard
-            isURLEncodedCompatible,
-            isURLEncoded(make.request.headers),
-            let data = buffer().getData()
-        else {
-            make.request.body = Internals.Body(partLength, buffers: [buffer()])
-            return
-        }
-
-        let json = try jsonObject(data)
-
-        switch json {
-        case let value as [String: Any]:
-            try makeDictionaryURLEncoded(value, in: &make)
-        case let value as [Any]:
-            try makeArrayURLEncoded(value, in: &make)
-        default:
-            make.request.body = Internals.Body(partLength, buffers: [buffer()])
+        switch source {
+        case .data(let factory):
+            try makeDefault(factory, in: &make)
+        case .string(let factory):
+            try makeDefault(factory, in: &make)
+        case .url(let factory):
+            try makeDefault(factory, in: &make)
+        case .encoded(let factory):
+            try makeEncodableEncodedIfNeeded(factory, in: &make)
+        case .json(let factory):
+            try makeJSONEncodedIfNeeded(factory, in: &make)
         }
     }
 
     // MARK: - Private methods
 
-    private func isURLEncoded(_ headers: HTTPHeaders) -> Bool {
-        headers.contains(name: "Content-Type") {
-            $0.range(of: "x-www-form-urlencoded", options: .caseInsensitive) != nil
+    private func makeEncodableEncodedIfNeeded(
+        _ factory: EncodablePayloadFactory,
+        in make: inout Make
+    ) throws {
+        guard needsToEncodeInURL(factory, headers: make.request.headers) else {
+            return try makeDefault(factory, in: &make)
+        }
+
+        let json = try JSONSerialization.jsonObject(
+            with: try factory.encode(JSONEncoder()),
+            options: [.fragmentsAllowed]
+        )
+
+        try encodeJSON(
+            json: json,
+            factory: factory,
+            in: &make
+        )
+    }
+
+    private func makeJSONEncodedIfNeeded(
+        _ factory: JSONPayloadFactory,
+        in make: inout Make
+    ) throws {
+        guard needsToEncodeInURL(factory, headers: make.request.headers) else {
+            return try makeDefault(factory, in: &make)
+        }
+
+        try encodeJSON(
+            json: factory.jsonObject,
+            factory: factory,
+            in: &make
+        )
+    }
+
+    private func encodeJSON(
+        json: Any,
+        factory: PayloadFactory,
+        in make: inout Make
+    ) throws {
+        switch json {
+        case let array as [Any]:
+            try makeArrayURLEncoded(array, in: &make)
+        case let dictionary as [String: Any]:
+            try makeDictionaryURLEncoded(dictionary, in: &make)
+        default:
+            try makeDefault(factory, in: &make)
         }
     }
 
-    private func jsonObject(_ data: Data) throws -> Any {
-        var readingOptions = JSONSerialization.ReadingOptions.fragmentsAllowed
-
-        #if canImport(Darwin)
-        if #available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *) {
-            readingOptions.insert(.json5Allowed)
+    private func needsToEncodeInURL(_ factory: PayloadFactory, headers: HTTPHeaders) -> Bool {
+        if let contentType = factory.contentType {
+            return isFormURLEncoded(String(contentType))
         }
-        #endif
 
-        return try JSONSerialization.jsonObject(with: data, options: readingOptions)
+        return headers.contains(name: "Content-Type") {
+            isFormURLEncoded($0)
+        }
+    }
+
+    private func isFormURLEncoded(_ string: String) -> Bool {
+        string.range(of: "x-www-form-urlencoded", options: .caseInsensitive) != nil
     }
 
     private func makeDictionaryURLEncoded(_ value: [String: Any], in make: inout Make) throws {
@@ -85,7 +140,8 @@ struct PayloadNode: PropertyNode {
         if outputPayloadInURL(make.request.method) {
             make.request.queries.append(contentsOf: queries)
         } else {
-            make.request.body = Internals.Body(buffers: [
+            // TODO: - Needs to update header with charset
+            make.request.body = Internals.Body(partLength, buffers: [
                 Internals.DataBuffer(queries.joined().utf8)
             ])
         }
@@ -99,5 +155,24 @@ struct PayloadNode: PropertyNode {
         return ["GET", "HEAD"].first(where: {
             method.caseInsensitiveCompare($0) == .orderedSame
         }) != nil
+    }
+
+    private func makeDefault(_ factory: PayloadFactory, in make: inout Make) throws {
+        if let contentType = factory.contentType {
+            make.request.headers.set(
+                name: "Content-Type",
+                value: String(contentType)
+            )
+        } else if make.request.headers.first(name: "Content-Type") == nil {
+            make.request.headers.set(
+                name: "Content-Type",
+                value: String(ContentType.octetStream)
+            )
+        }
+
+        let buffer = try factory()
+
+        make.request.headers.setContentLengthIfNeeded(buffer.estimatedBytes)
+        make.request.body = Internals.Body(partLength, buffers: [buffer])
     }
 }

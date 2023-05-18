@@ -28,7 +28,7 @@ import Foundation
  }
  ```
  */
-public struct Payload<Provider: Sendable>: Property {
+public struct Payload: Property {
 
     // MARK: - Public properties
 
@@ -39,9 +39,7 @@ public struct Payload<Provider: Sendable>: Property {
 
     // MARK: - Private properties
 
-    private let isURLEncodedCompatible: Bool
-    private let provider: Provider
-    private let buffer: @Sendable (Provider) -> Internals.AnyBuffer
+    private let source: PayloadNode.Source
 
     // MARK: - Inits
 
@@ -53,12 +51,15 @@ public struct Payload<Provider: Sendable>: Property {
         - options: Options for serializing the dictionary.
      */
     public init(
-        _ dictionary: [String: Any],
-        options: JSONSerialization.WritingOptions = .prettyPrinted
-    ) where Provider == _DictionaryPayload {
-        isURLEncodedCompatible = true
-        provider = _DictionaryPayload(dictionary, options: options)
-        buffer = { $0.buffer }
+        _ json: Any,
+        options: JSONSerialization.WritingOptions = .prettyPrinted,
+        contentType: ContentType? = nil
+    ) {
+        source = .json(JSONPayloadFactory(
+            jsonObject: json,
+            options: options,
+            contentType: contentType
+        ))
     }
 
     /**
@@ -68,14 +69,71 @@ public struct Payload<Provider: Sendable>: Property {
         - value: An encodable value to be serialized.
         - encoder: An encoder to use for the serialization.
      */
-    public init<T: Encodable>(
-        _ value: T,
-        encoder: JSONEncoder = .init()
-    ) where Provider == _EncodablePayload<T> {
-        isURLEncodedCompatible = true
-        provider = _EncodablePayload(value, encoder: encoder)
-        buffer = { $0.buffer }
+    public init<Object: Encodable>(
+        _ object: Object,
+        encoder: JSONEncoder = .init(),
+        contentType: ContentType? = nil
+    ) {
+        source = .encoded(EncodablePayloadFactory(
+            object,
+            encoder: encoder,
+            contentType: contentType
+        ))
     }
+
+    public init<Verbatim: StringProtocol, Encoding: StringEncoding>(
+        verbatim: Verbatim,
+        using encoding: Encoding,
+        contentType: ContentType = .text
+    ) {
+        source = .string(StringPayloadFactory(
+            verbatim: verbatim,
+            encoding: encoding,
+            contentType: contentType
+        ))
+    }
+
+    public init(
+        data: Data,
+        contentType: ContentType? = nil
+    ) {
+        source = .data(DataPayloadFactory(
+            data: data,
+            contentType: contentType
+        ))
+    }
+
+    public init(
+        url: URL,
+        contentType: ContentType? = nil
+    ) {
+        source = .url(FilePayloadFactory(
+            url: url,
+            contentType: contentType
+        ))
+    }
+
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<Payload>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
+        return .leaf(PayloadNode(
+            source: property.source,
+            urlEncoder: inputs.environment.urlEncoder,
+            partLength: inputs.environment.payloadPartLength
+        ))
+    }
+}
+
+// MARK: - Deprecated
+
+extension Payload {
+
 
     /**
      Initializes a `Payload` with a string.
@@ -84,13 +142,15 @@ public struct Payload<Provider: Sendable>: Property {
         - string: A string to be used as the body data.
         - encoding: The encoding to use when converting the string to data.
      */
+    @available(*, deprecated, renamed: "init(verbatim:using:)")
     public init(
         _ string: String,
         using encoding: String.Encoding = .utf8
-    ) where Provider == _StringPayload {
-        isURLEncodedCompatible = false
-        provider = _StringPayload(string, using: encoding)
-        buffer = { $0.buffer }
+    ) {
+        self.init(
+            verbatim: string,
+            using: _StringEncoding(encoding)
+        )
     }
 
     /**
@@ -99,10 +159,9 @@ public struct Payload<Provider: Sendable>: Property {
      - Parameters:
         - data: The raw data to be used as the body.
      */
-    public init(_ data: Data) where Provider == _DataPayload {
-        isURLEncodedCompatible = false
-        provider = _DataPayload(data)
-        buffer = { $0.buffer }
+    @available(*, deprecated, renamed: "init(data:)")
+    public init(_ data: Data) {
+        self.init(data: data)
     }
 
     /**
@@ -111,29 +170,8 @@ public struct Payload<Provider: Sendable>: Property {
      - Parameters:
         - fileURL: The file url to be used as the body.
      */
-    public init(_ fileURL: URL) where Provider == _FilePayload {
-        isURLEncodedCompatible = false
-        provider = _FilePayload(fileURL)
-        buffer = { $0.buffer }
-    }
-
-    // MARK: - Public static methods
-
-    /// This method is used internally and should not be called directly.
-    public static func _makeProperty(
-        property: _GraphValue<Payload<Provider>>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-
-        let provider = property.provider
-        let buffer = property.buffer
-
-        return .leaf(PayloadNode(
-            isURLEncodedCompatible: property.isURLEncodedCompatible,
-            buffer: { buffer(provider) },
-            urlEncoder: inputs.environment.urlEncoder,
-            partLength: inputs.environment.payloadPartLength
-        ))
+    @available(*, deprecated, renamed: "init(url:)")
+    public init(_ fileURL: URL) {
+        self.init(url: fileURL)
     }
 }

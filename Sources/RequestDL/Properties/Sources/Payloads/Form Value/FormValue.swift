@@ -68,15 +68,19 @@ public struct FormValue: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            MultipartItem(
+
+        return try .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            item: FormItem(
                 name: property.key,
                 filename: nil,
-                contentType: nil,
                 additionalHeaders: nil,
-                data: Internals.DataBuffer(property.value.utf8)
+                factory: StringPayloadFactory(
+                    verbatim: property.value,
+                    encoding: .utf8
+                )
             )
-        })
+        ))
     }
 }
 

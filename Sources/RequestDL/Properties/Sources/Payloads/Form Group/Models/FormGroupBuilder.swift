@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct MultipartBuilder: Sendable {
+struct FormGroupBuilder: Sendable {
 
     // MARK: - Private static properties
 
@@ -22,15 +22,15 @@ struct MultipartBuilder: Sendable {
     }
 
     let boundary: String
-    let items: [MultipartItem]
+    let items: [FormItem]
 
     // MARK: - Inits
 
-    init(_ items: [MultipartItem]) {
+    init(_ items: [FormItem]) {
         self.init(Self.boundary, items: items)
     }
 
-    fileprivate init(_ boundary: String, items: [MultipartItem]) {
+    fileprivate init(_ boundary: String, items: [FormItem]) {
         self.boundary = boundary
         self.items = items
     }
@@ -58,14 +58,14 @@ struct MultipartBuilder: Sendable {
 
     // MARK: - Private methods
 
-    private func buildBuffer(_ item: MultipartItem) -> [Internals.AnyBuffer] {
+    private func buildBuffer(_ item: FormItem) -> [Internals.AnyBuffer] {
          [
             buildHeadersBuffer(item.headers()),
-            item.data
+            item.buffer
         ]
     }
 
-    private func buildHeadersBuffer(_ headers: Internals.Headers) -> Internals.AnyBuffer {
+    private func buildHeadersBuffer(_ headers: HTTPHeaders) -> Internals.AnyBuffer {
         var buffer = Internals.DataBuffer()
 
         for (name, value) in headers {

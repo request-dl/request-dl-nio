@@ -17,10 +17,9 @@ public struct FormData: Property {
 
     // MARK: - Internal properties
 
-    let buffer: Internals.AnyBuffer
-    let fileName: String
-    let key: String
-    let contentType: ContentType
+    let name: String
+    let filename: String
+    let factory: PayloadFactory
 
     // MARK: - Inits
 
@@ -40,10 +39,12 @@ public struct FormData: Property {
         fileName: String = "",
         type: ContentType
     ) {
-        self.buffer = Internals.DataBuffer(data)
-        self.key = key
-        self.fileName = fileName
-        self.contentType = type
+        self.name = key
+        self.filename = fileName
+        self.factory = DataPayloadFactory(
+            data: data,
+            contentType: type
+        )
     }
 
     /**
@@ -62,10 +63,13 @@ public struct FormData: Property {
         fileName: String = "",
         encoder: JSONEncoder = .init()
     ) {
-        self.key = key
-        self.fileName = fileName
-        self.buffer = _EncodablePayload(object, encoder: encoder).buffer
-        self.contentType = .json
+        self.name = key
+        self.filename = fileName
+        self.factory = EncodablePayloadFactory(
+            object,
+            encoder: encoder,
+            contentType: .json
+        )
     }
 
     // MARK: - Public static methods
@@ -76,14 +80,14 @@ public struct FormData: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            MultipartItem(
-                name: property.key,
-                filename: property.fileName,
-                contentType: property.contentType,
+        return try .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            item: FormItem(
+                name: property.name,
+                filename: property.filename,
                 additionalHeaders: nil,
-                data: property.buffer
+                factory: property.factory
             )
-        })
+        ))
     }
 }

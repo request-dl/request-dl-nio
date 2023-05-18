@@ -7,6 +7,10 @@ import XCTest
 
 // swiftlint:disable function_body_length
 class FormGroupTests: XCTestCase {
+}
+
+@available(*, deprecated)
+extension FormGroupTests {
 
     func testSingleForm() async throws {
         // Given
@@ -36,7 +40,7 @@ class FormGroupTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            ["form-data; name=\"\(key)\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data("\(value)".utf8))
@@ -94,7 +98,7 @@ class FormGroupTests: XCTestCase {
         // Then: - Property Index 0
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key1)\""
+            ["form-data; name=\"\(key1)\""]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data("\(value1)".utf8))
@@ -102,12 +106,12 @@ class FormGroupTests: XCTestCase {
         // Then: - Property Index 1
         XCTAssertEqual(
             multipartForm.items[1].headers["Content-Disposition"],
-            "form-data; name=\"\(key2)\"; filename=\"\(fileName2)\""
+            ["form-data; name=\"\(key2)\"; filename=\"\(fileName2)\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[1].headers["Content-Type"],
-            contentType2.rawValue
+            [String(contentType2.rawValue)]
         )
 
         XCTAssertEqual(
@@ -118,12 +122,12 @@ class FormGroupTests: XCTestCase {
         // Then: - Property Index 2
         XCTAssertEqual(
             multipartForm.items[2].headers["Content-Disposition"],
-            "form-data; name=\"\(key3)\"; filename=\"\(try resourceFile3.url().lastPathComponent)\""
+            ["form-data; name=\"\(key3)\"; filename=\"\(try resourceFile3.url().lastPathComponent)\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[2].headers["Content-Type"],
-            ContentType.pdf.rawValue
+            [String(ContentType.pdf)]
         )
 
         XCTAssertEqual(
@@ -163,14 +167,14 @@ class FormGroupTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            ["form-data; name=\"\(key)\""]
         )
 
         XCTAssertEqual(multipartForm.items[1].contents, Data("\(value2)".utf8))
 
         XCTAssertEqual(
             multipartForm.items[1].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            ["form-data; name=\"\(key)\""]
         )
     }
 

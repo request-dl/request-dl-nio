@@ -4,49 +4,47 @@
 
 import Foundation
 
-struct MultipartItem: Sendable {
+struct FormItem: Sendable {
 
     // MARK: - Internal methods
 
-    let data: Internals.AnyBuffer
+    let buffer: Internals.AnyBuffer
 
     // MARK: - Private properties
 
     private let name: String
     private let filename: String?
-    private let contentType: ContentType?
-    private let additionalHeaders: Internals.Headers?
+    private let contentType: ContentType
+    private let additionalHeaders: HTTPHeaders?
 
     // MARK: - Inits
 
     init(
         name: String,
         filename: String? = nil,
-        contentType: ContentType? = nil,
-        additionalHeaders: Internals.Headers? = nil,
-        data: Internals.AnyBuffer
-    ) {
+        additionalHeaders: HTTPHeaders? = nil,
+        factory: PayloadFactory
+    ) throws {
         self.name = name
         self.filename = filename
-        self.contentType = contentType
+        self.contentType = factory.contentType ?? .octetStream
         self.additionalHeaders = additionalHeaders
-        self.data = data
+        self.buffer = try factory()
     }
 
     // MARK: - Internal methods
 
-    func headers() -> Internals.Headers {
-        var headers = Internals.Headers()
+    func headers() -> HTTPHeaders {
+        var headers = HTTPHeaders()
 
         headers.set(name: "Content-Disposition", value: contentDisposition())
+        headers.set(name: "Content-Type", value: String(contentType))
 
-        if let contentType {
-            headers.set(name: "Content-Type", value: String(contentType))
-        }
-
-        if let additionalHeaders {
+        if var additionalHeaders {
+            additionalHeaders.setContentLengthIfNeeded(buffer.estimatedBytes)
             return headers.merging(additionalHeaders, by: +)
         } else {
+            headers.setContentLengthIfNeeded(buffer.estimatedBytes)
             return headers
         }
     }
