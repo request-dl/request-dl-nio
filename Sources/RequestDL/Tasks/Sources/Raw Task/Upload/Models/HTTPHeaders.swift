@@ -97,7 +97,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
      Indicates whether the `HTTPHeaders` instance is empty.
      */
     public var isEmpty: Bool {
-        keys.isEmpty
+        _names.isEmpty
     }
 
     /**
@@ -110,12 +110,12 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     /**
      Returns an array of header keys in the `HTTPHeaders` instance.
     */
-    public var keys: [String] {
-        names.map(\.rawValue)
+    public var names: [String] {
+        _names.map(\.rawValue)
     }
 
     public var first: Element? {
-        names.first.flatMap { name in
+        _names.first.flatMap { name in
             values.first.flatMap {
                 $0.first.map {
                     (name.rawValue, $0)
@@ -125,7 +125,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     }
 
     public var last: Element? {
-        names.last.flatMap { name in
+        _names.last.flatMap { name in
             values.last.flatMap {
                 $0.last.map {
                     (name.rawValue, $0)
@@ -137,11 +137,11 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     // MARK: - Private properties
 
     fileprivate var _first: Name? {
-        names.first
+        _names.first
     }
 
-    private var names: [Name]
     private var values: [[String]]
+    private var _names: [Name]
 
     // MARK: - Inits
 
@@ -149,7 +149,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
      Initializes an empty `HTTPHeaders` instance.
      */
     public init() {
-        self.names = []
+        self._names = []
         self.values = []
     }
 
@@ -191,10 +191,10 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         let name = self.name(name)
         let value = trimmingCharacters(value)
 
-        if let index = names.firstIndex(of: name) {
+        if let index = _names.firstIndex(of: name) {
             values[index] = [value]
         } else {
-            names.append(name)
+            _names.append(name)
             values.append([value])
         }
     }
@@ -203,10 +203,10 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         let name = self.name(name)
         let value = trimmingCharacters(value)
 
-        if let index = names.firstIndex(of: name) {
+        if let index = _names.firstIndex(of: name) {
             values[index].append(value)
         } else {
-            names.append(name)
+            _names.append(name)
             values.append([value])
         }
     }
@@ -224,11 +224,11 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     }
 
     public func contains(name: String) -> Bool {
-        names.contains(self.name(name))
+        _names.contains(self.name(name))
     }
 
     public func contains(name: String, where closure: (String) throws -> Bool) rethrows -> Bool {
-        guard let index = names.firstIndex(of: self.name(name)) else {
+        guard let index = _names.firstIndex(of: self.name(name)) else {
             return false
         }
 
@@ -249,17 +249,16 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ) rethrows -> HTTPHeaders {
         var mutableSelf = self
 
-        for _name in headers.names {
+        for _name in headers._names {
             let name = _name.rawValue
 
             guard let values = headers[name] else {
                 continue
             }
 
-            if let index = mutableSelf.names.firstIndex(of: _name) {
-                mutableSelf.values[index] = try Array(Set(
-                    groupingValues(mutableSelf.values[index], values)
-                ))
+            if let index = mutableSelf._names.firstIndex(of: _name) {
+                let values = try groupingValues(mutableSelf.values[index], values)
+                mutableSelf.values[index] = unique(values: values)
             } else {
                 for value in values {
                     mutableSelf.add(name: name, value: value)
@@ -279,20 +278,35 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     // MARK: - Private methods
 
     fileprivate mutating func _remove(_ name: Name) {
-        guard let index = names.firstIndex(of: name) else {
+        guard let index = _names.firstIndex(of: name) else {
             return
         }
 
-        names.remove(at: index)
+        _names.remove(at: index)
         values.remove(at: index)
     }
 
     fileprivate func _values(_ name: Name) -> [String]? {
-        guard let index = names.firstIndex(of: name) else {
+        guard let index = _names.firstIndex(of: name) else {
             return nil
         }
 
         return values[index]
+    }
+
+    private func unique(values: [String]) -> [String] {
+        var merged = [Name]()
+
+        return values.compactMap {
+            let value = name(trimmingCharacters($0))
+
+            if merged.contains(value) {
+                return nil
+            } else {
+                merged.append(value)
+                return value.rawValue
+            }
+        }
     }
 
     private func name(_ name: String) -> Name {
@@ -321,25 +335,25 @@ extension HTTPHeaders: RandomAccessCollection {
     }
 
     public var endIndex: Index {
-        .init(name: names.endIndex, value: .zero)
+        .init(name: _names.endIndex, value: .zero)
     }
 
     public subscript(position: Index) -> (name: String, value: String) {
         (
-            name: names[position.name].rawValue,
+            name: _names[position.name].rawValue,
             value: values[position.name][position.value]
         )
     }
 
     public func index(before i: Index) -> Index {
-        guard values[i.name].startIndex == i.value else {
+        guard i.value == .zero else {
             return .init(
                 name: i.name,
                 value: values[i.name].index(before: i.value)
             )
         }
 
-        let name = names.index(before: i.name)
+        let name = _names.index(before: i.name)
         return .init(
             name: name,
             value: values.startIndex >= name ? values[name].index(before: values[name].endIndex) : values.startIndex
@@ -354,7 +368,7 @@ extension HTTPHeaders: RandomAccessCollection {
             )
         }
 
-        let name = names.index(after: i.name)
+        let name = _names.index(after: i.name)
         return .init(
             name: name,
             value: name < values.endIndex ? values[name].startIndex : .zero
