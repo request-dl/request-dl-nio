@@ -73,7 +73,7 @@ public struct MockedTask: Task {
                     reason: "Mock status"
                 ),
                 version: .init(minor: 1, major: 2),
-                headers: .init(headers ?? [:]),
+                headers: .init(Array(headers ?? [:])),
                 isKeepAlive: false
             ),
             payload: data

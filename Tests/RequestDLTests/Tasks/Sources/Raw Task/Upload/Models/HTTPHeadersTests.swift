@@ -19,113 +19,452 @@ class HTTPHeadersTests: XCTestCase {
         headers = nil
     }
 
-    func testHeaders_whenEmpty_shouldBeEmpty() async throws {
+    func testHeaders_whenEmpty_shouldBeEmpty() {
         XCTAssertTrue(headers.isEmpty)
     }
 
-    func testHeaders_whenSetValue_shouldContainsValue() async throws {
+    func testHeaders_whenInitWithSequence() {
         // Given
-        let key = "Content-Type"
-        let value = "application/json"
-
-        // When
-        headers.setValue(value, forKey: key)
+        let headers = HTTPHeaders([
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3"),
+            ("Authorization", "Bearer 123")
+        ])
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), value)
+        XCTAssertEqual(headers.count, 5)
+        XCTAssertFalse(headers.isEmpty)
+
+        XCTAssertEqual(headers.names, [
+            "Content-Type", "Accept", "Authorization"
+        ])
+
+        XCTAssertEqual(headers.first?.name, "Content-Type")
+        XCTAssertEqual(headers.first?.value, "application/json")
+
+        XCTAssertEqual(headers.last?.name, "Authorization")
+        XCTAssertEqual(headers.last?.value, "Bearer 123")
     }
 
-    func testHeaders_whenAddValue_shouldContainsTwoValues() async throws {
+    func testHeaders_whenInitWithDictionaryLiteral() {
         // Given
-        let key = "Content-Type"
-        let value = "application/json; text/html"
-
-        // When
-        headers.setValue(value, forKey: key)
+        let headers: HTTPHeaders = [
+            "Content-Type": "text/html",
+            "Accept": "audio/mp3"
+        ]
 
         // Then
-        XCTAssertEqual(headers.getValue(forKey: key), value)
+        XCTAssertEqual(headers.first?.name, "Content-Type")
+        XCTAssertEqual(headers.first?.value, "text/html")
+
+        XCTAssertEqual(headers.last?.name, "Accept")
+        XCTAssertEqual(headers.last?.value, "audio/mp3")
     }
 
-    func testHeaders_whenSameKeysWithCaseDifference_shouldObtainSameValue() async throws {
+    func testHeaders_whenSetValues() {
         // Given
-        let key1 = "Content-Type"
-        let key2 = "Content-type"
-        let value = "application/json"
-
-        // When
-        headers.setValue(value, forKey: key1)
-        let value2 = headers.getValue(forKey: key2)
-
-        // Then
-        XCTAssertEqual(headers.getValue(forKey: key1), value2)
-    }
-
-    func testHeaders_whenMultipleKeys_shouldIterateOverThem() async throws {
-        // Given
-        let key1 = "Content-Type"
-        let value1 = "application/json"
-
-        let key2 = "Accept"
-        let value2 = "text/html"
-
-        let key3 = "Origin"
-        let value3 = "https://google.com"
-
-        // When
-        headers.setValue(value1, forKey: key1)
-        headers.setValue(value2, forKey: key2)
-        headers.setValue(value3, forKey: key3)
-
-        // Then
-        XCTAssertEqual(headers.count, 3)
-
-        XCTAssertTrue(Array(headers).allSatisfy {
-            switch $0 {
-            case key1:
-                return $1 == value1
-            case key2:
-                return $1 == value2
-            case key3:
-                return $1 == value3
-            default:
-                return false
-            }
-        })
-    }
-
-    func testHeaders_whenInitWithTuples() async throws {
-        // Given
-        let rawHeaders = [
-            ("Content-Type", "application/x-www-form-urlencoded"),
-            ("content-type", "charset=utf-8")
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3"),
+            ("Authorization", "Bearer 123")
         ]
 
         // When
-        let headers = HTTPHeaders(rawHeaders)
+        for (name, value) in values {
+            headers.set(name: name, value: value)
+        }
 
         // Then
-        XCTAssertEqual(headers.count, 1)
+        let headersSequence = Array(headers).map { ($0.lowercased(), $1) }
+        let expectingSequence = values[2..<values.count].map {
+            ($0.lowercased(), $1)
+        }
+
+        XCTAssertEqual(headers.count, 3)
+
+        XCTAssertEqual(headers.names, [
+            "Content-Type", "Accept", "Authorization"
+        ])
+
         XCTAssertEqual(
-            headers.getValue(forKey: "Content-Type"),
-            "application/x-www-form-urlencoded; charset=utf-8"
+            headersSequence.map(\.0),
+            expectingSequence.map(\.0)
+        )
+
+        XCTAssertEqual(
+            headersSequence.map(\.1),
+            expectingSequence.map(\.1)
         )
     }
 
-    func testHeaders_whenHashable() async throws {
+    func testHeaders_whenAddValues() {
         // Given
-        let headers1 = Internals.Headers([
-            ("Content-Type", "application/json")
-        ])
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3"),
+            ("Authorization", "Bearer 123")
+        ]
 
-        let headers2 = Internals.Headers([
-            ("Accept", "text/html")
-        ])
-
-        // Given
-        let sut = Set([headers1, headers1, headers2])
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
 
         // Then
-        XCTAssertEqual(sut, [headers1, headers2])
+        let headersSequence = Array(headers).map { ($0.lowercased(), $1) }
+        let expectingSequence = values.map {
+            ($0.lowercased(), $1)
+        }
+
+        XCTAssertEqual(headers.count, 5)
+
+        XCTAssertEqual(headers.names, [
+            "Content-Type", "Accept", "Authorization"
+        ])
+
+        XCTAssertEqual(
+            headersSequence.map(\.0),
+            expectingSequence.map(\.0)
+        )
+
+        XCTAssertEqual(
+            headersSequence.map(\.1),
+            expectingSequence.map(\.1)
+        )
+    }
+
+    func testHeaders_whenRemoveAddedValue() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3"),
+            ("Authorization", "Bearer 123")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        headers.remove(name: "CONTENT-TYPE")
+
+        // Then
+        XCTAssertEqual(headers.count, 2)
+
+        XCTAssertEqual(headers.names, [
+            "Accept", "Authorization"
+        ])
+
+        XCTAssertEqual(headers.map(\.value), [
+            "audio/mp3", "Bearer 123"
+        ])
+    }
+
+    func testHeaders_whenFirstOfNames() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3"),
+            ("Authorization", "Bearer 123")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        let value1 = headers.first(name: "Content-TYPE")
+        let value2 = headers.first(name: "ACCEPT")
+        let value3 = headers.first(name: "authorization")
+
+        // Then
+        XCTAssertEqual(value1, "application/json")
+        XCTAssertEqual(value2, "audio/mp3")
+        XCTAssertEqual(value3, "Bearer 123")
+    }
+
+    func testHeaders_whenLastOfNames() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3"),
+            ("Authorization", "Bearer 123")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        let value1 = headers.last(name: "Content-TYPE")
+        let value2 = headers.last(name: "ACCEPT")
+        let value3 = headers.last(name: "authorization")
+
+        // Then
+        XCTAssertEqual(value1, "text/html")
+        XCTAssertEqual(value2, "audio/mp3")
+        XCTAssertEqual(value3, "Bearer 123")
+    }
+
+    func testHeaders_whenContainsName() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        // Then
+        let key = "content-type"
+
+        XCTAssertTrue((0 ..< key.count).allSatisfy {
+            let index = key.index(key.startIndex, offsetBy: $0)
+
+            let uppercased = key[key.startIndex...index]
+            let lowercased = key[key.index(after: index)..<key.endIndex]
+
+            return headers.contains(name: "\(uppercased.uppercased())\(lowercased.lowercased())")
+        })
+
+        XCTAssertFalse(headers.contains(name: "Accept"))
+    }
+
+    func testHeaders_whenContainsNameWhere() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        // Then
+        XCTAssertTrue(headers.contains(name: "content-type") {
+            $0 == "text/html"
+        })
+
+        XCTAssertFalse(headers.contains(name: "content-type") {
+            $0 == "audio/mp3"
+        })
+    }
+
+    func testHeaders_whenSubscriptByName() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        // Then
+        XCTAssertEqual(headers["CONTENT-TYPE"], values.map(\.1))
+
+        XCTAssertNil(headers["Accept"])
+    }
+
+    func testHeaders_whenMergingWithRightExclusive() {
+        // Given
+        let sharedValues = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3")
+        ]
+
+        let exclusiveValues = [
+            ("Accept", "application/xml"),
+            ("Authorization", "Bearer 123")
+        ]
+
+        let otherHeaders = HTTPHeaders(sharedValues + exclusiveValues)
+
+        // When
+        for (name, value) in sharedValues {
+            headers.add(name: name, value: value)
+        }
+
+        headers = headers.merging(otherHeaders, by: +)
+
+        // Then
+        XCTAssertEqual(headers.count, 6)
+
+        XCTAssertEqual(headers.names, [
+            "Content-Type", "Accept", "Authorization"
+        ])
+
+        XCTAssertEqual(headers.map(\.value), [
+            "application/json", "application/javascript", "text/html",
+            "audio/mp3", "application/xml", "Bearer 123"
+        ])
+    }
+
+    func testHeaders_whenMergingWithLeftExclusive() {
+        // Given
+        let sharedValues = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html"),
+            ("Accept", "audio/mp3")
+        ]
+
+        let exclusiveValues = [
+            ("Accept", "application/xml"),
+            ("Authorization", "Bearer 123")
+        ]
+
+        let otherHeaders = HTTPHeaders(sharedValues)
+
+        // When
+        for (name, value) in sharedValues + exclusiveValues {
+            headers.add(name: name, value: value)
+        }
+
+        headers = headers.merging(otherHeaders, by: +)
+
+        // Then
+        XCTAssertEqual(headers.count, 6)
+
+        XCTAssertEqual(headers.names, [
+            "Content-Type", "Accept", "Authorization"
+        ])
+
+        XCTAssertEqual(headers.map(\.value), [
+            "application/json", "application/javascript", "text/html",
+            "audio/mp3", "application/xml", "Bearer 123"
+        ])
+    }
+
+    func testHeaders_whenUsingIndices() {
+        // Given
+        let values = [
+            ("Content-Type", "application/json"),
+            ("Content-type", "application/javascript"),
+            ("Content-Type", "text/html")
+        ]
+
+        // When
+        for (name, value) in values {
+            headers.add(name: name, value: value)
+        }
+
+        // Then
+        let value0 = headers[headers.startIndex]
+
+        XCTAssertEqual(
+            value0.name,
+            values[0].0
+        )
+
+        XCTAssertEqual(
+            value0.value,
+            values[0].1
+        )
+
+        let index1 = headers.index(after: headers.startIndex)
+        let value1 = headers[index1]
+
+        XCTAssertEqual(
+            value1.name,
+            values[0].0
+        )
+
+        XCTAssertEqual(
+            value1.value,
+            values[1].1
+        )
+
+        XCTAssertEqual(index1, headers.index(headers.startIndex, offsetBy: 1))
+        XCTAssertEqual(index1, headers.index(headers.endIndex, offsetBy: -2))
+
+        let index2 = headers.index(before: headers.endIndex)
+        let value2 = headers[index2]
+
+        XCTAssertEqual(
+            value2.name,
+            values[2].0
+        )
+
+        XCTAssertEqual(
+            value2.value,
+            values[2].1
+        )
+
+        XCTAssertEqual(index2, headers.index(headers.startIndex, offsetBy: 2))
+        XCTAssertEqual(index2, headers.index(headers.endIndex, offsetBy: -1))
     }
 }
+
+@available(*, deprecated)
+extension HTTPHeadersTests {
+
+    func testHeaders_whenInitWithDictionary() {
+        // Given
+        let dictionary = [
+            "Content-Type": "text/html",
+            "Accept": "audio/mp3"
+        ]
+
+        let headers = HTTPHeaders(dictionary)
+
+        // Then
+        let sequence = Array(dictionary)
+
+        XCTAssertEqual(headers.first?.name, sequence.first?.key)
+        XCTAssertEqual(headers.first?.value, sequence.first?.value)
+
+        XCTAssertEqual(headers.last?.name, sequence.last?.key)
+        XCTAssertEqual(headers.last?.value, sequence.last?.value)
+    }
+
+    func testHeaders_whenSetValue() {
+        // Given
+        let headers = [
+            ("Content-Type", "text/html"),
+            ("CONTENT-TYPE", "application/json"),
+            ("Accept", "audio/mp3")
+        ]
+
+        // When
+        for (name, value) in headers {
+            self.headers.setValue(value, forKey: name)
+        }
+
+        // Then
+        XCTAssertEqual(
+            self.headers.getValue(forKey: "CONTENT-TYPE"),
+            "application/json"
+        )
+
+        XCTAssertEqual(
+            self.headers.getValue(forKey: "ACCEPT"),
+            "audio/mp3"
+        )
+    }
+}
+

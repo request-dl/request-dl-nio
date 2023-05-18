@@ -39,8 +39,10 @@ struct PayloadNode: PropertyNode {
 
     // MARK: - Private methods
 
-    private func isURLEncoded(_ headers: Internals.Headers) -> Bool {
-        headers.contains("x-www-form-urlencoded", forKey: "Content-Type")
+    private func isURLEncoded(_ headers: HTTPHeaders) -> Bool {
+        headers.contains(name: "Content-Type") {
+            $0.range(of: "x-www-form-urlencoded", options: .caseInsensitive) != nil
+        }
     }
 
     private func jsonObject(_ data: Data) throws -> Any {
