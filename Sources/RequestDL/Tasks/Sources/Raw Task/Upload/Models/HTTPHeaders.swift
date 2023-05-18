@@ -321,7 +321,7 @@ extension HTTPHeaders: RandomAccessCollection {
     }
 
     public var endIndex: Index {
-        .init(name: names.endIndex, value: values.last?.endIndex ?? values.endIndex)
+        .init(name: names.endIndex, value: .zero)
     }
 
     public subscript(position: Index) -> (name: String, value: String) {
@@ -342,12 +342,12 @@ extension HTTPHeaders: RandomAccessCollection {
         let name = names.index(before: i.name)
         return .init(
             name: name,
-            value: values[name].endIndex
+            value: values.startIndex >= name ? values[name].index(before: values[name].endIndex) : values.startIndex
         )
     }
 
     public func index(after i: Index) -> Index {
-        guard values[i.name].endIndex == i.value else {
+        guard values[i.name].endIndex == i.value + 1 else {
             return .init(
                 name: i.name,
                 value: values[i.name].index(after: i.value)
@@ -357,7 +357,7 @@ extension HTTPHeaders: RandomAccessCollection {
         let name = names.index(after: i.name)
         return .init(
             name: name,
-            value: values[name].startIndex
+            value: name < values.endIndex ? values[name].startIndex : .zero
         )
     }
 }
