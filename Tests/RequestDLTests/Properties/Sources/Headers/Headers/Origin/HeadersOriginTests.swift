@@ -10,13 +10,13 @@ class HeadersOriginTests: XCTestCase {
     func testHost() async throws {
         let property = TestProperty(Headers.Origin("google.com"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "google.com")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["google.com"])
     }
 
     func testHostWithPort() async throws {
         let property = TestProperty(Headers.Origin("google.com", port: "8080"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "google.com:8080")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["google.com:8080"])
     }
 
     func testNeverBody() async throws {

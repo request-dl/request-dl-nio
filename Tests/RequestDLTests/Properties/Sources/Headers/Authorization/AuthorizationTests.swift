@@ -16,8 +16,8 @@ class AuthorizationTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Authorization"),
-            "Bearer myToken"
+            resolved.request.headers["Authorization"],
+            ["Bearer myToken"]
         )
     }
 
@@ -30,8 +30,8 @@ class AuthorizationTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Authorization"),
-            "Bearer 123"
+            resolved.request.headers["Authorization"],
+            ["Bearer 123"]
         )
     }
 
@@ -43,8 +43,8 @@ class AuthorizationTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Authorization"),
-            "Basic bXlVc2VyOm15UGFzc3dvcmQ="
+            resolved.request.headers["Authorization"],
+            ["Basic bXlVc2VyOm15UGFzc3dvcmQ="]
         )
     }
 
@@ -69,8 +69,8 @@ extension AuthorizationTests {
 
         // Then
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Authorization"),
-            "Bearer myToken"
+            resolved.request.headers["Authorization"],
+            ["Bearer myToken"]
         )
     }
 }

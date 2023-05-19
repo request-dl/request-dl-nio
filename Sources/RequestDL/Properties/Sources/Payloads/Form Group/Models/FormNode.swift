@@ -23,9 +23,9 @@ struct FormNode: PropertyNode {
     func make(_ make: inout Make) async throws {
         let constructor = MultipartFormConstructor([factory()])
 
-        make.request.headers.setValue(
-            "multipart/form-data; boundary=\"\(constructor.boundary)\"",
-            forKey: "Content-Type"
+        make.request.headers.set(
+            name: "Content-Type",
+            value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
         )
 
         make.request.body = Internals.Body(partLength, buffers: [

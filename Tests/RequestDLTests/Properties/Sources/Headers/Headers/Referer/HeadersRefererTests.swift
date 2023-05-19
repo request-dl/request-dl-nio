@@ -10,19 +10,19 @@ class HeadersRefererTests: XCTestCase {
     func testReferer() async throws {
         let property = TestProperty(Headers.Referer("https://www.example.com/"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Referer"), "https://www.example.com/")
+        XCTAssertEqual(resolved.request.headers["Referer"], ["https://www.example.com/"])
     }
 
     func testRefererWithHTML() async throws {
         let property = TestProperty(Headers.Referer("https://www.example.com/page1.html"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Referer"), "https://www.example.com/page1.html")
+        XCTAssertEqual(resolved.request.headers["Referer"], ["https://www.example.com/page1.html"])
     }
 
     func testRefererWithPathAndQuery() async throws {
         let property = TestProperty(Headers.Referer("https://www.google.com/search?q=apple"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Referer"), "https://www.google.com/search?q=apple")
+        XCTAssertEqual(resolved.request.headers["Referer"], ["https://www.google.com/search?q=apple"])
     }
 
     func testNeverBody() async throws {

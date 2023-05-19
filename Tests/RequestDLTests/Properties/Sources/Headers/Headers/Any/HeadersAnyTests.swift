@@ -21,7 +21,7 @@ class HeadersAnyTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: name), value)
+        XCTAssertEqual(resolved.request.headers[name], [value])
     }
 
     func testAny_whenInitWithLosslessValue() async throws {
@@ -38,7 +38,7 @@ class HeadersAnyTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: name), "\(value)")
+        XCTAssertEqual(resolved.request.headers[name], ["\(value)"])
     }
 
     func testNeverBody() async throws {
@@ -56,7 +56,7 @@ extension HeadersAnyTests {
     func testSingleHeaderAny() async throws {
         let property = TestProperty(Headers.Any("password", forKey: "xxx-api-key"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password")
+        XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password"])
     }
 
     func testHeadersAny() async throws {
@@ -67,7 +67,7 @@ extension HeadersAnyTests {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "text/html")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Encoding"), "gzip")
+        XCTAssertEqual(resolved.request.headers["Accept"], ["text/html"])
+        XCTAssertEqual(resolved.request.headers["Content-Encoding"], ["gzip"])
     }
 }

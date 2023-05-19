@@ -17,10 +17,10 @@ class HeadersTests: XCTestCase {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "text/javascript")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "application/json")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "127.0.0.1:8080")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password")
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["text/javascript"])
+        XCTAssertEqual(resolved.request.headers["Accept"], ["application/json"])
+        XCTAssertEqual(resolved.request.headers["Origin"], ["127.0.0.1:8080"])
+        XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password"])
     }
 
     func testCollisionHeaders() async throws {
@@ -34,9 +34,9 @@ class HeadersTests: XCTestCase {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "image/webp")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "image/jpeg")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password123")
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["image/webp"])
+        XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])
+        XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password123"])
     }
 
     func testCollisionHeadersWithGroup() async throws {
@@ -53,9 +53,9 @@ class HeadersTests: XCTestCase {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "image/webp")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "image/jpeg")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password123")
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["image/webp"])
+        XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])
+        XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password123"])
     }
 
     func testCombinedHeadersWithGroup() async throws {
@@ -73,11 +73,11 @@ class HeadersTests: XCTestCase {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Host"), "127.0.0.1:8080")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "image/webp")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "xxx-api-key"), "password")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Accept"), "image/jpeg")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "google.com")
+        XCTAssertEqual(resolved.request.headers["Host"], ["127.0.0.1:8080"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["image/webp"])
+        XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password"])
+        XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])
+        XCTAssertEqual(resolved.request.headers["Origin"], ["google.com"])
     }
 
     func testInvalidGroup() async throws {

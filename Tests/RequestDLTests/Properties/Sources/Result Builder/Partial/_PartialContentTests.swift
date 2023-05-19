@@ -25,7 +25,7 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
     }
 
     func testTupleThreeElementsBuilder() async throws {
@@ -50,8 +50,8 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
     }
 
     func testTupleFourElementsBuilder() async throws {
@@ -80,8 +80,8 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com/search")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
     }
 
     func testTupleFiveElementsBuilder() async throws {
@@ -118,8 +118,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
     }
 
     func testTupleSixElementsBuilder() async throws {
@@ -160,8 +160,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
 
         XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
         XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
@@ -209,8 +209,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
 
         XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
         XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
@@ -262,8 +262,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search/results?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Content-Type"], ["application/json"])
 
         XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
         XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))

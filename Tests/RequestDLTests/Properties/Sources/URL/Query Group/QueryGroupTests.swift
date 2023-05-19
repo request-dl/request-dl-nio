@@ -55,7 +55,7 @@ class QueryGroupTests: XCTestCase {
             """
         )
 
-        XCTAssertNil(resolved.request.headers.getValue(forKey: "api_key"))
+        XCTAssertNil(resolved.request.headers["api_key"])
     }
 
     func testQueries_whenInitWithDictionary_shouldBeValid() async throws {

@@ -51,13 +51,13 @@ class InternalsRequestTests: XCTestCase {
         let value2 = "text/html"
 
         // When
-        request.headers.setValue(value1, forKey: key1)
-        request.headers.setValue(value2, forKey: key2)
+        request.headers.set(name: key1, value: value1)
+        request.headers.set(name: key2, value: value2)
 
         // Then
         XCTAssertEqual(request.headers.count, 2)
-        XCTAssertEqual(request.headers.getValue(forKey: key1), value1)
-        XCTAssertEqual(request.headers.getValue(forKey: key2), value2)
+        XCTAssertEqual(request.headers[key1], [value1])
+        XCTAssertEqual(request.headers[key2], [value2])
     }
 
     func testRequest_whenSetReadingMode() async throws {
