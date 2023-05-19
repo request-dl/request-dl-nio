@@ -687,6 +687,7 @@ extension PayloadTests {
             .appendingPathComponent("payload.\(UUID())")
             .appendingPathExtension(".raw")
 
+        try data.write(to: url)
 
         // When
         let resolved = try await resolve(TestProperty {
