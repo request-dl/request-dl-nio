@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+// swiftlint:disable file_length type_body_length
 class HTTPHeadersTests: XCTestCase {
 
     var headers: HTTPHeaders!
@@ -467,4 +468,4 @@ extension HTTPHeadersTests {
         )
     }
 }
-
+// swiftlint:enable file_length type_body_length

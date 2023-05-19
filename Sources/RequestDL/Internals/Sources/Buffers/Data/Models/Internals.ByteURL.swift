@@ -37,8 +37,9 @@ extension Internals {
         /// This should only be used to wraps a ByteBuffer that
         /// will be managed exclusive by ByteURL
         init(_ buffer: NIOCore.ByteBuffer) {
+            let buffer = buffer.slice()
             self._buffer = buffer
-            self._writtenBytes = buffer.writerIndex
+            self._writtenBytes = buffer.readableBytes
         }
     }
 }

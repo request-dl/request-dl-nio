@@ -35,7 +35,7 @@ struct PayloadNode: PropertyNode {
         case .urlEncoded(let queries):
             let queries = queries.map { $0.build() }
 
-            guard !["GET", "HEAD"].contains(make.request.method) else {
+            guard ![nil, "GET", "HEAD"].contains(make.request.method) else {
                 make.request.queries.append(contentsOf: queries)
                 return
             }

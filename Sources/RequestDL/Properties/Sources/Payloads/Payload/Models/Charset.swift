@@ -7,6 +7,7 @@ import Foundation
 public enum Charset: String, Sendable {
 
     case utf8 = "UTF-8"
+    case utf16 = "UTF-16"
 }
 
 extension Charset: LosslessStringConvertible {
@@ -26,6 +27,8 @@ extension Charset {
         switch self {
         case .utf8:
             return try encode(string, using: .utf8)
+        case .utf16:
+            return try encode(string, using: .utf16)
         }
     }
 

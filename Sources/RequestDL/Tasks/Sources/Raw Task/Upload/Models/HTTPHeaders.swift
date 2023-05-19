@@ -5,6 +5,7 @@
 import Foundation
 import NIOHTTP1
 
+// swiftlint:disable file_length
 /**
  A structure that represents HTTP headers.
 
@@ -405,30 +406,30 @@ extension HTTPHeaders: RandomAccessCollection {
         )
     }
 
-    public func index(before i: Index) -> Index {
-        guard i.value == .zero else {
+    public func index(before index: Index) -> Index {
+        guard index.value == .zero else {
             return .init(
-                name: i.name,
-                value: values[i.name].index(before: i.value)
+                name: index.name,
+                value: values[index.name].index(before: index.value)
             )
         }
 
-        let name = _names.index(before: i.name)
+        let name = _names.index(before: index.name)
         return .init(
             name: name,
             value: values.startIndex >= name ? values[name].index(before: values[name].endIndex) : values.startIndex
         )
     }
 
-    public func index(after i: Index) -> Index {
-        guard values[i.name].endIndex == i.value + 1 else {
+    public func index(after index: Index) -> Index {
+        guard values[index.name].endIndex == index.value + 1 else {
             return .init(
-                name: i.name,
-                value: values[i.name].index(after: i.value)
+                name: index.name,
+                value: values[index.name].index(after: index.value)
             )
         }
 
-        let name = _names.index(after: i.name)
+        let name = _names.index(after: index.name)
         return .init(
             name: name,
             value: name < values.endIndex ? values[name].startIndex : .zero
@@ -442,7 +443,7 @@ extension HTTPHeaders {
 
     /**
      Returns an array of header keys in the `HTTPHeaders` instance.
-    */
+     */
     @available(*, deprecated, renamed: "names")
     public var keys: [String] {
         names
@@ -476,3 +477,4 @@ extension HTTPHeaders {
         }
     }
 }
+// swiftlint:enable file_length

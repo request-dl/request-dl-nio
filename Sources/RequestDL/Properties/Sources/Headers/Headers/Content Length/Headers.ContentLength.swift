@@ -7,6 +7,7 @@ import Foundation
 extension Headers {
 
     /// A type representing the Content-Length header in an HTTP message.
+    @available(*, deprecated, message: "Payload or Forms")
     public struct ContentLength: Property {
 
         // MARK: - Public properties
