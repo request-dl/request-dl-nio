@@ -25,8 +25,13 @@ class EncodablePayloadFactoryTests: XCTestCase {
         decoder.dateDecodingStrategy = .millisecondsSince1970
 
         // When
-        let payload = _EncodablePayload(mock, encoder: encoder)
-        let sut = try payload.buffer.getData().map {
+        let payload = EncodablePayloadFactory(
+            mock,
+            encoder: encoder,
+            contentType: nil
+        )
+
+        let sut = try payload().getData().map {
             try decoder.decode(Mock.self, from: $0)
         }
 

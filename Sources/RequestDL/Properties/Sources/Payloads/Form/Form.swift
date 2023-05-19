@@ -25,7 +25,7 @@ public struct Form<Headers: Property>: Property {
     public init(
         name: String,
         filename: String? = nil,
-        contentType: ContentType? = nil,
+        contentType: ContentType = .octetStream,
         data: Data
     ) where Headers == EmptyProperty {
         self.init(
@@ -56,18 +56,18 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    public init<Verbatim: StringProtocol, Encoding: StringEncoding>(
+    public init<Verbatim: StringProtocol>(
         name: String,
         filename: String? = nil,
-        verbatim: Verbatim,
-        encoding: Encoding
+        contentType: ContentType,
+        verbatim: Verbatim
     ) where Headers == EmptyProperty {
         self.init(
             name: name,
             filename: filename,
             factory: StringPayloadFactory(
                 verbatim: verbatim,
-                encoding: encoding
+                contentType: contentType
             ),
             headers: EmptyProperty()
         )
@@ -114,7 +114,7 @@ public struct Form<Headers: Property>: Property {
     public init(
         name: String,
         filename: String? = nil,
-        contentType: ContentType? = nil,
+        contentType: ContentType = .octetStream,
         data: Data,
         @PropertyBuilder headers: () -> Headers
     ) {
@@ -147,12 +147,11 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    public init<Verbatim: StringProtocol, Encoding: StringEncoding>(
+    public init<Verbatim: StringProtocol>(
         name: String,
         filename: String? = nil,
         contentType: ContentType = .text,
         verbatim: Verbatim,
-        encoding: Encoding,
         @PropertyBuilder headers: () -> Headers
     ) {
         self.init(
@@ -160,7 +159,6 @@ public struct Form<Headers: Property>: Property {
             filename: filename,
             factory: StringPayloadFactory(
                 verbatim: verbatim,
-                encoding: encoding,
                 contentType: contentType
             ),
             headers: headers()

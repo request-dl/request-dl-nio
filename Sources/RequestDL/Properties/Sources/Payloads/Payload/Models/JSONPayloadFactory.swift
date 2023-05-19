@@ -10,7 +10,7 @@ struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
 
     let jsonObject: Any
     let options: JSONSerialization.WritingOptions
-    let contentType: ContentType?
+    let contentType: ContentType
 
     // MARK: - Private properties
 
@@ -19,7 +19,7 @@ struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
     init(
         jsonObject: Any,
         options: JSONSerialization.WritingOptions,
-        contentType: ContentType?
+        contentType: ContentType
     ) {
         self.jsonObject = jsonObject
         self.options = options
@@ -28,12 +28,31 @@ struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
 
     // MARK: - Internal methods
 
-    func callAsFunction() throws -> Internals.AnyBuffer {
-        let data = try JSONSerialization.data(
+    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
+        guard contentType.isFormURLEncoded else {
+            return .init(
+                contentType: contentType,
+                source: try .buffer(Internals.DataBuffer(jsonToData()))
+            )
+        }
+
+        switch jsonObject {
+        case let array as [Any]:
+            return try input.jsonObject(array, contentType: contentType)
+        case let dictionary as [AnyHashable: Any]:
+            return try input.jsonObject(dictionary, contentType: contentType)
+        default:
+            return .init(
+                contentType: contentType,
+                source: try .buffer(Internals.DataBuffer(jsonToData()))
+            )
+        }
+    }
+
+    private func jsonToData() throws -> Data {
+        try JSONSerialization.data(
             withJSONObject: jsonObject,
             options: options
         )
-
-        return Internals.DataBuffer(data)
     }
 }

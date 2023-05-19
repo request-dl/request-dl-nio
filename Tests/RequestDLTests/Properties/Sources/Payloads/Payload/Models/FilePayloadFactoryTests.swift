@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-class _FilePayloadTests: XCTestCase {
+class FilePayloadFactoryTests: XCTestCase {
 
     func testFilePayload() async throws {
         // Given
@@ -20,9 +20,12 @@ class _FilePayloadTests: XCTestCase {
         try data.write(to: url)
 
         // When
-        let payload = _FilePayload(url)
+        let payload = FilePayloadFactory(
+            url: url,
+            contentType: nil
+        )
 
         // Then
-        XCTAssertEqual(payload.buffer.getData(), data)
+        XCTAssertEqual(try payload().getData(), data)
     }
 }

@@ -24,7 +24,11 @@ class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(dictionary, options: options))
         let resolved = try await resolve(property)
-        let expectedPayload = _DictionaryPayload(dictionary, options: options)
+        let expectedPayload = JSONPayloadFactory(
+            jsonObject: dictionary,
+            options: options,
+            contentType: nil
+        )
         let payload = try await resolved.request.body?.data()
 
         let payloadDecoded = try payload.map {
@@ -32,7 +36,7 @@ class PayloadTests: XCTestCase {
         } as? [String: Any]
 
         let expectedPayloadDecoded = try JSONSerialization.jsonObject(
-            with: expectedPayload.buffer.getData() ?? Data()
+            with: expectedPayload().getData() ?? Data()
         ) as? [String: Any]
 
         // Then
@@ -51,11 +55,15 @@ class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(foo, using: encoding))
         let resolved = try await resolve(property)
-        let expectedPayload = _StringPayload(foo, using: encoding)
+        let expectedPayload = StringPayloadFactory(
+            verbatim: foo,
+            encoding: .utf8,
+            contentType: .text
+        )
         let payload = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(payload, expectedPayload.buffer.getData())
+        XCTAssertEqual(payload, try expectedPayload().getData())
     }
 
     func testDataPayload() async throws {
@@ -65,11 +73,14 @@ class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(data))
         let resolved = try await resolve(property)
-        let expectedPayload = _DataPayload(data)
+        let expectedPayload = DataPayloadFactory(
+            data: data,
+            contentType: nil
+        )
         let payload = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(payload, expectedPayload.buffer.getData())
+        XCTAssertEqual(payload, try expectedPayload().getData())
     }
 
     func testEncodablePayload() async throws {
@@ -87,9 +98,13 @@ class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(mock, encoder: encoder))
         let resolved = try await resolve(property)
-        let expectedPayload = _EncodablePayload(mock, encoder: encoder)
+        let expectedPayload = EncodablePayloadFactory(
+            mock,
+            encoder: encoder,
+            contentType: nil
+        )
 
-        let expectedData = expectedPayload.buffer.getData() ?? Data()
+        let expectedData = try expectedPayload().getData() ?? Data()
         let expectedMock = try decoder.decode(Mock.self, from: expectedData)
         let payloadMock = try await (resolved.request.body?.data()).map {
             try decoder.decode(Mock.self, from: $0)
@@ -120,11 +135,14 @@ class PayloadTests: XCTestCase {
         // When
         let property = TestProperty(Payload(url))
         let resolved = try await resolve(property)
-        let expectedPayload = _FilePayload(url)
+        let expectedPayload = FilePayloadFactory(
+            url: url,
+            contentType: nil
+        )
         let payload = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(payload, expectedPayload.buffer.getData())
+        XCTAssertEqual(payload, try expectedPayload().getData())
     }
 
     func testPayload_whenGETEncodableURLEncoded() async throws {

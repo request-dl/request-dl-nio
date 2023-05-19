@@ -77,7 +77,7 @@ public struct FormValue: Property {
                 additionalHeaders: nil,
                 factory: StringPayloadFactory(
                     verbatim: property.value,
-                    encoding: .utf8
+                    contentType: .text
                 )
             )
         ))

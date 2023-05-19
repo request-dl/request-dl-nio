@@ -25,11 +25,17 @@ struct FormItem: Sendable {
         additionalHeaders: HTTPHeaders? = nil,
         factory: PayloadFactory
     ) throws {
+        let output = try factory(.empty)
+
+        guard case .buffer(let buffer) = output.source else {
+            fatalError()
+        }
+
         self.name = name
         self.filename = filename
-        self.contentType = factory.contentType ?? .octetStream
+        self.contentType = output.contentType
         self.additionalHeaders = additionalHeaders
-        self.buffer = try factory()
+        self.buffer = buffer
     }
 
     // MARK: - Internal methods
@@ -40,13 +46,13 @@ struct FormItem: Sendable {
         headers.set(name: "Content-Disposition", value: contentDisposition())
         headers.set(name: "Content-Type", value: String(contentType))
 
-        if var additionalHeaders {
-            additionalHeaders.setContentLengthIfNeeded(buffer.estimatedBytes)
-            return headers.merging(additionalHeaders, by: +)
-        } else {
-            headers.setContentLengthIfNeeded(buffer.estimatedBytes)
-            return headers
+        if let additionalHeaders {
+            headers = headers.merging(additionalHeaders, by: +)
         }
+
+        headers.set(name: "Content-Length", value: String(buffer.estimatedBytes))
+
+        return headers
     }
 
     // MARK: - Private methods

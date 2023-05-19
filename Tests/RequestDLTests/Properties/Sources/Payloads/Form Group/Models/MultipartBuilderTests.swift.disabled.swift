@@ -10,13 +10,16 @@ class MultipartBuilderTests: XCTestCase {
     func testSingleMultipartConstructor() async throws {
         // Given
         let value = "foo"
-        let item = MultipartItem(
+        let item = try FormItem(
             name: "string",
-            data: Internals.DataBuffer(value.utf8)
+            factory: DataPayloadFactory(
+                data: Data(value.utf8),
+                contentType: nil
+            )
         )
 
         // When
-        let constructor = MultipartBuilder([item])
+        let constructor = FormGroupBuilder([item])
 
         let multipartForm = try MultipartFormParser(
             constructor(),
@@ -37,21 +40,26 @@ class MultipartBuilderTests: XCTestCase {
     func testMultipleMultipartConstructor() async throws {
         // Given
         let value1 = "foo"
-        let form1 = MultipartItem(
+        let form1 = try FormItem(
             name: "string",
-            data: Internals.DataBuffer(value1.utf8)
+            factory: DataPayloadFactory(
+                data: Data(value1.utf8),
+                contentType: nil
+            )
         )
 
         let value2 = CharacterSet.alphanumerics.description
-        let form2 = MultipartItem(
+        let form2 = try FormItem(
             name: "document",
             filename: "document.pdf",
-            contentType: .pdf,
-            data: Internals.DataBuffer(value2.utf8)
+            factory: DataPayloadFactory(
+                data: Data(value2.utf8),
+                contentType: .pdf
+            )
         )
 
         // When
-        let constructor = MultipartBuilder([form1, form2])
+        let constructor = FormGroupBuilder([form1, form2])
 
         let multipartForm = try MultipartFormParser(
             constructor(),

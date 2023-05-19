@@ -6,7 +6,50 @@ import Foundation
 
 protocol PayloadFactory: Sendable {
 
-    var contentType: ContentType? { get }
-
-    func callAsFunction() throws -> Internals.AnyBuffer
+    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput
 }
+
+struct PayloadInput {
+
+    static var empty: PayloadInput {
+        .init(
+            method: nil,
+            charset: .utf8,
+            urlEncoder: .init()
+        )
+    }
+
+    let method: String?
+    let charset: Charset
+    let urlEncoder: URLEncoder
+
+    func jsonObject(_ array: [Any], contentType: ContentType) throws -> PayloadOutput {
+        .init(
+            contentType: .init(String(contentType) + "; charset=\(charset)"),
+            source: try .urlEncoded(array.enumerated().reduce([]) {
+                try $0 + urlEncoder.encode($1.element, forKey: String($1.offset))
+            })
+        )
+    }
+
+    func jsonObject(_ dictionary: [AnyHashable: Any], contentType: ContentType) throws -> PayloadOutput {
+        .init(
+            contentType: .init(String(contentType) + "; charset=\(charset)"),
+            source: try .urlEncoded(dictionary.reduce([]) {
+                try $0 + urlEncoder.encode($1.value, forKey: String(describing: $1.key))
+            })
+        )
+    }
+}
+
+struct PayloadOutput {
+
+    enum Source {
+        case buffer(Internals.AnyBuffer)
+        case urlEncoded([QueryItem])
+    }
+
+    let contentType: ContentType
+    let source: Source
+}
+

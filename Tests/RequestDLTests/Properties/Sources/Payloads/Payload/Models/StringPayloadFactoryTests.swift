@@ -5,17 +5,21 @@
 import XCTest
 @testable import RequestDL
 
-class _StringPayloadTests: XCTestCase {
+class StringPayloadFactoryTests: XCTestCase {
 
     func testStringPayload() async throws {
         // Given
         let foo = "foo"
 
         // When
-        let payload = _StringPayload(foo, using: .utf8)
+        let payload = StringPayloadFactory(
+            verbatim: foo,
+            encoding: .utf8,
+            contentType: .text
+        )
         let expectedData = Data(foo.utf8)
 
         // Then
-        XCTAssertEqual(payload.buffer.getData(), expectedData)
+        XCTAssertEqual(try payload().getData(), expectedData)
     }
 }

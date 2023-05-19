@@ -83,12 +83,12 @@ class FormDataTests: XCTestCase {
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Disposition"],
-            ["form-data; name=\"\(property.key)\"; filename=\"\""]
+            ["form-data; name=\"\(property.name)\"; filename=\"\""]
         )
 
         XCTAssertEqual(
             multipartForm.items[0].headers["Content-Type"],
-            [String(property.contentType)]
+            ["text/plain; charset=UTF-8"]
         )
 
         XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
@@ -113,15 +113,15 @@ class FormDataTests: XCTestCase {
             encoder: encoder
         )
 
-        let propertyData = property.buffer.getData() ?? Data()
+        let propertyData = try property.factory().getData() ?? Data()
 
         let expectedData = try encoder.encode(mock)
         let expectedMock = try decoder.decode(Mock.self, from: propertyData)
 
         // Then
-        XCTAssertEqual(property.contentType, .json)
-        XCTAssertEqual(property.fileName, "")
-        XCTAssertEqual(property.key, "data")
+        XCTAssertEqual(property.factory.contentType, .json)
+        XCTAssertEqual(property.filename, "")
+        XCTAssertEqual(property.name, "data")
         XCTAssertEqual(propertyData, expectedData)
         XCTAssertEqual(expectedMock.foo, mock.foo)
         XCTAssertEqual(expectedMock.date.seconds, mock.date.seconds)
@@ -139,7 +139,7 @@ class FormDataTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(property.fileName, fileName)
+        XCTAssertEqual(property.filename, fileName)
     }
 
     func testNeverBody() async throws {

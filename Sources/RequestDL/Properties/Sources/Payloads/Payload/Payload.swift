@@ -39,7 +39,7 @@ public struct Payload: Property {
 
     // MARK: - Private properties
 
-    private let source: PayloadNode.Source
+    private let factory: PayloadFactory
 
     // MARK: - Inits
 
@@ -53,13 +53,13 @@ public struct Payload: Property {
     public init(
         _ json: Any,
         options: JSONSerialization.WritingOptions = .prettyPrinted,
-        contentType: ContentType? = nil
+        contentType: ContentType = .json
     ) {
-        source = .json(JSONPayloadFactory(
+        factory = JSONPayloadFactory(
             jsonObject: json,
             options: options,
             contentType: contentType
-        ))
+        )
     }
 
     /**
@@ -72,45 +72,43 @@ public struct Payload: Property {
     public init<Object: Encodable>(
         _ object: Object,
         encoder: JSONEncoder = .init(),
-        contentType: ContentType? = nil
+        contentType: ContentType = .json
     ) {
-        source = .encoded(EncodablePayloadFactory(
+        factory = EncodablePayloadFactory(
             object,
             encoder: encoder,
             contentType: contentType
-        ))
+        )
     }
 
-    public init<Verbatim: StringProtocol, Encoding: StringEncoding>(
+    public init<Verbatim: StringProtocol>(
         verbatim: Verbatim,
-        using encoding: Encoding,
         contentType: ContentType = .text
     ) {
-        source = .string(StringPayloadFactory(
+        factory = StringPayloadFactory(
             verbatim: verbatim,
-            encoding: encoding,
             contentType: contentType
-        ))
+        )
     }
 
     public init(
         data: Data,
-        contentType: ContentType? = nil
+        contentType: ContentType = .octetStream
     ) {
-        source = .data(DataPayloadFactory(
+        factory = DataPayloadFactory(
             data: data,
             contentType: contentType
-        ))
+        )
     }
 
     public init(
         url: URL,
-        contentType: ContentType? = nil
+        contentType: ContentType
     ) {
-        source = .url(FilePayloadFactory(
+        factory = FilePayloadFactory(
             url: url,
             contentType: contentType
-        ))
+        )
     }
 
     // MARK: - Public static methods
@@ -123,7 +121,8 @@ public struct Payload: Property {
         property.assertPathway()
 
         return .leaf(PayloadNode(
-            source: property.source,
+            factory: property.factory,
+            charset: inputs.environment.charset,
             urlEncoder: inputs.environment.urlEncoder,
             partLength: inputs.environment.payloadPartLength
         ))
@@ -147,9 +146,10 @@ extension Payload {
         _ string: String,
         using encoding: String.Encoding = .utf8
     ) {
+        // TODO: - Warning String.Encoding has no effect
         self.init(
             verbatim: string,
-            using: _StringEncoding(encoding)
+            contentType: .text
         )
     }
 
@@ -172,6 +172,7 @@ extension Payload {
      */
     @available(*, deprecated, renamed: "init(url:)")
     public init(_ fileURL: URL) {
-        self.init(url: fileURL)
+        // TODO: - Warning fileURL type
+        self.init(url: fileURL, contentType: .octetStream)
     }
 }

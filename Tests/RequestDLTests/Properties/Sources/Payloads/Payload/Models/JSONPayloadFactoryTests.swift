@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-class _DictionaryPayloadTests: XCTestCase {
+class JSONPayloadFactoryTests: XCTestCase {
 
     func testDictionaryPayload() async throws {
         // Given
@@ -16,10 +16,15 @@ class _DictionaryPayloadTests: XCTestCase {
         let options = JSONSerialization.WritingOptions([.withoutEscapingSlashes])
 
         // When
-        let payload = _DictionaryPayload(data, options: options)
+        let payload = JSONPayloadFactory(
+            jsonObject: data,
+            options: options,
+            contentType: nil
+        )
+
         let expectedData = try JSONSerialization.data(withJSONObject: data, options: options)
 
         // Then
-        XCTAssertEqual(payload.buffer.getData(), expectedData)
+        XCTAssertEqual(try payload().getData(), expectedData)
     }
 }
