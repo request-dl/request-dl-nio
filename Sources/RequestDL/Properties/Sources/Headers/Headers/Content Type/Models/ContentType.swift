@@ -81,6 +81,7 @@ public struct ContentType: Sendable, Hashable {
     /// Content type for PDF files.
     public static let pdf: ContentType = "application/pdf"
 
+    /// Content type for bytes data.
     public static let octetStream: ContentType = "application/octet-stream"
 
     // MARK: - Internal properties

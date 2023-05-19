@@ -7,7 +7,7 @@ import Foundation
 extension Headers {
 
     /// A property that sets the `Content-Type` header field in an HTTP request.
-    @available(*, deprecated, message: "Content-Type is specified by Payload or Form")
+    @available(*, deprecated, message: "ContentType has been moved to internal logic of Payload and Forms")
     public struct ContentType: Property {
 
         // MARK: - Public properties
