@@ -19,6 +19,12 @@ extension EnvironmentValues {
 
 extension Property {
 
+    /**
+     Specifies the character set (charset) to be used for encoding data.
+
+     - Parameter charset: The character set to use for encoding.
+     - Returns: A modified property with the specified charset.
+     */
     public func charset(_ charset: Charset) -> some Property {
         environment(\.charset, charset)
     }

@@ -52,4 +52,3 @@ struct PayloadOutput {
     let contentType: ContentType
     let source: Source
 }
-

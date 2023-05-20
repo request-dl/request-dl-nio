@@ -156,7 +156,6 @@ public struct Payload: Property {
 
 extension Payload {
 
-
     /**
      Initializes a `Payload` with a string.
 

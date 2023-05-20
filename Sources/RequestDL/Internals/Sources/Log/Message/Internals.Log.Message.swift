@@ -4,6 +4,7 @@
 
 import Foundation
 
+// swiftlint:disable file_length
 extension Internals.Log {
 
     struct Message {
@@ -426,3 +427,4 @@ extension Internals.Log {
         )
     }
 }
+// swiftlint:enable file_length
