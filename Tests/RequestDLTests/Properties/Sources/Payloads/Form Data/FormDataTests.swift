@@ -5,163 +5,267 @@
 import XCTest
 @testable import RequestDL
 
+@available(*, deprecated)
 class FormDataTests: XCTestCase {
 
-    struct Mock: Codable {
-        let foo: String
-        let date: Date
-    }
-
-    func testDataFormWithFileName() async throws {
+    func testForm_whenInitDataEmptyFilename() async throws {
         // Given
-        let value = "foo"
-
-        let property = FormData(
-            Data(value.utf8),
-            forKey: "raw_string",
-            fileName: "data.txt",
-            type: .text
-        )
-
-        // When
-        let resolved = try await resolve(TestProperty(property))
-
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
-
-        // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 1)
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(property.key)\"; filename=\"\(property.fileName)\""
-        )
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Type"],
-            property.contentType.rawValue
-        )
-
-        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
-    }
-
-    func testDataFormWithoutFileName() async throws {
-        // Given
-        let value = "foo"
-
-        let property = FormData(
-            Data(value.utf8),
-            forKey: "raw_string",
-            type: .text
-        )
-
-        // When
-        let resolved = try await resolve(TestProperty(property))
-
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
-
-        // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 1)
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(property.key)\"; filename=\"\""
-        )
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Type"],
-            property.contentType.rawValue
-        )
-
-        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
-    }
-
-    func testEncodableData() async throws {
-        // Given
-        let mock = Mock(
-            foo: "bar",
-            date: Date()
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-
-        encoder.dateEncodingStrategy = .millisecondsSince1970
-        decoder.dateDecodingStrategy = .millisecondsSince1970
-
-        // When
-        let property = FormData(
-            mock,
-            forKey: "data",
-            encoder: encoder
-        )
-
-        let propertyData = property.buffer.getData() ?? Data()
-
-        let expectedData = try encoder.encode(mock)
-        let expectedMock = try decoder.decode(Mock.self, from: propertyData)
-
-        // Then
-        XCTAssertEqual(property.contentType, .json)
-        XCTAssertEqual(property.fileName, "")
-        XCTAssertEqual(property.key, "data")
-        XCTAssertEqual(propertyData, expectedData)
-        XCTAssertEqual(expectedMock.foo, mock.foo)
-        XCTAssertEqual(expectedMock.date.seconds, mock.date.seconds)
-    }
-
-    func testEncodableWithFilename() async throws {
-        // Given
-        let fileName = "contents.json"
-
-        // When
-        let property = FormData(
-            Mock(foo: "bar", date: Date()),
-            forKey: "data",
-            fileName: fileName
-        )
-
-        // Then
-        XCTAssertEqual(property.fileName, fileName)
-    }
-
-    func testNeverBody() async throws {
-        // Given
-        let property = FormData(Data(), forKey: "key", fileName: "123", type: .json)
-
-        // Then
-        try await assertNever(property.body)
-    }
-
-    func testData_whenPartLengthSet() async throws {
-        // Given
-        let length = 1_024
+        let name = "foo"
+        let data = Data.randomData(length: 1_024)
 
         // When
         let resolved = try await resolve(TestProperty {
             FormData(
-                Mock(foo: "bar", date: Date()),
-                forKey: "data",
-                fileName: "contents.json"
+                data,
+                forKey: name,
+                type: .octetStream
             )
-            .payloadPartLength(length)
         })
 
-        let sut = try await resolved.request.body?.buffers()
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(sut?.count, 1)
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        ])
+    }
+
+    func testForm_whenInitDataFilename() async throws {
+        // Given
+        let name = "foo"
+        let filename = "bar"
+        let data = Data.randomData(length: 1_024)
+        let contentType = ContentType.text
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormData(
+                data,
+                forKey: name,
+                fileName: filename,
+                type: contentType
+            )
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                    ("Content-Type", "text/plain"),
+                    ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        ])
+    }
+
+    func testForm_whenInitEncodableEmptyFilename() async throws {
+        // Given
+        let name = "some_name"
+        let mock = PayloadMock(
+            foo: "bar",
+            date: Date()
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormData(
+                mock,
+                forKey: name,
+                encoder: encoder
+            )
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        let data = try encoder.encode(mock)
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\""),
+                ("Content-Type", "application/json"),
+                ("Content-Length", String(data.count))
+            ])
+        ])
+
+        XCTAssertEqual(
+            try parsed.items.map {
+                try decoder.decode(PayloadMock.self, from: $0.contents)
+            },
+            [mock]
+        )
+    }
+
+    func testForm_whenInitEncodableFilename() async throws {
+        // Given
+        let name = "some_name"
+        let filename = "bar"
+        let mock = PayloadMock(
+            foo: "bar",
+            date: Date()
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormData(
+                mock,
+                forKey: name,
+                fileName: filename,
+                encoder: encoder
+            )
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        let data = try encoder.encode(mock)
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                ("Content-Type", "application/json"),
+                ("Content-Length", String(data.count))
+            ])
+        ])
+
+        XCTAssertEqual(
+            try parsed.items.map {
+                try decoder.decode(PayloadMock.self, from: $0.contents)
+            },
+            [mock]
+        )
+    }
+
+    func testForm_whenInitDataEmptyFilenamePartLength() async throws {
+        // Given
+        let name = "foo"
+        let data = Data.randomData(length: 1_024)
+        let partLength = 64
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormData(
+                data,
+                forKey: name,
+                type: .octetStream
+            )
+            .payloadPartLength(partLength)
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        let buffers = try await resolved.request.body?.buffers() ?? []
+        let builtData = buffers.compactMap { $0.getData() }.reduce(Data(), +)
+        let totalBytes = builtData.count
+
+        // Then
+        XCTAssertEqual(
+            buffers.compactMap { $0.getData() },
+            stride(from: .zero, to: totalBytes, by: partLength).map {
+                let upperBound = $0 + partLength
+                return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
+            }
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        ])
+    }
+
+    func testForm_whenBodyCalled_shouldBeNever() async throws {
+        // Given
+        let property = FormData(
+            Data(),
+            forKey: "foo",
+            type: .octetStream
+        )
+
+        // Then
+        try await assertNever(property.body)
     }
 }

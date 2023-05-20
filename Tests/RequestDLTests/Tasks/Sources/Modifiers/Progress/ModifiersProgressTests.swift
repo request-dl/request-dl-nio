@@ -75,7 +75,7 @@ class ModifiersProgressTests: XCTestCase {
             _ = try await UploadTask {
                 BaseURL(baseURL)
                 Path("index")
-                Payload(data)
+                Payload(data: data)
 
                 SecureConnection {
                     Trusts {
@@ -208,8 +208,6 @@ class ModifiersProgressTests: XCTestCase {
                 BaseURL(baseURL)
                 Path("index")
 
-                RequestDL.Headers.ContentLength(data.count)
-
                 ReadingMode(length: length)
 
                 SecureConnection {
@@ -218,7 +216,7 @@ class ModifiersProgressTests: XCTestCase {
                     }
                 }
 
-                Payload(data)
+                Payload(data: data)
             }
             .progress(progressMonitor)
             .extractPayload()

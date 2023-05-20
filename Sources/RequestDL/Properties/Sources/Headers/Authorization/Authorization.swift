@@ -13,9 +13,9 @@ public struct Authorization: Property {
         let token: String
 
         func make(_ make: inout Make) async throws {
-            make.request.headers.setValue(
-                "\(type.rawValue) \(token)",
-                forKey: "Authorization"
+            make.request.headers.set(
+                name: "Authorization",
+                value: "\(type.rawValue) \(token)"
             )
         }
     }

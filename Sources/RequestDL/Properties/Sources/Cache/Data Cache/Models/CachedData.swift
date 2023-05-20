@@ -75,7 +75,7 @@ public struct CachedData: Sendable {
                 minor: response.version.minor,
                 major: response.version.major
             ),
-            headers: .init(response.headers),
+            headers: response.headers,
             isKeepAlive: response.isKeepAlive
         )
     }

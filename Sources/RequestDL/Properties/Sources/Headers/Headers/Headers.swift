@@ -20,7 +20,7 @@ extension Headers {
 
         func make(_ make: inout Make) async throws {
             if !value.isEmpty {
-                make.request.headers.setValue(value, forKey: key)
+                make.request.headers.set(name: key, value: value)
             }
         }
     }

@@ -44,7 +44,7 @@ extension Internals {
         var queries: [Query]
 
         var method: String?
-        var headers: Headers
+        var headers: HTTPHeaders
 
         var body: Body?
         var readingMode: Internals.Response.ReadingMode

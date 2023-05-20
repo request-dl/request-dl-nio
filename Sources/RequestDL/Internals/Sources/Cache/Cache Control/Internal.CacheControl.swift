@@ -124,7 +124,7 @@ extension Internals {
             )
         }
 
-        private func getUpdatedHeadersForCache(_ client: Internals.Client) async -> Internals.Headers? {
+        private func getUpdatedHeadersForCache(_ client: Internals.Client) async -> HTTPHeaders? {
             var request = request
             request.method = "HEAD"
 
@@ -137,23 +137,23 @@ extension Internals {
                 return nil
             }
 
-            return Internals.Headers(response.headers)
+            return HTTPHeaders(response.headers)
         }
 
         private func updateCacheHeaders(
-            _ cachedHeaders: Internals.Headers,
-            with newHeaders: Internals.Headers
-        ) -> Internals.Headers {
+            _ cachedHeaders: HTTPHeaders,
+            with newHeaders: HTTPHeaders
+        ) -> HTTPHeaders {
             var cachedHeaders = cachedHeaders
 
-            let lastModified = newHeaders.getValue(forKey: "Last-Modified")
-            let eTag = newHeaders.getValue(forKey: "ETag")
+            let lastModified = newHeaders["Last-Modified"]
+            let eTag = newHeaders["ETag"]
 
-            let isLastModifiedUpdated = cachedHeaders.getValue(forKey: "Last-Modified").map {
+            let isLastModifiedUpdated = cachedHeaders["Last-Modified"].map {
                 $0 != lastModified
             } ?? false
 
-            let isETagUpdated = cachedHeaders.getValue(forKey: "ETag").map {
+            let isETagUpdated = cachedHeaders["ETag"].map {
                 $0 != eTag
             } ?? false
 
@@ -162,15 +162,24 @@ extension Internals {
             }
 
             if isLastModifiedUpdated, let lastModified {
-                cachedHeaders.setValue(lastModified, forKey: "Last-Modified")
+                cachedHeaders.remove(name: "Last-Modified")
+                for value in lastModified {
+                    cachedHeaders.set(name: "Last-Modified", value: value)
+                }
             }
 
             if isETagUpdated, let eTag {
-                cachedHeaders.setValue(eTag, forKey: "ETag")
+                cachedHeaders.remove(name: "ETag")
+                for value in eTag {
+                    cachedHeaders.set(name: "ETag", value: value)
+                }
             }
 
-            if let cacheControl = newHeaders.getValue(forKey: "Cache-Control") {
-                cachedHeaders.setValue(cacheControl, forKey: "Cache-Control")
+            if let cacheControl = newHeaders["Cache-Control"] {
+                cachedHeaders.remove(name: "Cache-Control")
+                for value in cacheControl {
+                    cachedHeaders.set(name: "Cache-Control", value: value)
+                }
             }
 
             return cachedHeaders
@@ -178,7 +187,7 @@ extension Internals {
 
         private func updateCachedResponse(
             _ cachedResponse: CachedResponse,
-            with updatedHeaders: Internals.Headers
+            with updatedHeaders: HTTPHeaders
         ) -> CachedResponse {
             .init(
                 response: .init(
@@ -203,7 +212,7 @@ extension Internals {
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 // TODO: - Accepts nil as zero
                 guard
-                    let contentLengthValue = head.headers.getValue(forKey: "Content-Length"),
+                    let contentLengthValue = head.headers["Content-Length"],
                     let contentLength = contentLengthValue.getHeaderContentLength()
                 else { return nil }
 
@@ -235,12 +244,13 @@ extension Internals {
     }
 }
 
-extension String {
+extension [String] {
 
     fileprivate func getHeaderContentLength() -> Int? {
-        split(separator: ";")
+        reduce([]) { $0 + $1.split(separator: ";") }
+            .lazy
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first(where: { Int($0) != nil })
-            .flatMap(Int.init)
+            .compactMap(Int.init)
+            .first
     }
 }

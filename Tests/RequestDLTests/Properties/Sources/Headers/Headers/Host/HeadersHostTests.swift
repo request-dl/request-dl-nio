@@ -10,13 +10,13 @@ class HeadersHostTests: XCTestCase {
     func testHost() async throws {
         let property = TestProperty(Headers.Host("google.com"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Host"), "google.com")
+        XCTAssertEqual(resolved.request.headers["Host"], ["google.com"])
     }
 
     func testHostWithPort() async throws {
         let property = TestProperty(Headers.Host("google.com", port: "8080"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Host"), "google.com:8080")
+        XCTAssertEqual(resolved.request.headers["Host"], ["google.com:8080"])
     }
 
     func testNeverBody() async throws {

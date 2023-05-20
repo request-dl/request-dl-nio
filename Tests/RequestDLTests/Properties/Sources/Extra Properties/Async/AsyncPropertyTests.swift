@@ -26,8 +26,8 @@ class AsyncPropertyTests: XCTestCase {
 
         // Then
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Authorization"),
-            "Bearer 123ddf4"
+            resolved.request.headers["Authorization"],
+            ["Bearer 123ddf4"]
         )
     }
 

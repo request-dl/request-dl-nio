@@ -23,8 +23,8 @@ extension Modifiers {
                 let data = try await Self.download(
                     progress,
                     length: progress.contentLengthHeaderKey
-                        .flatMap(downloadPart.head.headers.getValue)
-                        .flatMap(Int.init),
+                        .flatMap { downloadPart.head.headers[$0] }
+                        .flatMap { $0.lazy.compactMap(Int.init).first },
                     content: downloadPart.payload
                 )
 
@@ -47,8 +47,8 @@ extension Modifiers {
                 let data = try await Self.download(
                     progress,
                     length: progress.contentLengthHeaderKey
-                        .flatMap(downloadPart.head.headers.getValue)
-                        .flatMap(Int.init),
+                        .flatMap { downloadPart.head.headers[$0] }
+                        .flatMap { $0.lazy.compactMap(Int.init).first },
                     content: downloadPart.payload
                 )
 

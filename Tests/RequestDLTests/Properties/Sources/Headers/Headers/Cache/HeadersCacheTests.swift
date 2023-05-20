@@ -88,12 +88,14 @@ class HeadersCacheTests: XCTestCase {
         XCTAssertTrue(modifiedCache.isImmutable)
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Cache-Control"),
-            """
-            no-cache, no-store, no-transform, only-if-cached, private, max-age=1000, \
-            s-maxage=16000, max-stale=300, stale-while-revalidate=120, stale-if-error=86400, \
-            must-revalidate, proxy-revalidate, immutable
-            """
+            resolved.request.headers["Cache-Control"],
+            [
+                """
+                no-cache, no-store, no-transform, only-if-cached, private, max-age=1000, \
+                s-maxage=16000, max-stale=300, stale-while-revalidate=120, stale-if-error=86400, \
+                must-revalidate, proxy-revalidate, immutable
+                """
+            ]
         )
     }
 
@@ -106,7 +108,7 @@ class HeadersCacheTests: XCTestCase {
         let resolved = try await resolve(TestProperty(cache))
 
         // Then
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Cache-Control"), "public")
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
     func testNeverBody() async throws {

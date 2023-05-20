@@ -7,6 +7,7 @@ import Foundation
 /// `FormValue` is a type of property that represents a single value in a multipart form-data request
 ///
 /// It can be used to represent simple values like strings and numbers.
+@available(*, deprecated, renamed: "Form")
 public struct FormValue: Property {
 
     // MARK: - Public properties
@@ -59,29 +60,6 @@ public struct FormValue: Property {
         self.value = String(value)
     }
 
-    // MARK: - Public static methods
-
-    /// This method is used internally and should not be called directly.
-    public static func _makeProperty(
-        property: _GraphValue<FormValue>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-        return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            PartFormRawValue(Data(property.value.utf8), forHeaders: [
-                kContentDisposition: kContentDispositionValue(
-                    nil,
-                    forKey: property.key
-                )
-            ])
-        })
-    }
-}
-
-// MARK: - Deprecated
-
-extension FormValue {
-
     /**
      Creates a new instance of `FormValue` to represent a value with a corresponding key in a form.
 
@@ -101,5 +79,30 @@ extension FormValue {
             key: key,
             value: "\(value)"
         )
+    }
+
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<FormValue>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
+        return .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            item: FormItem(
+                name: property.key,
+                filename: nil,
+                additionalHeaders: nil,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
+                factory: StringPayloadFactory(
+                    verbatim: property.value,
+                    contentType: .text
+                )
+            )
+        ))
     }
 }

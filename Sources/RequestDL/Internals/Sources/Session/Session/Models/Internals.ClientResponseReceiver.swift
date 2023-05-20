@@ -95,7 +95,7 @@ extension Internals {
                         minor: head.version.minor,
                         major: head.version.major
                     ),
-                    headers: Headers(head.headers),
+                    headers: .init(head.headers),
                     isKeepAlive: head.isKeepAlive
                 )
 

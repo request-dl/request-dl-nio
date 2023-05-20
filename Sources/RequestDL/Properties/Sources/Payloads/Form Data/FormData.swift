@@ -5,6 +5,7 @@
 import Foundation
 
 /// A representation of data that can be sent in the body of an HTTP request using the `multipart/form-data` format.
+@available(*, deprecated, renamed: "Form")
 public struct FormData: Property {
 
     // MARK: - Public properties
@@ -16,10 +17,9 @@ public struct FormData: Property {
 
     // MARK: - Internal properties
 
-    let buffer: Internals.AnyBuffer
-    let fileName: String
-    let key: String
-    let contentType: ContentType
+    let name: String
+    let filename: String
+    let factory: PayloadFactory
 
     // MARK: - Inits
 
@@ -39,10 +39,12 @@ public struct FormData: Property {
         fileName: String = "",
         type: ContentType
     ) {
-        self.buffer = Internals.DataBuffer(data)
-        self.key = key
-        self.fileName = fileName
-        self.contentType = type
+        self.name = key
+        self.filename = fileName
+        self.factory = DataPayloadFactory(
+            data: data,
+            contentType: type
+        )
     }
 
     /**
@@ -61,10 +63,13 @@ public struct FormData: Property {
         fileName: String = "",
         encoder: JSONEncoder = .init()
     ) {
-        self.key = key
-        self.fileName = fileName
-        self.buffer = _EncodablePayload(object, encoder: encoder).buffer
-        self.contentType = .json
+        self.name = key
+        self.filename = fileName
+        self.factory = EncodablePayloadFactory(
+            object,
+            encoder: encoder,
+            contentType: .json
+        )
     }
 
     // MARK: - Public static methods
@@ -75,14 +80,16 @@ public struct FormData: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(FormNode(inputs.environment.payloadPartLength) {
-            PartFormRawValue(property.buffer.getData() ?? Data(), forHeaders: [
-                kContentDisposition: kContentDispositionValue(
-                    property.fileName,
-                    forKey: property.key
-                ),
-                "Content-Type": "\(property.contentType)"
-            ])
-        })
+        return .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            item: FormItem(
+                name: property.name,
+                filename: property.filename.isEmpty ? nil : property.filename,
+                additionalHeaders: nil,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
+                factory: property.factory
+            )
+        ))
     }
 }

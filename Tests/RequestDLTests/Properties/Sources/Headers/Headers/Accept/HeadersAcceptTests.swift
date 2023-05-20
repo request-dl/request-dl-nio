@@ -12,8 +12,8 @@ class HeadersAcceptTests: XCTestCase {
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "application/json"
+            resolved.request.headers["Accept"],
+            ["application/json"]
         )
     }
 
@@ -22,8 +22,8 @@ class HeadersAcceptTests: XCTestCase {
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "application/xml"
+            resolved.request.headers["Accept"],
+            ["application/xml"]
         )
     }
 
@@ -32,8 +32,8 @@ class HeadersAcceptTests: XCTestCase {
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "form-data"
+            resolved.request.headers["Accept"],
+            ["form-data"]
         )
     }
 
@@ -41,8 +41,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.formURLEncoded))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "application/x-www-form-urlencoded; charset=utf-8"
+            resolved.request.headers["Accept"],
+            ["application/x-www-form-urlencoded"]
         )
     }
 
@@ -50,8 +50,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.text))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "text/plain"
+            resolved.request.headers["Accept"],
+            ["text/plain"]
         )
     }
 
@@ -59,8 +59,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.html))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "text/html"
+            resolved.request.headers["Accept"],
+            ["text/html"]
         )
     }
 
@@ -68,8 +68,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.css))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "text/css"
+            resolved.request.headers["Accept"],
+            ["text/css"]
         )
     }
 
@@ -77,8 +77,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.javascript))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "text/javascript"
+            resolved.request.headers["Accept"],
+            ["text/javascript"]
         )
     }
 
@@ -86,8 +86,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.gif))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "image/gif"
+            resolved.request.headers["Accept"],
+            ["image/gif"]
         )
     }
 
@@ -95,8 +95,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.png))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "image/png"
+            resolved.request.headers["Accept"],
+            ["image/png"]
         )
     }
 
@@ -104,8 +104,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.jpeg))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "image/jpeg"
+            resolved.request.headers["Accept"],
+            ["image/jpeg"]
         )
     }
 
@@ -113,8 +113,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.bmp))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "image/bmp"
+            resolved.request.headers["Accept"],
+            ["image/bmp"]
         )
     }
 
@@ -122,8 +122,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.webp))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "image/webp"
+            resolved.request.headers["Accept"],
+            ["image/webp"]
         )
     }
 
@@ -131,8 +131,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.midi))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "audio/midi"
+            resolved.request.headers["Accept"],
+            ["audio/midi"]
         )
     }
 
@@ -140,8 +140,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.mpeg))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "audio/mpeg"
+            resolved.request.headers["Accept"],
+            ["audio/mpeg"]
         )
     }
 
@@ -149,8 +149,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.wav))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "audio/wav"
+            resolved.request.headers["Accept"],
+            ["audio/wav"]
         )
     }
 
@@ -158,8 +158,8 @@ class HeadersAcceptTests: XCTestCase {
         let property = TestProperty(Headers.Accept(.pdf))
         let resolved = try await resolve(property)
         XCTAssertEqual(
-            resolved.request.headers.getValue(forKey: "Accept"),
-            "application/pdf"
+            resolved.request.headers["Accept"],
+            ["application/pdf"]
         )
     }
 

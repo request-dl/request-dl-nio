@@ -25,7 +25,7 @@ class _PartialContentTests: XCTestCase {
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
     }
 
     func testTupleThreeElementsBuilder() async throws {
@@ -34,7 +34,8 @@ class _PartialContentTests: XCTestCase {
         var result: some Property {
             BaseURL("google.com")
             Headers.Origin("https://apple.com")
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
         }
 
         // When
@@ -46,12 +47,12 @@ class _PartialContentTests: XCTestCase {
                 BaseURL,
                 Headers.Origin
             >,
-            Headers.ContentType
+            Headers.Cache
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
     func testTupleFourElementsBuilder() async throws {
@@ -60,7 +61,8 @@ class _PartialContentTests: XCTestCase {
         var result: some Property {
             BaseURL("google.com")
             Headers.Origin("https://apple.com")
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
             Path("search")
         }
 
@@ -74,14 +76,14 @@ class _PartialContentTests: XCTestCase {
                     BaseURL,
                     Headers.Origin
                 >,
-                Headers.ContentType
+                Headers.Cache
             >,
             Path
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com/search")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
     func testTupleFiveElementsBuilder() async throws {
@@ -90,7 +92,8 @@ class _PartialContentTests: XCTestCase {
         var result: some Property {
             BaseURL("google.com")
             Headers.Origin("https://apple.com")
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
             Path("search")
             Query("request-dl", forKey: "q")
         }
@@ -106,7 +109,7 @@ class _PartialContentTests: XCTestCase {
                         BaseURL,
                         Headers.Origin
                     >,
-                    Headers.ContentType
+                    Headers.Cache
                 >,
                 Path
             >,
@@ -118,8 +121,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
     func testTupleSixElementsBuilder() async throws {
@@ -128,7 +131,8 @@ class _PartialContentTests: XCTestCase {
         var result: some Property {
             BaseURL("google.com")
             Headers.Origin("https://apple.com")
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
             Path("search")
             Query("request-dl", forKey: "q")
             Timeout(40)
@@ -146,7 +150,7 @@ class _PartialContentTests: XCTestCase {
                             BaseURL,
                             Headers.Origin
                         >,
-                        Headers.ContentType
+                        Headers.Cache
                     >,
                     Path
                 >,
@@ -160,8 +164,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
 
         XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
         XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
@@ -173,7 +177,8 @@ class _PartialContentTests: XCTestCase {
         var result: some Property {
             BaseURL("google.com")
             Headers.Origin("https://apple.com")
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
             Path("search")
             Query("request-dl", forKey: "q")
             Timeout(40)
@@ -193,7 +198,7 @@ class _PartialContentTests: XCTestCase {
                                 BaseURL,
                                 Headers.Origin
                             >,
-                            Headers.ContentType
+                            Headers.Cache
                         >,
                         Path
                     >,
@@ -209,8 +214,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
 
         XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
         XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
@@ -222,7 +227,8 @@ class _PartialContentTests: XCTestCase {
         var result: some Property {
             BaseURL("google.com")
             Headers.Origin("https://apple.com")
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
             Path("search")
             Query("request-dl", forKey: "q")
             Timeout(40)
@@ -244,7 +250,7 @@ class _PartialContentTests: XCTestCase {
                                     BaseURL,
                                     Headers.Origin
                                 >,
-                                Headers.ContentType
+                                Headers.Cache
                             >,
                             Path
                         >,
@@ -262,8 +268,8 @@ class _PartialContentTests: XCTestCase {
             "https://google.com/search/results?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Origin"), "https://apple.com")
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
 
         XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
         XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))

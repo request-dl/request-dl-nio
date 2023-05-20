@@ -27,7 +27,7 @@ class UploadTaskTests: XCTestCase {
                     Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
 
-                Payload(upload)
+                Payload(data: upload)
             }
             .ignoresProgress()
             .extractPayload()

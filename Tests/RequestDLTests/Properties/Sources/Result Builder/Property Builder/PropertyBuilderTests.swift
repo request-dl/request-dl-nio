@@ -11,15 +11,16 @@ class PropertyBuilderTests: XCTestCase {
         // Given
         @PropertyBuilder
         var property: some Property {
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
         }
 
         // When
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is Headers.ContentType)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertTrue(property is Headers.Cache)
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
     #if !os(Linux)
@@ -28,7 +29,8 @@ class PropertyBuilderTests: XCTestCase {
         @PropertyBuilder
         var property: some Property {
             if #available(iOS 99, macOS 99, watchOS 99, tvOS 99, *) {
-                Headers.ContentType(.json)
+                Headers.Cache()
+                    .public(true)
             }
         }
 
@@ -36,7 +38,7 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
+        XCTAssertTrue(property is _OptionalContent<Headers.Cache>)
         XCTAssertTrue(resolved.request.headers.isEmpty)
     }
     #endif
@@ -46,7 +48,8 @@ class PropertyBuilderTests: XCTestCase {
         @PropertyBuilder
         var property: some Property {
             if #available(iOS 14, macOS 12, watchOS 7, tvOS 14, *) {
-                Headers.ContentType(.json)
+                Headers.Cache()
+                    .public(true)
             }
         }
 
@@ -54,7 +57,7 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is _OptionalContent<Headers.ContentType>)
-        XCTAssertEqual(resolved.request.headers.getValue(forKey: "Content-Type"), "application/json")
+        XCTAssertTrue(property is _OptionalContent<Headers.Cache>)
+        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 }

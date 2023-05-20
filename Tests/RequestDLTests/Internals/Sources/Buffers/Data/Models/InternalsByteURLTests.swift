@@ -31,6 +31,21 @@ class InternalsByteURLTests: XCTestCase {
         XCTAssertEqual(url.writtenBytes, 64)
     }
 
+    func testByteURL_whenInitWithBufferSlice() {
+        // Given
+        var buffer = ByteBuffer(data: .randomData(length: 128))
+
+        buffer.moveReaderIndex(to: 64)
+
+        // When
+        let url = Internals.ByteURL(buffer)
+
+        // Then
+        XCTAssertEqual(url.buffer.writerIndex, 64)
+        XCTAssertEqual(url.buffer.readerIndex, .zero)
+        XCTAssertEqual(url.writtenBytes, 64)
+    }
+
     func testByteURL_whenEquals() {
         // Given
         let url = Internals.ByteURL()

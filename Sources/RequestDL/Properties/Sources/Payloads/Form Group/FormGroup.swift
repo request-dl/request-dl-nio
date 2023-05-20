@@ -15,33 +15,19 @@ import Foundation
 
  ```swift
  FormGroup {
-     FormValue("John", forKey: "name")
-     FormValue(25, forKey: "age")
+     Form(
+         name: "name",
+         verbatim: "John"
+     )
+
+     Form(
+         name: "age",
+         verbatim: "25"
+     )
  }
  ```
  */
 public struct FormGroup<Content: Property>: Property {
-
-    private struct Node: PropertyNode {
-
-        let partLength: Int?
-        let nodes: [LeafNode<FormNode>]
-
-        func make(_ make: inout Make) async throws {
-            let multipart = nodes.map(\.factory).map { $0() }
-
-            let constructor = MultipartFormConstructor(multipart)
-
-            make.request.headers.setValue(
-                "multipart/form-data; boundary=\"\(constructor.boundary)\"",
-                forKey: "Content-Type"
-            )
-
-            make.request.body = Internals.Body(partLength, buffers: [
-                Internals.DataBuffer(constructor.body)
-            ])
-        }
-    }
 
     // MARK: - Public properties
 
@@ -82,9 +68,9 @@ public struct FormGroup<Content: Property>: Property {
 
         let nodes = outputs.node.search(for: FormNode.self)
 
-        return .leaf(Node(
-            partLength: inputs.environment.payloadPartLength,
-            nodes: nodes
+        return .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            items: nodes.lazy.map(\.items).reduce([], +)
         ))
     }
 }

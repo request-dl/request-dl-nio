@@ -5,106 +5,173 @@
 import XCTest
 @testable import RequestDL
 
+@available(*, deprecated)
 class FormValueTests: XCTestCase {
 
-    func testValue_whenInitWithStringValue() async throws {
+    func testForm_whenInitKeyValue() async throws {
         // Given
-        let key = "title"
-        let value = "value"
+        let key = "Foo"
+        let value = 1_024 * 1_024
 
         // When
         let resolved = try await resolve(TestProperty {
             FormValue(key: key, value: value)
         })
 
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 1)
-
         XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(key)\""),
+                    ("Content-Type", "text/plain; charset=UTF-8"),
+                    ("Content-Length", "7")
+                ]),
+                contents: Data(String(value).utf8)
+            )
+        ])
     }
 
-    func testValue_whenInitWithLosslessValue() async throws {
+    func testForm_whenInitKeyValueUTF16() async throws {
         // Given
-        let key = "title"
-        let value = 123
+        let key = "Foo"
+        let value = 1_024 * 1_024
 
         // When
         let resolved = try await resolve(TestProperty {
             FormValue(key: key, value: value)
+                .charset(.utf16)
         })
 
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 1)
-
         XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(multipartForm.items[0].contents, Data("\(value)".utf8))
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(key)\""),
+                    ("Content-Type", "text/plain; charset=UTF-16"),
+                    ("Content-Length", "16")
+                ]),
+                contents: String(value).data(using: .utf16) ?? Data()
+            )
+        ])
     }
 
-    func testNeverBody() async throws {
+    func testForm_whenInitAnyAndKey() async throws {
         // Given
-        let property = FormValue.init(key: "key", value: "123")
+        let key = "Foo"
+        let value = 1_024 * 1_024
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormValue(value, forKey: key)
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(key)\""),
+                    ("Content-Type", "text/plain; charset=UTF-8"),
+                    ("Content-Length", "7")
+                ]),
+                contents: Data(String(value).utf8)
+            )
+        ])
+    }
+
+    func testForm_whenInitKeyValuePartLength() async throws {
+        // Given
+        let key = "Foo"
+        let value = 1_024 * 1_024
+        let partLength = 2
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormValue(key: key, value: value)
+                .payloadPartLength(partLength)
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        let buffers = try await resolved.request.body?.buffers() ?? []
+        let data = buffers.compactMap { $0.getData() }.reduce(Data(), +)
+        let totalBytes = data.count
+
+        // Then
+        XCTAssertEqual(
+            buffers.compactMap { $0.getData() },
+            stride(from: .zero, to: totalBytes, by: partLength).map {
+                let upperBound = $0 + partLength
+                return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
+            }
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(key)\""),
+                    ("Content-Type", "text/plain; charset=UTF-8"),
+                    ("Content-Length", "7")
+                ]),
+                contents: Data(String(value).utf8)
+            )
+        ])
+    }
+
+    func testForm_whenBodyCalled_shouldBeNever() async throws {
+        // Given
+        let property = FormValue(key: "foo", value: "bar")
 
         // Then
         try await assertNever(property.body)
-    }
-}
-
-@available(*, deprecated)
-extension FormValueTests {
-
-    func testSingleForm() async throws {
-        // Given
-        let key = "title"
-        let value = "foo"
-        let property = FormValue(value, forKey: key)
-
-        // When
-        let resolved = try await resolve(TestProperty(property))
-
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
-
-        // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 1)
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
-        )
-
-        XCTAssertEqual(multipartForm.items[0].contents, Data(value.utf8))
     }
 }

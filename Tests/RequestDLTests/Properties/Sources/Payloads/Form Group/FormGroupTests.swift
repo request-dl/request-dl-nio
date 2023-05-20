@@ -8,191 +8,190 @@ import XCTest
 // swiftlint:disable function_body_length
 class FormGroupTests: XCTestCase {
 
-    func testSingleForm() async throws {
+    func testGroup_whenMultipleData() async throws {
         // Given
-        let key = "index"
-        let value = 1
-
-        let property = FormGroup {
-            FormValue(key: key, value: value)
+        let parts = (0..<10).map { _ in
+            Data.randomData(length: (0...256).randomElement() ?? 256)
         }
-
-        // When
-        let resolved = try await resolve(TestProperty(property))
-
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
-
-        // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 1)
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
-        )
-
-        XCTAssertEqual(multipartForm.items[0].contents, Data("\(value)".utf8))
-    }
-
-    func testMultipleForm() async throws {
-        // Given
-        let key1 = "index"
-        let value1 = 1
-
-        let key2 = "template_image"
-        let value2 = try ResourceFile("template_image").data()
-        let fileName2 = "image.jpeg"
-        let contentType2: ContentType = .jpeg
-
-        let key3 = "template_document"
-        let resourceFile3 = ResourceFile("template_document")
-        let value3 = try resourceFile3.url()
-
-        let property = FormGroup {
-            FormValue(key: key1, value: value1)
-
-            FormData(
-                value2,
-                forKey: key2,
-                fileName: fileName2,
-                type: contentType2
-            )
-
-            FormFile(
-                value3,
-                forKey: key3,
-                fileName: nil,
-                type: nil
-            )
-        }
-
-        // When
-        let resolved = try await resolve(TestProperty(property))
-
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
-
-        // Then
-        XCTAssertEqual(contentTypeHeader, "multipart/form-data; boundary=\"\(boundary)\"")
-        XCTAssertEqual(multipartForm.items.count, 3)
-
-        // Then: - Property Index 0
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key1)\""
-        )
-
-        XCTAssertEqual(multipartForm.items[0].contents, Data("\(value1)".utf8))
-
-        // Then: - Property Index 1
-        XCTAssertEqual(
-            multipartForm.items[1].headers["Content-Disposition"],
-            "form-data; name=\"\(key2)\"; filename=\"\(fileName2)\""
-        )
-
-        XCTAssertEqual(
-            multipartForm.items[1].headers["Content-Type"],
-            contentType2.rawValue
-        )
-
-        XCTAssertEqual(
-            multipartForm.items[1].contents,
-            value2
-        )
-
-        // Then: - Property Index 2
-        XCTAssertEqual(
-            multipartForm.items[2].headers["Content-Disposition"],
-            "form-data; name=\"\(key3)\"; filename=\"\(try resourceFile3.url().lastPathComponent)\""
-        )
-
-        XCTAssertEqual(
-            multipartForm.items[2].headers["Content-Type"],
-            ContentType.pdf.rawValue
-        )
-
-        XCTAssertEqual(
-            multipartForm.items[2].contents,
-            try resourceFile3.data()
-        )
-    }
-
-    func testCollision() async throws {
-        // Given
-        let key = "index"
-        let value1 = "123"
-        let value2 = 124
-
-        let property = FormGroup {
-            FormValue(key: key, value: value1)
-            FormValue(key: key, value: value2)
-        }
-
-        // When
-        let resolved = try await resolve(TestProperty(property))
-
-        let contentTypeHeader = resolved.request.headers.getValue(forKey: "Content-Type")
-        let boundary = MultipartFormParser.extractBoundary(contentTypeHeader) ?? "nil"
-
-        let multipartForm = try MultipartFormParser(
-            await resolved.request.body?.data() ?? Data(),
-            boundary: boundary
-        ).parse()
-
-        // Then
-        XCTAssertEqual(multipartForm.items.count, 2)
-
-        XCTAssertEqual(multipartForm.items[0].contents, Data(value1.utf8))
-
-        XCTAssertEqual(
-            multipartForm.items[0].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
-        )
-
-        XCTAssertEqual(multipartForm.items[1].contents, Data("\(value2)".utf8))
-
-        XCTAssertEqual(
-            multipartForm.items[1].headers["Content-Disposition"],
-            "form-data; name=\"\(key)\""
-        )
-    }
-
-    func testNeverBody() async throws {
-        // Given
-        let property = FormGroup {}
-
-        // Then
-        try await assertNever(property.body)
-    }
-
-    func testGroup_whenPartLengthSet() async throws {
-        // Given
-        let length = 1_024
 
         // When
         let resolved = try await resolve(TestProperty {
             FormGroup {
-                FormValue(key: "key1", value: "foo")
-                FormValue(key: "key2", value: "bar")
+                ForEach(parts.enumerated(), id: \.offset) {
+                    Form(
+                        name: "part\($0)",
+                        data: $1
+                    )
+                }
             }
-            .payloadPartLength(length)
         })
 
-        let sut = try await resolved.request.body?.buffers()
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(sut?.count, 1)
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, partForms(parts))
+    }
+
+    func testGroup_whenMultipleDataWithFormGroup() async throws {
+        // Given
+        let parts1 = (0..<6).map { _ in
+            Data.randomData(length: (0...256).randomElement() ?? 256)
+        }
+
+        let parts2 = (0..<3).map { _ in
+            Data.randomData(length: (0...128).randomElement() ?? 128)
+        }
+
+        let parts3 = (0..<9).map { _ in
+            Data.randomData(length: (0...64).randomElement() ?? 64)
+        }
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormGroup {
+                FormGroup {
+                    ForEach(parts1.enumerated(), id: \.offset) {
+                        Form(
+                            name: "part1.\($0)",
+                            data: $1
+                        )
+                    }
+                }
+
+                FormGroup {
+                    ForEach(parts2.enumerated(), id: \.offset) {
+                        Form(
+                            name: "part2.\($0)",
+                            data: $1
+                        )
+                    }
+                }
+
+                FormGroup {
+                    ForEach(parts3.enumerated(), id: \.offset) {
+                        Form(
+                            name: "part3.\($0)",
+                            data: $1
+                        )
+                    }
+                }
+            }
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, (
+            partForms(parts1, prefix: "part1.") +
+            partForms(parts2, prefix: "part2.") +
+            partForms(parts3, prefix: "part3.")
+        ))
+    }
+
+    func testGroup_whenPartLength() async throws {
+        // Given
+        let name = "foo"
+        let data = Data.randomData(length: 256)
+        let partLength = 64
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormGroup {
+                Form(
+                    name: name,
+                    data: data
+                )
+            }
+            .payloadPartLength(partLength)
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        let buffers = try await resolved.request.body?.buffers() ?? []
+        let builtData = buffers.compactMap { $0.getData() }.reduce(Data(), +)
+        let totalBytes = builtData.count
+
+        // Then
+        XCTAssertEqual(
+            buffers.compactMap { $0.getData() },
+            stride(from: .zero, to: totalBytes, by: partLength).map {
+                let upperBound = $0 + partLength
+                return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
+            }
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        ])
+    }
+
+    func testGroup_whenBodyCalled_shouldBeNever() async throws {
+        // Given
+        let property = FormGroup {
+            Form(
+                name: "foo",
+                data: .randomData(length: 64)
+            )
+        }
+
+        // Then
+        try await assertNever(property.body)
+    }
+}
+
+extension FormGroupTests {
+
+    func partForms(_ parts: [Data], prefix: String = "part") -> [PartForm] {
+        parts.enumerated().map { offset, data in
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(prefix)\(offset)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        }
     }
 }
 // swiftlint:enable function_body_length

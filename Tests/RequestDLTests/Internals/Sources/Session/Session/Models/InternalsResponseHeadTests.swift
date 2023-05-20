@@ -12,10 +12,10 @@ class InternalsResponseHeadTests: XCTestCase {
         let url = "https://127.0.0.1"
         let status = Internals.ResponseHead.Status(code: 200, reason: "OK")
         let version = Internals.ResponseHead.Version(minor: 0, major: 1)
-        var headers = Internals.Headers()
+        var headers = HTTPHeaders()
         let isKeepAlive = true
 
-        headers.setValue("text/html", forKey: "Content-Type")
+        headers.set(name: "Content-Type", value: "text/html")
 
         // When
         let responseHead = Internals.ResponseHead(
