@@ -93,7 +93,7 @@ public struct Form<Headers: Property>: Property {
     ) where Headers == EmptyProperty {
         self.init(
             name: name,
-            filename: filename,
+            filename: filename ?? url.lastPathComponent,
             factory: FilePayloadFactory(
                 url: url,
                 contentType: contentType
@@ -241,7 +241,7 @@ public struct Form<Headers: Property>: Property {
     ) {
         self.init(
             name: name,
-            filename: filename,
+            filename: filename ?? url.lastPathComponent,
             factory: FilePayloadFactory(
                 url: url,
                 contentType: contentType

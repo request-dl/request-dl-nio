@@ -166,4 +166,12 @@ class FormValueTests: XCTestCase {
             )
         ])
     }
+
+    func testForm_whenBodyCalled_shouldBeNever() async throws {
+        // Given
+        let property = FormValue(key: "foo", value: "bar")
+
+        // Then
+        try await assertNever(property.body)
+    }
 }
