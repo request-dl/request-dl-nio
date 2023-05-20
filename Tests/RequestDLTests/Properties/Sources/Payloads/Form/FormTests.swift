@@ -699,16 +699,18 @@ class FormTests: XCTestCase {
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
+                ("Content-Length", String(data.count))
+            ])
         ])
+
+        XCTAssertEqual(
+            parsed.items.map { $0.contents.queries(using: .utf8) },
+            [data.queries(using: .utf8)]
+        )
     }
 
     func testForm_whenInitEncodableWithHeadersURLEncodedUTF16() async throws {
@@ -767,16 +769,18 @@ class FormTests: XCTestCase {
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
+                ("Content-Length", String(data.count))
+            ])
         ])
+
+        XCTAssertEqual(
+            parsed.items.map { $0.contents.queries(using: .utf8) },
+            [data.queries(using: .utf8)]
+        )
     }
 
     // MARK: - Init with JSON
@@ -959,16 +963,18 @@ class FormTests: XCTestCase {
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
+                ("Content-Length", String(data.count))
+            ])
         ])
+
+        XCTAssertEqual(
+            parsed.items.map { $0.contents.queries(using: .utf8) },
+            [data.queries(using: .utf8)]
+        )
     }
 
     func testForm_whenInitJSONWithHeadersURLEncodedUTF16() async throws {
@@ -1027,16 +1033,18 @@ class FormTests: XCTestCase {
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
+                ("Content-Length", String(data.count))
+            ])
         ])
+
+        XCTAssertEqual(
+            parsed.items.map { $0.contents.queries(using: .utf8) },
+            [data.queries(using: .utf8)]
+        )
     }
 
     // MARK: - Others tests

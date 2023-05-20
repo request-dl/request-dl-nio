@@ -38,3 +38,14 @@ extension Data {
         return Data(data)
     }
 }
+
+extension Data {
+
+    func queries(using encoding: String.Encoding) -> Set<String> {
+        guard let literal = String(data: self, encoding: encoding) else {
+            return []
+        }
+
+        return Set(literal.split(separator: "&").map { String($0) })
+    }
+}
