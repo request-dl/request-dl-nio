@@ -489,7 +489,6 @@ extension PayloadTests {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
 
         // Then
         let resolved = try await resolve(TestProperty {
@@ -531,7 +530,6 @@ extension PayloadTests {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
 
         // Then
         let resolved = try await resolve(TestProperty {
