@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-// swiftlint:disable file_length type_body_length
 class CharsetTests: XCTestCase {
 
     func testCharset_whenUTF8() throws {
