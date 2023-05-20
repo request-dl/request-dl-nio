@@ -15,8 +15,15 @@ import Foundation
 
  ```swift
  FormGroup {
-     FormValue("John", forKey: "name")
-     FormValue(25, forKey: "age")
+     Form(
+         name: "name",
+         verbatim: "John"
+     )
+
+     Form(
+         name: "age",
+         verbatim: "25"
+     )
  }
  ```
  */

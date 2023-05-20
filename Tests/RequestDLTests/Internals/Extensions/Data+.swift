@@ -8,6 +8,10 @@ import Foundation
 extension Data {
 
     static func randomData(length: Int) -> Data {
+        guard length > .zero else {
+            return Data()
+        }
+
         var buffer = Internals.DataBuffer()
 
         let max = length > UInt8.max ? UInt8.max : UInt8(length)
