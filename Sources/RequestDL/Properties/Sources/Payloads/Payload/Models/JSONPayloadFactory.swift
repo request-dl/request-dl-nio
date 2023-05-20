@@ -12,8 +12,6 @@ struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
     let options: JSONSerialization.WritingOptions
     let contentType: ContentType
 
-    // MARK: - Private properties
-
     // MARK: - Inits
 
     init(

@@ -44,11 +44,12 @@ public struct Payload: Property {
     // MARK: - Inits
 
     /**
-     Initializes a `Payload` with a dictionary.
+     Initializes a `Payload` with a JSON object.
 
      - Parameters:
-        - dictionary: A dictionary to be serialized.
-        - options: Options for serializing the dictionary.
+        - json: A JSON object to be serialized.
+        - options: Options for serializing the JSON object.
+        - contentType: The content type of the payload (default is JSON).
      */
     public init(
         _ json: Any,
@@ -66,8 +67,9 @@ public struct Payload: Property {
      Initializes a `Payload` with an encodable value.
 
      - Parameters:
-        - value: An encodable value to be serialized.
+        - object: An encodable value to be serialized.
         - encoder: An encoder to use for the serialization.
+        - contentType: The content type of the payload (default is JSON).
      */
     public init<Object: Encodable>(
         _ object: Object,
@@ -81,6 +83,13 @@ public struct Payload: Property {
         )
     }
 
+    /**
+     Initializes a `Payload` with a string verbatim.
+
+     - Parameters:
+        - verbatim: The verbatim string value.
+        - contentType: The content type of the payload (default is text).
+     */
     public init<Verbatim: StringProtocol>(
         verbatim: Verbatim,
         contentType: ContentType = .text
@@ -91,6 +100,13 @@ public struct Payload: Property {
         )
     }
 
+    /**
+     Initializes a `Payload` with raw data.
+
+     - Parameters:
+        - data: The raw data.
+        - contentType: The content type of the payload (default is octet-stream).
+     */
     public init(
         data: Data,
         contentType: ContentType = .octetStream
@@ -101,6 +117,13 @@ public struct Payload: Property {
         )
     }
 
+    /**
+     Initializes a `Payload` with a file URL.
+
+     - Parameters:
+        - url: The file URL.
+        - contentType: The content type of the payload.
+     */
     public init(
         url: URL,
         contentType: ContentType
@@ -146,7 +169,10 @@ extension Payload {
         _ string: String,
         using encoding: String.Encoding = .utf8
     ) {
-        // TODO: - Warning String.Encoding has no effect
+        Internals.Log.warning(
+            .stringEncodingHasNoEffectInPayload(encoding)
+        )
+
         self.init(
             verbatim: string,
             contentType: .text
@@ -172,7 +198,10 @@ extension Payload {
      */
     @available(*, deprecated, renamed: "init(url:)")
     public init(_ fileURL: URL) {
-        // TODO: - Warning fileURL type
+        Internals.Log.warning(
+            .fileWillBeRawBytesContentType(fileURL)
+        )
+
         self.init(url: fileURL, contentType: .octetStream)
     }
 }
