@@ -30,24 +30,24 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
     // MARK: - Internal methods
 
     func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
-        let data = try encode(encoder)
-
         guard contentType.isFormURLEncoded else {
-            return .init(
+            return try .init(
                 contentType: contentType,
-                source: .buffer(Internals.DataBuffer(data))
+                source: .buffer(Internals.DataBuffer(encode(encoder)))
             )
         }
 
-        switch try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {
+        let jsonData = try encode(.init())
+
+        switch try JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) {
         case let array as [Any]:
             return try input.jsonObject(array, contentType: contentType)
         case let dictionary as [AnyHashable: Any]:
             return try input.jsonObject(dictionary, contentType: contentType)
         default:
-            return .init(
+            return try .init(
                 contentType: contentType,
-                source: .buffer(Internals.DataBuffer(data))
+                source: .buffer(Internals.DataBuffer(encode(encoder)))
             )
         }
     }

@@ -117,7 +117,7 @@ public struct Form<Headers: Property>: Property {
     public init<Verbatim: StringProtocol>(
         name: String,
         filename: String? = nil,
-        contentType: ContentType,
+        contentType: ContentType = .text,
         verbatim: Verbatim
     ) where Headers == EmptyProperty {
         self.init(
@@ -135,21 +135,21 @@ public struct Form<Headers: Property>: Property {
      Creates a form with the given parameters.
 
      - Parameters:
-        - value: The value to be encoded and associated with the form field.
-        - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
         - name: The name of the form field.
         - filename: The filename associated with the form field, if applicable.
         - contentType: The content type of the form field.
+        - value: The value to be encoded and associated with the form field.
+        - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
 
      - Note: This initializer is available when `Headers` is `EmptyProperty` and `Value`
      conforms to `Encodable`.
      */
     public init<Value: Encodable>(
-        _ value: Value,
-        encoder: JSONEncoder = .init(),
         name: String,
         filename: String? = nil,
-        contentType: ContentType = .json
+        contentType: ContentType = .json,
+        value: Value,
+        encoder: JSONEncoder = .init()
     ) where Headers == EmptyProperty {
         self.init(
             name: name,
@@ -167,26 +167,26 @@ public struct Form<Headers: Property>: Property {
      Creates a form with the given parameters.
 
      - Parameters:
-        - json: The JSON object to be associated with the form field.
-        - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
         - name: The name of the form field.
         - filename: The filename associated with the form field, if applicable.
         - contentType: The content type of the form field.
+        - jsonObject: The JSON object to be associated with the form field.
+        - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
 
      - Note: This initializer is available when `Headers` is `EmptyProperty`.
      */
     public init(
-        _ json: Any,
-        options: JSONSerialization.WritingOptions = [],
         name: String,
         filename: String? = nil,
-        contentType: ContentType = .json
+        contentType: ContentType = .json,
+        jsonObject: Any,
+        options: JSONSerialization.WritingOptions = []
     ) where Headers == EmptyProperty {
         self.init(
             name: name,
             filename: filename,
             factory: JSONPayloadFactory(
-                jsonObject: json,
+                jsonObject: jsonObject,
                 options: options,
                 contentType: contentType
             ),
@@ -284,21 +284,21 @@ public struct Form<Headers: Property>: Property {
      Creates a form with the given parameters and custom headers.
 
      - Parameters:
-        - value: The value to be encoded and associated with the form field.
-        - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
         - name: The name of the form field.
         - filename: The filename associated with the form field, if applicable.
         - contentType: The content type of the form field.
+        - value: The value to be encoded and associated with the form field.
+        - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
         - headers: A closure that returns custom headers for the form.
 
      - Note: This initializer is available when `Value` conforms to `Encodable`.
      */
     public init<Value: Encodable>(
-        _ value: Value,
-        encoder: JSONEncoder = .init(),
         name: String,
         filename: String? = nil,
         contentType: ContentType = .json,
+        value: Value,
+        encoder: JSONEncoder = .init(),
         @PropertyBuilder headers: () -> Headers
     ) {
         self.init(
@@ -317,26 +317,26 @@ public struct Form<Headers: Property>: Property {
      Creates a form with the given parameters and custom headers.
 
      - Parameters:
-        - json: The JSON object to be associated with the form field.
-        - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
         - name: The name of the form field.
         - filename: The filename associated with the form field, if applicable.
         - contentType: The content type of the form field.
+        - json: The JSON object to be associated with the form field.
+        - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
         - headers: A closure that returns custom headers for the form.
      */
     public init(
-        _ json: Any,
-        options: JSONSerialization.WritingOptions,
         name: String,
         filename: String? = nil,
         contentType: ContentType = .json,
+        jsonObject: Any,
+        options: JSONSerialization.WritingOptions = [],
         @PropertyBuilder headers: () -> Headers
     ) {
         self.init(
             name: name,
             filename: filename,
             factory: JSONPayloadFactory(
-                jsonObject: json,
+                jsonObject: jsonObject,
                 options: options,
                 contentType: contentType
             ),

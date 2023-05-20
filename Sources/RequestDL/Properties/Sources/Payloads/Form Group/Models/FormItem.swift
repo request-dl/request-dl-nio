@@ -74,12 +74,11 @@ struct FormItem: Sendable {
 
         headers.set(name: "Content-Disposition", value: contentDisposition())
         headers.set(name: "Content-Type", value: String(contentType))
+        headers.set(name: "Content-Length", value: String(buffer.estimatedBytes))
 
         if let additionalHeaders {
-            headers = headers.merging(additionalHeaders, by: +)
+            headers = headers.merging(additionalHeaders) { lhs, _ in lhs }
         }
-
-        headers.set(name: "Content-Length", value: String(buffer.estimatedBytes))
 
         return headers
     }
