@@ -8,11 +8,6 @@ import XCTest
 // swiftlint:disable file_length type_body_length
 class PayloadTests: XCTestCase {
 
-    struct Mock: Codable, Equatable {
-        let foo: String
-        let date: Date
-    }
-
     func testPayload_whenInitJSON() async throws {
         // Given
         let json: [String: Any] = [
@@ -83,13 +78,16 @@ class PayloadTests: XCTestCase {
 
     func testPayload_whenInitEncodable() async throws {
         // Given
-        let mock = Mock(
+        let mock = PayloadMock(
             foo: "bar",
             date: Date()
         )
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
         // Then
         let resolved = try await resolve(TestProperty {
@@ -113,20 +111,25 @@ class PayloadTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            data,
-            try encoder.encode(mock)
+            try data.map {
+                try decoder.decode(PayloadMock.self, from: $0)
+            },
+            mock
         )
     }
 
     func testPayload_whenInitEncodableWithCustomType() async throws {
         // Given
-        let mock = Mock(
+        let mock = PayloadMock(
             foo: "bar",
             date: Date()
         )
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
         let customType = ContentType("application/json+request-dl")
 
@@ -153,8 +156,10 @@ class PayloadTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            data,
-            try encoder.encode(mock)
+            try data.map {
+                try decoder.decode(PayloadMock.self, from: $0)
+            },
+            mock
         )
     }
 
@@ -478,7 +483,7 @@ extension PayloadTests {
 
     func testPayload_whenGETInitEncodableWithURLEncoded() async throws {
         // Given
-        let mock = Mock(
+        let mock = PayloadMock(
             foo: "bar",
             date: Date()
         )
@@ -520,7 +525,7 @@ extension PayloadTests {
 
     func testPayload_whenPOSTInitEncodableWithURLEncodedCharsetUTF16() async throws {
         // Given
-        let mock = Mock(
+        let mock = PayloadMock(
             foo: "bar",
             date: Date()
         )

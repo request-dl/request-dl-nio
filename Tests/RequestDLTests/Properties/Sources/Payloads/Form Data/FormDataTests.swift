@@ -8,11 +8,6 @@ import XCTest
 @available(*, deprecated)
 class FormDataTests: XCTestCase {
 
-    struct Mock: Codable {
-        let foo: String
-        let date: Date
-    }
-
     func testForm_whenInitDataEmptyFilename() async throws {
         // Given
         let name = "foo"
@@ -99,13 +94,16 @@ class FormDataTests: XCTestCase {
     func testForm_whenInitEncodableEmptyFilename() async throws {
         // Given
         let name = "some_name"
-        let mock = Mock(
+        let mock = PayloadMock(
             foo: "bar",
             date: Date()
         )
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -132,29 +130,36 @@ class FormDataTests: XCTestCase {
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/json"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\""),
+                ("Content-Type", "application/json"),
+                ("Content-Length", String(data.count))
+            ])
         ])
+
+        XCTAssertEqual(
+            try parsed.items.map {
+                try decoder.decode(PayloadMock.self, from: $0.contents)
+            },
+            [mock]
+        )
     }
 
     func testForm_whenInitEncodableFilename() async throws {
         // Given
         let name = "some_name"
         let filename = "bar"
-        let mock = Mock(
+        let mock = PayloadMock(
             foo: "bar",
             date: Date()
         )
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -182,16 +187,20 @@ class FormDataTests: XCTestCase {
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/json"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
+        XCTAssertEqual(parsed.items.map(\.headers), [
+            HTTPHeaders([
+                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                ("Content-Type", "application/json"),
+                ("Content-Length", String(data.count))
+            ])
         ])
+
+        XCTAssertEqual(
+            try parsed.items.map {
+                try decoder.decode(PayloadMock.self, from: $0.contents)
+            },
+            [mock]
+        )
     }
 
     func testForm_whenInitDataEmptyFilenamePartLength() async throws {
