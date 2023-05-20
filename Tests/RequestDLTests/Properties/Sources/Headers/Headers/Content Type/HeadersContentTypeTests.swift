@@ -31,7 +31,7 @@ class HeadersContentTypeTests: XCTestCase {
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Content-Type"],
-            ["application/x-www-form-urlencoded; charset=utf-8"]
+            ["application/x-www-form-urlencoded"]
         )
     }
 

@@ -71,11 +71,17 @@ extension Headers {
         ) async throws -> _PropertyOutputs {
             property.assertPathway()
 
+            let value = property.pointer()
+                .makeContents()
+                .joined(separator: ", ")
+
+            if value.isEmpty {
+                return .empty
+            }
+
             return .leaf(Headers.Node(
                 key: "Cache-Control",
-                value: property.pointer()
-                    .makeContents()
-                    .joined(separator: ", ")
+                value: value
             ))
         }
 
