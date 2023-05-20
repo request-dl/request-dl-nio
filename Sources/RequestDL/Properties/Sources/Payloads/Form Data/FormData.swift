@@ -84,7 +84,7 @@ public struct FormData: Property {
             fragmentLength: inputs.environment.payloadPartLength,
             item: FormItem(
                 name: property.name,
-                filename: property.filename,
+                filename: property.filename.isEmpty ? nil : property.filename,
                 additionalHeaders: nil,
                 charset: inputs.environment.charset,
                 urlEncoder: inputs.environment.urlEncoder,

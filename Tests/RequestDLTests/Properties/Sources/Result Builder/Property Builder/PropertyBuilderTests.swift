@@ -23,6 +23,7 @@ class PropertyBuilderTests: XCTestCase {
         XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
+    #if !os(Linux)
     func testLimitedNotAvailableBuildBlock() async throws {
         // Given
         @PropertyBuilder
@@ -40,6 +41,7 @@ class PropertyBuilderTests: XCTestCase {
         XCTAssertTrue(property is _OptionalContent<Headers.Cache>)
         XCTAssertTrue(resolved.request.headers.isEmpty)
     }
+    #endif
 
     func testLimitedAvailableBuildBlock() async throws {
         // Given
