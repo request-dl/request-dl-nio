@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+// swiftlint:disable file_length type_body_length
 class PayloadTests: XCTestCase {
 
     struct Mock: Codable, Equatable {
@@ -385,6 +386,7 @@ class PayloadTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
+// swiftlint:enable type_body_length
 
 // MARK: - Form URL encoded tests
 
@@ -681,7 +683,6 @@ extension PayloadTests {
     func testPayload_whenDeprecatedInitURL() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
-        let contentType = ContentType("application/octet-stream+request-dl")
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("payload.\(UUID())")
@@ -710,3 +711,4 @@ extension PayloadTests {
         XCTAssertEqual(builtData, data)
     }
 }
+// swiftlint:enable file_length
