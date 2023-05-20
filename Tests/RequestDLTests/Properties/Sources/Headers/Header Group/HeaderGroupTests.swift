@@ -46,7 +46,8 @@ class HeaderGroupTests: XCTestCase {
 
     func testHeaderGroupWithMultipleHeaders() async throws {
         let property = TestProperty(HeaderGroup {
-            Headers.ContentType(.javascript)
+            Headers.Cache()
+                .public(true)
             Headers.Accept(.json)
             Headers.Origin("127.0.0.1:8080")
             Headers.Any(name: "xxx-api-key", value: "password")
@@ -55,8 +56,8 @@ class HeaderGroupTests: XCTestCase {
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
-            resolved.request.headers["Content-Type"],
-            ["text/javascript"]
+            resolved.request.headers["Cache-Control"],
+            ["public"]
         )
 
         XCTAssertEqual(

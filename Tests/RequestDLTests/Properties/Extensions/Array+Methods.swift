@@ -25,32 +25,39 @@ extension Array {
 
 extension Array where Element: Equatable {
 
+    private func hasSuffix(_ suffix: [Element]) -> Bool {
+        guard endIndex >= suffix.endIndex else {
+            return false
+        }
+
+        let lowerBound = index(endIndex, offsetBy: -suffix.endIndex)
+
+        return Array(self[lowerBound ..< endIndex]) == suffix
+    }
+
     private func _components<S: Sequence>(
         separatedBy separator: S
     ) -> [[Element]] where S.Element == Element {
+        var group = [[Element]]()
+        var item = [Element]()
         let separator = Array(separator)
-        var combinedElements: [Element] = []
 
-        return reduce([[]]) {
-            combinedElements.append($1)
+        for element in self {
+            item.append(element)
 
-            let matches = combinedElements.count <= separator.count && combinedElements
-                .enumerated()
-                .allSatisfy { separator[$0] == $1 }
-
-            if matches {
-                if combinedElements == separator {
-                    combinedElements = []
-                    return $0 + [[]]
-                } else {
-                    return $0
-                }
-            } else {
-                let pendingElements = combinedElements
-                combinedElements = []
-                return $0.appendingSliceAtLast(pendingElements)
+            if item.hasSuffix(separator) {
+                item.removeLast(separator.count)
+                group.append(item)
+                item = []
             }
         }
+
+        if !item.isEmpty || hasSuffix(separator) {
+            group.append(item)
+            item = []
+        }
+
+        return group
     }
 
     func components<S: Sequence>(

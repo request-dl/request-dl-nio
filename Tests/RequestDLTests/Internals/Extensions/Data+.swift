@@ -8,6 +8,10 @@ import Foundation
 extension Data {
 
     static func randomData(length: Int) -> Data {
+        guard length > .zero else {
+            return Data()
+        }
+
         var buffer = Internals.DataBuffer()
 
         let max = length > UInt8.max ? UInt8.max : UInt8(length)
@@ -32,5 +36,16 @@ extension Data {
         }
 
         return Data(data)
+    }
+}
+
+extension Data {
+
+    func queries(using encoding: String.Encoding) -> Set<String> {
+        guard let literal = String(data: self, encoding: encoding) else {
+            return []
+        }
+
+        return Set(literal.split(separator: "&").map { String($0) })
     }
 }

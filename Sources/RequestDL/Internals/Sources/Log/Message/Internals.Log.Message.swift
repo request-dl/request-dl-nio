@@ -4,6 +4,7 @@
 
 import Foundation
 
+// swiftlint:disable file_length
 extension Internals.Log {
 
     struct Message {
@@ -270,6 +271,56 @@ extension Internals.Log.Message {
     }
 }
 
+// MARK: - Payload
+
+extension Internals.Log.Message {
+
+    static func stringEncodingHasNoEffectInPayload<Encoding>(
+        _ encoding: Encoding
+    ) -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            Specifying the `using:` parameter with a value of \
+            type `String.Encoding` has no impact or effect on \
+            the payload encoding. This means that specifying a \
+            specific string encoding, such as UTF-8 or ASCII, \
+            does not affect how the payload is encoded.
+
+            To use a different encoding, you should use the \
+            `.charset(_:)` method on the payload structure. \
+            It's important to note that only commonly used \
+            encoding formats are available for selection.
+
+            Make sure to choose the appropriate encoding method \
+            based on the type of content you are dealing with.
+            """,
+            parameters: [
+                String(describing: type(of: encoding)): encoding
+            ]
+        )
+    }
+
+    static func fileWillBeRawBytesContentType<URL>(
+        _ url: URL
+    ) -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            When sending a payload by providing only the URL, \
+            the Content-Type header is automatically set to \
+            `application/octet-stream`.
+
+            To specify a different content type, you need to use \
+            the `.init(url:contentType:)` initializer. This allows \
+            you to explicitly define the content type for the \
+            payload.
+            """,
+            parameters: [
+                String(describing: type(of: url)): url
+            ]
+        )
+    }
+}
+
 // MARK: - Tasks
 extension Internals.Log.Message {
 
@@ -376,3 +427,4 @@ extension Internals.Log {
         )
     }
 }
+// swiftlint:enable file_length

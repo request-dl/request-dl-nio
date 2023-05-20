@@ -7,11 +7,22 @@ import XCTest
 
 struct MultipartFormParser {
 
-    let data: Data
+    let buffers: [Internals.AnyBuffer]
     let boundary: String
 
-    init(_ data: Data, boundary: String) {
-        self.data = data
+    init(_ request: Internals.Request) async throws {
+        let contentTypeHeader = request.headers["Content-Type"] ?? []
+        let boundary = contentTypeHeader.first.flatMap {
+            MultipartFormParser.extractBoundary($0)
+        } ?? "nil"
+
+        let buffers = try await request.body?.buffers() ?? []
+
+        self.init(buffers, boundary: boundary)
+    }
+
+    init(_ buffers: [Internals.AnyBuffer], boundary: String) {
+        self.buffers = buffers
         self.boundary = boundary
     }
 }
@@ -33,7 +44,7 @@ extension MultipartFormParser {
 extension MultipartFormParser {
 
     func rawData() throws -> RawData {
-        .init(from: data)
+        .init(from: buffers.reduce(Data()) { $0 + ($1.getData() ?? Data()) })
     }
 
     func breakIntoChunks(_ rawData: RawData) throws -> [[RawData]] {
@@ -95,8 +106,8 @@ extension MultipartFormParser {
 
 extension MultipartFormParser {
 
-    func headers(_ lines: [RawData]) throws -> [String: String] {
-        var headers = [String: String]()
+    func headers(_ lines: [RawData]) throws -> HTTPHeaders {
+        var headers = HTTPHeaders()
 
         for line in lines {
             var key: String = ""
@@ -124,7 +135,7 @@ extension MultipartFormParser {
                 throw MultipartFormParserError.duplicatedHeaders
             }
 
-            headers[key] = value.trimmingCharacters(in: .whitespaces)
+            headers.add(name: key, value: value)
         }
 
         guard !headers.isEmpty else {

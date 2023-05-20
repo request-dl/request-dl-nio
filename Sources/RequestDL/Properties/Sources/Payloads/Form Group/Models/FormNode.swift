@@ -8,28 +8,53 @@ struct FormNode: PropertyNode {
 
     // MARK: - Internal properties
 
-    let partLength: Int?
-    let factory: @Sendable () -> PartFormRawValue
+    let fragmentLength: Int?
+    let items: [FormItem]
 
     // MARK: - Inits
 
-    init(_ partLength: Int?, _ factory: @escaping @Sendable () -> PartFormRawValue) {
-        self.partLength = partLength
-        self.factory = factory
+    init(
+        fragmentLength: Int?,
+        item: FormItem
+    ) {
+        self.init(
+            fragmentLength: fragmentLength,
+            items: [item]
+        )
+    }
+
+    init(
+        fragmentLength: Int?,
+        items: [FormItem]
+    ) {
+        self.fragmentLength = fragmentLength
+        self.items = items
     }
 
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        let constructor = MultipartFormConstructor([factory()])
+        let constructor = FormGroupBuilder(items)
 
         make.request.headers.set(
             name: "Content-Type",
             value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
         )
 
-        make.request.body = Internals.Body(partLength, buffers: [
-            Internals.DataBuffer(constructor.body)
-        ])
+        let buffers = try constructor()
+
+        make.request.headers.set(
+            name: "Content-Length",
+            value: String(
+                buffers.lazy
+                    .map(\.estimatedBytes)
+                    .reduce(.zero, +)
+            )
+        )
+
+        make.request.body = Internals.Body(
+            fragmentLength,
+            buffers: buffers
+        )
     }
 }

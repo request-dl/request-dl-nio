@@ -3,14 +3,15 @@
 */
 
 import Foundation
+import RequestDL
 
-struct PartForm {
+struct PartForm: Hashable {
 
-    let headers: [String: String]
+    let headers: HTTPHeaders
     let contents: Data
 
     init(
-        headers: [String: String],
+        headers: HTTPHeaders,
         contents: Data
     ) {
         self.headers = headers

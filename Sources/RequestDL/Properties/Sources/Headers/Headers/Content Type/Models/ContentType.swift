@@ -39,8 +39,8 @@ public struct ContentType: Sendable, Hashable {
     /// Content type for form data with files.
     public static let formData: ContentType = "form-data"
 
-    /// Content type for form data in the `x-www-form-urlencoded; charset=utf-8` format.
-    public static let formURLEncoded: ContentType = "application/x-www-form-urlencoded; charset=utf-8"
+    /// Content type for form data in the `x-www-form-urlencoded` format.
+    public static let formURLEncoded: ContentType = "application/x-www-form-urlencoded"
 
     /// Content type for plain text data.
     public static let text: ContentType = "text/plain"
@@ -81,6 +81,9 @@ public struct ContentType: Sendable, Hashable {
     /// Content type for PDF files.
     public static let pdf: ContentType = "application/pdf"
 
+    /// Content type for bytes data.
+    public static let octetStream: ContentType = "application/octet-stream"
+
     // MARK: - Internal properties
 
     let rawValue: String
@@ -94,18 +97,6 @@ public struct ContentType: Sendable, Hashable {
      */
     public init<S: StringProtocol>(_ rawValue: S) {
         self.rawValue = String(rawValue)
-    }
-
-    // MARK: - Internal static methods
-
-    static var allCases: [ContentType] {
-        [
-            .json, .xml, .formData, .formURLEncoded,
-            .text, .html, .css, .javascript,
-            .gif, .png, .jpeg, .bmp, .webp,
-            .midi, .mpeg, .wav,
-            .pdf
-        ]
     }
 }
 

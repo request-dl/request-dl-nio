@@ -15,7 +15,8 @@ class ResolveTests: XCTestCase {
             Path("v2")
 
             Headers.Accept(.json)
-            Headers.ContentType(.json)
+            Headers.Cache()
+                .public(true)
 
             Timeout(60)
 
@@ -39,7 +40,8 @@ class ResolveTests: XCTestCase {
 
             HeaderGroup {
                 Headers.Accept(.json)
-                Headers.ContentType(.json)
+                Headers.Cache()
+                    .public(true)
 
                 Timeout(60) // should be eliminated
             }
@@ -117,8 +119,8 @@ extension ResolveTests {
                 },
                 LeafNode<Node> {
                     property = Node {
-                        key = Content-Type,
-                        value = application/json
+                        key = Cache-Control,
+                        value = public
                     }
                 },
                 LeafNode<Node> {
@@ -174,8 +176,8 @@ extension ResolveTests {
                             },
                             LeafNode<Node> {
                                 property = Node {
-                                    key = Content-Type,
-                                    value = application/json
+                                    key = Cache-Control,
+                                    value = public
                                 }
                             }
                         ]

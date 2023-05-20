@@ -57,11 +57,15 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         }
     }
 
-    fileprivate struct Name: Sendable, Hashable, Codable {
+    fileprivate struct Name: Sendable, Hashable, Codable, CustomDebugStringConvertible {
 
         // MARK: - Internal properties
 
         let rawValue: String
+
+        var debugDescription: String {
+            rawValue
+        }
 
         // MARK: - Private properties
 
@@ -443,7 +447,7 @@ extension HTTPHeaders {
 
     /**
      Returns an array of header keys in the `HTTPHeaders` instance.
-    */
+     */
     @available(*, deprecated, renamed: "names")
     public var keys: [String] {
         names
