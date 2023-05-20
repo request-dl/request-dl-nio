@@ -184,14 +184,18 @@ public struct DataCache: Sendable {
 
     // MARK: - Public methods
 
-    public func getCachedData(forKey key: String) -> CachedData? {
+    public func getCachedData(forKey key: String, policy: DataCache.Policy.Set) -> CachedData? {
         let key = base64EncodedKey(key)
 
-        if let cachedData = storage.memoryStorage[key] {
+        if policy.contains(.memory), let cachedData = storage.memoryStorage[key] {
             return cachedData
         }
 
-        return storage.diskStorage[key]
+        if policy.contains(.disk) {
+            return storage.diskStorage[key]
+        }
+
+        return nil
     }
 
     public func setCachedData(_ cachedData: CachedData, forKey key: String) {
@@ -290,5 +294,8 @@ public struct DataCache: Sendable {
 
     func base64EncodedKey(_ key: String) -> String {
         Data(key.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }

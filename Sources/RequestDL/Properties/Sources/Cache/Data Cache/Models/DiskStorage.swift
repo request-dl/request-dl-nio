@@ -50,12 +50,12 @@ struct DiskStorage: Sendable {
 
         // MARK: - Internal static properties
 
-        static let pathExtension = "storedcachedrecord"
+        static let pathExtension = "cached"
 
         // MARK: - Private static properties
 
-        private static let responsePath = "response.cached"
-        private static let dataPath = "data.cached"
+        private static let responsePath = "response.record"
+        private static let dataPath = "data.record"
 
         // MARK: - Internal properties
 
@@ -104,7 +104,7 @@ struct DiskStorage: Sendable {
             let timeUnit = Int(date.timeIntervalSinceReferenceDate)
 
             let url = directory
-                .appendingPathComponent("\(timeUnit).\(key)")
+                .appendingPathComponent(String(timeUnit, radix: 36) + "." + key)
                 .appendingPathExtension(DiskStorage.Record.pathExtension)
 
             self.url = url
@@ -133,7 +133,7 @@ struct DiskStorage: Sendable {
                 .lastPathComponent
                 .split(separator: ".")
 
-            guard let time = components.first.flatMap({ Int64($0) }) else {
+            guard let time = components.first.flatMap({ Int64($0, radix: 36) }) else {
                 return nil
             }
 

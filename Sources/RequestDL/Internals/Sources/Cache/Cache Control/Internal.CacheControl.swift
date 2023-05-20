@@ -51,7 +51,10 @@ extension Internals {
                 return nil
             }
 
-            return dataCache.getCachedData(forKey: request.url)
+            return dataCache.getCachedData(
+                forKey: request.url,
+                policy: request.cachePolicy
+            )
         }
 
         private func checkIfCachedDataStillValid(
