@@ -20,7 +20,7 @@ class PayloadTests: XCTestCase {
         let resolved = try await resolve(TestProperty {
             Payload(
                 json,
-                options: .fragmentsAllowed
+                options: .sortedKeys
             )
         })
 
@@ -37,10 +37,10 @@ class PayloadTests: XCTestCase {
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
-            data,
-            try JSONSerialization.data(withJSONObject: json)
-        )
+        XCTAssertEqual(data, try JSONSerialization.data(
+            withJSONObject: json,
+            options: .sortedKeys
+        ))
     }
 
     func testPayload_whenInitJSONWithCustomType() async throws {
@@ -52,7 +52,7 @@ class PayloadTests: XCTestCase {
         let resolved = try await resolve(TestProperty {
             Payload(
                 json,
-                options: .fragmentsAllowed,
+                options: .sortedKeys,
                 contentType: customType
             )
         })
@@ -70,10 +70,10 @@ class PayloadTests: XCTestCase {
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
-            data,
-            try JSONSerialization.data(withJSONObject: json)
-        )
+        XCTAssertEqual(data, try JSONSerialization.data(
+            withJSONObject: json,
+            options: .sortedKeys
+        ))
     }
 
     func testPayload_whenInitEncodable() async throws {

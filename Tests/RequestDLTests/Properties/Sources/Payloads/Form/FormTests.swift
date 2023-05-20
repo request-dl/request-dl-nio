@@ -797,14 +797,18 @@ class FormTests: XCTestCase {
         let resolved = try await resolve(TestProperty {
             Form(
                 name: name,
-                jsonObject: jsonObject
+                jsonObject: jsonObject,
+                options: .sortedKeys
             )
         })
 
         let parser = try await MultipartFormParser(resolved.request)
         let parsed = try parser.parse()
 
-        let data = try JSONSerialization.data(withJSONObject: jsonObject)
+        let data = try JSONSerialization.data(
+            withJSONObject: jsonObject,
+            options: .sortedKeys
+        )
 
         // Then
         XCTAssertEqual(
@@ -845,14 +849,18 @@ class FormTests: XCTestCase {
                 name: name,
                 filename: filename,
                 contentType: contentType,
-                jsonObject: jsonObject
+                jsonObject: jsonObject,
+                options: .sortedKeys
             )
         })
 
         let parser = try await MultipartFormParser(resolved.request)
         let parsed = try parser.parse()
 
-        let data = try JSONSerialization.data(withJSONObject: jsonObject)
+        let data = try JSONSerialization.data(
+            withJSONObject: jsonObject,
+            options: .sortedKeys
+        )
 
         // Then
         XCTAssertEqual(
@@ -889,14 +897,18 @@ class FormTests: XCTestCase {
         let resolved = try await resolve(TestProperty {
             Form(
                 name: name,
-                jsonObject: jsonObject
+                jsonObject: jsonObject,
+                options: .sortedKeys
             )
         })
 
         let parser = try await MultipartFormParser(resolved.request)
         let parsed = try parser.parse()
 
-        let data = try JSONSerialization.data(withJSONObject: jsonObject)
+        let data = try JSONSerialization.data(
+            withJSONObject: jsonObject,
+            options: .sortedKeys
+        )
 
         // Then
         XCTAssertEqual(
