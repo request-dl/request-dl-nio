@@ -11,7 +11,7 @@ struct AsyncLock: Sendable {
 
         // MARK: - Private properties
 
-        private let lock = NIOLock()
+        private let _lock = NIOLock()
 
         // MARK: - Unsafe properties
 
@@ -25,11 +25,11 @@ struct AsyncLock: Sendable {
         // MARK: - Internal methods
 
         func wait() async {
-            lock.lock()
+            lock()
 
             _signal -= 1
             if _signal >= .zero {
-                defer { lock.unlock() }
+                defer { unlock() }
 
                 do {
                     try _Concurrency.Task.checkCancellation()
@@ -45,16 +45,16 @@ struct AsyncLock: Sendable {
             return await withTaskCancellationHandler {
                 await withUnsafeContinuation {
                     if case .cancelled = task.state {
-                        lock.unlock()
+                        unlock()
                         return
                     }
 
                     task.state = .waiting($0)
                     _tasks.insert(task, at: 0)
-                    lock.unlock()
+                    unlock()
                 }
             } onCancel: {
-                lock.lock()
+                lock()
 
                 _signal += 1
 
@@ -63,34 +63,46 @@ struct AsyncLock: Sendable {
                 }
 
                 if case .waiting = task.state {
-                    lock.unlock()
+                    unlock()
                 } else {
                     task.state = .cancelled
-                    lock.unlock()
+                    unlock()
                 }
             }
         }
 
         func signal() {
-            lock.lock()
-            defer { lock.unlock() }
+            lock()
+            defer { unlock() }
 
             _signal += 1
 
             var pendingTasks = [Task]()
+            var stop = false
 
-            while let task = _tasks.popLast() {
+            while !stop, let task = _tasks.popLast() {
                 switch task.state {
                 case .pending:
                     pendingTasks.append(task)
                 case .waiting(let continuation):
                     continuation.resume()
+                    stop = true
                 case .cancelled:
-                    continue
+                    break
                 }
             }
 
             _tasks.append(contentsOf: pendingTasks.reversed())
+        }
+
+        // MARK: - Private methods
+
+        func lock() {
+            _lock.lock()
+        }
+
+        func unlock() {
+            _lock.unlock()
         }
 
         deinit {
