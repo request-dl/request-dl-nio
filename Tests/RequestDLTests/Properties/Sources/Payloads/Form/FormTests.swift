@@ -656,7 +656,6 @@ class FormTests: XCTestCase {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -722,7 +721,6 @@ class FormTests: XCTestCase {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -983,7 +981,6 @@ class FormTests: XCTestCase {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
 
         // When
         let resolved = try await resolve(TestProperty {
