@@ -10,6 +10,17 @@ struct MultipartFormParser {
     let buffers: [Internals.AnyBuffer]
     let boundary: String
 
+    init(_ request: Internals.Request) async throws {
+        let contentTypeHeader = request.headers["Content-Type"] ?? []
+        let boundary = contentTypeHeader.first.flatMap {
+            MultipartFormParser.extractBoundary($0)
+        } ?? "nil"
+
+        let buffers = try await request.body?.buffers() ?? []
+
+        self.init(buffers, boundary: boundary)
+    }
+
     init(_ buffers: [Internals.AnyBuffer], boundary: String) {
         self.buffers = buffers
         self.boundary = boundary

@@ -5,7 +5,7 @@
 import Foundation
 import RequestDL
 
-struct PartForm {
+struct PartForm: Hashable {
 
     let headers: HTTPHeaders
     let contents: Data
