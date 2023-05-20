@@ -370,12 +370,14 @@ public struct Form<Headers: Property>: Property {
             inputs: inputs
         )
 
-        return try .leaf(FormNode(
+        return .leaf(FormNode(
             fragmentLength: inputs.environment.payloadPartLength,
             item: FormItem(
                 name: property.name,
                 filename: property.filename,
                 additionalHeaders: additionalHeaders.isEmpty ? nil : additionalHeaders,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
                 factory: property.factory
             )
         ))

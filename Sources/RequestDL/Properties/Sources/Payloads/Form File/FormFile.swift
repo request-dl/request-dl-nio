@@ -77,12 +77,14 @@ public struct FormFile: Property {
             contentType: property.contentType
         )
 
-        return try .leaf(FormNode(
+        return .leaf(FormNode(
             fragmentLength: inputs.environment.payloadPartLength,
             item: FormItem(
                 name: property.key,
                 filename: property.fileName,
                 additionalHeaders: nil,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
                 factory: factory
             )
         ))

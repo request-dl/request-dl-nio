@@ -37,14 +37,14 @@ struct FormGroupBuilder: Sendable {
 
     // MARK: - Internal methods
 
-    func callAsFunction() -> [Internals.AnyBuffer] {
+    func callAsFunction() throws -> [Internals.AnyBuffer] {
         var buffers = [Internals.AnyBuffer]()
 
         for item in items {
             var nodeBuffers = [Internals.AnyBuffer]()
 
             nodeBuffers.append(Internals.DataBuffer("--\(boundary)\(eol)".utf8))
-            nodeBuffers.append(contentsOf: buildBuffer(item))
+            nodeBuffers.append(contentsOf: try buildBuffer(item))
             nodeBuffers.append(Internals.DataBuffer(eol.utf8))
 
             buffers.append(contentsOf: nodeBuffers)
@@ -58,10 +58,12 @@ struct FormGroupBuilder: Sendable {
 
     // MARK: - Private methods
 
-    private func buildBuffer(_ item: FormItem) -> [Internals.AnyBuffer] {
-         [
-            buildHeadersBuffer(item.headers()),
-            item.buffer
+    private func buildBuffer(_ item: FormItem) throws -> [Internals.AnyBuffer] {
+        let output = try item()
+
+        return [
+            buildHeadersBuffer(output.headers),
+            output.buffer
         ]
     }
 

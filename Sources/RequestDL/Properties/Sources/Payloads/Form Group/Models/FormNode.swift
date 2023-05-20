@@ -41,7 +41,7 @@ struct FormNode: PropertyNode {
             value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
         )
 
-        let buffers = constructor()
+        let buffers = try constructor()
 
         make.request.headers.set(
             name: "Content-Length",

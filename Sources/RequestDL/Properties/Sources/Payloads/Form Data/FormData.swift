@@ -80,12 +80,14 @@ public struct FormData: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return try .leaf(FormNode(
+        return .leaf(FormNode(
             fragmentLength: inputs.environment.payloadPartLength,
             item: FormItem(
                 name: property.name,
                 filename: property.filename,
                 additionalHeaders: nil,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
                 factory: property.factory
             )
         ))

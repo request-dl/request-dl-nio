@@ -6,41 +6,70 @@ import Foundation
 
 struct FormItem: Sendable {
 
-    // MARK: - Internal methods
-
-    let buffer: Internals.AnyBuffer
+    struct Output {
+        let headers: HTTPHeaders
+        let buffer: Internals.AnyBuffer
+    }
 
     // MARK: - Private properties
 
     private let name: String
     private let filename: String?
-    private let contentType: ContentType
     private let additionalHeaders: HTTPHeaders?
+    private let charset: Charset
+    private let urlEncoder: URLEncoder
+    private let factory: PayloadFactory
 
     // MARK: - Inits
 
     init(
         name: String,
-        filename: String? = nil,
-        additionalHeaders: HTTPHeaders? = nil,
+        filename: String?,
+        additionalHeaders: HTTPHeaders?,
+        charset: Charset,
+        urlEncoder: URLEncoder,
         factory: PayloadFactory
-    ) throws {
-        let output = try factory(.empty)
-
-        guard case .buffer(let buffer) = output.source else {
-            fatalError()
-        }
-
+    ) {
         self.name = name
         self.filename = filename
-        self.contentType = output.contentType
         self.additionalHeaders = additionalHeaders
-        self.buffer = buffer
+        self.charset = charset
+        self.urlEncoder = urlEncoder
+        self.factory = factory
     }
 
     // MARK: - Internal methods
 
-    func headers() -> HTTPHeaders {
+    func callAsFunction() throws -> Output {
+        let output = try factory(.init(
+            method: nil,
+            charset: charset,
+            urlEncoder: urlEncoder
+        ))
+
+        switch output.source {
+        case .buffer(let buffer):
+            return .init(
+                headers: makeHeader(buffer, for: output.contentType),
+                buffer: buffer
+            )
+        case .urlEncoded(let queries):
+            let queries = queries.map { $0.build() }.joined()
+            let data = try charset.encode(queries)
+            let buffer = Internals.DataBuffer(data)
+            return .init(
+                headers: makeHeader(buffer, for: output.contentType),
+                buffer: buffer
+            )
+        }
+    }
+
+    // MARK: - Private methods
+
+    private func makeHeader(
+        _ buffer: Internals.AnyBuffer,
+        for contentType: ContentType
+    ) -> HTTPHeaders {
         var headers = HTTPHeaders()
 
         headers.set(name: "Content-Disposition", value: contentDisposition())
@@ -54,8 +83,6 @@ struct FormItem: Sendable {
 
         return headers
     }
-
-    // MARK: - Private methods
 
     private func contentDisposition() -> String {
         var contentDisposition = "form-data; name=\"\(name)\""

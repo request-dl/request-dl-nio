@@ -60,34 +60,6 @@ public struct FormValue: Property {
         self.value = String(value)
     }
 
-    // MARK: - Public static methods
-
-    /// This method is used internally and should not be called directly.
-    public static func _makeProperty(
-        property: _GraphValue<FormValue>,
-        inputs: _PropertyInputs
-    ) async throws -> _PropertyOutputs {
-        property.assertPathway()
-
-        return try .leaf(FormNode(
-            fragmentLength: inputs.environment.payloadPartLength,
-            item: FormItem(
-                name: property.key,
-                filename: nil,
-                additionalHeaders: nil,
-                factory: StringPayloadFactory(
-                    verbatim: property.value,
-                    contentType: .text
-                )
-            )
-        ))
-    }
-}
-
-// MARK: - Deprecated
-@available(*, deprecated)
-extension FormValue {
-
     /**
      Creates a new instance of `FormValue` to represent a value with a corresponding key in a form.
 
@@ -107,5 +79,30 @@ extension FormValue {
             key: key,
             value: "\(value)"
         )
+    }
+
+    // MARK: - Public static methods
+
+    /// This method is used internally and should not be called directly.
+    public static func _makeProperty(
+        property: _GraphValue<FormValue>,
+        inputs: _PropertyInputs
+    ) async throws -> _PropertyOutputs {
+        property.assertPathway()
+
+        return .leaf(FormNode(
+            fragmentLength: inputs.environment.payloadPartLength,
+            item: FormItem(
+                name: property.key,
+                filename: nil,
+                additionalHeaders: nil,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
+                factory: StringPayloadFactory(
+                    verbatim: property.value,
+                    contentType: .text
+                )
+            )
+        ))
     }
 }

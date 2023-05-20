@@ -11,14 +11,6 @@ protocol PayloadFactory: Sendable {
 
 struct PayloadInput {
 
-    static var empty: PayloadInput {
-        .init(
-            method: nil,
-            charset: .utf8,
-            urlEncoder: .init()
-        )
-    }
-
     let method: String?
     let charset: Charset
     let urlEncoder: URLEncoder
