@@ -38,6 +38,12 @@ private struct LocalCacheStrategyProperty: Property {
 
 extension Property {
 
+    /**
+     Adds a cache strategy to the property using the specified cache strategy.
+     
+     - Parameter cacheStrategy: The cache strategy to be added to the property.
+     - Returns: A property with the added cache strategy.
+     */
     @PropertyBuilder
     public func cacheStrategy(_ cacheStrategy: CacheStrategy) -> some Property {
         self

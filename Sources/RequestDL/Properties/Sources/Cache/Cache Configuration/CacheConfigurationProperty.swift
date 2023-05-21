@@ -48,32 +48,18 @@ private struct CacheConfigurationProperty: Property {
 
 extension Property {
 
-    @PropertyBuilder
-    public func cache(
-        memoryCapacity: UInt64
-    ) -> some Property {
-        self
-        cache(
-            memoryCapacity: memoryCapacity,
-            diskCapacity: .zero
-        )
-    }
+    /**
+     Adds a cache configuration to the property with the specified memory and disk capacities.
 
+     - Parameters:
+        - memoryCapacity: The maximum memory capacity in bytes for the cache.
+        - diskCapacity: The maximum disk capacity in bytes for the cache.
+     - Returns: A property with the added cache configuration.
+     */
     @PropertyBuilder
     public func cache(
-        diskCapacity: UInt64
-    ) -> some Property {
-        self
-        cache(
-            memoryCapacity: .zero,
-            diskCapacity: diskCapacity
-        )
-    }
-
-    @PropertyBuilder
-    public func cache(
-        memoryCapacity: UInt64,
-        diskCapacity: UInt64
+        memoryCapacity: UInt64 = .zero,
+        diskCapacity: UInt64 = .zero
     ) -> some Property {
         self
         CacheConfigurationProperty(
@@ -83,6 +69,15 @@ extension Property {
         )
     }
 
+    /**
+     Adds a cache configuration to the property with the specified memory and disk capacities and suite name for disk storage.
+
+     - Parameters:
+        - memoryCapacity: The maximum memory capacity in bytes for the cache.
+        - diskCapacity: The maximum disk capacity in bytes for the cache.
+        - suiteName: The name of the shared user defaults suite for disk storage.
+     - Returns: A property with the added cache configuration.
+     */
     @PropertyBuilder
     public func cache(
         memoryCapacity: UInt64 = .zero,
@@ -97,6 +92,15 @@ extension Property {
         )
     }
 
+    /**
+     Adds a cache configuration to the property with the specified memory and disk capacities and file URL for disk storage.
+
+     - Parameters:
+        - memoryCapacity: The maximum memory capacity in bytes for the cache.
+        - diskCapacity: The maximum disk capacity in bytes for the cache.
+        - url: The file URL representing the location for disk storage.
+     - Returns: A property with the added cache configuration.
+     */
     @PropertyBuilder
     public func cache(
         memoryCapacity: UInt64 = .zero,
