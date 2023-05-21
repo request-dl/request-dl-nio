@@ -4,18 +4,6 @@
 
 import Foundation
 
-// TODO: - Verify cache expiration using headers
-
-// TODO: - Lock cache while is writing
-// block attempt to write over current process
-
-// TODO: - Return cache only if it was totally wrote
-
-// TODO: - Unit tests for cache
-
-// TODO: - cache responses with zero bytes
-// cache responses with zero bytes
-
 extension Internals {
 
     struct CacheControl: Sendable {
@@ -102,45 +90,87 @@ extension Internals {
             cached cachedData: CachedData,
             request: Internals.Request
         ) async -> CachedData? {
-            guard let headers = await getUpdatedHeadersForCache(client) else {
-                return nil
-            }
+            guard let headers = await getUpdatedHeadersForCache(
+                client: client,
+                cached: cachedData
+            ) else { return nil }
 
             let modifiedHeaders = updateCacheHeaders(
                 cachedData.cachedResponse.response.headers,
                 with: headers
             )
 
+            guard modifiedHeaders != cachedData.response.headers else {
+                return cachedData
+            }
+
             let cachedResponse = updateCachedResponse(
                 cachedData.cachedResponse,
                 with: modifiedHeaders
             )
-
+            
             dataCache.updateCached(
                 key: request.url,
                 cachedResponse: cachedResponse
             )
 
-            return .init(
-                cachedResponse: cachedResponse,
-                buffer: cachedData.buffer
+            return dataCache.getCachedData(
+                forKey: request.url,
+                policy: request.cachePolicy
             )
         }
 
-        private func getUpdatedHeadersForCache(_ client: Internals.Client) async -> HTTPHeaders? {
+        private func getUpdatedHeadersForCache(
+            client: Internals.Client,
+            cached cachedData: CachedData
+        ) async -> HTTPHeaders? {
             var request = request
             request.method = "HEAD"
+
+            updateHeaders(
+                &request.headers,
+                cachedHeaders: cachedData.response.headers,
+                for: "Last-Modified"
+            )
+
+            updateHeaders(
+                &request.headers,
+                cachedHeaders: cachedData.response.headers,
+                for: "ETag"
+            )
 
             guard let response = try? await client.execute(request: request.build()).get() else {
                 return nil
             }
 
-            if response.status.code != 304 {
-                dataCache.remove(forKey: request.url)
+            let lastModified = response.headers["Last-Modified"]
+            let eTag = response.headers["ETag"]
+
+            if lastModified != cachedData.response.headers["Last-Modified"] ?? [] {
                 return nil
             }
 
-            return HTTPHeaders(response.headers)
+            if eTag != cachedData.response.headers["ETag"] ?? [] {
+                return nil
+            }
+
+            return .init(response.headers)
+        }
+
+        private func updateHeaders(
+            _ headers: inout HTTPHeaders,
+            cachedHeaders: HTTPHeaders,
+            for name: String
+        ) {
+            let values = headers[name] ?? cachedHeaders[name]
+
+            if let values, headers[name] ?? [] != values {
+                headers.remove(name: name)
+
+                for value in values {
+                    headers.add(name: name, value: value)
+                }
+            }
         }
 
         private func updateCacheHeaders(
@@ -149,41 +179,17 @@ extension Internals {
         ) -> HTTPHeaders {
             var cachedHeaders = cachedHeaders
 
-            let lastModified = newHeaders["Last-Modified"]
-            let eTag = newHeaders["ETag"]
+            updateHeaders(
+                &cachedHeaders,
+                cachedHeaders: newHeaders,
+                for: "Cache-Control"
+            )
 
-            let isLastModifiedUpdated = cachedHeaders["Last-Modified"].map {
-                $0 != lastModified
-            } ?? false
-
-            let isETagUpdated = cachedHeaders["ETag"].map {
-                $0 != eTag
-            } ?? false
-
-            guard isLastModifiedUpdated || isETagUpdated else {
-                return cachedHeaders
-            }
-
-            if isLastModifiedUpdated, let lastModified {
-                cachedHeaders.remove(name: "Last-Modified")
-                for value in lastModified {
-                    cachedHeaders.set(name: "Last-Modified", value: value)
-                }
-            }
-
-            if isETagUpdated, let eTag {
-                cachedHeaders.remove(name: "ETag")
-                for value in eTag {
-                    cachedHeaders.set(name: "ETag", value: value)
-                }
-            }
-
-            if let cacheControl = newHeaders["Cache-Control"] {
-                cachedHeaders.remove(name: "Cache-Control")
-                for value in cacheControl {
-                    cachedHeaders.set(name: "Cache-Control", value: value)
-                }
-            }
+            updateHeaders(
+                &cachedHeaders,
+                cachedHeaders: newHeaders,
+                for: "Expires"
+            )
 
             return cachedHeaders
         }
@@ -213,13 +219,8 @@ extension Internals {
             }
 
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
-                // TODO: - Accepts nil as zero
-                guard
-                    let contentLengthValue = head.headers["Content-Length"],
-                    let contentLength = contentLengthValue.getHeaderContentLength()
-                else { return nil }
+                let contentLength = contentLength(headers: head.headers["Content-Length"] ?? [])
 
-                // TODO: - Needs optimizations
                 let asyncBuffers = Internals.AsyncStream<Internals.DataBuffer>()
 
                 _Concurrency.Task(priority: .background) {
@@ -244,16 +245,13 @@ extension Internals {
                 return asyncBuffers
             }
         }
-    }
-}
 
-extension [String] {
-
-    fileprivate func getHeaderContentLength() -> Int? {
-        reduce([]) { $0 + $1.split(separator: ";") }
-            .lazy
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .compactMap(Int.init)
-            .first
+        private func contentLength(headers: [String]) -> Int {
+            headers.reduce([]) { $0 + $1.split(separator: ";") }
+                .lazy
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .compactMap(Int.init)
+                .first ?? .zero
+        }
     }
 }

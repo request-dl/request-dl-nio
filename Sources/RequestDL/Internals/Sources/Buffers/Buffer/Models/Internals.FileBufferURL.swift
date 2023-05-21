@@ -24,29 +24,34 @@ extension Internals {
         // MARK: - Internal properties
 
         var writtenBytes: Int {
-            let size = try? FileManager.default.attributesOfItem(
-                atPath: _path
-            )[.size] as? Int
+            do {
+                let values = try url.resourceValues(
+                    forKeys: [.fileSizeKey, .totalFileSizeKey]
+                )
 
-            return size ?? .zero
+                let fileSize = values.fileSize ?? .zero
+                let totalFileSize = values.totalFileSize ?? .zero
+
+                return max(fileSize, totalFileSize)
+            } catch {
+                return .zero
+            }
         }
 
         // MARK: - Private properties
 
-        private var _path: String {
-            url.absolutePath(percentEncoded: false)
-        }
-
+        private let _path: String
         private let url: Foundation.URL
 
         // MARK: - Inits
 
         init(_ url: Foundation.URL) {
             self.url = url
+            self._path = url.absolutePath(percentEncoded: false)
         }
 
         func isResourceAvailable() -> Bool {
-            (try? url.checkResourceIsReachable()) ?? false
+            FileManager.default.fileExists(atPath: _path)
         }
 
         func createResourceIfNeeded() {
@@ -56,7 +61,7 @@ extension Internals {
 
             let directoryURL = url.deletingLastPathComponent()
 
-            if directoryURL.hasDirectoryPath, (try? directoryURL.checkResourceIsReachable()) ?? false {
+            if directoryURL.hasDirectoryPath, !directoryURL.isReachable {
                 try? FileManager.default.createDirectory(
                     at: directoryURL,
                     withIntermediateDirectories: true
@@ -69,5 +74,14 @@ extension Internals {
         func absoluteURL() -> Foundation.URL {
             url
         }
+    }
+}
+
+extension URL {
+
+    var isReachable: Bool {
+        FileManager.default.fileExists(
+            atPath: absolutePath(percentEncoded: false)
+        )
     }
 }

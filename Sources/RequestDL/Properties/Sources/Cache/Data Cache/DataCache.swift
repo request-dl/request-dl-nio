@@ -90,8 +90,8 @@ public struct DataCache: Sendable {
             self.directory = directory
             self._memoryStorage = .init(directory: directory)
             self._diskStorage = .init(directory: directory)
-            self._memoryCapacity = 1_024 * 1_024 * 16
-            self._diskCapacity = 1_024 * 1_024 * 128
+            self._memoryCapacity = .zero
+            self._diskCapacity = .zero
         }
     }
 

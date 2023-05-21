@@ -39,6 +39,16 @@ extension Internals {
                 directoryURL = url
             }
 
+            let lazyDataCache = DataCache(url: directoryURL)
+
+            if memoryCapacity == nil || memoryCapacity == .zero {
+                lazyDataCache.memoryCapacity = max(lazyDataCache.memoryCapacity, 1_024 * 1_024 * 2)
+            }
+
+            if diskCapacity == nil || diskCapacity == .zero {
+                lazyDataCache.diskCapacity = max(lazyDataCache.diskCapacity, 1_024 * 1_024 * 2)
+            }
+
             return .init(
                 memoryCapacity: memoryCapacity ?? .zero,
                 diskCapacity: diskCapacity  ?? .zero,

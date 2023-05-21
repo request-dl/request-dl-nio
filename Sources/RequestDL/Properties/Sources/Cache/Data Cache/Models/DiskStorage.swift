@@ -224,14 +224,20 @@ struct DiskStorage: Sendable {
         freeSpace(maximumCapacity - spaceNeeded)
 
         guard
-            (try? record.dataURL.checkResourceIsReachable()) ?? false,
+            record.dataURL.isReachable,
             let newRecord = self.record(key, createdAt: Date())
         else { return }
 
-        try? FileManager.default.moveItem(
-            at: record.dataURL,
-            to: newRecord.dataURL
-        )
+        do {
+            try FileManager.default.moveItem(
+                at: record.dataURL,
+                to: newRecord.dataURL
+            )
+
+            try response.write(to: newRecord.responseURL)
+        } catch {
+            try? FileManager.default.removeItem(at: newRecord.url)
+        }
 
         try? FileManager.default.removeItem(at: record.url)
     }

@@ -89,6 +89,8 @@ extension Internals {
 
                         if let data = incomeBytes.readData(readableBytes) {
                             buffer.writeData(data)
+                        } else {
+                            break
                         }
 
                         if buffer.readableBytes == length {
