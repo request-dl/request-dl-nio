@@ -32,7 +32,7 @@ extension DataCache.Policy {
 
         /**
          Initializes a cache policy set with the specified cache policy.
-         
+
          - Parameter policy: The cache policy to initialize the set with.
          */
         public init(_ policy: DataCache.Policy) {

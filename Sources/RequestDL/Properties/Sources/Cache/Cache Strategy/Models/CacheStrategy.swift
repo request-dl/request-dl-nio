@@ -23,4 +23,3 @@ public enum CacheStrategy: Sendable, Hashable {
      */
     case returnStoredElseLoad
 }
-
