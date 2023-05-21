@@ -4,18 +4,30 @@
 
 import Foundation
 
+/**
+ A struct representing cached data with associated metadata.
+ */
 public struct CachedData: Sendable {
 
     // MARK: - Public properties
 
+    /**
+     The response head associated with the cached data.
+     */
     public var response: ResponseHead {
         .init(cachedResponse.response)
     }
 
+    /**
+     The cache policy associated with the cached data.
+     */
     public var policy: DataCache.Policy.Set {
         cachedResponse.policy
     }
 
+    /**
+     The actual data stored in the cache.
+     */
     public var data: Data {
         buffer.getData() ?? Data()
     }
@@ -26,6 +38,14 @@ public struct CachedData: Sendable {
 
     let buffer: Internals.AnyBuffer
 
+    /**
+     Initializes a `CachedData` instance with the provided response head, cache policy, and data.
+
+     - Parameters:
+        - response: The response head associated with the cached data.
+        - policy: The cache policy associated with the cached data.
+        - data: The data to be cached.
+     */
     public init<Data: DataProtocol>(
         response: ResponseHead,
         policy: DataCache.Policy.Set,
@@ -40,6 +60,14 @@ public struct CachedData: Sendable {
         )
     }
 
+    /**
+     Initializes a `CachedData` instance with the provided response head, cache policy, and file URL.
+
+     - Parameters:
+        - response: The response head associated with the cached data.
+        - policy: The cache policy associated with the cached data.
+        - url: The file URL representing the location of the cached data.
+     */
     public init(
         response: ResponseHead,
         policy: DataCache.Policy.Set,

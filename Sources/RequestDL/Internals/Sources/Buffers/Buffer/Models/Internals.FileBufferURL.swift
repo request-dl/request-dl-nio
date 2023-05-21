@@ -25,14 +25,8 @@ extension Internals {
 
         var writtenBytes: Int {
             do {
-                let values = try url.resourceValues(
-                    forKeys: [.fileSizeKey, .totalFileSizeKey]
-                )
-
-                let fileSize = values.fileSize ?? .zero
-                let totalFileSize = values.totalFileSize ?? .zero
-
-                return max(fileSize, totalFileSize)
+                let attributes = try FileManager.default.attributesOfItem(atPath: _path)
+                return attributes[.size] as? Int ?? .zero
             } catch {
                 return .zero
             }

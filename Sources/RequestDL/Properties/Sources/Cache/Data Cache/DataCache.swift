@@ -4,6 +4,9 @@
 
 import Foundation
 
+/**
+ A data cache that stores and retrieves data based on specified capacities and policies.
+ */
 public struct DataCache: Sendable {
 
     private class Manager: @unchecked Sendable {
@@ -97,11 +100,17 @@ public struct DataCache: Sendable {
 
     // MARK: - Public properties
 
+    /**
+     The maximum memory capacity in bytes for the data cache.
+     */
     public var memoryCapacity: UInt64 {
         get { storage.memoryCapacity }
         nonmutating set { storage.memoryCapacity = newValue }
     }
 
+    /**
+     The maximum disk capacity in bytes for the data cache.
+     */
     public var diskCapacity: UInt64 {
         get { storage.diskCapacity }
         nonmutating set { storage.diskCapacity = newValue }
@@ -113,6 +122,14 @@ public struct DataCache: Sendable {
 
     // MARK: - Internal properties
 
+    /**
+     Initializes a data cache with specified memory and disk capacities and a file URL for disk storage.
+
+     - Parameters:
+        - memoryCapacity: The maximum memory capacity in bytes for the data cache.
+        - diskCapacity: The maximum disk capacity in bytes for the data cache.
+        - url: The file URL representing the location for disk storage.
+     */
     public init(
         memoryCapacity: UInt64 = .zero,
         diskCapacity: UInt64 = .zero,
@@ -137,6 +154,14 @@ public struct DataCache: Sendable {
         storage.diskCapacity = max(diskCapacity, storage.diskCapacity)
     }
 
+    /**
+     Initializes a data cache with specified memory and disk capacities and a suite name for disk storage.
+
+     - Parameters:
+        - memoryCapacity: The maximum memory capacity in bytes for the data cache.
+        - diskCapacity: The maximum disk capacity in bytes for the data cache.
+        - suiteName: The name of the shared user defaults suite for disk storage.
+     */
     public init(
         memoryCapacity: UInt64 = .zero,
         diskCapacity: UInt64 = .zero,
@@ -149,6 +174,13 @@ public struct DataCache: Sendable {
         )
     }
 
+    /**
+     Initializes a data cache with specified memory and disk capacities.
+
+     - Parameters:
+        - memoryCapacity: The maximum memory capacity in bytes for the data cache.
+        - diskCapacity: The maximum disk capacity in bytes for the data cache.
+     */
     public init(
         memoryCapacity: UInt64 = .zero,
         diskCapacity: UInt64 = .zero
@@ -186,6 +218,14 @@ public struct DataCache: Sendable {
 
     // MARK: - Public methods
 
+    /**
+     Retrieves cached data for a specified key and policy.
+
+     - Parameters:
+        - key: The key associated with the cached data.
+        - policy: The policy indicating the desired behavior for retrieving the cached data.
+     - Returns: The cached data, if available based on the specified policy.
+     */
     public func getCachedData(forKey key: String, policy: DataCache.Policy.Set) -> CachedData? {
         let key = base64EncodedKey(key)
 
@@ -200,6 +240,13 @@ public struct DataCache: Sendable {
         return nil
     }
 
+    /**
+     Sets cached data for a specified key.
+
+     - Parameters:
+        - cachedData: The cached data to be stored.
+        - key: The key associated with the cached data.
+     */
     public func setCachedData(_ cachedData: CachedData, forKey key: String) {
         var buffer = allocateBuffer(
             key: key,
@@ -210,6 +257,11 @@ public struct DataCache: Sendable {
         buffer?.writeBuffer(cachedData.buffer)
     }
 
+    /**
+     Removes cached data for a specified key.
+
+     - Parameter key: The key associated with the cached data to be removed.
+     */
     public func remove(forKey key: String) {
         let key = base64EncodedKey(key)
 
@@ -217,11 +269,19 @@ public struct DataCache: Sendable {
         storage.diskStorage.remove(key)
     }
 
+    /**
+     Removes all cached data from the cache.
+     */
     public func removeAll() {
         storage.memoryStorage.removeAll()
         storage.diskStorage.removeAll()
     }
 
+    /**
+     Removes all cached data from the cache that was stored since a specified date.
+
+     - Parameter date: The date to filter cached data removal.
+     */
     public func removeAll(since date: Date) {
         storage.memoryStorage.removeAll(since: date)
         storage.diskStorage.removeAll(since: date)

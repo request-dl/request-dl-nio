@@ -14,8 +14,12 @@ extension Internals {
             case cache(((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?)
         }
 
+        // MARK: - Internal properties
+
         let request: Internals.Request
         let dataCache: DataCache
+
+        // MARK: - Internal methods
 
         func callAsFunction(_ client: Internals.Client) async -> Output {
             if let cachedData = storedCachedData() {
@@ -34,6 +38,8 @@ extension Internals {
                 request: request
             ))
         }
+
+        // MARK: - Private methods
 
         private func storedCachedData() -> CachedData? {
             guard request.isCacheEnabled else {
