@@ -167,12 +167,14 @@ public struct DataCache: Sendable {
     // MARK: - Internal static methods
 
     static func temporaryURL(suiteName: String) -> URL {
-        FileManager.default.temporaryDirectory.appendingPathExtension(
-            suiteName.replacingOccurrences(
-                of: "[/:\\\\]",
-                with: "_",
-                options: .regularExpression
-            )
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("com.request-dl.Swift.Cache")
+            .appendingPathComponent(
+                suiteName.replacingOccurrences(
+                    of: "[/:\\\\]",
+                    with: "_",
+                    options: .regularExpression
+                )
         )
     }
 

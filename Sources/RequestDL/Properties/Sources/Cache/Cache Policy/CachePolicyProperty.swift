@@ -44,4 +44,3 @@ extension Property {
         CachePolicyProperty(policy: cachePolity)
     }
 }
-

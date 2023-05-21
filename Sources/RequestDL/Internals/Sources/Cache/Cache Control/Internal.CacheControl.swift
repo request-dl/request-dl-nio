@@ -4,6 +4,7 @@
 
 import Foundation
 
+// swiftlint:disable type_body_length
 extension Internals {
 
     struct CacheControl: Sendable {
@@ -49,24 +50,30 @@ extension Internals {
             client: Internals.Client,
             cached cachedData: CachedData
         ) async -> SessionTask? {
-            switch request.localCacheStrategy {
-            case .ignoresStored:
+            if request.localCacheStrategy == .ignoresStored {
                 return nil
-            case .usesStoredOnly:
-                return makeCachedSession(cachedData)
-            case .returnStoredElseLoad:
-                guard let cachedData = await validateCachedData(
-                    client: client,
-                    dataCache: dataCache,
-                    cached: cachedData,
-                    request: request
-                ) else { return nil }
+            }
 
+            if request.localCacheStrategy == .usesStoredOnly {
                 return makeCachedSession(cachedData)
             }
+
+            guard let cachedData = await validateCachedData(
+                client: client,
+                dataCache: dataCache,
+                cached: cachedData,
+                request: request
+            ) else { return nil }
+
+            return makeCachedSession(cachedData)
         }
 
-        private func makeCachedSession(_ cachedData: CachedData) -> SessionTask {
+        private func makeCachedSession(_ cachedData: CachedData) -> SessionTask? {
+            if !isCachedDataValid(cachedData) {
+                dataCache.remove(forKey: request.url)
+                return nil
+            }
+
             let download = Internals.DownloadBuffer(
                 readingMode: request.readingMode
             )
@@ -108,7 +115,7 @@ extension Internals {
                 cachedData.cachedResponse,
                 with: modifiedHeaders
             )
-            
+
             dataCache.updateCached(
                 key: request.url,
                 cachedResponse: cachedResponse
@@ -246,12 +253,71 @@ extension Internals {
             }
         }
 
+        private func isCachedDataValid(_ cachedData: CachedData) -> Bool {
+            let headers = cachedData.response.headers
+
+            let contentLength = contentLength(headers: headers["Content-Length"] ?? [])
+
+            if cachedData.buffer.readableBytes != contentLength {
+                return false
+            }
+
+            if let expiresDate = expiresDate(headers: headers["Expires"] ?? []) {
+                if expiresDate < Date() {
+                    return false
+                }
+            }
+
+            if let maxAge = maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
+                if maxAge > .zero && cachedData.cachedResponse.date.advanced(by: TimeInterval(maxAge)) < Date() {
+                    return false
+                }
+            }
+
+            return true
+        }
+
         private func contentLength(headers: [String]) -> Int {
+            flatAndCombineHeadersValues(headers)
+                .compactMap(Int.init)
+                .max() ?? .zero
+        }
+
+        private func expiresDate(headers: [String]) -> Date? {
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+            dateFormatter.timeZone = TimeZone(identifier: "GMT")
+
+            return flatAndCombineHeadersValues(headers)
+                .compactMap(dateFormatter.date(from:))
+                .max()
+        }
+
+        private func maxAgeSeconds(headers: [String]) -> Int? {
+            flatAndCombineHeadersValues(headers)
+                .compactMap {
+                    let components = $0.split(separator: "=")
+
+                    if components.count <= 1 {
+                        return nil
+                    }
+
+                    if components[0].range(of: "max-age", options: [.caseInsensitive]) == nil {
+                        return nil
+                    }
+
+                    return Int(components.dropFirst().joined(separator: "="))
+                }
+                .max()
+        }
+
+        private func flatAndCombineHeadersValues(_ headers: [String]) -> LazyMapSequence<[Substring], String> {
             headers.reduce([]) { $0 + $1.split(separator: ";") }
+                .reduce([]) { $0 + $1.split(separator: ",") }
                 .lazy
                 .map { $0.trimmingCharacters(in: .whitespaces) }
-                .compactMap(Int.init)
-                .first ?? .zero
         }
     }
 }
+// swiftlint:enable type_body_length
