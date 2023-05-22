@@ -336,5 +336,3 @@ extension Internals {
     }
 }
 // swiftlint:enable type_body_length
-
-public struct EmptyCachedDataError: Error {}
