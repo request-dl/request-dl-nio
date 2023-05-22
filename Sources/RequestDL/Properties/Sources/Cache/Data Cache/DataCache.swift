@@ -354,7 +354,9 @@ public struct DataCache: Sendable {
         )
     }
 
-    func base64EncodedKey(_ key: String) -> String {
+    // MARK: - Private methods
+
+    private func base64EncodedKey(_ key: String) -> String {
         Data(key.utf8).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
