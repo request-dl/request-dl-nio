@@ -4,14 +4,14 @@
 
 import Foundation
 
-private struct LocalCacheStrategyProperty: Property {
+private struct CacheStrategyProperty: Property {
 
     private struct Node: PropertyNode {
 
         let strategy: CacheStrategy
 
         func make(_ make: inout Make) async throws {
-            make.request.localCacheStrategy = strategy
+            make.request.cacheStrategy = strategy
         }
     }
 
@@ -26,7 +26,7 @@ private struct LocalCacheStrategyProperty: Property {
     // MARK: - Internal static methods
 
     static func _makeProperty(
-        property: _GraphValue<LocalCacheStrategyProperty>,
+        property: _GraphValue<CacheStrategyProperty>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
@@ -47,6 +47,6 @@ extension Property {
     @PropertyBuilder
     public func cacheStrategy(_ cacheStrategy: CacheStrategy) -> some Property {
         self
-        LocalCacheStrategyProperty(strategy: cacheStrategy)
+        CacheStrategyProperty(strategy: cacheStrategy)
     }
 }

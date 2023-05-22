@@ -22,14 +22,16 @@ extension Internals {
         // MARK: - Internal methods
 
         func callAsFunction(_ client: Internals.Client) async -> Output {
-            if let cachedData = storedCachedData() {
-                let cachedSessionTask = await checkIfCachedDataStillValid(
-                    client: client,
-                    cached: cachedData
-                )
+            if request.cacheStrategy != .ignoreCachedData {
+                if let cachedData = storedCachedData() {
+                    let cachedSessionTask = await checkIfCachedDataStillValid(
+                        client: client,
+                        cached: cachedData
+                    )
 
-                if let cachedSessionTask {
-                    return .task(cachedSessionTask)
+                    if let cachedSessionTask {
+                        return .task(cachedSessionTask)
+                    }
                 }
             }
 
@@ -56,22 +58,29 @@ extension Internals {
             client: Internals.Client,
             cached cachedData: CachedData
         ) async -> SessionTask? {
-            if request.localCacheStrategy == .ignoresStored {
+            switch request.cacheStrategy {
+            case .ignoreCachedData:
                 return nil
-            }
+            case .useCachedDataOnly:
+                return makeCachedSession(cachedData) ?? {
+                    SessionTask(AsyncResponse(
+                        upload: .empty(),
+                        head: .empty(),
+                        download: .throwing(EmptyCachedDataError())
+                    ))
+                }()
+            case .returnCachedDataElseLoad:
+                return makeCachedSession(cachedData)
+            case .reloadAndValidateCachedData:
+                guard let cachedData = await validateCachedData(
+                    client: client,
+                    dataCache: dataCache,
+                    cached: cachedData,
+                    request: request
+                ) else { return nil }
 
-            if request.localCacheStrategy == .usesStoredOnly {
                 return makeCachedSession(cachedData)
             }
-
-            guard let cachedData = await validateCachedData(
-                client: client,
-                dataCache: dataCache,
-                cached: cachedData,
-                request: request
-            ) else { return nil }
-
-            return makeCachedSession(cachedData)
         }
 
         private func makeCachedSession(_ cachedData: CachedData) -> SessionTask? {
@@ -327,3 +336,5 @@ extension Internals {
     }
 }
 // swiftlint:enable type_body_length
+
+public struct EmptyCachedDataError: Error {}

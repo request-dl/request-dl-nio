@@ -49,7 +49,7 @@ extension Internals {
         var body: Body?
         var readingMode: Internals.Response.ReadingMode
         var cachePolicy: DataCache.Policy.Set
-        var localCacheStrategy: CacheStrategy
+        var cacheStrategy: CacheStrategy
 
         // MARK: - Inits
 
@@ -62,7 +62,7 @@ extension Internals {
             self.body = nil
             self.readingMode = .length(1_024)
             self.cachePolicy = []
-            self.localCacheStrategy = .ignoresStored
+            self.cacheStrategy = .ignoreCachedData
         }
 
         // MARK: - Internal methods

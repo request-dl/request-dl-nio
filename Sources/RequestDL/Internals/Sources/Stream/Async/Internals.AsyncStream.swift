@@ -187,6 +187,13 @@ extension Internals {
             return asyncStream
         }
 
+        static func throwing(_ error: Error) -> AsyncStream<Element> {
+            let asyncStream = AsyncStream()
+            asyncStream.append(.failure(error))
+            asyncStream.close()
+            return asyncStream
+        }
+
         // MARK: - Internal methods
 
         func append(_ value: Result<Element, Error>) {

@@ -4,22 +4,18 @@
 
 import Foundation
 
-/**
- A cache strategy enumeration that represents different strategies for handling cached data.
- */
+/// A cache strategy enumeration that represents different strategies for handling cached data.
 public enum CacheStrategy: Sendable, Hashable {
-    /**
-     Ignores stored data in the cache and always performs a fresh load from the source.
-     */
-    case ignoresStored
 
-    /**
-     Uses stored data from the cache only and does not perform any network requests.
-     */
-    case usesStoredOnly
+    /// Ignores cached data and always performs a fresh load from the source.
+    case ignoreCachedData
 
-    /**
-     Returns stored data from the cache if available, otherwise performs a load from the source.
-     */
-    case returnStoredElseLoad
+    /// Reloads and revalidates cached data.
+    case reloadAndValidateCachedData
+
+    /// Returns cached data if available, otherwise performs a load from the source.
+    case returnCachedDataElseLoad
+
+    /// Uses only cached data and doesn't make any network requests.
+    case useCachedDataOnly
 }
