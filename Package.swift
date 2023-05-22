@@ -21,7 +21,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.17.0"
+            from: "1.18.0"
         ),
         .package(
             url: "https://github.com/apple/swift-docc-plugin.git",
