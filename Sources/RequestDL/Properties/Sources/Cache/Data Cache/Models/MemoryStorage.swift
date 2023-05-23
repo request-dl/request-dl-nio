@@ -27,7 +27,7 @@ struct MemoryStorage: Sendable {
             cachedResponse: CachedResponse
         ) {
             self.key = key
-            self.date = Date()
+            self.date = cachedResponse.date
             self.cachedResponse = cachedResponse
             self.dataURL = .init()
         }
@@ -74,7 +74,7 @@ struct MemoryStorage: Sendable {
                 fatalError()
             }
 
-            if entry.date < date {
+            if entry.date <= date {
                 identifiers.remove(key)
                 records[key] = nil
             }

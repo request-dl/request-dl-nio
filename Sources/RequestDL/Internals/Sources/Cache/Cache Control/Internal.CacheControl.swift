@@ -241,6 +241,10 @@ extension Internals {
             }
 
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
+                guard !containsNoCache(headers: head.headers["Cache-Control"] ?? []) else {
+                    return nil
+                }
+
                 let contentLength = contentLength(headers: head.headers["Content-Length"] ?? [])
 
                 let asyncBuffers = Internals.AsyncStream<Internals.DataBuffer>()
@@ -290,6 +294,11 @@ extension Internals {
             }
 
             return true
+        }
+
+        private func containsNoCache(headers: [String]) -> Bool {
+            flatAndCombineHeadersValues(headers)
+                .contains("no-cache")
         }
 
         private func contentLength(headers: [String]) -> Int {

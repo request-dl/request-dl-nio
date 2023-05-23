@@ -198,7 +198,7 @@ struct DiskStorage: Sendable {
     }
 
     func removeAll(since date: Date) {
-        for record in records() where record.date < date {
+        for record in records() where record.date <= date {
             try? FileManager.default.removeItem(at: record.url)
         }
     }
@@ -225,7 +225,7 @@ struct DiskStorage: Sendable {
 
         guard
             record.dataURL.isReachable,
-            let newRecord = self.record(key, createdAt: Date())
+            let newRecord = self.record(key, createdAt: cachedResponse.date)
         else { return }
 
         do {
@@ -260,7 +260,7 @@ struct DiskStorage: Sendable {
 
         freeSpace(maximumCapacity - writableBytes)
 
-        guard let record = record(key, createdAt: Date()) else {
+        guard let record = record(key, createdAt: cachedResponse.date) else {
             return nil
         }
 

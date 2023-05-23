@@ -159,6 +159,100 @@ class DataCacheTests: XCTestCase {
 
         XCTAssertEqual(cachedDisk2?.data, cachedData2.data)
     }
+
+    func testCache_whenRemoveKey() {
+        // Given
+        let key1 = "https://google.com"
+        let key2 = "https://apple.com"
+
+        let cachedData1 = mockCachedData(
+            url: key1,
+            length: 1_024 - 256
+        )
+
+        let cachedData2 = mockCachedData(
+            url: key2,
+            length: 512
+        )
+
+        // When
+        dataCache.setCachedData(cachedData1, forKey: key1)
+        dataCache.setCachedData(cachedData2, forKey: key2)
+
+        let memoryCached1 = dataCache.getCachedData(forKey: key1, policy: .memory)
+        let diskCached1 = dataCache.getCachedData(forKey: key1, policy: .disk)
+        let diskCached1Data = diskCached1?.data
+
+        dataCache.remove(forKey: key1)
+
+        let memoryCached2 = dataCache.getCachedData(forKey: key2, policy: .memory)
+        let diskCached2 = dataCache.getCachedData(forKey: key2, policy: .disk)
+
+        let memoryCached1_v2 = dataCache.getCachedData(forKey: key1, policy: .memory)
+        let diskCached1_v2 = dataCache.getCachedData(forKey: key1, policy: .disk)
+
+        // Then
+        XCTAssertEqual(memoryCached1?.data, cachedData1.data)
+        XCTAssertEqual(diskCached1Data, cachedData1.data)
+
+        XCTAssertEqual(memoryCached2?.data, cachedData2.data)
+        XCTAssertEqual(diskCached2?.data, cachedData2.data)
+
+        XCTAssertNil(memoryCached1_v2)
+        XCTAssertNil(diskCached1_v2)
+    }
+
+    func testCache_whenRemoveSince() {
+        // Given
+        let cachedDatas = (0 ..< 3) .map {
+            mockCachedData(
+                url: "https://google.com/\($0)",
+                length: 1_024
+            )
+        }
+
+        // When
+        for cacheData in cachedDatas {
+            dataCache.setCachedData(cacheData, forKey: cacheData.cachedResponse.response.url)
+        }
+
+        dataCache.removeAll(since: cachedDatas[1].cachedResponse.date)
+
+        let storedDatas = [0, 1, 2].map {
+            dataCache.getCachedData(forKey: "https://google.com/\($0)", policy: .all)
+        }
+
+        // Then
+        XCTAssertNil(storedDatas[0])
+        XCTAssertNil(storedDatas[1])
+        XCTAssertEqual(storedDatas[2]?.data, cachedDatas[2].data)
+    }
+
+    func testCache_whenRemoveAll() {
+        // Given
+        let cachedDatas = (0 ..< 3) .map {
+            mockCachedData(
+                url: "https://google.com/\($0)",
+                length: 1_024
+            )
+        }
+
+        // When
+        for cacheData in cachedDatas {
+            dataCache.setCachedData(cacheData, forKey: cacheData.cachedResponse.response.url)
+        }
+
+        dataCache.removeAll()
+
+        let storedDatas = [0, 1, 2].map {
+            dataCache.getCachedData(forKey: "https://google.com/\($0)", policy: .all)
+        }
+
+        // Then
+        XCTAssertNil(storedDatas[0])
+        XCTAssertNil(storedDatas[1])
+        XCTAssertNil(storedDatas[2])
+    }
 }
 
 extension DataCacheTests {
