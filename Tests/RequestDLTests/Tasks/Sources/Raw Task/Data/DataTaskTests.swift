@@ -27,8 +27,8 @@ class DataTaskTests: XCTestCase {
                     Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
-                .extractPayload()
-                .result()
+            .extractPayload()
+            .result()
 
             let result = try HTTPResult<String>(data)
 

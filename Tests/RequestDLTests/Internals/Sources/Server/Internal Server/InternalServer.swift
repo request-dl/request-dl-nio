@@ -14,17 +14,22 @@ struct InternalServer<Response: Codable> where Response: Equatable {
     let port: UInt
     let tlsConfiguration: TLSConfiguration
     let response: Response
+    let noCache: Bool
+    let maxAge: Bool
 
     init(
         host: String,
         port: UInt,
         response: Response,
+        noCache: Bool = false,
+        maxAge: Bool = true,
         option: Option? = nil
     ) throws {
-
         self.host = host
         self.port = port
         self.response = response
+        self.noCache = noCache
+        self.maxAge = maxAge
 
         switch option {
         case .none:
@@ -73,7 +78,11 @@ extension InternalServer {
                         channel.pipeline.configureHTTPServerPipeline()
                     }
                     .flatMap {
-                        channel.pipeline.addHandler(HTTPHandler(response))
+                        channel.pipeline.addHandler(HTTPHandler(
+                            response: response,
+                            noCache: noCache,
+                            maxAge: maxAge
+                        ))
                     }
             }
             .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)

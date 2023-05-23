@@ -32,6 +32,12 @@ extension Internals {
                     if let cachedSessionTask {
                         return .task(cachedSessionTask)
                     }
+                } else if case .useCachedDataOnly = request.cacheStrategy {
+                    return .task(SessionTask(Internals.AsyncResponse(
+                        upload: .empty(),
+                        head: .throwing(EmptyCachedDataError()),
+                        download: .empty()
+                    )))
                 }
             }
 
@@ -65,8 +71,8 @@ extension Internals {
                 return makeCachedSession(cachedData) ?? {
                     SessionTask(AsyncResponse(
                         upload: .empty(),
-                        head: .empty(),
-                        download: .throwing(EmptyCachedDataError())
+                        head: .throwing(EmptyCachedDataError()),
+                        download: .empty()
                     ))
                 }()
             case .returnCachedDataElseLoad:

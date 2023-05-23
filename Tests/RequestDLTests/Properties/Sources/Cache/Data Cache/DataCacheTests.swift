@@ -253,6 +253,19 @@ class DataCacheTests: XCTestCase {
         XCTAssertNil(storedDatas[1])
         XCTAssertNil(storedDatas[2])
     }
+
+    func testCache_whenInitWithSuiteName() {
+        // Given
+        let suiteName = "shared_other_lib"
+
+        // When
+        let dataCache = DataCache(suiteName: suiteName)
+
+        let suiteURL = DataCache.temporaryURL(suiteName: suiteName)
+
+        // Then
+        XCTAssertEqual(dataCache, DataCache(url: suiteURL))
+    }
 }
 
 extension DataCacheTests {

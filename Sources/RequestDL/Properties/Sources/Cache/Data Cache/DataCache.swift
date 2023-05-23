@@ -7,9 +7,9 @@ import Foundation
 /**
  A data cache that stores and retrieves data based on specified capacities and policies.
  */
-public struct DataCache: Sendable {
+public struct DataCache: Sendable, Equatable {
 
-    private class Manager: @unchecked Sendable {
+    private final class Manager: @unchecked Sendable {
 
         // MARK: - Internal static properties
 
@@ -64,7 +64,7 @@ public struct DataCache: Sendable {
 
         private let lock = Lock()
 
-        private let directory: URL
+        fileprivate let directory: URL
 
         // MARK: - Unsafe properties
 
@@ -97,6 +97,10 @@ public struct DataCache: Sendable {
             self._diskCapacity = .zero
         }
     }
+
+    // MARK: - Public static properties
+
+    public static let shared = DataCache()
 
     // MARK: - Public properties
 
@@ -194,6 +198,12 @@ public struct DataCache: Sendable {
 
     init(url: URL) {
         self.storage = Manager.shared.storage(url)
+    }
+
+    // MARK: - Public static methods
+
+    public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.storage.directory == rhs.storage.directory
     }
 
     // MARK: - Internal static methods
