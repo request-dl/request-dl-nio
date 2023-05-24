@@ -352,9 +352,9 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     }
 
     public static func == (_ lhs: Self, _ rhs: HTTPHeaders) -> Bool {
-        lhs._names.allSatisfy {
-            let lhsValues = lhs._values($0) ?? []
-            let rhsValues = rhs._values($0) ?? []
+        lhs.names.allSatisfy {
+            let lhsValues = lhs[$0] ?? []
+            let rhsValues = rhs[$0] ?? []
             return lhsValues.allSatisfy {
                 rhsValues.contains($0)
             } && lhsValues.count == rhsValues.count
