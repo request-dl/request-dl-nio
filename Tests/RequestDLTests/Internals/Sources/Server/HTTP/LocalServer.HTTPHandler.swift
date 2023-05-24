@@ -90,18 +90,25 @@ extension LocalServer {
                 headers: headers
             )
 
-            _ = context.write(wrapOutboundOut(.head(head)))
+            context.write(
+                wrapOutboundOut(.head(head)),
+                promise: nil
+            )
 
             if let data = response, _method != .HEAD {
                 let ioData = IOData.byteBuffer(.init(data: data))
-                _ = context.write(wrapOutboundOut(.body(ioData)))
+                context.write(
+                    wrapOutboundOut(.body(ioData)),
+                    promise: nil
+                )
             }
 
             context.writeAndFlush(
-                wrapOutboundOut(.end(nil))
-            ).whenComplete { _ in
-                context.close(promise: nil)
-            }
+                wrapOutboundOut(.end(nil)),
+                promise: nil
+            )
+
+            context.close(promise: nil)
         }
 
         func channelInactive(context: ChannelHandlerContext) {
@@ -126,10 +133,6 @@ extension LocalServer {
             var jsonObject = [String: Any]()
 
             jsonObject["receivedBytes"] = receivedBytes
-
-            if let data = _incomeBuffer?.getData(at: .zero, length: receivedBytes) {
-                jsonObject["md5Hash"] = data.md5HashString()
-            }
 
             if let response {
                 jsonObject["response"] = response
