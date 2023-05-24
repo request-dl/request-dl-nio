@@ -10,38 +10,6 @@ import NIOHTTP1
 
 struct LocalServer: Sendable {
 
-    final class RequestBag: @unchecked Sendable {
-
-        private let lock = Lock()
-        private let lockState = AsyncLock()
-
-        private var _pendingConfiguration: ResponseConfiguration?
-
-        init() {}
-
-        func register(_ configuration: ResponseConfiguration) async {
-            await lockState.lock()
-
-            lock.withLock {
-                _pendingConfiguration = configuration
-            }
-        }
-
-        func latestConfiguration() -> ResponseConfiguration? {
-            lock.withLock {
-                _pendingConfiguration
-            }
-        }
-
-        func consume() {
-            lock.withLock {
-                _pendingConfiguration = nil
-            }
-
-            lockState.unlock()
-        }
-    }
-
     final class ServerManager: @unchecked Sendable {
 
         static let shared = ServerManager()
@@ -98,6 +66,38 @@ struct LocalServer: Sendable {
                 _channels[configuration] = (channel, bag)
                 return (channel, bag)
             }
+        }
+    }
+
+    final class RequestBag: @unchecked Sendable {
+
+        private let lock = Lock()
+        private let lockState = AsyncLock()
+
+        private var _pendingConfiguration: ResponseConfiguration?
+
+        init() {}
+
+        func register(_ configuration: ResponseConfiguration) async {
+            await lockState.lock()
+
+            lock.withLock {
+                _pendingConfiguration = configuration
+            }
+        }
+
+        func latestConfiguration() -> ResponseConfiguration? {
+            lock.withLock {
+                _pendingConfiguration
+            }
+        }
+
+        func consume() {
+            lock.withLock {
+                _pendingConfiguration = nil
+            }
+
+            lockState.unlock()
         }
     }
 

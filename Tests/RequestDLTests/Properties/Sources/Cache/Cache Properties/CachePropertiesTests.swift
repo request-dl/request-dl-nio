@@ -7,6 +7,12 @@ import XCTest
 
 class CachePropertiesTests: XCTestCase {
 
+    override func tearDown() async throws {
+        try await super.tearDown()
+        DataCache.shared.memoryCapacity = .zero
+        DataCache.shared.diskCapacity = .zero
+    }
+
     func testCache_whenCacheSharedWithoutCapacity() async throws {
         // When
         let resolved = try await resolve(TestProperty {

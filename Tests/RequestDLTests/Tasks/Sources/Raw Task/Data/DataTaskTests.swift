@@ -8,67 +8,89 @@ import NIOSSL
 
 class DataTaskTests: XCTestCase {
 
+    var localServer: LocalServer!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        localServer = try await .init(.standard)
+    }
+
+    override func tearDown() async throws {
+        try await super.tearDown()
+        localServer = nil
+    }
+
     func testDataTask() async throws {
         // Given
         let certificate = Certificates().server()
         let output = "Hello World"
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: output
+        )
+
+        await localServer.register(response)
+        defer { localServer.releaseConfiguration() }
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: output
-        ).run { baseURL in
-            let data = try await DataTask {
-                BaseURL(baseURL)
-                Path("index")
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                SecureConnection {
-                    Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
-                }
+            SecureConnection {
+                Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(data)
-
-            // Then
-            XCTAssertEqual(result.response, output)
         }
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        XCTAssertEqual(result.response, output)
     }
 
     func testDataTask_whenCAEnabled() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
+
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8887,
+                option: .client(client)
+            )
+        )
+
         let output = "Hello World"
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: output
+        )
+
+        await localServer.register(response)
+        defer { localServer.releaseConfiguration() }
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: output,
-            option: .client(client)
-        ).run { baseURL in
-            let data = try await DataTask {
-                BaseURL(baseURL)
-                Path("index")
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                SecureConnection {
-                    Trusts(server.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
-                }
-                .verification(.fullVerification)
+            SecureConnection {
+                Trusts(server.certificateURL.absolutePath(percentEncoded: false))
+                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
             }
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(data)
-
-            // Then
-            XCTAssertEqual(result.response, output)
+            .verification(.fullVerification)
         }
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        XCTAssertEqual(result.response, output)
     }
 }
 
@@ -105,36 +127,44 @@ extension DataTaskTests {
         bbaf8a1dee0f
         """
 
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8886,
+                option: .psk(Data(key.utf8), identity)
+            )
+        )
+
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: output
+        )
+
+        await localServer.register(response)
+        defer { localServer.releaseConfiguration() }
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: output,
-            option: .psk(Data(key.utf8), identity)
-        ).run { baseURL in
-            let data = try await DataTask {
-                BaseURL(baseURL)
-                Path("index")
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                SecureConnection {
-                    PSKIdentity(
-                        PSKClientIdentityResolver(
-                            key: key,
-                            identity: identity
-                        )
+            SecureConnection {
+                PSKIdentity(
+                    PSKClientIdentityResolver(
+                        key: key,
+                        identity: identity
                     )
-                    .hint("pskHint")
-                }
-                .verification(.none)
-                .version(minimum: .v1, maximum: .v1_2)
+                )
+                .hint("pskHint")
             }
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(data)
-
-            // Then
-            XCTAssertEqual(result.response, output)
+            .verification(.none)
+            .version(minimum: .v1, maximum: .v1_2)
         }
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        XCTAssertEqual(result.response, output)
     }
 }

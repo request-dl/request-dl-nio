@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import CryptoKit
 @testable import RequestDL
 
 extension Data {
@@ -47,5 +48,14 @@ extension Data {
         }
 
         return Set(literal.split(separator: "&").map { String($0) })
+    }
+}
+
+extension Data {
+
+    func md5HashString() -> String {
+        Insecure.MD5.hash(data: self)
+            .map { String(format: "%02hhx", $0) }
+            .joined()
     }
 }

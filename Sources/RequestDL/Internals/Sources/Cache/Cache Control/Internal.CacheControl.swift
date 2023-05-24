@@ -319,9 +319,25 @@ extension Internals {
             dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
             dateFormatter.timeZone = TimeZone(identifier: "GMT")
 
-            return flatAndCombineHeadersValues(headers)
-                .compactMap(dateFormatter.date(from:))
-                .max()
+            var _weekday: String?
+            var dates: [Date] = []
+
+            for part in flatAndCombineHeadersValues(headers) {
+                if let weekday = _weekday {
+                    let literalDate = weekday + ", \(part)"
+
+                    if let date = dateFormatter.date(from: literalDate) {
+                        dates.append(date)
+                        _weekday = nil
+                    } else {
+                        _weekday = part
+                    }
+                } else {
+                    _weekday = part
+                }
+            }
+
+            return dates.max()
         }
 
         private func maxAgeSeconds(headers: [String]) -> Int? {

@@ -14,6 +14,7 @@ extension LocalServer {
         typealias OutboundOut = HTTPServerResponsePart
 
         private let bag: RequestBag
+        private var receivedAllParts = false
 
         private var _configuration: ResponseConfiguration?
 
@@ -30,6 +31,7 @@ extension LocalServer {
 
         func channelActive(context: ChannelHandlerContext) {
             _configuration = bag.latestConfiguration()
+            receivedAllParts = false
             cleanup()
         }
 
@@ -48,11 +50,14 @@ extension LocalServer {
                 _uri = incomeHeaders.uri
                 _version = incomeHeaders.version
                 _isKeepAlive = incomeHeaders.isKeepAlive
-            case .body(var incomeBuffer):
+            case .body(let incomeBuffer):
+                var incomeBuffer = incomeBuffer.slice()
                 var buffer = _incomeBuffer ?? .init()
                 buffer.writeBuffer(&incomeBuffer)
                 _incomeBuffer = buffer
             case .end(let incomeHeaders):
+                receivedAllParts = true
+
                 guard let incomeHeaders else {
                     break
                 }
@@ -65,48 +70,37 @@ extension LocalServer {
         }
 
         func channelReadComplete(context: ChannelHandlerContext) {
+            guard receivedAllParts else {
+                return
+            }
+
             defer { cleanup() }
 
-            do {
-                var headers = _configuration?.headers ?? .init()
-                let response = try responseData()
+            var headers = _configuration?.headers ?? .init()
+            let response = responseData()
 
-                headers.replaceOrAdd(
-                    name: "Content-Length",
-                    value: String(response?.count ?? .zero)
-                )
+            headers.replaceOrAdd(
+                name: "Content-Length",
+                value: String(response?.count ?? .zero)
+            )
 
-                let head = HTTPResponseHead(
-                    version: _version ?? .http1_1,
-                    status: .ok,
-                    headers: headers
-                )
+            let head = HTTPResponseHead(
+                version: _version ?? .http1_1,
+                status: .ok,
+                headers: headers
+            )
 
-                _ = context.write(wrapOutboundOut(.head(head)))
+            _ = context.write(wrapOutboundOut(.head(head)))
 
-                if let data = response {
-                    let ioData = IOData.byteBuffer(.init(data: data))
-                    _ = context.write(wrapOutboundOut(.body(ioData)))
-                }
+            if let data = response, _method != .HEAD {
+                let ioData = IOData.byteBuffer(.init(data: data))
+                _ = context.write(wrapOutboundOut(.body(ioData)))
+            }
 
-                context.writeAndFlush(
-                    wrapOutboundOut(.end(nil))
-                ).whenComplete { _ in
-                    context.close(promise: nil)
-                }
-            } catch {
-                let head = HTTPResponseHead(
-                    version: _version ?? .http1_1,
-                    status: .internalServerError
-                )
-
-                _ = context.write(wrapOutboundOut(.head(head)))
-
-                context.writeAndFlush(
-                    wrapOutboundOut(.end(nil))
-                ).whenComplete { _ in
-                    context.close(promise: nil)
-                }
+            context.writeAndFlush(
+                wrapOutboundOut(.end(nil))
+            ).whenComplete { _ in
+                context.close(promise: nil)
             }
         }
 
@@ -115,15 +109,15 @@ extension LocalServer {
             bag.consume()
         }
 
-        private func responseData() throws -> Data? {
+        private func responseData() -> Data? {
             var receivedBytes = Int.zero
 
             if let _incomeBuffer {
                 receivedBytes += _incomeBuffer.readableBytes
             }
 
-            let response = try _configuration.map {
-                try JSONSerialization.jsonObject(
+            let response = _configuration.map {
+                try? JSONSerialization.jsonObject(
                     with: $0.data,
                     options: [.fragmentsAllowed]
                 )
@@ -131,17 +125,17 @@ extension LocalServer {
 
             var jsonObject = [String: Any]()
 
-            jsonObject["incomeBytes"] = receivedBytes
+            jsonObject["receivedBytes"] = receivedBytes
 
             if let data = _incomeBuffer?.getData(at: .zero, length: receivedBytes) {
-                jsonObject["base64"] = data.base64EncodedString()
+                jsonObject["md5Hash"] = data.md5HashString()
             }
 
             if let response {
                 jsonObject["response"] = response
             }
 
-            return try JSONSerialization.data(
+            return try? JSONSerialization.data(
                 withJSONObject: jsonObject,
                 options: [.sortedKeys]
             )
@@ -154,6 +148,7 @@ extension LocalServer {
             _isKeepAlive = nil
             _incomeHeaders = nil
             _incomeBuffer = nil
+            receivedAllParts = false
         }
     }
 }

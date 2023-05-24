@@ -20,7 +20,9 @@ extension String {
         var string = ""
 
         for _ in 0 ..< length {
-            string += String(characters.randomElement()!)
+            string += characters.randomElement().map {
+                String($0)
+            } ?? "a"
         }
 
         return string

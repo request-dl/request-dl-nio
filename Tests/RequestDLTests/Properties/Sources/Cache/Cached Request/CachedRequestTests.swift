@@ -15,126 +15,306 @@ class CachedRequestTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         dataCache.removeAll()
+        dataCache.memoryCapacity = 8 * 1_024 * 1_024
+        dataCache.diskCapacity = 64 * 1_024 * 1_024
         localServer = try await LocalServer(.standard)
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
         dataCache.removeAll()
+        dataCache.memoryCapacity = .zero
+        dataCache.diskCapacity = .zero
         localServer = nil
     }
 
-    func testCache_whenServerNoCacheOnIgnoresCachedDataStrategy() async throws {
-        try await performCacheRequest(
+    func testCache_whenNoCacheOnIgnoresCachedDataStrategy() async throws {
+        // Given
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        let response = try await performCacheRequest(
             headers: makeHeaders(noCache: true),
-            cacheStrategy: .ignoreCachedData,
-            body: { baseURL, response in
-                // When
-                let cachedData = DataCache.shared.getCachedData(forKey: baseURL, policy: .all)
-
-                // Then
-                XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "no-cache")
-                XCTAssertNil(cachedData)
-            }
-        )
-    }
-
-    func testCache_whenServerCacheOnIgnoresCachedDataStrategy() async throws {
-        try await performCacheRequest(
-            headers: makeHeaders(),
-            cacheStrategy: .ignoreCachedData,
-            body: { baseURL, response in
-                // When
-                let cachedData = DataCache.shared.getCachedData(forKey: baseURL, policy: .all)
-
-                // Then
-                XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "public, max-age=5")
-                XCTAssertNil(cachedData)
-            }
-        )
-    }
-
-    func testCache_whenServerCacheOnUseCachedDataOnlyStrategyWithoutCache() async throws {
-        do {
-            try await performCacheRequest(
-                headers: makeHeaders(),
-                cacheStrategy: .useCachedDataOnly,
-                body: { baseURL, response in
-                    // When
-                    let cachedData = DataCache.shared.getCachedData(forKey: baseURL, policy: .all)
-
-                    // Then
-                    XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "public, max-age=15")
-                    XCTAssertNil(cachedData)
-                }
-            )
-
-            XCTFail("No error was thrown")
-        } catch {
-            XCTAssertTrue(error is EmptyCachedDataError)
-        }
-    }
-
-    func testCache_whenServerCacheOnUseCachedDataOnlyStrategyWithValidCache() async throws {
-        // Given
-        let eTag = UUID()
-        let cachedData = SendableBox(CachedData?.none)
-
-        try await performCacheRequest(
-            headers: makeHeaders(eTag: eTag),
-            cacheStrategy: .reloadAndValidateCachedData,
-            body: { baseURL, response in
-                try await _Concurrency.Task.sleep(nanoseconds: 2_000_000_000)
-
-                cachedData(
-                    self.dataCache.getCachedData(
-                        forKey: "https://\(baseURL)",
-                        policy: .all
-                    )
-                )
-            }
+            cacheStrategy: .ignoreCachedData
         )
 
-        // When
-        try await performCacheRequest(
-            headers: makeHeaders(eTag: eTag),
-            cacheStrategy: .useCachedDataOnly,
-            body: { baseURL, response in
-                // Then
-                XCTAssertEqual(cachedData()?.response, response.head)
-            }
+        try await waitCacheWriting()
+
+        let cachedData = DataCache.shared.getCachedData(
+            forKey: cacheKey,
+            policy: .all
         )
-    }
-
-    func testCache_whenServerCacheOnUseCachedDataOnlyStrategyWithInvalidCache() async throws {
-        // Given
-        let eTag = UUID()
-
-        try await performCacheRequest(
-            headers: makeHeaders(eTag: eTag),
-            cacheStrategy: .reloadAndValidateCachedData,
-            body: { baseURL, response in }
-        )
-
-        // When
-        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
 
         // Then
-        do {
-            try await performCacheRequest(
-                headers: makeHeaders(eTag: eTag),
-                cacheStrategy: .useCachedDataOnly,
-                body: { baseURL, response in }
-            )
+        XCTAssertNil(cachedData)
+        XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "no-cache")
+    }
 
-            XCTFail("No error was thrown")
+    func testCache_whenNoCacheOnIgnoresCachedDataStrategyWithPreviousCache() async throws {
+        // Given
+        let cacheData = mockCachedData(makeHeaders(eTag: UUID()))
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(noCache: true),
+            cacheStrategy: .ignoreCachedData
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = DataCache.shared.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "no-cache")
+    }
+
+    func testCache_whenUseCachedDataOnlyStrategyWithoutCache() async throws {
+        // Given
+        var thrownError: Error?
+
+        // When
+        do {
+            _ = try await performCacheRequest(
+                headers: makeHeaders(),
+                cacheStrategy: .useCachedDataOnly
+            )
         } catch {
-            XCTAssertTrue(error is EmptyCachedDataError)
+            thrownError = error
         }
+
+        // Then
+        XCTAssertTrue(thrownError is EmptyCachedDataError)
+    }
+
+    func testCache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
+        let cacheData = mockCachedData(makeHeaders())
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .useCachedDataOnly
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertEqual(response.head, cacheData.response)
+    }
+
+    func testCache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge() async throws {
+        let cacheData = mockCachedData(makeHeaders())
+        let cacheKey = "https://localhost:8888"
+        var thrownError: Error?
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+
+        do {
+            _ = try await performCacheRequest(
+                headers: makeHeaders(),
+                cacheStrategy: .useCachedDataOnly
+            )
+        } catch {
+            thrownError = error
+        }
+
+        // Then
+        XCTAssertTrue(thrownError is EmptyCachedDataError)
+    }
+
+    func testCache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
+        let cacheData = mockCachedData(makeHeaders(maxAge: false))
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .useCachedDataOnly
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertEqual(response.head, cacheData.response)
+    }
+
+    func testCache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires() async throws {
+        let cacheData = mockCachedData(makeHeaders(maxAge: false))
+        let cacheKey = "https://localhost:8888"
+        var thrownError: Error?
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+
+        do {
+            _ = try await performCacheRequest(
+                headers: makeHeaders(),
+                cacheStrategy: .useCachedDataOnly
+            )
+        } catch {
+            thrownError = error
+        }
+
+        // Then
+        XCTAssertTrue(thrownError is EmptyCachedDataError)
+    }
+
+    func testCache_whenReturnCachedDataElseLoadWithValidCache() async throws {
+        let cacheData = mockCachedData(makeHeaders())
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertEqual(response.head, cacheData.response)
+    }
+
+    func testCache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
+        let cacheData = mockCachedData(makeHeaders())
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertNotEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertNotEqual(response.head, cacheData.response)
+    }
+
+    func testCache_whenReloadAndValidateCachedDataWithValidCache() async throws {
+        let eTag = UUID()
+        let cacheData = mockCachedData(makeHeaders(eTag: eTag))
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(eTag: eTag),
+            cacheStrategy: .reloadAndValidateCachedData
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertEqual(response.head, cacheData.response)
+    }
+
+    func testCache_whenReloadAndValidateCachedDataWithInvalidCache() async throws {
+        let eTag = UUID()
+        let cacheData = mockCachedData(makeHeaders())
+        let cacheKey = "https://localhost:8888"
+
+        // When
+        dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+
+        let response = try await performCacheRequest(
+            headers: makeHeaders(eTag: eTag),
+            cacheStrategy: .reloadAndValidateCachedData
+        )
+
+        try await waitCacheWriting()
+
+        let updatedCachedData = dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        XCTAssertNotEqual(updatedCachedData?.response, cacheData.response)
+        XCTAssertNotEqual(response.head, cacheData.response)
     }
 }
 
 extension CachedRequestTests {
+
+    func waitCacheWriting() async throws {
+        try await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
+    }
+
+    func mockCachedData(_ headers: [(String, String)] = []) -> CachedData {
+        let data = try? JSONSerialization.data(withJSONObject: [
+            "receivedBytes": "0"
+        ])
+
+        return CachedData(
+            response: ResponseHead(
+                url: URL(string: "https://localhost:8888"),
+                status: .init(code: 200, reason: "Ok"),
+                version: .init(minor: 1, major: 2),
+                headers: HTTPHeaders(headers + [
+                    ("Content-Length", String(data?.count ?? .zero))
+                ]),
+                isKeepAlive: false
+            ),
+            policy: .all,
+            data: data ?? Data()
+        )
+    }
 
     private func makeHeaders(
         eTag: UUID? = nil,
@@ -173,21 +353,12 @@ extension CachedRequestTests {
     func performCacheRequest(
         headers: [(String, String)],
         cachePolicy: DataCache.Policy.Set = .all,
-        cacheStrategy: CacheStrategy,
-        body: @escaping @Sendable (String, TaskResult<Data>) async throws -> Void
-    ) async throws {
-        let response = LocalServer.ResponseConfiguration(
-            headers: .init(headers),
-            data: try JSONSerialization.data(
-                withJSONObject: output,
-                options: [.fragmentsAllowed]
-            )
-        )
+        cacheStrategy: CacheStrategy
+    ) async throws -> TaskResult<Data> {
+        let response = try responseConfiguration(headers, output)
 
         await localServer.register(response)
         defer { localServer.releaseConfiguration() }
-
-        let baseURL = localServer.baseURL
 
         let output = try await DataTask {
             SecureConnection {
@@ -196,12 +367,25 @@ extension CachedRequestTests {
                 }
             }
 
-            BaseURL(baseURL)
+            BaseURL(localServer.baseURL)
                 .cachePolicy(cachePolicy)
                 .cacheStrategy(cacheStrategy)
         }
         .result()
 
-        try await body(baseURL, output)
+        return output
+    }
+
+    private func responseConfiguration(
+        _ headers: [(String, String)],
+        _ output: String
+    ) throws -> LocalServer.ResponseConfiguration {
+        LocalServer.ResponseConfiguration(
+            headers: .init(headers),
+            data: try JSONSerialization.data(
+                withJSONObject: output,
+                options: [.fragmentsAllowed]
+            )
+        )
     }
 }

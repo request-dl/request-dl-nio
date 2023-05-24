@@ -24,6 +24,9 @@ class DataCacheTests: XCTestCase {
         try await super.tearDown()
         dataCache.removeAll()
         dataCache = nil
+
+        DataCache.shared.memoryCapacity = .zero
+        DataCache.shared.diskCapacity = .zero
     }
 
     func testCache_whenInit_shouldCapacityBeKnown() {
