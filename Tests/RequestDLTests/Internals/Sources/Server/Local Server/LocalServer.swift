@@ -40,7 +40,6 @@ struct LocalServer: Sendable {
                 let tlsConfiguration = try configuration.option.build()
                 let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
                 let bag = RequestBag()
-                let httpHandler = HTTPHandler(bag)
 
                 let futureChannel = ServerBootstrap(group: group)
                     .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -55,9 +54,10 @@ struct LocalServer: Sendable {
                                 channel.pipeline.configureHTTPServerPipeline()
                             }
                             .flatMap {
-                                channel.pipeline.addHandler(httpHandler)
+                                channel.pipeline.addHandler(HTTPHandler(bag))
                             }
                     }
+                    .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
                     .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                     .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
                     .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
