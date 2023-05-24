@@ -15,7 +15,7 @@ struct LocalServer: Sendable {
         static let shared = ServerManager()
 
         private let lock = AsyncLock()
-        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
 
         private var _channels: [Configuration: (Channel, RequestBag)] = [:]
 
@@ -40,6 +40,7 @@ struct LocalServer: Sendable {
                 let tlsConfiguration = try configuration.option.build()
                 let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
                 let bag = RequestBag()
+                let httpHandler = HTTPHandler(bag)
 
                 let futureChannel = ServerBootstrap(group: group)
                     .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -54,7 +55,7 @@ struct LocalServer: Sendable {
                                 channel.pipeline.configureHTTPServerPipeline()
                             }
                             .flatMap {
-                                channel.pipeline.addHandler(HTTPHandler(bag))
+                                channel.pipeline.addHandler(httpHandler)
                             }
                     }
                     .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
