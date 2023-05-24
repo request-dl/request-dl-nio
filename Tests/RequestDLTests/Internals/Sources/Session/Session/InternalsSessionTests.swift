@@ -178,7 +178,6 @@ class InternalsSessionTests: XCTestCase {
             try (download?.1).map(HTTPResult<String>.init),
             HTTPResult(
                 receivedBytes: length,
-                md5Hash: fileBuffer.getData()?.md5HashString(),
                 response: message
             )
         )

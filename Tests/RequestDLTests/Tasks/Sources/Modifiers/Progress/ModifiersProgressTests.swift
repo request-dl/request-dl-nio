@@ -159,7 +159,6 @@ class ModifiersProgressTests: XCTestCase {
 
         let expectingData = try HTTPResult(
             receivedBytes: .zero,
-            md5Hash: nil,
             response: message
         ).encode()
 

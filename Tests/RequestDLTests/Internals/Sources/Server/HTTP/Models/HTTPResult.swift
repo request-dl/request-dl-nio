@@ -7,7 +7,6 @@ import Foundation
 struct HTTPResult<Response: Codable>: Codable, Equatable where Response: Equatable {
 
     let receivedBytes: Int
-    let md5Hash: String?
     let response: Response
 }
 
