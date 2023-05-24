@@ -5,43 +5,28 @@
 import XCTest
 @testable import RequestDL
 
-extension String {
-
-    static func randomString(length: Int) -> String {
-        let lowercaseCharacters = "abcdefghijklmnopqrstuvwxyz"
-        let uppercaseCharacters = lowercaseCharacters.uppercased()
-        let decimalCharacters = "0123456789"
-
-        let characters = [
-            lowercaseCharacters,
-            uppercaseCharacters,
-            decimalCharacters
-        ].joined()
-
-        var string = ""
-
-        for _ in 0 ..< length {
-            string += String(characters.randomElement()!)
-        }
-
-        return string
-    }
-}
-
 class CachedRequestTests: XCTestCase {
 
     private let certificate = Certificates().server()
     private let dataCache = DataCache.shared
     private let output = String.randomString(length: 1_024)
+    private var localServer: LocalServer!
 
     override func setUp() async throws {
         try await super.setUp()
         dataCache.removeAll()
+        localServer = try await LocalServer(.standard)
+    }
+
+    override func tearDown() async throws {
+        try await super.tearDown()
+        dataCache.removeAll()
+        localServer = nil
     }
 
     func testCache_whenServerNoCacheOnIgnoresCachedDataStrategy() async throws {
         try await performCacheRequest(
-            noCache: true,
+            headers: makeHeaders(noCache: true),
             cacheStrategy: .ignoreCachedData,
             body: { baseURL, response in
                 // When
@@ -56,7 +41,7 @@ class CachedRequestTests: XCTestCase {
 
     func testCache_whenServerCacheOnIgnoresCachedDataStrategy() async throws {
         try await performCacheRequest(
-            noCache: false,
+            headers: makeHeaders(),
             cacheStrategy: .ignoreCachedData,
             body: { baseURL, response in
                 // When
@@ -72,7 +57,7 @@ class CachedRequestTests: XCTestCase {
     func testCache_whenServerCacheOnUseCachedDataOnlyStrategyWithoutCache() async throws {
         do {
             try await performCacheRequest(
-                noCache: false,
+                headers: makeHeaders(),
                 cacheStrategy: .useCachedDataOnly,
                 body: { baseURL, response in
                     // When
@@ -92,9 +77,11 @@ class CachedRequestTests: XCTestCase {
 
     func testCache_whenServerCacheOnUseCachedDataOnlyStrategyWithValidCache() async throws {
         // Given
+        let eTag = UUID()
         let cachedData = SendableBox(CachedData?.none)
 
         try await performCacheRequest(
+            headers: makeHeaders(eTag: eTag),
             cacheStrategy: .reloadAndValidateCachedData,
             body: { baseURL, response in
                 try await _Concurrency.Task.sleep(nanoseconds: 2_000_000_000)
@@ -110,6 +97,7 @@ class CachedRequestTests: XCTestCase {
 
         // When
         try await performCacheRequest(
+            headers: makeHeaders(eTag: eTag),
             cacheStrategy: .useCachedDataOnly,
             body: { baseURL, response in
                 // Then
@@ -120,8 +108,10 @@ class CachedRequestTests: XCTestCase {
 
     func testCache_whenServerCacheOnUseCachedDataOnlyStrategyWithInvalidCache() async throws {
         // Given
+        let eTag = UUID()
+
         try await performCacheRequest(
-            port: 8080,
+            headers: makeHeaders(eTag: eTag),
             cacheStrategy: .reloadAndValidateCachedData,
             body: { baseURL, response in }
         )
@@ -132,7 +122,7 @@ class CachedRequestTests: XCTestCase {
         // Then
         do {
             try await performCacheRequest(
-                port: 8080,
+                headers: makeHeaders(eTag: eTag),
                 cacheStrategy: .useCachedDataOnly,
                 body: { baseURL, response in }
             )
@@ -146,44 +136,72 @@ class CachedRequestTests: XCTestCase {
 
 extension CachedRequestTests {
 
-    func performCacheRequest(
-        port: UInt = 8888,
+    private func makeHeaders(
+        eTag: UUID? = nil,
         noCache: Bool = false,
-        maxAge: Bool = true,
+        maxAge: Bool = true
+    ) -> [(String, String)] {
+        if noCache {
+            return [("Cache-Control", "no-cache")]
+        }
+
+        var headers = [(String, String)]()
+
+        if let eTag {
+            headers.append(("ETag", String(describing: eTag)))
+        }
+
+        let now = Date()
+        let maxAgeSeconds = 5
+
+        if maxAge {
+            headers.append(("Cache-Control", "public, max-age=\(maxAgeSeconds)"))
+        } else {
+            let date = now.addingTimeInterval(TimeInterval(maxAgeSeconds))
+
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+            dateFormatter.timeZone = TimeZone(identifier: "GMT")
+            headers.append(("Cache-Control", "public"))
+            headers.append(("Expires", dateFormatter.string(from: date)))
+        }
+
+        return headers
+    }
+
+    func performCacheRequest(
+        headers: [(String, String)],
         cachePolicy: DataCache.Policy.Set = .all,
         cacheStrategy: CacheStrategy,
         body: @escaping @Sendable (String, TaskResult<Data>) async throws -> Void
     ) async throws {
-        try await withServer(port: port, noCache: noCache, maxAge: maxAge) { baseURL in
-            let output = try await DataTask {
-                SecureConnection {
-                    Trusts {
-                        RequestDL.Certificate(certificate.certificateURL.absolutePath(percentEncoded: false))
-                    }
+        let response = LocalServer.ResponseConfiguration(
+            headers: .init(headers),
+            data: try JSONSerialization.data(
+                withJSONObject: output,
+                options: [.fragmentsAllowed]
+            )
+        )
+
+        await localServer.register(response)
+        defer { localServer.releaseConfiguration() }
+
+        let baseURL = localServer.baseURL
+
+        let output = try await DataTask {
+            SecureConnection {
+                Trusts {
+                    RequestDL.Certificate(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
-
-                BaseURL(baseURL)
-                    .cachePolicy(cachePolicy)
-                    .cacheStrategy(cacheStrategy)
             }
-            .result()
 
-            try await body(baseURL, output)
+            BaseURL(baseURL)
+                .cachePolicy(cachePolicy)
+                .cacheStrategy(cacheStrategy)
         }
-    }
+        .result()
 
-    func withServer(
-        port: UInt,
-        noCache: Bool = false,
-        maxAge: Bool = true,
-        _ closure: @Sendable (String) async throws -> Void
-    ) async throws {
-        try await InternalServer(
-            host: "localhost",
-            port: port,
-            response: output,
-            noCache: noCache,
-            maxAge: maxAge
-        ).run(closure)
+        try await body(baseURL, output)
     }
 }

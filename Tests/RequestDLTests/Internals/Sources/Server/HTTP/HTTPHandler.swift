@@ -6,94 +6,154 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-final class HTTPHandler<Response: Codable> where Response: Equatable {
+extension LocalServer {
 
-    typealias InboundIn = HTTPServerRequestPart
-    typealias OutboundOut = HTTPServerResponsePart
+    final class HTTPHandler: ChannelInboundHandler {
 
-    private let noCache: Bool
-    private let maxAge: Bool
-    private var result: HTTPResult<Response>
+        typealias InboundIn = HTTPServerRequestPart
+        typealias OutboundOut = HTTPServerResponsePart
 
-    private var resultData: Data {
-        (try? result.encode()) ?? Data()
-    }
+        private let bag: RequestBag
 
-    init(
-        response: Response,
-        noCache: Bool,
-        maxAge: Bool
-    ) {
-        self.noCache = noCache
-        self.maxAge = maxAge
-        self.result = .init(
-            receivedBytes: .zero,
-            response: response
-        )
-    }
+        private var _configuration: ResponseConfiguration?
 
-    func addCacheHeaders(in headers: inout HTTPHeaders) {
-        headers.add(name: "ETag", value: resultData.base64EncodedString())
+        private var _uri: String?
+        private var _method: NIOHTTP1.HTTPMethod?
+        private var _version: NIOHTTP1.HTTPVersion?
+        private var _isKeepAlive: Bool?
+        private var _incomeHeaders: NIOHTTP1.HTTPHeaders?
+        private var _incomeBuffer: ByteBuffer?
 
-        if noCache {
-            headers.add(name: "Cache-Control", value: "no-cache")
-        } else {
-            let now = Date()
-            let maxAge = 5
-            let date = now.addingTimeInterval(TimeInterval(maxAge))
+        init(_ bag: RequestBag) {
+            self.bag = bag
+        }
 
-            let dateFormatter = DateFormatter()
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-            dateFormatter.timeZone = TimeZone(identifier: "GMT")
+        func channelActive(context: ChannelHandlerContext) {
+            _configuration = bag.latestConfiguration()
+            cleanup()
+        }
 
-            if self.maxAge {
-                headers.add(name: "Cache-Control", value: "public, max-age=\(maxAge)")
-            } else {
-                headers.add(name: "Cache-Control", value: "public")
-                headers.add(name: "Expires", value: dateFormatter.string(from: date))
+        func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+            let request = unwrapInboundIn(data)
+
+            switch request {
+            case .head(let incomeHeaders):
+                var headers = _incomeHeaders ?? .init()
+                for (name, value) in incomeHeaders.headers {
+                    headers.add(name: name, value: value)
+                }
+                _incomeHeaders = headers
+
+                _method = incomeHeaders.method
+                _uri = incomeHeaders.uri
+                _version = incomeHeaders.version
+                _isKeepAlive = incomeHeaders.isKeepAlive
+            case .body(var incomeBuffer):
+                var buffer = _incomeBuffer ?? .init()
+                buffer.writeBuffer(&incomeBuffer)
+                _incomeBuffer = buffer
+            case .end(let incomeHeaders):
+                guard let incomeHeaders else {
+                    break
+                }
+
+                var headers = _incomeHeaders ?? .init()
+                for (name, value) in incomeHeaders {
+                    headers.add(name: name, value: value)
+                }
             }
         }
-    }
-}
 
-extension HTTPHandler: ChannelInboundHandler {
+        func channelReadComplete(context: ChannelHandlerContext) {
+            defer { cleanup() }
 
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let request = unwrapInboundIn(data)
+            do {
+                var headers = _configuration?.headers ?? .init()
+                let response = try responseData()
 
-        switch request {
-        case .head(let head):
-            var response = HTTPResponseHead(
-                version: head.version,
-                status: HTTPResponseStatus.ok
-            )
+                headers.replaceOrAdd(
+                    name: "Content-Length",
+                    value: String(response?.count ?? .zero)
+                )
 
-            let value = head.headers.first(name: "content-length")
-                .flatMap(Int.init) ?? .zero
+                let head = HTTPResponseHead(
+                    version: _version ?? .http1_1,
+                    status: .ok,
+                    headers: headers
+                )
 
-            result.receivedBytes = value
-            response.headers.add(name: "content-length", value: String(resultData.count))
-            addCacheHeaders(in: &response.headers)
-            result.receivedBytes = .zero
+                _ = context.write(wrapOutboundOut(.head(head)))
 
-            context.write(wrapOutboundOut(.head(response)), promise: nil)
-        case .body(let bytes):
-            result.receivedBytes += bytes.readableBytes
-        case .end:
-            var headers = HTTPHeaders()
-            let buffer = ByteBuffer(bytes: resultData)
-
-            headers.add(name: "content-length", value: String(resultData.count))
-            addCacheHeaders(in: &headers)
-
-            context.writeAndFlush(wrapOutboundOut(.body(.byteBuffer(buffer))))
-                .flatMap {
-                    context.writeAndFlush(self.wrapOutboundOut(.end(headers)))
+                if let data = response {
+                    let ioData = IOData.byteBuffer(.init(data: data))
+                    _ = context.write(wrapOutboundOut(.body(ioData)))
                 }
-                .whenComplete { _ in
+
+                context.writeAndFlush(
+                    wrapOutboundOut(.end(nil))
+                ).whenComplete { _ in
                     context.close(promise: nil)
                 }
+            } catch {
+                let head = HTTPResponseHead(
+                    version: _version ?? .http1_1,
+                    status: .internalServerError
+                )
+
+                _ = context.write(wrapOutboundOut(.head(head)))
+
+                context.writeAndFlush(
+                    wrapOutboundOut(.end(nil))
+                ).whenComplete { _ in
+                    context.close(promise: nil)
+                }
+            }
+        }
+
+        func channelInactive(context: ChannelHandlerContext) {
+            _configuration = nil
+            bag.consume()
+        }
+
+        private func responseData() throws -> Data? {
+            var receivedBytes = Int.zero
+
+            if let _incomeBuffer {
+                receivedBytes += _incomeBuffer.readableBytes
+            }
+
+            let response = try _configuration.map {
+                try JSONSerialization.jsonObject(
+                    with: $0.data,
+                    options: [.fragmentsAllowed]
+                )
+            }
+
+            var jsonObject = [String: Any]()
+
+            jsonObject["incomeBytes"] = receivedBytes
+
+            if let data = _incomeBuffer?.getData(at: .zero, length: receivedBytes) {
+                jsonObject["base64"] = data.base64EncodedString()
+            }
+
+            if let response {
+                jsonObject["response"] = response
+            }
+
+            return try JSONSerialization.data(
+                withJSONObject: jsonObject,
+                options: [.sortedKeys]
+            )
+        }
+
+        private func cleanup() {
+            _method = nil
+            _uri = nil
+            _version = nil
+            _isKeepAlive = nil
+            _incomeHeaders = nil
+            _incomeBuffer = nil
         }
     }
 }

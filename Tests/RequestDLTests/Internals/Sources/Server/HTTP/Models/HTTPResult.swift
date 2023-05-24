@@ -6,16 +6,9 @@ import Foundation
 
 struct HTTPResult<Response: Codable>: Codable, Equatable where Response: Equatable {
 
-    var receivedBytes: Int
+    let receivedBytes: Int
+    let base64: String?
     let response: Response
-
-    init(
-        receivedBytes: Int,
-        response: Response
-    ) {
-        self.receivedBytes = receivedBytes
-        self.response = response
-    }
 }
 
 extension HTTPResult {

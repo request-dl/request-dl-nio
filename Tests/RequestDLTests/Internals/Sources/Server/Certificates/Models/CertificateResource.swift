@@ -5,7 +5,7 @@
 import Foundation
 @testable import RequestDL
 
-struct CertificateResource {
+struct CertificateResource: Hashable {
 
     let certificateURL: URL
 
