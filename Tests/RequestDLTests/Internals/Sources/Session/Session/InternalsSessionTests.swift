@@ -7,10 +7,14 @@ import XCTest
 
 class InternalsSessionTests: XCTestCase {
 
+    var localServer: LocalServer!
     var session: Internals.Session!
 
     override func setUp() async throws {
         try await super.setUp()
+
+        localServer = try await .init(.standard)
+        localServer.cleanup()
 
         session = Internals.Session(
             provider: .shared,
@@ -20,6 +24,10 @@ class InternalsSessionTests: XCTestCase {
 
     override func tearDown() async throws {
         try await super.tearDown()
+
+        localServer.cleanup()
+        localServer = nil
+
         session = nil
     }
 
@@ -29,7 +37,10 @@ class InternalsSessionTests: XCTestCase {
         request.baseURL = "https://google.com"
 
         // When
-        let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
         let result = try await Array(task.response)
 
         // Then
@@ -54,7 +65,10 @@ class InternalsSessionTests: XCTestCase {
         ])
 
         // When
-        let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
         let result = try await Array(task.response)
 
         // Then
@@ -78,7 +92,10 @@ class InternalsSessionTests: XCTestCase {
         request.body = Internals.Body(buffers: [])
 
         // When
-        let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
         let result = try await Array(task.response)
 
         // Then
@@ -110,61 +127,64 @@ class InternalsSessionTests: XCTestCase {
         var fileBuffer = Internals.FileBuffer(url)
         fileBuffer.writeData(Data.randomData(length: length))
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: message
+        )
+
+        localServer.insert(response)
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: message
-        ).run { baseURL in
-            var request = Internals.Request()
-            request.baseURL = "https://\(baseURL)"
-            request.method = "POST"
-            request.body = Internals.Body(fragment, buffers: [
-                fileBuffer
-            ])
+        var request = Internals.Request()
+        request.baseURL = "https://\(localServer.baseURL)"
+        request.method = "POST"
+        request.body = Internals.Body(fragment, buffers: [
+            fileBuffer
+        ])
 
-            var secureConnection = Internals.SecureConnection()
-            secureConnection.trustRoots = .certificates([
-                .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
-            ])
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([
+            .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
+        ])
 
-            var configuration = session.configuration
-            configuration.secureConnection = secureConnection
+        var configuration = session.configuration
+        configuration.secureConnection = secureConnection
 
-            let session = Internals.Session(
-                provider: session.provider,
-                configuration: configuration
-            )
+        let session = Internals.Session(
+            provider: session.provider,
+            configuration: configuration
+        )
 
-            let task = try await session.request(request)
+        let task = try await session.execute(
+            request: request,
+            dataCache: .init()
+        )
 
-            var parts: [Int] = []
-            var download: (Internals.ResponseHead, Data)?
+        var parts: [Int] = []
+        var download: (Internals.ResponseHead, Data)?
 
-            for try await result in task.response {
-                switch result {
-                case .upload(let part):
-                    NSLog("Send %d bytes (%d)", part, parts.count)
-                    parts.append(part)
-                case .download(let head, let bytes):
-                    NSLog("Head %d %@", head.status.code, head.status.reason)
-                    download = (head, try await Data(Array(bytes).joined()))
-                }
+        for try await result in task.response {
+            switch result {
+            case .upload(let part):
+                NSLog("Send %d bytes (%d)", part, parts.count)
+                parts.append(part)
+            case .download(let head, let bytes):
+                NSLog("Head %d %@", head.status.code, head.status.reason)
+                download = (head, try await Data(Array(bytes).joined()))
             }
-
-            // Then
-            XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
-            XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
-            XCTAssertNotNil(download)
-            XCTAssertEqual(download?.0.status.code, 200)
-            XCTAssertEqual(
-                try (download?.1).map(HTTPResult<String>.init),
-                HTTPResult(
-                    receivedBytes: length,
-                    response: message
-                )
-            )
         }
+
+        // Then
+        XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
+        XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
+        XCTAssertNotNil(download)
+        XCTAssertEqual(download?.0.status.code, 200)
+        XCTAssertEqual(
+            try (download?.1).map(HTTPResult<String>.init),
+            HTTPResult(
+                receivedBytes: length,
+                response: message
+            )
+        )
     }
     // swiftlint:enable function_body_length
 }

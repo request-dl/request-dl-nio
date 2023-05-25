@@ -338,6 +338,29 @@ extension Internals.Log.Message {
     }
 }
 
+// MARK: - Cache
+extension Internals.Log.Message {
+
+    static func loweringCacheCapacityOnInitNotPermitted<Memory, Disk>(
+        _ memoryCapacity: Memory,
+        _ diskCapacity: Disk
+    ) -> Internals.Log.Message {
+        Internals.Log.Message(
+            """
+            Cannot decrease the capacity of the disk or memory during \
+            DataCache initialization.
+
+            To accomplish this, you must directly access the DataCache \
+            object.
+            """,
+            parameters: [
+                "memoryCapacity": memoryCapacity,
+                "diskCapacity": diskCapacity
+            ]
+        )
+    }
+}
+
 // MARK: - Modifiers
 extension Internals.Log.Message {
 

@@ -6,7 +6,7 @@ import Foundation
 
 struct RawTask<Content: Property>: Task {
 
-    // MARK: - Internal methods
+    // MARK: - Internal properties
 
     let content: Content
 
@@ -15,8 +15,9 @@ struct RawTask<Content: Property>: Task {
     func result() async throws -> AsyncResponse {
         let resolved = try await Resolve(content).build()
 
-        return try await .init(resolved.session.request(
-            resolved.request
+        return try await .init(resolved.session.execute(
+            request: resolved.request,
+            dataCache: resolved.dataCache
         ).response)
     }
 }

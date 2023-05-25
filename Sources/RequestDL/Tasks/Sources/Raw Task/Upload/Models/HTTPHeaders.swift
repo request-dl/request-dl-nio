@@ -69,13 +69,19 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
         // MARK: - Private properties
 
-        private var _hashValue: Int
+        private let _hashValue: Int
 
         // MARK: - Inits
 
         init(_ rawValue: String) {
             self.rawValue = rawValue
             self._hashValue = rawValue.lowercased().hashValue
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            try self.init(container.decode(String.self, forKey: .rawValue))
         }
 
         // MARK: - Internal static methods
@@ -86,8 +92,19 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
         // MARK: - Internal methods
 
+        enum CodingKeys: CodingKey {
+            case rawValue
+            case _hashValue
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(rawValue, forKey: .rawValue)
+        }
+
         func hash(into hasher: inout Hasher) {
-            hasher.combine(_hashValue)
+            _hashValue.hash(into: &hasher)
         }
     }
 

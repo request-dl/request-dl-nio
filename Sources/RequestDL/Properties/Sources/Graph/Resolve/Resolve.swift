@@ -35,7 +35,8 @@ struct Resolve<Root: Property>: Sendable {
 
         return Resolved(
             session: session,
-            request: make.request
+            request: make.request,
+            dataCache: make.cacheConfiguration.build()
         )
     }
 

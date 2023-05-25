@@ -43,12 +43,17 @@ class ModifiersProgressTests: XCTestCase {
         }
     }
 
+    var localServer: LocalServer!
     var uploadMonitor: UploadProgressMonitor!
     var downloadMonitor: DownloadProgressMonitor!
     var progressMonitor: ProgressMonitor!
 
     override func setUp() async throws {
         try await super.setUp()
+
+        localServer = try await .init(.standard)
+        localServer.cleanup()
+
         uploadMonitor = .init()
         downloadMonitor = .init()
         progressMonitor = .init()
@@ -56,6 +61,10 @@ class ModifiersProgressTests: XCTestCase {
 
     override func tearDown() async throws {
         try await super.tearDown()
+
+        localServer.cleanup()
+        localServer = nil
+
         uploadMonitor = nil
         downloadMonitor = nil
         progressMonitor = nil
@@ -66,30 +75,30 @@ class ModifiersProgressTests: XCTestCase {
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
 
-        // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: ""
-        ).run { baseURL in
-            _ = try await UploadTask {
-                BaseURL(baseURL)
-                Path("index")
-                Payload(data: data)
+        let response = LocalServer.ResponseConfiguration(
+            data: data
+        )
 
-                SecureConnection {
-                    Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                    }
+        localServer.insert(response)
+
+        // When
+        _ = try await UploadTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
+            Payload(data: data)
+
+            SecureConnection {
+                Trusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
-            .uploadProgress(uploadMonitor)
-            .extractPayload()
-            .result()
-
-            // Then
-            XCTAssertEqual(uploadMonitor.sentBytes.reduce(.zero, +), data.count)
         }
+        .uploadProgress(uploadMonitor)
+        .extractPayload()
+        .result()
+
+        // Then
+        XCTAssertEqual(uploadMonitor.sentBytes.reduce(.zero, +), data.count)
     }
 
     func testIgnores_whenDownloadStep_shouldBeValid() async throws {
@@ -98,45 +107,45 @@ class ModifiersProgressTests: XCTestCase {
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: message
+        )
+
+        localServer.insert(response)
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: message
-        ).run { baseURL in
-            let data = try await UploadTask {
-                BaseURL(baseURL)
-                Path("index")
+        let data = try await UploadTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                SecureConnection {
-                    Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                    }
+            SecureConnection {
+                Trusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-
-                ReadingMode(length: length)
-            }
-            .ignoresUploadProgress()
-            .downloadProgress(downloadMonitor)
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(data)
-
-            // Then
-            XCTAssertEqual(downloadMonitor.length, data.count)
-            XCTAssertEqual(result.receivedBytes, .zero)
-
-            let completeParts = downloadMonitor.receivedData.dropLast()
-            if !completeParts.isEmpty {
-                XCTAssertEqual(
-                    completeParts.map(\.count),
-                    completeParts.indices.map { _ in length }
-                )
             }
 
-            XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+            ReadingMode(length: length)
         }
+        .ignoresUploadProgress()
+        .downloadProgress(downloadMonitor)
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        XCTAssertEqual(downloadMonitor.length, data.count)
+        XCTAssertEqual(result.receivedBytes, .zero)
+
+        let completeParts = downloadMonitor.receivedData.dropLast()
+        if !completeParts.isEmpty {
+            XCTAssertEqual(
+                completeParts.map(\.count),
+                completeParts.indices.map { _ in length }
+            )
+        }
+
+        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
     }
 
     func testIgnores_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
@@ -145,50 +154,50 @@ class ModifiersProgressTests: XCTestCase {
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: message
+        )
+
+        localServer.insert(response)
+
         let expectingData = try HTTPResult(
             receivedBytes: .zero,
             response: message
         ).encode()
 
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: message
-        ).run { baseURL in
-            let data = try await UploadTask {
-                BaseURL(baseURL)
-                Path("index")
+        let data = try await UploadTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                SecureConnection {
-                    Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                    }
+            SecureConnection {
+                Trusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-
-                ReadingMode(length: length)
-            }
-            .ignoresUploadProgress()
-            .extractPayload()
-            .downloadProgress(downloadMonitor, length: expectingData.count)
-            .result()
-
-            let result = try HTTPResult<String>(data)
-
-            // Then
-            XCTAssertEqual(downloadMonitor.length, data.count)
-            XCTAssertEqual(result.receivedBytes, .zero)
-
-            let completeParts = downloadMonitor.receivedData.dropLast()
-            if !completeParts.isEmpty {
-                XCTAssertEqual(
-                    completeParts.map(\.count),
-                    completeParts.indices.map { _ in length }
-                )
             }
 
-            XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+            ReadingMode(length: length)
         }
+        .ignoresUploadProgress()
+        .extractPayload()
+        .downloadProgress(downloadMonitor, length: expectingData.count)
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        XCTAssertEqual(downloadMonitor.length, data.count)
+        XCTAssertEqual(result.receivedBytes, .zero)
+
+        let completeParts = downloadMonitor.receivedData.dropLast()
+        if !completeParts.isEmpty {
+            XCTAssertEqual(
+                completeParts.map(\.count),
+                completeParts.indices.map { _ in length }
+            )
+        }
+
+        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
     }
 
     func testIgnores_whenCompleteProgress_shouldBeValid() async throws {
@@ -198,45 +207,45 @@ class ModifiersProgressTests: XCTestCase {
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: message
+        )
+
+        localServer.insert(response)
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: message
-        ).run { baseURL in
-            let receivedData = try await UploadTask {
-                BaseURL(baseURL)
-                Path("index")
+        let receivedData = try await UploadTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                ReadingMode(length: length)
+            ReadingMode(length: length)
 
-                SecureConnection {
-                    Trusts {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                    }
+            SecureConnection {
+                Trusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-
-                Payload(data: data)
-            }
-            .progress(progressMonitor)
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(receivedData)
-
-            // Then
-            XCTAssertEqual(progressMonitor.length, receivedData.count)
-            XCTAssertEqual(result.receivedBytes, data.count)
-
-            let completeParts = progressMonitor.receivedData.dropLast()
-            if !completeParts.isEmpty {
-                XCTAssertEqual(
-                    completeParts.map(\.count),
-                    completeParts.indices.map { _ in length }
-                )
             }
 
-            XCTAssertLessThanOrEqual(progressMonitor.receivedData.last?.count ?? .zero, length)
+            Payload(data: data)
         }
+        .progress(progressMonitor)
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(receivedData)
+
+        // Then
+        XCTAssertEqual(progressMonitor.length, receivedData.count)
+        XCTAssertEqual(result.receivedBytes, data.count)
+
+        let completeParts = progressMonitor.receivedData.dropLast()
+        if !completeParts.isEmpty {
+            XCTAssertEqual(
+                completeParts.map(\.count),
+                completeParts.indices.map { _ in length }
+            )
+        }
+
+        XCTAssertLessThanOrEqual(progressMonitor.receivedData.last?.count ?? .zero, length)
     }
 }

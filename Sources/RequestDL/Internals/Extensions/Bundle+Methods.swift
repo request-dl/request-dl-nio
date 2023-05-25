@@ -66,7 +66,7 @@ extension Bundle {
         }
 
         return bundleURL
-            .appendingPathComponent("Contents")
-            .appendingPathComponent("Resources")
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
     }
 }

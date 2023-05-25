@@ -42,6 +42,20 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        func execute(request: HTTPClient.Request) -> EventLoopFuture<HTTPClient.Response> {
+            let operation = manager.operation()
+
+            return _client.execute(
+                request: request
+            ).always { _ in
+                _Concurrency.Task {
+                    await self.lock.withLockVoid {
+                        operation.complete()
+                    }
+                }
+            }
+        }
+
         func execute<Delegate: HTTPClientResponseDelegate>(
             request: HTTPClient.Request,
             delegate: Delegate

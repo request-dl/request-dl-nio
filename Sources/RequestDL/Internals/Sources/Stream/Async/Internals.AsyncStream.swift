@@ -159,57 +159,10 @@ extension Internals {
             }
         }
 
-        private final class Queue: @unchecked Sendable {
-
-            private let lock = Lock()
-            private let priority: _Concurrency.TaskPriority
-
-            private var _operations: [() async -> Void]
-            private var _isRunning = false
-
-            init(priority: _Concurrency.TaskPriority = .utility) {
-                self.priority = priority
-                self._operations = []
-            }
-
-            func addOperation(_ operation: @escaping () async -> Void) {
-                lock.withLock {
-                    _operations.append(operation)
-                    _runIfNeeded()
-                }
-            }
-
-            private func _runIfNeeded() {
-                guard !_isRunning else {
-                    return
-                }
-
-                _isRunning = true
-                _runFirstOperation(true)
-            }
-
-            private func _runFirstOperation(_ isStateLock: Bool) {
-                isStateLock ? () : lock.lock()
-                defer { isStateLock ? () : lock.unlock() }
-
-                guard let operation = _operations.first else {
-                    _isRunning = false
-                    return
-                }
-
-                _operations.removeFirst()
-
-                _Concurrency.Task(priority: priority) {
-                    await operation()
-                    _runFirstOperation(false)
-                }
-            }
-        }
-
         // MARK: - Private properties
 
         private let storage = Storage()
-        private let queue = Queue()
+        private let queue = AsyncQueue()
 
         // MARK: - Inits
 
@@ -230,6 +183,13 @@ extension Internals {
         static func constant(_ value: Element) -> AsyncStream<Element> {
             let asyncStream = AsyncStream()
             asyncStream.append(.success(value))
+            asyncStream.close()
+            return asyncStream
+        }
+
+        static func throwing(_ error: Error) -> AsyncStream<Element> {
+            let asyncStream = AsyncStream()
+            asyncStream.append(.failure(error))
             asyncStream.close()
             return asyncStream
         }

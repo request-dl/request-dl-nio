@@ -18,8 +18,10 @@ extension Internals {
         private let lock = Lock()
 
         private let url: String
+
         private let upload: Internals.AsyncStream<Int>
         private let head: Internals.AsyncStream<ResponseHead>
+        private let cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
 
         // MARK: - Unsafe properties
 
@@ -35,12 +37,14 @@ extension Internals {
             url: String,
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<ResponseHead>,
-            download: DownloadBuffer
+            download: DownloadBuffer,
+            cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
         ) {
             self.url = url
             self.upload = upload
             self.head = head
             self._download = download
+            self.cache = cache
         }
 
         // MARK: - Internal methods
@@ -102,6 +106,10 @@ extension Internals {
                 _state = .head
                 _phase = .download
                 _reference = .download
+
+                if let cache = self.cache?(responseHead) {
+                    _download.cacheStream(cache)
+                }
 
                 return task.eventLoop.makeSucceededVoidFuture()
             }

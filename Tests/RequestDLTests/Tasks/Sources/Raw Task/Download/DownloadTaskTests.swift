@@ -7,33 +7,47 @@ import XCTest
 
 class DownloadTaskTests: XCTestCase {
 
+    var localServer: LocalServer!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        localServer = try await .init(.standard)
+        localServer.cleanup()
+    }
+
+    override func tearDown() async throws {
+        try await super.tearDown()
+        localServer.cleanup()
+        localServer = nil
+    }
+
     func testDataTask() async throws {
         // Given
         let certificate = Certificates().server()
         let output = "Hello World"
 
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: output
+        )
+
+        localServer.insert(response)
+
         // When
-        try await InternalServer(
-            host: "localhost",
-            port: 8888,
-            response: output
-        ).run { baseURL in
-            let data = try await DownloadTask {
-                BaseURL(baseURL)
-                Path("index")
+        let data = try await DownloadTask {
+            BaseURL(localServer.baseURL)
+            Path("index")
 
-                SecureConnection {
-                    Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
-                }
+            SecureConnection {
+                Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
-            .ignoresDownloadProgress()
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(data)
-
-            // Then
-            XCTAssertEqual(result.response, output)
         }
+        .ignoresDownloadProgress()
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        XCTAssertEqual(result.response, output)
     }
 }
