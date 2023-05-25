@@ -9,7 +9,7 @@ class CachedRequestTests: XCTestCase {
 
     private let certificate = Certificates().server()
     private let dataCache = DataCache.shared
-    private let output = String.randomString(length: 1_024)
+    private let output = String.randomString(length: 64)
     private var localServer: LocalServer!
 
     override func setUp() async throws {
@@ -44,11 +44,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .ignoreCachedData
         )
 
-        try await waitCacheWriting()
-
         let cachedData = DataCache.shared.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -69,11 +67,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .ignoreCachedData
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = DataCache.shared.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -111,11 +107,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .useCachedDataOnly
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -158,11 +152,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .useCachedDataOnly
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -205,11 +197,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .returnCachedDataElseLoad
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -231,11 +221,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .returnCachedDataElseLoad
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -256,11 +244,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .reloadAndValidateCachedData
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -283,11 +269,9 @@ class CachedRequestTests: XCTestCase {
             cacheStrategy: .reloadAndValidateCachedData
         )
 
-        try await waitCacheWriting()
-
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .memory
+            policy: .all
         )
 
         // Then
@@ -299,11 +283,7 @@ class CachedRequestTests: XCTestCase {
 extension CachedRequestTests {
 
     func waitCacheExpiration() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000_000)
-    }
-
-    func waitCacheWriting() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 4_000_000_000)
+        try await _Concurrency.Task.sleep(nanoseconds: 2_000_000_000)
     }
 
     func mockCachedData(_ headers: [(String, String)] = []) -> CachedData {
@@ -321,7 +301,7 @@ extension CachedRequestTests {
                 ]),
                 isKeepAlive: false
             ),
-            policy: .memory,
+            policy: .all,
             data: data ?? Data()
         )
     }
@@ -342,7 +322,7 @@ extension CachedRequestTests {
         }
 
         let now = Date()
-        let maxAgeSeconds = 5
+        let maxAgeSeconds = 2
 
         if maxAge {
             headers.append(("Cache-Control", "public, max-age=\(maxAgeSeconds)"))

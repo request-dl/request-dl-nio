@@ -103,9 +103,13 @@ struct DiskStorage: Sendable {
         ) {
             let timeUnit = Int(date.timeIntervalSinceReferenceDate)
 
-            let url = directory
-                .appendingPathComponent(String(timeUnit, radix: 36) + "." + key)
-                .appendingPathExtension(DiskStorage.Record.pathExtension)
+            var directoryPathComponent = String(timeUnit, radix: 36)
+            directoryPathComponent += "."
+            directoryPathComponent += key
+            directoryPathComponent += "."
+            directoryPathComponent += DiskStorage.Record.pathExtension
+
+            let url = directory.appendingPathComponent(directoryPathComponent, isDirectory: true)
 
             self.url = url
             self.key = key

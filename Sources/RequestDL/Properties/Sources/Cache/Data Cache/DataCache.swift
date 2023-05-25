@@ -197,6 +197,10 @@ public struct DataCache: Sendable, Equatable {
     }
 
     init(url: URL) {
+        let url = url
+            .deletingLastPathComponent()
+            .appendingPathComponent(url.lastPathComponent, isDirectory: true)
+
         self.storage = Manager.shared.storage(url)
     }
 
@@ -210,14 +214,18 @@ public struct DataCache: Sendable, Equatable {
 
     static func temporaryURL(suiteName: String) -> URL {
         FileManager.default.temporaryDirectory
-            .appendingPathComponent("com.request-dl.Swift.Cache")
+            .appendingPathComponent(
+                "com.request-dl.Swift.Cache",
+                isDirectory: true
+            )
             .appendingPathComponent(
                 suiteName.replacingOccurrences(
                     of: "[/:\\\\]",
                     with: "_",
                     options: .regularExpression
-                )
-        )
+                ),
+                isDirectory: true
+            )
     }
 
     static func mainTemporaryURL() -> URL {
