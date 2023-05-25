@@ -274,7 +274,7 @@ struct DiskStorage: Sendable {
         }
 
         var accumulatedSize: UInt64 = 0
-        var deleteOnly = false
+        var deleteOnly = maximumCapacity == .zero
 
         for entry in entries {
             if !deleteOnly {

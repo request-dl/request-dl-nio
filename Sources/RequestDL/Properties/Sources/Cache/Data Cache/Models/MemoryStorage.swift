@@ -129,7 +129,7 @@ struct MemoryStorage: Sendable {
 
     mutating func freeSpace(_ maximumCapacity: UInt64) {
         var accumulatedSize: UInt64 = 0
-        var deleteOnly = false
+        var deleteOnly = maximumCapacity == .zero
 
         for key in identifiers.reversed() {
             guard let entry = records[key] else {
