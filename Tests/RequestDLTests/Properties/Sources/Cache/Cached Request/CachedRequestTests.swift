@@ -299,11 +299,11 @@ class CachedRequestTests: XCTestCase {
 extension CachedRequestTests {
 
     func waitCacheExpiration() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000_000)
     }
 
     func waitCacheWriting() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 2_500_000_000)
+        try await _Concurrency.Task.sleep(nanoseconds: 4_000_000_000)
     }
 
     func mockCachedData(_ headers: [(String, String)] = []) -> CachedData {
