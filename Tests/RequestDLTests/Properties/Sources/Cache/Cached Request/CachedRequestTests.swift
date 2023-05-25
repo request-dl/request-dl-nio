@@ -48,7 +48,7 @@ class CachedRequestTests: XCTestCase {
 
         let cachedData = DataCache.shared.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -73,7 +73,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = DataCache.shared.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -115,7 +115,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -162,7 +162,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -209,7 +209,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -235,7 +235,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -260,7 +260,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -287,7 +287,7 @@ class CachedRequestTests: XCTestCase {
 
         let updatedCachedData = dataCache.getCachedData(
             forKey: cacheKey,
-            policy: .all
+            policy: .memory
         )
 
         // Then
@@ -321,7 +321,7 @@ extension CachedRequestTests {
                 ]),
                 isKeepAlive: false
             ),
-            policy: .all,
+            policy: .memory,
             data: data ?? Data()
         )
     }
