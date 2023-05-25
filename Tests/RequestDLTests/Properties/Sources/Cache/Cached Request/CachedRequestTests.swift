@@ -14,17 +14,23 @@ class CachedRequestTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
+
         dataCache.removeAll()
         dataCache.memoryCapacity = 8 * 1_024 * 1_024
         dataCache.diskCapacity = 64 * 1_024 * 1_024
+
         localServer = try await LocalServer(.standard)
+        localServer.cleanup()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
+
         dataCache.removeAll()
         dataCache.memoryCapacity = .zero
         dataCache.diskCapacity = .zero
+
+        localServer.cleanup()
         localServer = nil
     }
 
@@ -125,7 +131,7 @@ class CachedRequestTests: XCTestCase {
         // When
         dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+        try await waitCacheExpiration()
 
         do {
             _ = try await performCacheRequest(
@@ -172,7 +178,7 @@ class CachedRequestTests: XCTestCase {
         // When
         dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+        try await waitCacheExpiration()
 
         do {
             _ = try await performCacheRequest(
@@ -218,7 +224,7 @@ class CachedRequestTests: XCTestCase {
         // When
         dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+        try await waitCacheExpiration()
 
         let response = try await performCacheRequest(
             headers: makeHeaders(),
@@ -270,7 +276,7 @@ class CachedRequestTests: XCTestCase {
         // When
         dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+        try await waitCacheExpiration()
 
         let response = try await performCacheRequest(
             headers: makeHeaders(eTag: eTag),
@@ -291,6 +297,10 @@ class CachedRequestTests: XCTestCase {
 }
 
 extension CachedRequestTests {
+
+    func waitCacheExpiration() async throws {
+        try await _Concurrency.Task.sleep(nanoseconds: 6_000_000_000)
+    }
 
     func waitCacheWriting() async throws {
         try await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
@@ -357,8 +367,7 @@ extension CachedRequestTests {
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, output)
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         let output = try await DataTask {
             SecureConnection {

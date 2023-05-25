@@ -13,10 +13,12 @@ class DataTaskTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         localServer = try await .init(.standard)
+        localServer.cleanup()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
+        localServer.cleanup()
         localServer = nil
     }
 
@@ -29,8 +31,7 @@ class DataTaskTests: XCTestCase {
             jsonObject: output
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await DataTask {
@@ -69,8 +70,7 @@ class DataTaskTests: XCTestCase {
             jsonObject: output
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await DataTask {
@@ -139,8 +139,7 @@ extension DataTaskTests {
             jsonObject: output
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await DataTask {

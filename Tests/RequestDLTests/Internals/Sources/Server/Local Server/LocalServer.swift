@@ -12,19 +12,27 @@ struct LocalServer: Sendable {
 
     final class ServerManager: @unchecked Sendable {
 
+        // MARK: - Internal static properties
+
         static let shared = ServerManager()
 
-        private let lock = AsyncLock()
-        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
+        // MARK: - Private properties
 
-        private var _channels: [Configuration: (Channel, RequestBag)] = [:]
+        private let lock = AsyncLock()
+        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+        // MARK: - Unsafe properties
+
+        private var _channels: [Configuration: (Channel, ResponseQueue)] = [:]
+
+        // MARK: - Internal methods
 
         func remove(_ configuration: Configuration) async throws {
             try await _channels[configuration]?.0.close()
             _channels[configuration] = nil
         }
 
-        func channel(_ configuration: Configuration) async throws -> (Channel, RequestBag) {
+        func channel(_ configuration: Configuration) async throws -> (Channel, ResponseQueue) {
             try await lock.withLock {
                 if let output = _channels[configuration] {
                     return output
@@ -39,7 +47,7 @@ struct LocalServer: Sendable {
 
                 let tlsConfiguration = try configuration.option.build()
                 let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-                let bag = RequestBag()
+                let responseQueue = ResponseQueue()
 
                 let futureChannel = ServerBootstrap(group: group)
                     .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -54,72 +62,78 @@ struct LocalServer: Sendable {
                                 channel.pipeline.configureHTTPServerPipeline()
                             }
                             .flatMap {
-                                channel.pipeline.addHandler(HTTPHandler(bag))
+                                channel.pipeline.addHandler(HTTPHandler(responseQueue))
                             }
                     }
-                    .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
                     .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                     .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
                     .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
                     .bind(host: configuration.host, port: Int(configuration.port))
 
                 let channel = try await futureChannel.get()
-                _channels[configuration] = (channel, bag)
-                return (channel, bag)
+                _channels[configuration] = (channel, responseQueue)
+                return (channel, responseQueue)
             }
         }
     }
 
-    final class RequestBag: @unchecked Sendable {
+    final class ResponseQueue: @unchecked Sendable {
+
+        // MARK: - Private properties
 
         private let lock = Lock()
-        private let lockState = AsyncLock()
 
-        private var _pendingConfiguration: ResponseConfiguration?
+        // MARK: - Unsafe properties
+
+        private var _responses: [ResponseConfiguration] = []
+
+        // MARK: - Inits
 
         init() {}
 
-        func register(_ configuration: ResponseConfiguration) async {
-            await lockState.lock()
+        // MARK: - Internal methods
 
+        func insert(_ response: ResponseConfiguration) {
             lock.withLock {
-                _pendingConfiguration = configuration
+                _responses.insert(response, at: .zero)
             }
         }
 
-        func latestConfiguration() -> ResponseConfiguration? {
+        func popLast() -> ResponseConfiguration? {
             lock.withLock {
-                _pendingConfiguration
+                _responses.popLast()
             }
         }
 
-        func consume() {
+        func cleanup() {
             lock.withLock {
-                _pendingConfiguration = nil
+                _responses = []
             }
-
-            lockState.unlock()
         }
     }
 
+    // MARK: - Private properties
+
     private let configuration: Configuration
-    private let bag: RequestBag
     private let channel: Channel
+    private let responseQueue: ResponseQueue
+
+    // MARK: - Inits
 
     init(_ configuration: Configuration) async throws {
-        let (channel, bag) = try await ServerManager.shared.channel(configuration)
+        let (channel, responseQueue) = try await ServerManager.shared.channel(configuration)
 
         self.configuration = configuration
         self.channel = channel
-        self.bag = bag
+        self.responseQueue = responseQueue
     }
 
-    func register(_ configuration: ResponseConfiguration) async {
-        await bag.register(configuration)
+    func insert(_ response: ResponseConfiguration) {
+        responseQueue.insert(response)
     }
 
-    func releaseConfiguration() {
-        bag.consume()
+    func cleanup() {
+        responseQueue.cleanup()
     }
 
     var baseURL: String {

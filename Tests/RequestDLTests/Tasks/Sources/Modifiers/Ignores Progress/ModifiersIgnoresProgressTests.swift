@@ -12,10 +12,12 @@ class ModifiersIgnoresProgressTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         localServer = try await .init(.standard)
+        localServer.cleanup()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
+        localServer.cleanup()
         localServer = nil
     }
 
@@ -28,8 +30,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let bytes = try await UploadTask {
@@ -60,8 +61,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await UploadTask {
@@ -91,8 +91,7 @@ class ModifiersIgnoresProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await UploadTask {

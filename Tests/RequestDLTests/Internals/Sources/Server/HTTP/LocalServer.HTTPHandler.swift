@@ -13,7 +13,10 @@ extension LocalServer {
         typealias InboundIn = HTTPServerRequestPart
         typealias OutboundOut = HTTPServerResponsePart
 
-        private let bag: RequestBag
+        // MARK: - Private properties
+
+        private let responseQueue: ResponseQueue
+        private var isNewConnection = true
         private var receivedAllParts = false
 
         private var _configuration: ResponseConfiguration?
@@ -25,17 +28,21 @@ extension LocalServer {
         private var _incomeHeaders: NIOHTTP1.HTTPHeaders?
         private var _incomeBuffer: ByteBuffer?
 
-        init(_ bag: RequestBag) {
-            self.bag = bag
+        // MARK: - Inits
+
+        init(_ responseQueue: ResponseQueue) {
+            self.responseQueue = responseQueue
         }
 
-        func channelActive(context: ChannelHandlerContext) {
-            _configuration = bag.latestConfiguration()
-            receivedAllParts = false
-            cleanup()
-        }
+        // MARK: - Internal methods
 
         func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+            if isNewConnection {
+                _configuration = responseQueue.popLast()
+                cleanup()
+                isNewConnection = false
+            }
+
             let request = unwrapInboundIn(data)
 
             switch request {
@@ -90,31 +97,23 @@ extension LocalServer {
                 headers: headers
             )
 
-            context.write(
-                wrapOutboundOut(.head(head)),
-                promise: nil
-            )
+            context.writeAndFlush(self.wrapOutboundOut(.head(head)))
+                .flatMapWithEventLoop { _, eventLoop in
+                    guard let data = response, self._method != .HEAD else {
+                        return eventLoop.makeSucceededVoidFuture()
+                    }
 
-            if let data = response, _method != .HEAD {
-                let ioData = IOData.byteBuffer(.init(data: data))
-                context.write(
-                    wrapOutboundOut(.body(ioData)),
-                    promise: nil
-                )
-            }
-
-            context.writeAndFlush(
-                wrapOutboundOut(.end(nil)),
-                promise: nil
-            )
-
-            context.close(promise: nil)
+                    let ioData = IOData.byteBuffer(.init(data: data))
+                    return context.writeAndFlush(self.wrapOutboundOut(.body(ioData)))
+                }.flatMap {
+                    context.writeAndFlush(self.wrapOutboundOut(.end(nil)))
+                }.whenComplete { _ in
+                    self._configuration = nil
+                    self.isNewConnection = true
+                }
         }
 
-        func channelInactive(context: ChannelHandlerContext) {
-            _configuration = nil
-            bag.consume()
-        }
+        // MARK: - Private methods
 
         private func responseData() -> Data? {
             var receivedBytes = Int.zero

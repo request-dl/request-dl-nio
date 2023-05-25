@@ -11,6 +11,7 @@ import NIOHTTP1
 extension LocalServer {
 
     struct ResponseConfiguration: Sendable {
+
         let headers: NIOHTTP1.HTTPHeaders
         let data: Data
 

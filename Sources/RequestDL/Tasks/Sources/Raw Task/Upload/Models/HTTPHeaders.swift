@@ -351,16 +351,6 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         return mutableSelf
     }
 
-    public static func == (_ lhs: Self, _ rhs: HTTPHeaders) -> Bool {
-        lhs.names.allSatisfy {
-            let lhsValues = lhs[$0] ?? []
-            let rhsValues = rhs[$0] ?? []
-            return lhsValues.allSatisfy {
-                rhsValues.contains($0)
-            } && lhsValues.count == rhsValues.count
-        } && lhs._names.count == rhs._names.count
-    }
-
     // MARK: - Internal methods
 
     func build() -> NIOHTTP1.HTTPHeaders {

@@ -50,7 +50,10 @@ class ModifiersProgressTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
+
         localServer = try await .init(.standard)
+        localServer.cleanup()
+
         uploadMonitor = .init()
         downloadMonitor = .init()
         progressMonitor = .init()
@@ -58,7 +61,10 @@ class ModifiersProgressTests: XCTestCase {
 
     override func tearDown() async throws {
         try await super.tearDown()
+
+        localServer.cleanup()
         localServer = nil
+
         uploadMonitor = nil
         downloadMonitor = nil
         progressMonitor = nil
@@ -73,8 +79,7 @@ class ModifiersProgressTests: XCTestCase {
             data: data
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         _ = try await UploadTask {
@@ -106,8 +111,7 @@ class ModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await UploadTask {
@@ -154,8 +158,7 @@ class ModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         let expectingData = try HTTPResult(
             receivedBytes: .zero,
@@ -208,8 +211,7 @@ class ModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let receivedData = try await UploadTask {

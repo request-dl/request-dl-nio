@@ -14,6 +14,8 @@ class InternalsSessionTests: XCTestCase {
         try await super.setUp()
 
         localServer = try await .init(.standard)
+        localServer.cleanup()
+
         session = Internals.Session(
             provider: .shared,
             configuration: .init()
@@ -22,7 +24,10 @@ class InternalsSessionTests: XCTestCase {
 
     override func tearDown() async throws {
         try await super.tearDown()
+
+        localServer.cleanup()
         localServer = nil
+
         session = nil
     }
 
@@ -126,8 +131,7 @@ class InternalsSessionTests: XCTestCase {
             jsonObject: message
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         var request = Internals.Request()

@@ -12,10 +12,12 @@ class DownloadTaskTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         localServer = try await .init(.standard)
+        localServer.cleanup()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
+        localServer.cleanup()
         localServer = nil
     }
 
@@ -28,8 +30,7 @@ class DownloadTaskTests: XCTestCase {
             jsonObject: output
         )
 
-        await localServer.register(response)
-        defer { localServer.releaseConfiguration() }
+        localServer.insert(response)
 
         // When
         let data = try await DownloadTask {
