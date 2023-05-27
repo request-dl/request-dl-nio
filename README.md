@@ -22,7 +22,7 @@ implement custom properties to define various aspects of the request within a
 struct specification or using the `@PropertyBuilder`. This makes it easy to customize 
 requests to meet specific needs.
 
-- **[Documentation](https://brennobemoura.github.io/request-dl/documentation/requestdl/)**
+- **[Documentation](https://request-dl.github.io/request-dl/documentation/requestdl/)**
 
 ## Installation
 
@@ -31,7 +31,7 @@ add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/brennobemoura/request-dl.git", from: "2.1.0")
+    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.2.0")
 ]
 ```
 
