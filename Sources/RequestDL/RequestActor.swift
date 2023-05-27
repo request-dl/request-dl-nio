@@ -10,9 +10,3 @@ public actor RequestActor {
 
     public static let shared = RequestActor()
 }
-
-
-@available(*, unavailable)
-func unavailableMethod() {
-    print("Hello World!")
-}
