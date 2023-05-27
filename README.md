@@ -1,6 +1,6 @@
-[![Swift Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2Frequest-dl%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/brennobemoura/request-dl)
-[![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbrennobemoura%2Frequest-dl%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/brennobemoura/request-dl)
-[![codecov](https://codecov.io/gh/brennobemoura/request-dl/branch/main/graph/badge.svg?token=MW5J053T85)](https://codecov.io/gh/brennobemoura/request-dl)
+[![Swift Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Frequest-dl%2Frequest-dl%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/request-dl/request-dl)
+[![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Frequest-dl%2Frequest-dl%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/request-dl/request-dl)
+[![codecov](https://codecov.io/gh/request-dl/request-dl/branch/main/graph/badge.svg?token=MW5J053T85)](https://codecov.io/gh/request-dl/request-dl)
 
 # RequestDL
 
@@ -22,7 +22,7 @@ implement custom properties to define various aspects of the request within a
 struct specification or using the `@PropertyBuilder`. This makes it easy to customize 
 requests to meet specific needs.
 
-- **[Documentation](https://brennobemoura.github.io/request-dl/documentation/requestdl/)**
+- **[Documentation](https://request-dl.github.io/request-dl/documentation/requestdl/)**
 
 ## Installation
 
@@ -31,7 +31,7 @@ add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/brennobemoura/request-dl.git", from: "2.1.0")
+    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.2.0")
 ]
 ```
 
