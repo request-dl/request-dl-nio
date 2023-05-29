@@ -19,7 +19,7 @@ import Foundation
          DataTask {
              BaseURL("google.com")
              Path("results")
-             Query(index, forKey: "page")
+             Query(name: "page", value: index)
          }
      }
      .result()

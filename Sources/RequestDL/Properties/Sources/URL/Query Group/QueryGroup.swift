@@ -13,9 +13,9 @@ Usage:
 
  ```swift
  QueryGroup {
-     Query("John", forKey: "name")
-     Query("Doe", forKey: "surname")
-     Query(30, forKey: "age")
+     Query(name: "name", value: "John")
+     Query(name: "surname", value: "Doe")
+     Query(name: "age", value: 30)
  }
  ```
  */
@@ -81,7 +81,7 @@ extension QueryGroup where Content == PropertyForEach<[String: Any], String, Que
     public init(_ dictionary: [String: Any]) {
         self.init {
             PropertyForEach(dictionary, id: \.key) {
-                Query($0.value, forKey: $0.key)
+                Query(name: $0.key, value: $0.value)
             }
         }
     }

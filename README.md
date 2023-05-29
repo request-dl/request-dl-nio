@@ -54,7 +54,7 @@ try await DataTask {
         CustomHeader(name: "xxx-api-key", value: token)
     }
     
-    Query("apple", forKey: "q")
+    Query(name: "q", value: "apple")
 }
 .logInConsole(true)
 .decode(GoogleResponse.self)

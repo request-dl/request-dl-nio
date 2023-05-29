@@ -47,7 +47,7 @@ class ResolveTests: XCTestCase {
             }
 
             QueryGroup {
-                Query("some question", forKey: "q")
+                Query(name: "q", value: "some question")
             }
         }
 

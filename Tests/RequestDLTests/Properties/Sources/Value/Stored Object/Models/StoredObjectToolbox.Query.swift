@@ -12,7 +12,7 @@ extension StoredObjectToolbox {
         @StoredObject var factory = Factory()
 
         var body: some Property {
-            RequestDL.Query(factory.rawValue, forKey: "index")
+            RequestDL.Query(name: "index", value: factory.rawValue)
         }
     }
 }

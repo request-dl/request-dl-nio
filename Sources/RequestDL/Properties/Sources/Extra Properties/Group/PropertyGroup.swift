@@ -17,7 +17,7 @@ import Foundation
 ///
 ///     PropertyGroup {
 ///         Path("users")
-///         Query(user.id, forKey: "id")
+///         Query(name: "id", value: user.id)
 ///     }
 /// }
 /// ```

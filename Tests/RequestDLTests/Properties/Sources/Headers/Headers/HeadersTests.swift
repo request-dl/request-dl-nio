@@ -163,7 +163,7 @@ class HeadersTests: XCTestCase {
         let property = TestProperty {
             BaseURL("127.0.0.1")
             HeaderGroup {
-                Query("password", forKey: "api_key")
+                Query(name: "api_key", value: "password")
             }
         }
 
