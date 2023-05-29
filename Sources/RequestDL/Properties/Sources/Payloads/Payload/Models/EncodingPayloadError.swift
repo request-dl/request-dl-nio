@@ -16,7 +16,7 @@ public struct EncodingPayloadError: Error {
     public let context: Context
 
     // MARK: - Inits
-    
+
     init(_ context: Context) {
         self.context = context
     }
