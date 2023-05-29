@@ -48,7 +48,11 @@ struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
     }
 
     private func jsonToData() throws -> Data {
-        try JSONSerialization.data(
+        guard JSONSerialization.isValidJSONObject(jsonObject) else {
+            throw EncodingPayloadError(.invalidJSONObject)
+        }
+
+        return try JSONSerialization.data(
             withJSONObject: jsonObject,
             options: options
         )
