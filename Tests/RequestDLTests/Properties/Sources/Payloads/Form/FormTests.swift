@@ -1114,6 +1114,52 @@ class FormTests: XCTestCase {
         ])
     }
 
+    func testForm_whenHeadersWithAddingStrategy() async throws {
+        // Given
+        let name = "foo"
+        let data = Data.randomData(length: 64)
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            Form(
+                name: name,
+                data: data,
+                headers: {
+                    CustomHeader(name: "Accept-Language", value: "en-US")
+                    CustomHeader(name: "Accept-Language", value: "pt-BR")
+                        .headerStrategy(.adding)
+                }
+            )
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count)),
+                    ("Accept-Language", "en-US"),
+                    ("Accept-Language", "pt-BR")
+                ]),
+                contents: data
+            )
+        ])
+    }
+
     func testForm_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = Form(
