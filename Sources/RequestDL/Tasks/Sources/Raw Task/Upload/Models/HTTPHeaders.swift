@@ -458,6 +458,22 @@ extension HTTPHeaders: RandomAccessCollection {
     }
 }
 
+// MARK: - CustomDebugStringConvertible
+
+extension HTTPHeaders: CustomDebugStringConvertible {
+
+    public var debugDescription: String {
+        var lines: [String] = []
+        for name in _names {
+            for value in _values(name) ?? [] {
+                lines.append("\(name.rawValue): \(value)")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+}
+
 // MARK: - Deprecated
 
 extension HTTPHeaders {
