@@ -9,7 +9,7 @@ class AnyPropertyTests: XCTestCase {
 
     func testAnyPropertyErasingQuery() async throws {
         // Given
-        let property = Query(123, forKey: "number")
+        let property = Query(name: "number", value: 123)
 
         // When
         let resolved = try await resolve(TestProperty {

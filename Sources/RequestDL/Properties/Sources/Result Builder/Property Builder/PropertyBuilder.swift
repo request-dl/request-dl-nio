@@ -24,12 +24,12 @@ import Foundation
 
  ```swift
  myProperties {
-     Query("abc", forKey: "string")
+     Query(name: "string", value: "abc")
      Payload("some-content", using: .utf8)
      Path("search")
      Group {
          BaseURL("google.com")
-         Query(1, forKey: "page")
+         Query(name: "page", value: 1)
      }
  }
  ```
@@ -99,9 +99,9 @@ public struct PropertyBuilder: Sendable {
      ```swift
      Group {
          if condition {
-             Query("foo", forKey: "password")
+             Query(name: "password", value: "foo")
          } else {
-             Query("bar", forKey: "password")
+             Query(name: "password", value: "bar")
          }
      }
      */

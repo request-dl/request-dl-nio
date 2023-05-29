@@ -9,7 +9,7 @@ class QueryTests: XCTestCase {
 
     func testSingleQuery() async throws {
         // Given
-        let property = Query(123, forKey: "number")
+        let property = Query(name: "number", value: 123)
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -25,10 +25,10 @@ class QueryTests: XCTestCase {
         // Given
         let property = TestProperty {
             BaseURL("127.0.0.1")
-            Query(123, forKey: "number")
-            Query(1, forKey: "page")
-            Query("password", forKey: "api_key")
-            Query([9, "nine"] as [Any], forKey: "array")
+            Query(name: "number", value: 123)
+            Query(name: "page", value: 1)
+            Query(name: "api_key", value: "password")
+            Query(name: "array", value: [9, "nine"] as [Any])
         }
 
         // When
@@ -57,8 +57,8 @@ class QueryTests: XCTestCase {
         let property = TestProperty {
             BaseURL("127.0.0.1")
             Group {
-                Query(true, forKey: "flag")
-                Query([9, "nine"] as [Any], forKey: "array")
+                Query(name: "flag", value: true)
+                Query(name: "array", value: [9, "nine"] as [Any])
             }
             .urlEncoder(urlEncoder)
         }
@@ -80,7 +80,7 @@ class QueryTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = Query(123, forKey: "key")
+        let property = Query(name: "key", value: 123)
 
         // Then
         try await assertNever(property.body)

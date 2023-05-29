@@ -25,7 +25,7 @@ class GroupTests: XCTestCase {
         let property = Group {
             BaseURL("google.com")
             Path("api/v1")
-            Query("all", forKey: "available_methods")
+            Query(name: "available_methods", value: "all")
         }
 
         // When

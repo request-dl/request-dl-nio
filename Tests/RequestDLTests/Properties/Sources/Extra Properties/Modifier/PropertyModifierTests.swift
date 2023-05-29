@@ -23,7 +23,7 @@ class PropertyModifierTests: XCTestCase {
                 Path("v2")
             }
 
-            Query(123, forKey: "id")
+            Query(name: "id", value: 123)
         }
     }
 

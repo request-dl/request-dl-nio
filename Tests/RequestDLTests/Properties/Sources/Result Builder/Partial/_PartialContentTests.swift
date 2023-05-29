@@ -95,7 +95,7 @@ class _PartialContentTests: XCTestCase {
             CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
         }
 
         // When
@@ -134,7 +134,7 @@ class _PartialContentTests: XCTestCase {
             CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
             Timeout(40)
         }
 
@@ -180,9 +180,9 @@ class _PartialContentTests: XCTestCase {
             CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
             Timeout(40)
-            Query(1, forKey: "page")
+            Query(name: "page", value: 1)
         }
 
         // When
@@ -230,9 +230,9 @@ class _PartialContentTests: XCTestCase {
             CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
             Timeout(40)
-            Query(1, forKey: "page")
+            Query(name: "page", value: 1)
             Path("results")
         }
 
