@@ -15,7 +15,7 @@ import Foundation
  ```swift
  HeaderGroup {
      Headers.ContentType(.json)
-     Headers.Any("123", forKey: "key")
+     CustomHeader("123", forKey: "key")
  }
  ```
  */
@@ -23,7 +23,7 @@ public struct HeaderGroup<Content: Property>: Property {
 
     private struct Node: PropertyNode {
 
-        let nodes: [LeafNode<Headers.Node>]
+        let nodes: [LeafNode<HeaderNode>]
 
         func make(_ make: inout Make) async throws {
             for node in nodes {
@@ -68,11 +68,11 @@ public struct HeaderGroup<Content: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(Node(nodes: outputs.node.search(for: Headers.Node.self)))
+        return .leaf(Node(nodes: outputs.node.search(for: HeaderNode.self)))
     }
 }
 
-extension HeaderGroup where Content == ForEach<[String: Any], String, Headers.`Any`> {
+extension HeaderGroup where Content == ForEach<[String: Any], String, CustomHeader> {
 
     /**
      Initializes a new `HeaderGroup` with a dictionary of headers.
@@ -82,7 +82,7 @@ extension HeaderGroup where Content == ForEach<[String: Any], String, Headers.`A
     public init(_ dictionary: [String: Any]) {
         self.init {
             ForEach(dictionary, id: \.key) {
-                Headers.Any(
+                CustomHeader(
                     name: $0.key,
                     value: "\($0.value)"
                 )

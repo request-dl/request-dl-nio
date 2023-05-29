@@ -7,13 +7,13 @@ import XCTest
 
 class HeadersTests: XCTestCase {
 
-    func testMultipleHeadersWithoutGroup() async throws {
+    func testHeaders_whenMultipleHeadersWithoutGroup() async throws {
         let property = TestProperty {
-            Headers.Cache()
+            CacheHeader()
                 .public(true)
-            Headers.Accept(.json)
-            Headers.Origin("127.0.0.1:8080")
-            Headers.Any(name: "xxx-api-key", value: "password")
+            AcceptHeader(.json)
+            OriginHeader("127.0.0.1:8080")
+            CustomHeader(name: "xxx-api-key", value: "password")
         }
 
         let resolved = try await resolve(property)
@@ -24,17 +24,17 @@ class HeadersTests: XCTestCase {
         XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password"])
     }
 
-    func testCollisionHeaders() async throws {
+    func testHeaders_whenSameHeaderSpecifyWithSettingStrategy() async throws {
         let property = TestProperty {
-            Headers.Cache()
+            CacheHeader()
                 .public(true)
 
-            Headers.Cache()
+            CacheHeader()
                 .proxyRevalidate()
 
-            Headers.Accept(.jpeg)
-            Headers.Any(name: "xxx-api-key", value: "password")
-            Headers.Any(name: "xxx-api-key", value: "password123")
+            AcceptHeader(.jpeg)
+            CustomHeader(name: "xxx-api-key", value: "password")
+            CustomHeader(name: "xxx-api-key", value: "password123")
         }
 
         let resolved = try await resolve(property)
@@ -44,19 +44,19 @@ class HeadersTests: XCTestCase {
         XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password123"])
     }
 
-    func testCollisionHeadersWithGroup() async throws {
+    func testHeaders_whenSameHeaderWithGroupWithSettingStrategy() async throws {
         let property = TestProperty {
-            Headers.Cache()
+            CacheHeader()
                 .public(true)
 
-            Headers.Accept(.jpeg)
-            Headers.Any(name: "xxx-api-key", value: "password")
+            AcceptHeader(.jpeg)
+            CustomHeader(name: "xxx-api-key", value: "password")
 
             HeaderGroup {
-                Headers.Cache()
+                CacheHeader()
                     .proxyRevalidate()
 
-                Headers.Any(name: "xxx-api-key", value: "password123")
+                CustomHeader(name: "xxx-api-key", value: "password123")
             }
         }
 
@@ -67,19 +67,86 @@ class HeadersTests: XCTestCase {
         XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password123"])
     }
 
-    func testCombinedHeadersWithGroup() async throws {
+    func testHeaders_whenSameHeaderSpecifyWithAddingStrategy() async throws {
+        // Given
         let property = TestProperty {
-            Headers.Host("127.0.0.1", port: "8080")
+            CacheHeader()
+                .public(true)
+
+            CacheHeader()
+                .proxyRevalidate()
+
+            AcceptHeader(.jpeg)
+            CustomHeader(name: "xxx-api-key", value: "password")
+            CustomHeader(name: "xxx-api-key", value: "password123")
+        }
+        .headerStrategy(.adding)
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Cache-Control"],
+            ["public", "proxy-revalidate"]
+        )
+
+        XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])
+
+        XCTAssertEqual(
+            resolved.request.headers["xxx-api-key"],
+            ["password", "password123"]
+        )
+    }
+
+    func testHeaders_whenSameHeaderWithGroupWithAddingStrategy() async throws {
+        // Given
+        let property = TestProperty {
+            CacheHeader()
+                .public(true)
+
+            AcceptHeader(.jpeg)
+            CustomHeader(name: "xxx-api-key", value: "password")
 
             HeaderGroup {
-                Headers.Cache()
+                CacheHeader()
+                    .proxyRevalidate()
+
+                CustomHeader(name: "xxx-api-key", value: "password123")
+            }
+        }
+        .headerStrategy(.adding)
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Cache-Control"],
+            ["public", "proxy-revalidate"]
+        )
+
+        XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])
+
+        XCTAssertEqual(
+            resolved.request.headers["xxx-api-key"],
+            ["password", "password123"]
+        )
+    }
+
+    func testHeaders_whenCombinedHeadersWithGroup() async throws {
+        let property = TestProperty {
+            HostHeader("127.0.0.1", port: "8080")
+
+            HeaderGroup {
+                CacheHeader()
                     .public(true)
 
-                Headers.Any(name: "xxx-api-key", value: "password")
+                CustomHeader(name: "xxx-api-key", value: "password")
             }
 
-            Headers.Accept(.jpeg)
-            Headers.Origin("google.com")
+            AcceptHeader(.jpeg)
+            OriginHeader("google.com")
         }
 
         let resolved = try await resolve(property)
@@ -91,7 +158,7 @@ class HeadersTests: XCTestCase {
         XCTAssertEqual(resolved.request.headers["Origin"], ["google.com"])
     }
 
-    func testInvalidGroup() async throws {
+    func testHeaders_whenInvalidGroup() async throws {
         // Given
         let property = TestProperty {
             BaseURL("127.0.0.1")

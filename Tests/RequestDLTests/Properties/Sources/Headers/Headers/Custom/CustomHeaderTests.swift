@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-class HeadersAnyTests: XCTestCase {
+class CustomHeaderTests: XCTestCase {
 
     func testAny_whenInitWithStringValue() async throws {
         // Given
@@ -14,7 +14,7 @@ class HeadersAnyTests: XCTestCase {
 
         // When
         let resolved = try await resolve(TestProperty {
-            Headers.Any(
+            CustomHeader(
                 name: name,
                 value: value
             )
@@ -31,7 +31,7 @@ class HeadersAnyTests: XCTestCase {
 
         // When
         let resolved = try await resolve(TestProperty {
-            Headers.Any(
+            CustomHeader(
                 name: name,
                 value: value
             )
@@ -43,7 +43,7 @@ class HeadersAnyTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = Headers.Any(name: "key", value: 123)
+        let property = CustomHeader(name: "key", value: 123)
 
         // Then
         try await assertNever(property.body)
@@ -51,18 +51,18 @@ class HeadersAnyTests: XCTestCase {
 }
 
 @available(*, deprecated)
-extension HeadersAnyTests {
+extension CustomHeaderTests {
 
     func testSingleHeaderAny() async throws {
-        let property = TestProperty(Headers.Any("password", forKey: "xxx-api-key"))
+        let property = TestProperty(CustomHeader("password", forKey: "xxx-api-key"))
         let resolved = try await resolve(property)
         XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password"])
     }
 
     func testHeadersAny() async throws {
         let property = TestProperty {
-            Headers.Any("text/html", forKey: "Accept")
-            Headers.Any("gzip", forKey: "Content-Encoding")
+            CustomHeader("text/html", forKey: "Accept")
+            CustomHeader("gzip", forKey: "Content-Encoding")
         }
 
         let resolved = try await resolve(property)
