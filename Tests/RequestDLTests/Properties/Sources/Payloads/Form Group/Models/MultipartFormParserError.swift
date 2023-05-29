@@ -10,7 +10,6 @@ enum MultipartFormParserError: Error {
     case invalidLine
     case invalidChunk
     case invalidHeaderLine
-    case duplicatedHeaders
     case invalidHeaders
 }
 
@@ -28,8 +27,6 @@ extension MultipartFormParserError: LocalizedError {
             return "The multipart form data contains an invalid chunk."
         case .invalidHeaderLine:
             return "The multipart form data contains an invalid header line."
-        case .duplicatedHeaders:
-            return "The multipart form data contains duplicated headers."
         case .invalidHeaders:
             return "The multipart form data contains invalid headers."
         }

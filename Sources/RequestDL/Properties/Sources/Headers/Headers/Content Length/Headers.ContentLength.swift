@@ -4,6 +4,7 @@
 
 import Foundation
 
+@available(*, deprecated)
 extension Headers {
 
     /// A type representing the Content-Length header in an HTTP message.
@@ -40,9 +41,10 @@ extension Headers {
             inputs: _PropertyInputs
         ) async throws -> _PropertyOutputs {
             property.assertPathway()
-            return .leaf(Headers.Node(
+            return .leaf(HeaderNode(
                 key: "Content-Length",
-                value: String(property.bytes)
+                value: String(property.bytes),
+                strategy: inputs.environment.headerStrategy
             ))
         }
     }

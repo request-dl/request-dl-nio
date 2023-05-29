@@ -585,7 +585,7 @@ extension PayloadTests {
     }
 }
 
-// MARK: - Part length tests
+// MARK: - Others tests
 
 extension PayloadTests {
 
@@ -622,6 +622,24 @@ extension PayloadTests {
                 return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
         )
+    }
+
+    func testPayload_whenInvalidJSONObject() async throws {
+        // Given
+        let jsonObject: Any = { () -> Void in }
+        var encodingError: EncodingPayloadError?
+
+        // When
+        do {
+            _ = try await resolve(TestProperty {
+                Payload(jsonObject)
+            })
+        } catch let error as EncodingPayloadError {
+            encodingError = error
+        }
+
+        // Then
+        XCTAssertEqual(encodingError?.context, .invalidJSONObject)
     }
 }
 
