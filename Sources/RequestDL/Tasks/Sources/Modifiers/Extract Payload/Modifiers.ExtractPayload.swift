@@ -23,7 +23,7 @@ extension Modifiers {
      .extractPayload()
      ```
      */
-    public struct ExtractPayload<Content: Task, Element>: TaskModifier where Content.Element == TaskResult<Element> {
+    public struct ExtractPayload<Content: RequestTask, Element>: TaskModifier where Content.Element == TaskResult<Element> {
 
         /**
          Modifies the task to extract only the payload from a task result.
@@ -37,9 +37,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Modifies the task to ignore the URLResponse and only return the data.

@@ -13,7 +13,7 @@ extension Interceptors {
      cancelled when it goes out of scope.
 
      Use this interceptor allows you to perform operations on a separate closure without changing
-     the behavior of the main `Task`.
+     the behavior of the main `RequestTask`.
 
      Usage:
 
@@ -44,9 +44,9 @@ extension Interceptors {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Returns a new `InterceptedTask` object that runs the current task on a separate thread.

@@ -72,7 +72,7 @@ public struct HeaderGroup<Content: Property>: Property {
     }
 }
 
-extension HeaderGroup where Content == ForEach<[String: Any], String, CustomHeader> {
+extension HeaderGroup where Content == PropertyForEach<[String: Any], String, CustomHeader> {
 
     /**
      Initializes a new `HeaderGroup` with a dictionary of headers.
@@ -81,7 +81,7 @@ extension HeaderGroup where Content == ForEach<[String: Any], String, CustomHead
      */
     public init(_ dictionary: [String: Any]) {
         self.init {
-            ForEach(dictionary, id: \.key) {
+            PropertyForEach(dictionary, id: \.key) {
                 CustomHeader(
                     name: $0.key,
                     value: "\($0.value)"

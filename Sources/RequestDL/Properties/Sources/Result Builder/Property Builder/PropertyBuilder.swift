@@ -27,7 +27,7 @@ import Foundation
      Query(name: "string", value: "abc")
      Payload("some-content", using: .utf8)
      Path("search")
-     Group {
+     PropertyGroup {
          BaseURL("google.com")
          Query(name: "page", value: 1)
      }
@@ -97,7 +97,7 @@ public struct PropertyBuilder: Sendable {
      Example:
 
      ```swift
-     Group {
+     PropertyGroup {
          if condition {
              Query(name: "password", value: "foo")
          } else {
@@ -118,7 +118,7 @@ public struct PropertyBuilder: Sendable {
      Here's an example of how it can be used:
 
      ```swift
-     Group {
+     PropertyGroup {
          if #available(iOS 15, *) {
              Headers(...)
          }

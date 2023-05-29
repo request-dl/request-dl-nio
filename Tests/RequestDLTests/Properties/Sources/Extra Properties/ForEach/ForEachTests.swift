@@ -20,7 +20,7 @@ class ForEachTests: XCTestCase {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
-            ForEach(paths) { path in
+            PropertyForEach(paths) { path in
                 Path(path.id)
             }
         })
@@ -39,7 +39,7 @@ class ForEachTests: XCTestCase {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
-            ForEach(paths, id: \.self) { path in
+            PropertyForEach(paths, id: \.self) { path in
                 Path(path)
             }
         })
@@ -58,7 +58,7 @@ class ForEachTests: XCTestCase {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
-            ForEach(range) { index in
+            PropertyForEach(range) { index in
                 Path("\(index)")
             }
         })
@@ -77,7 +77,7 @@ class ForEachTests: XCTestCase {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("127.0.0.1")
-            ForEach(range) { index in
+            PropertyForEach(range) { index in
                 Path("\(index)")
             }
         })
@@ -91,7 +91,7 @@ class ForEachTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = ForEach([Int](), id: \.self) { _ in
+        let property = PropertyForEach([Int](), id: \.self) { _ in
             EmptyProperty()
         }
 

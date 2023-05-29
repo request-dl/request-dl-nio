@@ -5,11 +5,11 @@
 import Foundation
 
 /**
- `EnvironmentValues` is a type that contains all of the environment values
- for a view hierarchy. It is accessible via a subscript on a view's `Environment`
+ `PropertyEnvironmentValues` is a type that contains all of the environment values
+ for a view hierarchy. It is accessible via a subscript on a view's `PropertyEnvironment`
  property.
  */
-public struct EnvironmentValues: Sendable {
+public struct PropertyEnvironmentValues: Sendable {
 
     // MARK: - Private properties
 
@@ -22,12 +22,12 @@ public struct EnvironmentValues: Sendable {
     // MARK: - Public methods
 
     /**
-     Subscript for retrieving an `Value` for a given `EnvironmentKey` type.
+     Subscript for retrieving an `Value` for a given `PropertyEnvironmentKey` type.
 
-     - Parameter key: The `EnvironmentKey` type to retrieve the `Value` for.
+     - Parameter key: The `PropertyEnvironmentKey` type to retrieve the `Value` for.
      - Returns: The `Value` in the environment for the given `key`.
      */
-    public subscript<Key: EnvironmentKey>(key: Key.Type) -> Key.Value {
+    public subscript<Key: PropertyEnvironmentKey>(key: Key.Type) -> Key.Value {
         get {
             guard let value = values[ObjectIdentifier(key)] as? Key.Value else {
                 return Key.defaultValue
@@ -40,3 +40,6 @@ public struct EnvironmentValues: Sendable {
         }
     }
 }
+
+@available(*, deprecated, renamed: "PropertyEnvironmentValues")
+public typealias EnvironmentValues = PropertyEnvironmentValues

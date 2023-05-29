@@ -7,13 +7,13 @@ import XCTest
 
 class EnvironmentTests: XCTestCase {
 
-    struct IntegerEnvironmentKey: EnvironmentKey {
+    struct IntegerEnvironmentKey: PropertyEnvironmentKey {
         static var defaultValue: Int = .zero
     }
 
     struct IntegerReceiver: Property {
 
-        @Environment(\.integer) var integer
+        @PropertyEnvironment(\.integer) var integer
         let value: @Sendable (Int) -> Void
 
         var body: EmptyProperty {
@@ -70,7 +70,7 @@ class EnvironmentTests: XCTestCase {
     }
 }
 
-extension EnvironmentValues {
+extension PropertyEnvironmentValues {
 
     fileprivate var integer: Int {
         get { self[EnvironmentTests.IntegerEnvironmentKey.self] }

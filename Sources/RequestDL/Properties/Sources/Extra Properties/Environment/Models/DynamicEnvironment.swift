@@ -6,5 +6,5 @@ import Foundation
 
 protocol DynamicEnvironment: DynamicValue {
 
-    func update(_ values: EnvironmentValues)
+    func update(_ values: PropertyEnvironmentValues)
 }

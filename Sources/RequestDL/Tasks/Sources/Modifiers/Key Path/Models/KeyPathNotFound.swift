@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- A error type representing a validation error due to a missing keyPath in `Task` result data.
+ A error type representing a validation error due to a missing keyPath in `RequestTask` result data.
  Conforms to the `TaskError` protocol.
  */
 public struct KeyPathNotFound: TaskError, LocalizedError {

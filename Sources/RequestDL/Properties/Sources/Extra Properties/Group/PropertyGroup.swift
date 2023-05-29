@@ -4,10 +4,10 @@
 
 import Foundation
 
-/// A property that groups together other properties for use in a `DataTask`.
+/// A property that groups together other properties for use in a `RequestTask`.
 ///
-/// A `Group` property is used to group together other properties that share common characteristics, such
-/// as a base URL or query parameters. In the example code below, a `Group` property is used
+/// A `PropertyGroup` property is used to group together other properties that share common characteristics, such
+/// as a base URL or query parameters. In the example code below, a `PropertyGroup` property is used
 /// to group a `Path` property and a `Query` that specify the endpoint and a user ID for a request to
 /// the "api.example.com" server.
 ///
@@ -15,13 +15,13 @@ import Foundation
 /// DataTask {
 ///     BaseURL("api.example.com")
 ///
-///     Group {
+///     PropertyGroup {
 ///         Path("users")
 ///         Query(name: "id", value: user.id)
 ///     }
 /// }
 /// ```
-public struct Group<Content: Property>: Property {
+public struct PropertyGroup<Content: Property>: Property {
 
     // MARK: - Public properties
 
@@ -35,7 +35,7 @@ public struct Group<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /// Creates a new `Group` property with the specified properties.
+    /// Creates a new `PropertyGroup` property with the specified properties.
     ///
     /// - Parameter content: The properties to be contained within the group.
     public init(@PropertyBuilder content: () -> Content) {
@@ -46,7 +46,7 @@ public struct Group<Content: Property>: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<Group<Content>>,
+        property: _GraphValue<PropertyGroup<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
@@ -57,3 +57,6 @@ public struct Group<Content: Property>: Property {
         )
     }
 }
+
+@available(*, deprecated, renamed: "PropertyGroup")
+public typealias Group = PropertyGroup

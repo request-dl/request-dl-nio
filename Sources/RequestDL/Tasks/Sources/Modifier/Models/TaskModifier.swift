@@ -16,7 +16,7 @@ import Foundation
 public protocol TaskModifier<Element>: Sendable {
 
     /// The type of task being modified.
-    associatedtype Body: Task
+    associatedtype Body: RequestTask
 
     /// The type of the returned element after modification.
     associatedtype Element: Sendable

@@ -10,7 +10,7 @@ struct SeedFactory: Sendable {
 
         // MARK: - Internal properties
 
-        var seeds: [Namespace.ID: Seed] {
+        var seeds: [PropertyNamespace.ID: Seed] {
             get { lock.withLock { _seeds } }
             set { lock.withLock { _seeds = newValue } }
         }
@@ -21,7 +21,7 @@ struct SeedFactory: Sendable {
 
         // MARK: - Unsafe properties
 
-        private var _seeds = [Namespace.ID: Seed]()
+        private var _seeds = [PropertyNamespace.ID: Seed]()
     }
 
     // MARK: - Private properties
@@ -34,7 +34,7 @@ struct SeedFactory: Sendable {
 
     // MARK: - Internal methods
 
-    func callAsFunction(_ id: Namespace.ID) -> Seed {
+    func callAsFunction(_ id: PropertyNamespace.ID) -> Seed {
         let currentSeed = storage.seeds[id] ?? .init(-1)
         let seed = currentSeed.next()
         storage.seeds[id] = seed

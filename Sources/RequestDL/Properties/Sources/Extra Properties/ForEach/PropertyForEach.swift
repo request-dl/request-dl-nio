@@ -7,7 +7,7 @@ import Foundation
 /**
  A property that iterates over a sequence of data and produces properties for each element.
 
- The `ForEach` property is used to create a property for each element of a given `Data` sequence, identified
+ The `PropertyForEach` property is used to create a property for each element of a given `Data` sequence, identified
  by its `ID`. The property to be produced is determined by the `content` closure that takes each element
  of the sequence as input and produces a property.
 
@@ -18,13 +18,13 @@ import Foundation
 
  DataTask {
      BaseURL("ecommerce.com")
-     ForEach(paths, id: \.self) {
+     PropertyForEach(paths, id: \.self) {
          Path($0)
      }
  }
  ```
  */
-public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable, Content: Property {
+public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable, Content: Property {
 
     // MARK: - Public properties
 
@@ -45,7 +45,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendab
     private let id: @Sendable (Data.Element) -> ID
 
     /**
-     Creates a new instance of `ForEach`.
+     Creates a new instance of `PropertyForEach`.
 
      - Parameters:
      - data: The sequence of data to be iterated over.
@@ -64,7 +64,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendab
     }
 
     /**
-     Creates a new instance of `ForEach` where the elements of the data sequence are identifiable.
+     Creates a new instance of `PropertyForEach` where the elements of the data sequence are identifiable.
 
      - Parameters:
      - data: The sequence of data to be iterated over.
@@ -83,7 +83,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendab
     }
 
     /**
-      Creates a new instance of `ForEach` for a `Range` of `Int`.
+      Creates a new instance of `PropertyForEach` for a `Range` of `Int`.
 
       - Parameters:
         - data: The `Range` of `Int` values to be iterated over.
@@ -102,7 +102,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendab
     }
 
     /**
-      Creates a new instance of `ForEach` for a `ClosedRange` of `Int`.
+      Creates a new instance of `PropertyForEach` for a `ClosedRange` of `Int`.
 
       - Parameters:
         - data: The `ClosedRange` of `Int` values to be iterated over.
@@ -123,7 +123,7 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendab
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<ForEach<Data, ID, Content>>,
+        property: _GraphValue<PropertyForEach<Data, ID, Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
@@ -145,3 +145,6 @@ public struct ForEach<Data, ID, Content>: Property where Data: Sequence & Sendab
         return .children(group)
     }
 }
+
+@available(*, deprecated, renamed: "PropertyForEach")
+public typealias ForEach = PropertyForEach

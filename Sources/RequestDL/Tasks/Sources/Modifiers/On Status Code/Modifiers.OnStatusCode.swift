@@ -10,14 +10,14 @@ extension Modifiers {
      A task modifier that allows the customization of error handling based on the HTTP status
      code of the response.
 
-     `OnStatusCode` modifies the behavior of a `Task` by executing a provided closure when
+     `OnStatusCode` modifies the behavior of a `RequestTask` by executing a provided closure when
      the HTTP status code of the response satisfies a certain condition. It only works on tasks that
      return a `TaskResultPrimitive`, which is implemented by `TaskResult<Element>`.
 
      This modifier is particularly useful when you need to throw a specific error for a certain status code,
      providing a cleaner and more organized error handling approach.
      */
-    public struct OnStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
+    public struct OnStatusCode<Content: RequestTask>: TaskModifier where Content.Element: TaskResultPrimitive {
 
         // MARK: - Internal properties
 
@@ -45,9 +45,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task where Element: TaskResultPrimitive {
+extension RequestTask where Element: TaskResultPrimitive {
 
     private func onStatusCode(
         _ transform: @escaping @Sendable (Element) throws -> Void,

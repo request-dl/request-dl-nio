@@ -9,7 +9,7 @@ extension Interceptors {
     /**
      An interceptor for logging task result.
 
-     Use `logInConsole(_:)` method of the `Task` to add an instance of the
+     Use `logInConsole(_:)` method of the `RequestTask` to add an instance of the
      `Interceptors.Logger` interceptor to log task result.
 
      Example:
@@ -52,9 +52,9 @@ extension Interceptors {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -72,7 +72,7 @@ extension Task {
     }
 }
 
-extension Task<TaskResult<Data>> {
+extension RequestTask<TaskResult<Data>> {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.
@@ -91,7 +91,7 @@ extension Task<TaskResult<Data>> {
     }
 }
 
-extension Task<Data> {
+extension RequestTask<Data> {
 
     /**
      Add the `Interceptors.Logger` interceptor to log task result.

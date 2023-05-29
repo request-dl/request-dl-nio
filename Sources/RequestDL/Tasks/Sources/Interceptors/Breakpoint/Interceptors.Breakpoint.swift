@@ -40,9 +40,9 @@ extension Interceptors {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Adds a breakpoint to the task's result. The breakpoint will stop the task's execution and

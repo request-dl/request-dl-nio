@@ -8,8 +8,9 @@
 providing a simple and streamlined experience.
 
 RequestDL is a Swift package designed to simplify the process of performing network
-requests. It provides a set of tools, including the `Task` protocol, which supports
-different types of requests, including `DataTask`, `DownloadTask`, and `UploadTask`.
+requests. It provides a set of tools, including the `RequestTask` protocol, which
+supports different types of requests, including `DataTask`, `DownloadTask`, and 
+`UploadTask`.
 
 One of the key features of RequestDL is its support for specifying properties of a
 request, such as `Query`, `Payload`, and `Headers`, among others. You can also use 

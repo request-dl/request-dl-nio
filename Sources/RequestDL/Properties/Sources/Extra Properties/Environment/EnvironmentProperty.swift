@@ -13,7 +13,7 @@ private struct EnvironmentProperty<Content: Property>: Property {
     }
 
     let content: Content
-    let setter: @Sendable (inout EnvironmentValues) -> Void
+    let setter: @Sendable (inout PropertyEnvironmentValues) -> Void
 
     // MARK: - Internal static methods
 
@@ -41,13 +41,13 @@ extension Property {
      Sets an `EnvironmentValue` for a given `keyPath`.
 
      - Parameters:
-       - keyPath: The `WritableKeyPath` of the `EnvironmentValues` to set the `value` for.
+       - keyPath: The `WritableKeyPath` of the `PropertyEnvironmentValues` to set the `value` for.
        - value: The `Value` to set for the `EnvironmentValue`.
 
      - Returns: A modified `Property` with the new `EnvironmentValue` set.
      */
     public func environment<Value>(
-        _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
+        _ keyPath: WritableKeyPath<PropertyEnvironmentValues, Value>,
         _ value: Value
     ) -> some Property {
         EnvironmentProperty(content: self) {
