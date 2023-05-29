@@ -4,11 +4,11 @@
 
 import Foundation
 
-private struct HeaderStrategyKey: EnvironmentKey {
+private struct HeaderStrategyKey: PropertyEnvironmentKey {
     static let defaultValue: HeaderStrategy = .setting
 }
 
-extension EnvironmentValues {
+extension PropertyEnvironmentValues {
 
     var headerStrategy: HeaderStrategy {
         get { self[HeaderStrategyKey.self] }
