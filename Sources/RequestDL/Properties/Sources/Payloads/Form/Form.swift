@@ -394,12 +394,18 @@ public struct Form<Headers: Property>: Property {
             inputs: inputs
         )
 
-        return HTTPHeaders(
-            output.node.search(for: RequestDL.Headers.Node.self)
-                .lazy
-                .filter { !$0.value.isEmpty }
-                .map { ($0.key, $0.value) }
-        )
+        var headers = HTTPHeaders()
+
+        for header in output.node.search(for: HeaderNode.self) {
+            switch header.strategy {
+            case .adding:
+                headers.add(name: header.key, value: header.value)
+            case .setting:
+                headers.set(name: header.key, value: header.value)
+            }
+        }
+
+        return headers
     }
 }
 // swiftlint:enable file_length

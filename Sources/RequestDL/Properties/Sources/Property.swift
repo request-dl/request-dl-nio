@@ -18,10 +18,10 @@ import Foundation
 
     var body: some Property {
         Headers.ContentType(.json)
-        Headers.Accept(.json)
+        AcceptHeader(.json)
 
         if cache {
-            Headers.Cache()
+            CacheHeader()
                 .cached(true)
         }
     }

@@ -49,8 +49,8 @@ try await DataTask {
     BaseURL("google.com")
     
     HeaderGroup {
-        Headers.Accept(.json)
-        Headers.ContentType(.json)
+        AcceptHeader(.json)
+        CustomHeader(name: "xxx-api-key", value: token)
     }
     
     Query("apple", forKey: "q")
@@ -62,8 +62,8 @@ try await DataTask {
 ```
 
 This code creates a `DataTask` with the `BaseURL` set to "google.com", a `HeaderGroup`
-containing the "Accept" and "Content-Type" headers set to "application/json", and 
-a query parameter with the key "q" and the value "apple". It then sets the 
+containing the "Accept" set to "application/json", a "xxx-api-key" header set the API 
+token, and a query parameter with the key "q" and the value "apple". It then sets the 
 `logInConsole` property to true, which will print the response in the console when
 the request is completed. It also decodes the response into an instance of 
 `GoogleResponse` and then ignores it.

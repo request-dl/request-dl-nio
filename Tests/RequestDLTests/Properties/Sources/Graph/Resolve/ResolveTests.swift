@@ -14,8 +14,8 @@ class ResolveTests: XCTestCase {
             Path("api")
             Path("v2")
 
-            Headers.Accept(.json)
-            Headers.Cache()
+            AcceptHeader(.json)
+            CacheHeader()
                 .public(true)
 
             Timeout(60)
@@ -39,8 +39,8 @@ class ResolveTests: XCTestCase {
             Path("v2")
 
             HeaderGroup {
-                Headers.Accept(.json)
-                Headers.Cache()
+                AcceptHeader(.json)
+                CacheHeader()
                     .public(true)
 
                 Timeout(60) // should be eliminated
@@ -111,16 +111,18 @@ extension ResolveTests {
                         path = v2
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
+                LeafNode<HeaderNode> {
+                    property = HeaderNode {
                         key = Accept,
-                        value = application/json
+                        value = application/json,
+                        strategy = .setting
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
+                LeafNode<HeaderNode> {
+                    property = HeaderNode {
                         key = Cache-Control,
-                        value = public
+                        value = public,
+                        strategy = .setting
                     }
                 },
                 LeafNode<Node> {
@@ -168,16 +170,18 @@ extension ResolveTests {
                 LeafNode<Node> {
                     property = Node {
                         nodes = [
-                            LeafNode<Node> {
-                                property = Node {
+                            LeafNode<HeaderNode> {
+                                property = HeaderNode {
                                     key = Accept,
-                                    value = application/json
+                                    value = application/json,
+                                    strategy = .setting
                                 }
                             },
-                            LeafNode<Node> {
-                                property = Node {
+                            LeafNode<HeaderNode> {
+                                property = HeaderNode {
                                     key = Cache-Control,
-                                    value = public
+                                    value = public,
+                                    strategy = .setting
                                 }
                             }
                         ]

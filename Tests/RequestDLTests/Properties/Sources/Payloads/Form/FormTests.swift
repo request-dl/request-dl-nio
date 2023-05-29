@@ -108,7 +108,7 @@ class FormTests: XCTestCase {
                 data: data,
                 headers: {
                     ForEach(headers, id: \.0) {
-                        Headers.Any(name: $0, value: $1)
+                        CustomHeader(name: $0, value: $1)
                     }
                 }
             )
@@ -269,7 +269,7 @@ class FormTests: XCTestCase {
                 url: url,
                 headers: {
                     ForEach(headers, id: \.0) {
-                        Headers.Any(name: $0, value: $1)
+                        CustomHeader(name: $0, value: $1)
                     }
                 }
             )
@@ -443,7 +443,7 @@ class FormTests: XCTestCase {
                 verbatim: verbatim,
                 headers: {
                     ForEach(headers, id: \.0) {
-                        Headers.Any(name: $0, value: $1)
+                        CustomHeader(name: $0, value: $1)
                     }
                 }
             )
@@ -1108,6 +1108,52 @@ class FormTests: XCTestCase {
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
                     ("Content-Type", "application/octet-stream"),
                     ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        ])
+    }
+
+    func testForm_whenHeadersWithAddingStrategy() async throws {
+        // Given
+        let name = "foo"
+        let data = Data.randomData(length: 64)
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            Form(
+                name: name,
+                data: data,
+                headers: {
+                    CustomHeader(name: "Accept-Language", value: "en-US")
+                    CustomHeader(name: "Accept-Language", value: "pt-BR")
+                        .headerStrategy(.adding)
+                }
+            )
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count)),
+                    ("Accept-Language", "en-US"),
+                    ("Accept-Language", "pt-BR")
                 ]),
                 contents: data
             )

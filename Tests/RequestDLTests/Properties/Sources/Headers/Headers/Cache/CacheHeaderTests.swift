@@ -5,10 +5,10 @@
 import XCTest
 @testable import RequestDL
 
-class HeadersCacheTests: XCTestCase {
+class CacheHeaderTests: XCTestCase {
 
     func testDefaultValues() async throws {
-        let cache = Headers.Cache()
+        let cache = CacheHeader()
 
         XCTAssertTrue(cache.isCached)
         XCTAssertTrue(cache.isStored)
@@ -27,7 +27,7 @@ class HeadersCacheTests: XCTestCase {
 
     func testInitializationWithPolicy() async throws {
         // Given
-        let cache = Headers.Cache()
+        let cache = CacheHeader()
 
         // When
         let resolved = try await resolve(TestProperty(cache))
@@ -52,7 +52,7 @@ class HeadersCacheTests: XCTestCase {
 
     func testModifiedCacheWithAllProperties() async throws {
         // Given
-        let cache = Headers.Cache()
+        let cache = CacheHeader()
 
         let modifiedCache = cache
             .cached(false)
@@ -101,7 +101,7 @@ class HeadersCacheTests: XCTestCase {
 
     func testPublicCache() async throws {
         // Given
-        let cache = Headers.Cache()
+        let cache = CacheHeader()
             .public(true)
 
         // When
@@ -113,7 +113,7 @@ class HeadersCacheTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = Headers.Cache()
+        let property = CacheHeader()
 
         // Then
         try await assertNever(property.body)
