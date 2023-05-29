@@ -11,7 +11,7 @@ class PropertyBuilderTests: XCTestCase {
         // Given
         @PropertyBuilder
         var property: some Property {
-            Headers.Cache()
+            CacheHeader()
                 .public(true)
         }
 
@@ -19,7 +19,7 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is Headers.Cache)
+        XCTAssertTrue(property is CacheHeader)
         XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 
@@ -29,7 +29,7 @@ class PropertyBuilderTests: XCTestCase {
         @PropertyBuilder
         var property: some Property {
             if #available(iOS 99, macOS 99, watchOS 99, tvOS 99, *) {
-                Headers.Cache()
+                CacheHeader()
                     .public(true)
             }
         }
@@ -38,7 +38,7 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is _OptionalContent<Headers.Cache>)
+        XCTAssertTrue(property is _OptionalContent<CacheHeader>)
         XCTAssertTrue(resolved.request.headers.isEmpty)
     }
     #endif
@@ -48,7 +48,7 @@ class PropertyBuilderTests: XCTestCase {
         @PropertyBuilder
         var property: some Property {
             if #available(iOS 14, macOS 12, watchOS 7, tvOS 14, *) {
-                Headers.Cache()
+                CacheHeader()
                     .public(true)
             }
         }
@@ -57,7 +57,7 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is _OptionalContent<Headers.Cache>)
+        XCTAssertTrue(property is _OptionalContent<CacheHeader>)
         XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
     }
 }

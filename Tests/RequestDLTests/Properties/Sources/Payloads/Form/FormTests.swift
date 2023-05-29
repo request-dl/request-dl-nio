@@ -108,7 +108,7 @@ class FormTests: XCTestCase {
                 data: data,
                 headers: {
                     ForEach(headers, id: \.0) {
-                        Headers.Any(name: $0, value: $1)
+                        CustomHeader(name: $0, value: $1)
                     }
                 }
             )
@@ -269,7 +269,7 @@ class FormTests: XCTestCase {
                 url: url,
                 headers: {
                     ForEach(headers, id: \.0) {
-                        Headers.Any(name: $0, value: $1)
+                        CustomHeader(name: $0, value: $1)
                     }
                 }
             )
@@ -443,7 +443,7 @@ class FormTests: XCTestCase {
                 verbatim: verbatim,
                 headers: {
                     ForEach(headers, id: \.0) {
-                        Headers.Any(name: $0, value: $1)
+                        CustomHeader(name: $0, value: $1)
                     }
                 }
             )

@@ -4,6 +4,7 @@
 
 import Foundation
 
+@available(*, deprecated)
 extension Headers {
 
     /// A property that sets the `Content-Type` header field in an HTTP request.
@@ -41,9 +42,10 @@ extension Headers {
         ) async throws -> _PropertyOutputs {
             property.assertPathway()
             return .leaf(
-                Headers.Node(
+                HeaderNode(
                     key: "Content-Type",
-                    value: property.contentType.rawValue
+                    value: property.contentType.rawValue,
+                    strategy: inputs.environment.headerStrategy
                 )
             )
         }

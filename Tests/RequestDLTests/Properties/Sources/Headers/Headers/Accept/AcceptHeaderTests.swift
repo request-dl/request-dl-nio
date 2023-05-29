@@ -5,10 +5,10 @@
 import XCTest
 @testable import RequestDL
 
-class HeadersAcceptTests: XCTestCase {
+class AcceptHeaderTests: XCTestCase {
 
     func testHeadersJsonAccept() async throws {
-        let property = TestProperty(Headers.Accept(.json))
+        let property = TestProperty(AcceptHeader(.json))
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
@@ -18,7 +18,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersXmlAccept() async throws {
-        let property = TestProperty(Headers.Accept(.xml))
+        let property = TestProperty(AcceptHeader(.xml))
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
@@ -28,7 +28,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersFormDataAccept() async throws {
-        let property = TestProperty(Headers.Accept(.formData))
+        let property = TestProperty(AcceptHeader(.formData))
         let resolved = try await resolve(property)
 
         XCTAssertEqual(
@@ -38,7 +38,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersFormURLEncodedAccept() async throws {
-        let property = TestProperty(Headers.Accept(.formURLEncoded))
+        let property = TestProperty(AcceptHeader(.formURLEncoded))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -47,7 +47,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersTextAccept() async throws {
-        let property = TestProperty(Headers.Accept(.text))
+        let property = TestProperty(AcceptHeader(.text))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -56,7 +56,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersHtmlAccept() async throws {
-        let property = TestProperty(Headers.Accept(.html))
+        let property = TestProperty(AcceptHeader(.html))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -65,7 +65,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersCssAccept() async throws {
-        let property = TestProperty(Headers.Accept(.css))
+        let property = TestProperty(AcceptHeader(.css))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -74,7 +74,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersJavascriptAccept() async throws {
-        let property = TestProperty(Headers.Accept(.javascript))
+        let property = TestProperty(AcceptHeader(.javascript))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -83,7 +83,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersGifAccept() async throws {
-        let property = TestProperty(Headers.Accept(.gif))
+        let property = TestProperty(AcceptHeader(.gif))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -92,7 +92,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersPngAccept() async throws {
-        let property = TestProperty(Headers.Accept(.png))
+        let property = TestProperty(AcceptHeader(.png))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -101,7 +101,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersJpegAccept() async throws {
-        let property = TestProperty(Headers.Accept(.jpeg))
+        let property = TestProperty(AcceptHeader(.jpeg))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -110,7 +110,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersBmpAccept() async throws {
-        let property = TestProperty(Headers.Accept(.bmp))
+        let property = TestProperty(AcceptHeader(.bmp))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -119,7 +119,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersWebpAccept() async throws {
-        let property = TestProperty(Headers.Accept(.webp))
+        let property = TestProperty(AcceptHeader(.webp))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -128,7 +128,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersMidiAccept() async throws {
-        let property = TestProperty(Headers.Accept(.midi))
+        let property = TestProperty(AcceptHeader(.midi))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -137,7 +137,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersMpegAccept() async throws {
-        let property = TestProperty(Headers.Accept(.mpeg))
+        let property = TestProperty(AcceptHeader(.mpeg))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -146,7 +146,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersWavAccept() async throws {
-        let property = TestProperty(Headers.Accept(.wav))
+        let property = TestProperty(AcceptHeader(.wav))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -155,7 +155,7 @@ class HeadersAcceptTests: XCTestCase {
     }
 
     func testHeadersPdfAccept() async throws {
-        let property = TestProperty(Headers.Accept(.pdf))
+        let property = TestProperty(AcceptHeader(.pdf))
         let resolved = try await resolve(property)
         XCTAssertEqual(
             resolved.request.headers["Accept"],
@@ -165,7 +165,7 @@ class HeadersAcceptTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = Headers.Accept(.json)
+        let property = AcceptHeader(.json)
 
         // Then
         try await assertNever(property.body)
