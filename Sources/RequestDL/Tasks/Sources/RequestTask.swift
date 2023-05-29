@@ -5,19 +5,19 @@
 import Foundation
 
 /**
- The Task protocol defines an object that makes a request and returns a result asynchronously.
+ The RequestTask protocol defines an object that makes a request and returns a result asynchronously.
 
  For URLRequest-based requests, each request is considered as a URLSessionTask that allows the
  monitoring and cancellation of the request through it. For requests using a custom protocol,
- the concept of Task is used to assemble the request and execute it when the `result()` function
+ the concept of RequestTask is used to assemble the request and execute it when the `result()` function
  is called.
 
  The associatedtype `Element` represents the type of the expected result of the task.
 
- - Note: The Task protocol does not specify how the request is made or how the result is processed,
+ - Note: The RequestTask protocol does not specify how the request is made or how the result is processed,
  it only provides a way to execute a request and receive its result asynchronously.
  */
-public protocol Task<Element>: Sendable {
+public protocol RequestTask<Element>: Sendable {
 
     associatedtype Element: Sendable
 
@@ -31,9 +31,9 @@ public protocol Task<Element>: Sendable {
     func result() async throws -> Element
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Returns an `InterceptedTask` that executes the original task and intercepts
@@ -65,3 +65,6 @@ extension Task {
         ModifiedTask(task: self, modifier: modifier)
     }
 }
+
+@available(*, deprecated, renamed: "RequestTask")
+public typealias Task = RequestTask

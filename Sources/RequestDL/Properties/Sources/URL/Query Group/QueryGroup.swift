@@ -76,11 +76,11 @@ public struct QueryGroup<Content: Property>: Property {
     }
 }
 
-extension QueryGroup where Content == ForEach<[String: Any], String, Query<Any>> {
+extension QueryGroup where Content == PropertyForEach<[String: Any], String, Query<Any>> {
 
     public init(_ dictionary: [String: Any]) {
         self.init {
-            ForEach(dictionary, id: \.key) {
+            PropertyForEach(dictionary, id: \.key) {
                 Query($0.value, forKey: $0.key)
             }
         }

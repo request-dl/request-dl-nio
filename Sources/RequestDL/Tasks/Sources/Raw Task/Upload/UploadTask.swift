@@ -37,7 +37,7 @@ import Foundation
  parameter. `Property` protocol contains information about the request such as its URL, headers,
  body and etc.
  */
-public struct UploadTask<Content: Property>: Task {
+public struct UploadTask<Content: Property>: RequestTask {
 
     // MARK: - Private properties
 

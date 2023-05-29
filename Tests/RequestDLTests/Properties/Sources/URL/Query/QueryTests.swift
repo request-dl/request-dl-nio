@@ -56,7 +56,7 @@ class QueryTests: XCTestCase {
 
         let property = TestProperty {
             BaseURL("127.0.0.1")
-            Group {
+            PropertyGroup {
                 Query(true, forKey: "flag")
                 Query([9, "nine"] as [Any], forKey: "array")
             }

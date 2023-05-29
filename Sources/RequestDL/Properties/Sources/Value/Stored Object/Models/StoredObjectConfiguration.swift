@@ -21,7 +21,7 @@ struct StoredObjectConfiguration: Hashable {
 
     // MARK: - Internal properties
 
-    let id: Namespace.ID
+    let id: PropertyNamespace.ID
     let label: String
     let seed: Seed
 
@@ -32,7 +32,7 @@ struct StoredObjectConfiguration: Hashable {
     // MARK: - Inits
 
     init<Base>(
-        id: Namespace.ID,
+        id: PropertyNamespace.ID,
         label: String,
         seed: Seed,
         base: Base.Type

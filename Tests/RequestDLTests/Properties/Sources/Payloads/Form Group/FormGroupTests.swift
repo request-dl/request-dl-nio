@@ -17,7 +17,7 @@ class FormGroupTests: XCTestCase {
         // When
         let resolved = try await resolve(TestProperty {
             FormGroup {
-                ForEach(parts.enumerated(), id: \.offset) {
+                PropertyForEach(parts.enumerated(), id: \.offset) {
                     Form(
                         name: "part\($0)",
                         data: $1
@@ -61,7 +61,7 @@ class FormGroupTests: XCTestCase {
         let resolved = try await resolve(TestProperty {
             FormGroup {
                 FormGroup {
-                    ForEach(parts1.enumerated(), id: \.offset) {
+                    PropertyForEach(parts1.enumerated(), id: \.offset) {
                         Form(
                             name: "part1.\($0)",
                             data: $1
@@ -70,7 +70,7 @@ class FormGroupTests: XCTestCase {
                 }
 
                 FormGroup {
-                    ForEach(parts2.enumerated(), id: \.offset) {
+                    PropertyForEach(parts2.enumerated(), id: \.offset) {
                         Form(
                             name: "part2.\($0)",
                             data: $1
@@ -79,7 +79,7 @@ class FormGroupTests: XCTestCase {
                 }
 
                 FormGroup {
-                    ForEach(parts3.enumerated(), id: \.offset) {
+                    PropertyForEach(parts3.enumerated(), id: \.offset) {
                         Form(
                             name: "part3.\($0)",
                             data: $1

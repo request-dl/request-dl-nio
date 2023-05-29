@@ -20,15 +20,15 @@ struct GraphNamespaceOperation<Content>: GraphValueOperation {
 
     func callAsFunction(_ properties: inout GraphProperties) {
         var labels = [String]()
-        var latestID: Namespace.ID?
+        var latestID: PropertyNamespace.ID?
 
         for child in mirror() {
-            guard let namespace = child.value as? Namespace else {
+            guard let namespace = child.value as? PropertyNamespace else {
                 continue
             }
 
             labels.append(child.label ?? "nil")
-            let namespaceID = Namespace.ID(
+            let namespaceID = PropertyNamespace.ID(
                 base: Content.self,
                 namespace: labels.joined(separator: ".")
             )

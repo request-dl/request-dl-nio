@@ -12,7 +12,7 @@ extension StoredObjectToolbox {
         @CombinedProperty var paths
 
         var body: some Property {
-            ForEach(paths, id: \.self) {
+            PropertyForEach(paths, id: \.self) {
                 RequestDL.Path($0)
             }
         }

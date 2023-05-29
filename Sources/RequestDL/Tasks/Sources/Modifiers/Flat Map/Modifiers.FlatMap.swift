@@ -7,9 +7,9 @@ import Foundation
 extension Modifiers {
 
     /**
-     A modifier that allows flat-mapping the result of a `Task` to a new element type.
+     A modifier that allows flat-mapping the result of a `RequestTask` to a new element type.
 
-     `Content` is the type of the original `Task`, and `NewElement` is the type of the new
+     `Content` is the type of the original `RequestTask`, and `NewElement` is the type of the new
      element that the result will be flat-mapped to.
 
      Example:
@@ -21,7 +21,7 @@ extension Modifiers {
          }
      ```
      */
-    public struct FlatMap<Content: Task, NewElement: Sendable>: TaskModifier {
+    public struct FlatMap<Content: RequestTask, NewElement: Sendable>: TaskModifier {
 
         enum Map: Sendable {
             case original(Content.Element)
@@ -35,9 +35,9 @@ extension Modifiers {
         // MARK: - Public methods
 
         /**
-         Transforms the result of a `Task` to a new element type.
+         Transforms the result of a `RequestTask` to a new element type.
 
-         - Parameter task: The original `Task`.
+         - Parameter task: The original `RequestTask`.
          - Throws: An error if the transformation fails.
          - Returns: The result of the transformation.
          */
@@ -75,15 +75,15 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
-     Flat-maps the result of a `Task` to a new element type.
+     Flat-maps the result of a `RequestTask` to a new element type.
 
-     - Parameter transform: A closure that takes the result of the `Task` and transforms it to a new element type.
-     - Returns: A new `Task` that returns the flat-mapped element of type `NewElement`.
+     - Parameter transform: A closure that takes the result of the `RequestTask` and transforms it to a new element type.
+     - Returns: A new `RequestTask` that returns the flat-mapped element of type `NewElement`.
      */
     public func flatMap<NewElement>(
         _ transform: @escaping @Sendable (Result<Element, Error>) throws -> NewElement

@@ -9,7 +9,7 @@ extension StoredObjectToolbox {
 
     struct TwoNamespaceModifier: PropertyModifier {
 
-        @Namespace var two
+        @PropertyNamespace var two
 
         func body(content: Content) -> some Property {
             content

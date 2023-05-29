@@ -6,7 +6,7 @@ import Foundation
 
 extension Modifiers {
 
-    public struct IgnoresProgress<Content: Task, Output: Sendable>: TaskModifier {
+    public struct IgnoresProgress<Content: RequestTask, Output: Sendable>: TaskModifier {
 
         // MARK: - Internal properties
 
@@ -77,9 +77,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     public func ignoresProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<Data>>>
     where Element == AsyncResponse {

@@ -107,7 +107,7 @@ class FormTests: XCTestCase {
                 filename: filename,
                 data: data,
                 headers: {
-                    ForEach(headers, id: \.0) {
+                    PropertyForEach(headers, id: \.0) {
                         CustomHeader(name: $0, value: $1)
                     }
                 }
@@ -268,7 +268,7 @@ class FormTests: XCTestCase {
                 contentType: .pdf,
                 url: url,
                 headers: {
-                    ForEach(headers, id: \.0) {
+                    PropertyForEach(headers, id: \.0) {
                         CustomHeader(name: $0, value: $1)
                     }
                 }
@@ -442,7 +442,7 @@ class FormTests: XCTestCase {
                 name: name,
                 verbatim: verbatim,
                 headers: {
-                    ForEach(headers, id: \.0) {
+                    PropertyForEach(headers, id: \.0) {
                         CustomHeader(name: $0, value: $1)
                     }
                 }

@@ -27,7 +27,7 @@ import Foundation
  )
  ```
 */
-public struct MockedTask: Task {
+public struct MockedTask: RequestTask {
 
     // MARK: - Private properties
 

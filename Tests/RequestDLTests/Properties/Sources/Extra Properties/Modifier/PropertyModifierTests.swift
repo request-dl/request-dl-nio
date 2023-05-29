@@ -12,7 +12,7 @@ class PropertyModifierTests: XCTestCase {
         let includesContent: Bool
 
         func body(content: Content) -> some Property {
-            Group {
+            PropertyGroup {
                 if includesContent {
                     content
                 } else {
@@ -96,13 +96,13 @@ extension PropertyModifierTests {
 
 extension PropertyModifierTests {
 
-    struct PathEnvironmentKey: EnvironmentKey {
+    struct PathEnvironmentKey: PropertyEnvironmentKey {
         static var defaultValue: String?
     }
 
     struct PathModifier: PropertyModifier {
 
-        @Environment(\.path) var path
+        @PropertyEnvironment(\.path) var path
 
         func body(content: Content) -> some Property {
             content
@@ -150,7 +150,7 @@ extension PropertyModifierTests {
     }
 }
 
-extension EnvironmentValues {
+extension PropertyEnvironmentValues {
 
     fileprivate var path: String? {
         get { self[PropertyModifierTests.PathEnvironmentKey.self] }

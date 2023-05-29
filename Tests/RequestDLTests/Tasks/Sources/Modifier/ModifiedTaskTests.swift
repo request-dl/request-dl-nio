@@ -7,7 +7,7 @@ import XCTest
 
 class ModifiedTaskTests: XCTestCase {
 
-    struct Modified<Body: Task>: TaskModifier {
+    struct Modified<Body: RequestTask>: TaskModifier {
 
         let callback: @Sendable () -> Void
 

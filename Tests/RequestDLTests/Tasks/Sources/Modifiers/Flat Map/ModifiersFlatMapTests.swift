@@ -11,7 +11,7 @@ class ModifiersFlatMapTests: XCTestCase {
 
     struct FailedTaskError: Error {}
 
-    struct FailedTask: Task {
+    struct FailedTask: RequestTask {
 
         func result() async throws -> Data {
             throw FailedTaskError()
