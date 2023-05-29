@@ -4,7 +4,7 @@
 
 import Foundation
 
-extension Task {
+extension RequestTask {
 
     /**
      A convenience method to send a simple ping request to the server and wait for the result.

@@ -4,7 +4,7 @@
 
 import Foundation
 
-extension Namespace {
+extension PropertyNamespace {
 
     /// The ID used for namespace memory storage.
     public struct ID: Sendable, Hashable {
@@ -39,7 +39,7 @@ extension Namespace {
 
 // MARK: - CustomStringConvertible
 
-extension Namespace.ID: CustomStringConvertible {
+extension PropertyNamespace.ID: CustomStringConvertible {
 
     private var namespaceDescription: String {
         namespace.split(separator: ".").last.map {

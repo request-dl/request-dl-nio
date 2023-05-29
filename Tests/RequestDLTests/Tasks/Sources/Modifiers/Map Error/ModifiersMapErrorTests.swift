@@ -9,7 +9,7 @@ class ModifiersMapErrorTests: XCTestCase {
 
     struct AnyError: Error {}
 
-    struct ErrorTask<T>: Task {
+    struct ErrorTask<T>: RequestTask {
 
         func result() async throws -> T {
             throw AnyError()

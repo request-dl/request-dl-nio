@@ -9,7 +9,7 @@ class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsOneHierarchy_shouldBeValid() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("apple.com")
             Path("api")
             Path("v2")
@@ -33,7 +33,7 @@ class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsTwoHierarchy_shouldBeValid() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("apple.com")
             Path("api")
             Path("v2")
@@ -60,7 +60,7 @@ class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsSecureConnection_shouldBeValid() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("apple.com")
 
             SecureConnection {

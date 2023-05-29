@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct RawTask<Content: Property>: Task {
+struct RawTask<Content: Property>: RequestTask {
 
     // MARK: - Internal properties
 

@@ -7,12 +7,13 @@ import Foundation
 /**
  A type that represents a task that has been modified by a `TaskModifier`.
 
- A `ModifiedTask` is a `Task` that is created by applying a `TaskModifier` to a base `Task`.
+ A `ModifiedTask` is a `RequestTask` that is created by applying a `TaskModifier` to a base
+ `RequestTask`.
 
  - Note: The `Element` associated type of the `ModifiedTask` is determined by the `Element`
  associated type of the `TaskModifier`.
  */
-public struct ModifiedTask<Modifier: TaskModifier>: Task {
+public struct ModifiedTask<Modifier: TaskModifier>: RequestTask {
 
     public typealias Element = Modifier.Element
 
