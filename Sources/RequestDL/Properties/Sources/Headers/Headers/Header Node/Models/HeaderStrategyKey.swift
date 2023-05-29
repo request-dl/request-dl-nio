@@ -20,7 +20,7 @@ extension Property {
 
     /**
      Sets the header strategy for the property.
-     
+
      - Parameter headerStrategy: The header strategy to be set.
      - Returns: A modified version of the property with the updated header strategy.
      */
