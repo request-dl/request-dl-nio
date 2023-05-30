@@ -6,6 +6,7 @@ import Foundation
 
 extension Modifiers {
 
+    // swiftlint:disable line_length
     /**
      A task modifier that extracts only the payload from a task result.
 
@@ -24,6 +25,7 @@ extension Modifiers {
      ```
      */
     public struct ExtractPayload<Content: RequestTask, Element>: TaskModifier where Content.Element == TaskResult<Element> {
+        // swiftlint:enable line_length
 
         /**
          Modifies the task to extract only the payload from a task result.

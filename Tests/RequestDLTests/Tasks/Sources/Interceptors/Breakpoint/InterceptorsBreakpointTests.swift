@@ -19,9 +19,11 @@ class InterceptorsBreakpointTests: XCTestCase {
         }
 
         // When
-        _ = try await MockedTask(data: Data.init)
-            .breakpoint()
-            .result()
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .breakpoint()
+        .result()
 
         // Then
         XCTAssertTrue(breakpointActivated)

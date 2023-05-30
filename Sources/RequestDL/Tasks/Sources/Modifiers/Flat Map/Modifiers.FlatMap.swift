@@ -82,7 +82,8 @@ extension RequestTask {
     /**
      Flat-maps the result of a `RequestTask` to a new element type.
 
-     - Parameter transform: A closure that takes the result of the `RequestTask` and transforms it to a new element type.
+     - Parameter transform: A closure that takes the result of the `RequestTask` and transforms
+     it to a new element type.
      - Returns: A new `RequestTask` that returns the flat-mapped element of type `NewElement`.
      */
     public func flatMap<NewElement>(

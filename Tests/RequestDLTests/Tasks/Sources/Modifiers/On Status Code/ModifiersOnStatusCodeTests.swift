@@ -16,11 +16,17 @@ class ModifiersOnStatusCodeTests: XCTestCase {
 
         // When
         do {
-            _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                .onStatusCode(statusCode) { _ in
-                    throw AnyError()
+            _ = try await MockedTask(
+                status: status(statusCode),
+                content: {
+                    BaseURL("localhost")
                 }
-                .result()
+            )
+            .ignoresProgress()
+            .onStatusCode(statusCode) { _ in
+                throw AnyError()
+            }
+            .result()
         } catch is AnyError {
             throwAnyError = true
         } catch { throw error }
@@ -37,11 +43,17 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         // When
         for statusCode in StatusCode.continue ... .networkAuthenticationRequired {
             do {
-                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                    .onStatusCode(statusCodes) { _ in
-                        throw AnyError()
+                _ = try await MockedTask(
+                    status: status(statusCode),
+                    content: {
+                        BaseURL("localhost")
                     }
-                    .result()
+                )
+                .ignoresProgress()
+                .onStatusCode(statusCodes) { _ in
+                    throw AnyError()
+                }
+                .result()
             } catch is AnyError {
                 received.append(statusCode)
             } catch { throw error }
@@ -62,11 +74,17 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         // When
         for statusCode in StatusCode.continue ... .networkAuthenticationRequired {
             do {
-                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                    .onStatusCode(statusCodeSet) { _ in
-                        throw AnyError()
+                _ = try await MockedTask(
+                    status: status(statusCode),
+                    content: {
+                        BaseURL("localhost")
                     }
-                    .result()
+                )
+                .ignoresProgress()
+                .onStatusCode(statusCodeSet) { _ in
+                    throw AnyError()
+                }
+                .result()
             } catch is AnyError {
                 received.append(statusCode)
             } catch { throw error }
@@ -87,11 +105,17 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         // When
         for statusCode in StatusCode.continue ... .networkAuthenticationRequired {
             do {
-                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                    .onStatusCode(statusCodeSet) { _ in
-                        throw AnyError()
+                _ = try await MockedTask(
+                    status: status(statusCode),
+                    content: {
+                        BaseURL("localhost")
                     }
-                    .result()
+                )
+                .ignoresProgress()
+                .onStatusCode(statusCodeSet) { _ in
+                    throw AnyError()
+                }
+                .result()
             } catch is AnyError {
                 received.append(statusCode)
             } catch { throw error }
@@ -102,5 +126,12 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         XCTAssertTrue(received.allSatisfy {
             statusCodeSet.contains($0)
         })
+    }
+}
+
+extension ModifiersOnStatusCodeTests {
+
+    func status(_ statusCode: StatusCode) -> ResponseHead.Status {
+        .init(code: statusCode.rawValue, reason: "Mocked")
     }
 }

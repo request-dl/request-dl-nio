@@ -12,9 +12,13 @@ class ModifiersMapTests: XCTestCase {
         let output = 1
 
         // When
-        let result = try await MockedTask(data: Data.init)
-            .map { _ in output }
-            .result()
+        let result = try await MockedTask {
+            BaseURL("localhost")
+            Payload(data: Data())
+        }
+        .ignoresProgress()
+        .map { _ in output }
+        .result()
 
         // Then
         XCTAssertEqual(result, output)

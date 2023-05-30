@@ -22,12 +22,14 @@ class InterceptedTaskTests: XCTestCase {
         let taskIntercepted = SendableBox(false)
 
         // When
-        _ = try await MockedTask(data: Data.init)
-            .intercept(Intercepted {
-                taskIntercepted(true)
-                expectation.fulfill()
-            })
-            .result()
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .intercept(Intercepted {
+            taskIntercepted(true)
+            expectation.fulfill()
+        })
+        .result()
 
         // Then
         await fulfillment(of: [expectation], timeout: 3)

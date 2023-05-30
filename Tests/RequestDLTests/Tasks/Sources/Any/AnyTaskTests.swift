@@ -12,9 +12,13 @@ class AnyTaskTests: XCTestCase {
         let data = Data("123".utf8)
 
         // When
-        let result = try await MockedTask { data }
-            .eraseToAnyTask()
-            .result()
+        let result = try await MockedTask {
+            BaseURL("localhost")
+            Payload(data: data)
+        }
+        .ignoresProgress()
+        .eraseToAnyTask()
+        .result()
 
         // Then
         XCTAssertEqual(result.payload, data)

@@ -14,8 +14,10 @@ class GroupTaskTests: XCTestCase {
         // When
         let result = try await GroupTask(items) { index in
             MockedTask {
-                Data("\(index)".utf8)
+                BaseURL("localhost")
+                Payload(data: Data("\(index)".utf8))
             }
+            .ignoresProgress()
         }
         .result()
 

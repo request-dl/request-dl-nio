@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-// swiftlint:disable file_length type_body_length
 class ResponseHeadTests: XCTestCase {
 
     func testHead_whenDebugDescription() {

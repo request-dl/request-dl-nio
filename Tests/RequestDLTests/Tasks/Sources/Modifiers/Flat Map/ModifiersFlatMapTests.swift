@@ -23,12 +23,14 @@ class ModifiersFlatMapTests: XCTestCase {
         let flatMapCalled = SendableBox(false)
 
         // When
-        let result = try await MockedTask(data: Data.init)
-            .flatMap { _ in
-                flatMapCalled(true)
-                return true
-            }
-            .result()
+        let result = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .flatMap { _ in
+            flatMapCalled(true)
+            return true
+        }
+        .result()
 
         // Then
         XCTAssertTrue(flatMapCalled())
@@ -41,11 +43,13 @@ class ModifiersFlatMapTests: XCTestCase {
 
         // When
         do {
-            _ = try await MockedTask(data: Data.init)
-                .flatMap { _ in
-                    throw error
-                }
-                .result()
+            _ = try await MockedTask {
+                BaseURL("localhost")
+            }
+            .flatMap { _ in
+                throw error
+            }
+            .result()
         } catch is FlatMapError {} catch {
             throw error
         }
