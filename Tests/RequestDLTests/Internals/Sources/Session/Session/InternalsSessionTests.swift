@@ -41,7 +41,8 @@ class InternalsSessionTests: XCTestCase {
             request: request,
             dataCache: .init()
         )
-        let result = try await Array(task.response)
+
+        let result = try await Array(task())
 
         // Then
         XCTAssertEqual(result.count, 1)
@@ -69,7 +70,7 @@ class InternalsSessionTests: XCTestCase {
             request: request,
             dataCache: .init()
         )
-        let result = try await Array(task.response)
+        let result = try await Array(task())
 
         // Then
         XCTAssertEqual(result.count, length + 1)
@@ -96,7 +97,7 @@ class InternalsSessionTests: XCTestCase {
             request: request,
             dataCache: .init()
         )
-        let result = try await Array(task.response)
+        let result = try await Array(task())
 
         // Then
         XCTAssertEqual(result.count, 1)
@@ -160,9 +161,9 @@ class InternalsSessionTests: XCTestCase {
         )
 
         var parts: [Int] = []
-        var download: (Internals.ResponseHead, Data)?
+        var download: (ResponseHead, Data)?
 
-        for try await result in task.response {
+        for try await result in task() {
             switch result {
             case .upload(let part):
                 NSLog("Send %d bytes (%d)", part, parts.count)
