@@ -105,11 +105,16 @@ extension Internals {
                 download.close()
             }
 
-            return .init(.init(
-                upload: .empty(),
-                head: .constant(cachedData.cachedResponse.response),
-                download: download.stream
-            ))
+            return SessionTask(
+                response: .init(
+                    upload: .empty(),
+                    head: .constant(cachedData.cachedResponse.response),
+                    download: download.stream
+                ),
+                seed: .init {
+                    download.close()
+                }
+            )
         }
 
         private func validateCachedData(
@@ -167,7 +172,7 @@ extension Internals {
                 for: "ETag"
             )
 
-            guard let response = try? await client.execute(request: request.build()).get() else {
+            guard let response = try? await client.execute(request: request.build()).response() else {
                 return nil
             }
 

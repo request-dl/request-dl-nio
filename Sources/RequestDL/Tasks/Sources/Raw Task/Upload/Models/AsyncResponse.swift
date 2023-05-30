@@ -14,6 +14,7 @@ public struct AsyncResponse: AsyncSequence {
      */
     public struct Iterator: AsyncIteratorProtocol {
 
+        fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncResponse.Iterator
 
         /**
@@ -26,7 +27,10 @@ public struct AsyncResponse: AsyncSequence {
             case .upload(let part):
                 return .upload(part)
             case .download(let head, let bytes):
-                return .download(.init(head), .init(bytes))
+                return .download(.init(head), .init(
+                    seed: seed,
+                    bytes: bytes
+                ))
             case .none:
                 return nil
             }
@@ -37,12 +41,17 @@ public struct AsyncResponse: AsyncSequence {
 
     // MARK: - Private properties
 
-    private let asyncResponse: Internals.AsyncResponse
+    private let seed: Internals.TaskSeed
+    private let response: Internals.AsyncResponse
 
     // MARK: - Inits
 
-    init(_ asyncResponse: Internals.AsyncResponse) {
-        self.asyncResponse = asyncResponse
+    init(
+        seed: Internals.TaskSeed,
+        response: Internals.AsyncResponse
+    ) {
+        self.seed = seed
+        self.response = response
     }
 
     // MARK: - Public methods
@@ -53,6 +62,9 @@ public struct AsyncResponse: AsyncSequence {
      - Returns: An async iterator for the asynchronous response.
      */
     public func makeAsyncIterator() -> Iterator {
-        Iterator(iterator: asyncResponse.makeAsyncIterator())
+        Iterator(
+            seed: seed,
+            iterator: response.makeAsyncIterator()
+        )
     }
 }
