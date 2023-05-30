@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import AsyncHTTPClient
 
 // swiftlint:disable type_body_length
 extension Internals {
@@ -112,6 +113,7 @@ extension Internals {
                     download: download.stream
                 ),
                 seed: .init {
+                    download.failed(HTTPClientError.cancelled)
                     download.close()
                 }
             )
