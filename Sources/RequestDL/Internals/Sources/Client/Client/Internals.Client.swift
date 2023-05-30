@@ -5,6 +5,7 @@
 import Foundation
 import NIOCore
 import AsyncHTTPClient
+import Logging
 
 extension Internals {
 
@@ -42,11 +43,12 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func execute(request: HTTPClient.Request) -> EventLoopFuture<HTTPClient.Response> {
+        func execute(request: HTTPClient.Request, logger: Logger) -> EventLoopFuture<HTTPClient.Response> {
             let operation = manager.operation()
 
             return _client.execute(
-                request: request
+                request: request,
+                logger: logger
             ).always { _ in
                 _Concurrency.Task {
                     await self.lock.withLockVoid {
@@ -58,13 +60,15 @@ extension Internals {
 
         func execute<Delegate: HTTPClientResponseDelegate>(
             request: HTTPClient.Request,
-            delegate: Delegate
+            delegate: Delegate,
+            logger: Logger
         ) -> EventLoopFuture<Delegate.Response> {
             let operation = manager.operation()
 
             return _client.execute(
                 request: request,
-                delegate: delegate
+                delegate: delegate,
+                logger: logger
             ).futureResult.always { _ in
                 _Concurrency.Task {
                     await self.lock.withLockVoid {

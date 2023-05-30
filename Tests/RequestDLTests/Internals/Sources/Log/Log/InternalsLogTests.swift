@@ -3,9 +3,27 @@
 */
 
 import XCTest
+import Logging
 @testable import RequestDL
 
 class InternalsLogTests: XCTestCase {
+
+    func testLogger_whenSomething() async throws {
+        // When
+        let certificates = Certificates().server()
+        let localServer = try await LocalServer(.standard)
+        let logger = Logger(label: "request-dl.tests")
+
+        let result = try await DataTask {
+            BaseURL(localServer.baseURL)
+            DebugLog(logger)
+            SecureConnection {
+                Trusts(certificates.certificateURL.absolutePath(percentEncoded: false))
+            }
+        }.result()
+
+        print(result)
+    }
 
     let line: UInt = #line
     let file: StaticString = #file

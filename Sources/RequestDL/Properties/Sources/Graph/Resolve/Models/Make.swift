@@ -3,12 +3,14 @@
 */
 
 import Foundation
+import Logging
 
 struct Make: Sendable {
 
     // MARK: - Internal properties
 
     var provider: SessionProvider?
+    var logger: Logger?
     var configuration: Internals.Session.Configuration
     var request: Internals.Request
     var cacheConfiguration: Internals.CacheConfiguration
@@ -20,6 +22,7 @@ struct Make: Sendable {
         request: Internals.Request
     ) {
         self.provider = nil
+        self.logger = nil
         self.configuration = configuration
         self.request = request
         self.cacheConfiguration = .init()

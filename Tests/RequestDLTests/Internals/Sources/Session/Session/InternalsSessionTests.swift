@@ -3,10 +3,12 @@
 */
 
 import XCTest
+import Logging
 @testable import RequestDL
 
 class InternalsSessionTests: XCTestCase {
 
+    var logger: Logger!
     var localServer: LocalServer!
     var session: Internals.Session!
 
@@ -16,8 +18,11 @@ class InternalsSessionTests: XCTestCase {
         localServer = try await .init(.standard)
         localServer.cleanup()
 
+        logger = .init(label: "request-dl.tests")
+
         session = Internals.Session(
             provider: .shared,
+            logger: logger,
             configuration: .init()
         )
     }
@@ -151,6 +156,7 @@ class InternalsSessionTests: XCTestCase {
 
         let session = Internals.Session(
             provider: session.provider,
+            logger: nil,
             configuration: configuration
         )
 

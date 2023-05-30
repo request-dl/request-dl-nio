@@ -30,6 +30,7 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
+            logger: make.logger,
             configuration: make.configuration
         )
 

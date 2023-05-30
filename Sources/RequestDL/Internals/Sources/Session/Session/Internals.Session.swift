@@ -6,6 +6,7 @@ import Foundation
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
+import Logging
 
 extension Internals {
 
@@ -14,6 +15,7 @@ extension Internals {
         // MARK: - Internal properties
 
         let provider: SessionProvider
+        let logger: Logger?
         let configuration: Internals.Session.Configuration
         let manager: Internals.ClientManager
 
@@ -21,9 +23,11 @@ extension Internals {
 
         init(
             provider: SessionProvider,
+            logger: Logger?,
             configuration: Configuration
         ) {
             self.provider = provider
+            self.logger = logger
             self.configuration = configuration
             self.manager = .shared
         }
@@ -41,7 +45,8 @@ extension Internals {
 
             let cacheControl = CacheControl(
                 request: request,
-                dataCache: dataCache
+                dataCache: dataCache,
+                logger: logger
             )
 
             switch await cacheControl(client) {
@@ -85,12 +90,20 @@ extension Internals {
 
             let eventLoopFuture = client.execute(
                 request: request,
-                delegate: delegate
+                delegate: delegate,
+                logger: logger ?? Internals.logginDisabled
             )
 
             let sessionTask = SessionTask(response)
             sessionTask.attach(eventLoopFuture)
             return sessionTask
         }
+    }
+}
+
+extension Internals {
+
+    static let logginDisabled = Logger(label: "request-dl.logging.disabled") { _ in
+        SwiftLogNoOpLogHandler()
     }
 }
