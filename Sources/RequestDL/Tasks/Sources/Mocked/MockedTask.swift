@@ -35,6 +35,14 @@ public struct MockedTask<Element: Sendable>: RequestTask {
 
     // MARK: - Inits
 
+    /// Initializes a new instance of the `MockedTask` struct.
+    ///
+    /// - Parameters:
+    ///   - version: The HTTP version of the response. Default is `.init(minor: 0, major: 2)`.
+    ///   - status: The status of the response. Default is `.init(code: 200, reason: "Ok")`.
+    ///   - isKeepAlive: A Boolean value indicating whether the connection should be kept alive.
+    ///   Default is `false`.
+    ///   - content: A closure that returns the content of the response.
     public init<Content: Property>(
         version: ResponseHead.Version = .init(minor: 0, major: 2),
         status: ResponseHead.Status = .init(code: 200, reason: "Ok"),
