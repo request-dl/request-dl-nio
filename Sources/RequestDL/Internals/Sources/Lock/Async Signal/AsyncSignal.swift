@@ -50,7 +50,7 @@ struct AsyncSignal: Sendable {
     }
 
     // MARK: - Internal methods
-    
+
     func wait() async {
         lock.lock()
 
