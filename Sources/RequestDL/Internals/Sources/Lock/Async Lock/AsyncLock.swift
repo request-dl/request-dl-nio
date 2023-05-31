@@ -82,8 +82,8 @@ struct AsyncLock: Sendable {
         }
 
         deinit {
-            assert(_first == nil)
-            assert(_last == nil)
+            let isEmpty = _first == nil && _last == nil
+            precondition(isEmpty, "The AsyncLock is being deallocated with pending tasks. This is not safe.")
         }
     }
 

@@ -9,6 +9,10 @@ struct AsyncSignal: Sendable {
     private final class Storage: @unchecked Sendable {
         var signal = false
         var tasks: [Task] = []
+
+        deinit {
+            precondition(tasks.isEmpty, "The AsyncSignal is being deallocated with pending tasks. This is not safe.")
+        }
     }
 
     private final class Task: @unchecked Sendable {
