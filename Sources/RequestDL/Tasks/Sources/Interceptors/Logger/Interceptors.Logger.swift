@@ -27,7 +27,6 @@ extension Interceptors {
 
      - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
-    @available(*, deprecated, message: "Declare Logger inside PropertyBuilder")
     public struct Logger<Element: Sendable>: TaskInterceptor {
 
         // MARK: - Internal properties
@@ -67,7 +66,6 @@ extension RequestTask {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    @available(*, deprecated, message: "Declare Logger inside PropertyBuilder")
     public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
         intercept(Interceptors.Logger(
             isActive: isActive,
@@ -86,7 +84,6 @@ extension RequestTask<TaskResult<Data>> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    @available(*, deprecated, message: "Declare Logger inside PropertyBuilder")
     public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
         intercept(Interceptors.Logger(
             isActive: isActive,
@@ -106,7 +103,6 @@ extension RequestTask<Data> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    @available(*, deprecated, message: "Declare Logger inside PropertyBuilder")
     public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
         intercept(Interceptors.Logger(
             isActive: isActive,

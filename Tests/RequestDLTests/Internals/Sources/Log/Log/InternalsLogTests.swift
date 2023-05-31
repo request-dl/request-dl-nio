@@ -16,7 +16,7 @@ class InternalsLogTests: XCTestCase {
 
         let result = try await DataTask {
             BaseURL(localServer.baseURL)
-            DebugLog(logger)
+            Log(logger)
             SecureConnection {
                 Trusts(certificates.certificateURL.absolutePath(percentEncoded: false))
             }

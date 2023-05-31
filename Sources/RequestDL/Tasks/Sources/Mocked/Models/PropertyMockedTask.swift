@@ -31,7 +31,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
         let cacheControl = Internals.CacheControl(
             request: request,
-            dataCache: resolved.dataCache
+            dataCache: resolved.dataCache,
+            logger: resolved.session.logger
         )
 
         let client = try await Internals.ClientManager.shared.client(
