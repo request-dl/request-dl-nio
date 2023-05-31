@@ -12,11 +12,13 @@ class InterceptorsDetachTests: XCTestCase {
         let taskDetached = SendableBox(false)
 
         // When
-        _ = try await MockedTask(data: Data.init)
-            .detach { _ in
-                taskDetached(true)
-            }
-            .result()
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .detach { _ in
+            taskDetached(true)
+        }
+        .result()
 
         // Then
         XCTAssertTrue(taskDetached())

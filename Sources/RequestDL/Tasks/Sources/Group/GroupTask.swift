@@ -4,6 +4,7 @@
 
 import Foundation
 
+// swiftlint:disable line_length
 /**
  `GroupTask` is a task that groups multiple tasks that operate on elements of the same collection type.
 
@@ -30,6 +31,7 @@ import Foundation
  the `subscript` method.
  */
 public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where Data.Element: Hashable, Data: Sendable {
+    // swiftlint:enable line_length
 
     // MARK: - Private properties
 

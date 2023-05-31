@@ -12,7 +12,10 @@ class TaskMethodsTests: XCTestCase {
         let data = Data()
 
         // When
-        try await MockedTask { data }
-            .ping(10)
+        try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ping(10)
     }
 }

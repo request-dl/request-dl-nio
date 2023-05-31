@@ -4,6 +4,7 @@
 
 import Foundation
 
+// swiftlint:disable line_length
 /**
  A property that iterates over a sequence of data and produces properties for each element.
 
@@ -25,6 +26,7 @@ import Foundation
  ```
  */
 public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable, Content: Property {
+    // swiftlint:enable line_length
 
     // MARK: - Public properties
 

@@ -12,9 +12,13 @@ class ModifiersExtractPayloadTests: XCTestCase {
         let data = Data("--".utf8)
 
         // When
-        let result = try await MockedTask { data }
-            .extractPayload()
-            .result()
+        let result = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .extractPayload()
+        .result()
 
         // Then
         XCTAssertEqual(result, data)

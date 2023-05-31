@@ -17,9 +17,13 @@ class ModifiersStatusCodeTests: XCTestCase {
         // When
         for statusCode in statusCodes {
             do {
-                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                    .acceptOnlyStatusCode(statusCodeSet)
-                    .result()
+                _ = try await MockedTask(
+                    status: status(statusCode),
+                    content: { BaseURL("localhost") }
+                )
+                .ignoresProgress()
+                .acceptOnlyStatusCode(statusCodeSet)
+                .result()
                 received.append(statusCode)
             } catch is InvalidStatusCodeError<TaskResult<Data>> {
                 failures.append(statusCode)
@@ -51,9 +55,13 @@ class ModifiersStatusCodeTests: XCTestCase {
         // When
         for statusCode in statusCodes {
             do {
-                _ = try await MockedTask(statusCode: statusCode, data: Data.init)
-                    .acceptOnlyStatusCode(statusCodeSet)
-                    .result()
+                _ = try await MockedTask(
+                    status: status(statusCode),
+                    content: { BaseURL("localhost") }
+                )
+                .ignoresProgress()
+                .acceptOnlyStatusCode(statusCodeSet)
+                .result()
                 received.append(statusCode)
             } catch is InvalidStatusCodeError<TaskResult<Data>> {
                 failures.append(statusCode)
@@ -73,5 +81,12 @@ class ModifiersStatusCodeTests: XCTestCase {
         })
 
         XCTAssertEqual(failures.count, statusCodes.count - statusCodeSet.count)
+    }
+}
+
+extension ModifiersStatusCodeTests {
+
+    func status(_ statusCode: StatusCode) -> ResponseHead.Status {
+        .init(code: statusCode.rawValue, reason: "mock")
     }
 }
