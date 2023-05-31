@@ -11,7 +11,6 @@ extension Internals {
     struct UnsafeTask<Element>: Sendable, Hashable {
 
         fileprivate final class RunningState: @unchecked Sendable {
-
             var isRunning = true
         }
 
