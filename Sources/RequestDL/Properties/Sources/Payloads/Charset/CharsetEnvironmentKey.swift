@@ -4,12 +4,12 @@
 
 import Foundation
 
-private struct CharsetEnvironmentKey: EnvironmentKey {
+private struct CharsetEnvironmentKey: PropertyEnvironmentKey {
 
     static var defaultValue: Charset = .utf8
 }
 
-extension EnvironmentValues {
+extension PropertyEnvironmentValues {
 
     var charset: Charset {
         get { self[CharsetEnvironmentKey.self] }

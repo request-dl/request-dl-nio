@@ -23,9 +23,13 @@ class InterceptorsLoggerTests: XCTestCase {
         // When
         defer { Internals.Override.Print.restore() }
 
-        let result = try await MockedTask { data }
-            .logInConsole(true)
-            .result()
+        let result = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .logInConsole(true)
+        .result()
 
         // Then
         XCTAssertTrue(strings.first?.contains(
@@ -52,10 +56,14 @@ class InterceptorsLoggerTests: XCTestCase {
         // When
         defer { Internals.Override.Print.restore() }
 
-        _ = try await MockedTask { data }
-            .extractPayload()
-            .logInConsole(true)
-            .result()
+        _ = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .extractPayload()
+        .logInConsole(true)
+        .result()
 
         // Then
         XCTAssertTrue(strings.first?.contains(
@@ -83,11 +91,15 @@ class InterceptorsLoggerTests: XCTestCase {
 
         let data = try JSONEncoder().encode(value)
 
-        _ = try await MockedTask { data }
-            .decode(String.self)
-            .extractPayload()
-            .logInConsole(true)
-            .result()
+        _ = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .decode(String.self)
+        .extractPayload()
+        .logInConsole(true)
+        .result()
 
         // Then
         XCTAssertTrue(strings.first?.contains(

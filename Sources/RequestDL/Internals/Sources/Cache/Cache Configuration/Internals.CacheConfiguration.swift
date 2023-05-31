@@ -2,13 +2,17 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 extension Internals {
 
-    struct CacheConfiguration: Equatable {
+    struct CacheConfiguration: Sendable, Equatable {
 
-        enum Directory: Equatable {
+        enum Directory: Sendable, Equatable {
             case url(URL)
             case custom(String)
             case main

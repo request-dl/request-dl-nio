@@ -2,15 +2,23 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 /// A structure representing the head of an HTTP response.
 public struct ResponseHead: Sendable, Hashable {
 
     /// A structure representing the status of an HTTP response.
-    public struct Status: Sendable, Hashable {
+    public struct Status: Sendable, Hashable, CustomDebugStringConvertible {
 
         // MARK: - Public properties
+
+        public var debugDescription: String {
+            String(code) + " " + reason
+        }
 
         /// The HTTP status code of the response.
         public let code: UInt
@@ -42,9 +50,13 @@ public struct ResponseHead: Sendable, Hashable {
     }
 
     /// A structure representing the version of the HTTP protocol used in an HTTP response.
-    public struct Version: Sendable, Hashable {
+    public struct Version: Sendable, Hashable, CustomDebugStringConvertible {
 
         // MARK: - Public properties
+
+        public var debugDescription: String {
+            String(minor) + " ... " + String(major)
+        }
 
         /// The minor version number of the HTTP protocol used in the response.
         public let minor: Int
@@ -125,5 +137,22 @@ public struct ResponseHead: Sendable, Hashable {
             headers: head.headers,
             isKeepAlive: head.isKeepAlive
         )
+    }
+}
+
+// MARK: - CustomDebugStringConvertible
+
+extension ResponseHead: CustomDebugStringConvertible {
+
+    public var debugDescription: String {
+        """
+        \(url?.absoluteString ?? "URL(nil)")
+        \(status.debugDescription) Status
+
+        HTTP version range: \(version)
+        Keep alive: \(isKeepAlive)
+
+        \(headers.debugDescription)
+        """
     }
 }

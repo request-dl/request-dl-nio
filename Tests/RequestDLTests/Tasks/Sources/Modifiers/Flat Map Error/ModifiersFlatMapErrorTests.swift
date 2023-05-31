@@ -16,11 +16,13 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         let flatMapCalled = SendableBox(false)
 
         // When
-        _ = try await MockedTask(data: Data.init)
-            .flatMapError { _ in
-                flatMapCalled(true)
-            }
-            .result()
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .flatMapError { _ in
+            flatMapCalled(true)
+        }
+        .result()
 
         // Then
         XCTAssertFalse(flatMapCalled())
@@ -31,11 +33,13 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         let error = FlatMapError()
 
         // When
-        _ = try await MockedTask(data: Data.init)
-            .flatMapError { _ in
-                throw error
-            }
-            .result()
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .flatMapError { _ in
+            throw error
+        }
+        .result()
     }
 
     func testFlatMapErrorThrowingMockError() async throws {
@@ -46,13 +50,15 @@ class ModifiersFlatMapErrorTests: XCTestCase {
 
         // When
         do {
-            _ = try await MockedTask(data: Data.init)
-                .flatMap { _ in throw error }
-                .flatMapError(FlatMapError.self) { _ in
-                    mapError(true)
-                    throw transformedError
-                }
-                .result()
+            _ = try await MockedTask {
+                BaseURL("localhost")
+            }
+            .flatMap { _ in throw error }
+            .flatMapError(FlatMapError.self) { _ in
+                mapError(true)
+                throw transformedError
+            }
+            .result()
         } catch is TransformedError {} catch {
             throw error
         }

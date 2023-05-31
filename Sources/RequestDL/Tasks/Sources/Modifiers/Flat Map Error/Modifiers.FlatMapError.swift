@@ -7,15 +7,15 @@ import Foundation
 extension Modifiers {
 
     /**
-     A `TaskModifier` that maps the error of a `Task` to a new `Error` type.
+     A `TaskModifier` that maps the error of a `RequestTask` to a new `Error` type.
 
-     Use this modifier to transform the error type of a `Task`. The `FlatMapError`
+     Use this modifier to transform the error type of a `RequestTask`. The `FlatMapError`
      modifier takes a closure that maps an error of the original task to a new error
      type. The closure is called when the task fails with an error. If the closure
      succeeds, the error is transformed to the new error type. If the closure fails,
      the task fails with the original error.
      */
-    public struct FlatMapError<Content: Task>: TaskModifier {
+    public struct FlatMapError<Content: RequestTask>: TaskModifier {
 
         // MARK: - Internal properties
 
@@ -24,9 +24,9 @@ extension Modifiers {
         // MARK: - Public methods
 
         /**
-         Transforms the result of a `Task` to a new element type.
+         Transforms the result of a `RequestTask` to a new element type.
 
-         - Parameter task: The original `Task`.
+         - Parameter task: The original `RequestTask`.
          - Throws: An error if the transformation fails.
          - Returns: The result of the transformation.
          */
@@ -41,9 +41,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Returns a `ModifiedTask` with the error-handling behavior specified by the provided closure.

@@ -4,11 +4,11 @@
 
 import Foundation
 
-private struct PayloadPartLengthKey: EnvironmentKey {
+private struct PayloadPartLengthKey: PropertyEnvironmentKey {
     static var defaultValue: Int?
 }
 
-extension EnvironmentValues {
+extension PropertyEnvironmentValues {
 
     var payloadPartLength: Int? {
         get { self[PayloadPartLengthKey.self] }

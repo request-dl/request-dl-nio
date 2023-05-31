@@ -4,11 +4,11 @@
 
 import Foundation
 
-private struct URLEncoderEnvironmentKey: EnvironmentKey {
+private struct URLEncoderEnvironmentKey: PropertyEnvironmentKey {
     static var defaultValue = URLEncoder()
 }
 
-extension EnvironmentValues {
+extension PropertyEnvironmentValues {
 
     var urlEncoder: URLEncoder {
         get { self[URLEncoderEnvironmentKey.self] }

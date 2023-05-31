@@ -10,12 +10,13 @@ import Foundation
  - Interceptor: The type of `Interceptor` that will intercept the task.
  - Content: The type of `Content` that will be returned by the task.
 
- An `InterceptedTask` conforms to the `Task` protocol and defines a `result()` method that returns
- a `Content.Element` object. The `result()` method can throw an error asynchronously.
+ An `InterceptedTask` conforms to the `RequestTask` protocol and defines a `result()`
+ method that returns a `Content.Element` object. The `result()` method can throw an error
+ asynchronously.
  */
 public struct InterceptedTask<
-    Interceptor: TaskInterceptor, Content: Task
->: Task where Interceptor.Element == Content.Element {
+    Interceptor: TaskInterceptor, Content: RequestTask
+>: RequestTask where Interceptor.Element == Content.Element {
 
     public typealias Element = Content.Element
 

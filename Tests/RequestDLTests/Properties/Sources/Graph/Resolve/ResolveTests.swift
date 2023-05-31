@@ -9,13 +9,13 @@ class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsOneHierarchy_shouldBeValid() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("apple.com")
             Path("api")
             Path("v2")
 
-            Headers.Accept(.json)
-            Headers.Cache()
+            AcceptHeader(.json)
+            CacheHeader()
                 .public(true)
 
             Timeout(60)
@@ -33,21 +33,21 @@ class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsTwoHierarchy_shouldBeValid() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("apple.com")
             Path("api")
             Path("v2")
 
             HeaderGroup {
-                Headers.Accept(.json)
-                Headers.Cache()
+                AcceptHeader(.json)
+                CacheHeader()
                     .public(true)
 
                 Timeout(60) // should be eliminated
             }
 
             QueryGroup {
-                Query("some question", forKey: "q")
+                Query(name: "q", value: "some question")
             }
         }
 
@@ -60,7 +60,7 @@ class ResolveTests: XCTestCase {
 
     func testDebug_whenContainsSecureConnection_shouldBeValid() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("apple.com")
 
             SecureConnection {
@@ -111,16 +111,18 @@ extension ResolveTests {
                         path = v2
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
+                LeafNode<HeaderNode> {
+                    property = HeaderNode {
                         key = Accept,
-                        value = application/json
+                        value = application/json,
+                        strategy = .setting
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
+                LeafNode<HeaderNode> {
+                    property = HeaderNode {
                         key = Cache-Control,
-                        value = public
+                        value = public,
+                        strategy = .setting
                     }
                 },
                 LeafNode<Node> {
@@ -168,16 +170,18 @@ extension ResolveTests {
                 LeafNode<Node> {
                     property = Node {
                         nodes = [
-                            LeafNode<Node> {
-                                property = Node {
+                            LeafNode<HeaderNode> {
+                                property = HeaderNode {
                                     key = Accept,
-                                    value = application/json
+                                    value = application/json,
+                                    strategy = .setting
                                 }
                             },
-                            LeafNode<Node> {
-                                property = Node {
+                            LeafNode<HeaderNode> {
+                                property = HeaderNode {
                                     key = Cache-Control,
-                                    value = public
+                                    value = public,
+                                    strategy = .setting
                                 }
                             }
                         ]

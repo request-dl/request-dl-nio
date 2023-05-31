@@ -88,15 +88,16 @@ extension Internals {
 
             let request = try request.build()
 
-            let eventLoopFuture = client.execute(
+            let unsafeTask = client.execute(
                 request: request,
                 delegate: delegate,
                 logger: logger ?? Internals.logginDisabled
             )
 
-            let sessionTask = SessionTask(response)
-            sessionTask.attach(eventLoopFuture)
-            return sessionTask
+            return SessionTask(
+                response: response,
+                seed: unsafeTask()
+            )
         }
     }
 }

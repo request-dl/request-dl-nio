@@ -70,7 +70,7 @@ public enum Charset: String, Sendable, LosslessStringConvertible {
 
     private func encode(_ string: String, using encoding: String.Encoding) throws -> Data {
         guard let data = string.data(using: encoding) else {
-            throw EncodingPayloadError()
+            throw EncodingPayloadError(.invalidStringEncoding)
         }
 
         return data

@@ -2,7 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 /**
  A property type for a file in a form data request.

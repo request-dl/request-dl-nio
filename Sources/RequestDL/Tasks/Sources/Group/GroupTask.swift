@@ -4,11 +4,12 @@
 
 import Foundation
 
+// swiftlint:disable line_length
 /**
  `GroupTask` is a task that groups multiple tasks that operate on elements of the same collection type.
 
  You can use `GroupTask` to create a single task that makes a sequence of requests based on the
- encapsulated `Task`. For each element that should be an `ID` conforming to `Hashable`,
+ encapsulated `RequestTask`. For each element that should be an `ID` conforming to `Hashable`,
  `GroupTask` will result in a dictionary of results.
 
  Usage:
@@ -19,7 +20,7 @@ import Foundation
          DataTask {
              BaseURL("google.com")
              Path("results")
-             Query(index, forKey: "page")
+             Query(name: "page", value: index)
          }
      }
      .result()
@@ -29,7 +30,8 @@ import Foundation
  You can get the result individually or by using the `\.keys`, `\.values` properties of dictionary or by using
  the `subscript` method.
  */
-public struct GroupTask<Data: Sequence, Content: Task>: Task where Data.Element: Hashable, Data: Sendable {
+public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where Data.Element: Hashable, Data: Sendable {
+    // swiftlint:enable line_length
 
     // MARK: - Private properties
 

@@ -29,7 +29,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio.git",
-            from: "2.53.0"
+            from: "2.54.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras.git",

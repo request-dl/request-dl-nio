@@ -4,6 +4,7 @@
 
 import Foundation
 import Logging
+import AsyncHTTPClient
 
 // swiftlint:disable type_body_length
 extension Internals {
@@ -107,11 +108,17 @@ extension Internals {
                 download.close()
             }
 
-            return .init(.init(
-                upload: .empty(),
-                head: .constant(cachedData.cachedResponse.response),
-                download: download.stream
-            ))
+            return SessionTask(
+                response: .init(
+                    upload: .empty(),
+                    head: .constant(cachedData.cachedResponse.response),
+                    download: download.stream
+                ),
+                seed: .init {
+                    download.failed(HTTPClientError.cancelled)
+                    download.close()
+                }
+            )
         }
 
         private func validateCachedData(
@@ -172,7 +179,7 @@ extension Internals {
             guard let response = try? await client.execute(
                 request: request.build(),
                 logger: logger ?? Internals.logginDisabled
-            ).get() else { return nil }
+            ).response() else { return nil }
 
             let lastModified = response.headers["Last-Modified"]
             let eTag = response.headers["ETag"]

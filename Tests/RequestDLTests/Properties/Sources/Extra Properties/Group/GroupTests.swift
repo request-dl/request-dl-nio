@@ -9,7 +9,7 @@ class GroupTests: XCTestCase {
 
     func testSingleGroup() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("google.com")
         }
 
@@ -22,10 +22,10 @@ class GroupTests: XCTestCase {
 
     func testMultipleGroup() async throws {
         // Given
-        let property = Group {
+        let property = PropertyGroup {
             BaseURL("google.com")
             Path("api/v1")
-            Query("all", forKey: "available_methods")
+            Query(name: "available_methods", value: "all")
         }
 
         // When
@@ -40,7 +40,7 @@ class GroupTests: XCTestCase {
 
     func testNeverBody() async throws {
         // Given
-        let property = Group {}
+        let property = PropertyGroup {}
 
         // Then
         try await assertNever(property.body)

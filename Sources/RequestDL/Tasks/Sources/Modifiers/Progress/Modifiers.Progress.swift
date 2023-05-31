@@ -2,11 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 extension Modifiers {
 
-    public struct Progress<Content: Task, Output: Sendable>: TaskModifier {
+    public struct Progress<Content: RequestTask, Output: Sendable>: TaskModifier {
 
         // MARK: - Private properties
 
@@ -113,9 +117,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extensions
+// MARK: - RequestTask extensions
 
-extension Task<AsyncResponse> {
+extension RequestTask<AsyncResponse> {
 
     public func progress(
         _ progress: Progress
@@ -130,7 +134,7 @@ extension Task<AsyncResponse> {
     }
 }
 
-extension Task<TaskResult<AsyncBytes>> {
+extension RequestTask<TaskResult<AsyncBytes>> {
 
     public func downloadProgress(
         _ download: DownloadProgress
@@ -139,7 +143,7 @@ extension Task<TaskResult<AsyncBytes>> {
     }
 }
 
-extension Task<AsyncBytes> {
+extension RequestTask<AsyncBytes> {
 
     public func downloadProgress(
         _ download: DownloadProgress,

@@ -14,6 +14,7 @@ public struct AsyncBytes: AsyncSequence, Hashable {
      */
     public struct AsyncIterator: AsyncIteratorProtocol {
 
+        fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncBytes.AsyncIterator
 
         /**
@@ -30,12 +31,17 @@ public struct AsyncBytes: AsyncSequence, Hashable {
 
     // MARK: - Private properties
 
-    fileprivate let asyncBytes: Internals.AsyncBytes
+    private let seed: Internals.TaskSeed
+    fileprivate let bytes: Internals.AsyncBytes
 
     // MARK: - Inits
 
-    init(_ asyncBytes: Internals.AsyncBytes) {
-        self.asyncBytes = asyncBytes
+    init(
+        seed: Internals.TaskSeed,
+        bytes: Internals.AsyncBytes
+    ) {
+        self.seed = seed
+        self.bytes = bytes
     }
 
     // MARK: - Public methods
@@ -46,7 +52,10 @@ public struct AsyncBytes: AsyncSequence, Hashable {
      - Returns: An async iterator for the asynchronous bytes.
      */
     public func makeAsyncIterator() -> AsyncIterator {
-        .init(iterator: asyncBytes.makeAsyncIterator())
+        .init(
+            seed: seed,
+            iterator: bytes.makeAsyncIterator()
+        )
     }
 }
 
@@ -55,6 +64,6 @@ public struct AsyncBytes: AsyncSequence, Hashable {
 extension Data {
 
     init(_ asyncBytes: AsyncBytes) async throws {
-        try await self.init(asyncBytes.asyncBytes)
+        try await self.init(asyncBytes.bytes)
     }
 }

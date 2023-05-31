@@ -26,10 +26,14 @@ class ModifiersDecodeTests: XCTestCase {
         // When
         let data = try encoder.encode(array)
 
-        let result = try await MockedTask { data }
-            .decode([Date].self, decoder: decoder)
-            .extractPayload()
-            .result()
+        let result = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .decode([Date].self, decoder: decoder)
+        .extractPayload()
+        .result()
 
         // Then
         XCTAssertEqual(
@@ -56,10 +60,14 @@ class ModifiersDecodeTests: XCTestCase {
         // When
         let data = try encoder.encode(dictionary)
 
-        let result = try await MockedTask { data }
-            .decode([Date: Int].self, decoder: decoder)
-            .extractPayload()
-            .result()
+        let result = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .decode([Date: Int].self, decoder: decoder)
+        .extractPayload()
+        .result()
 
         // Then
         XCTAssertEqual(result.keys.count, dictionary.keys.count)
@@ -91,10 +99,14 @@ class ModifiersDecodeTests: XCTestCase {
         // When
         let data = try encoder.encode(mock)
 
-        let result = try await MockedTask { data }
-            .decode(MockModel.self, decoder: decoder)
-            .extractPayload()
-            .result()
+        let result = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .decode(MockModel.self, decoder: decoder)
+        .extractPayload()
+        .result()
 
         // Then
         XCTAssertEqual(
@@ -110,10 +122,14 @@ class ModifiersDecodeTests: XCTestCase {
         // When
         let data = try JSONEncoder().encode(array)
 
-        let result = try await MockedTask { data }
-            .extractPayload()
-            .decode([Int].self)
-            .result()
+        let result = try await MockedTask(content: {
+            BaseURL("localhost")
+            Payload(data: data)
+        })
+        .ignoresProgress()
+        .extractPayload()
+        .decode([Int].self)
+        .result()
 
         // Then
         XCTAssertEqual(array, result)

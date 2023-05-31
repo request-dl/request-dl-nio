@@ -8,7 +8,7 @@ import Combine
 import _Concurrency
 
 /**
-A publisher that wraps a Task instance and publishes its output asynchronously.
+A publisher that wraps a `RequestTask` instance and publishes its output asynchronously.
 */
 public struct PublishedTask<Output>: Publisher {
 
@@ -62,7 +62,7 @@ public struct PublishedTask<Output>: Publisher {
 
     // MARK: - Inits
 
-    init<Content: Task>(_ content: Content) where Content.Element == Output {
+    init<Content: RequestTask>(_ content: Content) where Content.Element == Output {
         self.wrapper = { try await content.result() }
     }
 
@@ -81,14 +81,15 @@ public struct PublishedTask<Output>: Publisher {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     /**
-     Creates a `PublishedTask` publisher from the current `Task` instance.
+     Creates a `PublishedTask` publisher from the current `RequestTask` instance.
 
-     - Returns: A `PublishedTask` publisher that emits the output of the current `Task` instance.
+     - Returns: A `PublishedTask` publisher that emits the output of the current `RequestTask`
+     instance.
      */
     public func publisher() -> PublishedTask<Element> {
         .init(self)

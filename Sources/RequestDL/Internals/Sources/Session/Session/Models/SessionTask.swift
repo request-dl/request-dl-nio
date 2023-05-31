@@ -5,31 +5,31 @@
 import Foundation
 import NIOCore
 
-final class SessionTask: @unchecked Sendable {
+struct SessionTask: Sendable {
 
     // MARK: - Internal properties
 
-    let response: Internals.AsyncResponse
-
-    // MARK: - Private properties
-
-    private let lock = Lock()
-
-    // MARK: - Unsafe properties
-
-    private var _eventLoopFuture: EventLoopFuture<Void>?
+    private let response: Internals.AsyncResponse
+    private let seed: Internals.TaskSeed
 
     // MARK: - Inits
 
+    init(
+        response: Internals.AsyncResponse,
+        seed: Internals.TaskSeed
+    ) {
+        self.response = response
+        self.seed = seed
+    }
+
     init(_ response: Internals.AsyncResponse) {
         self.response = response
+        self.seed = .withoutCancellation
     }
 
     // MARK: - Internal methods
 
-    func attach(_ eventLoopFuture: EventLoopFuture<Void>) {
-        lock.withLockVoid {
-            self._eventLoopFuture = eventLoopFuture
-        }
+    func callAsFunction() -> AsyncResponse {
+        .init(seed: seed, response: response)
     }
 }

@@ -2,28 +2,32 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 extension Modifiers {
 
     /**
-     A `TaskModifier` that decodes the data returned by the `Task` into a specified type
+     A `TaskModifier` that decodes the data returned by the `RequestTask` into a specified type
      using a `JSONDecoder`.
 
      Generic types:
 
-     - `Content`: The type of the original `Task` being modified.
+     - `Content`: The type of the original `RequestTask` being modified.
      - `Element`: The type to decode the data into.
      - `Output`: The decoded result.
 
-     The `Decode` modifier can be used with any `Task` whose `Element` is of type
+     The `Decode` modifier can be used with any `RequestTask` whose `Element` is of type
      `TaskResult<Data>` or `Data`. It expects a `Decodable` type to be specified as
      the `Element` type it will decode the data into.
 
      The decoding operation is performed using a `JSONDecoder`. By default, the decoding is
      performed assuming that the data is in plain format, i.e., not an array or dictionary.
      */
-    public struct Decode<Content: Task, Element: Decodable, Output: Sendable>: TaskModifier {
+    public struct Decode<Content: RequestTask, Element: Decodable, Output: Sendable>: TaskModifier {
 
         // MARK: - Internal properties
 
@@ -38,10 +42,10 @@ extension Modifiers {
         // MARK: - Public methods
 
         /**
-         Decodes the data of the specified `Task` instance into an instance of the `Element`
+         Decodes the data of the specified `RequestTask` instance into an instance of the `Element`
          type specified during initialization.
 
-         - Parameter task: The `Task` instance whose data is to be decoded.
+         - Parameter task: The `RequestTask` instance whose data is to be decoded.
          - Returns: A `Output` instance containing the decoded data.
          - Throws: If the decoding operation fails.
          */
@@ -53,13 +57,13 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extensions
+// MARK: - RequestTask extensions
 
-extension Task {
+extension RequestTask {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
-     `Task`.
+     `RequestTask`.
 
      - Parameters:
         - type: The type to decode the result data into.
@@ -86,7 +90,7 @@ extension Task {
 
     /**
      Returns a new instance of `ModifiedTask` that applies the `Decode` modifier to the original
-     `Task`.
+     `RequestTask`.
 
      - Parameters:
         - type: The type to decode the data into.

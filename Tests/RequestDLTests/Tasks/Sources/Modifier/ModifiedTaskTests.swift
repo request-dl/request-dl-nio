@@ -7,7 +7,7 @@ import XCTest
 
 class ModifiedTaskTests: XCTestCase {
 
-    struct Modified<Body: Task>: TaskModifier {
+    struct Modified<Body: RequestTask>: TaskModifier {
 
         let callback: @Sendable () -> Void
 
@@ -22,11 +22,13 @@ class ModifiedTaskTests: XCTestCase {
         let taskModified = SendableBox(false)
 
         // When
-        _ = try await MockedTask(data: Data.init)
-            .modify(Modified {
-                taskModified(true)
-            })
-            .result()
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .modify(Modified {
+            taskModified(true)
+        })
+        .result()
 
         // Then
         XCTAssertTrue(taskModified())

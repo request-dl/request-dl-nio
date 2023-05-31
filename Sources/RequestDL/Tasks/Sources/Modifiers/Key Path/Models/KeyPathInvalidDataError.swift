@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- A error type representing a validation error due to a unexpected `Task` result data.
+ A error type representing a validation error due to a unexpected `RequestTask` result data.
  Conforms to the `TaskError` protocol.
  */
 public struct KeyPathInvalidDataError: TaskError, LocalizedError {

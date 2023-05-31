@@ -2,12 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 extension Modifiers {
 
     /**
-     A type that modifies the behavior of a `Task`.
+     A type that modifies the behavior of a `RequestTask`.
 
      The `KeyPath` modifier allows you to extract a sub-value from the data returned
      by the task using a key path.
@@ -19,7 +23,7 @@ extension Modifiers {
          .keyPath(\.data)
      ```
      */
-    public struct KeyPath<Content: Task>: TaskModifier {
+    public struct KeyPath<Content: RequestTask>: TaskModifier {
 
         // MARK: - Internal properties
 
@@ -63,9 +67,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task<TaskResult<Data>> {
+extension RequestTask<TaskResult<Data>> {
 
     /**
      Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
@@ -88,7 +92,7 @@ extension Task<TaskResult<Data>> {
     }
 }
 
-extension Task<Data> {
+extension RequestTask<Data> {
 
     /**
      Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.

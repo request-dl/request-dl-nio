@@ -2,11 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
+
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 extension Modifiers {
 
-    public struct IgnoresProgress<Content: Task, Output: Sendable>: TaskModifier {
+    public struct IgnoresProgress<Content: RequestTask, Output: Sendable>: TaskModifier {
 
         // MARK: - Internal properties
 
@@ -77,9 +82,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task {
+extension RequestTask {
 
     public func ignoresProgress() -> ModifiedTask<Modifiers.IgnoresProgress<Self, TaskResult<Data>>>
     where Element == AsyncResponse {

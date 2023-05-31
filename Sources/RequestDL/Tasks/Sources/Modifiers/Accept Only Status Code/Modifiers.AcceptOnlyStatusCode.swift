@@ -7,7 +7,7 @@ import Foundation
 extension Modifiers {
 
     /// A modifier that accepts only a specific set of status codes as a successful result.
-    public struct AcceptOnlyStatusCode<Content: Task>: TaskModifier where Content.Element: TaskResultPrimitive {
+    public struct AcceptOnlyStatusCode<Content: RequestTask>: TaskModifier where Content.Element: TaskResultPrimitive {
 
         // MARK: - Internal properties
 
@@ -37,9 +37,9 @@ extension Modifiers {
     }
 }
 
-// MARK: - Task extension
+// MARK: - RequestTask extension
 
-extension Task where Element: TaskResultPrimitive {
+extension RequestTask where Element: TaskResultPrimitive {
 
     /**
      Returns a modified task that accepts only the specified status codes.

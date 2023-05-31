@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- The `@Namespace` property wrapper allows you to define a namespace identifier
+ The `@PropertyNamespace` property wrapper allows you to define a namespace identifier
  for `Property` objects.
 
  This creates a namespace ID for storing objects inside the `Property` declaration.
@@ -15,7 +15,7 @@ import Foundation
  ```swift
  struct ProjectDefaults: Property {
 
-    @Namespace var projectName
+    @PropertyNamespace var projectName
     @StateObject var pskResolver = PSKResolver()
 
     var property: some Property {
@@ -35,8 +35,8 @@ import Foundation
  ```swift
  struct ProjectDefaults: Property {
 
-    @Namespace var foo
-    @Namespace var bar
+    @PropertyNamespace var foo
+    @PropertyNamespace var bar
 
     @StateObject var pskResolver = PSKResolver()
 
@@ -49,7 +49,7 @@ import Foundation
  ```
  */
 @propertyWrapper
-public struct Namespace: DynamicValue {
+public struct PropertyNamespace: DynamicValue {
 
     // MARK: - Public properties
 
@@ -72,3 +72,6 @@ public struct Namespace: DynamicValue {
      */
     public init() {}
 }
+
+@available(*, deprecated, renamed: "PropertyNamespace")
+public typealias Namespace = PropertyNamespace

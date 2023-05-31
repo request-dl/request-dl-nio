@@ -23,16 +23,19 @@ class PublishedTaskTests: XCTestCase {
         let expectation = expectation(description: "publisher")
 
         // When
-        MockedTask(data: Data.init)
-            .publisher()
-            .map { _ in
-                PublisherResult.success
-            }
-            .replaceError(with: .failure)
-            .sink {
-                isSuccess = $0 == .success
-                expectation.fulfill()
-            }.store(in: &cancellation)
+        MockedTask {
+            BaseURL("localhost")
+        }
+        .ignoresProgress()
+        .publisher()
+        .map { _ in
+            PublisherResult.success
+        }
+        .replaceError(with: .failure)
+        .sink {
+            isSuccess = $0 == .success
+            expectation.fulfill()
+        }.store(in: &cancellation)
 
         await fulfillment(of: [expectation], timeout: 3.0)
 
@@ -52,12 +55,15 @@ class PublishedTaskTests: XCTestCase {
         // When
         subject
             .flatMap {
-                MockedTask(data: Data.init)
-                    .publisher()
-                    .map { _ in
-                        PublisherResult.success
-                    }
-                    .replaceError(with: .failure)
+                MockedTask {
+                    BaseURL("localhost")
+                }
+                .ignoresProgress()
+                .publisher()
+                .map { _ in
+                    PublisherResult.success
+                }
+                .replaceError(with: .failure)
             }
             .sink {
                 isSuccess = isSuccess && $0 == .success

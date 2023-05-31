@@ -16,7 +16,7 @@ class _EitherContentTests: XCTestCase {
             if chooseFirst {
                 BaseURL("google.com")
             } else {
-                Headers.Origin("https://apple.com")
+                OriginHeader("https://apple.com")
             }
         }
 
@@ -24,7 +24,7 @@ class _EitherContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _EitherContent<BaseURL, RequestDL.Headers.Origin>)
+        XCTAssertTrue(result is _EitherContent<BaseURL, OriginHeader>)
         XCTAssertEqual(resolved.request.url, "https://google.com")
         XCTAssertTrue(resolved.request.headers.isEmpty)
     }
@@ -36,7 +36,7 @@ class _EitherContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             if chooseFirst {
-                Headers.Origin("https://apple.com")
+                OriginHeader("https://apple.com")
             } else {
                 BaseURL("127.0.0.1")
             }
@@ -46,7 +46,7 @@ class _EitherContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _EitherContent<RequestDL.Headers.Origin, BaseURL>)
+        XCTAssertTrue(result is _EitherContent<OriginHeader, BaseURL>)
         XCTAssertEqual(resolved.request.url, "https://127.0.0.1")
         XCTAssertTrue(resolved.request.headers.isEmpty)
     }

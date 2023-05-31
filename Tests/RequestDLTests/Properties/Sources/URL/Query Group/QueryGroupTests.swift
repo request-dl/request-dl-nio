@@ -10,8 +10,8 @@ class QueryGroupTests: XCTestCase {
     func testGroupOfQueries() async throws {
         // Given
         let property = QueryGroup {
-            Query(123, forKey: "number")
-            Query(1, forKey: "page")
+            Query(name: "number", value: 123)
+            Query(name: "page", value: 1)
         }
 
         // When
@@ -34,9 +34,9 @@ class QueryGroupTests: XCTestCase {
     func testGroupOfQueriesIgnoringOtherTypes() async throws {
         // Given
         let property = QueryGroup {
-            Query(123, forKey: "number")
-            Query(1, forKey: "page")
-            Headers.Any(name: "api_key", value: "password")
+            Query(name: "number", value: 123)
+            Query(name: "page", value: 1)
+            CustomHeader(name: "api_key", value: "password")
         }
 
         // When

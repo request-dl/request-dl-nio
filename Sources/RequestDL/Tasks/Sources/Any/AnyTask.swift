@@ -20,7 +20,7 @@ import Foundation
  }
  ```
  */
-public struct AnyTask<Element: Sendable>: Task {
+public struct AnyTask<Element: Sendable>: RequestTask {
 
     // MARK: - Private properties
 
@@ -28,7 +28,7 @@ public struct AnyTask<Element: Sendable>: Task {
 
     // MARK: - Inits
 
-    init<T: Task>(_ task: T) where T.Element == Element {
+    init<T: RequestTask>(_ task: T) where T.Element == Element {
         wrapper = { try await task.result() }
     }
 
@@ -48,7 +48,7 @@ public struct AnyTask<Element: Sendable>: Task {
 
 // MARK: - Task extension
 
-extension Task {
+extension RequestTask {
 
     /**
      Returns an `AnyTask` instance that wraps `self`.

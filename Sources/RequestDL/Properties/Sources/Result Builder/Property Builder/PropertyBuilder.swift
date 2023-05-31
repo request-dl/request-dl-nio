@@ -24,12 +24,12 @@ import Foundation
 
  ```swift
  myProperties {
-     Query("abc", forKey: "string")
+     Query(name: "string", value: "abc")
      Payload("some-content", using: .utf8)
      Path("search")
-     Group {
+     PropertyGroup {
          BaseURL("google.com")
-         Query(1, forKey: "page")
+         Query(name: "page", value: 1)
      }
  }
  ```
@@ -97,11 +97,11 @@ public struct PropertyBuilder: Sendable {
      Example:
 
      ```swift
-     Group {
+     PropertyGroup {
          if condition {
-             Query("foo", forKey: "password")
+             Query(name: "password", value: "foo")
          } else {
-             Query("bar", forKey: "password")
+             Query(name: "password", value: "bar")
          }
      }
      */
@@ -118,7 +118,7 @@ public struct PropertyBuilder: Sendable {
      Here's an example of how it can be used:
 
      ```swift
-     Group {
+     PropertyGroup {
          if #available(iOS 15, *) {
              Headers(...)
          }

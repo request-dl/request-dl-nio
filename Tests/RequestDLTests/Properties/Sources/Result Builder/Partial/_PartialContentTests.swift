@@ -12,7 +12,7 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
+            OriginHeader("https://apple.com")
         }
 
         // When
@@ -21,7 +21,7 @@ class _PartialContentTests: XCTestCase {
         // Then
         XCTAssertTrue(result is _PartialContent<
             BaseURL,
-            Headers.Origin
+            OriginHeader
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com")
@@ -33,8 +33,8 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
-            Headers.Cache()
+            OriginHeader("https://apple.com")
+            CacheHeader()
                 .public(true)
         }
 
@@ -45,9 +45,9 @@ class _PartialContentTests: XCTestCase {
         XCTAssertTrue(result is _PartialContent<
             _PartialContent<
                 BaseURL,
-                Headers.Origin
+                OriginHeader
             >,
-            Headers.Cache
+            CacheHeader
         >)
 
         XCTAssertEqual(resolved.request.url, "https://google.com")
@@ -60,8 +60,8 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
-            Headers.Cache()
+            OriginHeader("https://apple.com")
+            CacheHeader()
                 .public(true)
             Path("search")
         }
@@ -74,9 +74,9 @@ class _PartialContentTests: XCTestCase {
             _PartialContent<
                 _PartialContent<
                     BaseURL,
-                    Headers.Origin
+                    OriginHeader
                 >,
-                Headers.Cache
+                CacheHeader
             >,
             Path
         >)
@@ -91,11 +91,11 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
-            Headers.Cache()
+            OriginHeader("https://apple.com")
+            CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
         }
 
         // When
@@ -107,9 +107,9 @@ class _PartialContentTests: XCTestCase {
                 _PartialContent<
                     _PartialContent<
                         BaseURL,
-                        Headers.Origin
+                        OriginHeader
                     >,
-                    Headers.Cache
+                    CacheHeader
                 >,
                 Path
             >,
@@ -130,11 +130,11 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
-            Headers.Cache()
+            OriginHeader("https://apple.com")
+            CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
             Timeout(40)
         }
 
@@ -148,9 +148,9 @@ class _PartialContentTests: XCTestCase {
                     _PartialContent<
                         _PartialContent<
                             BaseURL,
-                            Headers.Origin
+                            OriginHeader
                         >,
-                        Headers.Cache
+                        CacheHeader
                     >,
                     Path
                 >,
@@ -176,13 +176,13 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
-            Headers.Cache()
+            OriginHeader("https://apple.com")
+            CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
             Timeout(40)
-            Query(1, forKey: "page")
+            Query(name: "page", value: 1)
         }
 
         // When
@@ -196,9 +196,9 @@ class _PartialContentTests: XCTestCase {
                         _PartialContent<
                             _PartialContent<
                                 BaseURL,
-                                Headers.Origin
+                                OriginHeader
                             >,
-                            Headers.Cache
+                            CacheHeader
                         >,
                         Path
                     >,
@@ -226,13 +226,13 @@ class _PartialContentTests: XCTestCase {
         @PropertyBuilder
         var result: some Property {
             BaseURL("google.com")
-            Headers.Origin("https://apple.com")
-            Headers.Cache()
+            OriginHeader("https://apple.com")
+            CacheHeader()
                 .public(true)
             Path("search")
-            Query("request-dl", forKey: "q")
+            Query(name: "q", value: "request-dl")
             Timeout(40)
-            Query(1, forKey: "page")
+            Query(name: "page", value: 1)
             Path("results")
         }
 
@@ -248,9 +248,9 @@ class _PartialContentTests: XCTestCase {
                             _PartialContent<
                                 _PartialContent<
                                     BaseURL,
-                                    Headers.Origin
+                                    OriginHeader
                                 >,
-                                Headers.Cache
+                                CacheHeader
                             >,
                             Path
                         >,

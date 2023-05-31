@@ -131,10 +131,6 @@ extension MultipartFormParser {
                 throw MultipartFormParserError.invalidHeaderLine
             }
 
-            if headers[key] != nil {
-                throw MultipartFormParserError.duplicatedHeaders
-            }
-
             headers.add(name: key, value: value)
         }
 
