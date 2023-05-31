@@ -15,9 +15,11 @@ struct RawTask<Content: Property>: RequestTask {
     func result() async throws -> AsyncResponse {
         let resolved = try await Resolve(content).build()
 
-        return try await .init(resolved.session.execute(
+        let sessionTask = try await resolved.session.execute(
             request: resolved.request,
             dataCache: resolved.dataCache
-        ).response)
+        )
+
+        return sessionTask()
     }
 }

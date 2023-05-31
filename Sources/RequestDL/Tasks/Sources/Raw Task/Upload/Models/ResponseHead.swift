@@ -2,7 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
 
 /// A structure representing the head of an HTTP response.
 public struct ResponseHead: Sendable, Hashable {
