@@ -41,12 +41,15 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
         switch await cacheControl(client) {
         case .task(let task):
-            return .init(task.response)
+            return task()
         case .cache(let cache):
-            return try await .init(mockRequest(
-                resolved: resolved,
-                cache: cache
-            ))
+            return try await .init(
+                seed: .withoutCancellation,
+                response: mockRequest(
+                    resolved: resolved,
+                    cache: cache
+                )
+            )
         }
     }
 
