@@ -7,118 +7,101 @@ import NIOConcurrencyHelpers
 
 struct AsyncLock: Sendable {
 
-    private final class Storage: @unchecked Sendable {
+    private final class Node: @unchecked Sendable {
 
-        // MARK: - Private properties
+        // MARK: - Internal properties
 
-        private let _lock = NIOLock()
+        let task: Task
 
-        // MARK: - Unsafe properties
-
-        private var _signal: Int = 1
-        private var _tasks = [Task]()
+        var next: Node?
+        weak var previous: Node?
 
         // MARK: - Inits
 
-        init() {}
-
-        // MARK: - Internal methods
-
-        func wait() async {
-            lock()
-
-            _signal -= 1
-            if _signal >= .zero {
-                defer { unlock() }
-
-                do {
-                    try _Concurrency.Task.checkCancellation()
-                } catch {
-                    _signal += 1
-                }
-
-                return
-            }
-
-            let task = Task(.pending)
-
-            return await withTaskCancellationHandler {
-                await withUnsafeContinuation {
-                    if case .cancelled = task.state {
-                        unlock()
-                        return
-                    }
-
-                    task.state = .waiting($0)
-                    _tasks.insert(task, at: 0)
-                    unlock()
-                }
-            } onCancel: {
-                lock()
-
-                _signal += 1
-
-                if let index = _tasks.firstIndex(where: { $0 === task }) {
-                    _tasks.remove(at: index)
-                }
-
-                if case .waiting = task.state {
-                    unlock()
-                } else {
-                    task.state = .cancelled
-                    unlock()
-                }
-            }
-        }
-
-        func signal() {
-            lock()
-            defer { unlock() }
-
-            _signal += 1
-
-            var pendingTasks = [Task]()
-            var stop = false
-
-            while !stop, let task = _tasks.popLast() {
-                switch task.state {
-                case .pending:
-                    pendingTasks.append(task)
-                case .waiting(let continuation):
-                    continuation.resume()
-                    stop = true
-                case .cancelled:
-                    break
-                }
-            }
-
-            _tasks.append(contentsOf: pendingTasks.reversed())
-        }
-
-        // MARK: - Private methods
-
-        func lock() {
-            _lock.lock()
-        }
-
-        func unlock() {
-            _lock.unlock()
-        }
-
-        deinit {
-            precondition(_tasks.isEmpty, "The AsyncLock is being deallocated with pending tasks. This is not safe.")
+        init(_ task: Task) {
+            self.task = task
+            task.node = self
         }
     }
 
-    private final class Task: @unchecked Sendable {
+    private final class Storage: @unchecked Sendable {
+
+        // MARK: - Internal properties
+
+        var first: Task? {
+            _first?.task
+        }
+
+        var last: Task? {
+            _last?.task
+        }
+
+        // MARK: - Private properties
+
+        private var _first: Node?
+        private weak var _last: Node?
+
+        // MARK: - Internal methods
+
+        func append(_ task: Task) {
+            assert(task.node == nil)
+
+            let node = Node(task)
+            let previous = _last ?? _first
+
+            node.previous = previous
+            previous?.next = node
+
+            _last = node
+            _first = _first ?? node
+        }
+
+        func remove(_ task: Task) {
+            defer { task.node = nil }
+
+            let node = task.node.unsafelyUnwrapped
+
+            if node === _first {
+                _first = node.next
+                _first?.previous = nil
+                return
+            }
+
+            let previous = node.previous
+
+            if node === last {
+                _last = previous
+                previous?.next = nil
+                return
+            }
+
+            let next = node.next
+
+            previous?.next = next
+            next?.previous = previous
+        }
+
+        deinit {
+            let isEmpty = _first == nil && _last == nil
+            precondition(isEmpty, "The AsyncLock is being deallocated with pending tasks. This is not safe.")
+        }
+    }
+
+    private class Task: @unchecked Sendable {
 
         enum State {
             case pending
             case waiting(UnsafeContinuation<Void, Never>)
+            case running
             case cancelled
         }
 
+        // MARK: - Internal properties
+
         var state: State
+        weak var node: Node?
+
+        // MARK: - Inits
 
         init(_ state: State) {
             self.state = state
@@ -127,11 +110,17 @@ struct AsyncLock: Sendable {
 
     // MARK: - Private properties
 
-    private let storage = Storage()
+    private let lock = Lock()
 
-    // MARK: - Inits
+    // MARK: - Unsafe properties
 
-    init() {}
+    private let _storage: Storage
+
+    // MARK: - inits
+
+    init() {
+        _storage = .init()
+    }
 
     // MARK: - Internal methods
 
@@ -152,10 +141,83 @@ struct AsyncLock: Sendable {
     }
 
     func lock() async {
-        await storage.wait()
+        let task = startTask()
+
+        lock.lock()
+
+        if _storage.first === task {
+            task.state = .running
+            lock.unlock()
+            return
+        }
+
+        lock.unlock()
+        await withTaskCancellationHandler {
+            await withUnsafeContinuation { continuation in
+                lock.withLock {
+                    if case .cancelled = task.state {
+                        return
+                    }
+
+                    if task === _storage.first {
+                        task.state = .running
+                        continuation.resume()
+                        return
+                    }
+
+                    task.state = .waiting(continuation)
+                }
+            }
+        } onCancel: {
+            lock.withLock {
+                if case .running = task.state {
+                    return
+                }
+
+                task.state = .cancelled
+
+                if task === _storage.first {
+                    _resumeNextPendingTask()
+                    return
+                }
+
+                _storage.remove(task)
+            }
+        }
     }
 
     func unlock() {
-        storage.signal()
+        lock.withLock {
+            _resumeNextPendingTask()
+        }
+    }
+
+    // MARK: - Private methods
+
+    private func startTask() -> Task {
+        lock.withLock {
+            let task = Task(.pending)
+            _storage.append(task)
+            return task
+        }
+    }
+
+    // MARK: - Unsafe methods
+
+    private func _resumeNextPendingTask() {
+        var stop = false
+
+        while !stop, let task = _storage.first {
+            switch task.state {
+            case .pending:
+                stop = true
+            case .waiting(let continuation):
+                task.state = .running
+                continuation.resume()
+                stop = true
+            case .running, .cancelled:
+                _storage.remove(task)
+            }
+        }
     }
 }
