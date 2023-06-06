@@ -20,9 +20,17 @@ public struct InterceptedTask<
 
     public typealias Element = Content.Element
 
+    // MARK: - Public properties
+
+    @_spi(Private)
+    public var environment: TaskEnvironmentValues {
+        get { task.environment }
+        set { task.environment = newValue }
+    }
+
     // MARK: - Internal properties
 
-    let task: Content
+    var task: Content
     let interceptor: Interceptor
 
     // MARK: - Public methods

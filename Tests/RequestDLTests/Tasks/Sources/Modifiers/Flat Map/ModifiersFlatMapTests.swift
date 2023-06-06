@@ -11,13 +11,6 @@ class ModifiersFlatMapTests: XCTestCase {
 
     struct FailedTaskError: Error {}
 
-    struct FailedTask: RequestTask {
-
-        func result() async throws -> Data {
-            throw FailedTaskError()
-        }
-    }
-
     func testFlatMap() async throws {
         // Given
         let flatMapCalled = SendableBox(false)
@@ -60,11 +53,15 @@ class ModifiersFlatMapTests: XCTestCase {
         let success = Data("Hello World".utf8)
 
         // When
-        let result = try await FailedTask()
-            .flatMap { _ in
-                success
+        let result = try await MockedTask(content: {
+            AsyncProperty {
+                throw FailedTaskError()
             }
-            .result()
+        })
+        .flatMap { _ in
+            success
+        }
+        .result()
 
         // Then
         XCTAssertEqual(result, success)
@@ -77,11 +74,15 @@ class ModifiersFlatMapTests: XCTestCase {
 
         // When
         do {
-            _ = try await FailedTask()
-                .flatMap { _ in
-                    throw error
+            _ = try await MockedTask(content: {
+                AsyncProperty {
+                    throw FailedTaskError()
                 }
-                .result()
+            })
+            .flatMap { _ in
+                throw error
+            }
+            .result()
         } catch is FlatMapError {
             failed = true
         } catch {

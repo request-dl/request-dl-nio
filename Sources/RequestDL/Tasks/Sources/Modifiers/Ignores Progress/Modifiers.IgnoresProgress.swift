@@ -2,7 +2,6 @@
  See LICENSE for this package's licensing information.
 */
 
-
 #if canImport(Darwin)
 import Foundation
 #else
@@ -84,6 +83,7 @@ extension Modifiers {
 
 // MARK: - RequestTask extension
 
+// swiftlint:disable line_length
 extension RequestTask {
 
     public func ignoresProgress() -> ModifiedRequestTask<Modifiers.IgnoresProgress<Element, TaskResult<Data>>>
@@ -106,3 +106,4 @@ extension RequestTask {
         modifier(Modifiers.IgnoresProgress())
     }
 }
+// swiftlint:enable line_length

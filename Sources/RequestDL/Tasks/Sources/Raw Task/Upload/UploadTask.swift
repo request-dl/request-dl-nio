@@ -39,9 +39,17 @@ import Foundation
  */
 public struct UploadTask<Content: Property>: RequestTask {
 
+    // MARK: - Public properties
+
+    @_spi(Private)
+    public var environment: TaskEnvironmentValues {
+        get { task.environment }
+        set { task.environment = newValue }
+    }
+
     // MARK: - Private properties
 
-    private let content: Content
+    private var task: RawTask<Content>
 
     // MARK: - Inits
 
@@ -51,7 +59,7 @@ public struct UploadTask<Content: Property>: RequestTask {
      - Parameter content: The content of the request.
      */
     public init(@PropertyBuilder content: () -> Content) {
-        self.content = content()
+        self.task = RawTask(content: content())
     }
 
     // MARK: - Public methods
@@ -69,6 +77,6 @@ public struct UploadTask<Content: Property>: RequestTask {
      - Throws: An error of type `Error` that indicates an issue with the request or response.
      */
     public func result() async throws -> AsyncResponse {
-        try await RawTask(content: content).result()
+        try await task.result()
     }
 }

@@ -6,6 +6,11 @@ import Foundation
 
 struct RawTask<Content: Property>: RequestTask {
 
+    // MARK: - Public properties
+
+    @_spi(Private)
+    public var environment = TaskEnvironmentValues()
+
     // MARK: - Internal properties
 
     let content: Content

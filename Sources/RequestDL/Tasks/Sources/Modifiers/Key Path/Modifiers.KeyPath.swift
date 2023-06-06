@@ -78,7 +78,9 @@ extension RequestTask<TaskResult<Data>> {
 
      - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
      */
-    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
+    public func keyPath(
+        _ keyPath: KeyPath<AbstractKeyPath, String>
+    ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
         modifier(Modifiers.KeyPath(
             keyPath: { $0[keyPath: keyPath] },
             data: \.payload,
@@ -101,7 +103,9 @@ extension RequestTask<Data> {
 
      - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
      */
-    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
+    public func keyPath(
+        _ keyPath: KeyPath<AbstractKeyPath, String>
+    ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
         modifier(Modifiers.KeyPath(
             keyPath: { $0[keyPath: keyPath] },
             data: { $0 },
