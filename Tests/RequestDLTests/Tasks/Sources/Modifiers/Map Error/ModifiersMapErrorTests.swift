@@ -9,29 +9,27 @@ class ModifiersMapErrorTests: XCTestCase {
 
     struct AnyError: Error {}
 
-    struct ErrorTask<T>: RequestTask {
-
-        func result() async throws -> T {
-            throw AnyError()
-        }
-    }
-
     func testMapError() async throws {
         // Given
         let output = 1
         let invalidOutput = 2
 
         // When
-        let result = try await ErrorTask<Int>()
-            .mapError {
-                switch $0 {
-                case is AnyError:
-                    return output
-                default:
-                    return invalidOutput
-                }
+        let result = try await MockedTask(content: {
+            AsyncProperty {
+                throw AnyError()
             }
-            .result()
+        })
+        .map { _ in Int.zero }
+        .mapError {
+            switch $0 {
+            case is AnyError:
+                return output
+            default:
+                return invalidOutput
+            }
+        }
+        .result()
 
         // Then
         XCTAssertEqual(result, output)

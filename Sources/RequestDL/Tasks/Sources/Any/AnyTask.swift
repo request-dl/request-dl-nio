@@ -22,14 +22,22 @@ import Foundation
  */
 public struct AnyTask<Element: Sendable>: RequestTask {
 
+    // MARK: - Public properties
+
+    @_spi(Private)
+    public var environment: TaskEnvironmentValues {
+        get { task.environment }
+        set { task.environment = newValue }
+    }
+
     // MARK: - Private properties
 
-    private let wrapper: @Sendable () async throws -> Element
+    private var task: any RequestTask<Element>
 
     // MARK: - Inits
 
     init<T: RequestTask>(_ task: T) where T.Element == Element {
-        wrapper = { try await task.result() }
+        self.task = task
     }
 
     // MARK: - Public methods
@@ -42,7 +50,7 @@ public struct AnyTask<Element: Sendable>: RequestTask {
      - Throws: If the wrapped task throws an error.
      */
     public func result() async throws -> Element {
-        try await wrapper()
+        try await task.result()
     }
 }
 

@@ -8,9 +8,17 @@ import Foundation
 /// to be used directly by clients of this framework.
 public struct _RequestTaskModifier_Content<Modifier: RequestTaskModifier>: RequestTask {
 
+    // MARK: - Public properties
+
+    @_spi(Private)
+    public var environment: TaskEnvironmentValues {
+        get { task.environment }
+        set { task.environment = newValue }
+    }
+
     // MARK: - Private properties
 
-    private let task: any RequestTask<Modifier.Input>
+    private var task: any RequestTask<Modifier.Input>
 
     // MARK: - Inits
 
