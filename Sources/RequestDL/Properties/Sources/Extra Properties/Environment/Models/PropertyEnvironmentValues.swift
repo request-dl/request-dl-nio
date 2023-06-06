@@ -6,8 +6,7 @@ import Foundation
 
 /**
  `PropertyEnvironmentValues` is a type that contains all of the environment values
- for a view hierarchy. It is accessible via a subscript on a view's `PropertyEnvironment`
- property.
+ for a property hierarchy. It is accessible via a subscript on a property's `PropertyEnvironment` wrapper.
  */
 public struct PropertyEnvironmentValues: Sendable {
 
@@ -25,7 +24,7 @@ public struct PropertyEnvironmentValues: Sendable {
      Subscript for retrieving an `Value` for a given `PropertyEnvironmentKey` type.
 
      - Parameter key: The `PropertyEnvironmentKey` type to retrieve the `Value` for.
-     - Returns: The `Value` in the environment for the given `key`.
+     - Returns: The `Value` in the environment for the given `Key`.
      */
     public subscript<Key: PropertyEnvironmentKey>(key: Key.Type) -> Key.Value {
         get {

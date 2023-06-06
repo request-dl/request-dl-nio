@@ -4,15 +4,12 @@
 
 import Foundation
 
+/// `TaskEnvironmentValues` is a type that contains all of the environment values for a task.
 public struct TaskEnvironmentValues: @unchecked Sendable {
-
-    // MARK: - Private properties
-
-    private let lock = Lock()
 
     // MARK: - Unsafe properties
 
-    private var _dependencies = [ObjectIdentifier: Sendable]()
+    private var dependencies = [ObjectIdentifier: Sendable]()
 
     // MARK: - Inits
 
@@ -20,17 +17,19 @@ public struct TaskEnvironmentValues: @unchecked Sendable {
 
     // MARK: - Public methods
 
+    /**
+     Subscript for retrieving an `Value` for a given `TaskEnvironmentKey` type.
+
+     - Parameter key: The `TaskEnvironmentKey` type to retrieve the `Value` for.
+     - Returns: The `Value` in the environment for the given `Key`.
+     */
     public subscript<Key: TaskEnvironmentKey>(_ keyType: Key.Type) -> Key.Value {
         get {
-            lock.withLock {
-                let value = _dependencies[ObjectIdentifier(keyType)] as? Key.Value
-                return value ?? Key.defaultValue
-            }
+            let value = dependencies[ObjectIdentifier(keyType)] as? Key.Value
+            return value ?? Key.defaultValue
         }
         set {
-            lock.withLock {
-                _dependencies[ObjectIdentifier(keyType)] = newValue
-            }
+            dependencies[ObjectIdentifier(keyType)] = newValue
         }
     }
 }

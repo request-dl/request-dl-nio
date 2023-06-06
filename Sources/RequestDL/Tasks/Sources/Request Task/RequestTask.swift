@@ -17,7 +17,7 @@ import Foundation
  - Note: The RequestTask protocol does not specify how the request is made or how the result is processed,
  it only provides a way to execute a request and receive its result asynchronously.
  */
-public protocol RequestTask<Element>: RequestTaskInternals {
+public protocol RequestTask<Element>: _RequestTaskInternals {
 
     associatedtype Element: Sendable
 
