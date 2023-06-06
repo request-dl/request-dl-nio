@@ -27,7 +27,7 @@ extension Modifiers {
      The decoding operation is performed using a `JSONDecoder`. By default, the decoding is
      performed assuming that the data is in plain format, i.e., not an array or dictionary.
      */
-    public struct Decode<Content: RequestTask, Element: Decodable, Output: Sendable>: TaskModifier {
+    public struct Decode<Input: Sendable, Element: Decodable, Output: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
@@ -36,8 +36,8 @@ extension Modifiers {
 
         // MARK: - Private properties
 
-        fileprivate let data: @Sendable (Content.Element) -> Data
-        fileprivate let output: @Sendable (Content.Element, Element) -> Output
+        fileprivate let data: @Sendable (Input) -> Data
+        fileprivate let output: @Sendable (Input, Element) -> Output
 
         // MARK: - Public methods
 
@@ -49,7 +49,7 @@ extension Modifiers {
          - Returns: A `Output` instance containing the decoded data.
          - Throws: If the decoding operation fails.
          */
-        public func task(_ task: Content) async throws -> Output {
+        public func body(_ task: Content) async throws -> Output {
             let result = try await task.result()
 
             return try output(result, decoder.decode(type, from: data(result)))
@@ -73,9 +73,9 @@ extension RequestTask {
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, T, TaskResult<T>>>
+    ) -> ModifiedRequestTask<Modifiers.Decode<Element, T, TaskResult<T>>>
     where Element == TaskResult<Data> {
-        modify(Modifiers.Decode(
+        modifier(Modifiers.Decode(
             type: type,
             decoder: decoder,
             data: \.payload,
@@ -100,9 +100,9 @@ extension RequestTask {
     public func decode<T: Decodable>(
         _ type: T.Type,
         decoder: JSONDecoder = .init()
-    ) -> ModifiedTask<Modifiers.Decode<Self, T, T>>
+    ) -> ModifiedRequestTask<Modifiers.Decode<Element, T, T>>
     where Element == Data {
-        modify(Modifiers.Decode(
+        modifier(Modifiers.Decode(
             type: type,
             decoder: decoder,
             data: { $0 },

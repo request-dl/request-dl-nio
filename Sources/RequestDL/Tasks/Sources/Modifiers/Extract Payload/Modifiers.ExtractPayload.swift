@@ -24,7 +24,10 @@ extension Modifiers {
      .extractPayload()
      ```
      */
-    public struct ExtractPayload<Content: RequestTask, Element>: TaskModifier where Content.Element == TaskResult<Element> {
+    public struct ExtractPayload<Output>: RequestTaskModifier {
+
+        public typealias Input = TaskResult<Output>
+
         // swiftlint:enable line_length
 
         /**
@@ -33,7 +36,7 @@ extension Modifiers {
          - Parameter task: The task to modify.
          - Returns: A new instance of `Payload` type that contains only the payload data.
          */
-        public func task(_ task: Content) async throws -> Element {
+        public func body(_ task: Content) async throws -> Output {
             try await task.result().payload
         }
     }
@@ -48,7 +51,7 @@ extension RequestTask {
 
      - Returns: A new modified task that contains only the data.
      */
-    public func extractPayload<T>() -> ModifiedTask<Modifiers.ExtractPayload<Self, T>> where Element == TaskResult<T> {
-        modify(Modifiers.ExtractPayload())
+    public func extractPayload<T>() -> ModifiedRequestTask<Modifiers.ExtractPayload<T>> where Element == TaskResult<T> {
+        modifier(Modifiers.ExtractPayload())
     }
 }

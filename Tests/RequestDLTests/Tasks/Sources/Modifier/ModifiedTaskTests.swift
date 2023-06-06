@@ -7,11 +7,11 @@ import XCTest
 
 class ModifiedTaskTests: XCTestCase {
 
-    struct Modified<Body: RequestTask>: TaskModifier {
+    struct Modified<Input: Sendable>: RequestTaskModifier {
 
         let callback: @Sendable () -> Void
 
-        func task(_ task: Body) async throws -> Body.Element {
+        func body(_ task: Content) async throws -> some Sendable {
             callback()
             return try await task.result()
         }
@@ -25,7 +25,7 @@ class ModifiedTaskTests: XCTestCase {
         _ = try await MockedTask {
             BaseURL("localhost")
         }
-        .modify(Modified {
+        .modifier(Modified {
             taskModified(true)
         })
         .result()

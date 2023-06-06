@@ -10,17 +10,17 @@ import Foundation
 
 extension Modifiers {
 
-    public struct Progress<Content: RequestTask, Output: Sendable>: TaskModifier {
+    public struct Progress<Input: Sendable, Output: Sendable>: RequestTaskModifier {
 
         // MARK: - Private properties
 
-        private let process: @Sendable (Content.Element) async throws -> Output
+        private let process: @Sendable (Input) async throws -> Output
 
         // MARK: - Inits
 
         fileprivate init(
             _ progress: RequestDL.Progress
-        ) where Content.Element == AsyncResponse, Output == TaskResult<Data> {
+        ) where Input == AsyncResponse, Output == TaskResult<Data> {
             self.process = {
                 let downloadPart = try await Self.upload(progress, content: $0)
 
@@ -38,7 +38,7 @@ extension Modifiers {
 
         fileprivate init(
             _ progress: UploadProgress
-        ) where Content.Element == AsyncResponse, Output == TaskResult<AsyncBytes> {
+        ) where Input == AsyncResponse, Output == TaskResult<AsyncBytes> {
             self.process = {
                 try await Self.upload(progress, content: $0)
             }
@@ -46,7 +46,7 @@ extension Modifiers {
 
         fileprivate init(
             _ progress: DownloadProgress
-        ) where Content.Element == TaskResult<AsyncBytes>, Output == TaskResult<Data> {
+        ) where Input == TaskResult<AsyncBytes>, Output == TaskResult<Data> {
             self.process = { downloadPart in
                 let data = try await Self.download(
                     progress,
@@ -63,7 +63,7 @@ extension Modifiers {
         fileprivate init(
             _ progress: DownloadProgress,
             length: Int?
-        ) where Content.Element == AsyncBytes, Output == Data {
+        ) where Input == AsyncBytes, Output == Data {
             self.process = { bytes in
                 try await Self.download(
                     progress,
@@ -75,7 +75,7 @@ extension Modifiers {
 
         // MARK: - Public methods
 
-        public func task(_ task: Content) async throws -> Output {
+        public func body(_ task: Content) async throws -> Output {
             try await process(task.result())
         }
 
@@ -123,14 +123,14 @@ extension RequestTask<AsyncResponse> {
 
     public func progress(
         _ progress: Progress
-    ) -> ModifiedTask<Modifiers.Progress<Self, TaskResult<Data>>> {
-        modify(Modifiers.Progress(progress))
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
+        modifier(Modifiers.Progress(progress))
     }
 
     public func uploadProgress(
         _ upload: UploadProgress
-    ) -> ModifiedTask<Modifiers.Progress<Self, TaskResult<AsyncBytes>>> {
-        modify(Modifiers.Progress(upload))
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<AsyncBytes>>> {
+        modifier(Modifiers.Progress(upload))
     }
 }
 
@@ -138,8 +138,8 @@ extension RequestTask<TaskResult<AsyncBytes>> {
 
     public func downloadProgress(
         _ download: DownloadProgress
-    ) -> ModifiedTask<Modifiers.Progress<Self, TaskResult<Data>>> {
-        modify(Modifiers.Progress(download))
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
+        modifier(Modifiers.Progress(download))
     }
 }
 
@@ -148,7 +148,7 @@ extension RequestTask<AsyncBytes> {
     public func downloadProgress(
         _ download: DownloadProgress,
         length: Int? = nil
-    ) -> ModifiedTask<Modifiers.Progress<Self, Data>> {
-        modify(Modifiers.Progress(download, length: length))
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, Data>> {
+        modifier(Modifiers.Progress(download, length: length))
     }
 }

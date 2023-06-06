@@ -13,6 +13,7 @@ import Foundation
  The `task` function takes in a `Body` task and returns an `Element` value after applying
  the modification logic.
  */
+@available(*, deprecated, renamed: "RequestTaskModifier")
 public protocol TaskModifier<Element>: Sendable {
 
     /// The type of task being modified.

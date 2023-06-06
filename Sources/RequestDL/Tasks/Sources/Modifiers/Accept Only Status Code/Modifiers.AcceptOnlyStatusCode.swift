@@ -7,7 +7,7 @@ import Foundation
 extension Modifiers {
 
     /// A modifier that accepts only a specific set of status codes as a successful result.
-    public struct AcceptOnlyStatusCode<Content: RequestTask>: TaskModifier where Content.Element: TaskResultPrimitive {
+    public struct AcceptOnlyStatusCode<Input: TaskResultPrimitive>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
@@ -23,7 +23,7 @@ extension Modifiers {
          - Throws: An `InvalidStatusCodeError` if the status code of the result is not
          included in the set of accepted status codes.
          */
-        public func task(_ task: Content) async throws -> Content.Element {
+        public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
             guard
@@ -49,7 +49,7 @@ extension RequestTask where Element: TaskResultPrimitive {
      */
     public func acceptOnlyStatusCode(
         _ statusCodes: StatusCodeSet
-    ) -> ModifiedTask<Modifiers.AcceptOnlyStatusCode<Self>> {
-        modify(Modifiers.AcceptOnlyStatusCode(statusCodes: statusCodes))
+    ) -> ModifiedRequestTask<Modifiers.AcceptOnlyStatusCode<Element>> {
+        modifier(Modifiers.AcceptOnlyStatusCode(statusCodes: statusCodes))
     }
 }
