@@ -23,7 +23,7 @@ extension Modifiers {
          .keyPath(\.data)
      ```
      */
-    public struct KeyPath<Content: RequestTask>: TaskModifier {
+    public struct KeyPath<Input: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
@@ -31,8 +31,8 @@ extension Modifiers {
 
         // MARK: - Private properties
 
-        fileprivate let data: @Sendable (Content.Element) -> Data
-        fileprivate let element: @Sendable (Content.Element, Data) -> Content.Element
+        fileprivate let data: @Sendable (Input) -> Data
+        fileprivate let element: @Sendable (Input, Data) -> Input
 
         // MARK: - Public methods
 
@@ -43,7 +43,7 @@ extension Modifiers {
 
          - Returns: A `TaskResult` containing the extracted sub-value.
          */
-        public func task(_ task: Content) async throws -> Content.Element {
+        public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
             guard
@@ -78,8 +78,8 @@ extension RequestTask<TaskResult<Data>> {
 
      - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
      */
-    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
-        modify(Modifiers.KeyPath(
+    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
+        modifier(Modifiers.KeyPath(
             keyPath: { $0[keyPath: keyPath] },
             data: \.payload,
             element: {
@@ -101,8 +101,8 @@ extension RequestTask<Data> {
 
      - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
      */
-    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedTask<Modifiers.KeyPath<Self>> {
-        modify(Modifiers.KeyPath(
+    public func keyPath(_ keyPath: KeyPath<AbstractKeyPath, String>) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
+        modifier(Modifiers.KeyPath(
             keyPath: { $0[keyPath: keyPath] },
             data: { $0 },
             element: { $1 }

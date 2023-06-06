@@ -8,11 +8,11 @@ extension Modifiers {
 
     /// A task modifier that applies a mapping function to the error of the task, allowing for
     /// error handling and transformation.
-    public struct MapError<Content: RequestTask>: TaskModifier {
+    public struct MapError<Input: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Error) throws -> Element
+        let transform: @Sendable (Error) throws -> Input
 
         // MARK: - Public methods
 
@@ -23,7 +23,7 @@ extension Modifiers {
          to map.
          - Returns: A new error.
          */
-        public func task(_ task: Content) async throws -> Content.Element {
+        public func body(_ task: Content) async throws -> Input {
             do {
                 return try await task.result()
             } catch {
@@ -46,7 +46,7 @@ extension RequestTask {
      */
     public func mapError(
         _ transform: @escaping @Sendable (Error) throws -> Element
-    ) -> ModifiedTask<Modifiers.MapError<Self>> {
-        modify(Modifiers.MapError(transform: transform))
+    ) -> ModifiedRequestTask<Modifiers.MapError<Element>> {
+        modifier(Modifiers.MapError(transform: transform))
     }
 }

@@ -17,12 +17,12 @@ extension Modifiers {
      This modifier is particularly useful when you need to throw a specific error for a certain status code,
      providing a cleaner and more organized error handling approach.
      */
-    public struct OnStatusCode<Content: RequestTask>: TaskModifier where Content.Element: TaskResultPrimitive {
+    public struct OnStatusCode<Input: TaskResultPrimitive>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
         let contains: @Sendable (StatusCode) -> Bool
-        let transform: @Sendable (Content.Element) throws -> Void
+        let transform: @Sendable (Input) throws -> Void
 
         // MARK: - Public methods
 
@@ -32,7 +32,7 @@ extension Modifiers {
          - Returns: The result of the modified task.
          - Throws: it can throws the specific error for a certain status code
          */
-        public func task(_ task: Content) async throws -> Content.Element {
+        public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
             guard contains(StatusCode(result.head.status.code)) else {
@@ -52,8 +52,8 @@ extension RequestTask where Element: TaskResultPrimitive {
     private func onStatusCode(
         _ transform: @escaping @Sendable (Element) throws -> Void,
         contains: @escaping @Sendable (StatusCode) -> Bool
-    ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
-        modify(.init(
+    ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
+        modifier(Modifiers.OnStatusCode(
             contains: contains,
             transform: transform
         ))
@@ -73,7 +73,7 @@ extension RequestTask where Element: TaskResultPrimitive {
     public func onStatusCode(
         _ statusCode: Range<StatusCode>,
         _ transform: @escaping @Sendable (Element) throws -> Void
-    ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
+    ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         onStatusCode(transform) {
             statusCode.contains($0)
         }
@@ -93,7 +93,7 @@ extension RequestTask where Element: TaskResultPrimitive {
     public func onStatusCode(
         _ statusCode: StatusCodeSet,
         _ transform: @escaping @Sendable (Element) throws -> Void
-    ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
+    ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         onStatusCode(transform) {
             statusCode.contains($0)
         }
@@ -113,7 +113,7 @@ extension RequestTask where Element: TaskResultPrimitive {
     public func onStatusCode(
         _ statusCode: StatusCode,
         _ transform: @escaping @Sendable (Element) throws -> Void
-    ) -> ModifiedTask<Modifiers.OnStatusCode<Self>> {
+    ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         onStatusCode(transform) {
             statusCode == $0
         }

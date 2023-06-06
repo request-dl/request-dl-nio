@@ -59,10 +59,29 @@ extension RequestTask {
      - Returns: A `ModifiedTask` object that can be used to execute the original task and
      modify its result.
      */
+    @available(*, deprecated, renamed: "modifier")
     public func modify<Modifier: TaskModifier>(
         _ modifier: Modifier
     ) -> ModifiedTask<Modifier> where Modifier.Body == Self {
         ModifiedTask(task: self, modifier: modifier)
+    }
+
+    /**
+     Returns a `ModifiedRequestTask` that executes the original task and modifies its result using
+     the provided `RequestTaskModifier`.
+
+     - Parameter modifier: A `RequestTaskModifier` that modifies the result of the task.
+
+     - Returns: A `ModifiedRequestTask` object that can be used to execute the original task and
+     modify its result.
+     */
+    public func modifier<Modifier: RequestTaskModifier>(
+        _ modifier: Modifier
+    ) -> ModifiedRequestTask<Modifier> where Modifier.Input == Element {
+        ModifiedRequestTask(
+            task: .init(self),
+            modifier: modifier
+        )
     }
 }
 

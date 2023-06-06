@@ -13,6 +13,7 @@ import Foundation
  - Note: The `Element` associated type of the `ModifiedTask` is determined by the `Element`
  associated type of the `TaskModifier`.
  */
+@available(*, deprecated, renamed: "ModifiedRequestTask")
 public struct ModifiedTask<Modifier: TaskModifier>: RequestTask {
 
     public typealias Element = Modifier.Element

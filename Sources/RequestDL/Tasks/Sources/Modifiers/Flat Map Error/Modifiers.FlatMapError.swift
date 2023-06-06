@@ -7,7 +7,7 @@ import Foundation
 extension Modifiers {
 
     /**
-     A `TaskModifier` that maps the error of a `RequestTask` to a new `Error` type.
+     A `TaskInterceptor` that maps the error of a `RequestTask` to a new `Error` type.
 
      Use this modifier to transform the error type of a `RequestTask`. The `FlatMapError`
      modifier takes a closure that maps an error of the original task to a new error
@@ -15,7 +15,7 @@ extension Modifiers {
      succeeds, the error is transformed to the new error type. If the closure fails,
      the task fails with the original error.
      */
-    public struct FlatMapError<Content: RequestTask>: TaskModifier {
+    public struct FlatMapError<Input: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
@@ -30,7 +30,7 @@ extension Modifiers {
          - Throws: An error if the transformation fails.
          - Returns: The result of the transformation.
          */
-        public func task(_ task: Content) async throws -> Content.Element {
+        public func body(_ task: Content) async throws -> Input {
             do {
                 return try await task.result()
             } catch {
@@ -68,8 +68,8 @@ extension RequestTask {
      */
     public func flatMapError(
         _ transform: @escaping @Sendable (Error) throws -> Void
-    ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
-        modify(Modifiers.FlatMapError(transform: transform))
+    ) -> ModifiedRequestTask<Modifiers.FlatMapError<Element>> {
+        modifier(Modifiers.FlatMapError(transform: transform))
     }
 
     /**
@@ -98,7 +98,7 @@ extension RequestTask {
     public func flatMapError<Failure: Error>(
         _ type: Failure.Type,
         _ transform: @escaping @Sendable (Failure) throws -> Void
-    ) -> ModifiedTask<Modifiers.FlatMapError<Self>> {
+    ) -> ModifiedRequestTask<Modifiers.FlatMapError<Element>> {
         flatMapError {
             if let error = $0 as? Failure {
                 try transform(error)

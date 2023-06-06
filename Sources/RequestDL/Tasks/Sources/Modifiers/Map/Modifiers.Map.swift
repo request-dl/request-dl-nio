@@ -7,7 +7,7 @@ import Foundation
 extension Modifiers {
 
     /**
-     A `TaskModifier` that transforms the element of the given `RequestTask` using the
+     A `TaskInterceptor` that transforms the element of the given `RequestTask` using the
      provided closure.
 
      Use the `map` modifier to transform the `Element` of a `RequestTask` to a different type
@@ -25,11 +25,11 @@ extension Modifiers {
      In this example, the `RequestTask` produces `Data` elements, but you can use the `map`
      modifier to decode them into `MyModel` instances instead.
      */
-    public struct Map<Content: RequestTask, NewElement: Sendable>: TaskModifier {
+    public struct Map<Input: Sendable, Output: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Content.Element) throws -> NewElement
+        let transform: @Sendable (Input) throws -> Output
 
         // MARK: - Public methods
 
@@ -40,7 +40,7 @@ extension Modifiers {
          - Returns: The transformed element.
          - Throws: The error thrown by the closure, if any.
          */
-        public func task(_ task: Content) async throws -> NewElement {
+        public func body(_ task: Content) async throws -> Output {
             try transform(await task.result())
         }
     }
@@ -58,7 +58,7 @@ extension RequestTask {
      */
     public func map<NewElement>(
         _ transform: @escaping @Sendable (Element) throws -> NewElement
-    ) -> ModifiedTask<Modifiers.Map<Self, NewElement>> {
-        modify(Modifiers.Map(transform: transform))
+    ) -> ModifiedRequestTask<Modifiers.Map<Element, NewElement>> {
+        modifier(Modifiers.Map(transform: transform))
     }
 }

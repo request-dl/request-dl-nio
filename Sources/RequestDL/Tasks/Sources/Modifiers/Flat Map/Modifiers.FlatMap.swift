@@ -21,16 +21,16 @@ extension Modifiers {
          }
      ```
      */
-    public struct FlatMap<Content: RequestTask, NewElement: Sendable>: TaskModifier {
+    public struct FlatMap<Input: Sendable, Output: Sendable>: RequestTaskModifier {
 
         enum Map: Sendable {
-            case original(Content.Element)
-            case processed(NewElement)
+            case original(Input)
+            case processed(Output)
         }
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Result<Content.Element, Error>) throws -> NewElement
+        let transform: @Sendable (Result<Input, Error>) throws -> Output
 
         // MARK: - Public methods
 
@@ -41,7 +41,7 @@ extension Modifiers {
          - Throws: An error if the transformation fails.
          - Returns: The result of the transformation.
          */
-        public func task(_ task: Content) async throws -> NewElement {
+        public func body(_ task: Content) async throws -> Output {
             switch await mapResponseIntoResult(task) {
             case .failure(let error):
                 throw error
@@ -88,7 +88,7 @@ extension RequestTask {
      */
     public func flatMap<NewElement>(
         _ transform: @escaping @Sendable (Result<Element, Error>) throws -> NewElement
-    ) -> ModifiedTask<Modifiers.FlatMap<Self, NewElement>> {
-        modify(Modifiers.FlatMap(transform: transform))
+    ) -> ModifiedRequestTask<Modifiers.FlatMap<Element, NewElement>> {
+        modifier(Modifiers.FlatMap(transform: transform))
     }
 }
