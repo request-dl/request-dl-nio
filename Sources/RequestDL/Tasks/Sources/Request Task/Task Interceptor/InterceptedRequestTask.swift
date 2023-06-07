@@ -14,11 +14,9 @@ import Foundation
  method that returns a `Content.Element` object. The `result()` method can throw an error
  asynchronously.
  */
-public struct InterceptedTask<
-    Interceptor: TaskInterceptor, Content: RequestTask
->: RequestTask where Interceptor.Element == Content.Element {
+public struct InterceptedRequestTask<Interceptor: RequestTaskInterceptor>: RequestTask {
 
-    public typealias Element = Content.Element
+    public typealias Element = Interceptor.Element
 
     // MARK: - Public properties
 
@@ -30,7 +28,7 @@ public struct InterceptedTask<
 
     // MARK: - Internal properties
 
-    var task: Content
+    var task: any RequestTask<Element>
     let interceptor: Interceptor
 
     // MARK: - Public methods
@@ -45,10 +43,10 @@ public struct InterceptedTask<
     public func result() async throws -> Element {
         do {
             let result = try await task.result()
-            interceptor.received(.success(result))
+            interceptor.output(.success(result))
             return result
         } catch {
-            interceptor.received(.failure(error))
+            interceptor.output(.failure(error))
             throw error
         }
     }

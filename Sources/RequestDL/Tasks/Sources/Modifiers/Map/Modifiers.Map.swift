@@ -7,7 +7,7 @@ import Foundation
 extension Modifiers {
 
     /**
-     A `TaskInterceptor` that transforms the element of the given `RequestTask` using the
+     A `RequestTaskModifier` that transforms the element of the given `RequestTask` using the
      provided closure.
 
      Use the `map` modifier to transform the `Element` of a `RequestTask` to a different type

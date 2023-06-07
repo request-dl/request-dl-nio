@@ -14,7 +14,7 @@ supports different types of requests, including `DataTask`, `DownloadTask`, and
 
 One of the key features of RequestDL is its support for specifying properties of a
 request, such as `Query`, `Payload`, and `Headers`, among others. You can also use 
-`RequestTaskModifier` and `TaskInterceptor` to process the response after the request is 
+`RequestTaskModifier` and `RequestTaskInterceptor` to process the response after the request is 
 complete, allowing for actions like decoding, mapping, error handling based on status
 codes, and logging responses in the console.
 
@@ -32,7 +32,7 @@ add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.2.0")
+    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.3.0")
 ]
 ```
 

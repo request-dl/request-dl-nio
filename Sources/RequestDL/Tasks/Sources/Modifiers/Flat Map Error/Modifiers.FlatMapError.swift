@@ -7,7 +7,7 @@ import Foundation
 extension Modifiers {
 
     /**
-     A `TaskInterceptor` that maps the error of a `RequestTask` to a new `Error` type.
+     A `RequestTaskModifier` that maps the error of a `RequestTask` to a new `Error` type.
 
      Use this modifier to transform the error type of a `RequestTask`. The `FlatMapError`
      modifier takes a closure that maps an error of the original task to a new error
