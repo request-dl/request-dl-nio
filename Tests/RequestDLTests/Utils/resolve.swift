@@ -10,3 +10,10 @@ func resolve<Content: Property>(
 ) async throws -> Resolved {
     try await Resolve(content).build()
 }
+
+extension Resolve {
+
+    init(_ root: Root) {
+        self.init(root: root, environment: .init())
+    }
+}

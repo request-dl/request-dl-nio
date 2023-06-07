@@ -33,3 +33,12 @@ public struct TaskEnvironmentValues: @unchecked Sendable {
         }
     }
 }
+
+extension TaskEnvironmentValues {
+
+    func callAsFunction() -> PropertyEnvironmentValues {
+        var environment = PropertyEnvironmentValues()
+        environment.logger = logger
+        return environment
+    }
+}

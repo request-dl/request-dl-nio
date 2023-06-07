@@ -8,5 +8,5 @@ protocol MockedTaskPayload<Element>: Sendable {
 
     associatedtype Element: Sendable
 
-    func result() async throws -> Element
+    func result(_ environment: TaskEnvironmentValues) async throws -> Element
 }

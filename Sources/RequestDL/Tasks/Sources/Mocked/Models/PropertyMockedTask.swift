@@ -20,8 +20,11 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     // MARK: - Internal methods
 
-    func result() async throws -> AsyncResponse {
-        let resolved = try await Resolve(content).build()
+    func result(_ environment: TaskEnvironmentValues) async throws -> AsyncResponse {
+        let resolved = try await Resolve(
+            root: content,
+            environment: environment()
+        ).build()
 
         var request = resolved.request
 
@@ -31,7 +34,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
         let cacheControl = Internals.CacheControl(
             request: request,
-            dataCache: resolved.dataCache
+            dataCache: resolved.dataCache,
+            logger: environment.logger
         )
 
         let client = try await Internals.ClientManager.shared.client(
