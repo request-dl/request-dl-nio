@@ -76,7 +76,7 @@ public struct MockedTask<Element: Sendable>: RequestTask {
      from the provided status code and headers.
      */
     public func result() async throws -> Element {
-        try await payload.result()
+        try await payload.result(environment)
     }
 }
 

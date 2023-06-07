@@ -5,14 +5,13 @@
 import XCTest
 @testable import RequestDL
 
-@available(*, deprecated)
-class InterceptedTaskTests: XCTestCase {
+class InterceptedRequestTaskTests: XCTestCase {
 
-    struct Intercepted<Element>: TaskInterceptor {
+    struct Intercepted<Element: Sendable>: RequestTaskInterceptor {
 
         let callback: @Sendable () -> Void
 
-        func received(_ result: Result<Element, Error>) {
+        func output(_ result: Result<Element, Error>) {
             callback()
         }
     }
@@ -26,7 +25,7 @@ class InterceptedTaskTests: XCTestCase {
         _ = try await MockedTask {
             BaseURL("localhost")
         }
-        .intercept(Intercepted {
+        .interceptor(Intercepted {
             taskIntercepted(true)
             expectation.fulfill()
         })

@@ -5,6 +5,7 @@
 import Foundation
 import NIOCore
 import AsyncHTTPClient
+import Logging
 
 extension Internals {
 
@@ -42,22 +43,28 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func execute(request: HTTPClient.Request) -> UnsafeTask<ResponseAccumulator.Response> {
+        func execute(
+            request: HTTPClient.Request,
+            logger: Logger
+        ) -> UnsafeTask<ResponseAccumulator.Response> {
             execute(
                 request: request,
-                delegate: ResponseAccumulator(request: request)
+                delegate: ResponseAccumulator(request: request),
+                logger: logger
             )
         }
 
         func execute<Delegate: HTTPClientResponseDelegate>(
             request: HTTPClient.Request,
-            delegate: Delegate
+            delegate: Delegate,
+            logger: Logger
         ) -> UnsafeTask<Delegate.Response> {
             let operation = manager.operation()
 
             let task = _client.execute(
                 request: request,
-                delegate: delegate
+                delegate: delegate,
+                logger: logger
             )
 
             return UnsafeTask(task) {

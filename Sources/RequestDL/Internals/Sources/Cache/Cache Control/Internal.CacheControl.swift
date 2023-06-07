@@ -4,6 +4,7 @@
 
 import Foundation
 import AsyncHTTPClient
+import Logging
 
 // swiftlint:disable type_body_length
 extension Internals {
@@ -19,6 +20,7 @@ extension Internals {
 
         let request: Internals.Request
         let dataCache: DataCache
+        let logger: Logger
 
         // MARK: - Internal methods
 
@@ -174,9 +176,10 @@ extension Internals {
                 for: "ETag"
             )
 
-            guard let response = try? await client.execute(request: request.build()).response() else {
-                return nil
-            }
+            guard let response = try? await client.execute(
+                request: request.build(),
+                logger: logger
+            ).response() else { return nil }
 
             let lastModified = response.headers["Last-Modified"]
             let eTag = response.headers["ETag"]

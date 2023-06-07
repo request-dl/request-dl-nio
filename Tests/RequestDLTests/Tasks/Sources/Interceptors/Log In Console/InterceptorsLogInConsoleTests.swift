@@ -5,7 +5,7 @@
 import XCTest
 @testable import RequestDL
 
-class InterceptorsLoggerTests: XCTestCase {
+class InterceptorsLogInConsoleTests: XCTestCase {
 
     func testConsoleTaskResult() async throws {
         // Given

@@ -14,7 +14,7 @@ extension Interceptors {
      An interceptor for logging task result.
 
      Use `logInConsole(_:)` method of the `RequestTask` to add an instance of the
-     `Interceptors.Logger` interceptor to log task result.
+     `Interceptors.LogInConsole` interceptor to log task result.
 
      Example:
 
@@ -24,10 +24,8 @@ extension Interceptors {
      ```
 
      - Note: If `isActive` is `true`, it logs task result in the console.
-
-     - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
-    public struct Logger<Element: Sendable>: RequestTaskInterceptor {
+    public struct LogInConsole<Element: Sendable>: RequestTaskInterceptor {
 
         // MARK: - Internal properties
 
@@ -54,6 +52,9 @@ extension Interceptors {
             }
         }
     }
+
+    @available(*, deprecated, renamed: "LogInConsole")
+    public typealias Logger = LogInConsole
 }
 
 // MARK: - RequestTask extension
@@ -61,15 +62,16 @@ extension Interceptors {
 extension RequestTask {
 
     /**
-     Add the `Interceptors.Logger` interceptor to log task result.
+     Add the `Interceptors.LogInConsole` interceptor to log task result.
 
      - Parameter isActive: If `true`, the task result will be logged in the console.
-     - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
+     - Returns: A new instance of the `InterceptedTask` with `Interceptors.LogInConsole`
+     interceptor.
      */
     public func logInConsole(
         _ isActive: Bool
-    ) -> InterceptedRequestTask<Interceptors.Logger<Element>> {
-        interceptor(Interceptors.Logger(
+    ) -> InterceptedRequestTask<Interceptors.LogInConsole<Element>> {
+        interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {
                 ["Success: \($0)"]
@@ -81,15 +83,16 @@ extension RequestTask {
 extension RequestTask<TaskResult<Data>> {
 
     /**
-     Add the `Interceptors.Logger` interceptor to log task result.
+     Add the `Interceptors.LogInConsole` interceptor to log task result.
 
      - Parameter isActive: If `true`, the task result will be logged in the console.
-     - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
+     - Returns: A new instance of the `InterceptedTask` with `Interceptors.LogInConsole`
+     interceptor.
      */
     public func logInConsole(
         _ isActive: Bool
-    ) -> InterceptedRequestTask<Interceptors.Logger<Element>> {
-        interceptor(Interceptors.Logger(
+    ) -> InterceptedRequestTask<Interceptors.LogInConsole<Element>> {
+        interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {[
                 "Head: \($0.head)",
@@ -102,13 +105,14 @@ extension RequestTask<TaskResult<Data>> {
 extension RequestTask<Data> {
 
     /**
-     Add the `Interceptors.Logger` interceptor to log task result.
+     Add the `Interceptors.LogInConsole` interceptor to log task result.
 
      - Parameter isActive: If `true`, the task result will be logged in the console.
-     - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
+     - Returns: A new instance of the `InterceptedTask` with `Interceptors.LogInConsole`
+     interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedRequestTask<Interceptors.Logger<Element>> {
-        interceptor(Interceptors.Logger(
+    public func logInConsole(_ isActive: Bool) -> InterceptedRequestTask<Interceptors.LogInConsole<Element>> {
+        interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {
                 ["Success: \(String(data: $0, encoding: .utf8) ?? "Couldn't decode using UTF8")"]
