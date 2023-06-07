@@ -63,7 +63,7 @@ extension RequestTask {
      */
     public func interceptor<Interceptor>(
         _ interceptor: Interceptor
-    ) -> InterceptedRequestTask<Interceptor> where Interceptor: RequestTaskInterceptor<Element>  {
+    ) -> InterceptedRequestTask<Interceptor> where Interceptor: RequestTaskInterceptor<Element> {
         InterceptedRequestTask(
             task: self,
             interceptor: interceptor
