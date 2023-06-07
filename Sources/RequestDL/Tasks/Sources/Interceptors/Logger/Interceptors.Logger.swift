@@ -14,7 +14,7 @@ extension Interceptors {
      An interceptor for logging task result.
 
      Use `logInConsole(_:)` method of the `RequestTask` to add an instance of the
-     `Interceptors.Logger` interceptor to log task result.
+     `Interceptors.LogInConsole` interceptor to log task result.
 
      Example:
 
@@ -24,8 +24,6 @@ extension Interceptors {
      ```
 
      - Note: If `isActive` is `true`, it logs task result in the console.
-
-     - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
     public struct LogInConsole<Element: Sendable>: TaskInterceptor {
 
