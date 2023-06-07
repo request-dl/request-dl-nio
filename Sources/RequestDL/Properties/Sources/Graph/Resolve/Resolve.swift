@@ -9,11 +9,16 @@ struct Resolve<Root: Property>: Sendable {
     // MARK: - Private properties
 
     private let root: _GraphValue<_Root>
+    private let environment: PropertyEnvironmentValues
 
     // MARK: - Inits
 
-    init(_ root: Root) {
+    init(
+        root: Root,
+        environment: PropertyEnvironmentValues
+    ) {
         self.root = .root(.init(body: root))
+        self.environment = environment
     }
 
     // MARK: - Internal methods
@@ -30,7 +35,8 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
-            configuration: make.configuration
+            configuration: make.configuration,
+            logger: environment.logger
         )
 
         return Resolved(
@@ -64,7 +70,7 @@ struct Resolve<Root: Property>: Sendable {
 
     private func inputs() -> _PropertyInputs {
         .init(
-            environment: .init(),
+            environment: environment,
             namespaceID: .global,
             seedFactory: .init()
         )

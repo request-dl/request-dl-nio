@@ -19,7 +19,7 @@ struct LiteralMockedTaskPayload: MockedTaskPayload {
 
     // MARK: - Internal methods
 
-    func result() async throws -> TaskResult<Data> {
+    func result(_ environment: TaskEnvironmentValues) async throws -> TaskResult<Data> {
         .init(
             head: ResponseHead(
                 url: nil,

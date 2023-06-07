@@ -6,6 +6,7 @@ import Foundation
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
+import Logging
 
 extension Internals {
 
@@ -16,16 +17,19 @@ extension Internals {
         let provider: SessionProvider
         let configuration: Internals.Session.Configuration
         let manager: Internals.ClientManager
+        let logger: Logger
 
         // MARK: - Inits
 
         init(
             provider: SessionProvider,
-            configuration: Configuration
+            configuration: Configuration,
+            logger: Logger = .disabled
         ) {
             self.provider = provider
             self.configuration = configuration
             self.manager = .shared
+            self.logger = logger
         }
 
         // MARK: - Internal methods
@@ -41,7 +45,8 @@ extension Internals {
 
             let cacheControl = CacheControl(
                 request: request,
-                dataCache: dataCache
+                dataCache: dataCache,
+                logger: logger
             )
 
             switch await cacheControl(client) {
@@ -85,7 +90,8 @@ extension Internals {
 
             let unsafeTask = client.execute(
                 request: request,
-                delegate: delegate
+                delegate: delegate,
+                logger: logger
             )
 
             return SessionTask(

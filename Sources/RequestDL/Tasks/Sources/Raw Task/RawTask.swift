@@ -18,7 +18,10 @@ struct RawTask<Content: Property>: RequestTask {
     // MARK: - Internal methods
 
     func result() async throws -> AsyncResponse {
-        let resolved = try await Resolve(content).build()
+        let resolved = try await Resolve(
+            root: content,
+            environment: environment()
+        ).build()
 
         let sessionTask = try await resolved.session.execute(
             request: resolved.request,
