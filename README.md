@@ -32,7 +32,7 @@ add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.2.0")
+    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.3.0")
 ]
 ```
 
