@@ -44,10 +44,30 @@ extension RequestTask {
      - Returns: An `InterceptedTask` object that can be used to execute the original task
      and intercept its result.
      */
+    @available(*, deprecated, renamed: "interceptor")
     public func intercept<Interceptor: TaskInterceptor>(
         _ interceptor: Interceptor
     ) -> InterceptedTask<Interceptor, Self> {
         InterceptedTask(task: self, interceptor: interceptor)
+    }
+
+    /**
+     Returns an `InterceptedRequestTask` that executes the original task and intercepts
+     its result using the provided `RequestTaskInterceptor`.
+
+     - Parameter interceptor: A `RequestTaskInterceptor` that intercepts the result of the
+     task.
+
+     - Returns: An `InterceptedRequestTask` object that can be used to execute the original task
+     and intercept its result.
+     */
+    public func interceptor<Interceptor>(
+        _ interceptor: Interceptor
+    ) -> InterceptedRequestTask<Interceptor> where Interceptor: RequestTaskInterceptor<Element>  {
+        InterceptedRequestTask(
+            task: self,
+            interceptor: interceptor
+        )
     }
 
     /**

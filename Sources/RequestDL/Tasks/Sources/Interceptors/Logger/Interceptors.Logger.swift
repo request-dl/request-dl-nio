@@ -27,7 +27,7 @@ extension Interceptors {
 
      - Important: `Interceptors.Logger` can be used as a reference to implement custom interceptors.
      */
-    public struct Logger<Element: Sendable>: TaskInterceptor {
+    public struct Logger<Element: Sendable>: RequestTaskInterceptor {
 
         // MARK: - Internal properties
 
@@ -41,7 +41,7 @@ extension Interceptors {
 
         - Parameter result: The result of the task execution.
         */
-        public func received(_ result: Result<Element, Error>) {
+        public func output(_ result: Result<Element, Error>) {
             guard isActive else {
                 return
             }
@@ -66,8 +66,10 @@ extension RequestTask {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
-        intercept(Interceptors.Logger(
+    public func logInConsole(
+        _ isActive: Bool
+    ) -> InterceptedRequestTask<Interceptors.Logger<Element>> {
+        interceptor(Interceptors.Logger(
             isActive: isActive,
             results: {
                 ["Success: \($0)"]
@@ -84,8 +86,10 @@ extension RequestTask<TaskResult<Data>> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
-        intercept(Interceptors.Logger(
+    public func logInConsole(
+        _ isActive: Bool
+    ) -> InterceptedRequestTask<Interceptors.Logger<Element>> {
+        interceptor(Interceptors.Logger(
             isActive: isActive,
             results: {[
                 "Head: \($0.head)",
@@ -103,8 +107,8 @@ extension RequestTask<Data> {
      - Parameter isActive: If `true`, the task result will be logged in the console.
      - Returns: A new instance of the `InterceptedTask` with `Interceptors.Logger` interceptor.
      */
-    public func logInConsole(_ isActive: Bool) -> InterceptedTask<Interceptors.Logger<Element>, Self> {
-        intercept(Interceptors.Logger(
+    public func logInConsole(_ isActive: Bool) -> InterceptedRequestTask<Interceptors.Logger<Element>> {
+        interceptor(Interceptors.Logger(
             isActive: isActive,
             results: {
                 ["Success: \(String(data: $0, encoding: .utf8) ?? "Couldn't decode using UTF8")"]

@@ -11,7 +11,7 @@ import Foundation
 extension Modifiers {
 
     /**
-     A `TaskInterceptor` that decodes the data returned by the `RequestTask` into a specified type
+     A `RequestTaskModifier` that decodes the data returned by the `RequestTask` into a specified type
      using a `JSONDecoder`.
 
      Generic types:

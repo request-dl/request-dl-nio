@@ -24,7 +24,7 @@ extension Interceptors {
          }
      ```
      */
-    public struct Detach<Element>: TaskInterceptor {
+    public struct Detach<Element: Sendable>: RequestTaskInterceptor {
 
         // MARK: - Internal properties
 
@@ -38,7 +38,7 @@ extension Interceptors {
          - Parameter result: A `Result` object containing either the task's `Element`
          or an `Error`.
          */
-        public func received(_ result: Result<Element, Error>) {
+        public func output(_ result: Result<Element, Error>) {
             closure(result)
         }
     }
@@ -57,7 +57,7 @@ extension RequestTask {
      */
     public func detach(
         _ closure: @escaping @Sendable (Result<Element, Error>) -> Void
-    ) -> InterceptedTask<Interceptors.Detach<Element>, Self> {
-        intercept(Interceptors.Detach(closure: closure))
+    ) -> InterceptedRequestTask<Interceptors.Detach<Element>> {
+        interceptor(Interceptors.Detach(closure: closure))
     }
 }

@@ -5,6 +5,7 @@
 import XCTest
 @testable import RequestDL
 
+@available(*, deprecated)
 class InterceptedTaskTests: XCTestCase {
 
     struct Intercepted<Element>: TaskInterceptor {
