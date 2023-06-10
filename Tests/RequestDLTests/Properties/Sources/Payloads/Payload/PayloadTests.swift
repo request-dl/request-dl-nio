@@ -43,6 +43,41 @@ class PayloadTests: XCTestCase {
         ))
     }
 
+    func testPayload_whenInitJSONArray() async throws {
+        // Given
+        let json: [Any] = [
+            ["foo", "bar"],
+            ["user": ["name": "olaf"]],
+            [0, 1, 2]
+        ]
+
+        // Then
+        let resolved = try await resolve(TestProperty {
+            Payload(
+                json,
+                options: .sortedKeys
+            )
+        })
+
+        let data = try await resolved.request.body?.data()
+
+        // When
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["application/json"]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            (data?.count).map { [String($0)] }
+        )
+
+        XCTAssertEqual(data, try JSONSerialization.data(
+            withJSONObject: json,
+            options: .sortedKeys
+        ))
+    }
+
     func testPayload_whenInitJSONWithCustomType() async throws {
         // Given
         let json: [String: Any] = [:]
