@@ -230,17 +230,6 @@ extension Internals.Log.Message {
             ]
         )
     }
-
-    static func deprecatedServerConfiguration() -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            We have disabled support for server configuration as RequestDL \
-            was not designed for this.
-
-            Please consider using client-side configuration only
-            """
-        )
-    }
 }
 
 // MARK: - BaseURL

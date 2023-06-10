@@ -53,10 +53,3 @@ public struct RefererHeader: Property {
         ))
     }
 }
-
-@available(*, deprecated)
-extension Headers {
-
-    @available(*, deprecated, renamed: "RefererHeader")
-    public typealias Referer = RefererHeader
-}

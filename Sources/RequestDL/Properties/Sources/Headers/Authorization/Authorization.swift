@@ -89,19 +89,3 @@ public struct Authorization: Property {
         ))
     }
 }
-
-// MARK: - Deprecated
-
-extension Authorization {
-
-    /// Creates an `Authorization` instance for the given token type and token value.
-    ///
-    /// - Parameters:
-    ///    - type: The type of the authorization token.
-    ///    - token: The value of the authorization token.
-    @available(*, deprecated, message: "Prefers token as String")
-    public init(_ type: TokenType, token: Any) {
-        self.type = type
-        self.token = "\(token)"
-    }
-}

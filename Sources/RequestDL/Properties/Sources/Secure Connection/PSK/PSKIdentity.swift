@@ -10,26 +10,13 @@ public struct PSKIdentity: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
-        let source: Source
+        let resolver: SSLPSKIdentityResolver
         let hint: String?
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
             secureConnection.pskHint = hint
-
-            switch source {
-            case .resolver(let resolver):
-                secureConnection.pskIdentityResolver = resolver
-            case .deprecated:
-                Internals.Log.warning(
-                    .deprecatedServerConfiguration()
-                )
-            }
+            secureConnection.pskIdentityResolver = resolver
         }
-    }
-
-    private enum Source: Sendable {
-        case resolver(SSLPSKIdentityResolver)
-        case deprecated
     }
 
     // MARK: - Public properties
@@ -41,7 +28,7 @@ public struct PSKIdentity: Property {
 
     // MARK: - Private properties
 
-    private let source: Source
+    private let resolver: SSLPSKIdentityResolver
     private var hint: String?
 
     // MARK: - Inits
@@ -51,7 +38,7 @@ public struct PSKIdentity: Property {
     /// - Parameters:
     ///   - resolver: The client PSK identity resolver.
     public init(_ resolver: SSLPSKIdentityResolver) {
-        self.source = .resolver(resolver)
+        self.resolver = resolver
     }
 
     // MARK: - Public static methods
@@ -64,7 +51,7 @@ public struct PSKIdentity: Property {
         property.assertPathway()
         return .leaf(SecureConnectionNode(
             Node(
-                source: property.source,
+                resolver: property.resolver,
                 hint: property.hint
             )
         ))
@@ -86,70 +73,5 @@ public struct PSKIdentity: Property {
         var mutableSelf = self
         edit(&mutableSelf)
         return mutableSelf
-    }
-}
-
-// MARK: - Deprecated
-
-extension PSKIdentity {
-
-    /// Creates a PSK identity for client-side authentication with the given type and closure that
-    /// generates the PSK.
-    ///
-    /// - Parameters:
-    ///   - psk: The PSK type.
-    ///   - closure: A closure that generates a PSK client for a given client description.
-    @available(*, deprecated, renamed: "init(_:)")
-    public init(
-        _ psk: PSKClient,
-        _ closure: @escaping @Sendable (PSKClientDescription) throws -> PSKClientIdentity
-    ) {
-        self.init(ClientResolver(closure))
-    }
-
-    /// Creates a PSK identity for server-side authentication with the given type and closure that
-    /// generates the PSK.
-    ///
-    /// - Parameters:
-    ///   - psk: The PSK type.
-    ///   - closure: A closure that generates a PSK server for a given server description.
-    @available(*, deprecated, renamed: "init(_:)")
-    public init(
-        _ psk: PSKServer,
-        _ closure: @escaping @Sendable (PSKServerDescription) throws -> PSKServerIdentity
-    ) {
-        self.source = .deprecated
-    }
-
-    /// Creates a PSK identity for client-side authentication with the given type and closure that
-    /// generates the PSK.
-    ///
-    /// - Parameter closure: A closure that generates a PSK client for a given client description.
-    @available(*, deprecated, renamed: "init(_:)")
-    public init(
-        _ closure: @escaping @Sendable (PSKClientDescription) throws -> PSKClientIdentity
-    ) {
-        self.init(.client, closure)
-    }
-}
-
-@available(*, deprecated)
-extension PSKIdentity {
-
-    fileprivate final class ClientResolver: SSLPSKIdentityResolver {
-
-        private let resolver: @Sendable (PSKClientDescription) throws -> PSKClientIdentity
-
-        init(_ resolver: @escaping @Sendable (PSKClientDescription) throws -> PSKClientIdentity) {
-            self.resolver = resolver
-        }
-
-        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
-            let response = try resolver(.init(hint))
-            return .init(
-                key: response.key,
-                identity: response.identity
-            )
-        }
     }
 }

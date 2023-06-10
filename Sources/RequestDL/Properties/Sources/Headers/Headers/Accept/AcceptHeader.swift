@@ -47,10 +47,3 @@ public struct AcceptHeader: Property {
         ))
     }
 }
-
-@available(*, deprecated)
-extension Headers {
-
-    @available(*, deprecated, renamed: "AcceptHeader")
-    public typealias Accept = AcceptHeader
-}

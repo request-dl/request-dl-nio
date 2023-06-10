@@ -198,16 +198,6 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         self.init(elements)
     }
 
-    /**
-     Initializes an `HTTPHeaders` instance with a dictionary representing header key-value pairs.
-
-     - Parameter dictionary: A dictionary representing header key-value pairs.
-     */
-    @available(*, deprecated)
-    public init(_ dictionary: [String: String]) {
-        self.init(Array(dictionary).map { ($0, $1) })
-    }
-
     init(_ headers: NIOHTTP1.HTTPHeaders) {
         self.init(Array(headers))
     }
@@ -471,47 +461,6 @@ extension HTTPHeaders: CustomDebugStringConvertible {
         }
 
         return lines.joined(separator: "\n")
-    }
-}
-
-// MARK: - Deprecated
-
-extension HTTPHeaders {
-
-    /**
-     Returns an array of header keys in the `HTTPHeaders` instance.
-     */
-    @available(*, deprecated, renamed: "names")
-    public var keys: [String] {
-        names
-    }
-
-    /**
-     Retrieves the value for a given header key.
-
-     - Parameter key: The key of the header.
-
-     - Returns: The value associated with the given header key, or `nil` if the header key is not found.
-     */
-    @available(*, deprecated, renamed: "subscript(_:)")
-    public func getValue(forKey key: String) -> String? {
-        self[key]?.joined(separator: ", ")
-    }
-
-    /**
-     Sets the value for a given header key.
-
-     - Parameters:
-        - value: The value to set for the header.
-        - key: The key of the header.
-     */
-    @available(*, deprecated, renamed: "set(name:value:)")
-    public mutating func setValue(_ value: String, forKey key: String) {
-        remove(name: key)
-
-        for value in value.split(separator: ",") {
-            add(name: key, value: String(value))
-        }
     }
 }
 // swiftlint:enable file_length

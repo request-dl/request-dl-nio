@@ -295,10 +295,3 @@ public struct CacheHeader: Property {
 
     // swiftlint:enable cyclomatic_complexity
 }
-
-@available(*, deprecated)
-extension Headers {
-
-    @available(*, deprecated, renamed: "CacheHeader")
-    public typealias Cache = CacheHeader
-}

@@ -52,9 +52,6 @@ extension Interceptors {
             }
         }
     }
-
-    @available(*, deprecated, renamed: "LogInConsole")
-    public typealias Logger = LogInConsole
 }
 
 // MARK: - RequestTask extension

@@ -86,21 +86,3 @@ class QueryTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
-
-@available(*, deprecated)
-extension QueryTests {
-
-    func testQuery_whenInitForKey() async throws {
-        // Given
-        let property = Query(123, forKey: "number")
-
-        // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            property
-        })
-
-        // Then
-        XCTAssertEqual(resolved.request.url, "https://127.0.0.1?number=123")
-    }
-}

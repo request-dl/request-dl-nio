@@ -57,6 +57,3 @@ public struct PropertyGroup<Content: Property>: Property {
         )
     }
 }
-
-@available(*, deprecated, renamed: "PropertyGroup")
-public typealias Group = PropertyGroup

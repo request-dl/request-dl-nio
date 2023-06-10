@@ -72,6 +72,3 @@ public struct PropertyNamespace: DynamicValue {
      */
     public init() {}
 }
-
-@available(*, deprecated, renamed: "PropertyNamespace")
-public typealias Namespace = PropertyNamespace

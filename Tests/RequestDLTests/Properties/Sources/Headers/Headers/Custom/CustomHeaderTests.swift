@@ -49,25 +49,3 @@ class CustomHeaderTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
-
-@available(*, deprecated)
-extension CustomHeaderTests {
-
-    func testSingleHeaderAny() async throws {
-        let property = TestProperty(CustomHeader("password", forKey: "xxx-api-key"))
-        let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["xxx-api-key"], ["password"])
-    }
-
-    func testHeadersAny() async throws {
-        let property = TestProperty {
-            CustomHeader("text/html", forKey: "Accept")
-            CustomHeader("gzip", forKey: "Content-Encoding")
-        }
-
-        let resolved = try await resolve(property)
-
-        XCTAssertEqual(resolved.request.headers["Accept"], ["text/html"])
-        XCTAssertEqual(resolved.request.headers["Content-Encoding"], ["gzip"])
-    }
-}

@@ -58,10 +58,3 @@ public struct HostHeader: Property {
         ))
     }
 }
-
-@available(*, deprecated)
-extension Headers {
-
-    @available(*, deprecated, renamed: "HostHeader")
-    public typealias Host = HostHeader
-}
