@@ -61,11 +61,6 @@ struct Resolve<Root: Property>: Sendable {
         """
     }
 
-//    Not Available
-//    func printDescription() async throws {
-//        Internals.Log.debug(try await debugDescription)
-//    }
-
     // MARK: - Private methods
 
     private func inputs() -> _PropertyInputs {

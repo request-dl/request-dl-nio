@@ -39,6 +39,3 @@ public struct PropertyEnvironmentValues: Sendable {
         }
     }
 }
-
-@available(*, deprecated, renamed: "PropertyEnvironmentValues")
-public typealias EnvironmentValues = PropertyEnvironmentValues

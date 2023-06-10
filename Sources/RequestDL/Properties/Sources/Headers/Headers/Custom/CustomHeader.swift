@@ -65,28 +65,3 @@ public struct CustomHeader: Property {
         ))
     }
 }
-
-@available(*, deprecated)
-extension Headers {
-
-    @available(*, deprecated, renamed: "CustomHeader")
-    public typealias `Any` = CustomHeader
-}
-
-// MARK: - Deprecated
-
-extension CustomHeader {
-
-    /**
-     Initializes a new instance of `CustomHeader` for the given value and key.
-
-     - Parameters:
-        - value: The value for the header property.
-        - key: The key to reference the header property.
-     */
-    @available(*, deprecated, message: "Prefers the string init")
-    public init<S: StringProtocol>(_ value: Any, forKey key: S) {
-        self.key = String(key)
-        self.value = "\(value)"
-    }
-}

@@ -79,29 +79,3 @@ public struct MockedTask<Element: Sendable>: RequestTask {
         try await payload.result(environment)
     }
 }
-
-// MARK: - Deprecated
-
-extension MockedTask {
-
-    /**
-     Initializes a new `MockedTask` with the given status code, headers and closure that returns the mocked data.
-
-     - Parameters:
-        - statusCode: The HTTP status code for the mocked response.
-        - headers: The HTTP headers for the mocked response.
-        - data: The closure that returns the mocked data.
-    */
-    @available(*, deprecated, renamed: "init()")
-    public init(
-        statusCode: StatusCode = 200,
-        headers: [String: String]? = nil,
-        data: () -> Data
-    ) where Element == TaskResult<Data> {
-        self.payload = LiteralMockedTaskPayload(
-            statusCode: statusCode,
-            headers: headers,
-            data: data()
-        )
-    }
-}

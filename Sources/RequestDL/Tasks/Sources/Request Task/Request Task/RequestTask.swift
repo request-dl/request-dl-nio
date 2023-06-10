@@ -36,22 +36,6 @@ public protocol RequestTask<Element>: _RequestTaskInternals {
 extension RequestTask {
 
     /**
-     Returns an `InterceptedTask` that executes the original task and intercepts
-     its result using the provided `TaskInterceptor`.
-
-     - Parameter interceptor: A `TaskInterceptor` that intercepts the result of the task.
-
-     - Returns: An `InterceptedTask` object that can be used to execute the original task
-     and intercept its result.
-     */
-    @available(*, deprecated, renamed: "interceptor")
-    public func intercept<Interceptor: TaskInterceptor>(
-        _ interceptor: Interceptor
-    ) -> InterceptedTask<Interceptor, Self> {
-        InterceptedTask(task: self, interceptor: interceptor)
-    }
-
-    /**
      Returns an `InterceptedRequestTask` that executes the original task and intercepts
      its result using the provided `RequestTaskInterceptor`.
 
@@ -68,22 +52,6 @@ extension RequestTask {
             task: self,
             interceptor: interceptor
         )
-    }
-
-    /**
-     Returns a `ModifiedTask` that executes the original task and modifies its result using
-     the provided `TaskModifier`.
-
-     - Parameter modifier: A `TaskModifier` that modifies the result of the task.
-
-     - Returns: A `ModifiedTask` object that can be used to execute the original task and
-     modify its result.
-     */
-    @available(*, deprecated, renamed: "modifier")
-    public func modify<Modifier: TaskModifier>(
-        _ modifier: Modifier
-    ) -> ModifiedTask<Modifier> where Modifier.Body == Self {
-        ModifiedTask(task: self, modifier: modifier)
     }
 
     /**
@@ -104,6 +72,3 @@ extension RequestTask {
         )
     }
 }
-
-@available(*, deprecated, renamed: "RequestTask")
-public typealias Task = RequestTask

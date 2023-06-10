@@ -110,6 +110,3 @@ extension PropertyEnvironment: DynamicEnvironment {
         value = keyPath(values)
     }
 }
-
-@available(*, deprecated, renamed: "PropertyEnvironment")
-public typealias Environment = PropertyEnvironment

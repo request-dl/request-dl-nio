@@ -4,6 +4,7 @@
 
 import XCTest
 import AsyncHTTPClient
+import NIOPosix
 @testable import RequestDL
 
 class SessionTests: XCTestCase {
@@ -40,6 +41,20 @@ class SessionTests: XCTestCase {
 
         // Then
         XCTAssertEqual(sut.id, "other.10")
+        XCTAssertTrue(sut is Internals.IdentifiedSessionProvider)
+    }
+
+    func testSession_whenInitWithEventLoopGroup_shouldBeValid() async throws {
+        // Given
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let property = Session(eventLoopGroup)
+
+        // When
+        let sut = property.provider
+
+        // Then
+        XCTAssertEqual(sut.id, String(describing: ObjectIdentifier(eventLoopGroup)))
+        XCTAssertTrue(sut.group() === eventLoopGroup)
     }
 
     func testSession_whenWaitsForConnectivity_shouldBeValid() async throws {

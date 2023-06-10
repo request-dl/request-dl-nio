@@ -56,21 +56,3 @@ class AuthorizationTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
-
-@available(*, deprecated)
-extension AuthorizationTests {
-
-    func testAuthorizationWithTypeAndAnyToken() async throws {
-        // Given
-        let auth = Authorization(.bearer, token: "myToken" as Any)
-
-        // When
-        let resolved = try await resolve(TestProperty(auth))
-
-        // Then
-        XCTAssertEqual(
-            resolved.request.headers["Authorization"],
-            ["Bearer myToken"]
-        )
-    }
-}

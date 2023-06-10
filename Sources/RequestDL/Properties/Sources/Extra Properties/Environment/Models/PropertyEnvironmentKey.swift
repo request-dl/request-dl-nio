@@ -15,6 +15,3 @@ public protocol PropertyEnvironmentKey<Value>: Sendable {
     /// The default value for this `PropertyEnvironmentKey`.
     static var defaultValue: Value { get }
 }
-
-@available(*, deprecated, renamed: "PropertyEnvironmentKey")
-public typealias EnvironmentKey = PropertyEnvironmentKey

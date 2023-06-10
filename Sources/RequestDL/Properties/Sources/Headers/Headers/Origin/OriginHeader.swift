@@ -71,10 +71,3 @@ public struct OriginHeader: Property {
         ))
     }
 }
-
-@available(*, deprecated)
-extension Headers {
-
-    @available(*, deprecated, renamed: "OriginHeader")
-    public typealias Origin = OriginHeader
-}

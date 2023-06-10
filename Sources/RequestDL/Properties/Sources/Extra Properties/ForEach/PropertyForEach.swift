@@ -147,6 +147,3 @@ public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence 
         return .children(group)
     }
 }
-
-@available(*, deprecated, renamed: "PropertyForEach")
-public typealias ForEach = PropertyForEach

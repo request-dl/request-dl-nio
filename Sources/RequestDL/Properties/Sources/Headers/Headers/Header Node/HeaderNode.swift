@@ -4,10 +4,6 @@
 
 import Foundation
 
-/// A namespace for common HTTP headers used in requests and responses.
-@available(*, deprecated)
-public enum Headers {}
-
 struct HeaderNode: PropertyNode {
 
     // MARK: - Internal properties

@@ -64,18 +64,3 @@ public struct Query<Value: Sendable>: Property {
         ))
     }
 }
-
-extension Query {
-
-    /**
-     Creates a new `Query` instance with a value and a key.
-
-     - Parameters:
-        - value: The value of the query parameter.
-        - key: The key of the query parameter.
-     */
-    @available(*, deprecated, renamed: "init(name:value:)")
-    public init(_ value: Value, forKey key: String) {
-        self.init(name: key, value: value)
-    }
-}
