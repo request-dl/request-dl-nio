@@ -10,7 +10,11 @@ on:
 
 jobs:
   swift:
+    strategy:
+        matrix:
+          platform: [macOS-latest, ubuntu-latest]
+          swift-version: [5.7.2, 5.8]
     uses: request-dl/.github/.github/workflows/swift.yml@main
     with:
-      swift-version: 5.8
-      platform: macOS-13
+      swift-version: ${{ matrix.swift-version }}
+      platform: ${{ matrix.target }}
