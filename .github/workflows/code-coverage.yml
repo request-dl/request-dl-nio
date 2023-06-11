@@ -25,7 +25,7 @@ jobs:
 
       - name: 🖨️ LLVM Coverage Format
         run: |
-          xcrun llvm-cov export $(find .build -name RequestDLPackageTests) \
+          xcrun llvm-cov export $(find .build -name request-dlPackageTests) \
             -format="lcov" \
             -instr-profile=$(find .build -name default.profdata) \
             -ignore-filename-regex=".build|Tests" > RequestDL.lcov
