@@ -12,6 +12,7 @@ on:
       - 'Package.swift'
       - 'Sources/**'
       - 'Tests/**'
+      - '.github/workflows/code-coverage.yml'
 
 jobs:
   code-coverage:

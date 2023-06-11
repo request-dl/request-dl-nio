@@ -7,6 +7,7 @@ on:
       - 'Package.swift'
       - 'Sources/**'
       - 'Tests/**'
+      - '.github/workflows/swift.yml'
 
 jobs:
   swift:

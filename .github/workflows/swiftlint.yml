@@ -6,6 +6,7 @@ on:
       - '.swiftlint.yml'
       - 'Sources/**'
       - 'Tests/**'
+      - '.github/workflows/swiftlint.yml'
 
 jobs:
   swiftlint:
