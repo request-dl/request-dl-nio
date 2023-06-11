@@ -29,18 +29,18 @@ Check out our comprehensive documentation to get all the necessary information t
 
 ### Articles
 
-- [Exploring Combine Support](Sources/RequestDL/Documentation/Articles/Combine-Support.md)
-- [Creating Requests from Scratch](Sources/RequestDL/Documentation/Articles/Declarative-request-builder.md)
-- [Using Modifiers and Interceptors](Sources/RequestDL/Documentation/Articles/Modifiers-&-Interceptors.md)
-- [Exploring the Payload](Sources/RequestDL/Documentation/Articles/Payload-Diversity.md)
-- [Adding a Secure Connection Protocol](Sources/RequestDL/Documentation/Articles/Secure-Connection.md)
-- [Using Swift Concurrency from Beginning](Sources/RequestDL/Documentation/Articles/Swift-Concurrency.md)
-- [Exploring the Task Diversity](Sources/RequestDL/Documentation/Articles/Task-Diversity.md)
-- [Using Progress for Upload and Download Requests](Sources/RequestDL/Documentation/Articles/Upload-&-Download-progress.md)
+- [Exploring Combine Support](Sources/RequestDL/Documentation.docc/Articles/Combine-Support.md)
+- [Creating Requests from Scratch](Sources/RequestDL/Documentation.docc/Articles/Declarative-request-builder.md)
+- [Using Modifiers and Interceptors](Sources/RequestDL/Documentation.docc/Articles/Modifiers-&-Interceptors.md)
+- [Exploring the Payload](Sources/RequestDL/Documentation.docc/Articles/Payload-Diversity.md)
+- [Adding a Secure Connection Protocol](Sources/RequestDL/Documentation.docc/Articles/Secure-Connection.md)
+- [Using Swift Concurrency from Beginning](Sources/RequestDL/Documentation.docc/Articles/Swift-Concurrency.md)
+- [Exploring the Task Diversity](Sources/RequestDL/Documentation.docc/Articles/Task-Diversity.md)
+- [Using Progress for Upload and Download Requests](Sources/RequestDL/Documentation.docc/Articles/Upload-&-Download-progress.md)
 
 ### Translations
 
-- [Portuguese](https://github.com/brennobemoura/requestdl-documentation)
+- [Portuguese](https://github.com/brennobemoura/request-dl-portuguese)
 
 We would be delighted to have your help in translating our documentation into your preferred language! Simply open a Pull Request on our repository with the link to your translated version. We are looking forward to receiving your contribution!
 
