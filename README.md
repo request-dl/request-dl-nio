@@ -23,7 +23,26 @@ implement custom properties to define various aspects of the request within a
 struct specification or using the `@PropertyBuilder`. This makes it easy to customize 
 requests to meet specific needs.
 
-- **[Documentation](https://request-dl.github.io/request-dl/documentation/requestdl/)**
+## [Documentation](https://request-dl.github.io/request-dl/documentation/requestdl/)
+
+Check out our comprehensive documentation to get all the necessary information to start using RequestDL in your project.
+
+### Articles
+
+- [Exploring Combine Support](Sources/RequestDL/Documentation/Articles/Combine-Support.md)
+- [Creating Requests from Scratch](Sources/RequestDL/Documentation/Articles/Declarative-request-builder.md)
+- [Using Modifiers and Interceptors](Sources/RequestDL/Documentation/Articles/Modifiers-&-Interceptors.md)
+- [Exploring the Payload](Sources/RequestDL/Documentation/Articles/Payload-Diversity.md)
+- [Adding a Secure Connection Protocol](Sources/RequestDL/Documentation/Articles/Secure-Connection.md)
+- [Using Swift Concurrency from Beginning](Sources/RequestDL/Documentation/Articles/Swift-Concurrency.md)
+- [Exploring the Task Diversity](Sources/RequestDL/Documentation/Articles/Task-Diversity.md)
+- [Using Progress for Upload and Download Requests](Sources/RequestDL/Documentation/Articles/Upload-&-Download-progress.md)
+
+### Translations
+
+- [Portuguese](https://github.com/brennobemoura/requestdl-documentation)
+
+We would be delighted to have your help in translating our documentation into your preferred language! Simply open a Pull Request on our repository with the link to your translated version. We are looking forward to receiving your contribution!
 
 ## Installation
 
