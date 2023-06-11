@@ -37,6 +37,7 @@ Check out our comprehensive documentation to get all the necessary information t
 - [Using Swift Concurrency from Beginning](Sources/RequestDL/Documentation.docc/Articles/Swift-Concurrency.md)
 - [Exploring the Task Diversity](Sources/RequestDL/Documentation.docc/Articles/Task-Diversity.md)
 - [Using Progress for Upload and Download Requests](Sources/RequestDL/Documentation.docc/Articles/Upload-&-Download-progress.md)
+- [Caching responses](Sources/RequestDL/Documentation.docc/Articles/Cache-Support.md)
 
 ### Translations
 
