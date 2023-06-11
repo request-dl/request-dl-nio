@@ -15,24 +15,9 @@ on:
 
 jobs:
   code-coverage:
-    runs-on: macOS-latest
-    steps:
-      - name: ⬇️ Get Sources
-        uses: actions/checkout@v3.5.2
-      
-      - name: 🛠️ Test Package
-        run: swift test --enable-code-coverage
-
-      - name: 🖨️ LLVM Coverage Format
-        run: |
-          xcrun llvm-cov export $(find .build -name request-dlPackageTests) \
-            -format="lcov" \
-            -instr-profile=$(find .build -name default.profdata) \
-            -ignore-filename-regex=".build|Tests" > RequestDL.lcov
-
-      - name: 📦 Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ${{ github.workspace }}/RequestDL.lcov
-          verbose: true
+    uses: request-dl/.github/.github/workflows/code-coverage.yml@main
+    with:
+      swift-version: 5.7.2
+      package-tests: request-dlPackageTests
+      target: OpenAPIRequestDL
+    secrets: inherit
