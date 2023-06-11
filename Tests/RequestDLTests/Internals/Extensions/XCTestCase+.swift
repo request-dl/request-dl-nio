@@ -2,7 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
-#if swift(<5.8)
+#if swift(<5.8) || !canImport(Darwin)
 import XCTest
 
 extension XCTestCase {
