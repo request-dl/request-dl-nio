@@ -33,7 +33,7 @@ class InternalsDataStreamTests: XCTestCase {
         stream.close()
 
         // Then
-        await fulfillment(of: [expectation])
+        await _fulfillment(of: [expectation])
 
         XCTAssertTrue(values().isEmpty)
     }
@@ -60,7 +60,7 @@ class InternalsDataStreamTests: XCTestCase {
         stream.close()
 
         // Then
-        await fulfillment(of: [expectation], timeout: 5)
+        await _fulfillment(of: [expectation], timeout: 5)
 
         XCTAssertEqual(
             try values().compactMap { try $0.get() },
@@ -85,7 +85,7 @@ class InternalsDataStreamTests: XCTestCase {
         stream.append(.success(1))
 
         // Then
-        await fulfillment(of: [expectation], timeout: 5)
+        await _fulfillment(of: [expectation], timeout: 5)
 
         let _values = values()
 
@@ -112,7 +112,7 @@ class InternalsDataStreamTests: XCTestCase {
         stream.append(.success(2))
 
         // Then
-        await fulfillment(of: [expectation], timeout: 5)
+        await _fulfillment(of: [expectation], timeout: 5)
 
         let _values = values()
 
@@ -212,7 +212,7 @@ class InternalsDataStreamTests: XCTestCase {
         stream.close()
 
         // Then
-        await fulfillment(of: expectations)
+        await _fulfillment(of: expectations)
 
         for value in values {
             XCTAssertEqual(value().count, 10)

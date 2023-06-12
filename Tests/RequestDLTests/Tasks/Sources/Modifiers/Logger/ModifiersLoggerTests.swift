@@ -38,7 +38,7 @@ class ModifiersLoggerTests: XCTestCase {
         .result()
 
         // Then
-        await fulfillment(of: [expectation])
+        await _fulfillment(of: [expectation])
 
         XCTAssertEqual(logger()?.label, Logger.disabled.label)
     }
@@ -60,7 +60,7 @@ class ModifiersLoggerTests: XCTestCase {
         .result()
 
         // Then
-        await fulfillment(of: [expectation])
+        await _fulfillment(of: [expectation])
 
         XCTAssertEqual(logger()?.label, customLogger.label)
     }

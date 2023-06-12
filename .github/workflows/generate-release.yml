@@ -6,12 +6,9 @@ on:
     branches: [main]
 
 jobs:
-  update_release_draft:
-    runs-on: ubuntu-latest
+  generate-release:
     permissions:
       contents: write
       pull-requests: write
-    steps:
-      - uses: release-drafter/release-drafter@v5.23.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: request-dl/.github/.github/workflows/generate-release.yml@main
+    secrets: inherit

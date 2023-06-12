@@ -38,7 +38,7 @@ class EnvironmentTests: XCTestCase {
             receiver
         })
 
-        await fulfillment(of: [expectation])
+        await _fulfillment(of: [expectation])
 
         // Then
         XCTAssertEqual(value(), IntegerEnvironmentKey.defaultValue)
@@ -63,7 +63,7 @@ class EnvironmentTests: XCTestCase {
                 .environment(\.integer, value)
         })
 
-        await fulfillment(of: [expectation])
+        await _fulfillment(of: [expectation])
 
         // Then
         XCTAssertEqual(receivedValue(), value)

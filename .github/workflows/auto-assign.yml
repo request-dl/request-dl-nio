@@ -7,15 +7,9 @@ on:
     types: [opened]
 
 jobs:
-  run:
-    runs-on: ubuntu-latest
+  auto-assign:
     permissions:
       issues: write
       pull-requests: write
-    steps:
-    - name: 'Auto-assign issue'
-      uses: pozil/auto-assign-issue@v1
-      with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          assignees: brennobemoura
-          numOfAssignee: 1
+    uses: request-dl/.github/.github/workflows/auto-assign.yml@main
+    secrets: inherit

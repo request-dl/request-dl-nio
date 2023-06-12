@@ -6,20 +6,8 @@ on:
       - '.swiftlint.yml'
       - 'Sources/**'
       - 'Tests/**'
+      - '.github/workflows/swiftlint.yml'
 
 jobs:
-  lint:
-    runs-on: macOS-latest
-    steps:
-      - name: ⬇️ Get Sources
-        uses: actions/checkout@v3.5.2
-
-      - name: Install swiftlint
-        run: >
-          if [[ ! -f "/usr/local/bin/swiftlint" ]]
-             then
-               brew install swiftlint
-             fi
-
-      - name: Swiftlint
-        run: swiftlint lint
+  swiftlint:
+    uses: request-dl/.github/.github/workflows/swiftlint.yml@main
