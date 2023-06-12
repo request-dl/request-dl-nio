@@ -6,10 +6,6 @@ on:
     types:
       - published
 
-concurrency:
-  group: docs-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   documentation:
     permissions:
