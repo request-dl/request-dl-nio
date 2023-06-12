@@ -55,7 +55,7 @@ public struct BaseURL: Property {
 
     // MARK: - Internal properties
 
-    let internetProtocol: InternetProtocol
+    let scheme: URLScheme
     let host: String
 
     // MARK: - Private properties
@@ -73,7 +73,7 @@ public struct BaseURL: Property {
             )
         }
 
-        return "\(internetProtocol.rawValue)://\(host)"
+        return "\(scheme.rawValue)://\(host)"
     }
 
     // MARK: - Init
@@ -82,7 +82,7 @@ public struct BaseURL: Property {
      Creates a BaseURL by combining the internet protocol and the string host.
 
      - Parameters:
-        - internetProtocol: The internet protocol chosen.
+        - scheme: The internet protocol chosen.
         - path: The string host only.
 
      Example usage:
@@ -98,8 +98,8 @@ public struct BaseURL: Property {
      }
      ```
      */
-    public init(_ internetProtocol: InternetProtocol, host: String) {
-        self.internetProtocol = internetProtocol
+    public init(_ scheme: URLScheme, host: String) {
+        self.scheme = scheme
         self.host = host
     }
 
