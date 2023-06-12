@@ -43,7 +43,7 @@ class URLSchemeTests: XCTestCase {
         XCTAssertEqual(URLScheme.telnet, "telnet")
     }
 
-    func testProtocol_withStringLossless() async throws {
+    func testScheme_withStringLossless() async throws {
         // Given
         let scheme = URLScheme.dns
 

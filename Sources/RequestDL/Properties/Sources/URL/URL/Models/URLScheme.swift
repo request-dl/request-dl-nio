@@ -16,7 +16,7 @@ import Foundation
  - Note: For a complete list of the available types, please see the corresponding static
  properties.
 
- - Important: If the internet protocol type is not included in the predefined static properties, use
+ - Important: If the url scheme type is not included in the predefined static properties, use
  a string literal to initialize an instance of URLScheme.
 
  The URLScheme struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
@@ -30,31 +30,31 @@ public struct URLScheme: Sendable, Hashable {
 
     // MARK: - Public static methods
 
-    /// The HTTP protocol.
+    /// The HTTP scheme.
     public static let http: URLScheme = "http"
 
-    /// The HTTPS protocol.
+    /// The HTTPS scheme.
     public static let https: URLScheme = "https"
 
-    /// The FTP protocol.
+    /// The FTP scheme.
     public static let ftp: URLScheme = "ftp"
 
-    /// The SMTP protocol.
+    /// The SMTP scheme.
     public static let smtp: URLScheme = "smtp"
 
-    /// The IMAP protocol.
+    /// The IMAP scheme.
     public static let imap: URLScheme = "imap"
 
-    /// The POP protocol.
+    /// The POP scheme.
     public static let pop: URLScheme = "pop"
 
-    /// The DNS protocol.
+    /// The DNS scheme.
     public static let dns: URLScheme = "dns"
 
-    /// The SSH protocol.
+    /// The SSH scheme.
     public static let ssh: URLScheme = "ssh"
 
-    /// The Telnet protocol.
+    /// The Telnet scheme.
     public static let telnet: URLScheme = "telnet"
 
     // MARK: - Internal properties
@@ -80,8 +80,8 @@ extension URLScheme: ExpressibleByStringLiteral {
     /**
      Initializes a `URLScheme` instance using a string literal.
 
-     - Parameter value: A string literal representing the internet protocol type.
-     - Returns: An instance of `URLScheme` with the specified internet protocol type.
+     - Parameter value: A string literal representing the url scheme type.
+     - Returns: An instance of `URLScheme` with the specified url scheme type.
 
      - Note: Use this initializer to create a `URLScheme` instance from a string literal.
      */
