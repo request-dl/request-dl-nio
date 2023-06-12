@@ -7,24 +7,16 @@ on:
       - 'Package.swift'
       - 'Sources/**'
       - 'Tests/**'
+      - '.github/workflows/swift.yml'
 
 jobs:
-  build:
-    name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+  swift:
     strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        swift: ["5.7.2"]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: ☑️ Swift Select
-        uses: swift-actions/setup-swift@v1
-        with:
-            swift-version: ${{ matrix.swift }}
-
-      - name: ⬇️ Get Sources
-        uses: actions/checkout@v3.5.2
-
-      - name: 🍀 Test Package
-        run: swift test
+        fail-fast: false
+        matrix:
+          platform: [macOS-latest, ubuntu-latest]
+          swift-version: [5.7.2, 5.8]
+    uses: request-dl/.github/.github/workflows/swift.yml@main
+    with:
+      swift-version: ${{ matrix.swift-version }}
+      platform: ${{ matrix.platform }}

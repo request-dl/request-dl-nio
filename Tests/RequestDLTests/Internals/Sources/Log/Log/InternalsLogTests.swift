@@ -27,7 +27,7 @@ class InternalsLogTests: XCTestCase {
         Internals.Log.debug(message1, message2, line: line, file: file)
 
         // Then
-        await fulfillment(of: [expecting])
+        await _fulfillment(of: [expecting])
 
         XCTAssertEqual(payload?.0, " ")
         XCTAssertEqual(payload?.1, "\n")
@@ -55,7 +55,7 @@ class InternalsLogTests: XCTestCase {
         Internals.Log.warning(message1, message2, line: line, file: file)
 
         // Then
-        await fulfillment(of: [expecting])
+        await _fulfillment(of: [expecting])
 
         XCTAssertEqual(payload?.0, " ")
         XCTAssertEqual(payload?.1, "\n")
@@ -87,7 +87,7 @@ class InternalsLogTests: XCTestCase {
         }
 
         // Then
-        await fulfillment(of: [expecting])
+        await _fulfillment(of: [expecting])
 
         XCTAssertEqual(payload?.0, failureOutput(message1, message2))
         XCTAssertEqual((payload?.1).map { "\($0)" }, "\(file)")
