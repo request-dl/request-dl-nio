@@ -232,34 +232,6 @@ extension Internals.Log.Message {
     }
 }
 
-// MARK: - BaseURL
-extension Internals.Log.Message {
-
-    static func invalidHost<URL>(_ url: URL) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            Invalid host string: The protocol communication should \
-            not be included.
-            """,
-            parameters: [
-                String(describing: type(of: url)): url
-            ]
-        )
-    }
-
-    static func unexpectedHost<URL>(_ url: URL) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            Unexpected format for host string: Could not extract the \
-            host.
-            """,
-            parameters: [
-                String(describing: type(of: url)): url
-            ]
-        )
-    }
-}
-
 // MARK: - Payload
 
 extension Internals.Log.Message {
