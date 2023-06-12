@@ -1,5 +1,7 @@
 # Creating Requests from Scratch
 
+This article covers the various ways to specify your request.
+
 RequestDL is a powerful Swift library designed according to the declarative programming paradigm, offering an extensive API for specifying the fields of a request. Whether it's an HTTP request or any other network operation, RequestDL simplifies the process by focusing on four key fields:
 
 1. **URL**: Specify the target URL for your request, allowing you to connect to the desired endpoint.
@@ -11,11 +13,32 @@ With RequestDL's intuitive syntax and comprehensive API, you can effortlessly co
 
 ## URL
 
+This section details how to specify the request URL using the available declarative objects.
+
 ### BaseURL
 
-### Query
+The ``RequestDL/BaseURL`` is the entry point as it specifies the scheme and host to be queried during the request. To start using it, it is important to pay attention to some rules:
+
+- Scheme must be of type ``RequestDL/InternetProtocol``.
+- Host is a string without scheme.
+
+Here's an example of usage:
+
+```swift
+// Always HTTPS
+BaseURL("apple.com")
+
+// Specifying the scheme
+BaseURL(.http, host: "apple.com")
+```
+
+- Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
+
+- Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may generate a fatal error.
 
 ### Path
+
+### Query
 
 ## Method
 
@@ -40,8 +63,6 @@ With RequestDL's intuitive syntax and comprehensive API, you can effortlessly co
 ### Payload
 
 ### Form
-
----
 
 ## Base objects 
 
@@ -79,5 +100,5 @@ With RequestDL's intuitive syntax and comprehensive API, you can effortlessly co
 
 ## See also
 
-- Caching responses;
-- State in property
+- [Caching your responses](<doc:Cache-Support>);
+- [Storing and reading values inside properties](<doc:Property-State>);
