@@ -10,7 +10,7 @@ on:
 
 jobs:
   breaking-changes:
-    uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@main
+    uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@no-api-breaking-changes
     with:
       swift-version: 5.7.2
       platform: macOS-latest
