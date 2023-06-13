@@ -238,8 +238,8 @@ extension Internals.Log.Message {
     static func invalidHost<URL>(_ url: URL) -> Internals.Log.Message {
         Internals.Log.Message(
             """
-            Invalid host string: The protocol communication should \
-            not be included.
+            Invalid host string: The url scheme should not be \
+            included.
             """,
             parameters: [
                 String(describing: type(of: url)): url

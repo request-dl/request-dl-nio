@@ -6,10 +6,10 @@ import Foundation
 
 /**
  The BaseURL struct defines the base URL for a request. It provides the
- internet protocol and the host for the request.
+ url scheme and the host for the request.
 
- To create a BaseURL object, you need to provide the internet protocol
- and the string host. You can also set the internet protocol to HTTPS by
+ To create a BaseURL object, you need to provide the url scheme
+ and the string host. You can also set the url scheme to HTTPS by
  default if you only provide the host.
 
  Example usage:
@@ -25,7 +25,7 @@ import Foundation
 
  ```
 
- Or you can set the host without specifying the protocol type:
+ Or you can set the host without specifying the scheme type:
 
  ```swift
  struct AppleDeveloperBaseURL: Property {
@@ -55,7 +55,7 @@ public struct BaseURL: Property {
 
     // MARK: - Internal properties
 
-    let internetProtocol: InternetProtocol
+    let scheme: URLScheme
     let host: String
 
     // MARK: - Private properties
@@ -73,16 +73,16 @@ public struct BaseURL: Property {
             )
         }
 
-        return "\(internetProtocol.rawValue)://\(host)"
+        return "\(scheme.rawValue)://\(host)"
     }
 
     // MARK: - Init
 
     /**
-     Creates a BaseURL by combining the internet protocol and the string host.
+     Creates a BaseURL by combining the url scheme and the string host.
 
      - Parameters:
-        - internetProtocol: The internet protocol chosen.
+        - scheme: The url scheme chosen.
         - path: The string host only.
 
      Example usage:
@@ -98,13 +98,13 @@ public struct BaseURL: Property {
      }
      ```
      */
-    public init(_ internetProtocol: InternetProtocol, host: String) {
-        self.internetProtocol = internetProtocol
+    public init(_ scheme: URLScheme, host: String) {
+        self.scheme = scheme
         self.host = host
     }
 
     /**
-     Defines the base URL from the host with the default HTTPS protocol.
+     Defines the base URL from the host with the default HTTPS scheme.
 
      - Parameters:
         - path: The string host only.
