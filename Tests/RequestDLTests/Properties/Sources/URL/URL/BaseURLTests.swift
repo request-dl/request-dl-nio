@@ -9,119 +9,119 @@ class BaseURLTests: XCTestCase {
 
     func testHttpURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.http
+        let scheme = URLScheme.http
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testHttpsURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.https
+        let scheme = URLScheme.https
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testFtpURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.ftp
+        let scheme = URLScheme.ftp
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testSmtpURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.smtp
+        let scheme = URLScheme.smtp
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testImapURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.imap
+        let scheme = URLScheme.imap
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testPopURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.pop
+        let scheme = URLScheme.pop
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testDnsURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.dns
+        let scheme = URLScheme.dns
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testSshURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.ssh
+        let scheme = URLScheme.ssh
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testTelnetURL() async throws {
         // Given
-        let internetProtocol = InternetProtocol.telnet
+        let scheme = URLScheme.telnet
         let host = "google.com"
 
         // When
-        let baseURL = BaseURL(internetProtocol, host: host)
+        let baseURL = BaseURL(scheme, host: host)
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(internetProtocol)://\(host)")
+        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
     }
 
     func testDefaultURLWithoutProtocol() async throws {
@@ -167,10 +167,8 @@ class BaseURLTests: XCTestCase {
             XCTAssertEqual(error.context, .invalidHost)
             XCTAssertEqual(error.baseURL, baseURL)
             XCTAssertEqual(error.errorDescription, """
-                Invalid host string: The protocol communication should \
-                not be included.
-
-                baseURL: \(baseURL)
+                Invalid host string: The url scheme should not be \
+                included; BaseURL: \(baseURL)
                 """
             )
         } catch {
@@ -195,9 +193,7 @@ class BaseURLTests: XCTestCase {
             XCTAssertEqual(error.baseURL, baseURL)
             XCTAssertEqual(error.errorDescription, """
                 Unexpected format for host string: Could not extract the \
-                host.
-
-                baseURL: \(baseURL)
+                host; BaseURL: \(baseURL)
                 """
             )
         } catch {

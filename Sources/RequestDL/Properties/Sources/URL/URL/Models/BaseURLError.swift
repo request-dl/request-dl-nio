@@ -41,17 +41,13 @@ public struct BaseURLError: LocalizedError {
         switch context {
         case .invalidHost:
             return """
-                Invalid host string: The protocol communication should \
-                not be included.
-
-                baseURL: \(baseURL)
+                Invalid host string: The url scheme should not be \
+                included; BaseURL: \(baseURL)
                 """
         case .unexpectedHost:
             return """
                 Unexpected format for host string: Could not extract the \
-                host.
-
-                baseURL: \(baseURL)
+                host; BaseURL: \(baseURL)
                 """
         }
     }
