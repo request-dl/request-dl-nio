@@ -70,21 +70,27 @@ And the methods to add modifiers and interceptors:
 
 ### Features
 
-- [x] [Swift Concurrency](<doc:Swift-Concurrency>);
-- [x] [Declarative request builder](<doc:Declarative-request-builder>);
-- [x] [mTLS / TLS / SSL / PSK connection](<doc:Secure-Connection>) (easy setup);
-- [x] [Payload diversity](<doc:Payload-Diversity>) (JSON / Encodable / Multipart / URL Encoded);
-- [x] [Task diversity](<doc:Task-Diversity>) (UploadTask / DownloadTask / DataTask / MockedTask);
-- [x] [Modifiers & Interceptors](<doc:Modifiers-&-Interceptors>); 
-- [x] [Upload & Download progress](<doc:Upload-&-Download-progress>);
-- [x] [Combine support](<doc:Combine-Support>);
+- [x] [Declarative request builder](<doc:Creating-requests-from-scratch>);
+- [x] [mTLS / TLS / SSL / PSK](<doc:Secure-connection>);
+- [x] [JSON / Codable / Multipart / URL Encoded](<doc:Exploring-payload>);
+- [x] [UploadTask / DownloadTask / DataTask / MockedTask](<doc:Exploring-task>);
+- [x] [Modifiers & Interceptors](<doc:Modifiers-and-Interceptors>); 
+- [x] [Upload & Download progress](<doc:Upload-and-download-progress>);
+- [x] [Swift Concurrency](<doc:Swift-concurrency>);
+- [x] [Combine support](<doc:Exploring-combine>);
 
 We are excited to expand this list with many other features. Start by making your contribution in [Discussions](https://github.com/orgs/request-dl/discussions) or by opening a PR (Pull Request).
 
-## Why the Tucano bird?
+---
 
-![Brazilian AI generated Tucano bird](tucano.png)
+## Topics
 
-The Request library, initially developed by Carson Katri in 2019, served as the foundation for RequestDL. However, in 2020, Brenno de Moura made contributions that eventually led to the point (2022) where he requested permission from Carson to continue the work independently, focusing on developing new features.
+### First steps
 
-RequestDL originated in Brazil 🇧🇷, and as a tribute to the country, the Tucano bird, which is a common symbol found in Brazilian brands, was chosen as its mascot. Embracing the advancements in technology in 2023, the artwork for RequestDL was created using the text-to-image generator feature of the Canvas software.
+- <doc:Creating-the-project-property>
+- <doc:Preparing-the-certificates>
+
+### Essentials
+
+- <doc:Building-the-request>
+- <doc:Executing-the-request>

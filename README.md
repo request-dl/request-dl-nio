@@ -4,40 +4,27 @@
 
 # RequestDL
 
-> Thanks to **Mike Lewis**, progress is seamlessly integrated into this library,
-providing a simple and streamlined experience.
+> Thanks to **Mike Lewis**, progress is seamlessly integrated into this library, providing a simple and streamlined experience.
 
-RequestDL is a Swift package designed to simplify the process of performing network
-requests. It provides a set of tools, including the `RequestTask` protocol, which
-supports different types of requests, including `DataTask`, `DownloadTask`, and 
-`UploadTask`.
+RequestDL is a Swift package designed to simplify the process of performing network requests. It provides a set of tools, including the `RequestTask` protocol, which supports different types of requests, including `DataTask`, `DownloadTask`, and `UploadTask`.
 
-One of the key features of RequestDL is its support for specifying properties of a
-request, such as `Query`, `Payload`, and `Headers`, among others. You can also use 
-`RequestTaskModifier` and `RequestTaskInterceptor` to process the response after the request is 
-complete, allowing for actions like decoding, mapping, error handling based on status
-codes, and logging responses in the console.
+One of the key features of RequestDL is its support for specifying properties of a request, such as `Query`, `Payload`, and `Headers`, among others. You can also use  `RequestTaskModifier` and `RequestTaskInterceptor` to process the response after the request is  complete, allowing for actions like decoding, mapping, error handling based on status codes, and logging responses in the console.
 
-The `Property` protocol is another powerful feature that allows developers to
-implement custom properties to define various aspects of the request within a 
-struct specification or using the `@PropertyBuilder`. This makes it easy to customize 
-requests to meet specific needs.
+The `Property` protocol is another powerful feature that allows developers to implement custom properties to define various aspects of the request within a  struct specification or using the `@PropertyBuilder`. This makes it easy to customize  requests to meet specific needs.
 
 ## [Documentation](https://request-dl.github.io/request-dl/documentation/requestdl/)
 
 Check out our comprehensive documentation to get all the necessary information to start using RequestDL in your project.
 
-### Articles
+### First steps
 
-- [Exploring Combine Support](Sources/RequestDL/Documentation.docc/Articles/Combine-Support.md)
-- [Creating Requests from Scratch](Sources/RequestDL/Documentation.docc/Articles/Declarative-request-builder.md)
-- [Using Modifiers and Interceptors](Sources/RequestDL/Documentation.docc/Articles/Modifiers-&-Interceptors.md)
-- [Exploring the Payload](Sources/RequestDL/Documentation.docc/Articles/Payload-Diversity.md)
-- [Adding a Secure Connection Protocol](Sources/RequestDL/Documentation.docc/Articles/Secure-Connection.md)
-- [Using Swift Concurrency from Beginning](Sources/RequestDL/Documentation.docc/Articles/Swift-Concurrency.md)
-- [Exploring the Task Diversity](Sources/RequestDL/Documentation.docc/Articles/Task-Diversity.md)
-- [Using Progress for Upload and Download Requests](Sources/RequestDL/Documentation.docc/Articles/Upload-&-Download-progress.md)
-- [Caching responses](Sources/RequestDL/Documentation.docc/Articles/Cache-Support.md)
+- [Creating the project property](Sources/RequestDL/Documentation.docc/First Steps/Creating-the-project-property.md)
+- [Preparing the certificates](Sources/RequestDL/Documentation.docc/First Steps/Preparing-the-certificates.md)
+
+### Essentials
+
+- [Building the request](Sources/RequestDL/Documentation.docc/Essentials/Building the Request/Building-the-request.md)
+- [Executing the request](Sources/RequestDL/Documentation.docc/Essentials/Executing the Request/Executing-the-request.md)
 
 ### Translations
 
@@ -47,8 +34,7 @@ We would be delighted to have your help in translating our documentation into yo
 
 ## Installation
 
-RequestDL can be installed using Swift Package Manager. To include it in your project,
-add the following dependency to your Package.swift file:
+RequestDL can be installed using Swift Package Manager. To include it in your project, add the following dependency to your Package.swift file:
 
 ```swift
 dependencies: [
@@ -58,12 +44,9 @@ dependencies: [
 
 ## Usage
 
-Using RequestDL is easy and intuitive. You can create network requests in a 
-declarative way, specifying the properties of the request through the use of 
-the `Property` protocol or using the `@PropertyBuilder` attribute.
+Using RequestDL is easy and intuitive. You can create network requests in a  declarative way, specifying the properties of the request through the use of  the `Property` protocol or using the `@PropertyBuilder` attribute.
 
-Here's an example of a simple `DataTask` that queries Google for the term "apple", 
-logs the response in the console, and ignores the HTTP's response head:
+Here's an example of a simple `DataTask` that queries Google for the term "apple",  logs the response in the console, and ignores the HTTP's response head:
 
 ```swift
 try await DataTask {
@@ -82,15 +65,9 @@ try await DataTask {
 .result()
 ```
 
-This code creates a `DataTask` with the `BaseURL` set to "google.com", a `HeaderGroup`
-containing the "Accept" set to "application/json", a "xxx-api-key" header set the API 
-token, and a query parameter with the key "q" and the value "apple". It then sets the 
-`logInConsole` property to true, which will print the response in the console when
-the request is completed. It also decodes the response into an instance of 
-`GoogleResponse` and then ignores it.
+This code creates a `DataTask` with the `BaseURL` set to "google.com", a `HeaderGroup` containing the "Accept" set to "application/json", a "xxx-api-key" header set the API  token, and a query parameter with the key "q" and the value "apple". It then sets the  `logInConsole` property to true, which will print the response in the console when the request is completed. It also decodes the response into an instance of  `GoogleResponse` and then ignores it.
 
-This is just a simple example of what RequestDL can do. Check out the documentation
-for more information on how to use it.
+This is just a simple example of what RequestDL can do. Check out the documentation for more information on how to use it.
 
 ## Versioning
 
@@ -106,17 +83,10 @@ It is recommended to review the release notes for each version to understand the
 
 ## Contributing
 
-If you find a bug or have an idea for a new feature, please open an issue or 
-submit a pull request. We welcome contributions from the community!
+If you find a bug or have an idea for a new feature, please open an issue or  submit a pull request. We welcome contributions from the community!
 
 ## Acknowledgments
 
-This library owes a lot to the work of Carson Katri and his Swift package 
-[Request](https://github.com/carson-katri/swift-request). Many of the core 
-concepts and techniques used in RequestDL were inspired by Carson's library, and 
-the original implementation of RequestDL even used a fork of Carson's library as
-its foundation. 
+This library owes a lot to the work of Carson Katri and his Swift package  [Request](https://github.com/carson-katri/swift-request). Many of the core  concepts and techniques used in RequestDL were inspired by Carson's library, and  the original implementation of RequestDL even used a fork of Carson's library as its foundation. 
 
-Without Carson's work, this library would not exist in its current form. Thank you, 
-Carson, for your contributions to the Swift community and for inspiring the development 
-of RequestDL.
+Without Carson's work, this library would not exist in its current form. Thank you,  Carson, for your contributions to the Swift community and for inspiring the development  of RequestDL.
