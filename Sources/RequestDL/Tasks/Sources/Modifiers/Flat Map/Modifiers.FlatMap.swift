@@ -30,7 +30,7 @@ extension Modifiers {
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Result<Input, Error>) throws -> Output
+        let transform: @Sendable (Result<Input, Error>) async throws -> Output
 
         // MARK: - Public methods
 
@@ -50,7 +50,7 @@ extension Modifiers {
                 case .processed(let mapped):
                     return mapped
                 case .original(let original):
-                    return try transform(.success(original))
+                    return try await transform(.success(original))
                 }
             }
         }
@@ -61,13 +61,13 @@ extension Modifiers {
             do {
                 return .success(.original(try await task.result()))
             } catch {
-                return mapErrorIntoResult(error)
+                return await mapErrorIntoResult(error)
             }
         }
 
-        private func mapErrorIntoResult(_ error: Error) -> Result<Map, Error> {
+        private func mapErrorIntoResult(_ error: Error) async -> Result<Map, Error> {
             do {
-                return .success(.processed(try transform(.failure(error))))
+                return try await .success(.processed(transform(.failure(error))))
             } catch {
                 return .failure(error)
             }
@@ -87,7 +87,7 @@ extension RequestTask {
      - Returns: A new `RequestTask` that returns the flat-mapped element of type `NewElement`.
      */
     public func flatMap<NewElement>(
-        _ transform: @escaping @Sendable (Result<Element, Error>) throws -> NewElement
+        _ transform: @escaping @Sendable (Result<Element, Error>) async throws -> NewElement
     ) -> ModifiedRequestTask<Modifiers.FlatMap<Element, NewElement>> {
         modifier(Modifiers.FlatMap(transform: transform))
     }
