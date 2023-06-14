@@ -11,8 +11,8 @@ class DeprecatedModifiersProgressTests: XCTestCase {
     class UploadProgressMonitor: UploadProgress {
         var sentBytes: [Int] = []
 
-        func upload(_ bytesLength: Int) {
-            sentBytes.append(bytesLength)
+        func upload(_ chunkSize: Int, totalSize: Int) {
+            sentBytes.append(chunkSize)
         }
     }
 
@@ -21,9 +21,9 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         var receivedData: [Data] = []
         var length: Int?
 
-        func download(_ part: Data, length: Int?) {
-            receivedData.append(part)
-            self.length = length
+        func download(_ slice: Data, totalSize: Int) {
+            receivedData.append(slice)
+            self.length = totalSize
         }
     }
 
@@ -34,13 +34,13 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         var receivedData: [Data] = []
         var length: Int?
 
-        func upload(_ bytesLength: Int) {
-            sentBytes.append(bytesLength)
+        func upload(_ chunkSize: Int, totalSize: Int) {
+            sentBytes.append(chunkSize)
         }
 
-        func download(_ part: Data, length: Int?) {
-            receivedData.append(part)
-            self.length = length
+        func download(_ slice: Data, totalSize: Int) {
+            receivedData.append(slice)
+            self.length = totalSize
         }
     }
 
