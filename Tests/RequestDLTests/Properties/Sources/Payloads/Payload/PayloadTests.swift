@@ -627,12 +627,12 @@ extension PayloadTests {
     func testPayload_whenInitDataWithPartLength() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
-        let partLength = 1_024
+        let chunkSize = 1_024
 
         // When
         let resolved = try await resolve(TestProperty {
             Payload(data: data)
-                .payloadPartLength(partLength)
+                .payloadChunkSize(chunkSize)
         })
 
         let buffers = try await resolved.request.body?.buffers() ?? []
@@ -652,8 +652,8 @@ extension PayloadTests {
 
         XCTAssertEqual(
             buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: data.count, by: partLength).map {
-                let upperBound = $0 + partLength
+            stride(from: .zero, to: data.count, by: chunkSize).map {
+                let upperBound = $0 + chunkSize
                 return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
         )

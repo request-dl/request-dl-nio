@@ -147,7 +147,7 @@ public struct Payload: Property {
             factory: property.factory,
             charset: inputs.environment.charset,
             urlEncoder: inputs.environment.urlEncoder,
-            partLength: inputs.environment.payloadPartLength
+            chunkSize: inputs.environment.payloadChunkSize
         ))
     }
 }

@@ -94,7 +94,7 @@ public struct DownloadTask<Content: Property>: RequestTask {
      */
     public func result() async throws -> TaskResult<AsyncBytes> {
         try await task
-            .ignoresUploadProgress()
+            .collectBytes()
             .result()
     }
 }

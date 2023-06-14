@@ -8,26 +8,26 @@ struct FormNode: PropertyNode {
 
     // MARK: - Internal properties
 
-    let fragmentLength: Int?
+    let chunkSize: Int?
     let items: [FormItem]
 
     // MARK: - Inits
 
     init(
-        fragmentLength: Int?,
+        chunkSize: Int?,
         item: FormItem
     ) {
         self.init(
-            fragmentLength: fragmentLength,
+            chunkSize: chunkSize,
             items: [item]
         )
     }
 
     init(
-        fragmentLength: Int?,
+        chunkSize: Int?,
         items: [FormItem]
     ) {
-        self.fragmentLength = fragmentLength
+        self.chunkSize = chunkSize
         self.items = items
     }
 
@@ -43,18 +43,16 @@ struct FormNode: PropertyNode {
 
         let buffers = try constructor()
 
-        make.request.headers.set(
-            name: "Content-Length",
-            value: String(
-                buffers.lazy
-                    .map(\.estimatedBytes)
-                    .reduce(.zero, +)
-            )
-        )
-
-        make.request.body = Internals.Body(
-            fragmentLength,
+        let body = Internals.Body(
+            chunkSize: chunkSize,
             buffers: buffers
         )
+
+        make.request.headers.set(
+            name: "Content-Length",
+            value: String(body.totalSize)
+        )
+
+        make.request.body = body
     }
 }

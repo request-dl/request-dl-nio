@@ -62,7 +62,7 @@ class InternalsRequestTests: XCTestCase {
 
     func testRequest_whenSetReadingMode() async throws {
         // Given
-        let readingMode = Internals.Response.ReadingMode.separator([70])
+        let readingMode = Internals.DownloadStep.ReadingMode.separator([70])
 
         // When
         request.readingMode = readingMode

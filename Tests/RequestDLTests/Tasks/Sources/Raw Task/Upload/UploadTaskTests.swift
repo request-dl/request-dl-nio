@@ -44,7 +44,7 @@ class UploadTaskTests: XCTestCase {
 
             Payload(data: upload)
         }
-        .ignoresProgress()
+        .collectData()
         .extractPayload()
         .result()
 

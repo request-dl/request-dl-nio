@@ -49,3 +49,22 @@ extension Data {
         return Set(literal.split(separator: "&").map { String($0) })
     }
 }
+
+extension Data {
+
+    init<Sequence: AsyncSequence>(_ sequence: Sequence) async throws where Sequence.Element == UInt8 {
+        self.init()
+
+        for try await element in sequence {
+            append(element)
+        }
+    }
+
+    init<Sequence: AsyncSequence>(_ sequence: Sequence) async throws where Sequence.Element == Data {
+        self.init()
+
+        for try await data in sequence {
+            append(contentsOf: data)
+        }
+    }
+}

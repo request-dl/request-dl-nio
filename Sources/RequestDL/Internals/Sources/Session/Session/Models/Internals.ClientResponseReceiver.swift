@@ -9,7 +9,7 @@ import NIOHTTP1
 
 extension Internals {
 
-    class ClientResponseReceiver: @unchecked Sendable, HTTPClientResponseDelegate {
+    final class ClientResponseReceiver: @unchecked Sendable, HTTPClientResponseDelegate {
 
         typealias Response = Void
 

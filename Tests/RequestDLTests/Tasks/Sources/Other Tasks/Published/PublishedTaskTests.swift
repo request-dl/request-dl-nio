@@ -26,7 +26,7 @@ class PublishedTaskTests: XCTestCase {
         MockedTask {
             BaseURL("localhost")
         }
-        .ignoresProgress()
+        .collectData()
         .publisher()
         .map { _ in
             PublisherResult.success
@@ -58,7 +58,7 @@ class PublishedTaskTests: XCTestCase {
                 MockedTask {
                     BaseURL("localhost")
                 }
-                .ignoresProgress()
+                .collectData()
                 .publisher()
                 .map { _ in
                     PublisherResult.success

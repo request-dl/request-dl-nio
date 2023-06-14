@@ -17,7 +17,10 @@ class InternalsDownloadBufferTests: XCTestCase {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(download.stream))
+        let bytes = try await Array(Internals.AsyncBytes(
+            totalSize: data.count,
+            stream: download.stream
+        ))
 
         XCTAssertEqual(bytes, [data])
     }
@@ -35,8 +38,13 @@ class InternalsDownloadBufferTests: XCTestCase {
         var receivedData = Data()
         var errors = [Error]()
 
+        let bytes = Internals.AsyncBytes(
+            totalSize: data.count,
+            stream: download.stream
+        )
+
         do {
-            for try await data in Internals.AsyncBytes(download.stream) {
+            for try await data in bytes {
                 receivedData.append(data)
             }
         } catch {
@@ -67,10 +75,16 @@ class InternalsDownloadBufferTests: XCTestCase {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(download.stream))
-        let expecting = Array(part1 + part2 + part3 + part4).split(by: length)
+        let parts = part1 + part2 + part3 + part4
+        let bytes = Internals.AsyncBytes(
+            totalSize: parts.count,
+            stream: download.stream
+        )
 
-        XCTAssertEqual(bytes, expecting)
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = Array(parts).split(by: length)
+
+        XCTAssertEqual(receivedBytes, expectedBytes)
     }
 
     func testDownload_whenAppendingWithSplitByByte_shouldContainsFragmentsEndeingWithByte() async throws {
@@ -89,10 +103,16 @@ class InternalsDownloadBufferTests: XCTestCase {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(download.stream))
-        let data = line1 + line2 + line3
+        let parts = line1 + line2 + line3
+        let bytes = Internals.AsyncBytes(
+            totalSize: parts.count,
+            stream: download.stream
+        )
 
-        XCTAssertEqual(bytes, Array(data).split(separator: Array(separator)))
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = Array(parts).split(separator: Array(separator))
+
+        XCTAssertEqual(receivedBytes, expectedBytes)
     }
 
     func testDownload_whenAppendingOnlySeparator_shouldContainsTwoFragments() async throws {
@@ -106,10 +126,15 @@ class InternalsDownloadBufferTests: XCTestCase {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(download.stream))
-        let data = separator
+        let bytes = Internals.AsyncBytes(
+            totalSize: separator.count,
+            stream: download.stream
+        )
 
-        XCTAssertEqual(bytes, Array(data).split(separator: Array(separator)))
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = Array(separator).split(separator: Array(separator))
+
+        XCTAssertEqual(receivedBytes, expectedBytes)
     }
 
     func testDownload_whenEmpty_shouldBeEmpty() async throws {
@@ -120,9 +145,15 @@ class InternalsDownloadBufferTests: XCTestCase {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(download.stream))
+        let bytes = Internals.AsyncBytes(
+            totalSize: .zero,
+            stream: download.stream
+        )
 
-        XCTAssertTrue(bytes.isEmpty)
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = [Data]()
+
+        XCTAssertEqual(receivedBytes, expectedBytes)
     }
 
     func testDownload_whenMBAppending_shouldBeEqual() async throws {
@@ -136,8 +167,14 @@ class InternalsDownloadBufferTests: XCTestCase {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(download.stream))
+        let bytes = Internals.AsyncBytes(
+            totalSize: data.count,
+            stream: download.stream
+        )
 
-        XCTAssertEqual(bytes, Array(data).split(by: length))
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = Array(data).split(by: length)
+
+        XCTAssertEqual(receivedBytes, expectedBytes)
     }
 }

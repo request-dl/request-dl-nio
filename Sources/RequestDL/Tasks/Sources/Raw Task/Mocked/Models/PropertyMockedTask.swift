@@ -80,6 +80,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         }
 
         return Internals.AsyncResponse(
+            uploadingBytes: .zero,
             upload: .empty(),
             head: .constant(mockResponseHead(resolved)),
             download: downloadBuffer.stream

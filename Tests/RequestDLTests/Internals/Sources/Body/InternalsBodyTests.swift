@@ -29,7 +29,7 @@ class InternalsBodyTests: XCTestCase {
         // Given
         let string = "Hello World"
 
-        let body = Internals.Body(string.count, buffers: [
+        let body = Internals.Body(chunkSize: string.count, buffers: [
             Internals.DataBuffer(string)
         ])
 
