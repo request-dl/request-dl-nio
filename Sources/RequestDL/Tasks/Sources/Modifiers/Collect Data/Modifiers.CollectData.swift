@@ -65,7 +65,7 @@ extension Modifiers {
 extension RequestTask<AsyncResponse> {
 
     /// Returns a modified request task that collects and combines the individual bytes into a consolidated `Data` object.
-    public func collectData() -> ModifiedRequestTask<Modifiers.CollectData<Element, TaskResult<Data>>>  {
+    public func collectData() -> ModifiedRequestTask<Modifiers.CollectData<Element, TaskResult<Data>>> {
         modifier(Modifiers.CollectData())
     }
 }

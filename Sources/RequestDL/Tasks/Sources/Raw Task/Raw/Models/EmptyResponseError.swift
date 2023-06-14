@@ -14,4 +14,3 @@ public struct RequestFailureError: LocalizedError {
     /// Creates an instance of `RequestFailureError`.
     public init() {}
 }
-
