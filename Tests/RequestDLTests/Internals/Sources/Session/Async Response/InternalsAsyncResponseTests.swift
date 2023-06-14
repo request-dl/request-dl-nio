@@ -125,9 +125,3 @@ extension InternalsAsyncResponseTests {
         )
     }
 }
-
-/*
- [RequestDL.Internals.ResponseStep.download(RequestDL.Internals.DownloadStep(head: RequestDL.Internals.ResponseHead(url: "https://127.0.0.1", status: RequestDL.Internals.ResponseHead.Status(code: 200, reason: "OK"), version: RequestDL.Internals.ResponseHead.Version(minor: 0, major: 1), headers: , isKeepAlive: false), bytes: RequestDL.Internals.AsyncBytes(totalSize: 0, asyncBuffers: RequestDL.Internals.AsyncStream<RequestDL.Internals.Buffer<RequestDL.Internals.ByteStreamBuffer>>(storage: RequestDL.Internals.AsyncStream<RequestDL.Internals.Buffer<RequestDL.Internals.ByteStreamBuffer>>.(unknown context at $110e56e60).Storage, queue: RequestDL.Internals.AsyncQueue))))]
-
- [RequestDL.Internals.ResponseStep.download(RequestDL.Internals.DownloadStep(head: RequestDL.Internals.ResponseHead(url: "https://127.0.0.1", status: RequestDL.Internals.ResponseHead.Status(code: 200, reason: "OK"), version: RequestDL.Internals.ResponseHead.Version(minor: 0, major: 1), headers: , isKeepAlive: false), bytes: RequestDL.Internals.AsyncBytes(totalSize: 100000000, asyncBuffers: RequestDL.Internals.AsyncStream<RequestDL.Internals.Buffer<RequestDL.Internals.ByteStreamBuffer>>(storage: RequestDL.Internals.AsyncStream<RequestDL.Internals.Buffer<RequestDL.Internals.ByteStreamBuffer>>.(unknown context at $110e56e60).Storage, queue: RequestDL.Internals.AsyncQueue))))]
- */

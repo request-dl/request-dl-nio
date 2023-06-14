@@ -15,13 +15,17 @@ extension Modifiers {
 
         let transform: @Sendable (Input) async throws -> Output
 
-        init<Progress: UploadProgress>(_ progress: Progress) where Input == AsyncResponse, Output == TaskResult<AsyncBytes> {
+        init<Progress: UploadProgress>(
+            _ progress: Progress
+        ) where Input == AsyncResponse, Output == TaskResult<AsyncBytes> {
             transform = {
                 try await $0.collect(with: progress)
             }
         }
 
-        init<Download: DownloadProgress>(_ progress: Download) where Input == TaskResult<AsyncBytes>, Output == TaskResult<Data> {
+        init<Download: DownloadProgress>(
+            _ progress: Download
+        ) where Input == TaskResult<AsyncBytes>, Output == TaskResult<Data> {
             transform = {
                 try await .init(
                     head: $0.head,
@@ -30,7 +34,9 @@ extension Modifiers {
             }
         }
 
-        init<Download: DownloadProgress>(_ progress: Download) where Input == AsyncBytes, Output == Data {
+        init<Download: DownloadProgress>(
+            _ progress: Download
+        ) where Input == AsyncBytes, Output == Data {
             transform = {
                 try await $0.collect(with: progress)
             }
