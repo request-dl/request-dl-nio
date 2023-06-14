@@ -30,11 +30,8 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
     public typealias Element = Data
 
     // MARK: - Public properties
-    
+
     /// The total size of the `AsyncBytes` data.
-    public var totalSize: Int {
-        bytes.totalSize
-    }
     public var totalSize: Int {
         bytes.totalSize
     }
