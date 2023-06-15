@@ -371,7 +371,7 @@ public struct Form<Headers: Property>: Property {
         )
 
         return .leaf(FormNode(
-            fragmentLength: inputs.environment.payloadPartLength,
+            chunkSize: inputs.environment.payloadChunkSize,
             item: FormItem(
                 name: property.name,
                 filename: property.filename,

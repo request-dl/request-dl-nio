@@ -1061,11 +1061,11 @@ class FormTests: XCTestCase {
 
     // MARK: - Others tests
 
-    func testForm_whenInitDataPartLength() async throws {
+    func testForm_whenInitDataChunkSize() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 1_024)
-        let partLength = 64
+        let chunkSize = 64
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -1073,7 +1073,7 @@ class FormTests: XCTestCase {
                 name: name,
                 data: data
             )
-            .payloadPartLength(partLength)
+            .payloadChunkSize(chunkSize)
         })
 
         let parser = try await MultipartFormParser(resolved.request)
@@ -1086,8 +1086,8 @@ class FormTests: XCTestCase {
         // Then
         XCTAssertEqual(
             buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: totalBytes, by: partLength).map {
-                let upperBound = $0 + partLength
+            stride(from: .zero, to: totalBytes, by: chunkSize).map {
+                let upperBound = $0 + chunkSize
                 return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
         )

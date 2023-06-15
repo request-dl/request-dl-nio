@@ -4,7 +4,6 @@
 
 import Foundation
 
-// swiftlint:disable file_length
 extension Internals.Log {
 
     struct Message {
@@ -60,25 +59,6 @@ extension Internals.Log.Message {
             ].merging(error.map {[
                 String(describing: type(of: $0)): $0
             ]} ?? [:], uniquingKeysWith: { lhs, _ in lhs })
-        )
-    }
-}
-
-// MARK: [Internals] - Task
-extension Internals.Log.Message {
-
-    static func emptyRequestBody() -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            Creating a RequestBody with an empty BodyContent is potentially \
-            risky and may cause unexpected behavior.
-
-            Please ensure that a valid content is provided to the RequestBody \
-            to avoid any potential issues.
-
-            If no content is intended for the RequestBody, please consider \
-            using a different approach.
-            """
         )
     }
 }
@@ -322,30 +302,6 @@ extension Internals.Log.Message {
     }
 }
 
-// MARK: - Modifiers
-extension Internals.Log.Message {
-
-    static func missingStagesOfRequest<Content>(
-        _ content: Content
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            An error occurred while attempting to iterate through an \
-            asynchronous sequence representing the stages of a request.
-
-            The absence of a complete request was detected, as the loop \
-            terminated prematurely without encountering an upload or download \
-            step.
-
-            Please, open a bug report 🔎
-            """,
-            parameters: [
-                String(describing: type(of: content)): content
-            ]
-        )
-    }
-}
-
 extension Internals.Log {
 
     private static func debugParameters(
@@ -411,4 +367,3 @@ extension Internals.Log {
         )
     }
 }
-// swiftlint:enable file_length

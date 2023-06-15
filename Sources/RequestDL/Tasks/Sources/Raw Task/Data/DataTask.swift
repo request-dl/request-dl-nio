@@ -65,7 +65,7 @@ public struct DataTask<Content: Property>: RequestTask {
      */
     public func result() async throws -> TaskResult<Data> {
         try await task
-            .ignoresProgress()
+            .collectData()
             .result()
     }
 }

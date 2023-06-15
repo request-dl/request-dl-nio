@@ -11,7 +11,7 @@ struct PayloadNode: PropertyNode {
     let factory: PayloadFactory
     let charset: Charset
     let urlEncoder: URLEncoder
-    let partLength: Int?
+    let chunkSize: Int?
 
     // MARK: - Internal methods
 
@@ -64,11 +64,16 @@ struct PayloadNode: PropertyNode {
             value: String(output.contentType)
         )
 
-        make.request.headers.set(
-            name: "Content-Length",
-            value: String(buffer.estimatedBytes)
+        let body = Internals.Body(
+            chunkSize: chunkSize,
+            buffers: [buffer]
         )
 
-        make.request.body = Internals.Body(partLength, buffers: [buffer])
+        make.request.headers.set(
+            name: "Content-Length",
+            value: String(body.totalSize)
+        )
+
+        make.request.body = body
     }
 }

@@ -9,7 +9,7 @@ public struct ReadingMode: Property {
 
     private struct Node: PropertyNode {
 
-        let mode: Internals.Response.ReadingMode
+        let mode: Internals.DownloadStep.ReadingMode
 
         func make(_ make: inout Make) async throws {
             make.request.readingMode = mode
@@ -25,7 +25,7 @@ public struct ReadingMode: Property {
 
     // MARK: - Private properties
 
-    private let mode: Internals.Response.ReadingMode
+    private let mode: Internals.DownloadStep.ReadingMode
 
     // MARK: - Inits
 

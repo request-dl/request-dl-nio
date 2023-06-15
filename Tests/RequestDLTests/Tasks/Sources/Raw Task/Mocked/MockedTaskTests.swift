@@ -21,7 +21,7 @@ class MockedTaskTests: XCTestCase {
                 Payload(data: data, contentType: .text)
             }
         )
-        .ignoresProgress()
+        .collectData()
         .result()
 
         // Then
@@ -48,7 +48,7 @@ class MockedTaskTests: XCTestCase {
             BaseURL("localhost")
             Payload(data: data)
         }
-        .ignoresProgress()
+        .collectData()
         .result()
 
         // Then
