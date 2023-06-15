@@ -58,24 +58,6 @@ public struct BaseURL: Property {
     let scheme: URLScheme
     let host: String
 
-    // MARK: - Private properties
-
-    private var absoluteString: String {
-        if host.contains("://") {
-            Internals.Log.failure(
-                .invalidHost(host)
-            )
-        }
-
-        guard let host = host.split(separator: "/").first else {
-            Internals.Log.failure(
-                .unexpectedHost(host)
-            )
-        }
-
-        return "\(scheme.rawValue)://\(host)"
-    }
-
     // MARK: - Init
 
     /**
@@ -134,6 +116,26 @@ public struct BaseURL: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(baseURL: property.absoluteString))
+        return try .leaf(Node(baseURL: property.pointer().path()))
+    }
+
+    // MARK: - Private methods
+
+    private func path() throws -> String {
+        if host.contains("://") {
+            throw BaseURLError(
+                context: .invalidHost,
+                baseURL: host
+            )
+        }
+
+        guard let host = host.split(separator: "/").first else {
+            throw BaseURLError(
+                context: .unexpectedHost,
+                baseURL: host
+            )
+        }
+
+        return "\(scheme.rawValue)://\(host)"
     }
 }

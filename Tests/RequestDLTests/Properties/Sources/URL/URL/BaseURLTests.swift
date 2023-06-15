@@ -151,6 +151,56 @@ class BaseURLTests: XCTestCase {
         XCTAssertEqual(resolved.request.url, "https://google.com")
     }
 
+    func testURL_whenIncludingScheme() async throws {
+        // Given
+        let baseURL = "https://www.apple.com"
+
+        do {
+            // When
+            _ = try await resolve(TestProperty {
+                BaseURL(baseURL)
+            })
+
+            // Then
+            XCTFail("Not expecting success")
+        } catch let error as BaseURLError {
+            XCTAssertEqual(error.context, .invalidHost)
+            XCTAssertEqual(error.baseURL, baseURL)
+            XCTAssertEqual(error.errorDescription, """
+                Invalid host string: The url scheme should not be \
+                included; BaseURL: \(baseURL)
+                """
+            )
+        } catch {
+            throw error
+        }
+    }
+
+    func testURL_whenEmptyString() async throws {
+        // Given
+        let baseURL = ""
+
+        do {
+            // When
+            _ = try await resolve(TestProperty {
+                BaseURL(baseURL)
+            })
+
+            // Then
+            XCTFail("Not expecting success")
+        } catch let error as BaseURLError {
+            XCTAssertEqual(error.context, .unexpectedHost)
+            XCTAssertEqual(error.baseURL, baseURL)
+            XCTAssertEqual(error.errorDescription, """
+                Unexpected format for host string: Could not extract the \
+                host; BaseURL: \(baseURL)
+                """
+            )
+        } catch {
+            throw error
+        }
+    }
+
     func testNeverBody() async throws {
         // Given
         let property = BaseURL("apple.com")
