@@ -110,7 +110,7 @@ class FormGroupTests: XCTestCase {
         ))
     }
 
-    func testGroup_whenPartLength() async throws {
+    func testGroup_whenChunkSize() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 256)

@@ -1061,7 +1061,7 @@ class FormTests: XCTestCase {
 
     // MARK: - Others tests
 
-    func testForm_whenInitDataPartLength() async throws {
+    func testForm_whenInitDataChunkSize() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 1_024)
