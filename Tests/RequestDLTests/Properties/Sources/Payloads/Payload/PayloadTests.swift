@@ -678,38 +678,37 @@ extension PayloadTests {
     }
 }
 
-
 // MARK: - Deprecated
 
 @available(*, deprecated)
 extension PayloadTests {
-    
+
     func testDeprecated_whenInitDataWithPartLength() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
         let chunkSize = 1_024
-        
+
         // When
         let resolved = try await resolve(TestProperty {
             Payload(data: data)
                 .payloadPartLength(chunkSize)
         })
-        
+
         let buffers = try await resolved.request.body?.buffers() ?? []
-        
+
         // Then
         XCTAssertEqual(
             resolved.request.headers["Content-Type"],
             ["application/octet-stream"]
         )
-        
+
         XCTAssertEqual(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
-        
+
         let totalBytes = data.count
-        
+
         XCTAssertEqual(
             buffers.compactMap { $0.getData() },
             stride(from: .zero, to: data.count, by: chunkSize).map {

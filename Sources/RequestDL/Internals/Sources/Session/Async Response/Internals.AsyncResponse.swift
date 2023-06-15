@@ -52,16 +52,14 @@ extension Internals {
                     download: nil
                 )
 
-                return lastHead.map {
-                    let totalSize = $0.headers["Content-Length"]?
-                        .reduce([]) { $0 + $1.split(separator: ",") }
-                        .lazy
-                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                return lastHead.map { head in
+                    let totalSize = head.headers
+                        .components(name: "Content-Length")?
                         .compactMap(Int.init)
                         .max()
 
                     return .download(DownloadStep(
-                        head: $0,
+                        head: head,
                         bytes: AsyncBytes(
                             totalSize: totalSize ?? .zero,
                             stream: data
