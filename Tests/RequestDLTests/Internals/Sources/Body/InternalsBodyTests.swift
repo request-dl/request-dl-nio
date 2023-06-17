@@ -19,6 +19,9 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
+        XCTAssertEqual(body.chunkSize, 1)
+        XCTAssertEqual(body.totalSize, string.count)
+
         XCTAssertEqual(
             buffers.resolveData(),
             Array(string.utf8).split(by: 1)
@@ -29,7 +32,7 @@ class InternalsBodyTests: XCTestCase {
         // Given
         let string = "Hello World"
 
-        let body = Internals.Body(string.count, buffers: [
+        let body = Internals.Body(chunkSize: string.count, buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -37,6 +40,9 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
+        XCTAssertEqual(body.chunkSize, string.count)
+        XCTAssertEqual(body.totalSize, string.count)
+
         XCTAssertEqual(
             buffers.resolveData(),
             [Data(string.utf8)]
@@ -55,6 +61,26 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
+        XCTAssertEqual(body.chunkSize, .zero)
+        XCTAssertEqual(body.totalSize, string.count)
+
+        XCTAssertEqual(
+            buffers.resolveData(),
+            []
+        )
+    }
+
+    func testRequestBody_whenEmptyBuffer() async throws {
+        // Given
+        let body = Internals.Body(buffers: [])
+
+        // When
+        let buffers = try await body.buffers()
+
+        // Then
+        XCTAssertEqual(body.chunkSize, .zero)
+        XCTAssertEqual(body.totalSize, .zero)
+
         XCTAssertEqual(
             buffers.resolveData(),
             []

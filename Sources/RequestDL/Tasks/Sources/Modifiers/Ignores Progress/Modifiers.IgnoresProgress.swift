@@ -10,6 +10,7 @@ import Foundation
 
 extension Modifiers {
 
+    @available(*, deprecated, renamed: "Convert")
     public struct IgnoresProgress<Input: Sendable, Output: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
@@ -59,14 +60,13 @@ extension Modifiers {
                 switch step {
                 case .upload:
                     break
-                case .download(let head, let bytes):
-                    return .init(head: head, payload: bytes)
+                case .download(let step):
+                    return .init(head: step.head, payload: step.bytes)
                 }
             }
 
-            Internals.Log.failure(
-                .missingStagesOfRequest(content)
-            )
+            try Task.checkCancellation()
+            throw RequestFailureError()
         }
 
         private static func ignoresDownload(_ content: AsyncBytes) async throws -> Data {
@@ -86,21 +86,25 @@ extension Modifiers {
 // swiftlint:disable line_length
 extension RequestTask {
 
+    @available(*, deprecated, renamed: "collectData")
     public func ignoresProgress() -> ModifiedRequestTask<Modifiers.IgnoresProgress<Element, TaskResult<Data>>>
     where Element == AsyncResponse {
         modifier(Modifiers.IgnoresProgress())
     }
 
+    @available(*, deprecated, renamed: "collectBytes")
     public func ignoresUploadProgress() -> ModifiedRequestTask<Modifiers.IgnoresProgress<Element, TaskResult<AsyncBytes>>>
     where Element == AsyncResponse {
         modifier(Modifiers.IgnoresProgress())
     }
 
+    @available(*, deprecated, renamed: "collectData")
     public func ignoresDownloadProgress() -> ModifiedRequestTask<Modifiers.IgnoresProgress<Element, TaskResult<Data>>>
     where Element == TaskResult<AsyncBytes> {
         modifier(Modifiers.IgnoresProgress())
     }
 
+    @available(*, deprecated, renamed: "collectData")
     public func ignoresDownloadProgress() -> ModifiedRequestTask<Modifiers.IgnoresProgress<Element, Data>>
     where Element == AsyncBytes {
         modifier(Modifiers.IgnoresProgress())

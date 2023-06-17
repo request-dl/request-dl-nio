@@ -13,6 +13,7 @@ extension Internals {
 
             // MARK: - Internal properties
 
+            let uploadingBytes: Int
             let upload: AsyncStream<Int>.AsyncIterator?
             let download: (
                 head: Internals.AsyncStream<Internals.ResponseHead>,
@@ -22,12 +23,17 @@ extension Internals {
             // MARK: - Internal methods
 
             mutating func next() async throws -> Element? {
-                if var upload = upload, let part = try await upload.next() {
+                if var upload = upload, let chunkSize = try await upload.next() {
                     self = .init(
+                        uploadingBytes: uploadingBytes,
                         upload: upload,
                         download: download
                     )
-                    return .upload(part)
+
+                    return .upload(.init(
+                        chunkSize: chunkSize,
+                        totalSize: uploadingBytes
+                    ))
                 }
 
                 guard let (heads, data) = download else {
@@ -40,17 +46,34 @@ extension Internals {
                     lastHead = head
                 }
 
-                self = .init(upload: nil, download: nil)
-                return lastHead.map {
-                    .download($0, .init(data))
+                self = .init(
+                    uploadingBytes: uploadingBytes,
+                    upload: nil,
+                    download: nil
+                )
+
+                return lastHead.map { head in
+                    let totalSize = head.headers
+                        .components(name: "Content-Length")?
+                        .compactMap(Int.init)
+                        .max()
+
+                    return .download(DownloadStep(
+                        head: head,
+                        bytes: AsyncBytes(
+                            totalSize: totalSize ?? .zero,
+                            stream: data
+                        )
+                    ))
                 }
             }
         }
 
-        typealias Element = Response
+        typealias Element = ResponseStep
 
         // MARK: - Private properties
 
+        private let uploadingBytes: Int
         private let upload: Internals.AsyncStream<Int>
         private let head: Internals.AsyncStream<Internals.ResponseHead>
         private let download: Internals.AsyncStream<Internals.DataBuffer>
@@ -58,10 +81,12 @@ extension Internals {
         // MARK: - Inits
 
         init(
+            uploadingBytes: Int,
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             download: Internals.AsyncStream<Internals.DataBuffer>
         ) {
+            self.uploadingBytes = uploadingBytes
             self.upload = upload
             self.head = head
             self.download = download
@@ -71,6 +96,7 @@ extension Internals {
 
         func makeAsyncIterator() -> Iterator {
             Iterator(
+                uploadingBytes: uploadingBytes,
                 upload: upload.makeAsyncIterator(),
                 download: (head, download)
             )

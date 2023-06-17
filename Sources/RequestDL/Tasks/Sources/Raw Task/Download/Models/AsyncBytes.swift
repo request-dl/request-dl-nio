@@ -7,7 +7,7 @@ import Foundation
 /**
  A structure that represents asynchronous bytes.
  */
-public struct AsyncBytes: AsyncSequence, Hashable {
+public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
     /**
      A structure that defines an async iterator for the asynchronous bytes.
@@ -28,6 +28,13 @@ public struct AsyncBytes: AsyncSequence, Hashable {
     }
 
     public typealias Element = Data
+
+    // MARK: - Public properties
+
+    /// The total size of the `AsyncBytes` data.
+    public var totalSize: Int {
+        bytes.totalSize
+    }
 
     // MARK: - Private properties
 
@@ -56,14 +63,5 @@ public struct AsyncBytes: AsyncSequence, Hashable {
             seed: seed,
             iterator: bytes.makeAsyncIterator()
         )
-    }
-}
-
-// MARK: - Data extensions
-
-extension Data {
-
-    init(_ asyncBytes: AsyncBytes) async throws {
-        try await self.init(asyncBytes.bytes)
     }
 }

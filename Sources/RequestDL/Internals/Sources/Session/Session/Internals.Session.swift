@@ -81,6 +81,7 @@ extension Internals {
             )
 
             let response = Internals.AsyncResponse(
+                uploadingBytes: request.body?.totalSize ?? .zero,
                 upload: upload,
                 head: head,
                 download: download.stream

@@ -16,7 +16,7 @@ class ModifiersExtractPayloadTests: XCTestCase {
             BaseURL("localhost")
             Payload(data: data)
         })
-        .ignoresProgress()
+        .collectData()
         .extractPayload()
         .result()
 

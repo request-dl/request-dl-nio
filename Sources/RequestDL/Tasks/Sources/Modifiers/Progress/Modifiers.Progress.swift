@@ -10,109 +10,60 @@ import Foundation
 
 extension Modifiers {
 
+    /// A modifier that allows tracking the progress of a request.
     public struct Progress<Input: Sendable, Output: Sendable>: RequestTaskModifier {
 
-        // MARK: - Private properties
+        let transform: @Sendable (Input) async throws -> Output
 
-        private let process: @Sendable (Input) async throws -> Output
-
-        // MARK: - Inits
-
-        fileprivate init(
-            _ progress: RequestDL.Progress
-        ) where Input == AsyncResponse, Output == TaskResult<Data> {
-            self.process = {
-                let downloadPart = try await Self.upload(progress, content: $0)
-
-                let data = try await Self.download(
-                    progress,
-                    length: progress.contentLengthHeaderKey
-                        .flatMap { downloadPart.head.headers[$0] }
-                        .flatMap { $0.lazy.compactMap(Int.init).first },
-                    content: downloadPart.payload
-                )
-
-                return .init(head: downloadPart.head, payload: data)
-            }
-        }
-
-        fileprivate init(
-            _ progress: UploadProgress
+        init<Progress: UploadProgress>(
+            _ progress: Progress
         ) where Input == AsyncResponse, Output == TaskResult<AsyncBytes> {
-            self.process = {
-                try await Self.upload(progress, content: $0)
+            transform = {
+                try await $0.collect(with: progress)
             }
         }
 
-        fileprivate init(
-            _ progress: DownloadProgress
+        init<Download: DownloadProgress>(
+            _ progress: Download
         ) where Input == TaskResult<AsyncBytes>, Output == TaskResult<Data> {
-            self.process = { downloadPart in
-                let data = try await Self.download(
-                    progress,
-                    length: progress.contentLengthHeaderKey
-                        .flatMap { downloadPart.head.headers[$0] }
-                        .flatMap { $0.lazy.compactMap(Int.init).first },
-                    content: downloadPart.payload
+            transform = {
+                try await .init(
+                    head: $0.head,
+                    payload: $0.payload.collect(with: progress)
                 )
-
-                return .init(head: downloadPart.head, payload: data)
             }
         }
 
-        fileprivate init(
-            _ progress: DownloadProgress,
-            length: Int?
+        init<Download: DownloadProgress>(
+            _ progress: Download
         ) where Input == AsyncBytes, Output == Data {
-            self.process = { bytes in
-                try await Self.download(
-                    progress,
-                    length: length,
-                    content: bytes
+            transform = {
+                try await $0.collect(with: progress)
+            }
+        }
+
+        init<Upload: UploadProgress, Download: DownloadProgress>(
+            upload: Upload,
+            download: Download
+        ) where Input == AsyncResponse, Output == TaskResult<Data> {
+            transform = {
+                let result = try await $0.collect(with: upload)
+                return try await .init(
+                    head: result.head,
+                    payload: result.payload.collect(with: download)
                 )
             }
         }
 
-        // MARK: - Public methods
+        /**
+         Tracks the progress of a request.
 
+         - Parameter task: The request task to modify.
+         - Returns: The task result.
+         - Throws: An error if the modification fails.
+         */
         public func body(_ task: Content) async throws -> Output {
-            try await process(task.result())
-        }
-
-        // MARK: - Private static methods
-
-        private static func upload(
-            _ progress: RequestDL.UploadProgress,
-            content: AsyncResponse
-        ) async throws -> TaskResult<AsyncBytes> {
-
-            for try await step in content {
-                switch step {
-                case .upload(let bytesLength):
-                    progress.upload(bytesLength)
-                case .download(let head, let bytes):
-                    return .init(head: head, payload: bytes)
-                }
-            }
-
-            Internals.Log.failure(
-                .missingStagesOfRequest(content)
-            )
-        }
-
-        private static func download(
-            _ progress: RequestDL.DownloadProgress,
-            length: Int?,
-            content: AsyncBytes
-        ) async throws -> Data {
-            var receivedData = Data()
-
-            for try await data in content {
-                progress.download(data, length: length)
-                receivedData.append(data)
-            }
-
-            return receivedData
+            try await transform(task.result())
         }
     }
 }
@@ -121,14 +72,40 @@ extension Modifiers {
 
 extension RequestTask<AsyncResponse> {
 
-    public func progress(
+    /// Sets a progress tracking object for both upload and download.
+    ///
+    /// - Parameters:
+    ///   - progress: The progress tracking object.
+    /// - Returns: A modified request task with progress tracking.
+    public func progress<Progress: RequestDL.Progress>(
         _ progress: Progress
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
-        modifier(Modifiers.Progress(progress))
+        self.progress(upload: progress, download: progress)
     }
 
-    public func uploadProgress(
-        _ upload: UploadProgress
+    /// Sets separate progress tracking objects for upload and download.
+    ///
+    /// - Parameters:
+    ///   - upload: The progress tracking object for upload.
+    ///   - download: The progress tracking object for download.
+    /// - Returns: A modified request task with progress tracking.
+    public func progress<Upload: UploadProgress, Download: DownloadProgress>(
+        upload: Upload,
+        download: Download
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
+        modifier(Modifiers.Progress(
+            upload: upload,
+            download: download
+        ))
+    }
+
+    /// Sets a progress tracking object for upload.
+    ///
+    /// - Parameters:
+    ///   - upload: The progress tracking object for upload.
+    /// - Returns: A modified request task with progress tracking.
+    public func progress<Upload: UploadProgress>(
+        upload: Upload
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<AsyncBytes>>> {
         modifier(Modifiers.Progress(upload))
     }
@@ -136,8 +113,13 @@ extension RequestTask<AsyncResponse> {
 
 extension RequestTask<TaskResult<AsyncBytes>> {
 
-    public func downloadProgress(
-        _ download: DownloadProgress
+    /// Sets a progress tracking object for download.
+    ///
+    /// - Parameters:
+    ///   - download: The progress tracking object for download.
+    /// - Returns: A modified request task with progress tracking.
+    public func progress<Download: DownloadProgress>(
+        download: Download
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
         modifier(Modifiers.Progress(download))
     }
@@ -145,10 +127,47 @@ extension RequestTask<TaskResult<AsyncBytes>> {
 
 extension RequestTask<AsyncBytes> {
 
+    /// Sets a progress tracking object for download.
+    ///
+    /// - Parameters:
+    ///   - download: The progress tracking object for download.
+    /// - Returns: A modified request task with progress tracking.
+    public func progress<Download: DownloadProgress>(
+        download: Download
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, Data>> {
+        modifier(Modifiers.Progress(download))
+    }
+}
+
+// MARK: - Deprecated
+
+extension RequestTask<AsyncResponse> {
+
+    @available(*, deprecated, renamed: "progress(upload:)")
+    public func uploadProgress(
+        _ upload: UploadProgress
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<AsyncBytes>>> {
+        progress(upload: upload)
+    }
+}
+
+extension RequestTask<TaskResult<AsyncBytes>> {
+
+    @available(*, deprecated, renamed: "progress(download:)")
+    public func downloadProgress(
+        _ download: DownloadProgress
+    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
+        progress(download: download)
+    }
+}
+
+extension RequestTask<AsyncBytes> {
+
+    @available(*, deprecated, renamed: "progress(download:)")
     public func downloadProgress(
         _ download: DownloadProgress,
         length: Int? = nil
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, Data>> {
-        modifier(Modifiers.Progress(download, length: length))
+        progress(download: download)
     }
 }

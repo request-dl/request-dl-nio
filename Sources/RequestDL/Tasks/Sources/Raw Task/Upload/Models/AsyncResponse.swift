@@ -24,20 +24,25 @@ public struct AsyncResponse: AsyncSequence {
          */
         mutating public func next() async throws -> Element? {
             switch try await iterator.next() {
-            case .upload(let part):
-                return .upload(part)
-            case .download(let head, let bytes):
-                return .download(.init(head), .init(
-                    seed: seed,
-                    bytes: bytes
+            case .upload(let step):
+                return .upload(UploadStep(
+                    chunkSize: step.chunkSize,
+                    totalSize: step.totalSize
                 ))
+            case .download(let step):
+                return .download(DownloadStep(
+                    head: .init(step.head),
+                    bytes: AsyncBytes(
+                        seed: seed,
+                        bytes: step.bytes
+                    )))
             case .none:
                 return nil
             }
         }
     }
 
-    public typealias Element = Response
+    public typealias Element = ResponseStep
 
     // MARK: - Private properties
 

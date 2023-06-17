@@ -41,7 +41,7 @@ class DownloadTaskTests: XCTestCase {
                 Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
         }
-        .ignoresDownloadProgress()
+        .collectData()
         .extractPayload()
         .result()
 

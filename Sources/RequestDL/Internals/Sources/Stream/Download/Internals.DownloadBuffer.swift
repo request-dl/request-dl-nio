@@ -20,7 +20,7 @@ extension Internals {
             private let lock = Lock()
 
             private let queue = AsyncQueue(priority: .background)
-            private let readingMode: Internals.Response.ReadingMode
+            private let readingMode: Internals.DownloadStep.ReadingMode
 
             // MARK: - Unsafe properties
 
@@ -29,7 +29,7 @@ extension Internals {
 
             // MARK: - Init {
 
-            init(readingMode: Internals.Response.ReadingMode) {
+            init(readingMode: Internals.DownloadStep.ReadingMode) {
                 self._buffer = DataBuffer()
                 self.readingMode = readingMode
                 self.stream = .init()
@@ -163,7 +163,7 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(readingMode: Internals.Response.ReadingMode) {
+        init(readingMode: Internals.DownloadStep.ReadingMode) {
             self.storage = .init(readingMode: readingMode)
         }
 
@@ -187,9 +187,9 @@ extension Internals {
     }
 }
 
-// MARK: - Internals.Response extension
+// MARK: - Internals.DownloadStep extension
 
-extension Internals.Response {
+extension Internals.DownloadStep {
 
     enum ReadingMode: Sendable, Hashable {
         case length(Int)

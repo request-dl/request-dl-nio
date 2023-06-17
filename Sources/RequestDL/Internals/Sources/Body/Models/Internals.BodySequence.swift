@@ -10,10 +10,78 @@ extension Internals {
 
     struct BodySequence: Sendable, Sequence {
 
+        struct Iterator: Sendable, IteratorProtocol {
+
+            // MARK: - Internal properties
+
+            let chunkSize: Int
+            let totalSize: Int
+            private(set) var buffers: [Internals.AnyBuffer]
+
+            // MARK: - Private properties
+
+            private var bytes: NIOCore.ByteBuffer
+
+            // MARK: - Inits
+
+            init(
+                chunkSize: Int,
+                totalSize: Int,
+                buffers: [Internals.AnyBuffer]
+            ) {
+                self.chunkSize = chunkSize
+                self.totalSize = totalSize
+                self.buffers = buffers
+                self.bytes = .init(repeating: .zero, count: chunkSize)
+                bytes.moveReaderIndex(to: .zero)
+                bytes.moveWriterIndex(to: .zero)
+            }
+
+            // MARK: - Internal methods
+
+            mutating func next() -> NIOCore.ByteBuffer? {
+                guard chunkSize > .zero else {
+                    return nil
+                }
+
+                if bytes.writerIndex == chunkSize {
+                    let chunk = ByteBuffer(buffer: bytes)
+                    bytes.moveReaderIndex(to: .zero)
+                    bytes.moveWriterIndex(to: .zero)
+                    return chunk
+                }
+
+                guard var buffer = buffers.first else {
+                    let chunk = ByteBuffer(buffer: bytes)
+                    bytes.moveReaderIndex(to: .zero)
+                    bytes.moveWriterIndex(to: .zero)
+                    return chunk.readableBytes > .zero ? chunk : nil
+                }
+
+                let availableBytes = chunkSize - bytes.writerIndex
+                let length = buffer.readableBytes > availableBytes ? availableBytes : buffer.readableBytes
+
+                guard let data = buffer.readData(length) else {
+                    buffers.removeFirst()
+                    return next()
+                }
+
+                bytes.writeData(data)
+
+                if buffer.readableBytes == .zero {
+                    buffers.removeFirst()
+                } else {
+                    buffers[.zero] = buffer
+                }
+
+                return next()
+            }
+        }
+
         // MARK: - Internal properties
 
-        let size: Int
-        let fragmentSize: Int
+        let chunkSize: Int
+        let totalSize: Int
 
         var isEmpty: Bool {
             buffers.isEmpty
@@ -26,104 +94,33 @@ extension Internals {
         // MARK: - Inits
 
         init(
-            buffers: [Internals.AnyBuffer],
-            size fragment: Int?
+            chunkSize: Int?,
+            buffers: [Internals.AnyBuffer]
         ) {
-            let size = buffers.lazy
+            let totalSize = buffers.lazy
                 .map(\.estimatedBytes)
                 .reduce(.zero, +)
 
-            self.buffers = buffers
-            self.size = size
-            self.fragmentSize = fragment ?? {
-                if size == .zero {
+            self.chunkSize = chunkSize ?? {
+                if totalSize == .zero {
                     return .zero
                 }
 
-                let fragments = Int(floor(Double(size) / 10_000))
-                return fragments == .zero && size > .zero ? 1 : fragments
+                let chunkSize = Int(floor(Double(totalSize) / 10_000))
+                return chunkSize == .zero && totalSize > .zero ? 1 : chunkSize
             }()
+            self.totalSize = totalSize
+            self.buffers = buffers
         }
 
         // MARK: - Internal methods
 
         func makeIterator() -> Iterator {
             Iterator(
-                buffers: buffers,
-                size: size,
-                fragment: fragmentSize
+                chunkSize: chunkSize,
+                totalSize: totalSize,
+                buffers: buffers
             )
-        }
-    }
-}
-
-extension Internals.BodySequence {
-
-    struct Iterator: Sendable, IteratorProtocol {
-
-        // MARK: - Internal properties
-
-        let size: Int
-        let fragment: Int
-        private(set) var buffers: [Internals.AnyBuffer]
-
-        // MARK: - Private properties
-
-        private var bytes: NIOCore.ByteBuffer
-
-        // MARK: - Inits
-
-        init(
-            buffers: [Internals.AnyBuffer],
-            size: Int,
-            fragment: Int
-        ) {
-            self.buffers = buffers
-            self.size = size
-            self.fragment = fragment
-            self.bytes = .init(repeating: .zero, count: fragment)
-            bytes.moveReaderIndex(to: .zero)
-            bytes.moveWriterIndex(to: .zero)
-        }
-
-        // MARK: - Internal methods
-
-        mutating func next() -> NIOCore.ByteBuffer? {
-            guard fragment > .zero else {
-                return nil
-            }
-
-            if bytes.writerIndex == fragment {
-                let chunk = ByteBuffer(buffer: bytes)
-                bytes.moveReaderIndex(to: .zero)
-                bytes.moveWriterIndex(to: .zero)
-                return chunk
-            }
-
-            guard var buffer = buffers.first else {
-                let chunk = ByteBuffer(buffer: bytes)
-                bytes.moveReaderIndex(to: .zero)
-                bytes.moveWriterIndex(to: .zero)
-                return chunk.readableBytes > .zero ? chunk : nil
-            }
-
-            let availableBytes = fragment - bytes.writerIndex
-            let length = buffer.readableBytes > availableBytes ? availableBytes : buffer.readableBytes
-
-            guard let data = buffer.readData(length) else {
-                buffers.removeFirst()
-                return next()
-            }
-
-            bytes.writeData(data)
-
-            if buffer.readableBytes == .zero {
-                buffers.removeFirst()
-            } else {
-                buffers[.zero] = buffer
-            }
-
-            return next()
         }
     }
 }
