@@ -81,8 +81,6 @@ And the methods to add modifiers and interceptors:
 
 We are excited to expand this list with many other features. Start by making your contribution in [Discussions](https://github.com/orgs/request-dl/discussions) or by opening a PR (Pull Request).
 
----
-
 ## Topics
 
 ### First steps

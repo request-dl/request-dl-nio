@@ -6,68 +6,43 @@ The request body supports multiple data types. Learn about all the supported one
 
 TBD.
 
-## Payload
-
-TBD. See: ``RequestDL/Payload``.
-
-### JSON
-
-TBD. See: ``RequestDL/Payload/init(_:options:contentType:)``.
-
-### Codable
-
-TBD. See: ``RequestDL/Payload/init(_:encoder:contentType:)``.
-
-### Verbatim
-
-TBD. See: ``RequestDL/Payload/init(verbatim:contentType:)``.
-
-### Raw bytes
-
-TBD. See: ``RequestDL/Payload/init(data:contentType:)``.
-
-### File
-
-TBD. See: ``RequestDL/Payload/init(url:contentType:)``.
-
-## Form
-
-TBD. See: ``RequestDL/Form``.
-
-### JSON
-
-TBD. See: ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``.
-
-### Codable
-
-TBD. See: ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``.
-
-### Verbatim
-
-TBD. See: ``RequestDL/Form/init(name:filename:contentType:verbatim:)``.
-
-### Raw bytes
-
-TBD. See: ``RequestDL/Form/init(name:filename:contentType:data:)``.
-
-### File
-
-TBD. See: ``RequestDL/Form/init(name:filename:contentType:url:)``.
-
 ### Additional headers
 
 TBD. See for example: ``RequestDL/Form/init(name:filename:contentType:url:headers:)``.
 
-## Additional configuration
+## Topics
 
-### Payload part length
+### Inserting bytes in the request body
 
-TBD. See: ``RequestDL/Property/payloadPartLength(_:)``.
+- ``RequestDL/Payload``
+- ``RequestDL/EncodingPayloadError``
 
-### URL Encoded
+### Using the multipart form data
 
-TBD. See: ``RequestDL/Property/urlEncoder(_:)``.
+- ``RequestDL/Form``
+- ``RequestDL/FormGroup``
 
-### Charset
+### Setting content type
 
-TBD. See: ``RequestDL/Property/charset(_:)``.
+- ``RequestDL/ContentType``
+
+### Making the body URL encoded
+
+- ``RequestDL/URLEncoder``
+- ``RequestDL/QueryItem``
+- ``RequestDL/URLEncoderError``
+- ``RequestDL/Property/urlEncoder(_:)``
+
+### Specifying the content charset
+
+- ``RequestDL/Charset``
+- ``RequestDL/Property/charset(_:)``
+
+### Configure how the data will be uploaded
+
+- ``RequestDL/Property/payloadChunkSize(_:)``
+- ``RequestDL/Property/payloadPartLength(_:)``
+
+### Setting up the download strategy
+
+- ``RequestDL/ReadingMode``

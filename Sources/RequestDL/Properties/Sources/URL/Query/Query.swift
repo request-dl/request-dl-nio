@@ -7,6 +7,8 @@ import Foundation
 /**
  A Property protocol conforming type that represents a query parameter in a URL request.
 
+ ## Overview
+
  You can use it to build a URLRequest with query parameters.
 
  Usage:
@@ -20,6 +22,10 @@ import Foundation
  }
  .result()
  ```
+
+ ## See Also
+
+ - ``RequestDL/URLEncoder``
 */
 public struct Query<Value: Sendable>: Property {
 

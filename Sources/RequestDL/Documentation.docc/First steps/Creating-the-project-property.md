@@ -78,7 +78,7 @@ Of course, there are multiple options to achieve this, and we are only exploring
 
 ### ContentType
 
-Another commonly used aspect in requests is `RequestDL/ContentType`. The Github case is an excellent example since it requires a custom value that deviates from the existing standard value in the library, `application/json`.
+Another commonly used aspect in requests is ``RequestDL/ContentType``. The Github case is an excellent example since it requires a custom value that deviates from the existing standard value in the library, `application/json`.
 
 To achieve this, you need to configure a separate file to extend `ContentType` as follows:
 
@@ -96,8 +96,3 @@ This way, you can use this content type whenever necessary throughout your code.
 ## Getting back on track
 
 Now that you have made these initial configurations, there are, of course, other aspects to explore and utilize according to the specific needs of each application. However, this is the most basic example of getting started, and you are now ready to move on to the next steps.
-
-## See Also
-
-- <doc:Preparing-the-certificates>
-- <doc:Creating-requests-from-scratch>

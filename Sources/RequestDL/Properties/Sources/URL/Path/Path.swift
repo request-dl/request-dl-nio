@@ -5,52 +5,29 @@
 import Foundation
 
 /**
- Use Path to specify the URL pathway.
+ The `Path` is used to specify the URL path to reach the endpoint of the request.
 
- You can have multiple Paths inside the body or @PropertyBuilder results,
- which will be combined in to a single Path appended at BaseURL.
+ ## Overview
 
- Example of single path:
+ You can specify as many paths as necessary and even mix different types such as Int, Double, or any other type that conforms to `LosslessStringConvertible`.
 
- ```swift
- struct AppleDeveloperDefaultPaths: Property {
-
-     var body: some Property {
-         Path("api/v2/ios")
-     }
- }
- ```
-
- Example of multiple paths:
+ Here's an example with a single specified path:
 
  ```swift
- struct AppleDeveloperDefaultPaths: Property {
-
-     var body: some Property {
-         Path("api")
-         Path("v2")
-         Path("ios")
-     }
- }
+ // base-url/api/v1
+ Path("api/v1")
  ```
 
- The resulting URL from multiple paths is the concatenation of all paths,
- appended at the BaseURL. If any path has a leading or trailing slash, it will
- be trimmed. If you want to include a slash as a part of the path, you can
- escape it using a backslash (\\).
+ Here's an example with multiple specified paths, combined in the final URL:
 
  ```swift
- struct ExampleRequest: Property {
-
-     var body: some Property {
-         Path("users")
-         Path("1234")
-         Path("\\/posts")
-     }
- }
-
- The resulting URL of the above request would be `BaseURL/users/1234\/posts`.
+ // base-url/api/v1/users/18900
+ Path("api/v1")
+ Path("users")
+ Path(18900)
  ```
+
+ By using the `Path` component, you can easily construct the desired URL path for your request in RequestDL.
  */
 public struct Path: Property {
 

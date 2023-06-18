@@ -114,7 +114,3 @@ struct GithubAPI: Property {
 These were some basic examples of how to configure certificates to validate the server during a request. By doing this, you will be using TLS security in your network layer.
 
 Although it may not be the most secure option, we also support implementing mTLS or PSK. Continue exploring our documentation for more relevant information.
-
-## See Also
-
-- <doc:Secure-connection>

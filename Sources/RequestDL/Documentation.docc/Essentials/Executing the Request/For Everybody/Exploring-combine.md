@@ -6,6 +6,9 @@ Explore how to use Combine with tasks in an easy and efficient manner.
 
 TBD.
 
-## Publisher from task
+## Topics
 
-TBD. See: ``RequestDL/RequestTask/publisher()``.
+### Meet the modifier
+
+- ``RequestDL/PublishedTask``
+- ``RequestDL/RequestTask/publisher()``

@@ -5,35 +5,33 @@
 import Foundation
 
 /**
- The BaseURL struct defines the base URL for a request. It provides the
- url scheme and the host for the request.
+ The `BaseURL` is the entry point as it specifies the scheme and host to be queried during the request.
 
- To create a BaseURL object, you need to provide the url scheme
- and the string host. You can also set the url scheme to HTTPS by
- default if you only provide the host.
+ ## Overview
 
- Example usage:
+ To start using it, it is important to pay attention to some rules:
 
- ```swift
- import RequestDL
+ - Scheme must be of type ``RequestDL/URLScheme``.
+ - Host is a string without scheme.
 
- struct AppleDeveloperBaseURL: Property {
-     var body: some Property {
-         BaseURL(.https, host: "developer.apple.com")
-     }
- }
-
- ```
-
- Or you can set the host without specifying the scheme type:
+ Here's an example of usage:
 
  ```swift
- struct AppleDeveloperBaseURL: Property {
-     var body: some Property {
-         BaseURL("developer.apple.com")
-     }
- }
+ // Always HTTPS
+ BaseURL("apple.com")
+
+ // Specifying the scheme
+ BaseURL(.http, host: "apple.com")
  ```
+
+ - Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
+
+ - Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
+
+ ## See Also
+
+ - <doc:Creating-requests-from-scratch>
+ - <doc:Cache-support>
  */
 public struct BaseURL: Property {
 

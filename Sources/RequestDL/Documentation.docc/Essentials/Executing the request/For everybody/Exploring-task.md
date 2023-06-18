@@ -6,22 +6,47 @@ Discover the available variations to execute a request according to the specific
 
 TBD.
 
-## RequestTask
+## Topics
 
-TBD. See: ``RequestDL/RequestTask``.
+### The basics
 
-### DataTask
+- ``RequestDL/RequestTask``
+- ``RequestDL/TaskResultPrimitive``
+- ``RequestDL/TaskError``
+- ``RequestDL/TaskResult``
 
-TBD. See: ``RequestDL/DataTask``.
+### Meet the tasks
 
-### DownloadTask
+- ``RequestDL/UploadTask``
+- ``RequestDL/DownloadTask``
+- ``RequestDL/DataTask``
+- ``RequestDL/RequestFailureError``
 
-TBD. See: ``RequestDL/DownloadTask``.
+### Performing multiple tasks
 
-### UploadTask
+- ``RequestDL/GroupTask``
+- ``RequestDL/GroupResult``
 
-TBD. See: ``RequestDL/UploadTask``.
+### Discovering the response
 
-### MockedTask
+- ``RequestDL/ResponseHead``
+- ``RequestDL/ResponseHead/Status-swift.struct``
+- ``RequestDL/ResponseHead/Version-swift.struct``
+- ``RequestDL/StatusCode``
+- ``RequestDL/StatusCodeSet``
 
-TBD. See: ``RequestDL/MockedTask``.
+### Receiving the headers
+
+- ``RequestDL/HTTPHeaders``
+
+### Modifying and intercepting the responses 
+
+- <doc:Modifiers-and-Interceptors>
+
+### Monitoring the progress
+
+- <doc:Upload-and-download-progress>
+
+### Testing and debugging
+
+- ``RequestDL/MockedTask``

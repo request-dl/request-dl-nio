@@ -5,7 +5,35 @@
 import Foundation
 
 /**
- A typealias that combines the `UploadProgress` and `DownloadProgress`
- protocols to represent both upload and download progress.
+ The ``RequestDL/Progress`` protocol combines both `UploadProgress` and `DownloadProgress`, allowing for the implementation of a single object.
+
+ ```swift
+ struct GithubMonitor: Progress {
+
+     let uploadClosure: (Int, Int) -> Void
+     let downloadClosure: (Int, Int) -> Void
+
+     func upload(_ chunkSize: Int, totalSize: Int) {
+         uploadClosure(chunkSize, totalSize)
+     }
+
+     func download(_ slice: Data, totalSize: Int) {
+         downloadClosure(slice.count, totalSize)
+     }
+ }
+ ```
+
+ Then, we can use it as follows:
+
+ ```swift
+ UploadTask {
+     // Request specification
+ }
+ .progress(GithubMonitor(
+     uploadClosure: uploadClosure,
+     downloadClosure: downloadClosure,
+ ))
+ // Other methods
+ ```
  */
 public typealias Progress = UploadProgress & DownloadProgress

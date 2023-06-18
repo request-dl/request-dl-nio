@@ -6,24 +6,27 @@ Caching requests is crucial for saving costs and unnecessary loading screens. Di
 
 TBD.
 
-## Enabling the cache system
+## Topics
 
-TBD.
+### The caching system
 
-### Configuring the cache storage
+- ``RequestDL/DataCache``
+- ``RequestDL/CachedData``
+- ``RequestDL/EmptyCachedDataError``
 
-TBD.
+### Defining the strategy
 
-- ``RequestDL/Property/cache(memoryCapacity:diskCapacity:)``
+- ``RequestDL/CacheStrategy``
+- ``RequestDL/Property/cacheStrategy(_:)``
 
-### Setting the storage policy
+### Defining the policy
 
-TBD.
-
+- ``RequestDL/DataCache/Policy``
+- ``RequestDL/DataCache/Policy/Set``
 - ``RequestDL/Property/cachePolicy(_:)``
 
-### Setting the strategy
+### Initializing the cache  
 
-TBD.
-
-- ``RequestDL/Property/cacheStrategy(_:)``
+- ``RequestDL/Property/cache(memoryCapacity:diskCapacity:)``
+- ``RequestDL/Property/cache(memoryCapacity:diskCapacity:suiteName:)``
+- ``RequestDL/Property/cache(memoryCapacity:diskCapacity:url:)``
