@@ -5,11 +5,11 @@
 import Foundation
 
 /**
- During the definition of your request, you can include the upload monitor to receive notifications when a sequence of bytes is sent.
+ The `UploadProgress` is called when a certain number of bytes have been sent.
 
  - Note: It's important to remember that you can manage how your data is sent using ``RequestDL/Property/payloadChunkSize(_:)``.
 
- If no value is specified for the payload part length, RequestDL automatically fragments the parts in a 1:100 ratio, allowing for the implementation of a 100% progress bar.
+ If no value is specified for the payload chunk size, RequestDL automatically fragments the body in a 1:100 ratio, allowing for the implementation of a 100% progress bar with no additional code.
 
  Here's an example of the `GithubUploadMonitor`:
 
