@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- The `UploadProgress` is called when a certain number of bytes have been sent.
+ The ``RequestDL/UploadProgress`` is called when a certain number of bytes have been sent.
 
  - Note: It's important to remember that you can manage how your data is sent using ``RequestDL/Property/payloadChunkSize(_:)``.
 

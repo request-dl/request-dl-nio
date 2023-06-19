@@ -8,7 +8,7 @@ To start integrating RequestDL into your project, we recommend creating an objec
 
 For example, let's build an application that consumes the Github API. In the [documentation](https://docs.github.com/en/rest), it specifies that the `Accept` header should always be set to `application/vnd.github+json`, and the `X-GitHub-Api-Version` header should be set to `2022-11-28`, which is the latest version of the API. Additionally, all calls should be made to `https://api.github.com`.
 
-## The project property
+### The project property
 
 To implement these specifications for the Github API, we need to create the following object:
 
@@ -26,7 +26,7 @@ struct GithubAPI: Property {
 }
 ```
 
-### Authentication
+#### Authentication
 
 The Github documentation provides various authentication methods, which are not covered in this example. For educational purposes, let's focus on consuming a Github endpoint that requires the `Authorization: Bearer ***` header.
 
@@ -76,7 +76,7 @@ To accomplish this, we can leverage the `GithubAPI` object with the following im
 
 Of course, there are multiple options to achieve this, and we are only exploring a few valid approaches here.
 
-### ContentType
+#### ContentType
 
 Another commonly used aspect in requests is ``RequestDL/ContentType``. The Github case is an excellent example since it requires a custom value that deviates from the existing standard value in the library, `application/json`.
 
@@ -93,6 +93,6 @@ extension ContentType {
 
 This way, you can use this content type whenever necessary throughout your code.
 
-## Getting back on track
+## Next steps
 
 Now that you have made these initial configurations, there are, of course, other aspects to explore and utilize according to the specific needs of each application. However, this is the most basic example of getting started, and you are now ready to move on to the next steps.

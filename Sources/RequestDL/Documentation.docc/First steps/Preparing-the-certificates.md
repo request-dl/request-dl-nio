@@ -8,9 +8,9 @@ The most important configuration required in any application is to apply some se
 
 We are sharing two methods to obtain server certificates to help you explore the available resources. Additionally, obtaining a server certificate is quite easy nowadays.
 
-## Obtaining the Certificate 
+### Obtaining the Certificate 
 
-### via Browser
+#### via Browser
 
 In this example, we will obtain the DER certificates from the `api.github.com` server for our application.
 
@@ -42,7 +42,7 @@ In this example, we downloaded the entire certificate hierarchy from the server.
 
 - Note: It is recommended to always convert the certificates to PEM format, as it allows you to combine them into a single file for use anywhere.
 
-### via Terminal
+#### via Terminal
 
 Another method is to use the `openssl` command in your terminal. By using the command below, you can obtain the certificate in **PEM** format.
 
@@ -67,11 +67,11 @@ Another method is to use the `openssl` command in your terminal. By using the co
 
 In this example, we only downloaded the main server certificate without downloading the complete hierarchy. You can find other examples in the community explaining how to do this via the terminal.
 
-## Configuring GithubAPI
+### Configuring GithubAPI
 
 If you have read **[Creating the project property](<doc:Creating-the-project-property>)**, the configuration example we will be using is a continuation of the GithubAPI implementation.
 
-### Using DER Certificates Individually
+#### Using DER Certificates Individually
 
 ```swift 
 import RequestDL
@@ -91,7 +91,7 @@ struct GithubAPI: Property {
 }
 ```
 
-### Using PEM Certificates
+#### Using PEM Certificates
 
 ```swift 
 import RequestDL
@@ -109,7 +109,7 @@ struct GithubAPI: Property {
 }
 ```
 
-## Getting back on track
+## Next steps
 
 These were some basic examples of how to configure certificates to validate the server during a request. By doing this, you will be using TLS security in your network layer.
 

@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- The ``RequestDL/Progress`` protocol combines both `UploadProgress` and `DownloadProgress`, allowing for the implementation of a single object.
+ The ``RequestDL/Progress`` protocol combines both ``RequestDL/UploadProgress`` and ``RequestDL/DownloadProgress``, allowing for the implementation of a single object.
 
  ```swift
  struct GithubMonitor: Progress {

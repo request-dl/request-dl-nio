@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- The `DownloadProgress` is called when a certain number of bytes have been received.
+ The ``RequestDL/DownloadProgress`` is called when a certain number of bytes have been received.
 
  During the download process, SwiftNIO and AsyncHTTPClient provide the precise values of available bytes for reading, even asynchronously.
 

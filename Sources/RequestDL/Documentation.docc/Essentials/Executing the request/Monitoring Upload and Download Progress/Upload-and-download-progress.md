@@ -8,7 +8,7 @@ The way SwiftNIO and AsyncHTTPClient send and receive data from the server allow
 
 Whether sending a ``RequestDL/Payload`` or a ``RequestDL/Form``, it is possible to serialize the transmission into parts and monitor the upload progress. The same applies to download, as the same process happens internally.
 
-## Monitors
+### Monitors
 
 Exploring this feature in RequestDL involves separating the concepts of upload and download, which are represented through the ``RequestDL/AsyncResponse`` object. The foundation of RequestDL is asynchronous and is fully supported by the principles discussed here.
 

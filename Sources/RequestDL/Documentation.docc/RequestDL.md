@@ -8,11 +8,11 @@ RequestDL aims to provide a comprehensive API for developing applications that c
 
 With these foundations and leveraging modern networking techniques, along with extensive integration provided by Apple through these two modules, RequestDL can accomplish a great deal. All of this is achieved using a simplified and concise syntax.
 
-## Where to start?
+### Where to start?
 
 RequestDL is divided into two main parts: (a) ``RequestDL/Property``; and (b) ``RequestDL/RequestTask``.
 
-### The Property protocol
+#### The Property protocol
 
 This part is related to request construction, providing various methods and objects to specify the URL, payload, and headers. The `Property` utilizes the opaque type `some` to allow the implementation of declarative blocks that are compiled with the help of ``RequestDL/PropertyBuilder``, an `@resultBuilder`.
 
@@ -43,7 +43,7 @@ As for the methods:
 - ``RequestDL/Property/urlEncoder(_:)``;
 - ``RequestDL/Property/payloadPartLength(_:)``;
 
-### The RequestTask protocol
+#### The RequestTask protocol
 
 This protocol is part of the request result processing. Thanks to async/await, we have the possibility of receiving the data through an `AsyncSequence` as well as the `Data` containing the raw bytes. Additionally, we can use ``RequestDL/RequestTaskModifier`` and ``RequestDL/RequestTaskInterceptor`` to perform various types of operations. The request is finalized using the ``RequestDL/RequestTask/result()`` method.
 
@@ -68,7 +68,7 @@ And the methods to add modifiers and interceptors:
 - ``RequestDL/RequestTask/modifier(_:)``;
 - ``RequestDL/RequestTask/interceptor(_:)``.
 
-### Features
+#### Features
 
 - [x] [Declarative request builder](<doc:Creating-requests-from-scratch>);
 - [x] [mTLS / TLS / SSL / PSK](<doc:Secure-connection>);

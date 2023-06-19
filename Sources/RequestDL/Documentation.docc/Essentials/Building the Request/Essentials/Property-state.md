@@ -6,9 +6,9 @@ Discover how to obtain values and utilize classes within a property during the s
 
 TBD.
 
-## Meet the environment
+### Meet the environment
 
-### Environment
+#### Environment
 
 TBD.
 
@@ -16,13 +16,13 @@ TBD.
 - ``RequestDL/PropertyEnvironmentValues``;
 - ``RequestDL/Property/environment(_:_:)``;
 
-### Namespace
+#### Namespace
 
 TBD.
 
 - ``RequestDL/PropertyNamespace``;
 
-### Reference objects
+#### Reference objects
 
 TBD.
 
