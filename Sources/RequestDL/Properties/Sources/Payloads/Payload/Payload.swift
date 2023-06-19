@@ -27,6 +27,28 @@ import Foundation
      Payload(bodyDict)
  }
  ```
+
+ ## Topics
+
+ ### Sending raw bytes
+
+ - ``RequestDL/Payload/init(data:contentType:)``
+
+ ### Sending verbatim texts
+
+ - ``RequestDL/Payload/init(verbatim:contentType:)``
+
+ ### Sending files
+
+ - ``RequestDL/Payload/init(url:contentType:)``
+
+ ### Sending Encodable
+
+ - ``RequestDL/Payload/init(_:encoder:contentType:)``
+
+ ### Sending JSON objects
+
+ - ``RequestDL/Payload/init(_:options:contentType:)``
  */
 public struct Payload: Property {
 

@@ -26,7 +26,32 @@ import Foundation
  - Note: The `Headers` generic parameter represents the type of custom headers associated with the
  form. If no custom headers are needed, the default would be `EmptyProperty`.
 
- - SeeAlso: `Property`
+ ## Topics
+
+ ### Sending raw bytes
+
+ - ``RequestDL/Form/init(name:filename:contentType:data:)``
+ - ``RequestDL/Form/init(name:filename:contentType:data:headers:)``
+
+ ### Sending verbatim texts
+
+ - ``RequestDL/Form/init(name:filename:contentType:verbatim:)``
+ - ``RequestDL/Form/init(name:filename:contentType:verbatim:headers:)``
+
+ ### Sending files
+
+ - ``RequestDL/Form/init(name:filename:contentType:url:)``
+ - ``RequestDL/Form/init(name:filename:contentType:url:headers:)``
+
+ ### Sending Encodable
+
+ - ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``
+ - ``RequestDL/Form/init(name:filename:contentType:value:encoder:headers:)``
+
+ ### Sending JSON objects
+
+ - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``
+ - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:headers:)``
  */
 public struct Form<Headers: Property>: Property {
 
