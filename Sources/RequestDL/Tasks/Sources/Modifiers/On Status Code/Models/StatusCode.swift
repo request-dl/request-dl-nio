@@ -237,7 +237,7 @@ public struct StatusCode: Sendable, Hashable {
 
 extension StatusCode: ExpressibleByIntegerLiteral {
 
-    /// Creates a new `StatusCode` instance with the specified integer literal value.
+    /// Creates a instance with the specified integer literal value.
     ///
     /// - Parameter value: The integer literal value.
     public init(integerLiteral value: IntegerLiteralType) {

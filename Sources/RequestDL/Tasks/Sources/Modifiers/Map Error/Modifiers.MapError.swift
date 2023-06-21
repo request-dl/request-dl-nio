@@ -17,10 +17,9 @@ extension Modifiers {
         // MARK: - Public methods
 
         /**
-         A mapping function that transforms the error of the task result to a new error.
+         A mapping function that throws a new error or maps the current error into a valid object.
 
-         - Parameter task: A `RequestTask` that returns a `TaskResult` containing the error
-         to map.
+         - Parameter task: The ``RequestTask`` where its error will be mapped.
          - Returns: A new error.
          */
         public func body(_ task: Content) async throws -> Input {
@@ -38,11 +37,10 @@ extension Modifiers {
 extension RequestTask {
 
     /**
-     Returns a new `RequestTask` with the error of the original `RequestTask` mapped to a new error.
+     Modifies the behavior of the given task by mapping the error into a new error or in a valid result object.
 
-     - Parameter transform: A mapping function that transforms the error of the
-     task result to a new error.
-     - Returns: A new `RequestTask` with the mapped error.
+     - Parameter transform: A mapping function that throws a new error or maps the current error into a valid object.
+     - Returns: The modified task with the ``Modifiers/MapError`` modifier applied.
      */
     public func mapError(
         _ transform: @escaping @Sendable (Error) throws -> Element
