@@ -2,6 +2,15 @@
 
 A network layer written in Swift based on the declarative programming paradigm.
 
+@Metadata {
+    @PageImage(
+        purpose: icon, 
+        source: "tucano", 
+        alt: "A technology icon representing the RequestDL framework.")
+    
+    @PageColor(blue)
+}
+
 ## Overview
 
 RequestDL aims to provide a comprehensive API for developing applications that consume network services. At its core, RequestDL is built on Apple's **AsyncHTTPClient**, which in turn is based on **SwiftNIO**.
@@ -14,9 +23,7 @@ RequestDL is divided into two main parts: (a) ``RequestDL/Property``; and (b) ``
 
 #### The Property protocol
 
-This part is related to request construction, providing various methods and objects to specify the URL, payload, and headers. The `Property` utilizes the opaque type `some` to allow the implementation of declarative blocks that are compiled with the help of ``RequestDL/PropertyBuilder``, an `@resultBuilder`.
-
-Example:
+This part is related to request construction, providing various methods and objects to specify the URL, payload, and headers. The ``Property`` utilizes the opaque type `some` to allow the implementation of declarative blocks that are compiled with the help of ``RequestDL/PropertyBuilder``, an `@resultBuilder`.
 
 ```swift
 @PropertyBuilder
@@ -30,24 +37,9 @@ func appleWebsite() -> some Property {
 }
 ```
 
-Thanks to `SwiftNIO` and `AsyncHTTPClient`, we can highlight the following objects:
-
-- ``RequestDL/Session``;
-- ``RequestDL/SecureConnection``;
-- ``RequestDL/Form``;
-- ``RequestDL/ReadingMode``.
-
-As for the methods:
-
-- ``RequestDL/Property/cache(memoryCapacity:diskCapacity:suiteName:)``;
-- ``RequestDL/Property/urlEncoder(_:)``;
-- ``RequestDL/Property/payloadPartLength(_:)``;
-
 #### The RequestTask protocol
 
 This protocol is part of the request result processing. Thanks to async/await, we have the possibility of receiving the data through an `AsyncSequence` as well as the `Data` containing the raw bytes. Additionally, we can use ``RequestDL/RequestTaskModifier`` and ``RequestDL/RequestTaskInterceptor`` to perform various types of operations. The request is finalized using the ``RequestDL/RequestTask/result()`` method.
-
-Example:
 
 ```swift
 try await DataTask {
@@ -57,18 +49,7 @@ try await DataTask {
 .result()
 ```
 
-We have the following tasks:
-
-- ``RequestDL/UploadTask``;
-- ``RequestDL/DownloadTask``;
-- ``RequestDL/DataTask``.
-
-And the methods to add modifiers and interceptors:
-
-- ``RequestDL/RequestTask/modifier(_:)``;
-- ``RequestDL/RequestTask/interceptor(_:)``.
-
-#### Features
+### Features
 
 - [x] [Declarative request builder](<doc:Creating-requests-from-scratch>);
 - [x] [mTLS / TLS / SSL / PSK](<doc:Secure-connection>);

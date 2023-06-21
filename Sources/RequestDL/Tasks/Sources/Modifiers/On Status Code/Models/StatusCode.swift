@@ -7,20 +7,18 @@ import Foundation
 /**
  The HTTP status code for a response.
 
- Usage:
-
  ```swift
  let statusCode: StatusCode = .continue
  ```
 
- - Note: For a complete list of the available status codes, please see the corresponding static
+ > Note: For a complete list of the available status codes, please see the corresponding static
  properties.
 
- - Important: If the status code is not included in the predefined static properties, use
+ > Important: If the status code is not included in the predefined static properties, use
  a integer literal to initialize an instance of StatusCode.
 
  The StatusCode struct conforms to the `ExpressibleByIntegerLiteral` protocol, allowing
- it to be initialized with a integer literal, like so:
+ it to be initialized with a integer literal.
 
  ```swift
  let customStatusCode: StatusCode = 99

@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- The ``RequestDL/DownloadProgress`` is called when a certain number of bytes have been received.
+ The ``RequestDL/DownloadProgress/download(_:totalSize:)`` is called when a certain number of bytes have been received.
 
  During the download process, SwiftNIO and AsyncHTTPClient provide the precise values of available bytes for reading, even asynchronously.
 
@@ -34,7 +34,7 @@ import Foundation
  // Other methods
  ```
 
- - Note: You can use `UploadTask` with `progress(download:)` as long as you add the ``RequestDL/RequestTask/collectBytes()`` method.
+ > Note: You can use ``UploadTask`` with ``RequestTask/progress(download:)-20p6u`` as long as you add the ``RequestDL/RequestTask/collectBytes()`` method.
  */
 public protocol DownloadProgress {
 

@@ -9,13 +9,8 @@ extension Interceptors {
     /**
      A task interceptor that detaches the task from its context and performs it on another closure.
 
-     - Important: If you don't retain the task returned by this function, the task will be immediately
-     cancelled when it goes out of scope.
-
      Use this interceptor allows you to perform operations on a separate closure without changing
      the behavior of the main `RequestTask`.
-
-     Usage:
 
      ```swift
      DataTask { ... }
@@ -23,6 +18,9 @@ extension Interceptors {
              // Result is received on a separate thread
          }
      ```
+
+     > Important: If you don't retain the task returned by this function, the task will be immediately
+     cancelled when it goes out of scope.     
      */
     public struct Detach<Element: Sendable>: RequestTaskInterceptor {
 

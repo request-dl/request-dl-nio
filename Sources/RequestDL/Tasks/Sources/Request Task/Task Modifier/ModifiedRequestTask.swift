@@ -5,13 +5,11 @@
 import Foundation
 
 /**
- A type that represents a task that has been modified by a `RequestTaskModifier`.
+ A type that represents a task that has been modified by a ``RequestTaskModifier``.
 
- A `ModifiedRequestTask` is a `RequestTask` that is created by applying a
- `RequestTaskModifier` to a base `RequestTask`.
+ A ``ModifiedRequestTask`` is created by applying a ``RequestTask/modifier(_:)`` to a base ``RequestTask``.
 
- - Note: The `Element` associated type of the `ModifiedTask` is determined by the `Output`
- associated type of the `RequestTaskModifier`.
+ > Note: The `Element` associated type of the ``ModifiedRequestTask`` is determined by the `Output` associated type of the ``RequestTaskModifier``.
  */
 public struct ModifiedRequestTask<Modifier: RequestTaskModifier>: RequestTask {
 

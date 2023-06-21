@@ -18,13 +18,13 @@ Check out our comprehensive documentation to get all the necessary information t
 
 ### First steps
 
-- [Creating the project property](Sources/RequestDL/Documentation.docc/First Steps/Creating-the-project-property.md)
-- [Preparing the certificates](Sources/RequestDL/Documentation.docc/First Steps/Preparing-the-certificates.md)
+- [Creating the project property](https://request-dl.github.io/request-dl/documentation/requestdl/creating-the-project-property)
+- [Preparing the certificates](https://request-dl.github.io/request-dl/documentation/requestdl/preparing-the-certificates)
 
 ### Essentials
 
-- [Building the request](Sources/RequestDL/Documentation.docc/Essentials/Building the Request/Building-the-request.md)
-- [Executing the request](Sources/RequestDL/Documentation.docc/Essentials/Executing the Request/Executing-the-request.md)
+- [Building the request](https://request-dl.github.io/request-dl/documentation/requestdl/building-the-request)
+- [Executing the request](https://request-dl.github.io/request-dl/documentation/requestdl/executing-the-request)
 
 ### Translations
 
@@ -38,7 +38,7 @@ RequestDL can be installed using Swift Package Manager. To include it in your pr
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/request-dl/request-dl.git", from: "2.3.0")
+    .package(url: "https://github.com/request-dl/request-dl.git", from: "3.0.0")
 ]
 ```
 

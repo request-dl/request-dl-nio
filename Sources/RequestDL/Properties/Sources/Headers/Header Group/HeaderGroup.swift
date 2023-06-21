@@ -10,8 +10,6 @@ import Foundation
  Use a HeaderGroup to combine multiple header properties into a single property. The properties can be defined
  either directly in the initializer or using a closure with a PropertyBuilder.
 
- Example:
-
  ```swift
  HeaderGroup {
      Headers.ContentType(.json)

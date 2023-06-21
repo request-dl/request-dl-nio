@@ -7,8 +7,6 @@ import Foundation
 /**
  A custom error type representing base URL-related errors.
 
- Usage:
-
  ```swift
  throw BaseURLError(
     context: .invalidHost,

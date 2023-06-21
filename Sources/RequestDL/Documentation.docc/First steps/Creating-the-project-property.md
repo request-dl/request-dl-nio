@@ -80,7 +80,7 @@ Of course, there are multiple options to achieve this, and we are only exploring
 
 Another commonly used aspect in requests is ``RequestDL/ContentType``. The Github case is an excellent example since it requires a custom value that deviates from the existing standard value in the library, `application/json`.
 
-To achieve this, you need to configure a separate file to extend `ContentType` as follows:
+To achieve this, you need to configure a separate file to extend ``RequestDL/ContentType`` as follows:
 
 ```swift
 import RequestDL

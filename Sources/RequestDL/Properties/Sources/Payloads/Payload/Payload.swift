@@ -16,8 +16,6 @@ import Foundation
 
  To create a `Payload`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
 
- Example:
-
  ```swift
  let bodyDict = ["name": "John", "age": 28]
 

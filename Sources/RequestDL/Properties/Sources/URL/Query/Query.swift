@@ -9,9 +9,7 @@ import Foundation
 
  ## Overview
 
- You can use it to build a URLRequest with query parameters.
-
- Usage:
+ You can use it to build a request with query parameters.
 
  ```swift
  try await DataTask {

@@ -40,7 +40,7 @@ One crucial point is to download the entire certificate hierarchy because when c
 
 In this example, we downloaded the entire certificate hierarchy from the server. However, we have the option to use ``RequestDL/DefaultTrusts`` together with ``RequestDL/AdditionalTrusts`` to achieve a similar result.
 
-- Note: It is recommended to always convert the certificates to PEM format, as it allows you to combine them into a single file for use anywhere.
+> Note: It is recommended to always convert the certificates to PEM format, as it allows you to combine them into a single file for use anywhere.
 
 #### via Terminal
 

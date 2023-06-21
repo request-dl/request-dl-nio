@@ -14,8 +14,6 @@ import Foundation
  - Scheme must be of type ``RequestDL/URLScheme``.
  - Host is a string without scheme.
 
- Here's an example of usage:
-
  ```swift
  // Always HTTPS
  BaseURL("apple.com")
@@ -24,14 +22,16 @@ import Foundation
  BaseURL(.http, host: "apple.com")
  ```
 
- - Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
+ > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
 
- - Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
+ > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
 
- ## See Also
+ ### Learn the fundamentals
 
- - <doc:Creating-requests-from-scratch>
- - <doc:Cache-support>
+ @Links(visualStyle: list) {
+     - <doc:Creating-requests-from-scratch>
+     - <doc:Cache-support>
+ }
  */
 public struct BaseURL: Property {
 
@@ -61,12 +61,6 @@ public struct BaseURL: Property {
     /**
      Creates a BaseURL by combining the url scheme and the string host.
 
-     - Parameters:
-        - scheme: The url scheme chosen.
-        - path: The string host only.
-
-     Example usage:
-
      ```swift
      import RequestDL
 
@@ -77,6 +71,10 @@ public struct BaseURL: Property {
          }
      }
      ```
+
+     - Parameters:
+        - scheme: The url scheme chosen.
+        - path: The string host only.
      */
     public init(_ scheme: URLScheme, host: String) {
         self.scheme = scheme
@@ -85,11 +83,6 @@ public struct BaseURL: Property {
 
     /**
      Defines the base URL from the host with the default HTTPS scheme.
-
-     - Parameters:
-        - path: The string host only.
-
-     Example usage:
 
      ```swift
      import RequestDL
@@ -101,6 +94,9 @@ public struct BaseURL: Property {
          }
      }
      ```
+
+     - Parameters:
+        - path: The string host only.
      */
     public init(_ host: String) {
         self.init(.https, host: host)

@@ -70,8 +70,6 @@ public struct Certificates<Content: Property>: Property {
     /**
      Initializes a new instance of the Certificates struct.
 
-     Example:
-
      ```swift
      DataTask {
         SecureConnection {

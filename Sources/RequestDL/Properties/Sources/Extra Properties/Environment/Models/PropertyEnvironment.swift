@@ -5,21 +5,23 @@
 import Foundation
 
 /**
- A property wrapper that provides access to values stored in the `PropertyEnvironmentValues`
+ A property wrapper that provides access to values stored in the ``PropertyEnvironmentValues``
  object.
 
- The `PropertyEnvironment` property wrapper is used to access values that are stored in the
- `PropertyEnvironmentValues` object. This object contains values that are shared across the
+ ## Overview
+
+ The ``PropertyEnvironment`` property wrapper is used to access values that are stored in the
+ ``PropertyEnvironmentValues`` object. This object contains values that are shared across the
  request tasks and can be accessed by any property within the request's hierarchy. By
- using the `PropertyEnvironment` property wrapper, you can access these values in a type-safe
+ using the ``PropertyEnvironment`` property wrapper, you can access these values in a type-safe
  manner and with less boilerplate code.
 
- **Usage**
+ ### Usage
 
- To use the `PropertyEnvironment` property wrapper, create a new instance of it and pass in a
- key path that  points to the value you want to access in the `PropertyEnvironmentValues`
+ To use the ``PropertyEnvironment`` property wrapper, create a new instance of it and pass in a
+ key path that  points to the value you want to access in the ``PropertyEnvironmentValues``
  object. For example, to access the `contentType` value, you can create an instance of
- `PropertyEnvironment` with the `\.contentType` key path:
+ ``PropertyEnvironment`` with the `\.contentType` key path:
 
  ```swift
  @PropertyEnvironment(\.contentType) var contentType: ContentType
@@ -28,10 +30,10 @@ import Foundation
  This will create a new property named `contentType` that you can use to access the
  `contentType` value anywhere in your property code.
 
- **Example**
+ ### Example
 
- The following example shows how to use the `wrappedValue` property to access the
- `contentType` value in a `Property`:
+ The following example shows how to use the ``PropertyEnvironment/wrappedValue`` property to access the
+ `contentType` value in a ``Property``.
 
  ```swift
  struct DefaultHeader: Property {
@@ -50,26 +52,26 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
     // MARK: - Public properties
 
     /**
-     The wrapped value that provides access to the value stored in the `PropertyEnvironmentValues` object.
+     The wrapped value that provides access to the value stored in the ``PropertyEnvironmentValues`` object.
 
-     To access the value stored in the `PropertyEnvironmentValues` object, use the `wrappedValue`
-     property on the `PropertyEnvironment` property wrapper. This property returns the value that is stored
-     in the `PropertyEnvironmentValues` object for the key path provided to the initializer.
+     To access the value stored in the ``PropertyEnvironmentValues`` object, use the ``PropertyEnvironment/wrappedValue``
+     property on the ``PropertyEnvironment`` property wrapper. This property returns the value that is stored
+     in the ``PropertyEnvironmentValues`` object for the key path provided to the initializer.
 
-     ## Example
+     ### Example
 
-     The following example shows how to use the `wrappedValue` property to access the
-     `contentType` value in a `Property`:
+     The following example shows how to use the ``PropertyEnvironment/wrappedValue`` property to access the
+     `contentType` value in a ``Property``:
 
      ```swift
-         struct DefaultHeader: Property {
+     struct DefaultHeader: Property {
 
-             @PropertyEnvironment(\.contentType) var contentType: ContentType
+         @PropertyEnvironment(\.contentType) var contentType: ContentType
 
-             var body: some Property {
-                 Headers.ContentType(contentType)
-             }
+         var body: some Property {
+             Headers.ContentType(contentType)
          }
+     }
      ```
      */
     public var wrappedValue: Value {
@@ -91,9 +93,9 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
     // MARK: - Inits
 
     /**
-     Initializes a new instance of the `PropertyEnvironment` property wrapper.
+     Initializes a new instance of the ``PropertyEnvironment`` property wrapper.
 
-     - Parameter keyPath: The key path that points to the value in the `PropertyEnvironmentValues` object.
+     - Parameter keyPath: The key path that points to the value in the ``PropertyEnvironmentValues`` object.
      */
     public init(_ keyPath: KeyPath<PropertyEnvironmentValues, Value>) {
         self.keyPath = {

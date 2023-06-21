@@ -12,7 +12,7 @@ extension Modifiers {
      This modifier can be useful in cases where only the payload data is required, and the
      URLResponse is not needed.
 
-     - Note: This modifier is not appropriate when the payload type is `Void`.
+     > Note: This modifier is not appropriate when the payload type is `Void`.
 
      ```
      try await DataTask {

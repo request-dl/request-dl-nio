@@ -16,14 +16,12 @@ extension Interceptors {
      Use `logInConsole(_:)` method of the `RequestTask` to add an instance of the
      `Interceptors.LogInConsole` interceptor to log task result.
 
-     Example:
-
      ```swift
      DataTask { ... }
          .logInConsole(true)
      ```
 
-     - Note: If `isActive` is `true`, it logs task result in the console.
+     > Note: If `isActive` is `true`, it logs task result in the console.
      */
     public struct LogInConsole<Element: Sendable>: RequestTaskInterceptor {
 

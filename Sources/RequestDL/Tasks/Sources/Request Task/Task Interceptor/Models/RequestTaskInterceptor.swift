@@ -10,12 +10,7 @@ import Foundation
  Define the protocol with a generic type `Element`. The generic type represents the element
  that the task will return.
 
- Use the `output` method to handle the result of the task with a
- `Result<Element, Error>` parameter.
-
- - Note: This protocol can be used as a base for creating custom interceptors for tasks.
-
- Example usage:
+ Use the ``RequestTaskInterceptor/output(_:)`` method to handle the result of the task with a `Result<Element, Error>` parameter.
 
  ```swift
  struct MyInterceptor: RequestTaskInterceptor {
@@ -30,20 +25,21 @@ import Foundation
      }
  }
  ```
+
+ > Note: This protocol can be used as a base for creating custom interceptors for tasks.
  */
 public protocol RequestTaskInterceptor<Element>: Sendable {
 
     associatedtype Element: Sendable
 
     /**
-     This method is part of the `RequestTaskInterceptor` protocol, which allows an object to
-     intercept and handle the result of a task execution.
+     This method allows an object to intercept and handle the result of a task execution.
 
      The `output` method is called when the task completes, and receives a `Result`
-     object containing either a successful `Element` result or an `Error`.
+     object containing either a successful `Element` result or a failure `Error`.
 
      - Parameter result: A `Result` object containing either a successful `Element`
-     result or an `Error`.
+     result or a failure `Error`.
      */
     func output(_ result: Result<Element, Error>)
 }

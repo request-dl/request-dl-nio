@@ -5,14 +5,9 @@
 import Foundation
 
 /**
- A task that can be intercepted by an `Interceptor` and returns a `Content` object.
+ A task that is intercepted by an ``RequestTaskInterceptor``.
 
- - Interceptor: The type of `Interceptor` that will intercept the task.
- - Content: The type of `Content` that will be returned by the task.
-
- An `InterceptedTask` conforms to the `RequestTask` protocol and defines a `result()`
- method that returns a `Content.Element` object. The `result()` method can throw an error
- asynchronously.
+ A ``InterceptedRequestTask`` is created by applying a ``RequestTask/interceptor(_:)`` to a base ``RequestTask``.
  */
 public struct InterceptedRequestTask<Interceptor: RequestTaskInterceptor>: RequestTask {
 

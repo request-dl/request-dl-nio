@@ -5,7 +5,7 @@
 import Foundation
 
 /**
- The `Modifiers` enumeration is used to group different types of modifiers in a single namespace.
+ This enumeration is used to group different types of modifiers in a single namespace.
 
  ## Topics
 

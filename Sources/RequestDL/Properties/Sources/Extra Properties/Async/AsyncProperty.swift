@@ -7,8 +7,6 @@ import Foundation
 /**
  A type that represents an asynchronous property specification.
 
- Usage example:
-
  ```swift
  DataTask {
      BaseURL("example.com")

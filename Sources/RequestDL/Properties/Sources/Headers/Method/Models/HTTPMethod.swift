@@ -42,8 +42,11 @@ public struct HTTPMethod: Sendable, Hashable {
 
     // MARK: - Inits
 
-    /// Initializes an HTTP method with the specified raw value.
-    /// - Parameter rawValue: The raw string value of the HTTP method.
+    /**
+     Initializes an HTTP method with the specified raw value.
+
+     - Parameter rawValue: The raw string value of the HTTP method.
+     */
     public init<S: StringProtocol>(_ rawValue: S) {
         self.rawValue = String(rawValue)
     }
@@ -52,9 +55,11 @@ public struct HTTPMethod: Sendable, Hashable {
 // MARK: - ExpressibleByStringLiteral
 
 extension HTTPMethod: ExpressibleByStringLiteral {
-
-    /// Initializes an HTTP method with the specified string literal value.
-    /// - Parameter value: The string literal value of the HTTP method.
+    
+    /**
+     Initializes an HTTP method with the specified string literal value.
+     - Parameter value: The string literal value of the HTTP method.
+     */
     public init(stringLiteral value: StringLiteralType) {
         self.init(value)
     }

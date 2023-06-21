@@ -5,10 +5,9 @@
 import Foundation
 
 /**
- A type that represents a upload task request.
+ Performs a async request containing the upload and download steps.
 
- Use `UploadTask` to represent a async upload and download steps for a specific resource. After you've
- constructed your upload task, you can use `result` function to receive the async request.
+ You can use ``UploadTask/result()`` function to receive the async response of the request.
 
  In the example below, a request is made to the Apple's website:
 
@@ -21,20 +20,19 @@ import Foundation
 
      for try await step in response {
          switch step {
-         case .upload(let part):
-             print("Uploaded \(part) bytes")
-         case .download(let head, let bytes):
-             print("Received \(head) with async \(bytes)")
+         case .upload(let step):
+             print("Uploaded \(step.chunkSize) bytes")
+         case .download(let step):
+             print("Received \(step.head) with async \(step.bytes)")
          }
      }
  }
  ```
 
- It's possible to control the length of bytes read by using the `ReadingMode` property to has the same
- behavior of `DownloadTask`.
+ It's possible to control the length of bytes read by using the ``ReadingMode`` property to has the same
+ behavior of ``DownloadTask``.
 
- - Note: `UploadTask` is a generic type that accepts a type that conforms to `Property` as its
- parameter. `Property` protocol contains information about the request such as its URL, headers,
+ > Note: The ``Property`` instance used by ``UploadTask`` contains information about the request such as its URL, headers,
  body and etc.
  */
 public struct UploadTask<Content: Property>: RequestTask {
@@ -54,7 +52,7 @@ public struct UploadTask<Content: Property>: RequestTask {
     // MARK: - Inits
 
     /**
-     Initializes a `UploadTask` instance.
+     Initializes with a ``Property`` as its content.
 
      - Parameter content: The content of the request.
      */
@@ -65,14 +63,9 @@ public struct UploadTask<Content: Property>: RequestTask {
     // MARK: - Public methods
 
     /**
-     Returns a task result that encapsulates the asynchronous response for a request.
+     Returns the asynchronous response for a request.
 
-     The `result` function is used to retrieve the asynchronous response from an `UploadTask` object.
-     The function returns an `AsyncResponse` object, which represents an asynchronous sequence of
-     request steps that iterates from the upload step to the download step.
-
-     - Returns: An `AsyncResponse` object that represents an asynchronous sequence of request
-     steps.
+     - Returns: An ``AsyncResponse`` sequence of request upload and download steps.
 
      - Throws: An error of type `Error` that indicates an issue with the request or response.
      */
