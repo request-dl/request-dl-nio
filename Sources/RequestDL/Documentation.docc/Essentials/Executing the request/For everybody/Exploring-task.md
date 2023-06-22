@@ -43,7 +43,7 @@ Since every request always starts with the upload process, followed by the downl
 
 ``RequestDL/DownloadTask`` results in ``RequestDL/ResponseHead`` and ``RequestDL/AsyncBytes``, disregarding the upload information. Through these objects, it is already possible to obtain all the data of the request, whether it was successful or not, and also monitor the byte transmission to the server, thanks to `async/await`.
 
-> Tip: You can control how bytes are read by the client through ``RequestDL/ReadingMode``, which should be specified during request construction. This way, you can track the download progress using ``RequestDL/RequestTask/progress(download:)``.
+> Tip: You can control how bytes are read by the client through ``RequestDL/ReadingMode``, which should be specified during request construction. This way, you can track the download progress using ``RequestDL/RequestTask/progress(download:)-20p6u``.
 
 Here's an example without available abstractions to explore the usage of ``RequestDL/DownloadTask``:
 
