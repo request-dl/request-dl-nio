@@ -12,7 +12,7 @@ extension Modifiers {
 
      This modifier changes the behavior of a ``RequestTask`` by executing a provided closure when
      the HTTP status code of the response satisfies a certain condition. It only works on tasks that
-     return a ``TaskResultPrimitive``, which is implemented by ``TaskResult<Element>``.
+     return a ``TaskResultPrimitive``, which is implemented by ``TaskResult``.
 
      This modifier is particularly useful when you need to throw a specific error for a certain status code,
      providing a cleaner and more organized error handling approach.

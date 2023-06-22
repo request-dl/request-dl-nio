@@ -7,7 +7,7 @@ import Foundation
 /**
  The ``RequestTaskModifier`` protocol defines a type that can modify a ``RequestTask`` type.
 
- This protocol requires the definition of an associated type `Input` and `Output` that must be a ``Sendable``
+ This protocol requires the definition of an associated type `Input` and `Output` that must be a `Sendable`
  type. The  ``RequestTaskModifier/body(_:)`` takes in a `Content` task and returns the modified `Output`.
  */
 public protocol RequestTaskModifier<Input, Output>: Sendable {
