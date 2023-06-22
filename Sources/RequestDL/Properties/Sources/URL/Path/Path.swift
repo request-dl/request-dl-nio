@@ -9,7 +9,8 @@ import Foundation
 
  ## Overview
 
- You can specify as many paths as necessary and even mix different types such as Int, Double, or any other type that conforms to `LosslessStringConvertible`.
+ You can specify as many paths as necessary and even mix different types such as Int, Double, or any other
+ type that conforms to `LosslessStringConvertible`.
 
  Here's an example with a single specified path:
 

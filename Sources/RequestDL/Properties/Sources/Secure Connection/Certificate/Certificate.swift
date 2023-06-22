@@ -7,11 +7,14 @@ import Foundation
 /**
  Set a certificate of type `PEM` or `DER`.
 
- It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure with the server. There are several options to utilize the ``RequestDL/Certificate``.
+ It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
+ with the server. There are several options to utilize the ``RequestDL/Certificate``.
 
- You can use it to configure the ``RequestDL/Trusts`` or ``RequestDL/AdditionalTrusts`` to validate if the server is trustworthy.
+ You can use it to configure the ``RequestDL/Trusts`` or ``RequestDL/AdditionalTrusts`` to
+ validate if the server is trustworthy.
 
- Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication certificates to the server.
+ Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication
+ certificates to the server.
 
  ```swift
  let certData = Data(base64Encoded: "...")

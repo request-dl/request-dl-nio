@@ -30,7 +30,7 @@ public struct ResponseHead: Sendable, Hashable {
 
         /**
          Initializes the status of HTTP response.
-        
+
          - Parameters:
            - code: The HTTP status code of the response.
            - reason: The reason phrase associated with the HTTP status code.
@@ -70,7 +70,7 @@ public struct ResponseHead: Sendable, Hashable {
 
         /**
          Initializes the version of HTTP response.
-        
+
          - Parameters:
            - minor: The minor version number of the HTTP protocol used in the response.
            - major: The major version number of the HTTP protocol used in the response.

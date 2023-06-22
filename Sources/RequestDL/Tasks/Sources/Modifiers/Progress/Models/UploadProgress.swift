@@ -5,9 +5,11 @@
 import Foundation
 
 /**
- The ``RequestDL/UploadProgress/upload(_:totalSize:)`` is called when a certain number of bytes have been sent.
+ The ``RequestDL/UploadProgress/upload(_:totalSize:)`` is called when a certain number of
+ bytes have been sent.
 
- If no value is specified for the payload chunk size, RequestDL automatically fragments the body in a 1:100 ratio, allowing for the implementation of a 100% progress bar with no additional code.
+ If no value is specified for the payload chunk size, RequestDL automatically fragments the body in a 1:100 ratio,
+ allowing for the implementation of a 100% progress bar with no additional code.
 
  Here's an example of the `GithubUploadMonitor`:
 
@@ -32,7 +34,8 @@ import Foundation
  // Other methods
  ```
 
- > Note: It's important to remember that you can manage how your data is sent using ``RequestDL/Property/payloadChunkSize(_:)``.
+ > Note: It's important to remember that you can manage how your data is sent using
+ ``RequestDL/Property/payloadChunkSize(_:)``.
  */
 public protocol UploadProgress {
 

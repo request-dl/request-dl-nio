@@ -15,7 +15,7 @@ public struct DownloadStep: Sendable, Hashable {
 
     /**
      Initializes with the response head and the async bytes expected to be received.
-    
+
      - Parameters:
        - head: The response head.
        - bytes: The downloaded bytes.

@@ -54,9 +54,10 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
     /**
      The wrapped value that provides access to the value stored in the ``PropertyEnvironmentValues`` object.
 
-     To access the value stored in the ``PropertyEnvironmentValues`` object, use the ``PropertyEnvironment/wrappedValue``
-     property on the ``PropertyEnvironment`` property wrapper. This property returns the value that is stored
-     in the ``PropertyEnvironmentValues`` object for the key path provided to the initializer.
+     To access the value stored in the ``PropertyEnvironmentValues`` object, use the
+     ``PropertyEnvironment/wrappedValue`` property on the ``PropertyEnvironment`` property
+     wrapper. This property returns the value that is stored in the ``PropertyEnvironmentValues``
+     object for the key path provided to the initializer.
 
      ### Example
 

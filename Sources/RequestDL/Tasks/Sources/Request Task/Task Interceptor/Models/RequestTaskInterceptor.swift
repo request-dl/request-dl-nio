@@ -10,7 +10,8 @@ import Foundation
  Define the protocol with a generic type `Element`. The generic type represents the element
  that the task will return.
 
- Use the ``RequestTaskInterceptor/output(_:)`` method to handle the result of the task with a `Result<Element, Error>` parameter.
+ Use the ``RequestTaskInterceptor/output(_:)`` method to handle the result of the task with a
+ `Result<Element, Error>` parameter.
 
  ```swift
  struct MyInterceptor: RequestTaskInterceptor {

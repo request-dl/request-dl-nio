@@ -20,7 +20,7 @@ extension Interceptors {
      ```
 
      > Important: If you don't retain the task returned by this function, the task will be immediately
-     cancelled when it goes out of scope.     
+     cancelled when it goes out of scope.
      */
     public struct Detach<Element: Sendable>: RequestTaskInterceptor {
 

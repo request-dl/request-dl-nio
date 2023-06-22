@@ -32,8 +32,8 @@ import Foundation
  It's possible to control the length of bytes read by using the ``ReadingMode`` property to has the same
  behavior of ``DownloadTask``.
 
- > Note: The ``Property`` instance used by ``UploadTask`` contains information about the request such as its URL, headers,
- body and etc.
+ > Note: The ``Property`` instance used by ``UploadTask`` contains information about the request
+ such as its URL, headers, body and etc.
  */
 public struct UploadTask<Content: Property>: RequestTask {
 

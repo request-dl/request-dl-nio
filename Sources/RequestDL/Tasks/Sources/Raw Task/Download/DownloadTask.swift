@@ -48,8 +48,8 @@ import Foundation
  }
  ```
 
- > Note: The ``Property`` instance used by ``DownloadTask`` contains information about the request such as its URL, headers,
- body and etc.
+ > Note: The ``Property`` instance used by ``DownloadTask`` contains information about the request
+ such as its URL, headers, body and etc.
  */
 public struct DownloadTask<Content: Property>: RequestTask {
 

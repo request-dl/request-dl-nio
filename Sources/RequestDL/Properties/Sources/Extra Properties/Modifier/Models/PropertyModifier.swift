@@ -8,7 +8,8 @@ import Foundation
  The ``PropertyModifier`` protocol defines a type that can modify a ``Property`` type.
 
  This protocol requires the definition of an associated type `Body` that must be a ``Property``
- type, as well as a function ``PropertyModifier/body(content:)`` that takes in a `Content` parameter and returns a `Body`.
+ type, as well as a function ``PropertyModifier/body(content:)`` that takes in a `Content`
+ parameter and returns a `Body`.
  */
 public protocol PropertyModifier: Sendable {
 

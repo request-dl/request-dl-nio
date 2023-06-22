@@ -39,7 +39,8 @@ public struct MockedTask<Element: Sendable>: RequestTask {
     // MARK: - Inits
 
     /**
-     Initializes with some informations about the response head and the ``Property`` content which will be the result of response.
+     Initializes with some informations about the response head and the ``Property`` content which will
+     be the result of response.
 
      - Parameters:
         - version: The HTTP version of the response. Default is `.init(minor: 0, major: 2)`.

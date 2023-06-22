@@ -5,11 +5,14 @@
 import Foundation
 
 /**
- The ``RequestDL/DownloadProgress/download(_:totalSize:)`` is called when a certain number of bytes have been received.
+ The ``RequestDL/DownloadProgress/download(_:totalSize:)`` is called when a certain number
+ of bytes have been received.
 
- During the download process, SwiftNIO and AsyncHTTPClient provide the precise values of available bytes for reading, even asynchronously.
+ During the download process, SwiftNIO and AsyncHTTPClient provide the precise values of available bytes
+ for reading, even asynchronously.
 
- To maintain a high level of control over the application state, we can use the ``RequestDL/ReadingMode`` to receive data in a fixed size for reading or based on a specific byte sequence.
+ To maintain a high level of control over the application state, we can use the
+ ``RequestDL/ReadingMode`` to receive data in a fixed size for reading or based on a specific byte sequence.
 
  Here's an example of the `GithubDownloadMonitor` definition:
 
@@ -34,7 +37,8 @@ import Foundation
  // Other methods
  ```
 
- > Note: You can use ``UploadTask`` with ``RequestTask/progress(download:)-20p6u`` as long as you add the ``RequestDL/RequestTask/collectBytes()`` method.
+ > Note: You can use ``UploadTask`` with ``RequestTask/progress(download:)-20p6u`` as
+ long as you add the ``RequestDL/RequestTask/collectBytes()`` method.
  */
 public protocol DownloadProgress {
 

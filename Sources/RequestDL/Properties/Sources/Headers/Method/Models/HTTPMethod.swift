@@ -55,7 +55,7 @@ public struct HTTPMethod: Sendable, Hashable {
 // MARK: - ExpressibleByStringLiteral
 
 extension HTTPMethod: ExpressibleByStringLiteral {
-    
+
     /**
      Initializes an HTTP method with the specified string literal value.
      - Parameter value: The string literal value of the HTTP method.
