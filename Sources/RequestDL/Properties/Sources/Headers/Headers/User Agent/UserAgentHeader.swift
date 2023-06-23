@@ -7,9 +7,11 @@ import Foundation
 /**
  Set the `User-Agent` header of the request.
 
- The default value for the `User-Agent` in RequestDL is "APP\_NAME/APP\_VERSION SYS\_NAME/SYS\_VERSION".
- If you want to add an extra parameter, you can use the ``RequestDL/UserAgentHeader``. You can also completely
- override the `User-Agent` values using ``RequestDL/Property/headerStrategy(_:)``.
+ If the `User-Agent` field is required in the request, the ``RequestDL/UserAgentHeader`` provides two
+ ways to configure the header.
+
+ To use the default value of RequestDL, simply use the empty initializer ``RequestDL/UserAgentHeader/init()``.
+ Alternatively, you can specify your own value using the initializer ``RequestDL/UserAgentHeader/init(_:)``.
 
  ```swift
  UserAgentHeader("CustomAgent")
@@ -36,13 +38,13 @@ public struct UserAgentHeader: Property {
     /**
      Initialize with a custom agent to be added to the headers.
 
-     - Parameter userAgent: The custom agent to be added.
+     - Parameter userAgent: The custom agent value.
      */
     public init<S: StringProtocol>(_ userAgent: S) {
         self.value = String(userAgent)
     }
 
-    /// Initialize the `User-Agent` with a default value
+    /// Initialize the `User-Agent` with **APP\_NAME/APP\_VERSION SYS\_NAME/SYS\_VERSION** value.
     public init() {
         value = ProcessInfo.processInfo.userAgent
     }
