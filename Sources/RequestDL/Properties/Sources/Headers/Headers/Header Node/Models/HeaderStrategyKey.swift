@@ -5,12 +5,12 @@
 import Foundation
 
 private struct HeaderStrategyKey: PropertyEnvironmentKey {
-    static let defaultValue: HeaderStrategy? = nil
+    static let defaultValue: HeaderStrategy = .setting
 }
 
 extension PropertyEnvironmentValues {
 
-    var headerStrategy: HeaderStrategy? {
+    var headerStrategy: HeaderStrategy {
         get { self[HeaderStrategyKey.self] }
         set { self[HeaderStrategyKey.self] = newValue }
     }

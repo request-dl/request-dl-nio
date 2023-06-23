@@ -3,6 +3,7 @@
 */
 
 import XCTest
+import AsyncHTTPClient
 @testable import RequestDL
 
 class UserAgentHeaderTests: XCTestCase {
@@ -13,35 +14,54 @@ class UserAgentHeaderTests: XCTestCase {
 
         // When
         let resolved = try await resolve(property)
-        let headers = resolved.request.b
 
         // Then
-        XCTAssertEqual(resolved.request.headers["User-Agent"], ["https://www.example.com/"])
+        XCTAssertNil(resolved.request.headers["User-Agent"])
     }
 
     func testAgent_whenValueIsSetWithAddStrategy() async throws {
         // Given
-        let property = TestProperty(UserAgentHeader("A text agent specification"))
+        let userAgent = "A text agent specification"
 
         // When
-        let resolved = try await resolve(property)
+        let resolved = try await resolve(TestProperty {
+            UserAgentHeader(userAgent)
+        })
 
         // Then
-        XCTAssertEqual(resolved.request.headers["User-Agent"], ["https://www.example.com/"])
+        XCTAssertEqual(resolved.request.headers["User-Agent"], [userAgent])
     }
 
-    func testAgent_whenValueIsSetWithSettingStrategy() async throws {
+    func testAgent_whenUsingDefaultValue() async throws {
         // Given
         let property = TestProperty {
-            UserAgentHeader("A text agent specification")
-                .headerStrategy(.setting)
+            UserAgentHeader()
         }
 
         // When
         let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(resolved.request.headers["User-Agent"], ["https://www.example.com/"])
+        XCTAssertEqual(resolved.request.headers["User-Agent"], [ProcessInfo.processInfo.userAgent])
+    }
+
+    func testAgent_whenUsingDefaultValueWithCustomAgent() async throws {
+        // Given
+        let userAgent = "CustomAgent"
+        // When
+        let resolved = try await resolve(TestProperty {
+            HeaderGroup {
+                UserAgentHeader()
+                UserAgentHeader(userAgent)
+            }
+            .headerStrategy(.adding)
+        })
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["User-Agent"],
+            [ProcessInfo.processInfo.userAgent + " \(userAgent)"]
+        )
     }
 
     func testNeverBody() async throws {

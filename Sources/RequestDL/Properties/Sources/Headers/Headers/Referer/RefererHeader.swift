@@ -47,7 +47,7 @@ public struct RefererHeader: Property {
         return .leaf(HeaderNode(
             key: "Referer",
             value: property.value,
-            strategy: inputs.environment.headerStrategy ?? .setting
+            strategy: inputs.environment.headerStrategy
         ))
     }
 }

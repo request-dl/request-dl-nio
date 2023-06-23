@@ -42,6 +42,11 @@ public struct UserAgentHeader: Property {
         self.value = String(userAgent)
     }
 
+    /// Initialize the `User-Agent` with a default value
+    public init() {
+        value = ProcessInfo.processInfo.userAgent
+    }
+
     // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
@@ -52,8 +57,9 @@ public struct UserAgentHeader: Property {
         property.assertPathway()
         return .leaf(HeaderNode(
             key: "User-Agent",
-            value: property.value,
-            strategy: inputs.environment.headerStrategy ?? .adding
+            value: property.value.trimmingCharacters(in: .whitespaces),
+            strategy: inputs.environment.headerStrategy,
+            appendingSeparator: " "
         ))
     }
 }
