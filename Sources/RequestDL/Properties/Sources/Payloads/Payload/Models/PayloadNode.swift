@@ -69,10 +69,12 @@ struct PayloadNode: PropertyNode {
             buffers: [buffer]
         )
 
-        make.request.headers.set(
-            name: "Content-Length",
-            value: String(body.totalSize)
-        )
+        if body.totalSize > .zero {
+            make.request.headers.set(
+                name: "Content-Length",
+                value: String(body.totalSize)
+            )
+        }
 
         make.request.body = body
     }
