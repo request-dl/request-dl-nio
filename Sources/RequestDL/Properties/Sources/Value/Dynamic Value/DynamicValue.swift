@@ -10,8 +10,6 @@ import Foundation
  It is possible to implement a custom `DynamicValue` using the `@propertyWrapper`
  attribute along with a `@StateObject` attribute inside it.
 
- Here's an example:
-
  ```swift
  @propertyWrapper
  struct MyWrapper: DynamicValue {

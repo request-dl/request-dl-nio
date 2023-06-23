@@ -7,20 +7,18 @@ import Foundation
 /**
  The ContentType struct is used to define the media type of the data in the HTTP request.
 
- Usage:
-
  ```swift
  let contentType: ContentType = .json
  ```
 
- - Note: For a complete list of the available types, please see the corresponding static
+ > Note: For a complete list of the available types, please see the corresponding static
  properties.
 
- - Important: If the media type is not included in the predefined static properties, use
+ > Important: If the media type is not included in the predefined static properties, use
  a string literal to initialize an instance of ContentType.
 
  The ContentType struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
- it to be initialized with a string literal, like so:
+ it to be initialized with a string literal.
 
  ```swift
  let customContentType: ContentType = "application/custom"
@@ -110,7 +108,7 @@ extension ContentType: ExpressibleByStringLiteral {
      - Parameter value: A string literal representing the media type.
      - Returns: An instance of `ContentType` with the specified media type.
 
-     - Note: Use this initializer to create a `ContentType` instance from a string literal.
+     > Note: Use this initializer to create a `ContentType` instance from a string literal.
      */
     public init(stringLiteral value: StringLiteralType) {
         self.rawValue = value

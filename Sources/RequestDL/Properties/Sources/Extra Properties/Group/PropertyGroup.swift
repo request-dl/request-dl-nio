@@ -4,23 +4,26 @@
 
 import Foundation
 
-/// A property that groups together other properties for use in a `RequestTask`.
-///
-/// A `PropertyGroup` property is used to group together other properties that share common characteristics, such
-/// as a base URL or query parameters. In the example code below, a `PropertyGroup` property is used
-/// to group a `Path` property and a `Query` that specify the endpoint and a user ID for a request to
-/// the "api.example.com" server.
-///
-/// ```swift
-/// DataTask {
-///     BaseURL("api.example.com")
-///
-///     PropertyGroup {
-///         Path("users")
-///         Query(name: "id", value: user.id)
-///     }
-/// }
-/// ```
+/**
+ A property that groups together other properties for use in a ``RequestTask``.
+
+ A ``PropertyGroup`` property is used to group together other properties that share common characteristics,
+ such as a base URL or query parameters.
+
+ In the example code below, a ``PropertyGroup`` property is used to group a ``Path`` property and a
+ ``Query`` that specify the endpoint and a user ID for a request to the "api.example.com" server.
+
+ ```swift
+ DataTask {
+     BaseURL("api.example.com")
+
+     PropertyGroup {
+         Path("users")
+         Query(name: "id", value: user.id)
+     }
+ }
+ ```
+ */
 public struct PropertyGroup<Content: Property>: Property {
 
     // MARK: - Public properties
@@ -35,9 +38,11 @@ public struct PropertyGroup<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /// Creates a new `PropertyGroup` property with the specified properties.
-    ///
-    /// - Parameter content: The properties to be contained within the group.
+    /**
+     Groups ``Property`` using ``PropertyBuilder`` result builder.
+
+     - Parameter content: The properties to be grouped.
+     */
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }

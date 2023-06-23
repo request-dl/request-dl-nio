@@ -38,13 +38,13 @@ private struct EnvironmentProperty<Content: Property>: Property {
 extension Property {
 
     /**
-     Sets an `EnvironmentValue` for a given `keyPath`.
+     Sets an `Value` for a given `keyPath`.
 
      - Parameters:
-       - keyPath: The `WritableKeyPath` of the `PropertyEnvironmentValues` to set the `value` for.
-       - value: The `Value` to set for the `EnvironmentValue`.
+       - keyPath: The `WritableKeyPath` of the ``PropertyEnvironmentValues`` to set the `value` for.
+       - value: The `Value` to set for the ``PropertyEnvironment``.
 
-     - Returns: A modified `Property` with the new `EnvironmentValue` set.
+     - Returns: A modified `Property` with the new ``PropertyEnvironmentValues`` set.
      */
     public func environment<Value>(
         _ keyPath: WritableKeyPath<PropertyEnvironmentValues, Value>,

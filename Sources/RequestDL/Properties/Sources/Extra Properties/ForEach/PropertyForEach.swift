@@ -8,11 +8,9 @@ import Foundation
 /**
  A property that iterates over a sequence of data and produces properties for each element.
 
- The `PropertyForEach` property is used to create a property for each element of a given `Data` sequence, identified
+ The ``PropertyForEach`` property is used to create a property for each element of a given `Data` sequence, identified
  by its `ID`. The property to be produced is determined by the `content` closure that takes each element
  of the sequence as input and produces a property.
-
- Example:
 
  ```swift
  let paths = ["user", "search", "results"]
@@ -47,7 +45,7 @@ public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence 
     private let id: @Sendable (Data.Element) -> ID
 
     /**
-     Creates a new instance of `PropertyForEach`.
+     Creates a new instance with `Data` identified by a `keyPath`.
 
      - Parameters:
      - data: The sequence of data to be iterated over.
@@ -66,11 +64,11 @@ public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence 
     }
 
     /**
-     Creates a new instance of `PropertyForEach` where the elements of the data sequence are identifiable.
+     Creates a new instance where the elements of the data sequence are identifiable.
 
      - Parameters:
-     - data: The sequence of data to be iterated over.
-     - content: A closure that takes an element of the data sequence as input and produces a
+        - data: The sequence of data to be iterated over.
+        - content: A closure that takes an element of the data sequence as input and produces a
      property for that element.
      */
     public init(
@@ -85,7 +83,7 @@ public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence 
     }
 
     /**
-      Creates a new instance of `PropertyForEach` for a `Range` of `Int`.
+      Creates a new instance for a `Range` of `Int`.
 
       - Parameters:
         - data: The `Range` of `Int` values to be iterated over.
@@ -104,7 +102,7 @@ public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence 
     }
 
     /**
-      Creates a new instance of `PropertyForEach` for a `ClosedRange` of `Int`.
+      Creates a new instance for a `ClosedRange` of `Int`.
 
       - Parameters:
         - data: The `ClosedRange` of `Int` values to be iterated over.

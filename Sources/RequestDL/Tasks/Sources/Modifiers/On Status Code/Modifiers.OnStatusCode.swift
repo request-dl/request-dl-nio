@@ -10,9 +10,9 @@ extension Modifiers {
      A task modifier that allows the customization of error handling based on the HTTP status
      code of the response.
 
-     `OnStatusCode` modifies the behavior of a `RequestTask` by executing a provided closure when
+     This modifier changes the behavior of a ``RequestTask`` by executing a provided closure when
      the HTTP status code of the response satisfies a certain condition. It only works on tasks that
-     return a `TaskResultPrimitive`, which is implemented by `TaskResult<Element>`.
+     return a ``TaskResultPrimitive``, which is implemented by ``TaskResult``.
 
      This modifier is particularly useful when you need to throw a specific error for a certain status code,
      providing a cleaner and more organized error handling approach.
@@ -68,7 +68,7 @@ extension RequestTask where Element: TaskResultPrimitive {
         - transform: The closure to be executed when the HTTP status code of the
      response satisfies the specified condition.
 
-     - Returns: The modified task with the `OnStatusCode` modifier applied.
+     - Returns: The modified task with the ``Modifiers/OnStatusCode`` modifier applied.
      */
     public func onStatusCode(
         _ statusCode: Range<StatusCode>,
@@ -88,7 +88,7 @@ extension RequestTask where Element: TaskResultPrimitive {
         - transform: The closure to be executed when the HTTP status code of the response
      satisfies the specified condition.
 
-     - Returns: The modified task with the `OnStatusCode` modifier applied.
+     - Returns: The modified task with the ``Modifiers/OnStatusCode`` modifier applied.
      */
     public func onStatusCode(
         _ statusCode: StatusCodeSet,
@@ -108,7 +108,7 @@ extension RequestTask where Element: TaskResultPrimitive {
         - transform: The closure to be executed when the HTTP status code of the response
      satisfies the specified condition.
 
-     - Returns: The modified task with the `OnStatusCode` modifier applied.
+     - Returns: The modified task with the ``Modifiers/OnStatusCode`` modifier applied.
      */
     public func onStatusCode(
         _ statusCode: StatusCode,

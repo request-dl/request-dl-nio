@@ -9,7 +9,7 @@ import Foundation
 
  The protocol provides a `body` property, which returns an opaque `some Property` type.
  By combining multiple request objects, we can use the `body` property to configure
- multiple request properties at once. This is demonstrated in the following example:
+ multiple request properties at once.
 
  ```swift
  struct DefaultHeaders: Property {

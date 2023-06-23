@@ -11,6 +11,6 @@ public struct RequestFailureError: LocalizedError {
         "The request received no response."
     }
 
-    /// Creates an instance of `RequestFailureError`.
+    /// Creates the error.
     public init() {}
 }

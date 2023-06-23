@@ -12,8 +12,6 @@ import Foundation
  Resource Sharing) requests to ensure that a web application can only access resources
  from a different origin if the server explicitly allows it.
 
- Example usage:
-
  ```swift
  OriginHeader("https://example.com")
  ```

@@ -39,7 +39,7 @@ public struct CachedData: Sendable {
     let buffer: Internals.AnyBuffer
 
     /**
-     Initializes a `CachedData` instance with the provided response head, cache policy, and data.
+     Initializes with the provided response head, cache policy, and data.
 
      - Parameters:
         - response: The response head associated with the cached data.
@@ -61,7 +61,7 @@ public struct CachedData: Sendable {
     }
 
     /**
-     Initializes a `CachedData` instance with the provided response head, cache policy, and file URL.
+     Initializes with the provided response head, cache policy, and file URL.
 
      - Parameters:
         - response: The response head associated with the cached data.

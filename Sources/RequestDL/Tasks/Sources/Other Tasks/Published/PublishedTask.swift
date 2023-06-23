@@ -7,9 +7,7 @@ import Foundation
 import Combine
 import _Concurrency
 
-/**
-A publisher that wraps a `RequestTask` instance and publishes its output asynchronously.
-*/
+/// A publisher for any ``RequestTask``.
 public struct PublishedTask<Output>: Publisher {
 
     class Subscription<S: Subscriber>: Combine.Subscription where S.Failure == Error {
@@ -86,10 +84,9 @@ public struct PublishedTask<Output>: Publisher {
 extension RequestTask {
 
     /**
-     Creates a `PublishedTask` publisher from the current `RequestTask` instance.
+     Creates a ``PublishedTask`` publisher from the current ``RequestTask`` instance.
 
-     - Returns: A `PublishedTask` publisher that emits the output of the current `RequestTask`
-     instance.
+     - Returns: A publisher that emits the output of the current ``RequestTask`` instance.
      */
     public func publisher() -> PublishedTask<Element> {
         .init(self)
