@@ -9,8 +9,6 @@ A group of query parameters that can be used to compose a request.
 
 You can use this to group multiple query parameters together and pass them as a single argument to a request.
 
-Usage:
-
  ```swift
  QueryGroup {
      Query(name: "name", value: "John")

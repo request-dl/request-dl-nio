@@ -16,8 +16,6 @@ extension Modifiers {
      The `KeyPath` modifier allows you to extract a sub-value from the data returned
      by the task using a key path.
 
-     Usage:
-
      ```swift
      DataTask { ... }
          .keyPath(\.data)

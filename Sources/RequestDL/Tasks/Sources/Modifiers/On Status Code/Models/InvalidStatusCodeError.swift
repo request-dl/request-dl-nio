@@ -6,9 +6,6 @@ import Foundation
 
 /**
  A error type representing a validation error due to an unexpected HTTP status code.
- Conforms to the `TaskError` protocol.
-
- Usage:
 
  ```swift
  do {

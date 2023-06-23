@@ -5,10 +5,9 @@
 import Foundation
 
 /**
- A type that represents a download task request.
+ Performs a download request.
 
- Use `DownloadTask` to represent a async request for a specific resource. After you've constructed your
- download task, you can use `result` function to receive the async bytes result of the request.
+ You can use ``DownloadTask/result()`` function to receive the async bytes result of the request.
 
  In the example below, a request is made to the Apple's website:
 
@@ -29,7 +28,7 @@ import Foundation
  }
  ```
 
- It's possible to control the length of bytes read by using the `ReadingMode` property.
+ It's possible to control the length of bytes read by using the ``ReadingMode`` property.
 
  ```swift
  func makeRequest() async throws {
@@ -49,9 +48,8 @@ import Foundation
  }
  ```
 
- - Note: `DownloadTask` is a generic type that accepts a type that conforms to `Property` as its
- parameter. `Property` protocol contains information about the request such as its URL, headers,
- body and etc.
+ > Note: The ``Property`` instance used by ``DownloadTask`` contains information about the request
+ such as its URL, headers, body and etc.
  */
 public struct DownloadTask<Content: Property>: RequestTask {
 
@@ -70,7 +68,7 @@ public struct DownloadTask<Content: Property>: RequestTask {
     // MARK: - Inits
 
     /**
-     Initializes a `DownloadTask` instance.
+     Initializes with a ``Property`` as its content.
 
      - Parameter content: The content of the request.
      */
@@ -81,15 +79,9 @@ public struct DownloadTask<Content: Property>: RequestTask {
     // MARK: - Public methods
 
     /**
-     Returns a task result that encapsulates the async response bytes for a request.
+     Returns a task result that encapsulates the response async bytes.
 
-     The `result` function is used to get the async response bytes from a `DownloadTask` object.
-     The function returns a `TaskResult<AsyncBytes>` object that encapsulates the async response
-     bytes or any error that occurred during the request execution.
-
-     - Returns: A `TaskResult<AsyncBytes>` object that encapsulates the async response bytes
-     for a request.
-
+     - Returns: A ``TaskResult`` with ``AsyncBytes`` as its `payload`.
      - Throws: An error of type `Error` that indicates an issue with the request or response.
      */
     public func result() async throws -> TaskResult<AsyncBytes> {

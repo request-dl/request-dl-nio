@@ -9,7 +9,7 @@ extension Modifiers {
     /**
      A modifier that updates the environment of `RequestTask` without changing the output.
 
-     - Note: This modifier requires the `RequestTask` to conform to `Sendable`.
+     > Note: This modifier requires the `RequestTask` to conform to `Sendable`.
      */
     public struct Environment<Input: Sendable>: RequestTaskModifier {
 

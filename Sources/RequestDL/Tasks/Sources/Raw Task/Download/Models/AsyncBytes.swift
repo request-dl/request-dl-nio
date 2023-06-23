@@ -31,7 +31,12 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
     // MARK: - Public properties
 
-    /// The total size of the `AsyncBytes` data.
+    /**
+     The total size of the response body.
+
+     Internally, the value is known when the client receives the response head which contains the
+     `Content-Length` header.
+     */
     public var totalSize: Int {
         bytes.totalSize
     }

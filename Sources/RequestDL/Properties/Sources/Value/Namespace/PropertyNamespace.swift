@@ -10,8 +10,6 @@ import Foundation
 
  This creates a namespace ID for storing objects inside the `Property` declaration.
 
- Here is an example:
-
  ```swift
  struct ProjectDefaults: Property {
 

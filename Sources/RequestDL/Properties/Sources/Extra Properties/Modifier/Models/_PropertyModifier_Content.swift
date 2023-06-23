@@ -4,8 +4,7 @@
 
 import Foundation
 
-/// This struct is marked as internal and is not intended
-/// to be used directly by clients of this framework.
+/// This struct is marked as internal and is not intended to be used directly by clients of this framework.
 public struct _PropertyModifier_Content<Modifier: PropertyModifier>: Property {
 
     typealias Inputs = (_GraphValue<Self>, _PropertyInputs)

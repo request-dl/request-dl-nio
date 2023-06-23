@@ -9,7 +9,7 @@ import NIOCore
  The Session object is used to set various properties related to the request context.
 
  By using this object, we can centralize the creation of a single type of session to be used
- in all requests. For example:
+ in all requests.
 
  ```swift
  struct MyAppConfiguration: Property {

@@ -10,7 +10,6 @@ extension Internals {
 
         private final class Root: Internals.ClientOperation {
 
-            ///
             override func complete() {
                 /*
                  * This function intentionally has no implementation and is

@@ -7,8 +7,6 @@ import Foundation
 /**
  A header that specifies the URL of a resource from which the requested resource was obtained.
 
- Usage:
-
  ```swift
  RefererHeader("https://www.example.com/")
  ```

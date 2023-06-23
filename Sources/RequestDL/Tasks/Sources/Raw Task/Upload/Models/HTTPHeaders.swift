@@ -6,11 +6,7 @@ import Foundation
 import NIOHTTP1
 
 // swiftlint:disable file_length
-/**
- A structure that represents HTTP headers.
-
- `HTTPHeaders` provides methods and properties for working with HTTP headers in Swift.
- */
+/// Provides methods and properties for HTTP headers.
 public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByDictionaryLiteral {
 
     public struct Iterator: IteratorProtocol {
@@ -115,30 +111,22 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     // MARK: - Public methods
 
-    /**
-     Indicates whether the `HTTPHeaders` instance is empty.
-     */
+    /// Indicates whether the instance is empty.
     public var isEmpty: Bool {
         _names.isEmpty
     }
 
-    /**
-     Returns the number of headers in the `HTTPHeaders` instance.
-    */
+    /// The number of headers name-value pair set.
     public var count: Int {
         values.lazy.map(\.count).reduce(.zero, +)
     }
 
-    /**
-     Returns an array of header names in the `HTTPHeaders` instance.
-    */
+    /// Returns an array of header names in the headers.
     public var names: [String] {
         _names.map(\.rawValue)
     }
 
-    /**
-     Returns the first name-value pair in the `HTTPHeaders` instance.
-     */
+    /// Returns the first name-value pair in the headers.
     public var first: Element? {
         _names.first.flatMap { name in
             values.first.flatMap {
@@ -149,9 +137,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         }
     }
 
-    /**
-     Returns the last name-value pair in the `HTTPHeaders` instance.
-     */
+    /// Returns the last name-value pair in the headers.
     public var last: Element? {
         _names.last.flatMap { name in
             values.last.flatMap {
@@ -174,7 +160,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     // MARK: - Inits
 
     /**
-     Initializes an empty `HTTPHeaders` instance.
+     Initializes an empty headers.
      */
     public init() {
         self._names = []
@@ -182,9 +168,9 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     }
 
     /**
-     Initializes an `HTTPHeaders` instance with an sequence of elements representing header name-value pairs.
+     Initializes an sequence of elements representing header name-value pairs.
 
-     - Parameter headers: An array of tuples representing header key-value pairs.
+     - Parameter headers: A sequence of tuples representing header name-value pairs.
      */
     public init<S: Sequence>(_ headers: S) where S.Element == (String, String) {
         self.init()

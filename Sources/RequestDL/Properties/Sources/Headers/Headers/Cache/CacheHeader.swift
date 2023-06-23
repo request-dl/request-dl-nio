@@ -7,8 +7,6 @@ import Foundation
 /**
  Represents the Cache Header property that can be set in a URLRequest.
 
- Usage:
-
  ```swift
  CacheHeader()
      .maxAge(60)
