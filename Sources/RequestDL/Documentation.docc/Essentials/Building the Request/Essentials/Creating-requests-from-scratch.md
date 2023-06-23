@@ -185,6 +185,7 @@ Learn more in:
 
 - ``RequestDL/HeaderStrategy``
 - ``RequestDL/Property/headerStrategy(_:)``
+- ``RequestDL/Property/headerSeparator(_:)``
 
 ### Working with payload
 

@@ -11,7 +11,7 @@ struct HeaderNode: PropertyNode {
     let key: String
     let value: String
     let strategy: HeaderStrategy
-    let appendingSeparator: String?
+    let separator: String?
 
     var makeHeadersClosure: @Sendable (inout HTTPHeaders) -> Void {
         { self(&$0) }
@@ -23,12 +23,12 @@ struct HeaderNode: PropertyNode {
         key: String,
         value: String,
         strategy: HeaderStrategy,
-        appendingSeparator: String? = nil
+        separator: String?
     ) {
         self.key = key
         self.value = value
         self.strategy = strategy
-        self.appendingSeparator = appendingSeparator
+        self.separator = separator
     }
 
     // MARK: - Internal methods
@@ -46,9 +46,9 @@ struct HeaderNode: PropertyNode {
 
         switch strategy {
         case .adding:
-            if let appendingSeparator {
+            if let separator {
                 let currentValue = (headers[key] ?? [])
-                let inlineValue = (currentValue + [value]).joined(separator: appendingSeparator)
+                let inlineValue = (currentValue + [value]).joined(separator: separator)
                 headers.set(name: key, value: inlineValue)
             } else {
                 headers.add(name: key, value: value)
@@ -68,7 +68,7 @@ extension HeaderNode: CustomReflectable {
             (label: "key", value: key),
             (label: "value", value: value),
             (label: "strategy", value: strategy),
-            (label: "appendingSeparator", value: appendingSeparator as Any)
+            (label: "separator", value: separator as Any)
         ])
     }
 }

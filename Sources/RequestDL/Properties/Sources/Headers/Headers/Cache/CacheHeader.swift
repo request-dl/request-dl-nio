@@ -67,9 +67,11 @@ public struct CacheHeader: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
+        let separator = inputs.environment.headerSeparator ?? ","
+
         let value = property.pointer()
             .makeContents()
-            .joined(separator: ", ")
+            .joined(separator: separator)
 
         if value.isEmpty {
             return .empty
@@ -78,7 +80,8 @@ public struct CacheHeader: Property {
         return .leaf(HeaderNode(
             key: "Cache-Control",
             value: value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: separator
         ))
     }
 

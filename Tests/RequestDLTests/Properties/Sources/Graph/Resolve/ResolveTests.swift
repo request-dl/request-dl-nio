@@ -116,7 +116,7 @@ extension ResolveTests {
                         key = Accept,
                         value = application/json,
                         strategy = .setting,
-                        appendingSeparator = nil
+                        separator = nil
                     }
                 },
                 LeafNode<HeaderNode> {
@@ -124,7 +124,9 @@ extension ResolveTests {
                         key = Cache-Control,
                         value = public,
                         strategy = .setting,
-                        appendingSeparator = nil
+                        separator = Optional<String> {
+                            some = ,
+                        }
                     }
                 },
                 LeafNode<Node> {
@@ -177,7 +179,7 @@ extension ResolveTests {
                                     key = Accept,
                                     value = application/json,
                                     strategy = .setting,
-                                    appendingSeparator = nil
+                                    separator = nil
                                 }
                             },
                             LeafNode<HeaderNode> {
@@ -185,7 +187,9 @@ extension ResolveTests {
                                     key = Cache-Control,
                                     value = public,
                                     strategy = .setting,
-                                    appendingSeparator = nil
+                                    separator = Optional<String> {
+                                        some = ,
+                                    }
                                 }
                             }
                         ]

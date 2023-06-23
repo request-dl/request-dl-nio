@@ -61,7 +61,7 @@ public struct UserAgentHeader: Property {
             key: "User-Agent",
             value: property.value.trimmingCharacters(in: .whitespaces),
             strategy: inputs.environment.headerStrategy,
-            appendingSeparator: " "
+            separator: " "
         ))
     }
 }
