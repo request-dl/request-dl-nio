@@ -80,7 +80,7 @@ public struct CacheHeader: Property {
         return .leaf(HeaderNode(
             key: "Cache-Control",
             value: value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy ?? .setting
         ))
     }
 

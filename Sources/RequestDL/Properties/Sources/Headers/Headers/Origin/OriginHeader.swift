@@ -67,7 +67,7 @@ public struct OriginHeader: Property {
         return .leaf(HeaderNode(
             key: "Origin",
             value: property.value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy ?? .setting
         ))
     }
 }

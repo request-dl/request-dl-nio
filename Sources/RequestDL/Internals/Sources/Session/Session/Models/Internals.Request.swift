@@ -58,7 +58,7 @@ extension Internals {
             self.pathComponents = []
             self.queries = []
             self.method = nil
-            self.headers = .init()
+            self.headers = Self.defaultHeaders()
             self.body = nil
             self.readingMode = .length(1_024)
             self.cachePolicy = []
@@ -75,5 +75,36 @@ extension Internals {
                 body: body?.build()
             )
         }
+
+        // MARK: - Private static methods
+
+        private static func defaultHeaders() -> HTTPHeaders {
+            HTTPHeaders([
+                ("User-Agent", defaultUserAgent())
+            ])
+        }
+
+        private static func defaultUserAgent() -> String {
+            let appName = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+
+            let appVersion = Bundle.main.versionString ?? "1.0.0"
+            let appBuild = Bundle.main.buildNumberString ?? "1"
+
+            let systemName = ProcessInfo.processInfo.hostName
+            let systemVersion = ProcessInfo.processInfo.operatingSystemVersionString
+
+            return "\(appName)/\(appVersion) (\(appBuild)) \(systemName)/\(systemVersion)"
+        }
+    }
+}
+
+extension Bundle {
+
+    var buildNumberString: String? {
+        infoDictionary?["CFBundleVersion"] as? String
+    }
+
+    var versionString: String? {
+        infoDictionary?["CFBundleShortVersionString"] as? String
     }
 }
