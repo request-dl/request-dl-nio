@@ -115,14 +115,14 @@ extension ResolveTests {
                     property = HeaderNode {
                         key = Accept,
                         value = application/json,
-                        strategy = .setting
+                        strategy = .adding
                     }
                 },
                 LeafNode<HeaderNode> {
                     property = HeaderNode {
                         key = Cache-Control,
                         value = public,
-                        strategy = .setting
+                        strategy = .adding
                     }
                 },
                 LeafNode<Node> {
@@ -174,14 +174,14 @@ extension ResolveTests {
                                 property = HeaderNode {
                                     key = Accept,
                                     value = application/json,
-                                    strategy = .setting
+                                    strategy = .adding
                                 }
                             },
                             LeafNode<HeaderNode> {
                                 property = HeaderNode {
                                     key = Cache-Control,
                                     value = public,
-                                    strategy = .setting
+                                    strategy = .adding
                                 }
                             }
                         ]
