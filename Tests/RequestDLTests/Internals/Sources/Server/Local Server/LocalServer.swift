@@ -6,6 +6,9 @@ import Foundation
 import NIO
 import NIOSSL
 import NIOHTTP1
+#if canImport(Network)
+import NIOTransportServices
+#endif
 @testable import RequestDL
 
 struct LocalServer: Sendable {

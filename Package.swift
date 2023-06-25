@@ -39,6 +39,10 @@ let package = Package(
             from: "2.24.0"
         ),
         .package(
+            url: "https://github.com/apple/swift-nio-transport-services.git",
+            from: "1.17.0"
+        ),
+        .package(
             url: "https://github.com/apple/swift-log.git",
             from: "1.5.2"
         )
@@ -55,6 +59,7 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "Logging", package: "swift-log")
             ]
         ),
@@ -67,6 +72,7 @@ let package = Package(
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "Logging", package: "swift-log")
             ],
             resources: [.process("Resources")]

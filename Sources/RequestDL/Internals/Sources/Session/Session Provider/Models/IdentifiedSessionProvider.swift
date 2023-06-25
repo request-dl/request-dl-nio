@@ -4,7 +4,11 @@
 
 import Foundation
 import NIOCore
+#if canImport(Network)
+import NIOTransportServices
+#else
 import NIOPosix
+#endif
 
 extension Internals {
 
@@ -32,7 +36,11 @@ extension Internals {
         // MARK: - Internal methods
 
         func group() -> EventLoopGroup {
-            MultiThreadedEventLoopGroup(numberOfThreads: numberOfThreads)
+            #if canImport(Network)
+            return NIOTSEventLoopGroup(loopCount: numberOfThreads, defaultQoS: .default)
+            #else
+            return MultiThreadedEventLoopGroup(numberOfThreads: numberOfThreads)
+            #endif
         }
     }
 }
