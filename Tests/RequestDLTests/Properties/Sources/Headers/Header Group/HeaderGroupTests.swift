@@ -93,7 +93,6 @@ class HeaderGroupTests: XCTestCase {
                 AcceptHeader(.gif)
                 AcceptHeader(.html)
             }
-            .headerStrategy(.adding)
         })
 
         // Then

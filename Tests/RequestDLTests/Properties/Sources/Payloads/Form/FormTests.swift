@@ -1127,7 +1127,6 @@ class FormTests: XCTestCase {
                 headers: {
                     CustomHeader(name: "Accept-Language", value: "en-US")
                     CustomHeader(name: "Accept-Language", value: "pt-BR")
-                        .headerStrategy(.adding)
                 }
             )
         })
