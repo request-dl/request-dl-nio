@@ -598,6 +598,10 @@ class FormTests: XCTestCase {
             foo: "bar",
             date: Date()
         )
+        let headers = [
+            ("Accept-Language", "en-US"),
+            ("Content-Encoding", "gzip")
+        ]
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -610,7 +614,12 @@ class FormTests: XCTestCase {
             Form(
                 name: name,
                 value: mock,
-                encoder: encoder
+                encoder: encoder,
+                headers: {
+                    PropertyForEach(headers, id: \.0) {
+                        CustomHeader(name: $0, value: $1)
+                    }
+                }
             )
         })
 
@@ -635,7 +644,7 @@ class FormTests: XCTestCase {
                 ("Content-Disposition", "form-data; name=\"\(name)\""),
                 ("Content-Type", "application/json"),
                 ("Content-Length", String(data.count))
-            ])
+            ] + headers)
         ])
 
         XCTAssertEqual(
@@ -646,7 +655,7 @@ class FormTests: XCTestCase {
         )
     }
 
-    func testForm_whenInitEncodableWithHeadersURLEncoded() async throws {
+    func testForm_whenInitEncodableURLEncoded() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -713,7 +722,7 @@ class FormTests: XCTestCase {
         )
     }
 
-    func testForm_whenInitEncodableWithHeadersURLEncodedUTF16() async throws {
+    func testForm_whenInitEncodableURLEncodedUTF16() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -892,13 +901,22 @@ class FormTests: XCTestCase {
             "foo": "bar",
             "magic_numbers": [0, 1, 2]
         ]
+        let headers = [
+            ("Accept-Language", "en-US"),
+            ("Content-Encoding", "gzip")
+        ]
 
         // When
         let resolved = try await resolve(TestProperty {
             Form(
                 name: name,
                 jsonObject: jsonObject,
-                options: .sortedKeys
+                options: .sortedKeys,
+                headers: {
+                    PropertyForEach(headers, id: \.0) {
+                        CustomHeader(name: $0, value: $1)
+                    }
+                }
             )
         })
 
@@ -927,13 +945,13 @@ class FormTests: XCTestCase {
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
                     ("Content-Type", "application/json"),
                     ("Content-Length", String(data.count))
-                ]),
+                ] + headers),
                 contents: data
             )
         ])
     }
 
-    func testForm_whenInitJSONWithHeadersURLEncoded() async throws {
+    func testForm_whenInitJSONURLEncoded() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -989,7 +1007,7 @@ class FormTests: XCTestCase {
         )
     }
 
-    func testForm_whenInitJSONWithHeadersURLEncodedUTF16() async throws {
+    func testForm_whenInitJSONWithURLEncodedUTF16() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
