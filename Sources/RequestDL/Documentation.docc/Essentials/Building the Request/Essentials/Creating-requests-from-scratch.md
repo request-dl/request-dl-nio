@@ -179,6 +179,7 @@ Learn more in:
 - ``RequestDL/RefererHeader``
 - ``RequestDL/CacheHeader``
 - ``RequestDL/AcceptCharsetHeader``
+- ``RequestDL/UserAgentHeader``
 - ``RequestDL/HeaderGroup``
 
 ### Changing the headers behavior

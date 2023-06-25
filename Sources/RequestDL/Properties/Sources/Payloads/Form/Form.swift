@@ -420,12 +420,7 @@ public struct Form<Headers: Property>: Property {
         var headers = HTTPHeaders()
 
         for header in output.node.search(for: HeaderNode.self) {
-            switch header.strategy {
-            case .adding:
-                headers.add(name: header.key, value: header.value)
-            case .setting:
-                headers.set(name: header.key, value: header.value)
-            }
+            header.makeHeadersClosure(&headers)
         }
 
         return headers
