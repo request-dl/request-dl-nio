@@ -72,4 +72,3 @@ class UserAgentHeaderTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
-

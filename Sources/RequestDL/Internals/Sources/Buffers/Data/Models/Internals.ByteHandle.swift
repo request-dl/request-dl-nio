@@ -124,8 +124,6 @@ extension Internals {
 extension Internals.ByteHandle {
 
     fileprivate struct ClosedError: Error {
-
-        init() {}
     }
 }
 
