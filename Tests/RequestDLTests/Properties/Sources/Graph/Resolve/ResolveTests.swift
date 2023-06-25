@@ -115,7 +115,7 @@ extension ResolveTests {
                     property = HeaderNode {
                         key = Accept,
                         value = application/json,
-                        strategy = .setting,
+                        strategy = .adding,
                         separator = nil
                     }
                 },
@@ -123,7 +123,7 @@ extension ResolveTests {
                     property = HeaderNode {
                         key = Cache-Control,
                         value = public,
-                        strategy = .setting,
+                        strategy = .adding,
                         separator = Optional<String> {
                             some = ,
                         }
@@ -178,7 +178,7 @@ extension ResolveTests {
                                 property = HeaderNode {
                                     key = Accept,
                                     value = application/json,
-                                    strategy = .setting,
+                                    strategy = .adding,
                                     separator = nil
                                 }
                             },
@@ -186,7 +186,7 @@ extension ResolveTests {
                                 property = HeaderNode {
                                     key = Cache-Control,
                                     value = public,
-                                    strategy = .setting,
+                                    strategy = .adding,
                                     separator = Optional<String> {
                                         some = ,
                                     }

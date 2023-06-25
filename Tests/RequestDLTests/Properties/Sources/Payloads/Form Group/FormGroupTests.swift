@@ -177,6 +177,22 @@ class FormGroupTests: XCTestCase {
         // Then
         try await assertNever(property.body)
     }
+
+    func testGroup_whenEmptyContent() async throws {
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormGroup {}
+        })
+
+        let data = try await resolved.request.body?.data() ?? Data()
+
+        // Then
+        XCTAssertTrue(data.isEmpty)
+
+        XCTAssertNil(resolved.request.headers["Content-Type"])
+
+        XCTAssertNil(resolved.request.headers["Content-Length"])
+    }
 }
 
 extension FormGroupTests {

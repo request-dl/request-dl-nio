@@ -178,6 +178,7 @@ Learn more in:
 - ``RequestDL/OriginHeader``
 - ``RequestDL/RefererHeader``
 - ``RequestDL/CacheHeader``
+- ``RequestDL/AcceptCharsetHeader``
 - ``RequestDL/UserAgentHeader``
 - ``RequestDL/HeaderGroup``
 
