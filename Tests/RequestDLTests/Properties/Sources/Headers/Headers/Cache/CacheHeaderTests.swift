@@ -91,9 +91,9 @@ class CacheHeaderTests: XCTestCase {
             resolved.request.headers["Cache-Control"],
             [
                 """
-                no-cache, no-store, no-transform, only-if-cached, private, max-age=1000, \
-                s-maxage=16000, max-stale=300, stale-while-revalidate=120, stale-if-error=86400, \
-                must-revalidate, proxy-revalidate, immutable
+                no-cache,no-store,no-transform,only-if-cached,private,max-age=1000,\
+                s-maxage=16000,max-stale=300,stale-while-revalidate=120,stale-if-error=86400,\
+                must-revalidate,proxy-revalidate,immutable
                 """
             ]
         )

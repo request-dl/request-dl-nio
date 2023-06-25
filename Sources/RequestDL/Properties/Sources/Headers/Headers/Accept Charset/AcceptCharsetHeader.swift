@@ -46,7 +46,8 @@ public struct AcceptCharsetHeader: Property {
         return .leaf(HeaderNode(
             key: "Accept-Charset",
             value: property.charset.rawValue,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: inputs.environment.headerSeparator
         ))
     }
 }
