@@ -72,19 +72,3 @@ class UserAgentHeaderTests: XCTestCase {
         try await assertNever(property.body)
     }
 }
-
-
-func a() async throws {
-    let data = try await DataTask {
-        BaseURL(.http, host: "localhost:xxx")
-        HeaderGroup {
-            AcceptHeader(.json)
-            AcceptHeader(.bmp)
-        }
-        .headerStrategy(.adding)
-    }
-    .extractPayload()
-    .result()
-
-    print(String(data: data, encoding: .utf8)!)
-}
