@@ -15,16 +15,6 @@ struct DataPayloadFactory: PayloadFactory {
     let data: Data
     let contentType: ContentType
 
-    // MARK: - Inits
-
-    init(
-        data: Data,
-        contentType: ContentType
-    ) {
-        self.data = data
-        self.contentType = contentType
-    }
-
     // MARK: - Internal methods
 
     func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
