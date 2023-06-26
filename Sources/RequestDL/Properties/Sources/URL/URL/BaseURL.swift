@@ -5,35 +5,33 @@
 import Foundation
 
 /**
- The BaseURL struct defines the base URL for a request. It provides the
- internet protocol and the host for the request.
+ The `BaseURL` is the entry point as it specifies the scheme and host to be queried during the request.
 
- To create a BaseURL object, you need to provide the internet protocol
- and the string host. You can also set the internet protocol to HTTPS by
- default if you only provide the host.
+ ## Overview
 
- Example usage:
+ To start using it, it is important to pay attention to some rules:
 
- ```swift
- import RequestDL
-
- struct AppleDeveloperBaseURL: Property {
-     var body: some Property {
-         BaseURL(.https, host: "developer.apple.com")
-     }
- }
-
- ```
-
- Or you can set the host without specifying the protocol type:
+ - Scheme must be of type ``RequestDL/URLScheme``.
+ - Host is a string without scheme.
 
  ```swift
- struct AppleDeveloperBaseURL: Property {
-     var body: some Property {
-         BaseURL("developer.apple.com")
-     }
- }
+ // Always HTTPS
+ BaseURL("apple.com")
+
+ // Specifying the scheme
+ BaseURL(.http, host: "apple.com")
  ```
+
+ > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
+
+ > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
+
+ ### Learn the fundamentals
+
+ @Links(visualStyle: list) {
+     - <doc:Creating-requests-from-scratch>
+     - <doc:Cache-support>
+ }
  */
 public struct BaseURL: Property {
 
@@ -55,37 +53,13 @@ public struct BaseURL: Property {
 
     // MARK: - Internal properties
 
-    let internetProtocol: InternetProtocol
+    let scheme: URLScheme
     let host: String
-
-    // MARK: - Private properties
-
-    private var absoluteString: String {
-        if host.contains("://") {
-            Internals.Log.failure(
-                .invalidHost(host)
-            )
-        }
-
-        guard let host = host.split(separator: "/").first else {
-            Internals.Log.failure(
-                .unexpectedHost(host)
-            )
-        }
-
-        return "\(internetProtocol.rawValue)://\(host)"
-    }
 
     // MARK: - Init
 
     /**
-     Creates a BaseURL by combining the internet protocol and the string host.
-
-     - Parameters:
-        - internetProtocol: The internet protocol chosen.
-        - path: The string host only.
-
-     Example usage:
+     Creates a BaseURL by combining the url scheme and the string host.
 
      ```swift
      import RequestDL
@@ -97,19 +71,18 @@ public struct BaseURL: Property {
          }
      }
      ```
+
+     - Parameters:
+        - scheme: The url scheme chosen.
+        - path: The string host only.
      */
-    public init(_ internetProtocol: InternetProtocol, host: String) {
-        self.internetProtocol = internetProtocol
+    public init(_ scheme: URLScheme, host: String) {
+        self.scheme = scheme
         self.host = host
     }
 
     /**
-     Defines the base URL from the host with the default HTTPS protocol.
-
-     - Parameters:
-        - path: The string host only.
-
-     Example usage:
+     Defines the base URL from the host with the default HTTPS scheme.
 
      ```swift
      import RequestDL
@@ -121,6 +94,9 @@ public struct BaseURL: Property {
          }
      }
      ```
+
+     - Parameters:
+        - path: The string host only.
      */
     public init(_ host: String) {
         self.init(.https, host: host)
@@ -134,6 +110,26 @@ public struct BaseURL: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(baseURL: property.absoluteString))
+        return try .leaf(Node(baseURL: property.pointer().path()))
+    }
+
+    // MARK: - Private methods
+
+    private func path() throws -> String {
+        if host.contains("://") {
+            throw BaseURLError(
+                context: .invalidHost,
+                baseURL: host
+            )
+        }
+
+        guard let host = host.split(separator: "/").first else {
+            throw BaseURLError(
+                context: .unexpectedHost,
+                baseURL: host
+            )
+        }
+
+        return "\(scheme.rawValue)://\(host)"
     }
 }

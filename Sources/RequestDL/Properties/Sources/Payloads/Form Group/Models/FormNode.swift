@@ -8,32 +8,37 @@ struct FormNode: PropertyNode {
 
     // MARK: - Internal properties
 
-    let fragmentLength: Int?
+    let chunkSize: Int?
     let items: [FormItem]
 
     // MARK: - Inits
 
     init(
-        fragmentLength: Int?,
+        chunkSize: Int?,
         item: FormItem
     ) {
         self.init(
-            fragmentLength: fragmentLength,
+            chunkSize: chunkSize,
             items: [item]
         )
     }
 
     init(
-        fragmentLength: Int?,
+        chunkSize: Int?,
         items: [FormItem]
     ) {
-        self.fragmentLength = fragmentLength
+        self.chunkSize = chunkSize
         self.items = items
     }
 
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
+        guard !items.isEmpty else {
+            removeAnySetHeaders(&make.request.headers)
+            return
+        }
+
         let constructor = FormGroupBuilder(items)
 
         make.request.headers.set(
@@ -43,18 +48,23 @@ struct FormNode: PropertyNode {
 
         let buffers = try constructor()
 
-        make.request.headers.set(
-            name: "Content-Length",
-            value: String(
-                buffers.lazy
-                    .map(\.estimatedBytes)
-                    .reduce(.zero, +)
-            )
-        )
-
-        make.request.body = Internals.Body(
-            fragmentLength,
+        let body = Internals.Body(
+            chunkSize: chunkSize,
             buffers: buffers
         )
+
+        make.request.headers.set(
+            name: "Content-Length",
+            value: String(body.totalSize)
+        )
+
+        make.request.body = body
+    }
+
+    // MARK: - Private methods
+
+    private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {
+        headers.remove(name: "Content-Type")
+        headers.remove(name: "Content-Length")
     }
 }

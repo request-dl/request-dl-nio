@@ -16,7 +16,7 @@ class ModifiersMapTests: XCTestCase {
             BaseURL("localhost")
             Payload(data: Data())
         }
-        .ignoresProgress()
+        .collectData()
         .map { _ in output }
         .result()
 

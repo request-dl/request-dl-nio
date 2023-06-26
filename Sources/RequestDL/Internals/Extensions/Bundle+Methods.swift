@@ -70,3 +70,10 @@ extension Bundle {
             .appendingPathComponent("Resources", isDirectory: true)
     }
 }
+
+extension Bundle {
+
+    var versionString: String? {
+        infoDictionary?["CFBundleShortVersionString"] as? String
+    }
+}

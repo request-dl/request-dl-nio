@@ -16,7 +16,7 @@ class AnyTaskTests: XCTestCase {
             BaseURL("localhost")
             Payload(data: data)
         }
-        .ignoresProgress()
+        .collectData()
         .eraseToAnyTask()
         .result()
 

@@ -616,7 +616,35 @@ extension PayloadTests {
     }
 
     func testPayload_whenGETInitDataWithURLEncoded() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024)
 
+        // Then
+        let resolved = try await resolve(TestProperty {
+            RequestMethod(.get)
+
+            Payload(
+                data: data,
+                contentType: .formURLEncoded
+            )
+        })
+
+        let resolvedData = try await resolved.request.body?.data()
+
+        // When
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["application/x-www-form-urlencoded"]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(data.count)]
+        )
+
+        XCTAssertEqual(resolvedData, data)
+
+        XCTAssertEqual(resolved.request.url, "https://www.apple.com")
     }
 }
 
@@ -624,15 +652,15 @@ extension PayloadTests {
 
 extension PayloadTests {
 
-    func testPayload_whenInitDataWithPartLength() async throws {
+    func testPayload_whenInitDataWithChunkSize() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
-        let partLength = 1_024
+        let chunkSize = 1_024
 
         // When
         let resolved = try await resolve(TestProperty {
             Payload(data: data)
-                .payloadPartLength(partLength)
+                .payloadChunkSize(chunkSize)
         })
 
         let buffers = try await resolved.request.body?.buffers() ?? []
@@ -652,8 +680,8 @@ extension PayloadTests {
 
         XCTAssertEqual(
             buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: data.count, by: partLength).map {
-                let upperBound = $0 + partLength
+            stride(from: .zero, to: data.count, by: chunkSize).map {
+                let upperBound = $0 + chunkSize
                 return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
         )
@@ -675,6 +703,69 @@ extension PayloadTests {
 
         // Then
         XCTAssertEqual(encodingError?.context, .invalidJSONObject)
+    }
+
+    func testPayload_whenEmptyPayload() async throws {
+        // Given
+        let data = Data()
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            Payload(data: data)
+        })
+
+        let buffers = try await resolved.request.body?.buffers() ?? []
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["application/octet-stream"]
+        )
+
+        XCTAssertNil(resolved.request.headers["Content-Length"])
+
+        XCTAssertEqual(buffers.resolveData().reduce(Data(), +), data)
+    }
+}
+
+// MARK: - Deprecated
+
+@available(*, deprecated)
+extension PayloadTests {
+
+    func testDeprecated_whenInitDataWithPartLength() async throws {
+        // Given
+        let data = Data.randomData(length: 1_024 * 1_024)
+        let chunkSize = 1_024
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            Payload(data: data)
+                .payloadPartLength(chunkSize)
+        })
+
+        let buffers = try await resolved.request.body?.buffers() ?? []
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["application/octet-stream"]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(data.count)]
+        )
+
+        let totalBytes = data.count
+
+        XCTAssertEqual(
+            buffers.compactMap { $0.getData() },
+            stride(from: .zero, to: data.count, by: chunkSize).map {
+                let upperBound = $0 + chunkSize
+                return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
+            }
+        )
     }
 }
 // swiftlint:enable file_length

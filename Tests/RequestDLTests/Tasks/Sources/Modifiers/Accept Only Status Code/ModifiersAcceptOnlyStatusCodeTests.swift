@@ -21,7 +21,7 @@ class ModifiersStatusCodeTests: XCTestCase {
                     status: status(statusCode),
                     content: { BaseURL("localhost") }
                 )
-                .ignoresProgress()
+                .collectData()
                 .acceptOnlyStatusCode(statusCodeSet)
                 .result()
                 received.append(statusCode)
@@ -59,7 +59,7 @@ class ModifiersStatusCodeTests: XCTestCase {
                     status: status(statusCode),
                     content: { BaseURL("localhost") }
                 )
-                .ignoresProgress()
+                .collectData()
                 .acceptOnlyStatusCode(statusCodeSet)
                 .result()
                 received.append(statusCode)

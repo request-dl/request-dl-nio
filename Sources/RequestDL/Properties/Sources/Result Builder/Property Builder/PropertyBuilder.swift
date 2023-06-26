@@ -10,8 +10,6 @@ import Foundation
  You use a property builder by adding multiple properties to a request, and returning them as
  a composed property within the closure.
 
- Example:
-
  ```swift
  func myProperties<Content: Property>(
      @PropertyBuilder content: () -> Content
@@ -79,7 +77,7 @@ public struct PropertyBuilder: Sendable {
     /**
      Constructs a property builder that can build a conditional block of properties.
 
-     - Note: This is a result builder method that is called when the builder encounters an `if` statement
+     > Note: This is a result builder method that is called when the builder encounters an `if` statement
      with a condition that evaluates to `true`.
      */
     public static func buildEither<First: Property, Second: Property>(
@@ -93,8 +91,6 @@ public struct PropertyBuilder: Sendable {
 
      Use `buildEither(first:)` to specify content when a condition is true and
      `buildEither(second:)` to specify content when it's false.
-
-     Example:
 
      ```swift
      PropertyGroup {

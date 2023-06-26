@@ -12,9 +12,9 @@ import NIOCore
 
  Conforms to Hashable and Sendable protocols.
 
- - Note: The maximum representable time interval is limited by the range of Int64.
+ > Note: The maximum representable time interval is limited by the range of Int64.
 
- - Warning: Be careful when working with large time intervals to avoid overflow.
+ > Warning: Be careful when working with large time intervals to avoid overflow.
 
  - Remark: Time intervals can be created using various factory methods, such as `nanoseconds(_:)`,
  `microseconds(_:)`, `milliseconds(_:)`, `seconds(_:)`, `minutes(_:)`, and

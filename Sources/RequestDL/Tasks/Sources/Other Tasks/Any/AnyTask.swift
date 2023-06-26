@@ -5,11 +5,9 @@
 import Foundation
 
 /**
- A type-erasing task that wraps another task that has an associated type of Element.
- The AnyTask type forwards its operations to an underlying task object, hiding its
- specific underlying type.
+ A type-erasing task that wraps another task.
 
- Example:
+ The ``AnyTask`` type forwards its operations to an underlying task object, hiding its specific underlying type.
 
  ```swift
  func makeRequest() -> AnyTask<TaskResult<Data>> {
@@ -59,9 +57,9 @@ public struct AnyTask<Element: Sendable>: RequestTask {
 extension RequestTask {
 
     /**
-     Returns an `AnyTask` instance that wraps `self`.
+     Returns an ``AnyTask`` instance that wraps the current ``RequestTask``.
 
-     - Returns: An `AnyTask` instance that wraps `self`.
+     - Returns: An ``AnyTask`` instance.
      */
     public func eraseToAnyTask() -> AnyTask<Element> {
         .init(self)

@@ -7,8 +7,6 @@ import Foundation
 /**
  A header that specifies the URL of a resource from which the requested resource was obtained.
 
- Usage:
-
  ```swift
  RefererHeader("https://www.example.com/")
  ```
@@ -49,7 +47,8 @@ public struct RefererHeader: Property {
         return .leaf(HeaderNode(
             key: "Referer",
             value: property.value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: inputs.environment.headerSeparator
         ))
     }
 }

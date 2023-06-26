@@ -76,7 +76,7 @@ class InternalsSessionTests: XCTestCase {
         XCTAssertEqual(result.count, length + 1)
         XCTAssertEqual(
             Array(result[0..<length]),
-            (0..<length).map { _ in .upload(1) }
+            (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
         )
 
         guard case .download? = result.last else {
@@ -138,9 +138,10 @@ class InternalsSessionTests: XCTestCase {
         var request = Internals.Request()
         request.baseURL = "https://\(localServer.baseURL)"
         request.method = "POST"
-        request.body = Internals.Body(fragment, buffers: [
-            fileBuffer
-        ])
+        request.body = Internals.Body(
+            chunkSize: fragment,
+            buffers: [fileBuffer]
+        )
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.trustRoots = .certificates([
@@ -160,23 +161,23 @@ class InternalsSessionTests: XCTestCase {
             dataCache: .init()
         )
 
-        var parts: [Int] = []
+        var uploadedBytes: [Int] = []
         var download: (ResponseHead, Data)?
 
         for try await result in task() {
             switch result {
-            case .upload(let part):
-                NSLog("Send %d bytes (%d)", part, parts.count)
-                parts.append(part)
-            case .download(let head, let bytes):
-                NSLog("Head %d %@", head.status.code, head.status.reason)
-                download = (head, try await Data(Array(bytes).joined()))
+            case .upload(let step):
+                NSLog("Send %d bytes of %d (%d)", step.chunkSize, step.totalSize, uploadedBytes.count)
+                uploadedBytes.append(step.chunkSize)
+            case .download(let step):
+                NSLog("Head %d %@", step.head.status.code, step.head.status.reason)
+                download = (step.head, try await Data(Array(step.bytes).joined()))
             }
         }
 
         // Then
-        XCTAssertEqual(parts.count, Int(ceil(Double(length) / Double(fragment))))
-        XCTAssertEqual(parts.reduce(.zero, +), fileBuffer.writerIndex)
+        XCTAssertEqual(uploadedBytes.count, Int(ceil(Double(length) / Double(fragment))))
+        XCTAssertEqual(uploadedBytes.reduce(.zero, +), fileBuffer.writerIndex)
         XCTAssertNotNil(download)
         XCTAssertEqual(download?.0.status.code, 200)
         XCTAssertEqual(

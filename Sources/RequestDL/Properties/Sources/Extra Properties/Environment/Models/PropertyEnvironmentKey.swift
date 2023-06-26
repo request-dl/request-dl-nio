@@ -5,13 +5,13 @@
 import Foundation
 
 /**
- The `PropertyEnvironmentKey` protocol defines a type that can be used as a key to
- retrieve an `Value` from `PropertyEnvironmentValues`.
+ The ``PropertyEnvironmentKey`` protocol defines a type that can be used as a key to
+ retrieve an `Value` from ``PropertyEnvironmentValues``.
  */
 public protocol PropertyEnvironmentKey<Value>: Sendable {
 
     associatedtype Value: Sendable
 
-    /// The default value for this `PropertyEnvironmentKey`.
+    /// The default value for this ``PropertyEnvironmentKey``.
     static var defaultValue: Value { get }
 }

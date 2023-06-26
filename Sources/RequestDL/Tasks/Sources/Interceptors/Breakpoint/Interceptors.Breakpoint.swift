@@ -10,11 +10,6 @@ extension Interceptors {
      A `RequestTaskInterceptor` that can be used to add a breakpoint to the task's result. The
      breakpoint will stop the task's execution and give control back to the debugger.
 
-     - Note: This should only be used during development and debugging, and not in production
-     code.
-
-     Usage
-
      ```swift
      try await DataTask {
          BaseURL("api.com")
@@ -23,6 +18,9 @@ extension Interceptors {
      .breakpoint()
      .result()
      ```
+
+     > Note: This should only be used during development and debugging, and not in production
+     code.
      */
     public struct Breakpoint<Element: Sendable>: RequestTaskInterceptor {
 
@@ -48,7 +46,7 @@ extension RequestTask {
      Adds a breakpoint to the task's result. The breakpoint will stop the task's execution and
      give control back to the debugger.
 
-     - Note: This should only be used during development and debugging, and not in
+     > Note: This should only be used during development and debugging, and not in
      production code.
 
      - Returns: An `InterceptedTask` object with the added breakpoint interceptor.

@@ -12,18 +12,6 @@ struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
     let options: JSONSerialization.WritingOptions
     let contentType: ContentType
 
-    // MARK: - Inits
-
-    init(
-        jsonObject: Any,
-        options: JSONSerialization.WritingOptions,
-        contentType: ContentType
-    ) {
-        self.jsonObject = jsonObject
-        self.options = options
-        self.contentType = contentType
-    }
-
     // MARK: - Internal methods
 
     func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {

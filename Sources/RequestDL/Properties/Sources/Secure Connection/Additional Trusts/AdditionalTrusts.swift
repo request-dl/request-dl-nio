@@ -71,8 +71,6 @@ public struct AdditionalTrusts<Content: Property>: Property {
     /**
      Initializes a new instance of the AdditionalTrusts struct.
 
-     Example:
-
      ```swift
      DataTask {
         SecureConnection {

@@ -53,10 +53,10 @@ private struct ModifiedProperty<Content: Property, Modifier: PropertyModifier>: 
 extension Property {
 
     /**
-     Returns a modified `Property` type based on the given `Modifier`.
+     Returns a modified ``Property`` type based on the given ``PropertyModifier``.
 
-     - Parameter modifier: The `Modifier` used to modify the `Property`.
-     - Returns: A modified `Property` type.
+     - Parameter modifier: The ``PropertyModifier`` used to modify the ``Property``.
+     - Returns: A modified ``Property`` type.
      */
     public func modifier<Modifier: PropertyModifier>(
         _ modifier: Modifier

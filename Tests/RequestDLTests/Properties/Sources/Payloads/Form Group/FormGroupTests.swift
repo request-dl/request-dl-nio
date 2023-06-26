@@ -110,11 +110,11 @@ class FormGroupTests: XCTestCase {
         ))
     }
 
-    func testGroup_whenPartLength() async throws {
+    func testGroup_whenChunkSize() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 256)
-        let partLength = 64
+        let chunkSize = 64
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -124,7 +124,7 @@ class FormGroupTests: XCTestCase {
                     data: data
                 )
             }
-            .payloadPartLength(partLength)
+            .payloadChunkSize(chunkSize)
         })
 
         let parser = try await MultipartFormParser(resolved.request)
@@ -137,8 +137,8 @@ class FormGroupTests: XCTestCase {
         // Then
         XCTAssertEqual(
             buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: totalBytes, by: partLength).map {
-                let upperBound = $0 + partLength
+            stride(from: .zero, to: totalBytes, by: chunkSize).map {
+                let upperBound = $0 + chunkSize
                 return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
         )
@@ -176,6 +176,22 @@ class FormGroupTests: XCTestCase {
 
         // Then
         try await assertNever(property.body)
+    }
+
+    func testGroup_whenEmptyContent() async throws {
+        // When
+        let resolved = try await resolve(TestProperty {
+            FormGroup {}
+        })
+
+        let data = try await resolved.request.body?.data() ?? Data()
+
+        // Then
+        XCTAssertTrue(data.isEmpty)
+
+        XCTAssertNil(resolved.request.headers["Content-Type"])
+
+        XCTAssertNil(resolved.request.headers["Content-Length"])
     }
 }
 

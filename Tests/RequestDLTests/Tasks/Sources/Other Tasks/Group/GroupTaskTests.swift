@@ -17,7 +17,7 @@ class GroupTaskTests: XCTestCase {
                 BaseURL("localhost")
                 Payload(data: Data("\(index)".utf8))
             }
-            .ignoresProgress()
+            .collectData()
         }
         .result()
 

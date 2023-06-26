@@ -22,7 +22,7 @@ class ModifiersOnStatusCodeTests: XCTestCase {
                     BaseURL("localhost")
                 }
             )
-            .ignoresProgress()
+            .collectData()
             .onStatusCode(statusCode) { _ in
                 throw AnyError()
             }
@@ -49,7 +49,7 @@ class ModifiersOnStatusCodeTests: XCTestCase {
                         BaseURL("localhost")
                     }
                 )
-                .ignoresProgress()
+                .collectData()
                 .onStatusCode(statusCodes) { _ in
                     throw AnyError()
                 }
@@ -80,7 +80,7 @@ class ModifiersOnStatusCodeTests: XCTestCase {
                         BaseURL("localhost")
                     }
                 )
-                .ignoresProgress()
+                .collectData()
                 .onStatusCode(statusCodeSet) { _ in
                     throw AnyError()
                 }
@@ -111,7 +111,7 @@ class ModifiersOnStatusCodeTests: XCTestCase {
                         BaseURL("localhost")
                     }
                 )
-                .ignoresProgress()
+                .collectData()
                 .onStatusCode(statusCodeSet) { _ in
                     throw AnyError()
                 }
