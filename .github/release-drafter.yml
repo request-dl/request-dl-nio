@@ -8,7 +8,10 @@ categories:
   - title: '🧰 Maintenance'
     label:
       - 'documentation'
+category-template: "### $TITLE"
 template: |
   ## What’s Changed
-  
+
   $CHANGES
+
+  See also: [Documentation](https://swiftpackageindex.com/request-dl/request-dl/main/documentation/requestdl)
