@@ -12,6 +12,6 @@ jobs:
   breaking-changes:
     uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@main
     with:
-      xcode-version: 15.0
+      xcode-version: "15.0"
       platform: macOS-13
     secrets: inherit
