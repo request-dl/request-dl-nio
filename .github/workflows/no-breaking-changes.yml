@@ -10,8 +10,8 @@ on:
 
 jobs:
   breaking-changes:
-    uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@no-api-breaking-changes
+    uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@main
     with:
-      swift-version: 5.8
-      platform: macOS-latest
+      xcode-version: 15.0
+      platform: macOS-13
     secrets: inherit
