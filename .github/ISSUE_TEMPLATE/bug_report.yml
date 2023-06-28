@@ -46,6 +46,8 @@ body:
         - watchOS
         - tvOS
         - visionOS
+    validations:
+      required: true
   - type: input
     id: platform-version
     attributes:
