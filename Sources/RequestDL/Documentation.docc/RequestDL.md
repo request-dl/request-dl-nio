@@ -9,6 +9,13 @@ A network layer written in Swift based on the declarative programming paradigm.
         alt: "A technology icon representing the RequestDL framework.")
     
     @PageColor(blue)
+    
+    @Available(macOS, introduced: "10.15")
+    @Available(iOS, introduced: "13.0")
+    @Available(tvOS, introduced: "13.0")
+    @Available(watchOS, introduced: "6.0")
+    @Available(visionOS, introduced: "1.0")
+    @Available("Linux", introduced: "5.7")
 }
 
 ## Overview
