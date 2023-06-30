@@ -50,18 +50,6 @@ extension Internals.Log.Message {
 // MARK: - Secure Connection
 extension Internals.Log.Message {
 
-    static func unexpectedCertificateSource<Source>(
-        _ source: Source
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            """,
-            parameters: [
-                String(describing: type(of: source)): source
-            ]
-        )
-    }
-
     static func cantCreateCertificateOutsideSecureConnection() -> Internals.Log.Message {
         Internals.Log.Message(
             """
@@ -108,61 +96,6 @@ extension Internals.Log.Message {
         )
     }
 
-    static func cantSerializeJSONData<Dictionary, Options>(
-        _ dictionary: Dictionary,
-        _ options: Options,
-        _ error: Error
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            An error occurred while trying to serialize JSON data: \(error.localizedDescription).
-            """,
-            parameters: [
-                String(describing: type(of: error)): error,
-                String(describing: type(of: options)): options,
-                String(describing: type(of: dictionary)): dictionary
-            ] as [String: Any]
-        )
-    }
-
-    static func cantEncodeObject<Object>(
-        _ object: Object,
-        _ error: Error
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            An error occurred while trying to encode the object to data: \(error.localizedDescription).
-            """,
-            parameters: [
-                String(describing: type(of: error)): error,
-                String(describing: type(of: object)): object
-            ] as [String: Any]
-        )
-    }
-
-    static func cantEncodeString<Object, Encoding>(
-        _ object: Object,
-        _ encoding: Encoding
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            An error occurred while trying to encode the string to data.
-            """,
-            parameters: [
-                String(describing: type(of: object)): object,
-                String(describing: type(of: encoding)): encoding
-            ] as [String: Any]
-        )
-    }
-
-    static func accessingAbstractContent() -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            There was an attempt to access a variable for which access was not expected.
-            """
-        )
-    }
-
     static func unexpectedGraphPathway() -> Internals.Log.Message {
         Internals.Log.Message(
             """
@@ -191,73 +124,6 @@ extension Internals.Log.Message {
             """,
             parameters: [
                 String(describing: type(of: keyPath)): keyPath
-            ]
-        )
-    }
-}
-
-// MARK: - Payload
-
-extension Internals.Log.Message {
-
-    static func stringEncodingHasNoEffectInPayload<Encoding>(
-        _ encoding: Encoding
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            Specifying the `using:` parameter with a value of \
-            type `String.Encoding` has no impact or effect on \
-            the payload encoding. This means that specifying a \
-            specific string encoding, such as UTF-8 or ASCII, \
-            does not affect how the payload is encoded.
-
-            To use a different encoding, you should use the \
-            `.charset(_:)` method on the payload structure. \
-            It's important to note that only commonly used \
-            encoding formats are available for selection.
-
-            Make sure to choose the appropriate encoding method \
-            based on the type of content you are dealing with.
-            """,
-            parameters: [
-                String(describing: type(of: encoding)): encoding
-            ]
-        )
-    }
-
-    static func fileWillBeRawBytesContentType<URL>(
-        _ url: URL
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            When sending a payload by providing only the URL, \
-            the Content-Type header is automatically set to \
-            `application/octet-stream`.
-
-            To specify a different content type, you need to use \
-            the `.init(url:contentType:)` initializer. This allows \
-            you to explicitly define the content type for the \
-            payload.
-            """,
-            parameters: [
-                String(describing: type(of: url)): url
-            ]
-        )
-    }
-}
-
-// MARK: - Tasks
-extension Internals.Log.Message {
-
-    static func timesShouldBeGreaterThanZero<Times>(
-        _ times: Times
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            The 'times' parameter must be greater than 0.
-            """,
-            parameters: [
-                String(describing: type(of: times)): times
             ]
         )
     }

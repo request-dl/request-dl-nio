@@ -54,16 +54,6 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
     // MARK: - Private properties
 
-    private var content: Content {
-        guard case .content(let content) = source else {
-            Internals.Log.failure(
-                .unexpectedCertificateSource(source)
-            )
-        }
-
-        return content
-    }
-
     private let source: Source
 
     // MARK: - Inits
@@ -142,12 +132,12 @@ public struct AdditionalTrusts<Content: Property>: Property {
             return .leaf(SecureConnectionNode(
                 Node(source: .bytes(bytes))
             ))
-        case .content:
+        case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .additionalTrust
 
             let outputs = try await Content._makeProperty(
-                property: property.content,
+                property: property.detach(next: content),
                 inputs: inputs
             )
 

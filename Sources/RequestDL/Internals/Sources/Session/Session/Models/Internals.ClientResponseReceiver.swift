@@ -237,3 +237,5 @@ extension Internals.ClientResponseReceiver {
         }
     }
 }
+
+class A: URLSession {}
