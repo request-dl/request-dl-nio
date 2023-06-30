@@ -18,6 +18,8 @@ public struct Trusts<Content: Property>: Property {
         let source: Source
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
+            secureConnection.useDefaultTrustRoots = false
+            
             switch source {
             case .file(let file):
                 secureConnection.trustRoots = .file(file)

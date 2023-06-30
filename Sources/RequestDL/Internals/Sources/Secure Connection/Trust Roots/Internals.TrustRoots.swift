@@ -9,8 +9,6 @@ extension Internals {
 
     enum TrustRoots: Sendable, Hashable {
 
-        case `default`
-
         case file(String)
 
         case bytes([UInt8])
@@ -26,19 +24,18 @@ extension Internals {
         // MARK: - Internal methods
 
         mutating func append(_ certificate: Internals.Certificate) {
-            guard case .certificates(let certificates) = self else {
-                Internals.Log.failure(
-                    .expectingCertificatesCase(self)
-                )
+            switch self {
+            case .file(let path):
+                self = .certificates([.init(path, format: .pem), certificate])
+            case .bytes(let bytes):
+                self = .certificates([.init(bytes, format: .pem), certificate])
+            case .certificates(let certificates):
+                self = .certificates(certificates + [certificate])
             }
-
-            self = .certificates(certificates + [certificate])
         }
 
         func build() throws -> NIOSSLTrustRoots {
             switch self {
-            case .default:
-                return .default
             case .file(let file):
                 return .file(file)
             case .bytes(let bytes):

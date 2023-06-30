@@ -21,22 +21,6 @@ extension Internals.Log {
     }
 }
 
-// MARK: [Internals] - Secure Connection
-extension Internals.Log.Message {
-
-    static func expectingCertificatesCase<T>(
-        _ property: T
-    ) -> Internals.Log.Message {
-        Internals.Log.Message(
-            """
-            """,
-            parameters: [
-                String(describing: type(of: property)): property
-            ]
-        )
-    }
-}
-
 // MARK: [Internals] - Session
 extension Internals.Log.Message {
 
