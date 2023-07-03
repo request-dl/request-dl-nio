@@ -2,4 +2,4 @@ version: 1
 builder:
   configs:
     - documentation_targets: [RequestDL]
-    swift_version: 5.9
+    - swift_version: 5.9
