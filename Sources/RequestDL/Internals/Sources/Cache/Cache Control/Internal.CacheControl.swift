@@ -184,6 +184,10 @@ extension Internals {
                 logger: logger
             ).response() else { return nil }
 
+            if response.status.code == 304 {
+                return cachedData.response.headers
+            }
+
             let lastModified = response.headers["Last-Modified"]
             let eTag = response.headers["ETag"]
 
