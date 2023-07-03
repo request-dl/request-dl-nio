@@ -12,6 +12,8 @@ categories:
     label:
       - 'dependencies'
 category-template: "### $TITLE"
+exclude-contributors:
+  - 'brennobemoura'
 template: |
   ## What’s Changed
 
