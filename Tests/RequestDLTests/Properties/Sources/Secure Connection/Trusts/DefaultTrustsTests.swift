@@ -19,9 +19,7 @@ class DefaultTrustsTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.session.configuration.secureConnection?.trustRoots,
-            .default
-        )
+        XCTAssertNil(resolved.session.configuration.secureConnection?.trustRoots)
+        XCTAssertTrue(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? false)
     }
 }

@@ -18,6 +18,8 @@ public struct Trusts<Content: Property>: Property {
         let source: Source
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
+            secureConnection.useDefaultTrustRoots = false
+
             switch source {
             case .file(let file):
                 secureConnection.trustRoots = .file(file)
@@ -44,18 +46,6 @@ public struct Trusts<Content: Property>: Property {
     /// Returns an exception since `Never` is a type that can never be constructed.
     public var body: Never {
         bodyException()
-    }
-
-    // MARK: - Internal properties
-
-    var content: Content {
-        guard case .content(let content) = source else {
-            Internals.Log.failure(
-                .unexpectedCertificateSource(source)
-            )
-        }
-
-        return content
     }
 
     // MARK: - Private properties
@@ -135,12 +125,12 @@ public struct Trusts<Content: Property>: Property {
             return .leaf(SecureConnectionNode(
                 Node(source: .bytes(bytes))
             ))
-        case .content:
+        case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .trust
 
             let outputs = try await Content._makeProperty(
-                property: property.content,
+                property: property.detach(next: content),
                 inputs: inputs
             )
 

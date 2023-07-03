@@ -8,9 +8,9 @@ import Foundation
 /// to be used directly by clients of this framework.
 public struct _EitherContent<First: Property, Second: Property>: Property {
 
-    private enum Source: Hashable {
-        case first
-        case second
+    private enum Source {
+        case first(First)
+        case second(Second)
     }
 
     // MARK: - Public properties
@@ -20,43 +20,18 @@ public struct _EitherContent<First: Property, Second: Property>: Property {
         bodyException()
     }
 
-    // MARK: - Internal properties
-
-    var first: First {
-        _first()
-    }
-
-    var second: Second {
-        _second()
-    }
-
     // MARK: - Private properties
-
-    private let _first: @Sendable () -> First
-    private let _second: @Sendable () -> Second
 
     private let source: Source
 
     // MARK: - Inits
 
     init(first: First) {
-        source = .first
-        _first = { first }
-        _second = {
-            Internals.Log.failure(
-                .accessingAbstractContent()
-            )
-        }
+        source = .first(first)
     }
 
     init(second: Second) {
-        source = .second
-        _second = { second }
-        _first = {
-            Internals.Log.failure(
-                .accessingAbstractContent()
-            )
-        }
+        source = .second(second)
     }
 
     // MARK: - Public static methods
@@ -69,14 +44,14 @@ public struct _EitherContent<First: Property, Second: Property>: Property {
         property.assertPathway()
 
         switch property.source {
-        case .first:
+        case .first(let first):
             return try await First._makeProperty(
-                property: property.first,
+                property: property.detach(next: first),
                 inputs: inputs
             )
-        case .second:
+        case .second(let second):
             return try await Second._makeProperty(
-                property: property.second,
+                property: property.detach(next: second),
                 inputs: inputs
             )
         }

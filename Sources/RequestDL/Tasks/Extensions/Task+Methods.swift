@@ -18,10 +18,8 @@ extension RequestTask {
      - Returns: Nothing. This function only waits for the server to respond to the ping request.
      */
     public func ping(_ times: Int = 1, debug: Bool = true) async throws {
-        guard times > 0 else {
-            Internals.Log.failure(
-                .timesShouldBeGreaterThanZero(times)
-            )
+        if times <= 0 {
+            return
         }
 
         for index in 0 ..< times {

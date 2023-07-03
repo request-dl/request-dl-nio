@@ -31,6 +31,7 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
+        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
         XCTAssertEqual(
             resolved.session.configuration.secureConnection?.trustRoots,
             .certificates([
@@ -63,6 +64,7 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
+        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
         XCTAssertEqual(
             resolved.session.configuration.secureConnection?.trustRoots,
             .file(fileURL.absolutePath(percentEncoded: false))
@@ -85,6 +87,7 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
+        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
         XCTAssertEqual(
             resolved.session.configuration.secureConnection?.trustRoots,
             .bytes(bytes)

@@ -12,7 +12,8 @@ public struct DefaultTrusts: Property {
     private struct Node: SecureConnectionPropertyNode {
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
-            secureConnection.trustRoots = .default
+            secureConnection.trustRoots = nil
+            secureConnection.useDefaultTrustRoots = true
         }
     }
 

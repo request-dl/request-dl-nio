@@ -241,6 +241,7 @@ extension ResolveTests {
                         secureConnection = SecureConnection {
                             certificateChain = nil,
                             certificateVerification = nil,
+                            useDefaultTrustRoots = false,
                             trustRoots = nil,
                             additionalTrustRoots = nil,
                             privateKey = nil,

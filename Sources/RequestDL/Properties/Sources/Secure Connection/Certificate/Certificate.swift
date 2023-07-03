@@ -125,9 +125,10 @@ public struct Certificate: Property {
         property.assertPathway()
 
         guard let certificateProperty = inputs.environment.certificateProperty else {
-            Internals.Log.failure(
+            Internals.Log.warning(
                 .cantCreateCertificateOutsideSecureConnection()
             )
+            return .empty
         }
 
         return .leaf(SecureConnectionNode(
