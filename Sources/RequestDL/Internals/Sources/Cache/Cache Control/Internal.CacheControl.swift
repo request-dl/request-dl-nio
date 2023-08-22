@@ -37,6 +37,7 @@ extension Internals {
                     }
                 } else if case .useCachedDataOnly = request.cacheStrategy {
                     return .task(SessionTask(Internals.AsyncResponse(
+                        uploadingBytes: .zero,
                         upload: .empty(),
                         head: .throwing(EmptyCachedDataError()),
                         download: .empty()
@@ -73,6 +74,7 @@ extension Internals {
             case .useCachedDataOnly:
                 return makeCachedSession(cachedData) ?? {
                     SessionTask(AsyncResponse(
+                        uploadingBytes: .zero,
                         upload: .empty(),
                         head: .throwing(EmptyCachedDataError()),
                         download: .empty()
@@ -110,6 +112,7 @@ extension Internals {
 
             return SessionTask(
                 response: .init(
+                    uploadingBytes: .zero,
                     upload: .empty(),
                     head: .constant(cachedData.cachedResponse.response),
                     download: download.stream
@@ -180,6 +183,10 @@ extension Internals {
                 request: request.build(),
                 logger: logger
             ).response() else { return nil }
+
+            if response.status.code == 304 {
+                return cachedData.response.headers
+            }
 
             let lastModified = response.headers["Last-Modified"]
             let eTag = response.headers["ETag"]

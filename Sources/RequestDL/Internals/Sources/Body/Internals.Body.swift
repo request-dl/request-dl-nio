@@ -10,6 +10,16 @@ extension Internals {
 
     struct Body: Sendable {
 
+        // MARK: - Internal properties
+
+        var chunkSize: Int {
+            _body.chunkSize
+        }
+
+        var totalSize: Int {
+            _body.totalSize
+        }
+
         // MARK: - Private properties
 
         private let _body: Internals.BodySequence
@@ -17,19 +27,19 @@ extension Internals {
         // MARK: - Inits
 
         init(
-            _ size: Int? = nil,
+            chunkSize: Int? = nil,
             buffers: [Internals.AnyBuffer]
         ) {
             _body = .init(
-                buffers: buffers,
-                size: size
+                chunkSize: chunkSize,
+                buffers: buffers
             )
         }
 
         // MARK: - Internal methods
 
         func build() -> HTTPClient.Body {
-            .stream(length: _body.size) {
+            .stream(length: _body.totalSize) {
                 Self.connect(
                     writer: $0,
                     body: _body
@@ -44,7 +54,7 @@ extension Internals {
             body: Internals.BodySequence
         ) -> EventLoopFuture<Void> {
             guard !body.isEmpty else {
-                Internals.Log.failure(.emptyRequestBody())
+                return writer.write(.byteBuffer(.init()))
             }
 
             var sequence = Internals.StreamWriterSequence(

@@ -12,8 +12,6 @@ extension Modifiers {
      `Content` is the type of the original `RequestTask`, and `NewElement` is the type of the new
      element that the result will be flat-mapped to.
 
-     Example:
-
      ```swift
      DataTask { ... }
          .flatMap { result in

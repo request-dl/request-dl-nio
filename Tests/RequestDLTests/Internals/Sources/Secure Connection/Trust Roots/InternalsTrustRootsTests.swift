@@ -18,17 +18,6 @@ class InternalsTrustRootsTests: XCTestCase {
         server = Certificates().server()
     }
 
-    func testRoots_whenDefault_shouldBeValid() async throws {
-        // Given
-        let root = Internals.TrustRoots.default
-
-        // When
-        let resolved = try root.build()
-
-        // Then
-        XCTAssertEqual(resolved, .default)
-    }
-
     func testTrusts_whenCertificates_shouldBeValid() async throws {
         // Given
         var trusts = Internals.TrustRoots()

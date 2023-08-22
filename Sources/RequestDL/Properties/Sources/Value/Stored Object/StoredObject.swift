@@ -7,10 +7,7 @@ import Foundation
 /**
  A property wrapper that defines a stored object inside `Property` objects.
 
- This wrapper can be used to store any type of object inside the property declaration.
- The object will be stored in memory.
-
- Example:
+ This wrapper can be used to store any **class** inside the property declaration.
 
  ```swift
  struct MyProperty: Property {
@@ -23,11 +20,9 @@ import Foundation
  }
  ```
 
- In this example, an instance of `MyClass` will be stored in the `myObject` property, using
- the `StoredObject` wrapper. The object will be stored in memory until the conditions of
- expiring the reference is meet. See `Internal.Storage` for details.
-
- - Note: The object type must be a class that conforms to `AnyObject` protocol.
+ In this example, an instance of `MyClass` will be stored in memory so that the `myObject` property
+ can always refer to the same instance. However, there are certain conditions that may cause the
+ reference to expire, leading to the replacement of the instance with a new one.
  */
 @propertyWrapper
 public struct StoredObject<Object: AnyObject>: DynamicValue {

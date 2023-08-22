@@ -34,13 +34,21 @@ extension Internals {
 
         typealias Element = Data
 
+        // MARK: - Internal properties
+
+        let totalSize: Int
+
         // MARK: - Private properties
 
         fileprivate let asyncBuffers: Internals.AsyncStream<Internals.DataBuffer>
 
         // MARK: - Inits
 
-        init(_ asyncBuffers: Internals.AsyncStream<DataBuffer>) {
+        init(
+            totalSize: Int,
+            stream asyncBuffers: Internals.AsyncStream<DataBuffer>
+        ) {
+            self.totalSize = totalSize
             self.asyncBuffers = asyncBuffers
         }
 
@@ -49,26 +57,5 @@ extension Internals {
         func makeAsyncIterator() -> Iterator {
             Iterator(asyncBuffers.makeAsyncIterator())
         }
-
-        // MARK: - Private methods
-
-        fileprivate func data() async throws -> Data {
-            var items = [Data]()
-
-            for try await data in self {
-                items.append(data)
-            }
-
-            return items.reduce(Data(), +)
-        }
-    }
-}
-
-// MARK: - Data extension
-
-extension Data {
-
-    init(_ asyncBytes: Internals.AsyncBytes) async throws {
-        self = try await asyncBytes.data()
     }
 }

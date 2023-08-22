@@ -53,24 +53,12 @@ public struct Certificates<Content: Property>: Property {
 
     // MARK: - Internal properties
 
-    var content: Content {
-        guard case .content(let content) = source else {
-            Internals.Log.failure(
-                .unexpectedCertificateSource(source)
-            )
-        }
-
-        return content
-    }
-
     let source: Source
 
     // MARK: - Inits
 
     /**
      Initializes a new instance of the Certificates struct.
-
-     Example:
 
      ```swift
      DataTask {
@@ -142,12 +130,12 @@ public struct Certificates<Content: Property>: Property {
             return .leaf(SecureConnectionNode(
                 Node(source: .bytes(bytes))
             ))
-        case .content:
+        case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .chain
 
             let outputs = try await Content._makeProperty(
-                property: property.content,
+                property: property.detach(next: content),
                 inputs: inputs
             )
 

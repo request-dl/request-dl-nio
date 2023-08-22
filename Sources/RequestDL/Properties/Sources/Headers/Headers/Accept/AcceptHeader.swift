@@ -43,7 +43,8 @@ public struct AcceptHeader: Property {
         return .leaf(HeaderNode(
             key: "Accept",
             value: property.type.rawValue,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: inputs.environment.headerSeparator
         ))
     }
 }

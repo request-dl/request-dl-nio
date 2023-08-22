@@ -21,6 +21,19 @@ class InternalsSecureConnectionTests: XCTestCase {
         secureConnection = nil
     }
 
+    func testSecureConnection_whenDefaultTrustNotSet_shouldBeFalse() async throws {
+        // Then
+        XCTAssertFalse(secureConnection.useDefaultTrustRoots)
+    }
+
+    func testSecureConnection_whenSetDefaultTrust() async throws {
+        // When
+        secureConnection.useDefaultTrustRoots = true
+
+        // Then
+        XCTAssertTrue(secureConnection.useDefaultTrustRoots)
+    }
+
     func testSecureConnection_whenTrustRoots_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()

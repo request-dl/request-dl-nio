@@ -7,8 +7,6 @@ import Foundation
 /**
  `Timeout` is a struct that defines the request timeout for a connect and read.
 
- Usage:
-
  To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
 
  ```swift
@@ -25,7 +23,7 @@ import Foundation
 
  ```
 
- - Note: A request timeout is the amount of time a client will wait for a response from the server
+ > Note: A request timeout is the amount of time a client will wait for a response from the server
  before terminating the connection. The timeout parameter is the duration of time before the timeout
  occurs, and the source parameter specifies the type of timeout to be applied
  */
@@ -70,7 +68,7 @@ public struct Timeout: Property {
 
      - Returns: A new instance of `Timeout`.
 
-     - Note: By default, the `source` parameter is set to `.all`.
+     > Note: By default, the `source` parameter is set to `.all`.
 
      */
     public init(_ timeout: UnitTime, for source: Source = .all) {

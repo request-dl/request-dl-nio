@@ -16,7 +16,7 @@ class ModifiersKeyPathTests: XCTestCase {
             BaseURL("localhost")
             Payload(jsonObject)
         }
-        .ignoresProgress()
+        .collectData()
         .keyPath(\.key)
         .result()
 
@@ -35,7 +35,7 @@ class ModifiersKeyPathTests: XCTestCase {
                 BaseURL("localhost")
                 Payload(jsonObject)
             }
-            .ignoresProgress()
+            .collectData()
             .keyPath(\.items)
             .result()
         } catch is KeyPathNotFound {
@@ -55,7 +55,7 @@ class ModifiersKeyPathTests: XCTestCase {
             BaseURL("localhost")
             Payload(jsonObject)
         }
-        .ignoresProgress()
+        .collectData()
         .extractPayload()
         .keyPath(\.key)
         .result()
@@ -75,7 +75,7 @@ class ModifiersKeyPathTests: XCTestCase {
                 BaseURL("localhost")
                 Payload(jsonObject)
             }
-            .ignoresProgress()
+            .collectData()
             .extractPayload()
             .keyPath(\.items)
             .result()

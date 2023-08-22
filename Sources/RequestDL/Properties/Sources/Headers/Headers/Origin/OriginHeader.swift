@@ -12,8 +12,6 @@ import Foundation
  Resource Sharing) requests to ensure that a web application can only access resources
  from a different origin if the server explicitly allows it.
 
- Example usage:
-
  ```swift
  OriginHeader("https://example.com")
  ```
@@ -67,7 +65,8 @@ public struct OriginHeader: Property {
         return .leaf(HeaderNode(
             key: "Origin",
             value: property.value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: inputs.environment.headerSeparator
         ))
     }
 }

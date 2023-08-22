@@ -69,7 +69,7 @@ public struct FormGroup<Content: Property>: Property {
         let nodes = outputs.node.search(for: FormNode.self)
 
         return .leaf(FormNode(
-            fragmentLength: inputs.environment.payloadPartLength,
+            chunkSize: inputs.environment.payloadChunkSize,
             items: nodes.lazy.map(\.items).reduce([], +)
         ))
     }

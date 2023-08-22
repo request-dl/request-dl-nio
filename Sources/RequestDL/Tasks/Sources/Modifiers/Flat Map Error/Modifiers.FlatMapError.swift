@@ -51,8 +51,6 @@ extension RequestTask {
      Use this method to provide a closure that takes an `Error` parameter and returns `Void` to
      be executed when an error occurs during the task.
 
-     Usage Example:
-
      ```swift
      DataTask { ... }
          .flatMapError { error in
@@ -79,7 +77,6 @@ extension RequestTask {
      Use this method to provide a closure that takes a parameter of the specified error type and returns
      `Void` to be executed when an error of that type occurs during the task.
 
-     Usage Example:
      ```swift
      DataTask { ... }
          .flatMapError(MyCustomError.self) { error in

@@ -7,55 +7,36 @@ import XCTest
 
 class InternalsAsyncResponseTests: XCTestCase {
 
-    var upload: Internals.AsyncStream<Int>!
-    var head: Internals.AsyncStream<Internals.ResponseHead>!
-    var download: Internals.AsyncStream<Internals.DataBuffer>!
-    var response: Internals.AsyncResponse!
-
-    override func setUp() async throws {
-        try await super.setUp()
-
-        upload = .init()
-        head = .init()
-        download = .init()
-
-        response = .init(
-            upload: upload,
-            head: head,
-            download: download
-        )
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        upload = nil
-        head = nil
-        download = nil
-        response = nil
-    }
-
     func testResponse_whenOnlyUploading_shouldReceiveParts() async throws {
         // Given
-        let parts = 0 ..< 16
+        let uploadingBytes = 16
+        let parts = 0 ..< uploadingBytes
+        let configuration = response(uploadingBytes: uploadingBytes)
 
         // When
         for part in parts {
-            upload.append(.success(part))
+            configuration.upload.append(.success(part))
         }
 
-        upload.close()
-        head.close()
-        download.close()
+        configuration.upload.close()
+        configuration.head.close()
+        configuration.download.close()
 
-        let received = try await Array(response)
+        let received = try await Array(configuration.response)
 
         // Then
-        XCTAssertEqual(received, parts.map { .upload($0) })
+        XCTAssertEqual(received, parts.map {
+            .upload(.init(
+                chunkSize: $0,
+                totalSize: uploadingBytes
+            ))
+        })
     }
 
     func testResponse_whenOnlyHead_shouldReceiveHead() async throws {
         // Given
+        let configuration = response()
+
         let head = Internals.ResponseHead(
             url: "https://127.0.0.1",
             status: .init(code: 200, reason: "OK"),
@@ -65,41 +46,82 @@ class InternalsAsyncResponseTests: XCTestCase {
         )
 
         // When
-        self.head.append(.success(head))
+        configuration.head.append(.success(head))
 
-        upload.close()
-        self.head.close()
-        download.close()
+        configuration.upload.close()
+        configuration.head.close()
+        configuration.download.close()
 
-        let received = try await Array(response)
+        let received = try await Array(configuration.response)
 
         // Then
-        XCTAssertEqual(received, [.download(head, .init(download))])
+        XCTAssertEqual(received, [.download(.init(
+            head: head,
+            bytes: .init(totalSize: .zero, stream: configuration.download)
+        ))])
     }
 
     func testResponse_whenHeadWithBytes_shouldReceiveHeadAndBytes() async throws {
         // Given
+        let configuration = response()
+
+        let data = Data.randomData(length: 100_000_000)
+
         let head = Internals.ResponseHead(
             url: "https://127.0.0.1",
             status: .init(code: 200, reason: "OK"),
             version: .init(minor: .zero, major: 1),
-            headers: .init(),
+            headers: .init([("Content-Length", String(data.count))]),
             isKeepAlive: false
         )
 
-        let data = Data.randomData(length: 100_000_000)
-
         // When
-        self.head.append(.success(head))
-        self.download.append(.success(.init(data)))
+        configuration.head.append(.success(head))
+        configuration.download.append(.success(.init(data)))
 
-        upload.close()
-        self.head.close()
-        download.close()
+        configuration.upload.close()
+        configuration.head.close()
+        configuration.download.close()
 
-        let received = try await Array(response)
+        let received = try await Array(configuration.response)
 
         // Then
-        XCTAssertEqual(received, [.download(head, .init(download))])
+        XCTAssertEqual(received, [.download(.init(
+            head: head,
+            bytes: .init(totalSize: data.count, stream: configuration.download)
+        ))])
+    }
+}
+
+extension InternalsAsyncResponseTests {
+
+    fileprivate struct Configuration {
+        let uploadingBytes: Int
+        let upload: Internals.AsyncStream<Int>
+        let head: Internals.AsyncStream<Internals.ResponseHead>
+        let download: Internals.AsyncStream<Internals.DataBuffer>
+        let response: Internals.AsyncResponse
+    }
+
+    fileprivate func response(
+        uploadingBytes: Int = .zero,
+        upload: Internals.AsyncStream<Int> = .init(),
+        head: Internals.AsyncStream<Internals.ResponseHead> = .init(),
+        download: Internals.AsyncStream<Internals.DataBuffer> = .init()
+    ) -> Configuration {
+        let response = Internals.AsyncResponse(
+            uploadingBytes: uploadingBytes,
+            upload: upload,
+            head: head,
+            download: download
+        )
+
+        return .init(
+            uploadingBytes: uploadingBytes,
+            upload: upload,
+            head: head,
+            download: download,
+            response: response
+        )
     }
 }

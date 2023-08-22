@@ -36,6 +36,7 @@ class HeadersTests: XCTestCase {
             CustomHeader(name: "xxx-api-key", value: "password")
             CustomHeader(name: "xxx-api-key", value: "password123")
         }
+        .headerStrategy(.setting)
 
         let resolved = try await resolve(property)
 
@@ -59,6 +60,7 @@ class HeadersTests: XCTestCase {
                 CustomHeader(name: "xxx-api-key", value: "password123")
             }
         }
+        .headerStrategy(.setting)
 
         let resolved = try await resolve(property)
 
@@ -77,10 +79,10 @@ class HeadersTests: XCTestCase {
                 .proxyRevalidate()
 
             AcceptHeader(.jpeg)
+
             CustomHeader(name: "xxx-api-key", value: "password")
             CustomHeader(name: "xxx-api-key", value: "password123")
         }
-        .headerStrategy(.adding)
 
         // When
         let resolved = try await resolve(property)
@@ -88,7 +90,7 @@ class HeadersTests: XCTestCase {
         // Then
         XCTAssertEqual(
             resolved.request.headers["Cache-Control"],
-            ["public", "proxy-revalidate"]
+            ["public,proxy-revalidate"]
         )
 
         XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])
@@ -115,7 +117,6 @@ class HeadersTests: XCTestCase {
                 CustomHeader(name: "xxx-api-key", value: "password123")
             }
         }
-        .headerStrategy(.adding)
 
         // When
         let resolved = try await resolve(property)
@@ -123,7 +124,7 @@ class HeadersTests: XCTestCase {
         // Then
         XCTAssertEqual(
             resolved.request.headers["Cache-Control"],
-            ["public", "proxy-revalidate"]
+            ["public,proxy-revalidate"]
         )
 
         XCTAssertEqual(resolved.request.headers["Accept"], ["image/jpeg"])

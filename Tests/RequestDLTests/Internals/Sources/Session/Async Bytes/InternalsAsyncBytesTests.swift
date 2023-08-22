@@ -24,7 +24,10 @@ class InternalsAsyncBytesTests: XCTestCase {
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
 
-        let bytes = Internals.AsyncBytes(stream)
+        let bytes = Internals.AsyncBytes(
+            totalSize: part1.count + part2.count,
+            stream: stream
+        )
 
         // When
         stream.append(.success(Internals.DataBuffer(part1)))
@@ -43,7 +46,10 @@ class InternalsAsyncBytesTests: XCTestCase {
         let part2 = Data("Earth is a small planet to live".utf8)
         let error = AnyError()
 
-        let bytes = Internals.AsyncBytes(stream)
+        let bytes = Internals.AsyncBytes(
+            totalSize: part1.count + part2.count,
+            stream: stream
+        )
 
         // When
         stream.append(.success(Internals.DataBuffer(part1)))

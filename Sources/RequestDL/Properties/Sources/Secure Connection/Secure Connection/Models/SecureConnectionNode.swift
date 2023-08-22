@@ -149,9 +149,10 @@ struct SecureConnectionNode: PropertyNode {
 
     func make(_ make: inout Make) async throws {
         guard let secureConnection = make.configuration.secureConnection else {
-            Internals.Log.failure(
+            Internals.Log.warning(
                 .cantCreateCertificateOutsideSecureConnection()
             )
+            return
         }
 
         var collector = secureConnection.collector()

@@ -7,9 +7,9 @@ import Foundation
 /**
  A Property protocol conforming type that represents a query parameter in a URL request.
 
- You can use it to build a URLRequest with query parameters.
+ ## Overview
 
- Usage:
+ You can use it to build a request with query parameters.
 
  ```swift
  try await DataTask {
@@ -20,6 +20,10 @@ import Foundation
  }
  .result()
  ```
+
+ ## See Also
+
+ - ``RequestDL/URLEncoder``
 */
 public struct Query<Value: Sendable>: Property {
 

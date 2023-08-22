@@ -61,7 +61,8 @@ public struct CustomHeader: Property {
         return .leaf(HeaderNode(
             key: property.key,
             value: property.value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: inputs.environment.headerSeparator
         ))
     }
 }

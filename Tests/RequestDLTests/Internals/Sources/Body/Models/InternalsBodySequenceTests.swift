@@ -23,7 +23,7 @@ class InternalsBodySequenceTests: XCTestCase {
         // Given
         let data = Data("Hello World!".utf8)
 
-        let bodySequence = makeBodySequence(size: 1024, [
+        let bodySequence = makeBodySequence(chunkSize: 1024, [
             Internals.DataBuffer(data)
         ])
 
@@ -39,7 +39,7 @@ class InternalsBodySequenceTests: XCTestCase {
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
 
-        let bodySequence = makeBodySequence(size: 1024, [
+        let bodySequence = makeBodySequence(chunkSize: 1024, [
             Internals.DataBuffer(part1),
             Internals.DataBuffer(part2)
         ])
@@ -55,16 +55,16 @@ class InternalsBodySequenceTests: XCTestCase {
         // Given
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
-        let size = 2
+        let chunkSize = 2
 
-        let bodySequence = makeBodySequence(size: size, [
+        let bodySequence = makeBodySequence(chunkSize: chunkSize, [
             Internals.DataBuffer(part1),
             Internals.DataBuffer(part2)
         ])
 
         // When
         let sequence = Array(bodySequence).resolveData()
-        let expecting = Array(part1 + part2).split(by: size)
+        let expecting = Array(part1 + part2).split(by: chunkSize)
 
         // Then
         XCTAssertEqual(sequence, expecting)
@@ -76,9 +76,9 @@ class InternalsBodySequenceTests: XCTestCase {
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
         let part3 = Data("Contents in the file".utf8)
-        let size = 16
+        let chunkSize = 16
 
-        let bodySequence = makeBodySequence(size: size, [
+        let bodySequence = makeBodySequence(chunkSize: chunkSize, [
             Internals.DataBuffer(part1),
             Internals.DataBuffer(part2),
             Internals.FileBuffer(part3)
@@ -86,7 +86,7 @@ class InternalsBodySequenceTests: XCTestCase {
 
         // When
         let sequence = Array(bodySequence).resolveData()
-        let expecting = Array(part1 + part2 + part3).split(by: size)
+        let expecting = Array(part1 + part2 + part3).split(by: chunkSize)
 
         // Then
         XCTAssertEqual(sequence, expecting)
@@ -95,7 +95,7 @@ class InternalsBodySequenceTests: XCTestCase {
     func testBodySequence_whenBiggerDataWithNilSize_shouldFragmentInto10000Parts() async throws {
         // Given
         let length = 20_001
-        let fragmentsSize = Int(floor(Double(length) / 10_000))
+        let chunkSize = Int(floor(Double(length) / 10_000))
 
         let data = Data.randomData(length: length)
 
@@ -105,7 +105,7 @@ class InternalsBodySequenceTests: XCTestCase {
 
         // When
         let sequence = Array(bodySequence).resolveData()
-        let expecting = Array(data).split(by: fragmentsSize)
+        let expecting = Array(data).split(by: chunkSize)
 
         // Then
         XCTAssertEqual(sequence, expecting)
@@ -115,12 +115,12 @@ class InternalsBodySequenceTests: XCTestCase {
 extension InternalsBodySequenceTests {
 
     func makeBodySequence(
-        size: Int? = nil,
+        chunkSize: Int? = nil,
         _ buffers: [Internals.AnyBuffer]
     ) -> Internals.BodySequence {
         return .init(
-            buffers: buffers,
-            size: size
+            chunkSize: chunkSize,
+            buffers: buffers
         )
     }
 }

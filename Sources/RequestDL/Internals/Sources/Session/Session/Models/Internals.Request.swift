@@ -47,7 +47,7 @@ extension Internals {
         var headers: HTTPHeaders
 
         var body: Body?
-        var readingMode: Internals.Response.ReadingMode
+        var readingMode: Internals.DownloadStep.ReadingMode
         var cachePolicy: DataCache.Policy.Set
         var cacheStrategy: CacheStrategy
 

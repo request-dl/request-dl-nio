@@ -4,9 +4,7 @@
 
 import Foundation
 
-/**
- A structure representing trusts as a property.
- */
+/// Configure the trusted certificates to validate the server using TLS.
 public struct Trusts<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -20,6 +18,8 @@ public struct Trusts<Content: Property>: Property {
         let source: Source
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
+            secureConnection.useDefaultTrustRoots = false
+
             switch source {
             case .file(let file):
                 secureConnection.trustRoots = .file(file)
@@ -48,18 +48,6 @@ public struct Trusts<Content: Property>: Property {
         bodyException()
     }
 
-    // MARK: - Internal properties
-
-    var content: Content {
-        guard case .content(let content) = source else {
-            Internals.Log.failure(
-                .unexpectedCertificateSource(source)
-            )
-        }
-
-        return content
-    }
-
     // MARK: - Private properties
 
     private let source: Source
@@ -67,9 +55,7 @@ public struct Trusts<Content: Property>: Property {
     // MARK: - Inits
 
     /**
-     Initializes a new instance of the Trusts struct.
-
-     Example:
+     Instantiate using a group of ``RequestDL/Certificates`` that forms a hierarchy of trusted certificates.
 
      ```swift
      DataTask {
@@ -83,15 +69,14 @@ public struct Trusts<Content: Property>: Property {
      }
      ```
 
-     - Parameter content: A closure that returns the content of the Trusts.
+     - Parameter content: A closure that returns the content of ``RequestDL/Certificate``.
      */
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
     /**
-     Initializes a new instance of the Trusts struct with the specified file
-     in `PEM` format.
+     Initializes with the specified `PEM` file.
 
      - Parameter file: The path to the file.
      */
@@ -100,8 +85,7 @@ public struct Trusts<Content: Property>: Property {
     }
 
     /**
-     Initializes a new instance of the Trusts struct with the specified bytes
-     in `PEM` format.
+     Initializes with the specified bytes in `PEM` format.
 
      - Parameter bytes: An array of bytes.
      */
@@ -110,8 +94,7 @@ public struct Trusts<Content: Property>: Property {
     }
 
     /**
-     Initializes a new instance of the Trusts struct with the specified file in the specified bundle
-     in `PEM` format.
+     Initializes with the specified `PEM` file in some bundle.
 
      - Parameters:
         - file: The path to the file.
@@ -142,12 +125,12 @@ public struct Trusts<Content: Property>: Property {
             return .leaf(SecureConnectionNode(
                 Node(source: .bytes(bytes))
             ))
-        case .content:
+        case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .trust
 
             let outputs = try await Content._makeProperty(
-                property: property.content,
+                property: property.detach(next: content),
                 inputs: inputs
             )
 

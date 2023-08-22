@@ -19,5 +19,5 @@ jobs:
     uses: request-dl/.github/.github/workflows/code-coverage.yml@main
     with:
       package-tests: request-dlPackageTests
-      target: OpenAPIRequestDL
+      target: RequestDL
     secrets: inherit

@@ -12,8 +12,6 @@ import Foundation
  filename, content type, and data or URL associated with a form field. It also supports adding custom headers
  to the form.
 
- Usage:
-
  ```swift
  Form(
     name: "example",
@@ -23,10 +21,35 @@ import Foundation
  )
  ```
 
- - Note: The `Headers` generic parameter represents the type of custom headers associated with the
+ > Note: The `Headers` generic parameter represents the type of custom headers associated with the
  form. If no custom headers are needed, the default would be `EmptyProperty`.
 
- - SeeAlso: `Property`
+ ## Topics
+
+ ### Sending raw bytes
+
+ - ``RequestDL/Form/init(name:filename:contentType:data:)``
+ - ``RequestDL/Form/init(name:filename:contentType:data:headers:)``
+
+ ### Sending verbatim texts
+
+ - ``RequestDL/Form/init(name:filename:contentType:verbatim:)``
+ - ``RequestDL/Form/init(name:filename:contentType:verbatim:headers:)``
+
+ ### Sending files
+
+ - ``RequestDL/Form/init(name:filename:contentType:url:)``
+ - ``RequestDL/Form/init(name:filename:contentType:url:headers:)``
+
+ ### Sending Encodable
+
+ - ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``
+ - ``RequestDL/Form/init(name:filename:contentType:value:encoder:headers:)``
+
+ ### Sending JSON objects
+
+ - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``
+ - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:headers:)``
  */
 public struct Form<Headers: Property>: Property {
 
@@ -55,7 +78,7 @@ public struct Form<Headers: Property>: Property {
         - contentType: The content type of the form field.
         - data: The data associated with the form field.
 
-     - Note: This initializer is available when `Headers` is `EmptyProperty`.
+     > Note: This initializer is available when `Headers` is `EmptyProperty`.
      */
     public init(
         name: String,
@@ -83,7 +106,7 @@ public struct Form<Headers: Property>: Property {
         - contentType: The content type of the form field.
         - url: The URL associated with the form field.
 
-     - Note: This initializer is available when `Headers` is `EmptyProperty`.
+     > Note: This initializer is available when `Headers` is `EmptyProperty`.
      */
     public init(
         name: String,
@@ -111,7 +134,7 @@ public struct Form<Headers: Property>: Property {
         - contentType: The content type of the form field.
         - verbatim: The verbatim data associated with the form field.
 
-     - Note: This initializer is available when `Headers` is `EmptyProperty` and `Verbatim`
+     > Note: This initializer is available when `Headers` is `EmptyProperty` and `Verbatim`
      conforms to `StringProtocol`.
      */
     public init<Verbatim: StringProtocol>(
@@ -141,7 +164,7 @@ public struct Form<Headers: Property>: Property {
         - value: The value to be encoded and associated with the form field.
         - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
 
-     - Note: This initializer is available when `Headers` is `EmptyProperty` and `Value`
+     > Note: This initializer is available when `Headers` is `EmptyProperty` and `Value`
      conforms to `Encodable`.
      */
     public init<Value: Encodable>(
@@ -173,7 +196,7 @@ public struct Form<Headers: Property>: Property {
         - jsonObject: The JSON object to be associated with the form field.
         - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
 
-     - Note: This initializer is available when `Headers` is `EmptyProperty`.
+     > Note: This initializer is available when `Headers` is `EmptyProperty`.
      */
     public init(
         name: String,
@@ -260,7 +283,7 @@ public struct Form<Headers: Property>: Property {
         - verbatim: The verbatim data associated with the form field.
         - headers: A closure that returns custom headers for the form.
 
-     - Note: This initializer is available when `Verbatim` conforms to `StringProtocol`.
+     > Note: This initializer is available when `Verbatim` conforms to `StringProtocol`.
      */
     public init<Verbatim: StringProtocol>(
         name: String,
@@ -291,7 +314,7 @@ public struct Form<Headers: Property>: Property {
         - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
         - headers: A closure that returns custom headers for the form.
 
-     - Note: This initializer is available when `Value` conforms to `Encodable`.
+     > Note: This initializer is available when `Value` conforms to `Encodable`.
      */
     public init<Value: Encodable>(
         name: String,
@@ -371,7 +394,7 @@ public struct Form<Headers: Property>: Property {
         )
 
         return .leaf(FormNode(
-            fragmentLength: inputs.environment.payloadPartLength,
+            chunkSize: inputs.environment.payloadChunkSize,
             item: FormItem(
                 name: property.name,
                 filename: property.filename,
@@ -397,12 +420,7 @@ public struct Form<Headers: Property>: Property {
         var headers = HTTPHeaders()
 
         for header in output.node.search(for: HeaderNode.self) {
-            switch header.strategy {
-            case .adding:
-                headers.add(name: header.key, value: header.value)
-            case .setting:
-                headers.set(name: header.key, value: header.value)
-            }
+            header.makeHeadersClosure(&headers)
         }
 
         return headers

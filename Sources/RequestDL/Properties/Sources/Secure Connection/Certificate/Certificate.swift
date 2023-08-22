@@ -4,19 +4,27 @@
 
 import Foundation
 
-/// A property that represents an X.509 certificate.
-///
-/// Use a `Certificate` property to specify an X.509 certificate that is used for secure communication
-/// over a network. A `Certificate` can be initialized with a sequence of bytes, a file path, or a file path
-/// within a bundle. You can also specify the format of the certificate using the `format` parameter.
-///
-/// ```swift
-/// let certData = Data(base64Encoded: "...")
-/// let cert = Certificate(certData!, format: .der)
-/// ```
+/**
+ Set a certificate of type `PEM` or `DER`.
+
+ It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
+ with the server. There are several options to utilize the ``RequestDL/Certificate``.
+
+ You can use it to configure the ``RequestDL/Trusts`` or ``RequestDL/AdditionalTrusts`` to
+ validate if the server is trustworthy.
+
+ Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication
+ certificates to the server.
+
+ ```swift
+ let certData = Data(base64Encoded: "...")
+ let cert = Certificate(certData!, format: .der)
+ ```
+ */
 public struct Certificate: Property {
 
     public enum Format: Sendable, Hashable {
+
         case pem
         case der
 
@@ -67,7 +75,7 @@ public struct Certificate: Property {
 
     // MARK: - Inits
 
-    /// Creates a `Certificate` property with the specified bytes and format.
+    /// Initializes with the specified bytes and format.
     ///
     /// - Parameters:
     ///    - bytes: A sequence of bytes that represent the certificate.
@@ -80,7 +88,7 @@ public struct Certificate: Property {
         self.format = format
     }
 
-    /// Creates a `Certificate` property with the specified file path and format.
+    /// Initializes with the specified file path and format.
     ///
     /// - Parameters:
     ///    - file: The path to the file that contains the certificate.
@@ -90,7 +98,7 @@ public struct Certificate: Property {
         self.format = format
     }
 
-    /// Creates a `Certificate` property with the specified file path within a bundle and format.
+    /// Initializes with the specified file path within a bundle and format.
     ///
     /// - Parameters:
     ///    - file: The path to the file that contains the certificate, relative to the specified bundle.
@@ -117,9 +125,10 @@ public struct Certificate: Property {
         property.assertPathway()
 
         guard let certificateProperty = inputs.environment.certificateProperty else {
-            Internals.Log.failure(
+            Internals.Log.warning(
                 .cantCreateCertificateOutsideSecureConnection()
             )
+            return .empty
         }
 
         return .leaf(SecureConnectionNode(
