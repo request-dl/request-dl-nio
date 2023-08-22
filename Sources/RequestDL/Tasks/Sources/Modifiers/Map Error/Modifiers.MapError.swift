@@ -12,7 +12,7 @@ extension Modifiers {
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Error) throws -> Input
+        let transform: @Sendable (Error) async throws -> Input
 
         // MARK: - Public methods
 
@@ -26,7 +26,7 @@ extension Modifiers {
             do {
                 return try await task.result()
             } catch {
-                return try transform(error)
+                return try await transform(error)
             }
         }
     }
@@ -43,7 +43,7 @@ extension RequestTask {
      - Returns: The modified task with the ``Modifiers/MapError`` modifier applied.
      */
     public func mapError(
-        _ transform: @escaping @Sendable (Error) throws -> Element
+        _ transform: @escaping @Sendable (Error) async throws -> Element
     ) -> ModifiedRequestTask<Modifiers.MapError<Element>> {
         modifier(Modifiers.MapError(transform: transform))
     }

@@ -22,7 +22,7 @@ extension Modifiers {
         // MARK: - Internal properties
 
         let contains: @Sendable (StatusCode) -> Bool
-        let transform: @Sendable (Input) throws -> Void
+        let transform: @Sendable (Input) async throws -> Void
 
         // MARK: - Public methods
 
@@ -39,7 +39,7 @@ extension Modifiers {
                 return result
             }
 
-            try transform(result)
+            try await transform(result)
             return result
         }
     }
@@ -50,7 +50,7 @@ extension Modifiers {
 extension RequestTask where Element: TaskResultPrimitive {
 
     private func onStatusCode(
-        _ transform: @escaping @Sendable (Element) throws -> Void,
+        _ transform: @escaping @Sendable (Element) async throws -> Void,
         contains: @escaping @Sendable (StatusCode) -> Bool
     ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         modifier(Modifiers.OnStatusCode(
@@ -72,7 +72,7 @@ extension RequestTask where Element: TaskResultPrimitive {
      */
     public func onStatusCode(
         _ statusCode: Range<StatusCode>,
-        _ transform: @escaping @Sendable (Element) throws -> Void
+        _ transform: @escaping @Sendable (Element) async throws -> Void
     ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         onStatusCode(transform) {
             statusCode.contains($0)
@@ -92,7 +92,7 @@ extension RequestTask where Element: TaskResultPrimitive {
      */
     public func onStatusCode(
         _ statusCode: StatusCodeSet,
-        _ transform: @escaping @Sendable (Element) throws -> Void
+        _ transform: @escaping @Sendable (Element) async throws -> Void
     ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         onStatusCode(transform) {
             statusCode.contains($0)
@@ -112,7 +112,7 @@ extension RequestTask where Element: TaskResultPrimitive {
      */
     public func onStatusCode(
         _ statusCode: StatusCode,
-        _ transform: @escaping @Sendable (Element) throws -> Void
+        _ transform: @escaping @Sendable (Element) async throws -> Void
     ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
         onStatusCode(transform) {
             statusCode == $0
