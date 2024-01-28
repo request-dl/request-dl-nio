@@ -28,7 +28,7 @@ Check out our comprehensive documentation to get all the necessary information t
 
 ### Translations
 
-- [Portuguese](https://brennobemoura.github.io/request-dl-portuguese/documentation/requestdl)
+- [Portuguese](https://o-nnerb.github.io/request-dl-portuguese/documentation/requestdl)
 
 We would be delighted to have your help in translating our documentation into your preferred language! Simply open a Pull Request on our repository with the link to your translated version. We are looking forward to receiving your contribution!
 

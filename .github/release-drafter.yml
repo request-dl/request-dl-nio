@@ -13,7 +13,7 @@ categories:
       - 'dependencies'
 category-template: "### $TITLE"
 exclude-contributors:
-  - 'brennobemoura'
+  - 'o-nnerb'
 template: |
   ## What’s Changed
 
