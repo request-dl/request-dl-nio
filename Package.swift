@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "request-dl",
+    name: "request-dl-nio",
     platforms: [
         .macOS(.v10_15),
         .iOS(.v13),

@@ -4,19 +4,19 @@ A network layer written in Swift based on the declarative programming paradigm.
 
 @Metadata {
     @PageImage(
-        purpose: icon, 
-        source: "tucano", 
+        purpose: icon,
+        source: "tucano",
         alt: "A technology icon representing the RequestDL framework.")
-    
+
     @PageColor(blue)
-    
+
     @Available(macOS, introduced: "10.15")
     @Available(iOS, introduced: "13.0")
     @Available(tvOS, introduced: "13.0")
     @Available(watchOS, introduced: "6.0")
     @Available(visionOS, introduced: "1.0")
-    @Available("Linux", introduced: "5.7")
-    
+    @Available("Swift", introduced: "5.7")
+
     @SupportedLanguage(swift)
 }
 
@@ -64,7 +64,7 @@ try await DataTask {
 - [x] [mTLS / TLS / SSL / PSK](<doc:Secure-connection>);
 - [x] [JSON / Codable / Multipart / URL Encoded](<doc:Exploring-payload>);
 - [x] [UploadTask / DownloadTask / DataTask / MockedTask](<doc:Exploring-task>);
-- [x] [Modifiers & Interceptors](<doc:Modifiers-and-Interceptors>); 
+- [x] [Modifiers & Interceptors](<doc:Modifiers-and-Interceptors>);
 - [x] [Upload & Download progress](<doc:Upload-and-download-progress>);
 - [x] [Swift Concurrency](<doc:Swift-concurrency>);
 - [x] [Combine support](<doc:Exploring-combine>);
