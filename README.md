@@ -1,6 +1,6 @@
-[![Swift Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Frequest-dl%2Frequest-dl%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/request-dl/request-dl)
-[![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Frequest-dl%2Frequest-dl%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/request-dl/request-dl)
-[![codecov](https://codecov.io/gh/request-dl/request-dl/branch/main/graph/badge.svg?token=MW5J053T85)](https://codecov.io/gh/request-dl/request-dl)
+[![Swift Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Frequest-dl%2Frequest-dl-nio%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/request-dl/request-dl-nio)
+[![Platform Compatibility](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Frequest-dl%2Frequest-dl-nio%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/request-dl/request-dl-nio)
+[![codecov](https://codecov.io/gh/request-dl/request-dl-nio/graph/badge.svg?token=MW5J053T85)](https://codecov.io/gh/request-dl/request-dl-nio)
 
 # RequestDL
 
@@ -12,19 +12,19 @@ One of the key features of RequestDL is its support for specifying properties of
 
 The `Property` protocol is another powerful feature that allows developers to implement custom properties to define various aspects of the request within a  struct specification or using the `@PropertyBuilder`. This makes it easy to customize  requests to meet specific needs.
 
-## [Documentation](https://swiftpackageindex.com/request-dl/request-dl/main/documentation/requestdl)
+## [Documentation](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl)
 
 Check out our comprehensive documentation to get all the necessary information to start using RequestDL in your project.
 
 ### First steps
 
-- [Creating the project property](https://swiftpackageindex.com/request-dl/request-dl/main/documentation/requestdl/creating-the-project-property)
-- [Preparing the certificates](https://swiftpackageindex.com/request-dl/request-dl/main/documentation/requestdl/preparing-the-certificates)
+- [Creating the project property](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl/creating-the-project-property)
+- [Preparing the certificates](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl/preparing-the-certificates)
 
 ### Essentials
 
-- [Building the request](https://swiftpackageindex.com/request-dl/request-dl/main/documentation/requestdl/building-the-request)
-- [Executing the request](https://swiftpackageindex.com/request-dl/request-dl/main/documentation/requestdl/executing-the-request)
+- [Building the request](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl/building-the-request)
+- [Executing the request](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl/executing-the-request)
 
 ### Translations
 
@@ -38,7 +38,7 @@ RequestDL can be installed using Swift Package Manager. To include it in your pr
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/request-dl/request-dl.git", from: "3.0.0")
+    .package(url: "https://github.com/request-dl/request-dl-nio.git", from: "3.0.3")
 ]
 ```
 
