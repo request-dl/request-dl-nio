@@ -6,6 +6,7 @@ import XCTest
 import NIOSSL
 @testable import RequestDL
 
+#if !canImport(Network)
 class PrivateKeyTests: XCTestCase {
 
     func testPrivateKey_whenInitPEMFileNoPassword_shouldBeValid() async throws {
@@ -273,3 +274,4 @@ class PrivateKeyTests: XCTestCase {
         try await assertNever(sut.body)
     }
 }
+#endif

@@ -40,8 +40,8 @@ extension Internals {
             case .bytes(let bytes):
                 return try .certificates(NIOSSLCertificate.fromPEMBytes(bytes))
             case .certificates(let certificates):
-                return .certificates(try certificates.map {
-                    try $0.build()
+                return .certificates(try certificates.reduce(into: []) {
+                    try $0.append(contentsOf: $1.build())
                 })
             }
         }

@@ -8,7 +8,7 @@ extension Internals {
 
     final class ClientOperationQueue: @unchecked Sendable {
 
-        private final class Root: Internals.ClientOperation {
+        private final class Root: Internals.ClientOperation, @unchecked Sendable {
 
             override func complete() {
                 /*

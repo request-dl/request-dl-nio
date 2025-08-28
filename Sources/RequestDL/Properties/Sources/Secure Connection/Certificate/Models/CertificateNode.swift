@@ -30,10 +30,12 @@ struct CertificateNode: SecureConnectionCollectorPropertyNode {
 
     func make(_ collector: inout SecureConnectionNode.Collector) {
         switch property {
+        #if !canImport(Network)
         case .chain:
             var certificateChain = collector.certificateChain ?? []
             certificateChain.append(source.build(format))
             collector.certificateChain = certificateChain
+        #endif
         case .trust:
             var trustRoots = collector.trustRoots ?? []
             trustRoots.append(source.build(format))

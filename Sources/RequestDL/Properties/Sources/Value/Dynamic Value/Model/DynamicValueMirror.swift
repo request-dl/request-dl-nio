@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct DynamicValueMirror<Content> {
+struct DynamicValueMirror<Content>: Sendable {
 
     struct Child {
         let label: String?

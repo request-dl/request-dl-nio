@@ -4,6 +4,7 @@
 
 import Foundation
 
+#if !canImport(Network)
 /**
  A structure representing chain certificate for a property used inside
  for sending the public certificates.
@@ -158,3 +159,4 @@ public struct Certificates<Content: Property>: Property {
         }
     }
 }
+#endif

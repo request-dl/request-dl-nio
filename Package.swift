@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 5.10
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -20,31 +20,31 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.18.0"
+            from: "1.27.0"
         ),
         .package(
             url: "https://github.com/apple/swift-docc-plugin.git",
-            from: "1.2.0"
+            from: "1.4.5"
         ),
         .package(
             url: "https://github.com/apple/swift-nio.git",
-            from: "2.54.0"
+            from: "2.86.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras.git",
-            from: "1.19.0"
+            from: "1.29.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl.git",
-            from: "2.24.0"
+            from: "2.33.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services.git",
-            from: "1.17.0"
+            from: "1.25.1"
         ),
         .package(
             url: "https://github.com/apple/swift-log.git",
-            from: "1.5.2"
+            from: "1.6.4"
         )
     ],
     targets: [

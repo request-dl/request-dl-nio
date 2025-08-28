@@ -33,12 +33,17 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func build() throws -> NIOSSLCertificate {
+        func build() throws -> [NIOSSLCertificate] {
             switch source {
             case .bytes(let bytes):
-                return try NIOSSLCertificate(bytes: bytes, format: format.build())
+                return try [NIOSSLCertificate(bytes: bytes, format: format.build())]
             case .file(let file):
-                return try NIOSSLCertificate(file: file, format: format.build())
+                switch format {
+                case .der:
+                    return try [NIOSSLCertificate.fromDERFile(file)]
+                case .pem:
+                    return try NIOSSLCertificate.fromPEMFile(file)
+                }
             }
         }
     }

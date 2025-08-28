@@ -13,11 +13,15 @@ extension Internals {
 
         // MARK: - Internal properties
 
+        #if !canImport(Network)
         var certificateChain: CertificateChain?
+        #endif
         var certificateVerification: NIOSSL.CertificateVerification?
         var trustRoots: TrustRoots?
         var additionalTrustRoots: [AdditionalTrustRoots]?
+        #if !canImport(Network)
         var privateKey: PrivateKeySource?
+        #endif
         var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         var sendCANameList: Bool?
@@ -25,11 +29,15 @@ extension Internals {
         var shutdownTimeout: TimeAmount?
         var pskHint: String?
         var applicationProtocols: [String]?
+        #if !canImport(Network)
         var keyLogger: SSLKeyLogger?
+        #endif
         var pskIdentityResolver: SSLPSKIdentityResolver?
         var minimumTLSVersion: NIOSSL.TLSVersion?
         var maximumTLSVersion: NIOSSL.TLSVersion?
+        #if !canImport(Network)
         var cipherSuites: String?
+        #endif
         var cipherSuiteValues: [NIOSSL.NIOTLSCipher]?
 
         // MARK: - Inits
@@ -50,9 +58,11 @@ extension Internals {
                 tlsConfiguration.maximumTLSVersion = maximumTLSVersion
             }
 
+            #if !canImport(Network)
             if let cipherSuites {
                 tlsConfiguration.cipherSuites = cipherSuites
             }
+            #endif
 
             if let cipherSuiteValues {
                 tlsConfiguration.cipherSuiteValues = cipherSuiteValues
@@ -100,11 +110,13 @@ extension Internals {
                 tlsConfiguration.applicationProtocols = applicationProtocols
             }
 
+            #if !canImport(Network)
             if let keyLogger {
                 tlsConfiguration.keyLogCallback = {
                     keyLogger($0)
                 }
             }
+            #endif
 
             if let pskIdentityResolver {
                 tlsConfiguration.pskClientCallback = {
@@ -123,13 +135,17 @@ extension Internals {
 
             tlsConfiguration = .makeClientConfiguration()
 
+            #if !canImport(Network)
             if let certificateChain {
                 tlsConfiguration.certificateChain = try certificateChain.build()
             }
+            #endif
 
+            #if !canImport(Network)
             if let privateKey {
                 tlsConfiguration.privateKey = try privateKey.build()
             }
+            #endif
 
             return tlsConfiguration
         }
@@ -141,11 +157,19 @@ extension Internals {
 extension Internals.SecureConnection: Equatable {
 
     static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.certificateChain == rhs.certificateChain
+        #if canImport(Network)
+        let isSecurityPropertiesEqual = true
+        #else
+        let isSecurityPropertiesEqual = lhs.certificateChain == rhs.certificateChain
+        && lhs.privateKey == rhs.privateKey
+        && lhs.keyLogger === rhs.keyLogger
+        && lhs.cipherSuites == rhs.cipherSuites
+        #endif
+
+        return isSecurityPropertiesEqual
         && lhs.certificateVerification == rhs.certificateVerification
         && lhs.trustRoots == rhs.trustRoots
         && lhs.additionalTrustRoots == rhs.additionalTrustRoots
-        && lhs.privateKey == rhs.privateKey
         && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms
         && lhs.verifySignatureAlgorithms == rhs.verifySignatureAlgorithms
         && lhs.sendCANameList == rhs.sendCANameList
@@ -153,11 +177,9 @@ extension Internals.SecureConnection: Equatable {
         && lhs.shutdownTimeout == rhs.shutdownTimeout
         && lhs.pskHint == rhs.pskHint
         && lhs.applicationProtocols == rhs.applicationProtocols
-        && lhs.keyLogger === rhs.keyLogger
         && lhs.pskIdentityResolver === rhs.pskIdentityResolver
         && lhs.minimumTLSVersion == rhs.minimumTLSVersion
         && lhs.maximumTLSVersion == rhs.maximumTLSVersion
-        && lhs.cipherSuites == rhs.cipherSuites
         && lhs.cipherSuiteValues == rhs.cipherSuiteValues
     }
 }

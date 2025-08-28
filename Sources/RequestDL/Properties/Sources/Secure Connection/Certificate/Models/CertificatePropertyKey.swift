@@ -5,7 +5,7 @@
 import Foundation
 
 struct CertificatePropertyKey: PropertyEnvironmentKey {
-    static var defaultValue: CertificateProperty?
+    static let defaultValue: CertificateProperty?
 }
 
 extension PropertyEnvironmentValues {

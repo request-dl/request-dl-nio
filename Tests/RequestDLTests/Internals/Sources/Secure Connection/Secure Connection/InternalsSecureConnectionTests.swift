@@ -49,6 +49,7 @@ class InternalsSecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut.additionalTrustRoots, [.file(certificatePath)])
     }
 
+    #if !canImport(Network)
     func testSecureConnection_whenPrivateKey_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
@@ -62,6 +63,7 @@ class InternalsSecureConnectionTests: XCTestCase {
         // Then
         XCTAssertEqual(sut.privateKey, .file(privateKeyPath))
     }
+    #endif
 
     func testSecureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given
@@ -202,7 +204,9 @@ class InternalsSecureConnectionTests: XCTestCase {
         ].joined(separator: ":")
 
         // When
+        #if !canImport(Network)
         secureConnection.cipherSuites = cipherSuites
+        #endif
         secureConnection.cipherSuiteValues = cipherSuitesValues
 
         let sut = try secureConnection.build()
@@ -279,6 +283,7 @@ extension InternalsSecureConnectionTests {
         }
     }
 
+    #if !canImport(Network)
     func testSecureConnection_whenKeyLog_shouldBeValid() async throws {
         // Given
         let data = Data("Hello World".utf8)
@@ -293,6 +298,7 @@ extension InternalsSecureConnectionTests {
         // Then
         sut.keyLogCallback?(.init(data: data))
     }
+    #endif
 }
 
 extension InternalsSecureConnectionTests {
