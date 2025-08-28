@@ -12,8 +12,6 @@ categories:
     label:
       - 'dependencies'
 category-template: "### $TITLE"
-exclude-contributors:
-  - 'o-nnerb'
 template: |
   ## What’s Changed
 
