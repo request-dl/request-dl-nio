@@ -27,7 +27,7 @@ extension Modifiers {
      The decoding operation is performed using a `JSONDecoder`. By default, the decoding is
      performed assuming that the data is in plain format, i.e., not an array or dictionary.
      */
-    public struct Decode<Input: Sendable, Element: Decodable, Output: Sendable>: RequestTaskModifier {
+    public struct Decode<Input: Sendable, Element: Decodable & Sendable, Output: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
 
