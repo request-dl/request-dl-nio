@@ -18,6 +18,6 @@ jobs:
   code-coverage:
     uses: request-dl/.github/.github/workflows/code-coverage.yml@main
     with:
-      package-tests: request-dl-nioPackageTests
+      package-tests: request-dlPackageTests
       target: RequestDL
     secrets: inherit
