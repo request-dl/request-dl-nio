@@ -10,6 +10,8 @@ struct CertificateResource: Hashable {
     let certificateURL: URL
 
     let privateKeyURL: URL
+
+    let format: Internals.Certificate.Format
 }
 
 extension CertificateResource {
@@ -19,6 +21,8 @@ extension CertificateResource {
         in bundle: Bundle,
         format: Internals.Certificate.Format
     ) {
+        self.format = format
+        
         let path = path.replacingOccurrences(of: "_", with: ".")
 
         self.certificateURL = bundle.url(

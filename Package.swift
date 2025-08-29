@@ -1,10 +1,10 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 5.10
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-    name: "request-dl-nio",
+    name: "request-dl",
     platforms: [
         .macOS(.v10_15),
         .iOS(.v13),
@@ -20,27 +20,31 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.20.1"
+            from: "1.27.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-docc-plugin",
-            from: "1.3.0"
+            url: "https://github.com/apple/swift-docc-plugin.git",
+            from: "1.4.5"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio",
-            from: "2.63.0"
+            url: "https://github.com/apple/swift-nio.git",
+            from: "2.86.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-extras",
-            from: "1.21.0"
+            url: "https://github.com/apple/swift-nio-extras.git",
+            from: "1.29.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.26.0"
+            url: "https://github.com/apple/swift-nio-ssl.git",
+            from: "2.33.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-log",
-            from: "1.5.4"
+            url: "https://github.com/apple/swift-nio-transport-services.git",
+            from: "1.25.1"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-log.git",
+            from: "1.6.4"
         )
     ],
     targets: [
@@ -55,6 +59,7 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "Logging", package: "swift-log")
             ]
         ),
@@ -67,6 +72,7 @@ let package = Package(
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "Logging", package: "swift-log")
             ],
             resources: [.process("Resources")]
