@@ -22,11 +22,16 @@ extension LocalServer {
         static func makeDefaultConfiguration() throws -> NIOSSL.TLSConfiguration {
             let server = Certificates().server()
 
-            return .makeServerConfiguration(
-                certificateChain: try NIOSSLCertificate.fromPEMFile(
+            return try .makeServerConfiguration(
+                certificateChain: NIOSSLCertificate.fromPEMFile(
                     server.certificateURL.absolutePath(percentEncoded: false)
                 ).map { .certificate($0) },
-                privateKey: .file(server.privateKeyURL.absolutePath(percentEncoded: false))
+                privateKey: .privateKey(
+                    .init(
+                        file: server.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: server.format.build()
+                    )
+                )
             )
         }
 
@@ -37,14 +42,16 @@ extension LocalServer {
             case .psk(let key, let identity):
                 var tlsConfiguration: TLSConfiguration = .makePreSharedKeyConfiguration()
                 tlsConfiguration.minimumTLSVersion = .tlsv1
-                tlsConfiguration.maximumTLSVersion = .tlsv12
+                tlsConfiguration.maximumTLSVersion = .tlsv13
 
-                tlsConfiguration.pskServerCallback = { hint, clientIdentity in
+                tlsConfiguration.pskServerProvider = { context in
                     var bytes = NIOSSLSecureBytes()
                     bytes.append(key)
                     bytes.append(":\(identity)".utf8)
-                    bytes.append(":\(clientIdentity)".utf8)
-                    bytes.append(":\(hint)".utf8)
+                    bytes.append(":\(context.clientIdentity)".utf8)
+                    if let hint = context.hint {
+                        bytes.append(":\(hint)".utf8)
+                    }
                     return .init(key: bytes)
                 }
                 tlsConfiguration.pskHint = "pskHint"
