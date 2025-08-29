@@ -10,5 +10,5 @@ on:
 
 jobs:
   breaking-changes:
-    uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@swift-select-action
+    uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@main
     secrets: inherit

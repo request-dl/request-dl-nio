@@ -16,7 +16,7 @@ on:
 
 jobs:
   code-coverage:
-    uses: request-dl/.github/.github/workflows/code-coverage.yml@swift-select-action
+    uses: request-dl/.github/.github/workflows/code-coverage.yml@main
     with:
       package-tests: request-dlPackageTests
       target: RequestDL
