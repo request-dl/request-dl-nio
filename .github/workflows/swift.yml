@@ -16,7 +16,7 @@ jobs:
         matrix:
           platform: [macOS-latest, ubuntu-latest]
           swift-version: ["5.10", "6.0", "6.1"]
-    uses: request-dl/.github/.github/workflows/swift.yml@main
+    uses: request-dl/.github/.github/workflows/swift.yml@swift-select-action
     with:
       swift-version: ${{ matrix.swift-version }}
       platform: ${{ matrix.platform }}
