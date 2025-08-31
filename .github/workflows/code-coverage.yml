@@ -40,7 +40,7 @@ jobs:
 
     uses: request-dl/.github/.github/workflows/apple-tests.yml@coverage-workflow
     with:
-      package-name: "request-dl-Package"
+      package-name: "request-dl"
       destination: ${{ matrix.destination }}
       coverage-enabled: true
     secrets: inherit
