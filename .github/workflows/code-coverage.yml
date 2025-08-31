@@ -21,7 +21,7 @@ jobs:
         include:
           - os: ubuntu-latest
             swift-version: '6.1'
-          - os: windows-11
+          - os: windows-11-arm
             swift-version: '5.10'
     uses: request-dl/.github/.github/workflows/third-party-tests.yml@coverage-workflow
     with:
