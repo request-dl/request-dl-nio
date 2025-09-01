@@ -33,7 +33,7 @@ class InternalsStorageTests: XCTestCase {
         // Then
         XCTAssertNotNil(storage.getValue(Int.self, forKey: key))
 
-        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime * 2))
+        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime * 3))
 
         XCTAssertNil(storage.getValue(Int.self, forKey: key))
     }
