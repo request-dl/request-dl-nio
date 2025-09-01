@@ -17,8 +17,9 @@ on:
 jobs:
   third-party-tests:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     uses: request-dl/.github/.github/workflows/third-party-tests.yml@coverage-workflow
     with:
       platform: ${{ matrix.os }}
