@@ -14,15 +14,24 @@ on:
       - 'Tests/**'
       - '.github/workflows/code-coverage.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   third-party-tests:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        include:
+          - platform: "ubuntu-latest"
+            name: "Linux"
+          # - platform: "windows-latest"
+          #   name: "Windows"
     uses: request-dl/.github/.github/workflows/third-party-tests.yml@coverage-workflow
     with:
-      platform: ${{ matrix.os }}
+      platform: ${{ matrix.platform }}
+      name: ${{ matrix.name }}
       coverage-enabled: true
     secrets: inherit
 
@@ -30,19 +39,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        destination:
-          - "platform=iOS Simulator,arch=arm64,name=iPhone 16 Pro,OS=18.5"
-          - "platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=18.5"
-          - "platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 10 (42mm),OS=11.5"
-          - "platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=18.5"
-          - "platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=2.5"
-          - "platform=macOS,arch=arm64,name=My Mac"
-          - "platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac"
-
+        include:
+          - destination: "platform=iOS Simulator,arch=arm64,name=iPhone 16 Pro,OS=18.5"
+            name: "iOS"
+          - destination: "platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=18.5"
+            name: "iPadOS"
+          - destination: "platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 10 (42mm),OS=11.5"
+            name: "watchOS"
+          - destination: "platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=18.5"
+            name: "tvOS"
+          - destination: "platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=2.5"
+            name: "visionOS"
+          - destination: "platform=macOS,arch=arm64,name=My Mac"
+            name: "macOS"
+          - destination: "platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac"
+            name: "macOS Catalyst"
     uses: request-dl/.github/.github/workflows/apple-tests.yml@coverage-workflow
     with:
       package-name: "request-dl"
       destination: ${{ matrix.destination }}
+      name: ${{ matrix.name }}
       coverage-enabled: true
     secrets: inherit
 
