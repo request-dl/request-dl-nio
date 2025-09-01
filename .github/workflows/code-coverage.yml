@@ -29,7 +29,7 @@ jobs:
             name: "Linux"
           # - platform: "windows-latest"
           #   name: "Windows"
-    uses: request-dl/.github/.github/workflows/third-party-tests.yml@coverage-workflow
+    uses: request-dl/.github/.github/workflows/third-party-tests.yml@main
     with:
       platform: ${{ matrix.platform }}
       name: ${{ matrix.name }}
@@ -56,7 +56,7 @@ jobs:
             name: "macOS"
           - destination: "platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac"
             name: "macOS Catalyst"
-    uses: request-dl/.github/.github/workflows/apple-tests.yml@coverage-workflow
+    uses: request-dl/.github/.github/workflows/apple-tests.yml@main
     with:
       package-name: "request-dl"
       destination: ${{ matrix.destination }}
@@ -66,6 +66,6 @@ jobs:
 
   coverage-upload:
     needs: [third-party-tests, apple-tests]
-    if: always() # ⬅️ Importante: executa mesmo se alguns jobs falharem
-    uses: request-dl/.github/.github/workflows/coverage-upload.yml@coverage-workflow
+    if: always()
+    uses: request-dl/.github/.github/workflows/coverage-upload.yml@main
     secrets: inherit
