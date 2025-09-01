@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   third-party-tests:
+    name: "Testing on Third Party Platforms"
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +37,7 @@ jobs:
     secrets: inherit
 
   apple-tests:
+    name: "Testing on Apple Platforms"
     strategy:
       fail-fast: false
       matrix:
