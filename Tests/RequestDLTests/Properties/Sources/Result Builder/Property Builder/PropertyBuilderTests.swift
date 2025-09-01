@@ -28,7 +28,7 @@ class PropertyBuilderTests: XCTestCase {
         // Given
         @PropertyBuilder
         var property: some Property {
-            if #available(iOS 99, macOS 99, watchOS 99, tvOS 99, *) {
+            if #available(iOS 99, macOS 99, watchOS 99, tvOS 99, visionOS 99, *) {
                 CacheHeader()
                     .public(true)
             }

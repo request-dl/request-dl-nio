@@ -8,6 +8,10 @@ on:
       - 'Sources/**'
       - '.github/workflows/no-breaking-changes.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   breaking-changes:
     uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@main
