@@ -60,8 +60,8 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut = await _Concurrency.Task.detached(priority: .background) {
-            await self.manager.provider(provider)
+        let sut = await _Concurrency.Task.detached(priority: .background) { [manager] in
+            await manager.provider(provider)
         }.value
 
         // Then

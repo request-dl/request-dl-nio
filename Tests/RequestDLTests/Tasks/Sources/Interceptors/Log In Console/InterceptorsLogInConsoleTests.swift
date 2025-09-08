@@ -10,13 +10,13 @@ class InterceptorsLogInConsoleTests: XCTestCase {
     func testConsoleTaskResult() async throws {
         // Given
         let data = Data("Hello World!".utf8)
-        var strings = [String]()
+        let strings = SendableBox([String]())
 
         Internals.Override.Print.replace { separator, _, items in
-            strings.append(
-                items
+            strings(
+                strings() + [items
                     .map { "\($0)" }
-                    .joined(separator: separator)
+                    .joined(separator: separator)]
             )
         }
 
@@ -32,7 +32,7 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(strings.first?.contains(
+        XCTAssertTrue(strings().first?.contains(
             """
             Head: \(result.head)
             Payload: \(String(data: data, encoding: .utf8) ?? "")
@@ -43,13 +43,13 @@ class InterceptorsLogInConsoleTests: XCTestCase {
     func testConsoleData() async throws {
         // Given
         let data = Data("Hello World!".utf8)
-        var strings = [String]()
+        let strings = SendableBox([String]())
 
         Internals.Override.Print.replace { separator, _, items in
-            strings.append(
-                items
+            strings(
+                strings() + [items
                     .map { "\($0)" }
-                    .joined(separator: separator)
+                    .joined(separator: separator)]
             )
         }
 
@@ -66,7 +66,7 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(strings.first?.contains(
+        XCTAssertTrue(strings().first?.contains(
             """
             Success: \(String(data: data, encoding: .utf8) ?? "")
             """
@@ -76,13 +76,13 @@ class InterceptorsLogInConsoleTests: XCTestCase {
     func testConsoleDecoded() async throws {
         // Given
         let value = "Hello World!"
-        var strings = [String]()
+        let strings = SendableBox([String]())
 
         Internals.Override.Print.replace { separator, _, items in
-            strings.append(
-                items
+            strings(
+                strings() + [items
                     .map { "\($0)" }
-                    .joined(separator: separator)
+                    .joined(separator: separator)]
             )
         }
 
@@ -102,7 +102,7 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(strings.first?.contains(
+        XCTAssertTrue(strings().first?.contains(
             "Success: \(value)"
         ) ?? false)
     }

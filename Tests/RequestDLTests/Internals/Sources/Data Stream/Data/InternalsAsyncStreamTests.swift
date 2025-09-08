@@ -226,6 +226,11 @@ extension InternalsDataStreamTests {
         values: SendableBox<[Result<Int, Error>]>,
         expectation: XCTestExpectation
     ) {
+        guard let stream else {
+            XCTFail("Found nil stream")
+            return
+        }
+        
         _Concurrency.Task {
             do {
                 for try await value in stream {

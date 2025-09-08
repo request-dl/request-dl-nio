@@ -23,7 +23,7 @@ extension Modifiers {
      .extractPayload()
      ```
      */
-    public struct ExtractPayload<Output>: RequestTaskModifier {
+    public struct ExtractPayload<Output: Sendable>: RequestTaskModifier {
 
         public typealias Input = TaskResult<Output>
 

@@ -25,7 +25,7 @@ import Foundation
 
  You can get the result individually or by using the `\.keys`, `\.values` properties of dictionary or by using the `subscript` method.
  */
-public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where Data.Element: Hashable, Data: Sendable {
+public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where Data.Element: Hashable & Sendable, Data: Sendable {
     // swiftlint:enable line_length
 
     @_spi(Private)

@@ -74,9 +74,9 @@ public struct QueryGroup<Content: Property>: Property {
     }
 }
 
-extension QueryGroup where Content == PropertyForEach<[String: Any], String, Query<Any>> {
+extension QueryGroup where Content == PropertyForEach<[String: Sendable], String, Query<Sendable>> {
 
-    public init(_ dictionary: [String: Any]) {
+    public init(_ dictionary: [String: Sendable]) {
         self.init {
             PropertyForEach(dictionary, id: \.key) {
                 Query(name: $0.key, value: $0.value)

@@ -21,7 +21,7 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
 
     // MARK: - Inits
 
-    init<Object: Encodable>(
+    init<Object: Encodable & Sendable>(
         _ object: Object,
         encoder: JSONEncoder,
         contentType: ContentType

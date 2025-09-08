@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct DynamicValueDeepSearch<Content>: Sendable {
+struct DynamicValueDeepSearch<Content: Sendable>: Sendable {
 
     struct Child<Value> {
         let label: String

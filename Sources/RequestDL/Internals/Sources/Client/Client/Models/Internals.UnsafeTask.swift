@@ -8,7 +8,7 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    struct UnsafeTask<Element>: Sendable, Hashable {
+    struct UnsafeTask<Element: Sendable>: Sendable, Hashable {
 
         fileprivate final class RunningState: @unchecked Sendable {
             var isRunning = true
@@ -23,7 +23,7 @@ extension Internals {
 
         init(
             _ task: HTTPClient.Task<Element>,
-            completion: @escaping () -> Void
+            completion: @Sendable @escaping () -> Void
         ) {
             let lock = Lock()
             let runningState = RunningState()

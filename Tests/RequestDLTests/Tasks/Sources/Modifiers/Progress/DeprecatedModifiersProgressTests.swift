@@ -8,39 +8,75 @@ import XCTest
 @available(*, deprecated)
 class DeprecatedModifiersProgressTests: XCTestCase {
 
-    class UploadProgressMonitor: UploadProgress {
-        var sentBytes: [Int] = []
+    final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {
+        
+        var sentBytes: [Int] {
+            lock.withLock { _sentBytes }
+        }
+        
+        private let lock = Lock()
+        private var _sentBytes: [Int] = []
 
         func upload(_ chunkSize: Int, totalSize: Int) {
-            sentBytes.append(chunkSize)
+            lock.withLock {
+                _sentBytes.append(chunkSize)
+            }
         }
     }
 
-    class DownloadProgressMonitor: DownloadProgress {
+    final class DownloadProgressMonitor: DownloadProgress, @unchecked Sendable {
+        
+        var length: Int? {
+            lock.withLock { _length }
+        }
 
-        var receivedData: [Data] = []
-        var length: Int?
+        var receivedData: [Data] {
+            lock.withLock { _receivedData }
+        }
+        
+        private let lock = Lock()
+        private var _receivedData: [Data] = []
+        private var _length: Int?
 
         func download(_ slice: Data, totalSize: Int) {
-            receivedData.append(slice)
-            self.length = totalSize
+            lock.withLock {
+                _receivedData.append(slice)
+                _length = totalSize
+            }
         }
     }
 
-    class ProgressMonitor: RequestDL.Progress {
+    class ProgressMonitor: RequestDL.Progress, @unchecked Sendable {
+        
+        var sentBytes: [Int] {
+            lock.withLock { _sentBytes }
+        }
+        
+        var length: Int? {
+            lock.withLock { _length }
+        }
 
-        var sentBytes: [Int] = []
+        var receivedData: [Data] {
+            lock.withLock { _receivedData }
+        }
 
-        var receivedData: [Data] = []
-        var length: Int?
+        private let lock = Lock()
+        private var _sentBytes: [Int] = []
+
+        private var _receivedData: [Data] = []
+        private var _length: Int?
 
         func upload(_ chunkSize: Int, totalSize: Int) {
-            sentBytes.append(chunkSize)
+            lock.withLock {
+                _sentBytes.append(chunkSize)
+            }
         }
 
         func download(_ slice: Data, totalSize: Int) {
-            receivedData.append(slice)
-            self.length = totalSize
+            lock.withLock {
+                _receivedData.append(slice)
+                _length = totalSize
+            }
         }
     }
 

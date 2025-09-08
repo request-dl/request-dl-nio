@@ -10,10 +10,10 @@ class InterceptorsBreakpointTests: XCTestCase {
 
     func testBreakpoint() async throws {
         // Given
-        var breakpointActivated = false
+        let breakpointActivated = SendableBox(false)
 
         Internals.Override.Raise.replace {
-            breakpointActivated = $0 == SIGTRAP
+            breakpointActivated($0 == SIGTRAP)
             Internals.Override.Raise.restore()
             return $0
         }
@@ -26,7 +26,7 @@ class InterceptorsBreakpointTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(breakpointActivated)
+        XCTAssertTrue(breakpointActivated())
     }
 }
 #endif

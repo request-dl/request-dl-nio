@@ -7,12 +7,12 @@ import Foundation
 /**
  A structure that represents an asynchronous response.
  */
-public struct AsyncResponse: AsyncSequence {
+public struct AsyncResponse: Sendable, AsyncSequence {
 
     /**
      A structure that defines an async iterator for the asynchronous response.
      */
-    public struct Iterator: AsyncIteratorProtocol {
+    public struct Iterator: Sendable, AsyncIteratorProtocol {
 
         fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncResponse.Iterator

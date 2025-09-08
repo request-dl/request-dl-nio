@@ -1,111 +1,56 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
 import Foundation
 
-struct AsyncSignal: Sendable {
+actor AsyncSignal {
 
-    private final class Storage: @unchecked Sendable {
-        var signal = false
-        var tasks: [Task] = []
+    private var isLocked: Bool
+    private var pendingOperations = [AsyncOperation]()
 
-        deinit {
-            precondition(tasks.isEmpty, "The AsyncSignal is being deallocated with pending tasks. This is not safe.")
-        }
+    init(_ locked: Bool = true) {
+        isLocked = locked
     }
 
-    private final class Task: @unchecked Sendable {
-
-        enum State {
-            case pending
-            case waiting(UnsafeContinuation<Void, Never>)
-            case running
-            case cancelled
-        }
-
-        // MARK: - Internal properties
-
-        var state: State
-
-        // MARK: - Inits
-
-        init(_ state: State) {
-            self.state = state
-        }
+    func lock() {
+        isLocked = true
     }
-
-    // MARK: - Private properties
-
-    private let lock = Lock()
-
-    // MARK: - Internal properties
-
-    private let _storage: Storage
-
-    // MARK: - Inits
-
-    init() {
-        _storage = .init()
-    }
-
-    // MARK: - Internal methods
 
     func wait() async {
-        lock.lock()
-
-        if _storage.signal {
-            lock.unlock()
+        guard isLocked else {
             return
         }
 
-        let task = Task(.pending)
-        _storage.tasks.insert(task, at: .zero)
-        lock.unlock()
+        let operation = AsyncOperation()
 
-        await withTaskCancellationHandler {
-            await withUnsafeContinuation { continuation in
-                lock.withLock {
-                    if case .cancelled = task.state {
-                        return
-                    }
-
-                    if _storage.signal {
-                        task.state = .running
-                        continuation.resume()
-                        return
-                    }
-
-                    task.state = .waiting(continuation)
-                }
-            }
-        } onCancel: {
-            lock.withLock {
-                if case .running = task.state {
+        await withTaskCancellationHandler { [weak operation] in
+            await withUnsafeContinuation {
+                guard let operation else {
                     return
                 }
 
-                task.state = .cancelled
-                if let index = _storage.tasks.firstIndex(where: { $0 === task }) {
-                    _storage.tasks.remove(at: index)
-                }
+                operation.schedule($0)
+                pendingOperations.insert(operation, at: .zero)
             }
+        } onCancel: {
+            operation.cancelled()
         }
     }
 
-    func signal() {
-        lock.withLock {
-            guard !_storage.signal else {
-                return
-            }
+    nonisolated func signal() {
+        Task {
+            await _signal()
+        }
+    }
 
-            _storage.signal = true
-            while let task = _storage.tasks.popLast() {
-                if case .waiting(let continuation) = task.state {
-                    task.state = .running
-                    continuation.resume()
-                }
-            }
+    private func _signal() {
+        isLocked = false
+
+        while let operation = pendingOperations.popLast() {
+            operation.resume()
+        }
+    }
+
+    deinit {
+        for operation in pendingOperations {
+            operation.dispose()
         }
     }
 }

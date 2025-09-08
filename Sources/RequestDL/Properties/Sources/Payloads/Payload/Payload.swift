@@ -91,7 +91,7 @@ public struct Payload: Property {
         - encoder: An encoder to use for the serialization.
         - contentType: The content type of the payload (default is JSON).
      */
-    public init<Object: Encodable>(
+    public init<Object: Encodable & Sendable>(
         _ object: Object,
         encoder: JSONEncoder = .init(),
         contentType: ContentType = .json

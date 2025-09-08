@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct GraphEnvironmentOperation<Content>: GraphValueOperation {
+struct GraphEnvironmentOperation<Content: Sendable>: GraphValueOperation {
 
     // MARK: - Private properties
 

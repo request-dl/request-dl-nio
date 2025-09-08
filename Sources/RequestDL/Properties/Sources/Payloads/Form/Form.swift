@@ -167,7 +167,7 @@ public struct Form<Headers: Property>: Property {
      > Note: This initializer is available when `Headers` is `EmptyProperty` and `Value`
      conforms to `Encodable`.
      */
-    public init<Value: Encodable>(
+    public init<Value: Encodable & Sendable>(
         name: String,
         filename: String? = nil,
         contentType: ContentType = .json,
@@ -316,7 +316,7 @@ public struct Form<Headers: Property>: Property {
 
      > Note: This initializer is available when `Value` conforms to `Encodable`.
      */
-    public init<Value: Encodable>(
+    public init<Value: Encodable & Sendable>(
         name: String,
         filename: String? = nil,
         contentType: ContentType = .json,

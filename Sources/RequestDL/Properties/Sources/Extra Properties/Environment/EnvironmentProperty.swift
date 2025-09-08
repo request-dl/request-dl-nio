@@ -46,8 +46,8 @@ extension Property {
 
      - Returns: A modified `Property` with the new ``PropertyEnvironmentValues`` set.
      */
-    public func environment<Value>(
-        _ keyPath: WritableKeyPath<PropertyEnvironmentValues, Value>,
+    public func environment<Value: Sendable>(
+        _ keyPath: WritableKeyPath<PropertyEnvironmentValues, Value> & Sendable,
         _ value: Value
     ) -> some Property {
         EnvironmentProperty(content: self) {

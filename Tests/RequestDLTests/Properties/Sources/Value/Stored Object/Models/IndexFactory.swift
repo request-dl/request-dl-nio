@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol IndexFactory: AnyObject {
+protocol IndexFactory: Sendable, AnyObject {
 
     var rawValue: Int { get }
 

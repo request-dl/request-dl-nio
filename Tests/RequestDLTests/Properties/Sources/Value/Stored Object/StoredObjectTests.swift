@@ -11,11 +11,14 @@ class StoredObjectTests: XCTestCase {
 
     func testStored_whenPath_shouldIndexBeOneAndPathZero() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -31,18 +34,21 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 1)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 1)
         XCTAssertEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0")
     }
 
     func testStored_whenPathDifferentPosition_shouldBeNotEqual() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -60,7 +66,7 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 1)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 1)
         XCTAssertEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.google.com/0")
         XCTAssertEqual(resolved2.request.url, "https://www.google.com/0")
@@ -68,11 +74,14 @@ class StoredObjectTests: XCTestCase {
 
     func testStored_whenPathWithEqualNamespace() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -90,18 +99,21 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 1)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 1)
         XCTAssertEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0")
     }
 
     func testStored_whenPathWithDifferentNamespace() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -119,18 +131,21 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 2)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 2)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0")
         XCTAssertEqual(resolved2.request.url, "https://www.apple.com/1")
     }
 
     func testStored_whenPathQuery_shouldURLContainsZeroAndOnes() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -148,18 +163,21 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 2)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 2)
         XCTAssertEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0?index=1")
     }
 
     func testStored_whenPathQueryDifferentPosition_shouldBeNotEqual() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -177,7 +195,7 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 4)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 4)
         XCTAssertNotEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0?index=1")
         XCTAssertEqual(resolved2.request.url, "https://www.apple.com/3?index=2")
@@ -185,11 +203,14 @@ class StoredObjectTests: XCTestCase {
 
     func testStored_whenMultiplePath_shouldIndexBeOneAndPathZero() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -205,18 +226,21 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 2)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 2)
         XCTAssertEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0/1")
     }
 
     func testStored_whenCombined_shouldRestoreEachOne() async throws {
         // Given
-        final class Factory: Index, IndexFactory {
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+            @MainActor
             static let producer = IndexProducer()
 
             init() {
-                super.init(Self.producer)
+                super.init(MainActor.sync {
+                    Self.producer
+                })
             }
         }
 
@@ -232,7 +256,7 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(Factory.producer.index, 3)
+        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 3)
         XCTAssertEqual(resolved1.request.url, resolved2.request.url)
         XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0/1.2")
     }

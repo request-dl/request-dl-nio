@@ -18,9 +18,10 @@ class InternalsLogTests: XCTestCase {
         // When
         let expecting = expectation(description: "print")
 
-        var payload: (String, String, [Any])?
+        let payload = SendableBox<(String, String, [Sendable])?>(nil)
+        
         Internals.Override.Print.replace {
-            payload = ($0, $1, $2)
+            payload(($0, $1, $2))
             expecting.fulfill()
         }
 
@@ -29,9 +30,9 @@ class InternalsLogTests: XCTestCase {
         // Then
         await _fulfillment(of: [expecting])
 
-        XCTAssertEqual(payload?.0, " ")
-        XCTAssertEqual(payload?.1, "\n")
-        XCTAssertEqual(payload?.2 as? [String], [
+        XCTAssertEqual(payload()?.0, " ")
+        XCTAssertEqual(payload()?.1, "\n")
+        XCTAssertEqual(payload()?.2 as? [String], [
             debugOutput(message1, message2)
         ])
     }
@@ -44,9 +45,9 @@ class InternalsLogTests: XCTestCase {
         // When
         let expecting = expectation(description: "print")
 
-        var payload: (String, String, [Any])?
+        let payload = SendableBox<(String, String, [Sendable])?>(nil)
         Internals.Override.Print.replace {
-            payload = ($0, $1, $2)
+            payload(($0, $1, $2))
             expecting.fulfill()
         }
 
@@ -57,9 +58,9 @@ class InternalsLogTests: XCTestCase {
         // Then
         await _fulfillment(of: [expecting])
 
-        XCTAssertEqual(payload?.0, " ")
-        XCTAssertEqual(payload?.1, "\n")
-        XCTAssertEqual(payload?.2 as? [String], [
+        XCTAssertEqual(payload()?.0, " ")
+        XCTAssertEqual(payload()?.1, "\n")
+        XCTAssertEqual(payload()?.2 as? [String], [
             warningOutput(message1, message2)
         ])
     }
@@ -72,9 +73,9 @@ class InternalsLogTests: XCTestCase {
         // When
         let expecting = expectation(description: "print")
 
-        var payload: (String, StaticString, UInt)?
+        let payload = SendableBox<(String, StaticString, UInt)?>(nil)
         Internals.Override.FatalError.replace {
-            payload = ($0, $1, $2)
+            payload(($0, $1, $2))
             expecting.fulfill()
             Thread.exit()
             return Swift.fatalError()
@@ -82,16 +83,16 @@ class InternalsLogTests: XCTestCase {
 
         defer { Internals.Override.FatalError.restore() }
 
-        Thread.detachNewThread { [self] in
+        Thread.detachNewThread { [line, file] in
             Internals.Log.failure(message1, message2, line: line, file: file)
         }
 
         // Then
         await _fulfillment(of: [expecting])
 
-        XCTAssertEqual(payload?.0, failureOutput(message1, message2))
-        XCTAssertEqual((payload?.1).map { "\($0)" }, "\(file)")
-        XCTAssertEqual(payload?.2, line)
+        XCTAssertEqual(payload()?.0, failureOutput(message1, message2))
+        XCTAssertEqual((payload()?.1).map { "\($0)" }, "\(file)")
+        XCTAssertEqual(payload()?.2, line)
     }
 }
 

@@ -3,14 +3,22 @@
 */
 
 import Foundation
+@testable import RequestDL
 
-class IndexProducer {
+class IndexProducer: @unchecked Sendable {
 
-    private(set) var index = 0
+    var index: Int {
+        lock.withLock { _index }
+    }
+    
+    private let lock = Lock()
+    private var _index: Int = 0
 
     func callAsFunction() -> Int {
-        let index = index
-        self.index += 1
-        return index
+        lock.withLock {
+            let index = _index
+            self._index += 1
+            return index
+        }
     }
 }

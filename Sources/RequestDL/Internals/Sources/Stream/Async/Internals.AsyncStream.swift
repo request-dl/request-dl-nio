@@ -8,11 +8,11 @@ extension Internals {
 
     struct AsyncStream<Element: Sendable>: Sendable, Hashable, AsyncSequence {
 
-        struct AsyncIterator: AsyncIteratorProtocol {
+        struct AsyncIterator: Sendable, AsyncIteratorProtocol {
 
             // MARK: - Private properties
 
-            fileprivate var node: () async -> Node?
+            fileprivate var node: @Sendable () async -> Node?
 
             // MARK: - Internal methods
 

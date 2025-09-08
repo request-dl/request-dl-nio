@@ -7,29 +7,53 @@ import XCTest
 
 class ModifiersProgressTests: XCTestCase {
 
-    class UploadProgressMonitor: UploadProgress {
-
-        var uploadedBytes: [Int] = []
-        var totalSize: Int = .zero
+    final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {
+        
+        var uploadedBytes: [Int] {
+            lock.withLock { _uploadedBytes }
+        }
+        
+        var totalSize: Int {
+            lock.withLock { _totalSize }
+        }
+        
+        private let lock = Lock()
+        
+        private var _uploadedBytes: [Int] = []
+        private var _totalSize: Int = .zero
 
         func upload(_ chunkSize: Int, totalSize: Int) {
-            uploadedBytes.append(chunkSize)
-            self.totalSize = totalSize
+            lock.withLock {
+                _uploadedBytes.append(chunkSize)
+                _totalSize = totalSize
+            }
         }
     }
 
-    class DownloadProgressMonitor: DownloadProgress {
-
-        var receivedData: [Data] = []
-        var totalSize: Int = .zero
+    final class DownloadProgressMonitor: DownloadProgress, @unchecked Sendable {
+        
+        var receivedData: [Data] {
+            lock.withLock { _receivedData }
+        }
+        
+        var totalSize: Int {
+            lock.withLock { _totalSize }
+        }
+        
+        private let lock = Lock()
+        
+        private var _receivedData: [Data] = []
+        private var _totalSize: Int = .zero
 
         func download(_ slice: Data, totalSize: Int) {
-            receivedData.append(slice)
-            self.totalSize = totalSize
+            lock.withLock {
+                _receivedData.append(slice)
+                _totalSize = totalSize
+            }
         }
     }
 
-    class ProgressMonitor: RequestDL.Progress {
+    final class ProgressMonitor: RequestDL.Progress, Sendable {
 
         let upload = UploadProgressMonitor()
         let download = DownloadProgressMonitor()
