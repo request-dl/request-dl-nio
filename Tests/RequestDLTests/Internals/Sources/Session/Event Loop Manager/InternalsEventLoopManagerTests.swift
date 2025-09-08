@@ -36,7 +36,7 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut1 = await manager.provider(provider)
+        let sut1 = try await XCTUnwrap(manager).provider(provider)
 
         // Then
         XCTAssertTrue(provider.group() === sut1)
@@ -47,8 +47,8 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut1 = await manager.provider(provider)
-        let sut2 = await manager.provider(provider)
+        let sut1 = try await XCTUnwrap(manager).provider(provider)
+        let sut2 = try await XCTUnwrap(manager).provider(provider)
 
         // Then
         XCTAssertTrue(provider.group() === sut1)

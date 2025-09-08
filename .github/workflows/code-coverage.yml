@@ -34,6 +34,7 @@ jobs:
       platform: ${{ matrix.platform }}
       name: ${{ matrix.name }}
       coverage-enabled: true
+      swift-version: "6.1"
     secrets: inherit
 
   apple-tests:

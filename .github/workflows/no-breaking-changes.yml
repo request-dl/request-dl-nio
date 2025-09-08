@@ -15,4 +15,6 @@ concurrency:
 jobs:
   breaking-changes:
     uses: request-dl/.github/.github/workflows/no-breaking-changes.yml@main
+    with:
+      swift-version: "6.1"
     secrets: inherit
