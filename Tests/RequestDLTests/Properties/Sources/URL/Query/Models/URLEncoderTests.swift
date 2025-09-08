@@ -291,6 +291,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDateWithMillisecondsSince1970() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
 
@@ -324,6 +326,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDateWithDateFormatter() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
 
