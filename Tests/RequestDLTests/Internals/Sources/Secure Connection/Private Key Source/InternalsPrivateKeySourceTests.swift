@@ -7,7 +7,7 @@ import XCTest
 
 class InternalsPrivateKeySourceTests: XCTestCase {
 
-    var certificate: CertificateResource!
+    var certificate: CertificateResource?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -21,6 +21,7 @@ class InternalsPrivateKeySourceTests: XCTestCase {
 
     func testPrivateKeyByFile() async throws {
         // Given
+        let certificate = try XCTUnwrap(certificate)
         let path = certificate.privateKeyURL.absolutePath(percentEncoded: false)
 
         // When
@@ -32,6 +33,7 @@ class InternalsPrivateKeySourceTests: XCTestCase {
 
     func testPrivateKeyByRepresentable() async throws {
         // Given
+        let certificate = try XCTUnwrap(certificate)
         let path = certificate.privateKeyURL.absolutePath(percentEncoded: false)
 
         // When

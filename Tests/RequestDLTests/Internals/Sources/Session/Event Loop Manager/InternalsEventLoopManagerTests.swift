@@ -19,7 +19,7 @@ class InternalsEventLoopManagerTests: XCTestCase {
         }
     }
 
-    private var manager: Internals.EventLoopGroupManager!
+    private var manager: Internals.EventLoopGroupManager?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -60,8 +60,8 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut = await _Concurrency.Task.detached(priority: .background) { [manager] in
-            await manager.provider(provider)
+        let sut = try await _Concurrency.Task.detached(priority: .background) { [manager] in
+            try await XCTUnwrap(manager).provider(provider)
         }.value
 
         // Then

@@ -10,7 +10,7 @@ class CachedRequestTests: XCTestCase {
     private let certificate = Certificates().server()
     private let dataCache = DataCache.shared
     private let output = String.randomString(length: 64)
-    private var localServer: LocalServer!
+    private var localServer: LocalServer?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -20,7 +20,7 @@ class CachedRequestTests: XCTestCase {
         dataCache.diskCapacity = 64 * 1_024 * 1_024
 
         localServer = try await LocalServer(.standard)
-        localServer.cleanup()
+        localServer?.cleanup()
     }
 
     override func tearDown() async throws {
@@ -30,7 +30,7 @@ class CachedRequestTests: XCTestCase {
         dataCache.memoryCapacity = .zero
         dataCache.diskCapacity = .zero
 
-        localServer.cleanup()
+        localServer?.cleanup()
         localServer = nil
     }
 
@@ -345,6 +345,7 @@ extension CachedRequestTests {
         cachePolicy: DataCache.Policy.Set = .all,
         cacheStrategy: CacheStrategy
     ) async throws -> TaskResult<Data> {
+        let localServer = try XCTUnwrap(localServer)
         let response = try responseConfiguration(headers, output)
 
         localServer.insert(response)

@@ -7,14 +7,14 @@ import XCTest
 
 class InternalsSessionTests: XCTestCase {
 
-    var localServer: LocalServer!
-    var session: Internals.Session!
+    var localServer: LocalServer?
+    var session: Internals.Session?
 
     override func setUp() async throws {
         try await super.setUp()
 
         localServer = try await .init(.standard)
-        localServer.cleanup()
+        localServer?.cleanup()
 
         var configuration = Internals.Session.Configuration()
         var secureConnection = Internals.SecureConnection()
@@ -31,7 +31,7 @@ class InternalsSessionTests: XCTestCase {
     override func tearDown() async throws {
         try await super.tearDown()
 
-        localServer.cleanup()
+        localServer?.cleanup()
         localServer = nil
 
         session = nil
@@ -39,6 +39,8 @@ class InternalsSessionTests: XCTestCase {
 
     func testSession_whenPerformingGet_shouldBeValid() async throws {
         // Given
+        let session = try XCTUnwrap(session)
+
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
 
@@ -61,6 +63,8 @@ class InternalsSessionTests: XCTestCase {
 
     func testSession_whenPerformingPostUploadingData_shouldBeValid() async throws {
         // Given
+        let session = try XCTUnwrap(session)
+
         let length = 1_023
         let data = Data.randomData(length: length)
 
@@ -93,6 +97,8 @@ class InternalsSessionTests: XCTestCase {
 
     func testSession_whenPerformingPostEmptyData_shouldBeValid() async throws {
         // Given
+        let session = try XCTUnwrap(session)
+
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
         request.method = "POST"
@@ -117,6 +123,9 @@ class InternalsSessionTests: XCTestCase {
     // swiftlint:disable function_body_length
     func testSession_whenUploadingFile_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let testingSession = try XCTUnwrap(session)
+
         let certificates = Certificates().server()
         let message = "Hello World"
 
@@ -154,11 +163,11 @@ class InternalsSessionTests: XCTestCase {
             .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
         ])
 
-        var configuration = session.configuration
+        var configuration = testingSession.configuration
         configuration.secureConnection = secureConnection
 
         let session = Internals.Session(
-            provider: session.provider,
+            provider: testingSession.provider,
             configuration: configuration
         )
 

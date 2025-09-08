@@ -7,22 +7,24 @@ import XCTest
 
 class DownloadTaskTests: XCTestCase {
 
-    var localServer: LocalServer!
+    var localServer: LocalServer?
 
     override func setUp() async throws {
         try await super.setUp()
         localServer = try await .init(.standard)
-        localServer.cleanup()
+        localServer?.cleanup()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
-        localServer.cleanup()
+        localServer?.cleanup()
         localServer = nil
     }
 
     func testDataTask() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        
         let certificate = Certificates().server()
         let output = "Hello World"
 

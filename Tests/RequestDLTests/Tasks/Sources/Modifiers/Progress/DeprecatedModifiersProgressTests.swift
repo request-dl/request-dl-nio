@@ -80,16 +80,16 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         }
     }
 
-    var localServer: LocalServer!
-    var uploadMonitor: UploadProgressMonitor!
-    var downloadMonitor: DownloadProgressMonitor!
-    var progressMonitor: ProgressMonitor!
+    var localServer: LocalServer?
+    var uploadMonitor: UploadProgressMonitor?
+    var downloadMonitor: DownloadProgressMonitor?
+    var progressMonitor: ProgressMonitor?
 
     override func setUp() async throws {
         try await super.setUp()
 
         localServer = try await .init(.standard)
-        localServer.cleanup()
+        localServer?.cleanup()
 
         uploadMonitor = .init()
         downloadMonitor = .init()
@@ -99,7 +99,7 @@ class DeprecatedModifiersProgressTests: XCTestCase {
     override func tearDown() async throws {
         try await super.tearDown()
 
-        localServer.cleanup()
+        localServer?.cleanup()
         localServer = nil
 
         uploadMonitor = nil
@@ -109,6 +109,9 @@ class DeprecatedModifiersProgressTests: XCTestCase {
 
     func testDeprecatedProgress_whenUploadStep_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let uploadMonitor = try XCTUnwrap(uploadMonitor)
+
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
 
@@ -140,6 +143,9 @@ class DeprecatedModifiersProgressTests: XCTestCase {
 
     func testDeprecatedProgress_whenDownloadStep_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
@@ -187,6 +193,9 @@ class DeprecatedModifiersProgressTests: XCTestCase {
 
     func testDeprecatedProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
@@ -240,6 +249,9 @@ class DeprecatedModifiersProgressTests: XCTestCase {
 
     func testProgress_whenCompleteProgress_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let progressMonitor = try XCTUnwrap(progressMonitor)
+
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
         let message = String(repeating: "c", count: 1_024 * 64)
