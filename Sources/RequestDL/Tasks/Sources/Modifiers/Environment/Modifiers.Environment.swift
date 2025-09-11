@@ -45,7 +45,7 @@ extension RequestTask {
      - Returns: A modified `RequestTask` with the applied environment modifier.
      */
     public func environment<Value: Sendable>(
-        _ keyPath: WritableKeyPath<TaskEnvironmentValues, Value>,
+        _ keyPath: WritableKeyPath<TaskEnvironmentValues, Value> & Sendable,
         _ value: Value
     ) -> ModifiedRequestTask<Modifiers.Environment<Element>> {
         modifier(Modifiers.Environment {

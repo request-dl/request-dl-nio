@@ -5,7 +5,7 @@
 import Foundation
 
 private struct URLEncoderEnvironmentKey: PropertyEnvironmentKey {
-    static var defaultValue = URLEncoder()
+    static let defaultValue = URLEncoder()
 }
 
 extension PropertyEnvironmentValues {

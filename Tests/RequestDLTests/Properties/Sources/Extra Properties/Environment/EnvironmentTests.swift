@@ -8,7 +8,7 @@ import XCTest
 class EnvironmentTests: XCTestCase {
 
     struct IntegerEnvironmentKey: PropertyEnvironmentKey {
-        static var defaultValue: Int = .zero
+        static var defaultValue: Int { .zero }
     }
 
     struct IntegerReceiver: Property {

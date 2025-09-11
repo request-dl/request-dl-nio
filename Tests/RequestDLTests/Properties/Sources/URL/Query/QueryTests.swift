@@ -28,7 +28,7 @@ class QueryTests: XCTestCase {
             Query(name: "number", value: 123)
             Query(name: "page", value: 1)
             Query(name: "api_key", value: "password")
-            Query(name: "array", value: [9, "nine"] as [Any])
+            Query(name: "array", value: [9, "nine"] as [Sendable])
         }
 
         // When
@@ -58,7 +58,7 @@ class QueryTests: XCTestCase {
             BaseURL("127.0.0.1")
             PropertyGroup {
                 Query(name: "flag", value: true)
-                Query(name: "array", value: [9, "nine"] as [Any])
+                Query(name: "array", value: [9, "nine"] as [Sendable])
             }
             .urlEncoder(urlEncoder)
         }

@@ -5,10 +5,10 @@
 import Foundation
 
 /// A structure representing an error that occurs during encoding payload.
-public struct EncodingPayloadError: Error {
+public struct EncodingPayloadError: Sendable, Error {
 
     /// An enumeration representing the different contexts of the error.
-    public enum Context {
+    public enum Context: Sendable {
 
         /// The error occurred due to an invalid JSON object
         case invalidJSONObject

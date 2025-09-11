@@ -9,7 +9,7 @@ import NIOCore
 
 class InternalsSecureConnectionTests: XCTestCase {
 
-    var secureConnection: Internals.SecureConnection!
+    var secureConnection: Internals.SecureConnection?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -22,11 +22,16 @@ class InternalsSecureConnectionTests: XCTestCase {
     }
 
     func testSecureConnection_whenDefaultTrustNotSet_shouldBeFalse() async throws {
+        // Given
+        let secureConnection = try XCTUnwrap(secureConnection)
         // Then
         XCTAssertFalse(secureConnection.useDefaultTrustRoots)
     }
 
     func testSecureConnection_whenSetDefaultTrust() async throws {
+        // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         // When
         secureConnection.useDefaultTrustRoots = true
 
@@ -36,6 +41,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenTrustRoots_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         let server = Certificates().server()
         let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
 
@@ -50,6 +57,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenAdditionalTrustRoots_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         let server = Certificates().server()
         let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
 
@@ -64,6 +73,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenPrivateKey_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         let server = Certificates().server()
         let privateKeyPath = server.privateKeyURL.absolutePath(percentEncoded: false)
 
@@ -78,6 +89,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let certificateVerification: NIOSSL.CertificateVerification = .noHostnameVerification
 
         // When
@@ -91,6 +103,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenSigningSignatureAlgorithms_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+        
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
             .ecdsaSecp384R1Sha384
@@ -107,6 +121,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenVerifySignatureAlgorithms_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
             .ecdsaSecp384R1Sha384
@@ -123,6 +139,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenSendCANameList_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let sendCANameList = true
 
         // When
@@ -136,6 +153,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenRenegotiationSupport_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let renegotiationSupport: NIORenegotiationSupport = .once
 
         // When
@@ -149,6 +167,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenShutdownTimeout_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let timeout = NIOCore.TimeAmount.seconds(50)
 
         // When
@@ -162,6 +181,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenPSKHint_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let pskHint = "example.com"
 
         // When
@@ -175,6 +195,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenApplicationProtocols_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let applicationProtocolos = ["h2"]
 
         // When
@@ -188,6 +209,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenTLSVersion_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         let minimumVersion = TLSVersion.tlsv11
         let maximumVersion = TLSVersion.tlsv13
 
@@ -204,6 +227,8 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenCipherSuites_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
+
         let cipherSuitesValues: [NIOTLSCipher] = [
             .TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
             .TLS_RSA_WITH_AES_256_GCM_SHA384
@@ -227,6 +252,7 @@ class InternalsSecureConnectionTests: XCTestCase {
 
     func testSecureConnection_whenClient_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let configuration: TLSConfiguration = .clientDefault
 
         // When
@@ -294,6 +320,7 @@ extension InternalsSecureConnectionTests {
 
     func testSecureConnection_whenKeyLog_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let data = Data("Hello World".utf8)
 
         // When
@@ -322,6 +349,7 @@ extension InternalsSecureConnectionTests {
 
     func testSecureConnection_whenPSKClient_shouldBeValid() async throws {
         // Given
+        var secureConnection = try XCTUnwrap(secureConnection)
         let identity = "apple.com"
         let resolver = ClientResolver()
 

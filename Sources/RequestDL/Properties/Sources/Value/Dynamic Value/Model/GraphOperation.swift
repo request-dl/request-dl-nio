@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct GraphOperation<Content>: Sendable {
+struct GraphOperation<Content: Sendable>: Sendable {
 
     // MARK: - Internal properties
 

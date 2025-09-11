@@ -4,4 +4,4 @@
 
 import Foundation
 
-public protocol TaskError: Error {}
+public protocol TaskError: Sendable, Error {}

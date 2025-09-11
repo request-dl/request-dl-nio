@@ -18,13 +18,13 @@ extension Internals.Body {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let eventLoop = group.any()
 
-        var buffers: [Internals.DataBuffer] = []
+        let buffers = SendableBox([Internals.DataBuffer]())
 
         try await build().stream(.init(closure: {
             switch $0 {
             case .byteBuffer(var byteBuffer):
                 if let data = byteBuffer.readData(length: byteBuffer.readableBytes) {
-                    buffers.append(.init(data))
+                    buffers(buffers() + [.init(data)])
                 }
             case .fileRegion:
                 Internals.Log.failure(
@@ -44,6 +44,6 @@ extension Internals.Body {
 
         try await group.shutdownGracefully()
 
-        return buffers
+        return buffers()
     }
 }

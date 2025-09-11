@@ -7,29 +7,53 @@ import XCTest
 
 class ModifiersProgressTests: XCTestCase {
 
-    class UploadProgressMonitor: UploadProgress {
-
-        var uploadedBytes: [Int] = []
-        var totalSize: Int = .zero
+    final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {
+        
+        var uploadedBytes: [Int] {
+            lock.withLock { _uploadedBytes }
+        }
+        
+        var totalSize: Int {
+            lock.withLock { _totalSize }
+        }
+        
+        private let lock = Lock()
+        
+        private var _uploadedBytes: [Int] = []
+        private var _totalSize: Int = .zero
 
         func upload(_ chunkSize: Int, totalSize: Int) {
-            uploadedBytes.append(chunkSize)
-            self.totalSize = totalSize
+            lock.withLock {
+                _uploadedBytes.append(chunkSize)
+                _totalSize = totalSize
+            }
         }
     }
 
-    class DownloadProgressMonitor: DownloadProgress {
-
-        var receivedData: [Data] = []
-        var totalSize: Int = .zero
+    final class DownloadProgressMonitor: DownloadProgress, @unchecked Sendable {
+        
+        var receivedData: [Data] {
+            lock.withLock { _receivedData }
+        }
+        
+        var totalSize: Int {
+            lock.withLock { _totalSize }
+        }
+        
+        private let lock = Lock()
+        
+        private var _receivedData: [Data] = []
+        private var _totalSize: Int = .zero
 
         func download(_ slice: Data, totalSize: Int) {
-            receivedData.append(slice)
-            self.totalSize = totalSize
+            lock.withLock {
+                _receivedData.append(slice)
+                _totalSize = totalSize
+            }
         }
     }
 
-    class ProgressMonitor: RequestDL.Progress {
+    final class ProgressMonitor: RequestDL.Progress, Sendable {
 
         let upload = UploadProgressMonitor()
         let download = DownloadProgressMonitor()
@@ -43,16 +67,16 @@ class ModifiersProgressTests: XCTestCase {
         }
     }
 
-    var localServer: LocalServer!
-    var uploadMonitor: UploadProgressMonitor!
-    var downloadMonitor: DownloadProgressMonitor!
-    var progressMonitor: ProgressMonitor!
+    var localServer: LocalServer?
+    var uploadMonitor: UploadProgressMonitor?
+    var downloadMonitor: DownloadProgressMonitor?
+    var progressMonitor: ProgressMonitor?
 
     override func setUp() async throws {
         try await super.setUp()
 
         localServer = try await .init(.standard)
-        localServer.cleanup()
+        localServer?.cleanup()
 
         uploadMonitor = .init()
         downloadMonitor = .init()
@@ -62,7 +86,7 @@ class ModifiersProgressTests: XCTestCase {
     override func tearDown() async throws {
         try await super.tearDown()
 
-        localServer.cleanup()
+        localServer?.cleanup()
         localServer = nil
 
         uploadMonitor = nil
@@ -72,6 +96,9 @@ class ModifiersProgressTests: XCTestCase {
 
     func testProgress_whenUploadStep_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let uploadMonitor = try XCTUnwrap(uploadMonitor)
+
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
 
@@ -103,6 +130,9 @@ class ModifiersProgressTests: XCTestCase {
 
     func testProgress_whenDownloadStep_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
@@ -150,6 +180,9 @@ class ModifiersProgressTests: XCTestCase {
 
     func testProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
@@ -203,6 +236,9 @@ class ModifiersProgressTests: XCTestCase {
 
     func testProgress_whenCompleteProgress_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        let progressMonitor = try XCTUnwrap(progressMonitor)
+
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
         let message = String(repeating: "c", count: 1_024 * 64)

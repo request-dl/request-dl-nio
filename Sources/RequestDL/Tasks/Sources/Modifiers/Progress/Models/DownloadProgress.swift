@@ -40,7 +40,7 @@ import Foundation
  > Note: You can use ``UploadTask`` with ``RequestTask/progress(download:)-20p6u`` as
  long as you add the ``RequestDL/RequestTask/collectBytes()`` method.
  */
-public protocol DownloadProgress {
+public protocol DownloadProgress: Sendable {
 
     /**
      Notifies the progress of a download operation.

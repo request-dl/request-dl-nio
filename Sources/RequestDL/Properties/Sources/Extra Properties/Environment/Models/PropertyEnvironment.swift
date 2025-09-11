@@ -98,7 +98,7 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
 
      - Parameter keyPath: The key path that points to the value in the ``PropertyEnvironmentValues`` object.
      */
-    public init(_ keyPath: KeyPath<PropertyEnvironmentValues, Value>) {
+    public init(_ keyPath: KeyPath<PropertyEnvironmentValues, Value> & Sendable) {
         self.keyPath = {
             $0[keyPath: keyPath]
         }

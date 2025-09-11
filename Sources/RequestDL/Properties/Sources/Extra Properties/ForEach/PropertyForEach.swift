@@ -23,7 +23,7 @@ import Foundation
  }
  ```
  */
-public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable, Content: Property {
+public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
     // swiftlint:enable line_length
 
     // MARK: - Public properties
@@ -55,7 +55,7 @@ public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence 
      */
     public init(
         _ data: Data,
-        id: KeyPath<Data.Element, ID>,
+        id: KeyPath<Data.Element, ID> & Sendable,
         @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
     ) {
         self.data = data

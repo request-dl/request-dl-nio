@@ -8,7 +8,7 @@ import XCTest
 // swiftlint:disable file_length type_body_length
 class URLEncoderTests: XCTestCase {
 
-    var urlEncoder: URLEncoder!
+    var urlEncoder: URLEncoder?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -21,7 +21,7 @@ class URLEncoderTests: XCTestCase {
     }
 
     private func encode<Value>(_ value: Value, forKey key: String) throws -> String {
-        try urlEncoder.encode(value, forKey: key)
+        try XCTUnwrap(urlEncoder).encode(value, forKey: key)
             .map { $0.build() }
             .joined()
     }
@@ -79,6 +79,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenSomeWithDroppingKey() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = "bar"
 
@@ -93,6 +95,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenNoneWithDroppingKey() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
 
         urlEncoder.optionalEncodingStrategy = .droppingKey
@@ -106,6 +110,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenSomeWithDroppingValue() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+        
         let key = "foo"
         let value = "bar"
 
@@ -120,6 +126,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenNoneWithDroppingValue() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
 
         urlEncoder.optionalEncodingStrategy = .droppingValue
@@ -133,6 +141,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenSomeWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = "bar"
 
@@ -150,6 +160,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenNoneWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
 
         urlEncoder.optionalEncodingStrategy = .custom {
@@ -192,6 +204,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenTrueWithNumeric() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = true
 
@@ -206,6 +220,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenFalseWithNumeric() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = false
 
@@ -220,6 +236,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenTrueWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = true
 
@@ -237,6 +255,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenFalseWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = false
 
@@ -255,6 +275,8 @@ class URLEncoderTests: XCTestCase {
     // MARK: - Date
     func testEncoder_whenDateWithSecondsSince1970() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
 
@@ -269,6 +291,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDateWithMillisecondsSince1970() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
 
@@ -283,6 +307,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDateWithISO8601() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
         let dateFormatter = ISO8601DateFormatter()
@@ -300,6 +326,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDateWithDateFormatter() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
 
@@ -319,6 +347,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDateWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
 
@@ -340,6 +370,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenArrayWithDroppingIndex() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
 
@@ -356,6 +388,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenArrayWithSubscripted() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
 
@@ -373,6 +407,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenArrayWithAccessMember() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
 
@@ -389,6 +425,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenArrayWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
 
@@ -409,6 +447,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenHeterogeneousArrayWithDroppingIndex() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
         let value: [Any?] = [1, "hello", date, true, String?.none]
@@ -440,6 +480,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDictionaryWithSubscripted() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = [
             "key1": "a",
@@ -464,6 +506,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDictionaryWithAccessMember() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = [
             "key1": "a",
@@ -488,6 +532,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDictionaryWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = [
             "key1": "a",
@@ -515,6 +561,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenHeterogeneousDictionaryWithDroppingIndex() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let date = Date()
         let array = [1, 2, 3]
@@ -577,6 +625,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenDataWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo"
         let value = Data.randomData(length: 64)
 
@@ -597,6 +647,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithLiteral() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "oneTwo"
         let value = ["threeFour": "1"]
 
@@ -613,6 +665,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithSnakeCased() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "_oneTwo_"
         let value = ["threeFour": "1"]
 
@@ -629,6 +683,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithKebabCased() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "oneTwo"
         let value = ["threeFour": "1"]
 
@@ -645,6 +701,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithCapitalized() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "oneTwo"
         let value = ["threeFour": "1"]
 
@@ -661,6 +719,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithUppercased() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "oneTwo"
         let value = ["threeFour": "1"]
 
@@ -677,6 +737,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithLowercased() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "oneTwo"
         let value = ["threeFour": "1"]
 
@@ -693,6 +755,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenKeyWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "oneTwo"
         let value = ["threeFour": "1"]
 
@@ -717,6 +781,8 @@ class URLEncoderTests: XCTestCase {
     // MARK: - Whitespace
     func testEncoder_whenWhitespaceWithPercentEscaping() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo bar"
         let value = "one two three"
 
@@ -731,6 +797,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenWhitespaceWithPlus() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+
         let key = "foo bar"
         let value = "one two three"
 
@@ -745,6 +813,8 @@ class URLEncoderTests: XCTestCase {
 
     func testEncoder_whenWhitespaceWithCustom() throws {
         // Given
+        let urlEncoder = try XCTUnwrap(urlEncoder)
+        
         let key = "foo bar"
         let value = "one two three"
 

@@ -8,7 +8,7 @@ import XCTest
 // swiftlint:disable file_length type_body_length
 class HTTPHeadersTests: XCTestCase {
 
-    var headers: HTTPHeaders!
+    var headers: HTTPHeaders?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -20,7 +20,8 @@ class HTTPHeadersTests: XCTestCase {
         headers = nil
     }
 
-    func testHeaders_whenEmpty_shouldBeEmpty() {
+    func testHeaders_whenEmpty_shouldBeEmpty() throws {
+        let headers = try XCTUnwrap(headers)
         XCTAssertTrue(headers.isEmpty)
     }
 
@@ -64,8 +65,10 @@ class HTTPHeadersTests: XCTestCase {
         XCTAssertEqual(headers.last?.value, "audio/mp3")
     }
 
-    func testHeaders_whenSetValues() {
+    func testHeaders_whenSetValues() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -102,8 +105,10 @@ class HTTPHeadersTests: XCTestCase {
         )
     }
 
-    func testHeaders_whenAddValues() {
+    func testHeaders_whenAddValues() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -140,8 +145,10 @@ class HTTPHeadersTests: XCTestCase {
         )
     }
 
-    func testHeaders_whenRemoveAddedValue() {
+    func testHeaders_whenRemoveAddedValue() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -169,8 +176,10 @@ class HTTPHeadersTests: XCTestCase {
         ])
     }
 
-    func testHeaders_whenFirstOfNames() {
+    func testHeaders_whenFirstOfNames() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -194,8 +203,10 @@ class HTTPHeadersTests: XCTestCase {
         XCTAssertEqual(value3, "Bearer 123")
     }
 
-    func testHeaders_whenLastOfNames() {
+    func testHeaders_whenLastOfNames() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -219,8 +230,10 @@ class HTTPHeadersTests: XCTestCase {
         XCTAssertEqual(value3, "Bearer 123")
     }
 
-    func testHeaders_whenContainsName() {
+    func testHeaders_whenContainsName() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -247,8 +260,10 @@ class HTTPHeadersTests: XCTestCase {
         XCTAssertFalse(headers.contains(name: "Accept"))
     }
 
-    func testHeaders_whenContainsNameWhere() {
+    func testHeaders_whenContainsNameWhere() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -270,8 +285,10 @@ class HTTPHeadersTests: XCTestCase {
         })
     }
 
-    func testHeaders_whenSubscriptByName() {
+    func testHeaders_whenSubscriptByName() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -289,8 +306,10 @@ class HTTPHeadersTests: XCTestCase {
         XCTAssertNil(headers["Accept"])
     }
 
-    func testHeaders_whenMergingWithRightExclusive() {
+    func testHeaders_whenMergingWithRightExclusive() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let sharedValues = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -325,8 +344,10 @@ class HTTPHeadersTests: XCTestCase {
         ])
     }
 
-    func testHeaders_whenMergingWithLeftExclusive() {
+    func testHeaders_whenMergingWithLeftExclusive() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let sharedValues = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
@@ -361,8 +382,10 @@ class HTTPHeadersTests: XCTestCase {
         ])
     }
 
-    func testHeaders_whenUsingIndices() {
+    func testHeaders_whenUsingIndices() throws {
         // Given
+        var headers = try XCTUnwrap(headers)
+
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),

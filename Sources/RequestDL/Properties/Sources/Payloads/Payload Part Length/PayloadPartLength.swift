@@ -5,7 +5,7 @@
 import Foundation
 
 private struct PayloadChunkSizeKey: PropertyEnvironmentKey {
-    static var defaultValue: Int?
+    static var defaultValue: Int? { nil }
 }
 
 extension PropertyEnvironmentValues {

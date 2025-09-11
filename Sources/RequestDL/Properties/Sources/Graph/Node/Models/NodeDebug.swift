@@ -103,7 +103,7 @@ struct NodeDebug {
                 return "\(label): \(value)"
             case .none, .class, .struct, .optional:
                 return "\(label) = \(value)"
-            @unknown default:
+            default:
                 return "\(label) = \(value)"
             }
         }

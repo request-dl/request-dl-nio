@@ -7,8 +7,8 @@ import XCTest
 
 class AdditionalTrustsTests: XCTestCase {
 
-    var client: CertificateResource!
-    var server: CertificateResource!
+    var client: CertificateResource?
+    var server: CertificateResource?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -18,7 +18,9 @@ class AdditionalTrustsTests: XCTestCase {
 
     func testAdditional_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try Array(Data(contentsOf: server.certificateURL))
+        let client = try XCTUnwrap(client)
+
+        let server = try Array(Data(contentsOf: XCTUnwrap(server).certificateURL))
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -42,6 +44,9 @@ class AdditionalTrustsTests: XCTestCase {
 
     func testAdditional_whenFile_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
@@ -71,6 +76,9 @@ class AdditionalTrustsTests: XCTestCase {
 
     func testAdditional_whenBytes_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)

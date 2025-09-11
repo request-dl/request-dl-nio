@@ -20,7 +20,7 @@ import Foundation
  }
  ```
 */
-public struct InvalidStatusCodeError<Element>: TaskError {
+public struct InvalidStatusCodeError<Element: Sendable>: TaskError {
 
     /// The data that caused the validation error.
     public let data: Element

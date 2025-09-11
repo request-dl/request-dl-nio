@@ -8,22 +8,24 @@ import XCTest
 @available(*, deprecated)
 class ModifiersIgnoresProgressTests: XCTestCase {
 
-    var localServer: LocalServer!
+    var localServer: LocalServer?
 
     override func setUp() async throws {
         try await super.setUp()
         localServer = try await .init(.standard)
-        localServer.cleanup()
+        localServer?.cleanup()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
-        localServer.cleanup()
+        localServer?.cleanup()
         localServer = nil
     }
 
     func testIgnores_whenUploadStep_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+
         let resource = Certificates().server()
         let message = "Hello World"
 
@@ -55,6 +57,8 @@ class ModifiersIgnoresProgressTests: XCTestCase {
 
     func testIgnores_whenDownloadStep_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+
         let resource = Certificates().server()
         let message = "Hello World"
 
@@ -85,6 +89,8 @@ class ModifiersIgnoresProgressTests: XCTestCase {
 
     func testIgnores_whenSkipProgress_shouldBeValid() async throws {
         // Given
+        let localServer = try XCTUnwrap(localServer)
+        
         let resource = Certificates().server()
         let message = "Hello World"
 

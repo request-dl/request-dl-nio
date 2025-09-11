@@ -172,7 +172,9 @@ public struct Session: Property {
 
     // MARK: - Private properties
 
-    private func edit(_ edit: @escaping (inout Internals.Session.Configuration) -> Void) -> Self {
+    private func edit(
+        _ edit: @Sendable @escaping (inout Internals.Session.Configuration) -> Void
+    ) -> Self {
         var mutableSelf = self
         mutableSelf.configuration = {
             configuration?(&$0)
