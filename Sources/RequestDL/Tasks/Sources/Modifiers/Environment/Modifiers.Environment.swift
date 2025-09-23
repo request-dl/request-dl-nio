@@ -27,9 +27,11 @@ extension Modifiers {
          - Returns: The result of the original task.
          */
         public func body(_ task: Content) async throws -> Input {
-            var task = task
-            update(&task.environment)
-            return try await task.result()
+            var environment = TaskEnvironmentValues.current
+            update(&environment)
+            return try await TaskEnvironmentValues.$current.withValue(environment) {
+                try await task.result()
+            }
         }
     }
 }

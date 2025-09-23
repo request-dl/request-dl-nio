@@ -25,14 +25,6 @@ import Foundation
  */
 public struct DataTask<Content: Property>: RequestTask {
 
-    // MARK: - Public properties
-
-    @_spi(Private)
-    public var environment: TaskEnvironmentValues {
-        get { task.environment }
-        set { task.environment = newValue }
-    }
-
     // MARK: - Private properties
 
     private var task: RawTask<Content>

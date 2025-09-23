@@ -10,10 +10,10 @@ class ModifiersEnvironmentTests: XCTestCase {
 
     struct NumberTask: RequestTask {
 
-        var environment = RequestDL.TaskEnvironmentValues()
+        @TaskEnvironment(\.number) var number
 
         func result() async throws -> Int {
-            environment.number
+            number
         }
     }
 
