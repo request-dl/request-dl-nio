@@ -1,56 +1,80 @@
 import Foundation
 
-actor AsyncSignal {
+public final class AsyncSignal: Sendable {
 
-    private var isLocked: Bool
-    private var pendingOperations = [AsyncOperation]()
+    private final class Storage: @unchecked Sendable {
 
-    init(_ locked: Bool = true) {
-        isLocked = locked
-    }
+        let lock = Lock()
 
-    func lock() {
-        isLocked = true
-    }
+        var _isLocked = false
+        var _pendingOperations = [AsyncOperation]()
 
-    func wait() async {
-        guard isLocked else {
-            return
+        init(isLocked: Bool) {
+            _isLocked = isLocked
         }
 
+        deinit {
+            while let operation = _pendingOperations.popLast() {
+                operation.resume()
+            }
+        }
+    }
+
+    // MARK: - Unsafe properties
+
+    private let storage: Storage
+
+    // MARK: - Inits
+
+    public init(_ signal: Bool = false) {
+        storage = .init(isLocked: !signal)
+    }
+
+    // MARK: - Public properties
+
+    public func signal() {
+        storage.lock.withLock {
+            storage._isLocked = false
+
+            while let operation = storage._pendingOperations.popLast() {
+                operation.resume()
+            }
+        }
+    }
+
+    public func lock() {
+        storage.lock.withLock {
+            storage._isLocked = true
+        }
+    }
+
+    public func wait() async {
         let operation = AsyncOperation()
 
-        await withTaskCancellationHandler { [weak operation] in
-            await withUnsafeContinuation {
-                guard let operation else {
-                    return
-                }
+        let lock = storage.lock
+        weak var storage = storage
 
+        await withTaskCancellationHandler {
+            await withUnsafeContinuation {
                 operation.schedule($0)
-                pendingOperations.insert(operation, at: .zero)
+
+                lock.withLock {
+                    guard storage?._isLocked ?? false else {
+                        operation.resume()
+                        return
+                    }
+
+                    guard storage?._pendingOperations.insert(operation, at: .zero) == nil else {
+                        return
+                    }
+
+                    operation.resume()
+                }
             }
         } onCancel: {
-            operation.cancelled()
-        }
-    }
-
-    nonisolated func signal() {
-        Task {
-            await _signal()
-        }
-    }
-
-    private func _signal() {
-        isLocked = false
-
-        while let operation = pendingOperations.popLast() {
-            operation.resume()
-        }
-    }
-
-    deinit {
-        for operation in pendingOperations {
-            operation.dispose()
+            lock.withLock {
+                operation.cancelled()
+            }
         }
     }
 }

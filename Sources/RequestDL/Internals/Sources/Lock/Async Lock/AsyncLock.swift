@@ -1,62 +1,88 @@
 import Foundation
 
-actor AsyncLock {
+public final class AsyncLock: Sendable {
 
-    private var isLocked = false
-    private var pendingOperations = [AsyncOperation]()
+    private final class Storage: @unchecked Sendable {
 
-    init() {}
+        var isLocked = false
+        var pendingOperations = [AsyncOperation]()
 
-    func withLock<Value: Sendable>(_ block: @Sendable () async throws -> Value) async rethrows -> Value {
+        deinit {
+            while let operation = pendingOperations.popLast() {
+                operation.resume()
+            }
+        }
+    }
+
+    // MARK: - Private properties
+
+    private let lock = Lock()
+
+    // MARK: - Unsafe properties
+
+    private let _storage = Storage()
+
+    // MARK: - Inits
+
+    public init() {}
+
+    // MARK: - Public properties
+
+    public func withLock<Value: Sendable>(isolation: isolated (any Actor)? = #isolation, _ block: @Sendable () async throws -> Value) async rethrows -> Value {
         await lock()
         defer { unlock() }
 
         return try await block()
     }
 
-    func withLockVoid(_ block: @Sendable () async throws -> Void) async rethrows {
+    public func withLockVoid(isolation: isolated (any Actor)? = #isolation, _ block: @Sendable () async throws -> Void) async rethrows {
         await lock()
         defer { unlock() }
 
         try await block()
     }
 
-    func lock() async {
-        guard isLocked else {
-            isLocked = true
-            return
-        }
+    public func unlock() {
+        lock.withLock {
+            guard _storage.isLocked else {
+                return
+            }
 
+            let continuation = _storage.pendingOperations.popLast()
+            _storage.isLocked = !_storage.pendingOperations.isEmpty
+
+            continuation?.resume()
+        }
+    }
+
+    public func lock() async {
         let operation = AsyncOperation()
 
-        await withTaskCancellationHandler { [weak operation] in
-            await withUnsafeContinuation {
-                guard let operation else {
-                    return
-                }
+        let lock = lock
+        weak var storage = _storage
 
+        await withTaskCancellationHandler {
+            await withUnsafeContinuation {
                 operation.schedule($0)
-                pendingOperations.insert(operation, at: .zero)
+
+                lock.withLock {
+                    guard storage?.isLocked ?? false else {
+                        storage?.isLocked = true
+                        operation.resume()
+                        return
+                    }
+
+                    guard storage?.pendingOperations.insert(operation, at: .zero) == nil else {
+                        return
+                    }
+
+                    operation.resume()
+                }
             }
         } onCancel: {
-            operation.cancelled()
-        }
-    }
-
-    func unlock() {
-        guard isLocked else {
-            return
-        }
-
-        let continuation = pendingOperations.popLast()
-        isLocked = !pendingOperations.isEmpty
-
-        continuation?.resume()
-    }
-
-    deinit {
-        for operation in pendingOperations {
-            operation.dispose()
+            lock.withLock {
+                operation.cancelled()
+            }
         }
     }
 }

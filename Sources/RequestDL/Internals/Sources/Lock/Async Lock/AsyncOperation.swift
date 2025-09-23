@@ -8,7 +8,7 @@ final class AsyncOperation: @unchecked Sendable {
         case cancelled
     }
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _state: State = .idle
 
     init() {}
@@ -32,14 +32,6 @@ final class AsyncOperation: @unchecked Sendable {
     func cancelled() {
         lock.withLock {
             _state = .cancelled
-        }
-    }
-
-    func dispose() {
-        lock.withLock {
-            if case .scheduled(let continuation) = _state {
-                continuation.resume()
-            }
         }
     }
 }

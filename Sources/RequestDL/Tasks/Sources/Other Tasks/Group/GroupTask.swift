@@ -28,9 +28,6 @@ import Foundation
 public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where Data.Element: Hashable & Sendable, Data: Sendable {
     // swiftlint:enable line_length
 
-    @_spi(Private)
-    public var environment = TaskEnvironmentValues()
-
     // MARK: - Private properties
 
     private let data: Data
@@ -63,9 +60,10 @@ public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where
               for element in data {
                   group.addTask {
                       do {
-                          var task = transform(element)
-                          task.environment = environment
-                          return (element, .success(try await task.result()))
+                          return try await TaskEnvironmentValues.$current.withValue(environment) {
+                              var task = transform(element)
+                              return (element, .success(try await task.result()))
+                          }
                       } catch {
                           return (element, .failure(error))
                       }

@@ -7,6 +7,9 @@ import Foundation
 /// ``TaskEnvironmentValues`` is a type that contains all of the environment values for a task.
 public struct TaskEnvironmentValues: @unchecked Sendable {
 
+    @TaskLocal
+    static var current = TaskEnvironmentValues()
+
     // MARK: - Unsafe properties
 
     private var dependencies = [ObjectIdentifier: Sendable]()
