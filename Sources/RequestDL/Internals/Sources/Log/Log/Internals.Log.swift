@@ -60,7 +60,7 @@ extension Internals.Log {
 extension Internals.Log {
 
     fileprivate static func log(
-        _ items: Any...,
+        _ items: [Any],
         level: Level,
         separator: String,
         line: UInt,
