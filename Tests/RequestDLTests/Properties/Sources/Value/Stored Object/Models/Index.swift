@@ -4,7 +4,7 @@
 
 import Foundation
 
-class Index {
+class Index: @unchecked Sendable {
 
     let rawValue: Int
 

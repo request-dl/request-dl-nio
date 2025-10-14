@@ -19,7 +19,7 @@ extension Modifiers {
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Error) throws -> Void
+        let transform: @Sendable (Error) async throws -> Void
 
         // MARK: - Public methods
 
@@ -34,7 +34,7 @@ extension Modifiers {
             do {
                 return try await task.result()
             } catch {
-                try transform(error)
+                try await transform(error)
                 throw error
             }
         }
@@ -65,7 +65,7 @@ extension RequestTask {
      `transform` closure.
      */
     public func flatMapError(
-        _ transform: @escaping @Sendable (Error) throws -> Void
+        _ transform: @escaping @Sendable (Error) async throws -> Void
     ) -> ModifiedRequestTask<Modifiers.FlatMapError<Element>> {
         modifier(Modifiers.FlatMapError(transform: transform))
     }
@@ -94,11 +94,11 @@ extension RequestTask {
      */
     public func flatMapError<Failure: Error>(
         _ type: Failure.Type,
-        _ transform: @escaping @Sendable (Failure) throws -> Void
+        _ transform: @escaping @Sendable (Failure) async throws -> Void
     ) -> ModifiedRequestTask<Modifiers.FlatMapError<Element>> {
         flatMapError {
             if let error = $0 as? Failure {
-                try transform(error)
+                try await transform(error)
             }
         }
     }

@@ -92,7 +92,7 @@ struct GithubAPI: Property {
 }
 ```
 
-- Warning: You should exclusively choose either Trust/Client Authorization or PSK. Defining both in the same request can result in unexpected behavior.
+> Warning: You should exclusively choose either Trust/Client Authorization or PSK. Defining both in the same request can result in unexpected behavior.
 
 ### Optimizations
 

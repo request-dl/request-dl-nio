@@ -54,7 +54,8 @@ public struct HostHeader: Property {
         return .leaf(HeaderNode(
             key: "Host",
             value: property.value,
-            strategy: inputs.environment.headerStrategy
+            strategy: inputs.environment.headerStrategy,
+            separator: inputs.environment.headerSeparator
         ))
     }
 }

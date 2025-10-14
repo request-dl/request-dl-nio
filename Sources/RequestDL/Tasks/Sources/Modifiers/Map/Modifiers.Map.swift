@@ -29,7 +29,7 @@ extension Modifiers {
 
         // MARK: - Internal properties
 
-        let transform: @Sendable (Input) throws -> Output
+        let transform: @Sendable (Input) async throws -> Output
 
         // MARK: - Public methods
 
@@ -41,7 +41,7 @@ extension Modifiers {
          - Throws: The error thrown by the closure, if any.
          */
         public func body(_ task: Content) async throws -> Output {
-            try transform(await task.result())
+            try await transform(task.result())
         }
     }
 }
@@ -57,7 +57,7 @@ extension RequestTask {
      - Returns: A modified `RequestTask` with the transformed element.
      */
     public func map<NewElement>(
-        _ transform: @escaping @Sendable (Element) throws -> NewElement
+        _ transform: @escaping @Sendable (Element) async throws -> NewElement
     ) -> ModifiedRequestTask<Modifiers.Map<Element, NewElement>> {
         modifier(Modifiers.Map(transform: transform))
     }

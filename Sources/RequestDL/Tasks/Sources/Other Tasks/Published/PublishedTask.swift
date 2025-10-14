@@ -3,21 +3,24 @@
 */
 
 import Foundation
-#if canImport(Combine)
-import Combine
+#if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+@preconcurrency import Combine
 import _Concurrency
 
 /// A publisher for any ``RequestTask``.
-public struct PublishedTask<Output>: Publisher {
+public struct PublishedTask<Output: Sendable>: Publisher {
 
-    class Subscription<S: Subscriber>: Combine.Subscription where S.Failure == Error {
+    final class Subscription<S: Subscriber>: @unchecked Sendable, Combine.Subscription where S.Failure == Error {
 
         // MARK: - Private properties
 
-        private var task: _Concurrency.Task<Void, Never>?
-        private var subscriber: S?
-
+        private let lock = Lock()
         private let wrapper: () async throws -> S.Input
+        
+        // MARK: - Unsafe properties
+        
+        private var _task: _Concurrency.Task<Void, Never>?
+        private var _subscriber: S?
 
         // MARK: - Inits
 
@@ -26,29 +29,33 @@ public struct PublishedTask<Output>: Publisher {
             subscriber: S
         ) {
             self.wrapper = wrapper
-            self.subscriber = subscriber
+            self._subscriber = subscriber
         }
 
         // MARK: - Internal properties
 
         func request(_ demand: Subscribers.Demand) {
-            guard let subscriber else {
-                return
-            }
-
-            task = _Concurrency.Task {
-                do {
-                    _ = subscriber.receive(try await wrapper())
-                    subscriber.receive(completion: .finished)
-                } catch {
-                    subscriber.receive(completion: .failure(error))
+            lock.withLock {
+                guard let subscriber = _subscriber else {
+                    return
+                }
+                
+                _task = _Concurrency.Task {
+                    do {
+                        _ = subscriber.receive(try await wrapper())
+                        subscriber.receive(completion: .finished)
+                    } catch {
+                        subscriber.receive(completion: .failure(error))
+                    }
                 }
             }
         }
 
         func cancel() {
-            subscriber = nil
-            task = nil
+            lock.withLock {
+                _subscriber = nil
+                _task = nil
+            }
         }
     }
 

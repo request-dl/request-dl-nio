@@ -8,8 +8,8 @@ import NIOSSL
 
 class InternalsTrustRootsTests: XCTestCase {
 
-    var client: CertificateResource!
-    var server: CertificateResource!
+    var client: CertificateResource?
+    var server: CertificateResource?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -18,19 +18,11 @@ class InternalsTrustRootsTests: XCTestCase {
         server = Certificates().server()
     }
 
-    func testRoots_whenDefault_shouldBeValid() async throws {
-        // Given
-        let root = Internals.TrustRoots.default
-
-        // When
-        let resolved = try root.build()
-
-        // Then
-        XCTAssertEqual(resolved, .default)
-    }
-
     func testTrusts_whenCertificates_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         var trusts = Internals.TrustRoots()
         trusts.append(.init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem))
         trusts.append(.init(server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
@@ -47,6 +39,9 @@ class InternalsTrustRootsTests: XCTestCase {
 
     func testTrustRoot_whenFilesMerged_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
@@ -69,6 +64,9 @@ class InternalsTrustRootsTests: XCTestCase {
 
     func testTrustRoot_whenBytesMerged_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)

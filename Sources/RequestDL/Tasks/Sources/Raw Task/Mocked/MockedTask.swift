@@ -27,11 +27,6 @@ import Foundation
 */
 public struct MockedTask<Element: Sendable>: RequestTask {
 
-    // MARK: - Public properties
-
-    @_spi(Private)
-    public var environment = TaskEnvironmentValues()
-
     // MARK: - Private properties
 
     private let payload: any MockedTaskPayload<Element>

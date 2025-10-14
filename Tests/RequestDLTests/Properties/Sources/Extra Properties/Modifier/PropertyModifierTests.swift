@@ -97,7 +97,7 @@ extension PropertyModifierTests {
 extension PropertyModifierTests {
 
     struct PathEnvironmentKey: PropertyEnvironmentKey {
-        static var defaultValue: String?
+        static var defaultValue: String? { nil }
     }
 
     struct PathModifier: PropertyModifier {

@@ -13,7 +13,7 @@ extension Internals {
 
         enum Output {
             case task(SessionTask)
-            case cache(((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?)
+            case cache((@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?)
         }
 
         // MARK: - Internal properties
@@ -184,6 +184,10 @@ extension Internals {
                 logger: logger
             ).response() else { return nil }
 
+            if response.status.code == 304 {
+                return cachedData.response.headers
+            }
+
             let lastModified = response.headers["Last-Modified"]
             let eTag = response.headers["ETag"]
 
@@ -254,7 +258,7 @@ extension Internals {
         private func cacheIfNeeded(
             dataCache: DataCache,
             request: Internals.Request
-        ) async throws -> ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)? {
+        ) async throws -> (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)? {
             guard request.isCacheEnabled else {
                 return nil
             }

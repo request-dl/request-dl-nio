@@ -7,7 +7,7 @@ import XCTest
 
 class InternalsAsyncBytesTests: XCTestCase {
 
-    var stream: Internals.AsyncStream<Internals.DataBuffer>!
+    var stream: Internals.AsyncStream<Internals.DataBuffer>?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -21,6 +21,8 @@ class InternalsAsyncBytesTests: XCTestCase {
 
     func testAsyncBytes_whenAppendData_shouldContainsAll() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
 
@@ -42,6 +44,8 @@ class InternalsAsyncBytesTests: XCTestCase {
 
     func testAsyncBytes_whenAppendError_shouldContaiAnyError() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+        
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
         let error = AnyError()

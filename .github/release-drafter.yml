@@ -1,14 +1,22 @@
 categories:
+  - title: '🐞 Bugs'
+    labels:
+      - 'bug'
   - title: '🚀 Enhancements'
     labels:
       - 'enhancement'
-  - title: '🐛 Bug Fixes'
-    labels:
-      - 'bug'
-  - title: '🧰 Maintenance'
+  - title: '📖 Documentation'
     label:
       - 'documentation'
+  - title: '🧰 Maintenance'
+    label:
+      - 'dependencies'
+category-template: "### $TITLE"
+exclude-contributors:
+  - 'o-nnerb'
 template: |
   ## What’s Changed
-  
+
   $CHANGES
+
+  See also: [Documentation](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl)

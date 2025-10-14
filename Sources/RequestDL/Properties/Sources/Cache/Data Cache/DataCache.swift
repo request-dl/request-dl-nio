@@ -215,7 +215,7 @@ public struct DataCache: Sendable, Equatable {
     static func temporaryURL(suiteName: String) -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(
-                "com.request-dl.Swift.Cache",
+                "com.request-dl-nio.Swift.Cache",
                 isDirectory: true
             )
             .appendingPathComponent(

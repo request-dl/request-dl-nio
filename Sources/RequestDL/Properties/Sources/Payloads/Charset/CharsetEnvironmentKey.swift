@@ -6,7 +6,9 @@ import Foundation
 
 private struct CharsetEnvironmentKey: PropertyEnvironmentKey {
 
-    static var defaultValue: Charset = .utf8
+    static var defaultValue: Charset {
+        .utf8
+    }
 }
 
 extension PropertyEnvironmentValues {

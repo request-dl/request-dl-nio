@@ -66,7 +66,7 @@ extension Internals {
                 return writer.write(.byteBuffer(.init()))
             }
 
-            return first.flatMapWithEventLoop {
+            return first.flatMapWithEventLoop { [sequence] in
                 consume(iterator: sequence, eventLoop: $1)
             }
         }

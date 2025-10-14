@@ -17,7 +17,7 @@ import Foundation
  > Note: The ``RequestTask`` protocol does not specify how the request is made or how the result is
  processed, it only provides a way to execute a request and receive its result asynchronously.
  */
-public protocol RequestTask<Element>: _RequestTaskInternals {
+public protocol RequestTask<Element>: Sendable {
 
     associatedtype Element: Sendable
 
@@ -68,5 +68,12 @@ extension RequestTask {
             task: .init(self),
             modifier: modifier
         )
+    }
+}
+
+extension RequestTask {
+
+    var environment: TaskEnvironmentValues {
+        TaskEnvironmentValues.current
     }
 }

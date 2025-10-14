@@ -178,12 +178,15 @@ Learn more in:
 - ``RequestDL/OriginHeader``
 - ``RequestDL/RefererHeader``
 - ``RequestDL/CacheHeader``
+- ``RequestDL/AcceptCharsetHeader``
+- ``RequestDL/UserAgentHeader``
 - ``RequestDL/HeaderGroup``
 
 ### Changing the headers behavior
 
 - ``RequestDL/HeaderStrategy``
 - ``RequestDL/Property/headerStrategy(_:)``
+- ``RequestDL/Property/headerSeparator(_:)``
 
 ### Working with payload
 

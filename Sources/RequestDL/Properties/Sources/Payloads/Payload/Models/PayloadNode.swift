@@ -36,6 +36,7 @@ struct PayloadNode: PropertyNode {
             let queries = queries.map { $0.build() }
 
             guard ![nil, "GET", "HEAD"].contains(make.request.method) else {
+                removeAnySetHeaders(&make.request.headers)
                 make.request.queries.append(contentsOf: queries)
                 return
             }
@@ -69,11 +70,20 @@ struct PayloadNode: PropertyNode {
             buffers: [buffer]
         )
 
-        make.request.headers.set(
-            name: "Content-Length",
-            value: String(body.totalSize)
-        )
+        if body.totalSize > .zero {
+            make.request.headers.set(
+                name: "Content-Length",
+                value: String(body.totalSize)
+            )
+        } else {
+            make.request.headers.remove(name: "Content-Length")
+        }
 
         make.request.body = body
+    }
+
+    private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {
+        headers.remove(name: "Content-Type")
+        headers.remove(name: "Content-Length")
     }
 }

@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct DynamicValueMirror<Content>: Sendable {
+struct DynamicValueMirror<Content: Sendable>: Sendable {
 
     struct Child {
         let label: String?
@@ -13,18 +13,18 @@ struct DynamicValueMirror<Content>: Sendable {
 
     // MARK: - Private properties
 
-    private let reflected: Mirror
+    private let reflected: @Sendable () -> Mirror
 
     // MARK: - Inits
 
     init(_ content: Content) {
-        reflected = Mirror(reflecting: content)
+        reflected = { Mirror(reflecting: content) }
     }
 
     // MARK: - Internal methods
 
     func callAsFunction() -> [Child] {
-        reflected.children.compactMap { child in
+        reflected().children.compactMap { child in
             (child.value as? DynamicValue).map {
                 .init(
                     label: child.label,

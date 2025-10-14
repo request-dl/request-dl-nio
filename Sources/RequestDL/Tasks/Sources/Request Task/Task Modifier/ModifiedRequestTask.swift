@@ -17,14 +17,6 @@ public struct ModifiedRequestTask<Modifier: RequestTaskModifier>: RequestTask {
 
     public typealias Element = Modifier.Output
 
-    // MARK: - Public properties
-
-    @_spi(Private)
-    public var environment: TaskEnvironmentValues {
-        get { task.environment }
-        set { task.environment = newValue }
-    }
-
     // MARK: - Internal properties
 
     var task: Modifier.Content

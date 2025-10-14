@@ -1145,7 +1145,6 @@ class FormTests: XCTestCase {
                 headers: {
                     CustomHeader(name: "Accept-Language", value: "en-US")
                     CustomHeader(name: "Accept-Language", value: "pt-BR")
-                        .headerStrategy(.adding)
                 }
             )
         })
@@ -1178,6 +1177,51 @@ class FormTests: XCTestCase {
         ])
     }
 
+    func testForm_whenHeadersWithSettingStrategy() async throws {
+        // Given
+        let name = "foo"
+        let data = Data.randomData(length: 64)
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            Form(
+                name: name,
+                data: data,
+                headers: {
+                    CustomHeader(name: "Accept-Language", value: "en-US")
+                    CustomHeader(name: "Accept-Language", value: "pt-BR")
+                }
+            )
+            .headerStrategy(.setting)
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count)),
+                    ("Accept-Language", "pt-BR")
+                ]),
+                contents: data
+            )
+        ])
+    }
+
     func testForm_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = Form(
@@ -1187,6 +1231,48 @@ class FormTests: XCTestCase {
 
         // Then
         try await assertNever(property.body)
+    }
+}
+
+extension FormTests {
+
+    func testForm_whenEmptyData() async throws {
+        // Given
+        let name = "foo"
+        let data = Data()
+
+        // When
+        let resolved = try await resolve(TestProperty {
+            Form(
+                name: name,
+                data: data
+            )
+        })
+
+        let parser = try await MultipartFormParser(resolved.request)
+        let parsed = try parser.parse()
+
+        // Then
+        XCTAssertEqual(
+            resolved.request.headers["Content-Type"],
+            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+        )
+
+        XCTAssertEqual(
+            resolved.request.headers["Content-Length"],
+            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+        )
+
+        XCTAssertEqual(parsed.items, [
+            PartForm(
+                headers: HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count))
+                ]),
+                contents: data
+            )
+        ])
     }
 }
 // swiftlint:enable file_length type_body_length function_body_length

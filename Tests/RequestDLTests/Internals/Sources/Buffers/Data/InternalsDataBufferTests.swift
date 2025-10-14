@@ -9,7 +9,7 @@ import NIOCore
 // swiftlint:disable type_body_length file_length
 class InternalsDataBufferTests: XCTestCase {
 
-    var byteURL: Internals.ByteURL!
+    var byteURL: Internals.ByteURL?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -25,6 +25,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenInitURL_shouldBeEmpty() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let dataBuffer = Internals.DataBuffer(byteURL)
 
         // When
@@ -44,6 +45,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenContainsData_shouldWriterBeAtEndAndReaderAtZero() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello world".utf8)
         try data.write(to: byteURL)
 
@@ -64,6 +66,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenContainsData_shouldReadDataAvailable() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello world".utf8)
         try data.write(to: byteURL)
 
@@ -83,6 +86,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenContainsDataMovingReaderIndex_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello world".utf8)
         try data.write(to: byteURL)
 
@@ -103,6 +107,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenContainsDataMovingWriterIndex_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello world".utf8)
         try data.write(to: byteURL)
 
@@ -123,6 +128,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenWritingWithTwoCopy_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         let sut1 = Internals.DataBuffer(byteURL)
         var sut2 = sut1
@@ -144,6 +150,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenWritingWithTwoInstances_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         let sut1 = Internals.DataBuffer(byteURL)
         var sut2 = Internals.DataBuffer(byteURL)
@@ -165,6 +172,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenWritingWithTwoInstancesSimultaneos_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.DataBuffer(byteURL)
@@ -183,6 +191,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenWritingWithTwoInstancesSimultaneosBytes_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.DataBuffer(byteURL)
@@ -201,6 +210,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenReadingWithTwoCopy_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         try data.write(to: byteURL)
 
@@ -225,6 +235,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenReadingWithTwoInstances_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         try data.write(to: byteURL)
 
@@ -249,6 +260,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenReadingWithTwoInstancesSimultaneos_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         try data.write(to: byteURL)
 
@@ -274,6 +286,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenReadingWithTwoInstancesSimultaneosBytes_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         try data.write(to: byteURL)
 
@@ -299,6 +312,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenWritingAndReadingSimultaneos_shouldBytesBeUpdatedAndOverrided() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let data = Data("Hello World".utf8)
         let overrideData = Data("Earth".utf8)
 
@@ -333,6 +347,7 @@ class InternalsDataBufferTests: XCTestCase {
 
     func testDataBuffer_whenWritingFromOtherDataBuffer_shouldHaveContentsAppended() async throws {
         // Given
+        let byteURL = try XCTUnwrap(byteURL)
         let otherByteURL = Internals.ByteURL()
 
         let data = Data("Hello World".utf8)

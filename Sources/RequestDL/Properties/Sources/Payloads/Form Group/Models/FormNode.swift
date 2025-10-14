@@ -34,6 +34,11 @@ struct FormNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
+        guard !items.isEmpty else {
+            removeAnySetHeaders(&make.request.headers)
+            return
+        }
+
         let constructor = FormGroupBuilder(items)
 
         make.request.headers.set(
@@ -54,5 +59,12 @@ struct FormNode: PropertyNode {
         )
 
         make.request.body = body
+    }
+
+    // MARK: - Private methods
+
+    private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {
+        headers.remove(name: "Content-Type")
+        headers.remove(name: "Content-Length")
     }
 }

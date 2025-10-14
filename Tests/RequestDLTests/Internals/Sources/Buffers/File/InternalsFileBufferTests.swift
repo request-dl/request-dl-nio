@@ -8,7 +8,7 @@ import XCTest
 // swiftlint:disable type_body_length file_length
 class InternalsFileBufferTests: XCTestCase {
 
-    var fileURL: URL!
+    var fileURL: URL?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -18,18 +18,19 @@ class InternalsFileBufferTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferTests.txt")
 
-        try fileURL.removeIfNeeded()
+        try fileURL?.removeIfNeeded()
     }
 
     override func tearDown() async throws {
         try await super.tearDown()
 
-        try fileURL.removeIfNeeded()
+        try fileURL?.removeIfNeeded()
         fileURL = nil
     }
 
     func testFileBuffer_whenInitURL_shouldBeEmpty() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let fileBuffer = Internals.FileBuffer(fileURL)
 
         // When
@@ -49,6 +50,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenContainsData_shouldWriterBeAtEndAndReaderAtZero() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -69,6 +71,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenContainsData_shouldReadDataAvailable() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -88,6 +91,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenContainsDataMovingReaderIndex_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -108,6 +112,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenContainsDataMovingWriterIndex_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -128,6 +133,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenWritingWithTwoCopy_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
         var sut2 = sut1
@@ -149,6 +155,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenWritingWithTwoInstances_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
         var sut2 = Internals.FileBuffer(fileURL)
@@ -170,6 +177,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenWritingWithTwoInstancesSimultaneos_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.FileBuffer(fileURL)
@@ -188,6 +196,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenWritingWithTwoInstancesSimultaneosBytes_shouldWritableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.FileBuffer(fileURL)
@@ -206,6 +215,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenReadingWithTwoCopy_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -230,6 +240,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenReadingWithTwoInstances_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -254,6 +265,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenReadingWithTwoInstancesSimultaneos_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -279,6 +291,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenReadingWithTwoInstancesSimultaneosBytes_shouldReadableBytesBeUpdated() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -304,6 +317,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenWritingAndReadingSimultaneos_shouldBytesBeUpdatedAndOverrided() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let data = Data("Hello World".utf8)
         let overrideData = Data("Earth".utf8)
 
@@ -338,6 +352,7 @@ class InternalsFileBufferTests: XCTestCase {
 
     func testFileBuffer_whenWritingFromOtherFileBuffer_shouldHaveContentsAppended() async throws {
         // Given
+        let fileURL = try XCTUnwrap(fileURL)
         let otherFile = fileURL
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferOtherFile.txt")

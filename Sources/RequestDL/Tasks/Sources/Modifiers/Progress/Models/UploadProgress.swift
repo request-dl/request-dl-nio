@@ -37,7 +37,7 @@ import Foundation
  > Note: It's important to remember that you can manage how your data is sent using
  ``RequestDL/Property/payloadChunkSize(_:)``.
  */
-public protocol UploadProgress {
+public protocol UploadProgress: Sendable {
 
     /**
      Notifies the progress of an upload operation.

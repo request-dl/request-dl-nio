@@ -25,7 +25,7 @@ import Foundation
  reference to expire, leading to the replacement of the instance with a new one.
  */
 @propertyWrapper
-public struct StoredObject<Object: AnyObject>: DynamicValue {
+public struct StoredObject<Object: AnyObject & Sendable>: DynamicValue {
 
     private struct Key: Sendable, Hashable {
 

@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -20,30 +20,26 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.27.0"
-        ),
-        .package(
-            url: "https://github.com/apple/swift-docc-plugin.git",
-            from: "1.4.5"
-        ),
-        .package(
-            url: "https://github.com/apple/swift-nio.git",
-            from: "2.86.0"
-        ),
-        .package(
-            url: "https://github.com/apple/swift-nio-extras.git",
             from: "1.29.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-ssl.git",
-            from: "2.33.0"
+            url: "https://github.com/apple/swift-nio",
+            from: "2.86.2"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-transport-services.git",
-            from: "1.25.1"
+            url: "https://github.com/apple/swift-nio-extras",
+            from: "1.29.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-log.git",
+            url: "https://github.com/apple/swift-nio-ssl",
+            from: "2.34.1"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-nio-transport-services",
+            from: "1.25.2"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-log",
             from: "1.6.4"
         )
     ],
@@ -66,15 +62,7 @@ let package = Package(
 
         .testTarget(
             name: "RequestDLTests",
-            dependencies: [
-                "RequestDL",
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
-                .product(name: "Logging", package: "swift-log")
-            ],
+            dependencies: ["RequestDL"],
             resources: [.process("Resources")]
         )
     ]

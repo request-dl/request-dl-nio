@@ -9,7 +9,7 @@ extension Internals {
 
     struct AsyncResponse: Sendable, AsyncSequence {
 
-        struct Iterator: AsyncIteratorProtocol {
+        struct Iterator: Sendable, AsyncIteratorProtocol {
 
             // MARK: - Internal properties
 

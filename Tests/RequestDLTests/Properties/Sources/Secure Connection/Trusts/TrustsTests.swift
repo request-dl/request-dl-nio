@@ -7,8 +7,8 @@ import XCTest
 
 class TrustsTests: XCTestCase {
 
-    var client: CertificateResource!
-    var server: CertificateResource!
+    var client: CertificateResource?
+    var server: CertificateResource?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -18,7 +18,8 @@ class TrustsTests: XCTestCase {
 
     func testTrusts_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try Array(Data(contentsOf: server.certificateURL))
+        let server = try Array(Data(contentsOf: XCTUnwrap(server).certificateURL))
+        let client = try XCTUnwrap(client)
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -31,6 +32,7 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
+        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
         XCTAssertEqual(
             resolved.session.configuration.secureConnection?.trustRoots,
             .certificates([
@@ -42,6 +44,9 @@ class TrustsTests: XCTestCase {
 
     func testTrusts_whenFile_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
@@ -63,6 +68,7 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
+        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
         XCTAssertEqual(
             resolved.session.configuration.secureConnection?.trustRoots,
             .file(fileURL.absolutePath(percentEncoded: false))
@@ -71,6 +77,9 @@ class TrustsTests: XCTestCase {
 
     func testTrusts_whenBytes_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+        
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
@@ -85,6 +94,7 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
+        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
         XCTAssertEqual(
             resolved.session.configuration.secureConnection?.trustRoots,
             .bytes(bytes)

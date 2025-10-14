@@ -7,7 +7,7 @@ import XCTest
 
 class InternalsDataStreamTests: XCTestCase {
 
-    var stream: Internals.AsyncStream<Int>!
+    var stream: Internals.AsyncStream<Int>?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -21,6 +21,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenInit_shouldBeEmpty() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let values = SendableBox([Result<Int, Error>]())
         let expectation = expectation(description: "empty_stream")
 
@@ -40,6 +42,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenAppendValues_shouldReceiveAll() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let values = SendableBox<[Result<Int, Error>]>([])
         let expectation = expectation(description: "stream.values")
 
@@ -70,6 +74,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenAppendErrorWithValues_shouldReceiveSome() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let values = SendableBox<[Result<Int, Error>]>([])
         let expectation = expectation(description: "stream.values")
 
@@ -96,6 +102,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenAppendValuesAndClose_shouldReceiveSome() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let values = SendableBox<[Result<Int, Error>]>([])
         let expectation = expectation(description: "stream.values")
 
@@ -123,6 +131,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenAppendingValues_shouldAwaitSequence() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let range = 0..<3
 
         for value in range {
@@ -143,6 +153,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenAppendError() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let error = AnyError()
         var receivedError: Error?
 
@@ -157,12 +169,14 @@ class InternalsDataStreamTests: XCTestCase {
             receivedError = error
         }
 
-//         Then
+        // Then
         XCTAssertNotNil(receivedError)
     }
 
     func testStream_whenCallingMultipleTimesClose() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         var values = [Int]()
 
         // When
@@ -180,6 +194,8 @@ class InternalsDataStreamTests: XCTestCase {
 
     func testStream_whenMultipleForEach() async throws {
         // Given
+        let stream = try XCTUnwrap(stream)
+
         let range = 0 ..< 100
 
         let values = range.map { _ in
@@ -226,6 +242,11 @@ extension InternalsDataStreamTests {
         values: SendableBox<[Result<Int, Error>]>,
         expectation: XCTestExpectation
     ) {
+        guard let stream else {
+            XCTFail("Found nil stream")
+            return
+        }
+        
         _Concurrency.Task {
             do {
                 for try await value in stream {

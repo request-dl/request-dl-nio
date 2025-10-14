@@ -19,7 +19,7 @@ public struct BaseURLError: LocalizedError {
     /**
      The possible contexts for the base URL error.
      */
-    public enum Context {
+    public enum Context: Sendable {
         /// The host string provided is invalid, as it should not include the protocol.
         case invalidHost
 

@@ -27,9 +27,11 @@ extension Modifiers {
          - Returns: The result of the original task.
          */
         public func body(_ task: Content) async throws -> Input {
-            var task = task
-            update(&task.environment)
-            return try await task.result()
+            var environment = TaskEnvironmentValues.current
+            update(&environment)
+            return try await TaskEnvironmentValues.$current.withValue(environment) {
+                try await task.result()
+            }
         }
     }
 }
@@ -45,7 +47,7 @@ extension RequestTask {
      - Returns: A modified `RequestTask` with the applied environment modifier.
      */
     public func environment<Value: Sendable>(
-        _ keyPath: WritableKeyPath<TaskEnvironmentValues, Value>,
+        _ keyPath: WritableKeyPath<TaskEnvironmentValues, Value> & Sendable,
         _ value: Value
     ) -> ModifiedRequestTask<Modifiers.Environment<Element>> {
         modifier(Modifiers.Environment {

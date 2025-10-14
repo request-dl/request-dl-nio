@@ -8,7 +8,7 @@ import NIOCore
 
 class InternalsRequestTests: XCTestCase {
 
-    private var request: Internals.Request!
+    private var request: Internals.Request?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -22,6 +22,7 @@ class InternalsRequestTests: XCTestCase {
 
     func testRequest_whenInitURL_shouldBeEqual() async throws {
         // Given
+        var request = try XCTUnwrap(request)
         let url = "https://google.com"
 
         // When
@@ -33,6 +34,7 @@ class InternalsRequestTests: XCTestCase {
 
     func testRequest_whenMethodIsAssign_shouldBeEqual() async throws {
         // Given
+        var request = try XCTUnwrap(request)
         let method = "POST"
 
         // When
@@ -44,6 +46,8 @@ class InternalsRequestTests: XCTestCase {
 
     func testRequest_whenHeadersAreSet_shouldContainsValues() async throws {
         // Given
+        var request = try XCTUnwrap(request)
+
         let key1 = "Content-Type"
         let value1 = "application/json"
 
@@ -62,6 +66,7 @@ class InternalsRequestTests: XCTestCase {
 
     func testRequest_whenSetReadingMode() async throws {
         // Given
+        var request = try XCTUnwrap(request)
         let readingMode = Internals.DownloadStep.ReadingMode.separator([70])
 
         // When
@@ -72,6 +77,8 @@ class InternalsRequestTests: XCTestCase {
     }
 
     func testRequest_whenUnsetReadingMode() async throws {
+        // Given
+        var request = try XCTUnwrap(request)
         // Then
         XCTAssertEqual(request.readingMode, .length(1_024))
     }

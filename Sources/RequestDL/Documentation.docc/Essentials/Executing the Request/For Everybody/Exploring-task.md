@@ -88,7 +88,7 @@ print(result.payload)
 
 Then, for each item in the sequence, you will have access to its individual result through ``RequestDL/GroupTask/result()``, which is a dictionary where the keys are identified by the sequence element.
 
-- Warning: The element must conform to the `Hashable` protocol.
+> Warning: The element must conform to the `Hashable` protocol.
 
 ## Topics
 

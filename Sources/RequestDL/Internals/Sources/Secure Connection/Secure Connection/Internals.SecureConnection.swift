@@ -17,6 +17,7 @@ extension Internals {
         var certificateChain: CertificateChain?
         #endif
         var certificateVerification: NIOSSL.CertificateVerification?
+        var useDefaultTrustRoots: Bool = false
         var trustRoots: TrustRoots?
         var additionalTrustRoots: [AdditionalTrustRoots]?
         #if !canImport(Network)
@@ -68,7 +69,9 @@ extension Internals {
                 tlsConfiguration.cipherSuiteValues = cipherSuiteValues
             }
 
-            if let trustRoots {
+            if useDefaultTrustRoots {
+                tlsConfiguration.trustRoots = .default
+            } else if let trustRoots {
                 tlsConfiguration.trustRoots = try trustRoots.build()
             }
 

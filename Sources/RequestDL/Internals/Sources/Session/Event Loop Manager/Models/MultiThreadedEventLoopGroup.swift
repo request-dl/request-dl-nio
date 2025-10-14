@@ -7,7 +7,5 @@ import NIOPosix
 
 extension MultiThreadedEventLoopGroup {
 
-    static let shared = MultiThreadedEventLoopGroup(
-        numberOfThreads: ProcessInfo.processInfo.activeProcessorCount
-    )
+    static let shared = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 }

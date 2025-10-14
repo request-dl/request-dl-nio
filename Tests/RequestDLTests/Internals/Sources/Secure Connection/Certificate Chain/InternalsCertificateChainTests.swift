@@ -8,8 +8,8 @@ import NIOSSL
 
 class InternalsCertificateChainTests: XCTestCase {
 
-    var client: CertificateResource!
-    var server: CertificateResource!
+    var client: CertificateResource?
+    var server: CertificateResource?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -20,6 +20,9 @@ class InternalsCertificateChainTests: XCTestCase {
 
     func testChain_whenCertificates_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         var chain = Internals.CertificateChain()
 
         chain.append(
@@ -48,6 +51,9 @@ class InternalsCertificateChainTests: XCTestCase {
 
     func testTrustRoot_whenFilesMerged_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
@@ -72,6 +78,9 @@ class InternalsCertificateChainTests: XCTestCase {
 
     func testTrustRoot_whenBytesMerged_shouldBeValid() async throws {
         // Given
+        let server = try XCTUnwrap(server)
+        let client = try XCTUnwrap(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
