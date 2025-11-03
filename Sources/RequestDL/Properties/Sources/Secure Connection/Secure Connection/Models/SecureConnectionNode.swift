@@ -20,9 +20,7 @@ struct SecureConnectionNode: PropertyNode {
 
         // MARK: - Internal properties
 
-        #if !canImport(Network)
         var certificateChain: [Internals.Certificate]?
-        #endif
 
         var trustRoots: [Internals.Certificate]?
 
@@ -44,18 +42,14 @@ struct SecureConnectionNode: PropertyNode {
             var secureConnection = secureConnection
 
             switch keyPath {
-            #if !canImport(Network)
             case \.certificateChain:
                 setCertificateChain(&secureConnection)
-            #endif
             case \.trustRoots:
                 setTrustRoots(&secureConnection)
             case \.additionalTrustRoots:
                 setAdditionalTrustRoots(&secureConnection)
             default:
-                #if !canImport(Network)
                 setCertificateChain(&secureConnection)
-                #endif
                 setTrustRoots(&secureConnection)
                 setAdditionalTrustRoots(&secureConnection)
             }
@@ -65,13 +59,11 @@ struct SecureConnectionNode: PropertyNode {
 
         // MARK: - Private methods
 
-        #if !canImport(Network)
         private func setCertificateChain(_ secureConnection: inout Internals.SecureConnection) {
             if let certificateChain {
                 secureConnection.certificateChain = .certificates(certificateChain)
             }
         }
-        #endif
 
         private func setTrustRoots(_ secureConnection: inout Internals.SecureConnection) {
             if let trustRoots {

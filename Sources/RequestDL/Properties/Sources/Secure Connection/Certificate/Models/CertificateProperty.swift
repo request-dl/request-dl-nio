@@ -5,9 +5,7 @@
 import Foundation
 
 enum CertificateProperty: Sendable, Hashable {
-    #if !canImport(Network)
     case chain
-    #endif
     case trust
     case additionalTrust
 }

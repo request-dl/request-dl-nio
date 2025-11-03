@@ -6,7 +6,7 @@ import Foundation
 import NIO
 import NIOSSL
 import NIOHTTP1
-#if canImport(Network)
+#if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
 import NIOTransportServices
 #endif
 @testable import RequestDL

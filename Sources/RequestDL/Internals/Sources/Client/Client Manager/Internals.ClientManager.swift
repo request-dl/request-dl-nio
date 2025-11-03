@@ -36,19 +36,28 @@ extension Internals {
             provider: SessionProvider,
             configuration: Internals.Session.Configuration
         ) async throws -> Internals.Client {
-            try await lock.withLock {
-                if var items = _table[provider.id] {
+            let options = SessionProviderOptions(
+                isCompatibleWithNetworkFramework: configuration.secureConnection?.isCompatibleWithNetworkFramework ?? true
+            )
+
+            let sessionProviderID = provider.uniqueIdentifier(with: options)
+
+            return try await lock.withLock {
+                if var items = _table[sessionProviderID] {
                     if let (index, item) = items.enumerated().first(where: { $1.configuration == configuration }) {
                         items[index] = item.updatingReadAt()
-                        _table[provider.id] = items
+                        _table[sessionProviderID] = items
                         return item.client
                     }
                 }
 
-                let eventLoopGroup = await EventLoopGroupManager.shared.provider(provider)
+                let eventLoopGroup = await EventLoopGroupManager.shared.provider(
+                    provider,
+                    with: options
+                )
 
                 return try _createNewClient(
-                    id: provider.id,
+                    id: sessionProviderID,
                     eventLoopGroup: eventLoopGroup,
                     configuration: configuration
                 )

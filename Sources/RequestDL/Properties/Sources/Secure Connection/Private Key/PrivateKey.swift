@@ -5,7 +5,6 @@
 import Foundation
 import NIOSSL
 
-#if !canImport(Network)
 /// A struct representing a private key for `SecureConnection` configuration.
 public struct PrivateKey: Property {
 
@@ -160,4 +159,3 @@ public struct PrivateKey: Property {
         ))
     }
 }
-#endif

@@ -117,7 +117,6 @@ public struct SecureConnection<Content: Property>: Property {
         )
     }
 
-    #if !canImport(Network)
     /// Sets the key log object for the secure connection.
     ///
     /// - Parameter closure: The `SSLKeyLogger` object.
@@ -127,7 +126,6 @@ public struct SecureConnection<Content: Property>: Property {
             $0.secureConnection.keyLogger = keyLogger
         }
     }
-    #endif
 
     /// Sets the timeout for shutting down the secure connection.
     ///
@@ -193,7 +191,6 @@ public struct SecureConnection<Content: Property>: Property {
         edit { $0.secureConnection.sendCANameList = !isDisabled }
     }
 
-    #if !canImport(Network)
     /// Sets the cipher suites for the secure connection using string representations.
     ///
     /// - Parameter suites: The cipher suites to use as string representations.
@@ -202,7 +199,6 @@ public struct SecureConnection<Content: Property>: Property {
         suites.forEach { precondition(!$0.contains(":")) }
         return edit { $0.secureConnection.cipherSuites = suites.joined(separator: ":") }
     }
-    #endif
 
     /// Sets the cipher suites for the secure connection using `TLSCipher` values.
     ///

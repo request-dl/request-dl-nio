@@ -81,10 +81,8 @@ class DataTaskTests: XCTestCase {
 
             SecureConnection {
                 Trusts(server.certificateURL.absolutePath(percentEncoded: false))
-                #if !canImport(Network)
                 RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
                 PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
-                #endif
             }
             .verification(.fullVerification)
         }

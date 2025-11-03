@@ -14,9 +14,19 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let id = "test"
         private let _group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-        func group() -> EventLoopGroup {
+        func uniqueIdentifier(with options: SessionProviderOptions) -> String {
+            id
+        }
+        
+        func group(with options: SessionProviderOptions) -> EventLoopGroup {
             _group
         }
+    }
+
+    var options: SessionProviderOptions {
+        SessionProviderOptions(
+            isCompatibleWithNetworkFramework: true
+        )
     }
 
     private var manager: Internals.EventLoopGroupManager?
@@ -36,10 +46,10 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut1 = try await XCTUnwrap(manager).provider(provider)
+        let sut1 = try await XCTUnwrap(manager).provider(provider, with: options)
 
         // Then
-        XCTAssertTrue(provider.group() === sut1)
+        XCTAssertTrue(provider.group(with: options) === sut1)
     }
 
     func testManager_whenRegisterIdentifier_shouldBeResolvedOnlyOnce() async throws {
@@ -47,12 +57,12 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut1 = try await XCTUnwrap(manager).provider(provider)
-        let sut2 = try await XCTUnwrap(manager).provider(provider)
+        let sut1 = try await XCTUnwrap(manager).provider(provider, with: options)
+        let sut2 = try await XCTUnwrap(manager).provider(provider, with: options)
 
         // Then
-        XCTAssertTrue(provider.group() === sut1)
-        XCTAssertTrue(provider.group() === sut2)
+        XCTAssertTrue(provider.group(with: options) === sut1)
+        XCTAssertTrue(provider.group(with: options) === sut2)
     }
 
     func testManager_whenRunningInBackground() async throws {
@@ -60,11 +70,11 @@ class InternalsEventLoopManagerTests: XCTestCase {
         let provider = CustomProvider()
 
         // When
-        let sut = try await _Concurrency.Task.detached(priority: .background) { [manager] in
-            try await XCTUnwrap(manager).provider(provider)
+        let sut = try await _Concurrency.Task.detached(priority: .background) { [manager, options] in
+            try await XCTUnwrap(manager).provider(provider, with: options)
         }.value
 
         // Then
-        XCTAssertTrue(sut === provider.group())
+        XCTAssertTrue(sut === provider.group(with: options))
     }
 }

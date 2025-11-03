@@ -17,7 +17,7 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(Array(data), format: .pem).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(bytes: Array(data), format: .pem))
+        XCTAssertEqual(resolved, try [.init(bytes: Array(data), format: .pem)])
     }
 
     func testCertificate_whenDERBytes_shouldBeValid() async throws {
@@ -29,7 +29,7 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(Array(data), format: .der).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(bytes: Array(data), format: .der))
+        XCTAssertEqual(resolved, try [.init(bytes: Array(data), format: .der)])
     }
 
     func testCertificate_whenPEMFile_shouldBeValid() async throws {
@@ -41,7 +41,7 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(path, format: .pem).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(file: path, format: .pem))
+        XCTAssertEqual(resolved, try [.init(file: path, format: .pem)])
     }
 
     func testCertificate_whenDERFile_shouldBeValid() async throws {
@@ -53,6 +53,6 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(path, format: .der).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(file: path, format: .der))
+        XCTAssertEqual(resolved, try [.init(file: path, format: .der)])
     }
 }

@@ -7,7 +7,15 @@ import NIOCore
 
 protocol SessionProvider: Sendable {
 
-    var id: String { get }
+    func uniqueIdentifier(
+        with options: SessionProviderOptions
+    ) -> String
 
-    func group() -> EventLoopGroup
+    func group(
+        with options: SessionProviderOptions
+    ) -> EventLoopGroup
+}
+
+struct SessionProviderOptions: Sendable {
+    let isCompatibleWithNetworkFramework: Bool
 }

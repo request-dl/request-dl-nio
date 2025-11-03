@@ -18,25 +18,22 @@ class SecureConnectionTests: XCTestCase {
             RequestDL.SecureConnection {}
         })
 
-        let sut = resolved.session.configuration.secureConnection
+        let sut = try XCTUnwrap(resolved.session.configuration.secureConnection)
 
         // Then
-        XCTAssertEqual(sut?.certificateVerification, secureConnection.certificateVerification)
-        XCTAssertEqual(sut?.signingSignatureAlgorithms, secureConnection.signingSignatureAlgorithms)
-        XCTAssertEqual(sut?.verifySignatureAlgorithms, secureConnection.verifySignatureAlgorithms)
-        XCTAssertEqual(sut?.sendCANameList, secureConnection.sendCANameList)
-        XCTAssertEqual(sut?.renegotiationSupport, secureConnection.renegotiationSupport)
-        XCTAssertEqual(sut?.shutdownTimeout, secureConnection.shutdownTimeout)
-        XCTAssertEqual(sut?.applicationProtocols, secureConnection.applicationProtocols)
-        XCTAssertEqual(sut?.minimumTLSVersion, secureConnection.minimumTLSVersion)
-        XCTAssertEqual(sut?.maximumTLSVersion, secureConnection.maximumTLSVersion)
-        #if !canImport(Network)
-        XCTAssertEqual(sut?.cipherSuites, secureConnection.cipherSuites)
-        #endif
-        XCTAssertEqual(sut?.cipherSuiteValues, secureConnection.cipherSuiteValues)
-        #if !canImport(Network)
-        XCTAssertNil(sut?.keyLogger)
-        #endif
+        XCTAssertTrue(sut.isCompatibleWithNetworkFramework)
+        XCTAssertEqual(sut.certificateVerification, secureConnection.certificateVerification)
+        XCTAssertEqual(sut.signingSignatureAlgorithms, secureConnection.signingSignatureAlgorithms)
+        XCTAssertEqual(sut.verifySignatureAlgorithms, secureConnection.verifySignatureAlgorithms)
+        XCTAssertEqual(sut.sendCANameList, secureConnection.sendCANameList)
+        XCTAssertEqual(sut.renegotiationSupport, secureConnection.renegotiationSupport)
+        XCTAssertEqual(sut.shutdownTimeout, secureConnection.shutdownTimeout)
+        XCTAssertEqual(sut.applicationProtocols, secureConnection.applicationProtocols)
+        XCTAssertEqual(sut.minimumTLSVersion, secureConnection.minimumTLSVersion)
+        XCTAssertEqual(sut.maximumTLSVersion, secureConnection.maximumTLSVersion)
+        XCTAssertEqual(sut.cipherSuites, secureConnection.cipherSuites)
+        XCTAssertEqual(sut.cipherSuiteValues, secureConnection.cipherSuiteValues)
+        XCTAssertNil(sut.keyLogger)
     }
 
     func testSecure_whenUpdatesVerification_shouldBeValid() async throws {
@@ -244,7 +241,6 @@ class SecureConnectionTests: XCTestCase {
         XCTAssertEqual(sut?.maximumTLSVersion, maxVersion.build())
     }
 
-    #if !canImport(Network)
     func testSecure_whenUpdatesCipherSuites_shouldBeValid() async throws {
         // Given
         let suite1 = "TLS_AES_128_GCM_SHA256"
@@ -261,7 +257,6 @@ class SecureConnectionTests: XCTestCase {
         // Then
         XCTAssertEqual(sut?.cipherSuites, [suite1, suite2].joined(separator: ":"))
     }
-    #endif
 
     func testSecure_whenUpdatesCipherSuiteValues_shouldBeValid() async throws {
         // Given
@@ -282,7 +277,6 @@ class SecureConnectionTests: XCTestCase {
         })
     }
 
-    #if !canImport(Network)
     func testSecure_whenUpdatesKeyLogger() async throws {
         // Given
         final class KeyLogger: SSLKeyLogger {
@@ -302,7 +296,6 @@ class SecureConnectionTests: XCTestCase {
         // Then
         XCTAssertTrue(sut?.keyLogger === logger)
     }
-    #endif
 
     func testSecure_whenAccessBody_shouldBeNever() async throws {
         // When

@@ -3,7 +3,7 @@
 */
 
 import Foundation
-#if canImport(Network)
+#if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
 import NIOTransportServices
 
 extension NIOTSEventLoopGroup {

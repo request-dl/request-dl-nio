@@ -64,11 +64,9 @@ class ResolveTests: XCTestCase {
             BaseURL("apple.com")
 
             SecureConnection {
-                #if !canImport(Network)
                 RequestDL.Certificates {
                     Certificate([0, 1, 2])
                 }
-                #endif
 
                 Trusts {
                     Certificate([6, 7, 8])
@@ -81,9 +79,7 @@ class ResolveTests: XCTestCase {
                 }
             }
 
-            #if !canImport(Network)
             PrivateKey([0, 2])
-            #endif
         }
 
         // When

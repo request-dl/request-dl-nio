@@ -5,7 +5,6 @@
 import XCTest
 @testable import RequestDL
 
-#if !canImport(Network)
 class CertificatesTests: XCTestCase {
 
     var client: CertificateResource?
@@ -117,4 +116,3 @@ class CertificatesTests: XCTestCase {
         try await assertNever(sut.body)
     }
 }
-#endif

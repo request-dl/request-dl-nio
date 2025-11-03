@@ -35,12 +35,15 @@ class SessionTests: XCTestCase {
     func testSession_whenInitWithIdentifier_shouldBeValid() async throws {
         // Given
         let property = Session("other", numberOfThreads: 10)
+        let options = SessionProviderOptions(
+            isCompatibleWithNetworkFramework: true
+        )
 
         // When
         let sut = property.provider
 
         // Then
-        XCTAssertEqual(sut.id, "other.10")
+        XCTAssertEqual(sut.uniqueIdentifier(with: options), "other.10")
         XCTAssertTrue(sut is Internals.IdentifiedSessionProvider)
     }
 
@@ -48,13 +51,16 @@ class SessionTests: XCTestCase {
         // Given
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let property = Session(eventLoopGroup)
+        let options = SessionProviderOptions(
+            isCompatibleWithNetworkFramework: true
+        )
 
         // When
         let sut = property.provider
 
         // Then
-        XCTAssertEqual(sut.id, String(describing: ObjectIdentifier(eventLoopGroup)))
-        XCTAssertTrue(sut.group() === eventLoopGroup)
+        XCTAssertEqual(sut.uniqueIdentifier(with: options), String(describing: ObjectIdentifier(eventLoopGroup)))
+        XCTAssertTrue(sut.group(with: .init(isCompatibleWithNetworkFramework: true)) === eventLoopGroup)
     }
 
     func testSession_whenWaitsForConnectivity_shouldBeValid() async throws {
