@@ -124,8 +124,8 @@ extension RequestTask<Data> {
 
 extension Data {
 
-    fileprivate func logInConsoleOutput() -> [String] {
-        ["Success: " + (String(data: self, encoding: .utf8) ?? debugDescription)]
+    fileprivate func logInConsoleOutput(isPayload: Bool = false) -> [String] {
+        [(isPayload ? "Payload: " : "Success: ") + (String(data: self, encoding: .utf8) ?? debugDescription)]
     }
 }
 
@@ -137,7 +137,7 @@ extension TaskResult {
         ]
 
         if let payload = payload as? Data {
-            contents.append(contentsOf: payload.logInConsoleOutput())
+            contents.append(contentsOf: payload.logInConsoleOutput(isPayload: true))
         } else {
             contents.append("Payload: \(payload)")
         }
