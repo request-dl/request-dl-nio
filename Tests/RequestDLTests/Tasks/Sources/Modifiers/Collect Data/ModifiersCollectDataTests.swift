@@ -39,9 +39,16 @@ class ModifiersCollectDataTests: XCTestCase {
             BaseURL(localServer.baseURL)
             Path("index")
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
         }
         .collectBytes()
@@ -71,9 +78,16 @@ class ModifiersCollectDataTests: XCTestCase {
             BaseURL(localServer.baseURL)
             Path("index")
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
         }
         .collectBytes()
@@ -103,9 +117,16 @@ class ModifiersCollectDataTests: XCTestCase {
             BaseURL(localServer.baseURL)
             Path("index")
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
         }
         .collectData()

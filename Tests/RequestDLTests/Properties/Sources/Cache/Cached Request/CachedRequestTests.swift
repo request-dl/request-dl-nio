@@ -352,9 +352,16 @@ extension CachedRequestTests {
 
         let output = try await DataTask {
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(certificate.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
 
             BaseURL(localServer.baseURL)

@@ -128,9 +128,16 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             Payload(data: data)
 
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
         }
         .uploadProgress(uploadMonitor)
@@ -162,9 +169,16 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             Path("index")
 
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
 
             ReadingMode(length: length)
@@ -217,9 +231,16 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             Path("index")
 
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
 
             ReadingMode(length: length)
@@ -271,9 +292,16 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             ReadingMode(length: length)
 
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts {
+                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                }
+                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
+                #endif
             }
 
             Payload(data: data)

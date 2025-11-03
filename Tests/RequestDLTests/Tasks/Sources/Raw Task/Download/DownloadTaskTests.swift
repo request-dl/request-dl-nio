@@ -40,7 +40,12 @@ class DownloadTaskTests: XCTestCase {
             Path("index")
 
             SecureConnection {
+                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+                DefaultTrusts()
+                AdditionalTrusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                #else
                 Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                #endif
             }
         }
         .collectData()
