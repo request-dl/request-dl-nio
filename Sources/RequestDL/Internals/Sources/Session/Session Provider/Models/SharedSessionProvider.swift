@@ -24,7 +24,7 @@ extension Internals {
         func uniqueIdentifier(with options: SessionProviderOptions) -> String {
             #if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
             if options.isCompatibleWithNetworkFramework {
-                return "NTS." + id
+                return "NTW." + id
             }
             #endif
             return id

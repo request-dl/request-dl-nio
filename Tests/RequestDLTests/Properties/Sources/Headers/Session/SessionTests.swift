@@ -43,7 +43,11 @@ class SessionTests: XCTestCase {
         let sut = property.provider
 
         // Then
+        #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
+        XCTAssertEqual(sut.uniqueIdentifier(with: options), "NTW.other.10")
+        #else
         XCTAssertEqual(sut.uniqueIdentifier(with: options), "other.10")
+        #endif
         XCTAssertTrue(sut is Internals.IdentifiedSessionProvider)
     }
 
