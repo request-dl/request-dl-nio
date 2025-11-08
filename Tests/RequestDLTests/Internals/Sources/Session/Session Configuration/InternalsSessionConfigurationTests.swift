@@ -89,13 +89,15 @@ class InternalsSessionConfigurationTests: XCTestCase {
         XCTAssertEqual(builtConfiguration.connectionPool, connectionPool)
     }
 
-    func testConfiguration_whenSetProxy_shoudlBeEqual() async throws {
+    func testConfiguration_whenSetHTTPProxyWith_shoudlBeEqual() async throws {
         // Given
         var configuration = try XCTUnwrap(configuration)
 
-        let proxy = HTTPClient.Configuration.Proxy.server(
+        let proxy = Internals.Proxy(
             host: "localhost",
-            port: 8888
+            port: 8888,
+            connection: .http,
+            authorization: nil
         )
 
         // When
@@ -104,7 +106,80 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(builtConfiguration.proxy, proxy)
+        XCTAssertEqual(builtConfiguration.proxy?.host, proxy.host)
+        XCTAssertEqual(builtConfiguration.proxy?.port, proxy.port)
+        XCTAssertEqual(builtConfiguration.proxy?.authorization, nil)
+    }
+
+    func testConfiguration_whenSetHTTPProxyWithAuthorization_shoudlBeEqual() async throws {
+        // Given
+        var configuration = try XCTUnwrap(configuration)
+
+        let username = UUID().uuidString
+        let password = UUID().uuidString
+
+        let proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .http,
+            authorization: .basic(username: username, password: password)
+        )
+
+        // When
+        configuration.proxy = proxy
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        XCTAssertEqual(builtConfiguration.proxy?.host, proxy.host)
+        XCTAssertEqual(builtConfiguration.proxy?.port, proxy.port)
+        XCTAssertEqual(builtConfiguration.proxy?.authorization, .basic(username: username, password: password))
+    }
+
+    func testConfiguration_whenSetHTTPProxyWithRawAuthorization_shoudlBeEqual() async throws {
+        // Given
+        var configuration = try XCTUnwrap(configuration)
+
+        let credentials = UUID().uuidString
+
+        let proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .http,
+            authorization: .basicRawCredentials(credentials)
+        )
+
+        // When
+        configuration.proxy = proxy
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        XCTAssertEqual(builtConfiguration.proxy?.host, proxy.host)
+        XCTAssertEqual(builtConfiguration.proxy?.port, proxy.port)
+        XCTAssertEqual(builtConfiguration.proxy?.authorization, .basic(credentials: credentials))
+    }
+
+    func testConfiguration_whenSetSOCKSProxy_shoudlBeEqual() async throws {
+        // Given
+        var configuration = try XCTUnwrap(configuration)
+
+        let proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .socks,
+            authorization: nil
+        )
+
+        // When
+        configuration.proxy = proxy
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        XCTAssertEqual(builtConfiguration.proxy?.host, proxy.host)
+        XCTAssertEqual(builtConfiguration.proxy?.port, proxy.port)
+        XCTAssertEqual(builtConfiguration.proxy?.authorization, nil)
     }
 
     func testConfiguration_whenSetDecompression_shouldBeEqual() async throws {
