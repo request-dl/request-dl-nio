@@ -9,21 +9,11 @@ import NIOSSL
 
 struct InternalsTrustRootsTests {
 
-    var client: CertificateResource?
-    var server: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-
-        client = Certificates().client()
-        server = Certificates().server()
-    }
-
     @Test
     func trusts_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         var trusts = Internals.TrustRoots()
         trusts.append(.init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem))
@@ -33,17 +23,18 @@ struct InternalsTrustRootsTests {
         let sut = try trusts.build()
 
         // Then
-        #expect(sut == try .certificates([
+        let expectedTrustRoots = try NIOSSLTrustRoots.certificates([
             .init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
             .init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem)
-        ]))
+        ])
+        #expect(sut == expectedTrustRoots)
     }
 
     @Test
     func trustRoot_whenFilesMerged_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -68,8 +59,8 @@ struct InternalsTrustRootsTests {
     @Test
     func trustRoot_whenBytesMerged_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -81,6 +72,7 @@ struct InternalsTrustRootsTests {
         let sut = try Internals.TrustRoots.bytes(bytes).build()
 
         // Then
-        #expect(sut == try .certificates(NIOSSLCertificate.fromPEMBytes(bytes)))
+        let expectedTrustRoots = try NIOSSLTrustRoots.certificates(NIOSSLCertificate.fromPEMBytes(bytes))
+        #expect(sut == expectedTrustRoots)
     }
 }

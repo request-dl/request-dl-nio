@@ -34,7 +34,7 @@ struct InternalsPrivateKeySourceTests {
         ).build()
 
         // Then
-        let expectedSource: NIOSSL.NIOSSLPrivateKeySource = .privateKey(.init(file: path, format: .pem))
+        let expectedSource: NIOSSL.NIOSSLPrivateKeySource = try .privateKey(.init(file: path, format: .pem))
         #expect(resolved == expectedSource)
     }
 }

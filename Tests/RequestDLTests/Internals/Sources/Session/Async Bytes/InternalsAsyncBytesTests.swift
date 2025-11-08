@@ -8,22 +8,10 @@ import Testing
 
 struct InternalsAsyncBytesTests {
 
-    var stream: Internals.AsyncStream<Internals.DataBuffer>?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        stream = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        stream = nil
-    }
-
     @Test
     func asyncBytes_whenAppendData_shouldContainsAll() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Internals.DataBuffer>()
 
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
@@ -47,7 +35,7 @@ struct InternalsAsyncBytesTests {
     @Test
     func asyncBytes_whenAppendError_shouldContaiAnyError() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Internals.DataBuffer>()
 
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)

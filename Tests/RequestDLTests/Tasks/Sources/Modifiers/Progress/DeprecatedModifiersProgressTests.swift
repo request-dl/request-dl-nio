@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-@available(*, deprecated)
 struct DeprecatedModifiersProgressTests {
 
     final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {

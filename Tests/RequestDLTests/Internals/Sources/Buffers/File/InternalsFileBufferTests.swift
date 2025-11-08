@@ -9,30 +9,29 @@ import Testing
 // swiftlint:disable type_body_length file_length
 struct InternalsFileBufferTests {
 
-    var fileURL: URL?
+    final class FileURLManager: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
+        let url: URL
 
-        fileURL = URL(fileURLWithPath: #file)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("FileBufferTests.txt")
+        init() throws {
+            url = URL(fileURLWithPath: #file + ".\(UUID().uuidString)")
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("FileBufferTests.txt")
 
-        try fileURL?.removeIfNeeded()
-    }
+            try url.removeIfNeeded()
+        }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        try fileURL?.removeIfNeeded()
-        fileURL = nil
+        deinit {
+            try? url.removeIfNeeded()
+        }
     }
 
     @Test
     func fileBuffer_whenInitURL_shouldBeEmpty() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let fileBuffer = Internals.FileBuffer(fileURL)
 
         // When
@@ -53,7 +52,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenContainsData_shouldWriterBeAtEndAndReaderAtZero() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -75,7 +75,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenContainsData_shouldReadDataAvailable() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -96,7 +97,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenContainsDataMovingReaderIndex_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -118,7 +120,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenContainsDataMovingWriterIndex_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -140,7 +143,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenWritingWithTwoCopy_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
         var sut2 = sut1
@@ -163,7 +167,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenWritingWithTwoInstances_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
         var sut2 = Internals.FileBuffer(fileURL)
@@ -186,7 +191,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenWritingWithTwoInstancesSimultaneos_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.FileBuffer(fileURL)
@@ -206,7 +212,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenWritingWithTwoInstancesSimultaneosBytes_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.FileBuffer(fileURL)
@@ -226,7 +233,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenReadingWithTwoCopy_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -252,7 +260,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenReadingWithTwoInstances_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -278,7 +287,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenReadingWithTwoInstancesSimultaneos_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -305,7 +315,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenReadingWithTwoInstancesSimultaneosBytes_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -332,7 +343,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenWritingAndReadingSimultaneos_shouldBytesBeUpdatedAndOverrided() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let overrideData = Data("Earth".utf8)
 
@@ -368,7 +380,8 @@ struct InternalsFileBufferTests {
     @Test
     func fileBuffer_whenWritingFromOtherFileBuffer_shouldHaveContentsAppended() async throws {
         // Given
-        let fileURL = try #require(fileURL)
+        let fileURLManager = try FileURLManager()
+        let fileURL = fileURLManager.url
         let otherFile = fileURL
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferOtherFile.txt")
@@ -638,10 +651,7 @@ struct InternalsFileBufferTests {
 
         // Then
 
-        #expect(
-            fileBuffer.getBytes(at: 32, length: 64),
-            Array(data[32 ..< 96])
-        )
+        #expect(fileBuffer.getBytes(at: 32, length: 64) == Array(data[32 ..< 96]))
     }
 
     @Test
@@ -655,10 +665,7 @@ struct InternalsFileBufferTests {
 
         // Then
 
-        #expect(
-            fileBuffer.getData(at: 32, length: 64),
-            data[32 ..< 96]
-        )
+        #expect(fileBuffer.getData(at: 32, length: 64) == data[32 ..< 96])
     }
 
     @Test
@@ -679,10 +686,7 @@ struct InternalsFileBufferTests {
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        #expect(
-            fileBuffer.readData(writeData.count),
-            writeData
-        )
+        #expect(fileBuffer.readData(writeData.count) == writeData)
     }
 
     @Test
@@ -702,10 +706,7 @@ struct InternalsFileBufferTests {
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex - 32)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        #expect(
-            fileBuffer.readData(writeData.count),
-            writeData
-        )
+        #expect(fileBuffer.readData(writeData.count) == writeData)
     }
 
     @Test
@@ -726,10 +727,7 @@ struct InternalsFileBufferTests {
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        #expect(
-            fileBuffer.readBytes(writeBytes.count),
-            writeBytes
-        )
+        #expect(fileBuffer.readBytes(writeBytes.count) == writeBytes)
     }
 
     @Test
@@ -749,10 +747,7 @@ struct InternalsFileBufferTests {
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex - 32)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        #expect(
-            fileBuffer.readBytes(writeBytes.count),
-            writeBytes
-        )
+        #expect(fileBuffer.readBytes(writeBytes.count) == writeBytes)
     }
 
     @Test

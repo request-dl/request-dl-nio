@@ -10,22 +10,10 @@ import NIOCore
 
 struct InternalsSecureConnectionTests {
 
-    var secureConnection: Internals.SecureConnection?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        secureConnection = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        secureConnection = nil
-    }
-
     @Test
     func secureConnection_whenDefaultTrustNotSet_shouldBeFalse() async throws {
         // Given
-        let secureConnection = try #require(secureConnection)
+        let secureConnection = Internals.SecureConnection()
         // Then
         #expect(!secureConnection.useDefaultTrustRoots)
     }
@@ -33,7 +21,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenSetDefaultTrust() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         // When
         secureConnection.useDefaultTrustRoots = true
@@ -45,7 +33,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenTrustRoots_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let server = Certificates().server()
         let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
@@ -62,7 +50,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenAdditionalTrustRoots_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let server = Certificates().server()
         let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
@@ -79,7 +67,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenPrivateKey_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let server = Certificates().server()
         let privateKeyPath = server.privateKeyURL.absolutePath(percentEncoded: false)
@@ -96,7 +84,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let certificateVerification: NIOSSL.CertificateVerification = .noHostnameVerification
 
         // When
@@ -111,7 +99,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenSigningSignatureAlgorithms_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
@@ -130,7 +118,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenVerifySignatureAlgorithms_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
@@ -149,7 +137,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenSendCANameList_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let sendCANameList = true
 
         // When
@@ -164,7 +152,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenRenegotiationSupport_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let renegotiationSupport: NIORenegotiationSupport = .once
 
         // When
@@ -179,7 +167,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenShutdownTimeout_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let timeout = NIOCore.TimeAmount.seconds(50)
 
         // When
@@ -194,7 +182,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenPSKHint_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let pskHint = "example.com"
 
         // When
@@ -209,7 +197,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenApplicationProtocols_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let applicationProtocolos = ["h2"]
 
         // When
@@ -224,7 +212,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenTLSVersion_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let minimumVersion = TLSVersion.tlsv11
         let maximumVersion = TLSVersion.tlsv13
@@ -243,7 +231,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenCipherSuites_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let cipherSuitesValues: [NIOTLSCipher] = [
             .TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
@@ -269,7 +257,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenClient_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let configuration: TLSConfiguration = .clientDefault
 
         // When
@@ -340,12 +328,12 @@ extension InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenKeyLog_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let data = Data("Hello World".utf8)
 
         // When
         secureConnection.keyLogger = KeyLogger {
-            #expect($0, data)
+            #expect($0 == data)
         }
 
         let sut = try secureConnection.build()
@@ -371,7 +359,7 @@ extension InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenPSKClient_shouldBeValid() async throws {
         // Given
-        var secureConnection = try #require(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let identity = "apple.com"
         let resolver = ClientResolver()
 
@@ -383,14 +371,8 @@ extension InternalsSecureConnectionTests {
 
         // Then
 
-        #expect(
-            result?.identity,
-            identity
-        )
+        #expect(result?.identity == identity)
 
-        #expect(
-            result.map { Data($0.key) },
-            Data(identity.utf8)
-        )
+        #expect(result.map { Data($0.key) } == Data(identity.utf8))
     }
 }

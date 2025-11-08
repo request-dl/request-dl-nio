@@ -9,21 +9,11 @@ import NIOSSL
 
 struct InternalsCertificateChainTests {
 
-    var client: CertificateResource?
-    var server: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-
-        client = Certificates().client()
-        server = Certificates().server()
-    }
-
     @Test
     func chain_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         var chain = Internals.CertificateChain()
 
@@ -45,17 +35,18 @@ struct InternalsCertificateChainTests {
         let sut = try chain.build()
 
         // Then
-        #expect(sut == try [
+        let expectedSources: [NIOSSLCertificateSource] = try [
             .certificate(.init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
             .certificate(.init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
-        ])
+        ]
+        #expect(sut == expectedSources)
     }
 
     @Test
     func trustRoot_whenFilesMerged_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -74,16 +65,17 @@ struct InternalsCertificateChainTests {
         let sut = try Internals.CertificateChain.file(fileURL.absolutePath(percentEncoded: false)).build()
 
         // Then
-        #expect(sut == try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
-            .certificate($0)
-        })
+        let expectedSources = try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
+            NIOSSLCertificateSource.certificate($0)
+        }
+        #expect(sut == expectedSources)
     }
 
     @Test
     func trustRoot_whenBytesMerged_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -95,8 +87,9 @@ struct InternalsCertificateChainTests {
         let sut = try Internals.CertificateChain.bytes(bytes).build()
 
         // Then
-        #expect(sut == try NIOSSLCertificate.fromPEMBytes(bytes).map {
-            .certificate($0)
-        })
+        let expectedSources = try NIOSSLCertificate.fromPEMBytes(bytes).map {
+            NIOSSLCertificateSource.certificate($0)
+        }
+        #expect(sut == expectedSources)
     }
 }
