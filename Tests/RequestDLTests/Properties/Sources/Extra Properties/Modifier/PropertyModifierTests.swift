@@ -41,8 +41,7 @@ struct PropertyModifierTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://apple.com/api/v2?id=123"
+            resolved.request.url == "https://apple.com/api/v2?id=123"
         )
     }
 
@@ -59,8 +58,7 @@ struct PropertyModifierTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://google.com/api/v2?id=123"
+            resolved.request.url == "https://google.com/api/v2?id=123"
         )
     }
 }
@@ -132,8 +130,7 @@ extension PropertyModifierTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://www.google.com/\(additionalPath)"
+            resolved.request.url == "https://www.google.com/\(additionalPath)"
         )
     }
 
@@ -150,8 +147,7 @@ extension PropertyModifierTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://www.google.com"
+            resolved.request.url == "https://www.google.com"
         )
     }
 }

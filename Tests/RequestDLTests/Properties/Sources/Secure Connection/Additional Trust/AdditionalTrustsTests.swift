@@ -8,47 +8,39 @@ import Testing
 
 struct AdditionalTrustsTests {
 
-    var client: CertificateResource?
-    var server: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        client = Certificates().client()
-        server = Certificates().server()
-    }
-
     @Test
     func additional_whenCertificates_shouldBeValid() async throws {
         // Given
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
-        let server = try Array(Data(contentsOf: #require(server).certificateURL))
+        let serverCertificate = try Array(Data(contentsOf: server.certificateURL))
 
         // When
         let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.AdditionalTrusts {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificate(server)
+                    RequestDL.Certificate(serverCertificate)
                 }
             }
         })
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.additionalTrustRoots,
-            .init([.certificates([
-                .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                .init(server, format: .pem)
-            ])])
+            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init([.certificates([
+                    .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+                    .init(serverCertificate, format: .pem)
+                ])
+            ])
         )
     }
 
     @Test
     func additional_whenFile_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -72,16 +64,17 @@ struct AdditionalTrustsTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.additionalTrustRoots,
-            .init([.file(fileURL.absolutePath(percentEncoded: false))])
+            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init(
+                [.file(fileURL.absolutePath(percentEncoded: false))]
+            )
         )
     }
 
     @Test
     func additional_whenBytes_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -98,8 +91,9 @@ struct AdditionalTrustsTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.additionalTrustRoots,
-            .init([.bytes(bytes)])
+            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init(
+                [.bytes(bytes)]
+            )
         )
     }
 

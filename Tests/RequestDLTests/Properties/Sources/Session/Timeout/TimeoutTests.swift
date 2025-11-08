@@ -59,13 +59,11 @@ struct TimeoutTests {
 
         // Then
         #expect(
-            resolved.session.configuration.timeout.read,
-            defaultConfiguration.timeout.read
+            resolved.session.configuration.timeout.read == defaultConfiguration.timeout.read
         )
 
         #expect(
-            resolved.session.configuration.timeout.connect,
-            defaultConfiguration.timeout.connect
+            resolved.session.configuration.timeout.connect == defaultConfiguration.timeout.connect
         )
     }
 

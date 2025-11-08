@@ -26,13 +26,13 @@ struct EnvironmentTests {
     @Test
     func environment_whenIntegerNotSet_shouldBeZero() async throws {
         // Given
-        let expectation = expectation(description: "integer.receiver")
+        let expectation = AsyncSignal()
 
         let value = SendableBox<Int?>(nil)
 
         let receiver = IntegerReceiver {
             value($0)
-            expectation.fulfill()
+            expectation.signal()
         }
 
         // When
@@ -40,7 +40,7 @@ struct EnvironmentTests {
             receiver
         })
 
-        await _fulfillment(of: [expectation])
+        await expectation.wait()
 
         // Then
         #expect(value() == IntegerEnvironmentKey.defaultValue)
@@ -49,13 +49,13 @@ struct EnvironmentTests {
     @Test
     func environment_whenIntegerSet_shouldBeUpdated() async throws {
         // Given
-        let expectation = expectation(description: "integer.receiver")
+        let expectation = AsyncSignal()
 
         let receivedValue = SendableBox<Int?>(nil)
 
         let receiver = IntegerReceiver {
             receivedValue($0)
-            expectation.fulfill()
+            expectation.signal()
         }
 
         let value = 2
@@ -66,7 +66,7 @@ struct EnvironmentTests {
                 .environment(\.integer, value)
         })
 
-        await _fulfillment(of: [expectation])
+        await expectation.wait()
 
         // Then
         #expect(receivedValue() == value)

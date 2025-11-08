@@ -8,38 +8,30 @@ import Testing
 
 struct TrustsTests {
 
-    var client: CertificateResource?
-    var server: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        client = Certificates().client()
-        server = Certificates().server()
-    }
-
     @Test
     func trusts_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try Array(Data(contentsOf: #require(server).certificateURL))
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
+
+        let serverCertificate = try Array(Data(contentsOf: server.certificateURL))
 
         // When
         let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Trusts {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificate(server)
+                    RequestDL.Certificate(serverCertificate)
                 }
             }
         })
 
         // Then
-        #expect(!resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
+        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots,
-            .certificates([
+            resolved.session.configuration.secureConnection?.trustRoots == .certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                .init(server, format: .pem)
+                .init(serverCertificate, format: .pem)
             ])
         )
     }
@@ -47,8 +39,8 @@ struct TrustsTests {
     @Test
     func trusts_whenFile_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -71,18 +63,19 @@ struct TrustsTests {
         })
 
         // Then
-        #expect(!resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
+        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots,
-            .file(fileURL.absolutePath(percentEncoded: false))
+            resolved.session.configuration.secureConnection?.trustRoots == .file(
+                fileURL.absolutePath(percentEncoded: false)
+            )
         )
     }
 
     @Test
     func trusts_whenBytes_shouldBeValid() async throws {
         // Given
-        let server = try #require(server)
-        let client = try #require(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -98,10 +91,9 @@ struct TrustsTests {
         })
 
         // Then
-        #expect(!resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
+        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots,
-            .bytes(bytes)
+            resolved.session.configuration.secureConnection?.trustRoots == .bytes(bytes)
         )
     }
 

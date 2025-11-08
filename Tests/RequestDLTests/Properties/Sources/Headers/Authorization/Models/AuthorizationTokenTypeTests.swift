@@ -36,7 +36,7 @@ struct AuthorizationTokenTypeTests {
     func hashable() async throws {
         let sut: Set<Authorization.TokenType> = [.bearer, .bearer, .basic]
 
-        #expect(sut, [.bearer == .basic])
+        #expect(sut == [.bearer, .basic])
     }
 
     @Test

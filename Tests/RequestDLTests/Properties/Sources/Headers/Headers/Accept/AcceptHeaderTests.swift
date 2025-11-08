@@ -14,8 +14,7 @@ struct AcceptHeaderTests {
         let resolved = try await resolve(property)
 
         #expect(
-            resolved.request.headers["Accept"],
-            ["application/json"]
+            resolved.request.headers["Accept"] == ["application/json"]
         )
     }
 
@@ -25,8 +24,7 @@ struct AcceptHeaderTests {
         let resolved = try await resolve(property)
 
         #expect(
-            resolved.request.headers["Accept"],
-            ["application/xml"]
+            resolved.request.headers["Accept"] == ["application/xml"]
         )
     }
 
@@ -36,8 +34,7 @@ struct AcceptHeaderTests {
         let resolved = try await resolve(property)
 
         #expect(
-            resolved.request.headers["Accept"],
-            ["form-data"]
+            resolved.request.headers["Accept"] == ["form-data"]
         )
     }
 
@@ -46,8 +43,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.formURLEncoded))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["application/x-www-form-urlencoded"]
+            resolved.request.headers["Accept"] == ["application/x-www-form-urlencoded"]
         )
     }
 
@@ -56,8 +52,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.text))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["text/plain"]
+            resolved.request.headers["Accept"] == ["text/plain"]
         )
     }
 
@@ -66,8 +61,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.html))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["text/html"]
+            resolved.request.headers["Accept"] == ["text/html"]
         )
     }
 
@@ -76,8 +70,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.css))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["text/css"]
+            resolved.request.headers["Accept"] == ["text/css"]
         )
     }
 
@@ -86,8 +79,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.javascript))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["text/javascript"]
+            resolved.request.headers["Accept"] == ["text/javascript"]
         )
     }
 
@@ -96,8 +88,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.gif))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["image/gif"]
+            resolved.request.headers["Accept"] == ["image/gif"]
         )
     }
 
@@ -106,8 +97,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.png))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["image/png"]
+            resolved.request.headers["Accept"] == ["image/png"]
         )
     }
 
@@ -116,8 +106,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.jpeg))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["image/jpeg"]
+            resolved.request.headers["Accept"] == ["image/jpeg"]
         )
     }
 
@@ -126,8 +115,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.bmp))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["image/bmp"]
+            resolved.request.headers["Accept"] == ["image/bmp"]
         )
     }
 
@@ -136,8 +124,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.webp))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["image/webp"]
+            resolved.request.headers["Accept"] == ["image/webp"]
         )
     }
 
@@ -146,8 +133,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.midi))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["audio/midi"]
+            resolved.request.headers["Accept"] == ["audio/midi"]
         )
     }
 
@@ -156,8 +142,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.mpeg))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["audio/mpeg"]
+            resolved.request.headers["Accept"] == ["audio/mpeg"]
         )
     }
 
@@ -166,8 +151,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.wav))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["audio/wav"]
+            resolved.request.headers["Accept"] == ["audio/wav"]
         )
     }
 
@@ -176,8 +160,7 @@ struct AcceptHeaderTests {
         let property = TestProperty(AcceptHeader(.pdf))
         let resolved = try await resolve(property)
         #expect(
-            resolved.request.headers["Accept"],
-            ["application/pdf"]
+            resolved.request.headers["Accept"] == ["application/pdf"]
         )
     }
 

@@ -23,8 +23,9 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .file(resource.privateKeyURL.absolutePath(percentEncoded: false))
+            resolved.session.configuration.secureConnection?.privateKey == .file(
+                resource.privateKeyURL.absolutePath(percentEncoded: false)
+            )
         )
     }
 
@@ -42,8 +43,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(Internals.PrivateKey(
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(Internals.PrivateKey(
                 resource.privateKeyURL.absolutePath(percentEncoded: false),
                 format: .der
             ))
@@ -65,8 +65,9 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(Internals.PrivateKey(bytes, format: .pem))
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
+                Internals.PrivateKey(bytes, format: .pem)
+            )
         )
     }
 
@@ -85,8 +86,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(Internals.PrivateKey(
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(Internals.PrivateKey(
                 bytes,
                 format: .der
             ))
@@ -109,8 +109,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            Bundle.module.resolveURL(forResourceName: file).map {
+            resolved.session.configuration.secureConnection?.privateKey == Bundle.module.resolveURL(forResourceName: file).map {
                 .file($0.absolutePath(percentEncoded: false))
             }
         )
@@ -135,8 +134,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
                 Internals.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
                     format: .pem,
@@ -165,8 +163,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
                 Internals.PrivateKey(
                     resource.privateKeyURL.absolutePath(percentEncoded: false),
                     format: .der,
@@ -196,8 +193,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
                 Internals.PrivateKey(
                     bytes,
                     format: .pem,
@@ -227,8 +223,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            .privateKey(
+            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
                 Internals.PrivateKey(
                     bytes,
                     format: .der,
@@ -260,8 +255,7 @@ struct PrivateKeyTests {
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey,
-            Bundle.module.resolveURL(forResourceName: file).map {
+            resolved.session.configuration.secureConnection?.privateKey == Bundle.module.resolveURL(forResourceName: file).map {
                 .privateKey(
                     Internals.PrivateKey(
                         $0.absolutePath(percentEncoded: false),

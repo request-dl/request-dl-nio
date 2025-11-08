@@ -23,6 +23,6 @@ struct TimeoutSourceTests {
     @Test
     func allTimeout() async throws {
         let allTimeout = Timeout.Source.all
-        #expect(allTimeout, [.connect == .read])
+        #expect(allTimeout == [.connect, .read])
     }
 }

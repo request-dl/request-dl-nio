@@ -117,8 +117,7 @@ struct UnitTimeTests {
 
         // Then
         #expect(
-            (lhs + rhs).nanoseconds,
-            (lhs.build() + rhs.build()).nanoseconds
+            (lhs + rhs).nanoseconds == (lhs.build() + rhs.build()).nanoseconds
         )
     }
 
@@ -130,8 +129,7 @@ struct UnitTimeTests {
 
         // Then
         #expect(
-            (lhs - rhs).nanoseconds,
-            (lhs.build() - rhs.build()).nanoseconds
+            (lhs - rhs).nanoseconds == (lhs.build() - rhs.build()).nanoseconds
         )
     }
 
@@ -141,7 +139,7 @@ struct UnitTimeTests {
         let sut: Set<UnitTime> = [.seconds(6), .seconds(6), .hours(10)]
 
         // Then
-        #expect(sut, [.seconds(6) == .hours(10)])
+        #expect(sut == [.seconds(6), .hours(10)])
     }
 
     @Test

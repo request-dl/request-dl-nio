@@ -87,8 +87,8 @@ struct NodeTests {
         let next3 = children.next()
 
         // Then
-        #expect((next1 as? LeafNode<Node<Int>>)?.value, 1)
-        #expect((next2 as? LeafNode<Node<Bool>>)?.value, true)
+        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
         #expect(next3 == nil)
     }
 
@@ -115,8 +115,8 @@ struct NodeTests {
         let next4 = children1.next()
 
         // Then
-        #expect((next1 as? LeafNode<Node<Int>>)?.value, 1)
-        #expect((next2 as? LeafNode<Node<Bool>>)?.value, true)
+        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
         #expect(next3 != nil)
         #expect(next4 == nil)
 
@@ -149,10 +149,10 @@ struct NodeTests {
         let next5 = children1.next()
 
         // Then
-        #expect((next1 as? LeafNode<Node<Int>>)?.value, 1)
-        #expect((next2 as? LeafNode<Node<Bool>>)?.value, true)
-        #expect((next3 as? LeafNode<Node<Int>>)?.value, 1)
-        #expect((next4 as? LeafNode<Node<Bool>>)?.value, true)
+        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
+        #expect((next3 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next4 as? LeafNode<Node<Bool>>)?.value == true)
         #expect(next5 == nil)
     }
 

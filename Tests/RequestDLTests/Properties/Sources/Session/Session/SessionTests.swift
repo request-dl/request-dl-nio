@@ -28,8 +28,7 @@ struct SessionTests {
         #expect(sut.proxy == configuration.proxy)
         #expect(sut.ignoreUncleanSSLShutdown == configuration.ignoreUncleanSSLShutdown)
         #expect(
-            String(describing: sut.decompression),
-            String(describing: configuration.decompression)
+            String(describing: sut.decompression) == String(describing: configuration.decompression)
         )
         #expect(sut.connectionPool == configuration.connectionPool)
     }
@@ -84,8 +83,7 @@ struct SessionTests {
 
         // Then
         #expect(
-            try resolved.session.configuration.build().networkFrameworkWaitForConnectivity,
-            waitsForConnectivity
+            try resolved.session.configuration.build().networkFrameworkWaitForConnectivity == waitsForConnectivity
         )
     }
 
@@ -102,8 +100,7 @@ struct SessionTests {
 
         // Then
         #expect(
-            resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit,
-            maximumConnections
+            resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit == maximumConnections
         )
     }
 
@@ -123,8 +120,7 @@ struct SessionTests {
         }
 
         #expect(
-            redirectConfiguration,
-            .disallow
+            redirectConfiguration == .disallow
         )
     }
 
@@ -147,8 +143,7 @@ struct SessionTests {
         }
 
         #expect(
-            redirectConfiguration,
-            .follow(
+            redirectConfiguration == .follow(
                 max: max,
                 allowCycles: cycles
             )
@@ -179,8 +174,11 @@ struct SessionTests {
 
         // Then
         #expect(
-            String(describing: resolved.session.configuration.decompression),
-            String(describing: HTTPClient.Decompression.disabled)
+            String(
+                describing: resolved.session.configuration.decompression
+            ) == String(
+                describing: HTTPClient.Decompression.disabled
+            )
         )
     }
 
@@ -196,8 +194,7 @@ struct SessionTests {
 
         // Then
         #expect(
-            resolved.session.configuration.decompression,
-            .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
         )
     }
 
@@ -215,8 +212,7 @@ struct SessionTests {
 
         // Then
         #expect(
-            try resolved.session.configuration.build().dnsOverride,
-            [origin: destination]
+            try resolved.session.configuration.build().dnsOverride == [origin: destination]
         )
     }
 

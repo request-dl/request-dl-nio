@@ -36,8 +36,7 @@ struct GroupTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://google.com/api/v1?available_methods=all"
+            resolved.request.url == "https://google.com/api/v1?available_methods=all"
         )
     }
 
