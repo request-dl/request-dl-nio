@@ -19,8 +19,9 @@ struct InternalsDecompressionTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: HTTPClient.Decompression.disabled)
+            String(describing: sut) == String(
+                describing: HTTPClient.Decompression.disabled
+            )
         )
     }
 
@@ -34,8 +35,9 @@ struct InternalsDecompressionTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: HTTPClient.Decompression.enabled(limit: .ratio(1_024)))
+            String(describing: sut) == String(
+                describing: HTTPClient.Decompression.enabled(limit: .ratio(1_024))
+            )
         )
     }
 

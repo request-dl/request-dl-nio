@@ -53,7 +53,7 @@ struct InternalsClientManagerTests {
         )
 
         // Then
-        #expect(!sut1 === sut2)
+        #expect(sut1 !== sut2)
     }
 
     @Test
@@ -78,6 +78,6 @@ struct InternalsClientManagerTests {
         )
 
         // Then
-        #expect(!sut1 === sut2)
+        #expect(sut1 !== sut2)
     }
 }

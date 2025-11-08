@@ -64,8 +64,9 @@ struct UserAgentHeaderTests {
 
         // Then
         #expect(
-            resolved.request.headers["User-Agent"],
-            [ProcessInfo.processInfo.userAgent + " \(userAgent)"]
+            resolved.request.headers["User-Agent"] == [
+                ProcessInfo.processInfo.userAgent + " \(userAgent)"
+            ]
         )
     }
 

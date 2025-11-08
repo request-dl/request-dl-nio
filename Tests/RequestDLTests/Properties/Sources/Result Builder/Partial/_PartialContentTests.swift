@@ -122,8 +122,7 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url,
-            "https://google.com/search?q=request-dl"
+            resolved.request.url == "https://google.com/search?q=request-dl"
         )
 
         #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
@@ -166,8 +165,7 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url,
-            "https://google.com/search?q=request-dl"
+            resolved.request.url == "https://google.com/search?q=request-dl"
         )
 
         #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
@@ -217,8 +215,7 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url,
-            "https://google.com/search?q=request-dl&page=1"
+            resolved.request.url == "https://google.com/search?q=request-dl&page=1"
         )
 
         #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
@@ -272,8 +269,7 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url,
-            "https://google.com/search/results?q=request-dl&page=1"
+            resolved.request.url == "https://google.com/search/results?q=request-dl&page=1"
         )
 
         #expect(resolved.request.headers["Origin"] == ["https://apple.com"])

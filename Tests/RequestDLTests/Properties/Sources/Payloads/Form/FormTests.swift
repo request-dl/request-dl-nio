@@ -30,13 +30,15 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -72,13 +74,15 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -123,13 +127,15 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -175,13 +181,15 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -227,13 +235,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(
+                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+            )]
         )
 
         #expect(parsed.items == [
@@ -287,13 +295,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(
+                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+            )]
         )
 
         #expect(parsed.items == [
@@ -329,13 +337,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -374,13 +382,11 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items == [
@@ -416,13 +422,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -465,13 +471,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -519,13 +525,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -539,8 +543,7 @@ struct FormTests {
         #expect(
             try parsed.items.map {
                 try decoder.decode(PayloadMock.self, from: $0.contents)
-            },
-            [mock]
+            } == [mock]
         )
     }
 
@@ -579,13 +582,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -599,8 +600,7 @@ struct FormTests {
         #expect(
             try parsed.items.map {
                 try decoder.decode(PayloadMock.self, from: $0.contents)
-            },
-            [mock]
+            } == [mock]
         )
     }
 
@@ -644,13 +644,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -664,8 +662,7 @@ struct FormTests {
         #expect(
             try parsed.items.map {
                 try decoder.decode(PayloadMock.self, from: $0.contents)
-            },
-            [mock]
+            } == [mock]
         )
     }
 
@@ -711,13 +708,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -729,8 +724,7 @@ struct FormTests {
         ])
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) },
-            [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
         )
     }
 
@@ -779,13 +773,13 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -797,8 +791,7 @@ struct FormTests {
         ])
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) },
-            [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
         )
     }
 
@@ -832,13 +825,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -885,13 +878,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -943,13 +936,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -998,13 +991,13 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -1016,8 +1009,7 @@ struct FormTests {
         ])
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) },
-            [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
         )
     }
 
@@ -1066,13 +1058,13 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -1084,8 +1076,7 @@ struct FormTests {
         ])
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) },
-            [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
         )
     }
 
@@ -1116,21 +1107,20 @@ struct FormTests {
 
         // Then
         #expect(
-            buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: totalBytes, by: chunkSize).map {
+            buffers.compactMap { $0.getData() } == stride(from: .zero, to: totalBytes, by: chunkSize).map {
                 let upperBound = $0 + chunkSize
                 return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
         )
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -1168,13 +1158,15 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -1215,13 +1207,15 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [
@@ -1271,13 +1265,15 @@ extension FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.request.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.request.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
         #expect(parsed.items == [

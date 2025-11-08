@@ -28,8 +28,7 @@ struct AsyncPropertyTests {
 
         // Then
         #expect(
-            resolved.request.headers["Authorization"],
-            ["Bearer 123ddf4"]
+            resolved.request.headers["Authorization"] == ["Bearer 123ddf4"]
         )
     }
 

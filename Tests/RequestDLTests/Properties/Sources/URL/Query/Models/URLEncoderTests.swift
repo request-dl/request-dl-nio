@@ -9,34 +9,17 @@ import Testing
 // swiftlint:disable file_length type_body_length
 struct URLEncoderTests {
 
-    var urlEncoder: URLEncoder?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        urlEncoder = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        urlEncoder = nil
-    }
-
-    private func encode<Value>(_ value: Value, forKey key: String) throws -> String {
-        try #require(urlEncoder).encode(value, forKey: key)
-            .map { $0.build() }
-            .joined()
-    }
-
     // MARK: - Default
 
     @Test
     func encoder_whenInteger() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
         let value = 123
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -44,12 +27,13 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenString() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
         let value = "bar"
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -59,12 +43,13 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenSomeWithLiteral() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
         let value = "bar"
 
         // When
-        let sut = try encode(value as String?, forKey: key)
+        let sut = try urlEncoder.encode(value as String?, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -72,11 +57,12 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenNoneWithLiteral() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
 
         // When
-        let sut = try encode(String?.none, forKey: key)
+        let sut = try urlEncoder.encode(String?.none, forKey: key)
 
         // Then
         #expect(sut == "\(key)=nil")
@@ -84,8 +70,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenSomeWithDroppingKey() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = "bar"
@@ -93,7 +79,7 @@ struct URLEncoderTests {
         urlEncoder.optionalEncodingStrategy = .droppingKey
 
         // When
-        let sut = try encode(value as String?, forKey: key)
+        let sut = try urlEncoder.encode(value as String?, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -101,15 +87,15 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenNoneWithDroppingKey() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
 
         urlEncoder.optionalEncodingStrategy = .droppingKey
 
         // When
-        let sut = try encode(String?.none, forKey: key)
+        let sut = try urlEncoder.encode(String?.none, forKey: key)
 
         // Then
         #expect(sut == "")
@@ -117,8 +103,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenSomeWithDroppingValue() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = "bar"
@@ -126,7 +112,7 @@ struct URLEncoderTests {
         urlEncoder.optionalEncodingStrategy = .droppingValue
 
         // When
-        let sut = try encode(value as String?, forKey: key)
+        let sut = try urlEncoder.encode(value as String?, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -134,15 +120,15 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenNoneWithDroppingValue() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
 
         urlEncoder.optionalEncodingStrategy = .droppingValue
 
         // When
-        let sut = try encode(String?.none, forKey: key)
+        let sut = try urlEncoder.encode(String?.none, forKey: key)
 
         // Then
         #expect(sut == "\(key)=")
@@ -150,8 +136,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenSomeWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = "bar"
@@ -162,7 +148,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value as String?, forKey: key)
+        let sut = try urlEncoder.encode(value as String?, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -170,8 +156,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenNoneWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
 
@@ -181,7 +167,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(String?.none, forKey: key)
+        let sut = try urlEncoder.encode(String?.none, forKey: key)
 
         // Then
         #expect(sut == "\(key)=none")
@@ -191,12 +177,13 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenTrueWithLiteral() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
         let value = true
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -204,12 +191,13 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenFalseWithLiteral() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
         let value = false
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(value)")
@@ -217,8 +205,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenTrueWithNumeric() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = true
@@ -226,7 +214,7 @@ struct URLEncoderTests {
         urlEncoder.boolEncodingStrategy = .numeric
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=1")
@@ -234,8 +222,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenFalseWithNumeric() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = false
@@ -243,7 +231,7 @@ struct URLEncoderTests {
         urlEncoder.boolEncodingStrategy = .numeric
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=0")
@@ -251,8 +239,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenTrueWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = true
@@ -263,7 +251,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=T")
@@ -271,8 +259,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenFalseWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = false
@@ -283,7 +271,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "\(key)=F")
@@ -292,8 +280,8 @@ struct URLEncoderTests {
     // MARK: - Date
     @Test
     func encoder_whenDateWithSecondsSince1970() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -301,7 +289,7 @@ struct URLEncoderTests {
         urlEncoder.dateEncodingStrategy = .secondsSince1970
 
         // When
-        let sut = try encode(date, forKey: key)
+        let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(Int64(date.timeIntervalSince1970))")
@@ -309,8 +297,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDateWithMillisecondsSince1970() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -318,7 +306,7 @@ struct URLEncoderTests {
         urlEncoder.dateEncodingStrategy = .millisecondsSince1970
 
         // When
-        let sut = try encode(date, forKey: key)
+        let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
         #expect(sut == "\(key)=\(Int64(date.timeIntervalSince1970) * 1_000)")
@@ -326,8 +314,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDateWithISO8601() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -336,7 +324,7 @@ struct URLEncoderTests {
         urlEncoder.dateEncodingStrategy = .iso8601
 
         // When
-        let sut = try encode(date, forKey: key)
+        let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
         let expectedDate = dateFormatter.string(from: date)
@@ -346,8 +334,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDateWithDateFormatter() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -358,7 +346,7 @@ struct URLEncoderTests {
         urlEncoder.dateEncodingStrategy = .formatter(dateFormatter)
 
         // When
-        let sut = try encode(date, forKey: key)
+        let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
         let expectedDate = dateFormatter.string(from: date)
@@ -368,8 +356,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDateWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -380,7 +368,7 @@ struct URLEncoderTests {
         urlEncoder.dateEncodingStrategy = .formatter(dateFormatter)
 
         // When
-        let sut = try encode(date, forKey: key)
+        let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
         let expectedDate = dateFormatter.string(from: date)
@@ -392,8 +380,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenArrayWithDroppingIndex() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -401,7 +389,7 @@ struct URLEncoderTests {
         urlEncoder.arrayEncodingStrategy = .droppingIndex
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == value.map {
@@ -411,8 +399,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenArrayWithSubscripted() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -420,7 +408,7 @@ struct URLEncoderTests {
         urlEncoder.arrayEncodingStrategy = .subscripted
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == value.enumerated().map {
@@ -431,8 +419,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenArrayWithAccessMember() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -440,7 +428,7 @@ struct URLEncoderTests {
         urlEncoder.arrayEncodingStrategy = .accessMember
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == value.enumerated().map {
@@ -450,8 +438,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenArrayWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -462,7 +450,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == value.enumerated().map {
@@ -473,8 +461,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenHeterogeneousArrayWithDroppingIndex() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -488,7 +476,7 @@ struct URLEncoderTests {
         urlEncoder.arrayEncodingStrategy = .droppingIndex
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedString = [
@@ -507,8 +495,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDictionaryWithSubscripted() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = [
@@ -521,7 +509,7 @@ struct URLEncoderTests {
         urlEncoder.dictionaryEncodingStrategy = .subscripted
 
         // When
-        let sut = try encode(value, forKey: key).split(separator: "&")
+        let sut = try urlEncoder.encode(value, forKey: key).split(separator: "&")
 
         // Then
         #expect(sut.count == value.count)
@@ -534,8 +522,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDictionaryWithAccessMember() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = [
@@ -548,7 +536,7 @@ struct URLEncoderTests {
         urlEncoder.dictionaryEncodingStrategy = .accessMember
 
         // When
-        let sut = try encode(value, forKey: key).split(separator: "&")
+        let sut = try urlEncoder.encode(value, forKey: key).split(separator: "&")
 
         // Then
         #expect(sut.count == value.count)
@@ -561,8 +549,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDictionaryWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = [
@@ -578,7 +566,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value, forKey: key).split(separator: "&")
+        let sut = try urlEncoder.encode(value, forKey: key).split(separator: "&")
 
         // Then
         #expect(sut.count == value.count)
@@ -591,8 +579,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenHeterogeneousDictionaryWithDroppingIndex() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -615,7 +603,7 @@ struct URLEncoderTests {
         urlEncoder.dictionaryEncodingStrategy = .accessMember
 
         // When
-        let sut = try encode(value, forKey: key).split(separator: "&")
+        let sut = try urlEncoder.encode(value, forKey: key).split(separator: "&")
 
         // Then
         let expectedValue = [
@@ -640,12 +628,13 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDataWithBase64() throws {
+        let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
         let value = Data.randomData(length: 64)
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedValue = value
@@ -657,8 +646,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenDataWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = Data.randomData(length: 64)
@@ -668,7 +657,7 @@ struct URLEncoderTests {
             try container.encode($0.map { String($0) }.joined())
         }
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedValue = value.map { String($0) }.joined()
@@ -680,8 +669,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithLiteral() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -689,7 +678,7 @@ struct URLEncoderTests {
         urlEncoder.keyEncodingStrategy = .literal
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "oneTwo[threeFour]".addingRFC3986PercentEncoding()
@@ -699,8 +688,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithSnakeCased() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "_oneTwo_"
         let value = ["threeFour": "1"]
@@ -708,7 +697,7 @@ struct URLEncoderTests {
         urlEncoder.keyEncodingStrategy = .snakeCased
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "_one_two_[three_four]".addingRFC3986PercentEncoding()
@@ -718,8 +707,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithKebabCased() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -727,7 +716,7 @@ struct URLEncoderTests {
         urlEncoder.keyEncodingStrategy = .kebabCased
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "one-two[three-four]".addingRFC3986PercentEncoding()
@@ -737,8 +726,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithCapitalized() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -746,7 +735,7 @@ struct URLEncoderTests {
         urlEncoder.keyEncodingStrategy = .capitalized
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "OneTwo[ThreeFour]".addingRFC3986PercentEncoding()
@@ -756,8 +745,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithUppercased() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -765,7 +754,7 @@ struct URLEncoderTests {
         urlEncoder.keyEncodingStrategy = .uppercased
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "ONETWO[THREEFOUR]".addingRFC3986PercentEncoding()
@@ -775,8 +764,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithLowercased() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -784,7 +773,7 @@ struct URLEncoderTests {
         urlEncoder.keyEncodingStrategy = .lowercased
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "onetwo[threefour]".addingRFC3986PercentEncoding()
@@ -794,8 +783,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenKeyWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -810,7 +799,7 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         let expectedKey = "one.two[three.four]".addingRFC3986PercentEncoding()
@@ -821,8 +810,8 @@ struct URLEncoderTests {
     // MARK: - Whitespace
     @Test
     func encoder_whenWhitespaceWithPercentEscaping() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo bar"
         let value = "one two three"
@@ -830,7 +819,7 @@ struct URLEncoderTests {
         urlEncoder.whitespaceEncodingStrategy = .percentEscaping
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "foo%20bar=one%20two%20three")
@@ -838,8 +827,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenWhitespaceWithPlus() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo bar"
         let value = "one two three"
@@ -847,7 +836,7 @@ struct URLEncoderTests {
         urlEncoder.whitespaceEncodingStrategy = .plus
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "foo+bar=one+two+three")
@@ -855,8 +844,8 @@ struct URLEncoderTests {
 
     @Test
     func encoder_whenWhitespaceWithCustom() throws {
+        let urlEncoder = URLEncoder()
         // Given
-        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo bar"
         let value = "one two three"
@@ -866,10 +855,19 @@ struct URLEncoderTests {
         }
 
         // When
-        let sut = try encode(value, forKey: key)
+        let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
         #expect(sut == "foobar=onetwothree")
     }
 }
 // swiftlint:enable file_length type_body_length
+
+private extension URLEncoder {
+
+    func encode<Value>(_ value: Value, forKey key: String) throws -> String {
+        try self.encode(value, forKey: key)
+            .map { $0.build() }
+            .joined()
+    }
+}

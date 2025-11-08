@@ -118,8 +118,7 @@ extension NamespaceTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://www.apple.com/multiple/namespace"
+            resolved.request.url == "https://www.apple.com/multiple/namespace"
         )
 
         #expect(namespaceID() == PropertyNamespace.ID(
@@ -159,8 +158,7 @@ extension NamespaceTests {
 
         // Then
         #expect(
-            resolved.request.url,
-            "https://www.apple.com/v1/namespace"
+            resolved.request.url == "https://www.apple.com/v1/namespace"
         )
 
         #expect(namespaceID() == PropertyNamespace.ID(

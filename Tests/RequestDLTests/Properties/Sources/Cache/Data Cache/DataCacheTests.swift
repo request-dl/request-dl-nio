@@ -6,38 +6,39 @@ import Foundation
 import Testing
 @testable import RequestDL
 
+private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
+private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
+
+@Suite(.serialized)
 struct DataCacheTests {
 
-    let memoryCapacity: UInt64 = 8 * 1_024 * 1_024
-    let diskCapacity: UInt64 = 64 * 1_024 * 1_024
+    final class TestState: Sendable {
 
-    var dataCache: DataCache?
+        let dataCache: DataCache
 
-    override func setUp() async throws {
-        try await super.setUp()
-        dataCache = .init(
-            memoryCapacity: 8 * 1_024 * 1_024,
-            diskCapacity: 64 * 1_024 * 1_024
-        )
-    }
+        init() {
+            dataCache = .init(
+                memoryCapacity: globalMemoryCapacity,
+                diskCapacity: globalDiskCapacity
+            )
+        }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-        dataCache?.removeAll()
-        dataCache = nil
-
-        DataCache.shared.memoryCapacity = .zero
-        DataCache.shared.diskCapacity = .zero
+        deinit {
+            dataCache.removeAll()
+            DataCache.shared.memoryCapacity = .zero
+            DataCache.shared.diskCapacity = .zero
+        }
     }
 
     @Test
     func cache_whenInit_shouldCapacityBeKnown() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         // Then
-        #expect(dataCache.memoryCapacity == memoryCapacity)
-        #expect(dataCache.diskCapacity == diskCapacity)
+        #expect(dataCache.memoryCapacity == globalMemoryCapacity)
+        #expect(dataCache.diskCapacity == globalDiskCapacity)
     }
 
     @Test
@@ -53,14 +54,15 @@ struct DataCacheTests {
         )
 
         // Then
-        #expect(dataCache.memoryCapacity == self.memoryCapacity)
-        #expect(dataCache.diskCapacity == self.diskCapacity)
+        #expect(dataCache.memoryCapacity == globalMemoryCapacity)
+        #expect(dataCache.diskCapacity == globalDiskCapacity)
     }
 
     @Test
     func cache_whenSetCapacityDirectly_shouldBeValid() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         let memoryCapacity: UInt64 = 4 * 1_024 * 1_024
         let diskCapacity: UInt64 = 16 * 1_024 * 1_024
@@ -76,8 +78,9 @@ struct DataCacheTests {
 
     @Test
     func cache_whenSetCachedData() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
@@ -113,8 +116,9 @@ struct DataCacheTests {
 
     @Test
     func cache_whenLowMemory() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         dataCache.memoryCapacity = 1_024
 
@@ -148,8 +152,9 @@ struct DataCacheTests {
 
     @Test
     func cache_whenLowDisk() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         dataCache.diskCapacity = 1_024
 
@@ -183,8 +188,9 @@ struct DataCacheTests {
 
     @Test
     func cache_whenRemoveKey() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
@@ -228,8 +234,9 @@ struct DataCacheTests {
 
     @Test
     func cache_whenRemoveSince() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         let cachedDatas = (0 ..< 3) .map {
             mockCachedData(
@@ -257,8 +264,9 @@ struct DataCacheTests {
 
     @Test
     func cache_whenRemoveAll() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try #require(dataCache)
+        let dataCache = testState.dataCache
 
         let cachedDatas = (0 ..< 3) .map {
             mockCachedData(

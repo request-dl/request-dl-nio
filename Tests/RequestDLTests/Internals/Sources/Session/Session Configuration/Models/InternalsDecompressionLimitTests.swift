@@ -19,8 +19,9 @@ struct InternalsDecompressionLimitTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: NIOHTTPDecompression.DecompressionLimit.none)
+            String(describing: sut) == String(
+                describing: NIOHTTPDecompression.DecompressionLimit.none
+            )
         )
     }
 
@@ -34,8 +35,9 @@ struct InternalsDecompressionLimitTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: NIOHTTPDecompression.DecompressionLimit.size(128))
+            String(describing: sut) == String(
+                describing: NIOHTTPDecompression.DecompressionLimit.size(128)
+            )
         )
     }
 
@@ -49,8 +51,9 @@ struct InternalsDecompressionLimitTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: NIOHTTPDecompression.DecompressionLimit.ratio(1_024))
+            String(describing: sut) == String(
+                describing: NIOHTTPDecompression.DecompressionLimit.ratio(1_024)
+            )
         )
     }
 

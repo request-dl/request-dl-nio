@@ -8,36 +8,25 @@ import Testing
 
 struct InternalsDataStreamTests {
 
-    var stream: Internals.AsyncStream<Int>?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        stream = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        stream = nil
-    }
-
     @Test
     func stream_whenInit_shouldBeEmpty() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let values = SendableBox([Result<Int, Error>]())
-        let expectation = expectation(description: "empty_stream")
+        let expectation = AsyncSignal()
 
         // When
         listenToValues(
             values: values,
-            expectation: expectation
+            expectation: expectation,
+            stream: stream
         )
 
         stream.close()
 
         // Then
-        await _fulfillment(of: [expectation])
+        await expectation.wait()
 
         #expect(values().isEmpty)
     }
@@ -45,10 +34,10 @@ struct InternalsDataStreamTests {
     @Test
     func stream_whenAppendValues_shouldReceiveAll() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let values = SendableBox<[Result<Int, Error>]>([])
-        let expectation = expectation(description: "stream.values")
+        let expectation = AsyncSignal()
 
         // When
         stream.append(.success(0))
@@ -57,7 +46,8 @@ struct InternalsDataStreamTests {
 
         listenToValues(
             values: values,
-            expectation: expectation
+            expectation: expectation,
+            stream: stream
         )
 
         stream.append(.success(3))
@@ -67,50 +57,52 @@ struct InternalsDataStreamTests {
         stream.close()
 
         // Then
-        await _fulfillment(of: [expectation], timeout: 5)
+        await expectation.wait()
 
         #expect(
-            try values().compactMap { try $0.get() },
-            Array(0...5)
+            try values().compactMap { try $0.get() } == Array(0...5)
         )
     }
 
     @Test
     func stream_whenAppendErrorWithValues_shouldReceiveSome() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let values = SendableBox<[Result<Int, Error>]>([])
-        let expectation = expectation(description: "stream.values")
+        let expectation = AsyncSignal()
 
         // When
         stream.append(.success(0))
 
         listenToValues(
             values: values,
-            expectation: expectation
+            expectation: expectation,
+            stream: stream
         )
 
         stream.append(.failure(AnyError()))
         stream.append(.success(1))
 
         // Then
-        await _fulfillment(of: [expectation], timeout: 5)
+        await expectation.wait()
 
         let _values = values()
 
         #expect(_values.count == 2)
         #expect(try _values[0].get() == 0)
-        XCTAssertThrowsError(try _values[1].get())
+        #expect(throws: (any Error).self) {
+            try _values[1].get()
+        }
     }
 
     @Test
     func stream_whenAppendValuesAndClose_shouldReceiveSome() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let values = SendableBox<[Result<Int, Error>]>([])
-        let expectation = expectation(description: "stream.values")
+        let expectation = AsyncSignal()
 
         // When
         stream.append(.success(0))
@@ -118,14 +110,15 @@ struct InternalsDataStreamTests {
 
         listenToValues(
             values: values,
-            expectation: expectation
+            expectation: expectation,
+            stream: stream
         )
 
         stream.close()
         stream.append(.success(2))
 
         // Then
-        await _fulfillment(of: [expectation], timeout: 5)
+        await expectation.wait()
 
         let _values = values()
 
@@ -137,7 +130,7 @@ struct InternalsDataStreamTests {
     @Test
     func stream_whenAppendingValues_shouldAwaitSequence() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let range = 0..<3
 
@@ -160,7 +153,7 @@ struct InternalsDataStreamTests {
     @Test
     func stream_whenAppendError() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let error = AnyError()
         var receivedError: Error?
@@ -183,7 +176,7 @@ struct InternalsDataStreamTests {
     @Test
     func stream_whenCallingMultipleTimesClose() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         var values = [Int]()
 
@@ -203,7 +196,7 @@ struct InternalsDataStreamTests {
     @Test
     func stream_whenMultipleForEach() async throws {
         // Given
-        let stream = try #require(stream)
+        let stream = Internals.AsyncStream<Int>()
 
         let range = 0 ..< 100
 
@@ -211,15 +204,16 @@ struct InternalsDataStreamTests {
             SendableBox([Result<Int, Error>]())
         }
 
-        let expectations = range.map {
-            expectation(description: "task number #\($0)")
+        let expectations = range.map { _ in
+            AsyncSignal()
         }
 
         // When
         for index in range {
             listenToValues(
                 values: values[index],
-                expectation: expectations[index]
+                expectation: expectations[index],
+                stream: stream
             )
         }
 
@@ -237,7 +231,9 @@ struct InternalsDataStreamTests {
         stream.close()
 
         // Then
-        await _fulfillment(of: expectations)
+        for expectation in expectations {
+            await expectation.wait()
+        }
 
         for value in values {
             #expect(value().count == 10)
@@ -249,13 +245,9 @@ extension InternalsDataStreamTests {
 
     func listenToValues(
         values: SendableBox<[Result<Int, Error>]>,
-        expectation: XCTestExpectation
+        expectation: AsyncSignal,
+        stream: Internals.AsyncStream<Int>
     ) {
-        guard let stream else {
-            Issue.record("Found nil stream")
-            return
-        }
-
         _Concurrency.Task {
             do {
                 for try await value in stream {
@@ -269,7 +261,7 @@ extension InternalsDataStreamTests {
                 values(_values)
             }
 
-            expectation.fulfill()
+            expectation.signal()
         }
     }
 }

@@ -83,6 +83,6 @@ struct InternalsByteURLTests {
 
         // Then
         #expect(sut.count == 2)
-        #expect(sut, [url1 == url2])
+        #expect(sut == [url1, url2])
     }
 }

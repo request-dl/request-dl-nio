@@ -8,40 +8,37 @@ import Testing
 
 struct InternalsSessionTests {
 
-    var localServer: LocalServer?
-    var session: Internals.Session?
+    final class TestState: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
+        let localServer: LocalServer
+        let session: Internals.Session
 
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
+        init() async throws {
+            localServer = try await .init(.standard)
+            localServer.cleanup()
 
-        var configuration = Internals.Session.Configuration()
-        var secureConnection = Internals.SecureConnection()
+            var configuration = Internals.Session.Configuration()
+            var secureConnection = Internals.SecureConnection()
 
-        secureConnection.certificateVerification = .some(.none)
-        configuration.secureConnection = secureConnection
+            secureConnection.certificateVerification = .some(.none)
+            configuration.secureConnection = secureConnection
 
-        session = Internals.Session(
-            provider: .shared,
-            configuration: configuration
-        )
-    }
+            session = Internals.Session(
+                provider: .shared,
+                configuration: configuration
+            )
+        }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        localServer?.cleanup()
-        localServer = nil
-
-        session = nil
+        deinit {
+            localServer.cleanup()
+        }
     }
 
     @Test
     func session_whenPerformingGet_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let session = try #require(session)
+        let session = testState.session
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
@@ -65,8 +62,9 @@ struct InternalsSessionTests {
 
     @Test
     func session_whenPerformingPostUploadingData_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let session = try #require(session)
+        let session = testState.session
 
         let length = 1_023
         let data = Data.randomData(length: length)
@@ -88,8 +86,7 @@ struct InternalsSessionTests {
         // Then
         #expect(result.count == length + 1)
         #expect(
-            Array(result[0..<length]),
-            (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
+            Array(result[0..<length]) == (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
         )
 
         guard case .download? = result.last else {
@@ -100,8 +97,9 @@ struct InternalsSessionTests {
 
     @Test
     func session_whenPerformingPostEmptyData_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let session = try #require(session)
+        let session = testState.session
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
@@ -127,9 +125,10 @@ struct InternalsSessionTests {
     // swiftlint:disable function_body_length
     @Test
     func session_whenUploadingFile_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try #require(localServer)
-        let testingSession = try #require(session)
+        let localServer = testState.localServer
+        let testingSession = testState.session
 
         let certificates = Certificates().server()
         let message = "Hello World"
@@ -208,8 +207,7 @@ struct InternalsSessionTests {
         #expect(download != nil)
         #expect(download?.0.status.code == 200)
         #expect(
-            try (download?.1).map(HTTPResult<String>.init),
-            HTTPResult(
+            try (download?.1).map(HTTPResult<String>.init) == HTTPResult(
                 receivedBytes: length,
                 response: message
             )

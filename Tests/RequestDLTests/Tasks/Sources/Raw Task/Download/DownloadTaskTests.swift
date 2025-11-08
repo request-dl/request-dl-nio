@@ -8,24 +8,13 @@ import Testing
 
 struct DownloadTaskTests {
 
-    var localServer: LocalServer?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        localServer?.cleanup()
-        localServer = nil
-    }
-
     @Test
     func dataTask() async throws {
         // Given
-        let localServer = try #require(localServer)
+        let localServer = try await LocalServer(.standard)
+
+        localServer.cleanup()
+        defer { localServer.cleanup() }
 
         let certificate = Certificates().server()
         let output = "Hello World"

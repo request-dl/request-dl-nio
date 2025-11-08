@@ -9,22 +9,10 @@ import NIOCore
 
 struct InternalsRequestTests {
 
-    private var request: Internals.Request?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        request = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        request = nil
-    }
-
     @Test
     func request_whenInitURL_shouldBeEqual() async throws {
         // Given
-        var request = try #require(request)
+        var request = Internals.Request()
         let url = "https://google.com"
 
         // When
@@ -37,7 +25,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenMethodIsAssign_shouldBeEqual() async throws {
         // Given
-        var request = try #require(request)
+        var request = Internals.Request()
         let method = "POST"
 
         // When
@@ -50,7 +38,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenHeadersAreSet_shouldContainsValues() async throws {
         // Given
-        var request = try #require(request)
+        var request = Internals.Request()
 
         let key1 = "Content-Type"
         let value1 = "application/json"
@@ -71,7 +59,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenSetReadingMode() async throws {
         // Given
-        var request = try #require(request)
+        var request = Internals.Request()
         let readingMode = Internals.DownloadStep.ReadingMode.separator([70])
 
         // When
@@ -84,7 +72,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenUnsetReadingMode() async throws {
         // Given
-        var request = try #require(request)
+        var request = Internals.Request()
         // Then
         #expect(request.readingMode == .length(1_024))
     }

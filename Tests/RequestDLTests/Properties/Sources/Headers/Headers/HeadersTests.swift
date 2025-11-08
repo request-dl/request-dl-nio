@@ -94,15 +94,13 @@ struct HeadersTests {
 
         // Then
         #expect(
-            resolved.request.headers["Cache-Control"],
-            ["public,proxy-revalidate"]
+            resolved.request.headers["Cache-Control"] == ["public,proxy-revalidate"]
         )
 
         #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
 
         #expect(
-            resolved.request.headers["xxx-api-key"],
-            ["password", "password123"]
+            resolved.request.headers["xxx-api-key"] == ["password", "password123"]
         )
     }
 
@@ -129,15 +127,13 @@ struct HeadersTests {
 
         // Then
         #expect(
-            resolved.request.headers["Cache-Control"],
-            ["public,proxy-revalidate"]
+            resolved.request.headers["Cache-Control"] == ["public,proxy-revalidate"]
         )
 
         #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
 
         #expect(
-            resolved.request.headers["xxx-api-key"],
-            ["password", "password123"]
+            resolved.request.headers["xxx-api-key"] == ["password", "password123"]
         )
     }
 

@@ -18,8 +18,7 @@ struct AuthorizationTests {
 
         // Then
         #expect(
-            resolved.request.headers["Authorization"],
-            ["Bearer myToken"]
+            resolved.request.headers["Authorization"] == ["Bearer myToken"]
         )
     }
 
@@ -33,8 +32,7 @@ struct AuthorizationTests {
 
         // Then
         #expect(
-            resolved.request.headers["Authorization"],
-            ["Bearer 123"]
+            resolved.request.headers["Authorization"] == ["Bearer 123"]
         )
     }
 
@@ -47,8 +45,7 @@ struct AuthorizationTests {
 
         // Then
         #expect(
-            resolved.request.headers["Authorization"],
-            ["Basic bXlVc2VyOm15UGFzc3dvcmQ="]
+            resolved.request.headers["Authorization"] == ["Basic bXlVc2VyOm15UGFzc3dvcmQ="]
         )
     }
 

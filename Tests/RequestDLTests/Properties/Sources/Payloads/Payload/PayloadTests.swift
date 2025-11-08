@@ -30,16 +30,14 @@ struct PayloadTests {
 
         // When
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/json"]
+            resolved.request.headers["Content-Type"] == ["application/json"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
-        #expect(data == try JSONSerialization.data(
+        #expect(try data == JSONSerialization.data(
             withJSONObject: json,
             options: .sortedKeys
         ))
@@ -66,16 +64,14 @@ struct PayloadTests {
 
         // When
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/json"]
+            resolved.request.headers["Content-Type"] == ["application/json"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
-        #expect(data == try JSONSerialization.data(
+        #expect(try data == JSONSerialization.data(
             withJSONObject: json,
             options: .sortedKeys
         ))
@@ -100,16 +96,14 @@ struct PayloadTests {
 
         // When
         #expect(
-            resolved.request.headers["Content-Type"],
-            [String(customType)]
+            resolved.request.headers["Content-Type"] == [String(customType)]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
-        #expect(data == try JSONSerialization.data(
+        #expect(try data == JSONSerialization.data(
             withJSONObject: json,
             options: .sortedKeys
         ))
@@ -141,20 +135,17 @@ struct PayloadTests {
 
         // When
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/json"]
+            resolved.request.headers["Content-Type"] == ["application/json"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
         #expect(
             try data.map {
                 try decoder.decode(PayloadMock.self, from: $0)
-            },
-            mock
+            } == mock
         )
     }
 
@@ -187,20 +178,17 @@ struct PayloadTests {
 
         // When
         #expect(
-            resolved.request.headers["Content-Type"],
-            [String(customType)]
+            resolved.request.headers["Content-Type"] == [String(customType)]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
         #expect(
             try data.map {
                 try decoder.decode(PayloadMock.self, from: $0)
-            },
-            mock
+            } == mock
         )
     }
 
@@ -224,23 +212,19 @@ struct PayloadTests {
 
         // Then
         #expect(
-            resolved1.request.headers["Content-Type"],
-            ["text/plain; charset=UTF-8"]
+            resolved1.request.headers["Content-Type"] == ["text/plain; charset=UTF-8"]
         )
 
         #expect(
-            resolved1.request.headers["Content-Length"],
-            (data1?.count).map { [String($0)] }
+            resolved1.request.headers["Content-Length"] == (data1?.count).map { [String($0)] }
         )
 
         #expect(
-            resolved2.request.headers["Content-Type"],
-            ["text/plain; charset=UTF-16"]
+            resolved2.request.headers["Content-Type"] == ["text/plain; charset=UTF-16"]
         )
 
         #expect(
-            resolved2.request.headers["Content-Length"],
-            (data2?.count).map { [String($0)] }
+            resolved2.request.headers["Content-Length"] == (data2?.count).map { [String($0)] }
         )
 
         #expect(data1 == verbatim.data(using: .utf8))
@@ -274,23 +258,19 @@ struct PayloadTests {
 
         // Then
         #expect(
-            resolved1.request.headers["Content-Type"],
-            ["text/plain+request-dl; charset=UTF-8"]
+            resolved1.request.headers["Content-Type"] == ["text/plain+request-dl; charset=UTF-8"]
         )
 
         #expect(
-            resolved1.request.headers["Content-Length"],
-            (data1?.count).map { [String($0)] }
+            resolved1.request.headers["Content-Length"] == (data1?.count).map { [String($0)] }
         )
 
         #expect(
-            resolved2.request.headers["Content-Type"],
-            ["text/plain+request-dl; charset=UTF-16"]
+            resolved2.request.headers["Content-Type"] == ["text/plain+request-dl; charset=UTF-16"]
         )
 
         #expect(
-            resolved2.request.headers["Content-Length"],
-            (data2?.count).map { [String($0)] }
+            resolved2.request.headers["Content-Length"] == (data2?.count).map { [String($0)] }
         )
 
         #expect(data1 == verbatim.data(using: .utf8))
@@ -311,13 +291,11 @@ struct PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/octet-stream"]
+            resolved.request.headers["Content-Type"] == ["application/octet-stream"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [String(data.count)]
         )
 
         #expect(builtData == data)
@@ -341,13 +319,11 @@ struct PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            [String(contentType)]
+            resolved.request.headers["Content-Type"] == [String(contentType)]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [String(data.count)]
         )
 
         #expect(builtData == data)
@@ -379,13 +355,11 @@ struct PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/octet-stream"]
+            resolved.request.headers["Content-Type"] == ["application/octet-stream"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [String(data.count)]
         )
 
         #expect(builtData == data)
@@ -418,13 +392,11 @@ struct PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            [String(contentType)]
+            resolved.request.headers["Content-Type"] == [String(contentType)]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [String(data.count)]
         )
 
         #expect(builtData == data)
@@ -471,8 +443,7 @@ extension PayloadTests {
         #expect(resolved.request.headers["Content-Length"] == nil)
 
         #expect(
-            Set(resolved.request.queries),
-            try Set(json.reduce([]) {
+            try Set(resolved.request.queries) == Set(json.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
                     $0.build()
                 }
@@ -511,18 +482,15 @@ extension PayloadTests {
         #expect(resolved.request.queries.isEmpty)
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/x-www-form-urlencoded; charset=UTF-16"]
+            resolved.request.headers["Content-Type"] == ["application/x-www-form-urlencoded; charset=UTF-16"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
         #expect(
-            Set(components),
-            try Set(json.reduce([]) {
+            try Set(components) == Set(json.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
                     let query = $0.build()
                     return "\(query.name)=\(query.value)"
@@ -564,8 +532,7 @@ extension PayloadTests {
         #expect(resolved.request.headers["Content-Length"] == nil)
 
         #expect(
-            Set(resolved.request.queries),
-            try Set(json?.reduce([]) {
+            try Set(resolved.request.queries) == Set(json?.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
                     $0.build()
                 }
@@ -612,18 +579,15 @@ extension PayloadTests {
         #expect(resolved.request.queries.isEmpty)
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/x-www-form-urlencoded; charset=UTF-16"]
+            resolved.request.headers["Content-Type"] == ["application/x-www-form-urlencoded; charset=UTF-16"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            (data?.count).map { [String($0)] }
+            resolved.request.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
         #expect(
-            Set(components),
-            try Set(json?.reduce([]) {
+            try Set(components) == Set(json?.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
                     let query = $0.build()
                     return "\(query.name)=\(query.value)"
@@ -651,13 +615,11 @@ extension PayloadTests {
 
         // When
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/x-www-form-urlencoded"]
+            resolved.request.headers["Content-Type"] == ["application/x-www-form-urlencoded"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [String(data.count)]
         )
 
         #expect(resolvedData == data)
@@ -686,20 +648,17 @@ extension PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/octet-stream"]
+            resolved.request.headers["Content-Type"] == ["application/octet-stream"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [String(data.count)]
         )
 
         let totalBytes = data.count
 
         #expect(
-            buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: data.count, by: chunkSize).map {
+            buffers.compactMap { $0.getData() } == stride(from: .zero, to: data.count, by: chunkSize).map {
                 let upperBound = $0 + chunkSize
                 return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }
@@ -739,8 +698,7 @@ extension PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/octet-stream"]
+            resolved.request.headers["Content-Type"] == ["application/octet-stream"]
         )
 
         #expect(resolved.request.headers["Content-Length"] == nil)
@@ -751,7 +709,6 @@ extension PayloadTests {
 
 // MARK: - Deprecated
 
-@available(*, deprecated)
 extension PayloadTests {
 
     @Test
@@ -770,20 +727,19 @@ extension PayloadTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/octet-stream"]
+            resolved.request.headers["Content-Type"] == ["application/octet-stream"]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"],
-            [String(data.count)]
+            resolved.request.headers["Content-Length"] == [
+                String(data.count)
+            ]
         )
 
         let totalBytes = data.count
 
         #expect(
-            buffers.compactMap { $0.getData() },
-            stride(from: .zero, to: data.count, by: chunkSize).map {
+            buffers.compactMap { $0.getData() } == stride(from: .zero, to: data.count, by: chunkSize).map {
                 let upperBound = $0 + chunkSize
                 return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
             }

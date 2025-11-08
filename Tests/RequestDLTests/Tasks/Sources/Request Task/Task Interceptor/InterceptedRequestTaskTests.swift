@@ -20,7 +20,7 @@ struct InterceptedRequestTaskTests {
     @Test
     func interceptor() async throws {
         // Given
-        let expectation = expectation(description: "Interceptor callback")
+        let expectation = AsyncSignal()
         let taskIntercepted = SendableBox(false)
 
         // When
@@ -29,12 +29,12 @@ struct InterceptedRequestTaskTests {
         }
         .interceptor(Intercepted {
             taskIntercepted(true)
-            expectation.fulfill()
+            expectation.signal()
         })
         .result()
 
         // Then
-        await _fulfillment(of: [expectation], timeout: 3)
+        await expectation.wait()
         #expect(taskIntercepted())
     }
 }

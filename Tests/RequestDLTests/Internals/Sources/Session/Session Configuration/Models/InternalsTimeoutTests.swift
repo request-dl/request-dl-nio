@@ -19,8 +19,9 @@ struct InternalsTimeoutTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.disallow)
+            String(describing: sut) == String(
+                describing: HTTPClient.Configuration.RedirectConfiguration.disallow
+            )
         )
     }
 
@@ -34,8 +35,9 @@ struct InternalsTimeoutTests {
 
         // Then
         #expect(
-            String(describing: sut),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 1_024, allowCycles: true))
+            String(describing: sut) == String(
+                describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
+            )
         )
     }
 

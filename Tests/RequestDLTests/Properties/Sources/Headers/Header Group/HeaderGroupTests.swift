@@ -27,23 +27,19 @@ struct HeaderGroupTests {
         let resolved = try await resolve(property)
 
         #expect(
-            resolved.request.headers["Content-Type"],
-            ["application/json"]
+            resolved.request.headers["Content-Type"] == ["application/json"]
         )
 
         #expect(
-            resolved.request.headers["Accept"],
-            ["text/html"]
+            resolved.request.headers["Accept"] == ["text/html"]
         )
 
         #expect(
-            resolved.request.headers["Origin"],
-            ["127.0.0.1:8080"]
+            resolved.request.headers["Origin"] == ["127.0.0.1:8080"]
         )
 
         #expect(
-            resolved.request.headers["xxx-api-key"],
-            ["password"]
+            resolved.request.headers["xxx-api-key"] == ["password"]
         )
     }
 
@@ -60,23 +56,19 @@ struct HeaderGroupTests {
         let resolved = try await resolve(property)
 
         #expect(
-            resolved.request.headers["Cache-Control"],
-            ["public"]
+            resolved.request.headers["Cache-Control"] == ["public"]
         )
 
         #expect(
-            resolved.request.headers["Accept"],
-            ["application/json"]
+            resolved.request.headers["Accept"] == ["application/json"]
         )
 
         #expect(
-            resolved.request.headers["Origin"],
-            ["127.0.0.1:8080"]
+            resolved.request.headers["Origin"] == ["127.0.0.1:8080"]
         )
 
         #expect(
-            resolved.request.headers["xxx-api-key"],
-            ["password"]
+            resolved.request.headers["xxx-api-key"] == ["password"]
         )
     }
 
@@ -102,8 +94,7 @@ struct HeaderGroupTests {
 
         // Then
         #expect(
-            resolved.request.headers["Accept"],
-            contentTypes.map { String($0) }
+            resolved.request.headers["Accept"] == contentTypes.map { String($0) }
         )
     }
 
@@ -130,8 +121,7 @@ struct HeaderGroupTests {
 
         // Then
         #expect(
-            resolved.request.headers["Accept"],
-            contentTypes.last.map { [String($0)] } ?? []
+            resolved.request.headers["Accept"] == contentTypes.last.map { [String($0)] } ?? []
         )
     }
 

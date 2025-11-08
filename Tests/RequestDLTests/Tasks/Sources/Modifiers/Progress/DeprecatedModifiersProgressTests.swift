@@ -80,38 +80,33 @@ struct DeprecatedModifiersProgressTests {
         }
     }
 
-    var localServer: LocalServer?
-    var uploadMonitor: UploadProgressMonitor?
-    var downloadMonitor: DownloadProgressMonitor?
-    var progressMonitor: ProgressMonitor?
+    final class TestState: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
+        let localServer: LocalServer
+        let uploadMonitor: UploadProgressMonitor
+        let downloadMonitor: DownloadProgressMonitor
+        let progressMonitor: ProgressMonitor
 
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
+        init() async throws {
+            localServer = try await .init(.standard)
+            localServer.cleanup()
 
-        uploadMonitor = .init()
-        downloadMonitor = .init()
-        progressMonitor = .init()
-    }
+            uploadMonitor = .init()
+            downloadMonitor = .init()
+            progressMonitor = .init()
+        }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        localServer?.cleanup()
-        localServer = nil
-
-        uploadMonitor = nil
-        downloadMonitor = nil
-        progressMonitor = nil
+        deinit {
+            localServer.cleanup()
+        }
     }
 
     @Test
     func deprecatedProgress_whenUploadStep_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try #require(localServer)
-        let uploadMonitor = try #require(uploadMonitor)
+        let localServer = testState.localServer
+        let uploadMonitor = testState.uploadMonitor
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -151,9 +146,10 @@ struct DeprecatedModifiersProgressTests {
 
     @Test
     func deprecatedProgress_whenDownloadStep_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try #require(localServer)
-        let downloadMonitor = try #require(downloadMonitor)
+        let localServer = testState.localServer
+        let downloadMonitor = testState.downloadMonitor
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -199,8 +195,7 @@ struct DeprecatedModifiersProgressTests {
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
             #expect(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
@@ -209,9 +204,10 @@ struct DeprecatedModifiersProgressTests {
 
     @Test
     func deprecatedProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try #require(localServer)
-        let downloadMonitor = try #require(downloadMonitor)
+        let localServer = testState.localServer
+        let downloadMonitor = testState.downloadMonitor
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -263,8 +259,7 @@ struct DeprecatedModifiersProgressTests {
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
             #expect(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
@@ -273,9 +268,10 @@ struct DeprecatedModifiersProgressTests {
 
     @Test
     func progress_whenCompleteProgress_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try #require(localServer)
-        let progressMonitor = try #require(progressMonitor)
+        let localServer = testState.localServer
+        let progressMonitor = testState.progressMonitor
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -323,8 +319,7 @@ struct DeprecatedModifiersProgressTests {
         let completeParts = progressMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
             #expect(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 

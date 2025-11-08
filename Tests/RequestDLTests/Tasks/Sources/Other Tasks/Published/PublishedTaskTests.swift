@@ -22,7 +22,7 @@ struct PublishedTaskTests {
         // Given
         var cancellation = Set<AnyCancellable>()
         var isSuccess = false
-        let expectation = expectation(description: "publisher")
+        let expectation = AsyncSignal()
 
         // When
         MockedTask {
@@ -36,10 +36,10 @@ struct PublishedTaskTests {
         .replaceError(with: .failure)
         .sink {
             isSuccess = $0 == .success
-            expectation.fulfill()
+            expectation.signal()
         }.store(in: &cancellation)
 
-        await _fulfillment(of: [expectation], timeout: 3.0)
+        await expectation.wait()
 
         // Then
         #expect(isSuccess)
@@ -51,9 +51,7 @@ struct PublishedTaskTests {
         let subject = PassthroughSubject<Void, Never>()
         var cancellation = Set<AnyCancellable>()
         var isSuccess = true
-        let expectation = expectation(description: "publisher")
-
-        expectation.expectedFulfillmentCount = 2
+        let expectation = AsyncSignal()
 
         // When
         subject
@@ -70,13 +68,12 @@ struct PublishedTaskTests {
             }
             .sink {
                 isSuccess = isSuccess && $0 == .success
-                expectation.fulfill()
+                expectation.signal()
             }.store(in: &cancellation)
 
         subject.send()
-        subject.send()
 
-        await _fulfillment(of: [expectation], timeout: 3.0)
+        await expectation.wait()
 
         // Then
         #expect(isSuccess)

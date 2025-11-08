@@ -70,7 +70,7 @@ struct SecureConnectionTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.signingSignatureAlgorithms, [algorithm1 == algorithm2].map {
+        #expect(sut?.signingSignatureAlgorithms == [algorithm1, algorithm2].map {
             $0.build()
         })
     }
@@ -90,7 +90,7 @@ struct SecureConnectionTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.verifySignatureAlgorithms, [algorithm1 == algorithm2].map {
+        #expect(sut?.verifySignatureAlgorithms == [algorithm1, algorithm2].map {
             $0.build()
         })
     }
@@ -161,7 +161,7 @@ struct SecureConnectionTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.applicationProtocols, [protocol1 == protocol2])
+        #expect(sut?.applicationProtocols == [protocol1, protocol2])
     }
 
     @Test
@@ -270,7 +270,7 @@ struct SecureConnectionTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.cipherSuites, [suite1 == suite2].joined(separator: ":"))
+        #expect(sut?.cipherSuites == [suite1, suite2].joined(separator: ":"))
     }
 
     @Test
@@ -288,7 +288,7 @@ struct SecureConnectionTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.cipherSuiteValues, [suite1 == suite2].map {
+        #expect(sut?.cipherSuiteValues == [suite1, suite2].map {
             $0.build()
         })
     }

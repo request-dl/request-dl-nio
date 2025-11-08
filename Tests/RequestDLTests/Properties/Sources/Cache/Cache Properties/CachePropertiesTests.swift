@@ -6,16 +6,17 @@ import Foundation
 import Testing
 @testable import RequestDL
 
+@Suite(.serialized)
 struct CachePropertiesTests {
 
-    override func tearDown() async throws {
-        try await super.tearDown()
+    func resetCapacity() {
         DataCache.shared.memoryCapacity = .zero
         DataCache.shared.diskCapacity = .zero
     }
 
     @Test
     func cache_whenCacheSharedWithoutCapacity() async throws {
+        defer { resetCapacity() }
         // When
         let resolved = try await resolve(TestProperty {
             EmptyProperty()
@@ -28,6 +29,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenCacheSharedWithCapacity() async throws {
+        defer { resetCapacity() }
         // Given
         let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
         let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
@@ -53,6 +55,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenCacheSuiteNameWithoutCapacity() async throws {
+        defer { resetCapacity() }
         // Given
         let suiteName = "hello_world"
 
@@ -68,6 +71,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenCacheSuiteNameWithCapacity() async throws {
+        defer { resetCapacity() }
         // Given
         let suiteName = "hello_world"
         let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
@@ -97,6 +101,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenCacheURLWithoutCapacity() async throws {
+        defer { resetCapacity() }
         // Given
         let url = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -115,6 +120,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenCacheURLWithCapacity() async throws {
+        defer { resetCapacity() }
         // Given
         let url = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -148,6 +154,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenMemoryCachePolicy() async throws {
+        defer { resetCapacity() }
         // Given
         let policy = DataCache.Policy.Set.memory
 
@@ -163,6 +170,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenDiskCachePolicy() async throws {
+        defer { resetCapacity() }
         // Given
         let policy = DataCache.Policy.Set.disk
 
@@ -178,6 +186,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenAllCachePolicy() async throws {
+        defer { resetCapacity() }
         // Given
         let policy = DataCache.Policy.Set.all
 
@@ -193,6 +202,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenIgnoreCachedDataStrategy() async throws {
+        defer { resetCapacity() }
         // Given
         let cacheStrategy = CacheStrategy.ignoreCachedData
 
@@ -208,6 +218,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenReloadAndValidateCachedDataStrategy() async throws {
+        defer { resetCapacity() }
         // Given
         let cacheStrategy = CacheStrategy.reloadAndValidateCachedData
 
@@ -223,6 +234,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenReturnCachedDataElseLoadStrategy() async throws {
+        defer { resetCapacity() }
         // Given
         let cacheStrategy = CacheStrategy.returnCachedDataElseLoad
 
@@ -238,6 +250,7 @@ struct CachePropertiesTests {
 
     @Test
     func cache_whenUseCachedDataOnlyStrategy() async throws {
+        defer { resetCapacity() }
         // Given
         let cacheStrategy = CacheStrategy.useCachedDataOnly
 

@@ -27,7 +27,7 @@ struct PSKIdentityTests {
                         key: key,
                         identity: identity,
                         received: {
-                            #expect($0, context)
+                            #expect($0 == context)
                         }
                     )
                 )

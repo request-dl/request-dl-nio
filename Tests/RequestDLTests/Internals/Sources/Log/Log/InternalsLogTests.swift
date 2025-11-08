@@ -18,19 +18,19 @@ struct InternalsLogTests {
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = expectation(description: "print")
+        let expecting = AsyncSignal()
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
 
         Internals.Override.Print.replace {
             payload(($0, $1, $2))
-            expecting.fulfill()
+            expecting.signal()
         }
 
         Internals.Log.debug(message1, message2, line: line, file: file)
 
         // Then
-        await _fulfillment(of: [expecting])
+        await expecting.wait()
 
         #expect(payload()?.0 == " ")
         #expect(payload()?.1 == "\n")
@@ -46,12 +46,12 @@ struct InternalsLogTests {
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = expectation(description: "print")
+        let expecting = AsyncSignal()
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
         Internals.Override.Print.replace {
             payload(($0, $1, $2))
-            expecting.fulfill()
+            expecting.signal()
         }
 
         defer { Internals.Override.Print.restore() }
@@ -59,7 +59,7 @@ struct InternalsLogTests {
         Internals.Log.warning(message1, message2, line: line, file: file)
 
         // Then
-        await _fulfillment(of: [expecting])
+        await expecting.wait()
 
         #expect(payload()?.0 == " ")
         #expect(payload()?.1 == "\n")
@@ -75,12 +75,12 @@ struct InternalsLogTests {
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = expectation(description: "print")
+        let expecting = AsyncSignal()
 
         let payload = SendableBox<(String, StaticString, UInt)?>(nil)
         Internals.Override.FatalError.replace {
             payload(($0, $1, $2))
-            expecting.fulfill()
+            expecting.signal()
             Thread.exit()
             return Swift.fatalError()
         }
@@ -92,10 +92,10 @@ struct InternalsLogTests {
         }
 
         // Then
-        await _fulfillment(of: [expecting])
+        await expecting.wait()
 
-        #expect(payload()?.0, failureOutput(message1 == message2))
-        #expect((payload()?.1).map { "\($0)" }, "\(file)")
+        #expect(payload()?.0 == failureOutput(message1, message2))
+        #expect((payload()?.1).map { "\($0)" } == "\(file)")
         #expect(payload()?.2 == line)
     }
 }

@@ -25,8 +25,7 @@ struct InternalsBodyTests {
         #expect(body.totalSize == string.count)
 
         #expect(
-            buffers.resolveData(),
-            Array(string.utf8).split(by: 1)
+            buffers.resolveData() == Array(string.utf8).split(by: 1)
         )
     }
 
@@ -47,8 +46,7 @@ struct InternalsBodyTests {
         #expect(body.totalSize == string.count)
 
         #expect(
-            buffers.resolveData(),
-            [Data(string.utf8)]
+            buffers.resolveData() == [Data(string.utf8)]
         )
     }
 
@@ -69,8 +67,7 @@ struct InternalsBodyTests {
         #expect(body.totalSize == string.count)
 
         #expect(
-            buffers.resolveData(),
-            []
+            buffers.resolveData() == []
         )
     }
 
@@ -87,8 +84,7 @@ struct InternalsBodyTests {
         #expect(body.totalSize == .zero)
 
         #expect(
-            buffers.resolveData(),
-            []
+            buffers.resolveData() == []
         )
     }
 }
