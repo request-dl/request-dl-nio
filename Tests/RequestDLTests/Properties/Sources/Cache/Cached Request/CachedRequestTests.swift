@@ -6,7 +6,7 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-@Suite(.localDataCache(.autogenerate))
+@Suite(.localDataCache(.autogenerate), .serialized)
 struct CachedRequestTests {
 
     final class TestState: Sendable {

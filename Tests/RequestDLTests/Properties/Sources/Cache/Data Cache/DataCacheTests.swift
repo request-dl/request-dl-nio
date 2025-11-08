@@ -9,29 +9,25 @@ import Testing
 private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
 
-@Suite(.localDataCache)
+@Suite(.localDataCache(.autogenerate))
 struct DataCacheTests {
 
     final class TestState: Sendable {
 
-        let suiteName = UUID().uuidString
-        let globalDataCache: DataCache
         let dataCache: DataCache
 
         init() {
-            globalDataCache = DataCache(suiteName: suiteName)
-
             dataCache = .init(
                 memoryCapacity: globalMemoryCapacity,
                 diskCapacity: globalDiskCapacity,
-                suiteName: suiteName
+                url: DataCache.shared.directoryURL
             )
         }
 
         deinit {
             dataCache.removeAll()
-            globalDataCache.memoryCapacity = .zero
-            globalDataCache.diskCapacity = .zero
+            DataCache.shared.memoryCapacity = .zero
+            DataCache.shared.diskCapacity = .zero
         }
     }
 
@@ -58,7 +54,7 @@ struct DataCacheTests {
         let dataCache = DataCache(
             memoryCapacity: memoryCapacity,
             diskCapacity: diskCapacity,
-            suiteName: testState.suiteName
+            url: DataCache.shared.directoryURL
         )
 
         // Then
