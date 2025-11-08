@@ -43,6 +43,7 @@ import Foundation
 
  ### The task environment **(Alpha)**
 
+ - ``RequestDL/TaskEnvironment``
  - ``RequestDL/TaskEnvironmentKey``
  - ``RequestDL/TaskEnvironmentValues``
  - ``RequestDL/Modifiers/Environment``

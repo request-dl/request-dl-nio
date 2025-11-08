@@ -200,6 +200,10 @@ Learn more in:
 
 - ``RequestDL/Session``
 
+### Adding Proxy
+
+- ``RequestDL/Proxy``
+
 ### Adding request timeout
 
 - ``RequestDL/Timeout``
