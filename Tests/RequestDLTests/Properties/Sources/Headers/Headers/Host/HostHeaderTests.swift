@@ -2,24 +2,28 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class HostHeaderTests: XCTestCase {
+struct HostHeaderTests {
 
-    func testHost() async throws {
+    @Test
+    func host() async throws {
         let property = TestProperty(HostHeader("google.com"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Host"], ["google.com"])
+        #expect(resolved.request.headers["Host"] == ["google.com"])
     }
 
-    func testHostWithPort() async throws {
+    @Test
+    func hostWithPort() async throws {
         let property = TestProperty(HostHeader("google.com", port: "8080"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Host"], ["google.com:8080"])
+        #expect(resolved.request.headers["Host"] == ["google.com:8080"])
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = HostHeader("apple.com")
 

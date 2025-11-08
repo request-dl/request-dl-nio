@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsBodyTests: XCTestCase {
+struct InternalsBodyTests {
 
-    func testRequestBody_whenFragmentByOne_shouldContainsAllCharacters() async throws {
+    @Test
+    func requestBody_whenFragmentByOne_shouldContainsAllCharacters() async throws {
         // Given
         let string = "Hello World"
 
@@ -19,16 +21,17 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
-        XCTAssertEqual(body.chunkSize, 1)
-        XCTAssertEqual(body.totalSize, string.count)
+        #expect(body.chunkSize == 1)
+        #expect(body.totalSize == string.count)
 
-        XCTAssertEqual(
+        #expect(
             buffers.resolveData(),
             Array(string.utf8).split(by: 1)
         )
     }
 
-    func testRequestBody_whenSizeIsSpecified_shouldContainsString() async throws {
+    @Test
+    func requestBody_whenSizeIsSpecified_shouldContainsString() async throws {
         // Given
         let string = "Hello World"
 
@@ -40,16 +43,17 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
-        XCTAssertEqual(body.chunkSize, string.count)
-        XCTAssertEqual(body.totalSize, string.count)
+        #expect(body.chunkSize == string.count)
+        #expect(body.totalSize == string.count)
 
-        XCTAssertEqual(
+        #expect(
             buffers.resolveData(),
             [Data(string.utf8)]
         )
     }
 
-    func testRequestBody_whenDataIsEmpty() async throws {
+    @Test
+    func requestBody_whenDataIsEmpty() async throws {
         // Given
         let string = ""
 
@@ -61,16 +65,17 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
-        XCTAssertEqual(body.chunkSize, .zero)
-        XCTAssertEqual(body.totalSize, string.count)
+        #expect(body.chunkSize == .zero)
+        #expect(body.totalSize == string.count)
 
-        XCTAssertEqual(
+        #expect(
             buffers.resolveData(),
             []
         )
     }
 
-    func testRequestBody_whenEmptyBuffer() async throws {
+    @Test
+    func requestBody_whenEmptyBuffer() async throws {
         // Given
         let body = Internals.Body(buffers: [])
 
@@ -78,10 +83,10 @@ class InternalsBodyTests: XCTestCase {
         let buffers = try await body.buffers()
 
         // Then
-        XCTAssertEqual(body.chunkSize, .zero)
-        XCTAssertEqual(body.totalSize, .zero)
+        #expect(body.chunkSize == .zero)
+        #expect(body.totalSize == .zero)
 
-        XCTAssertEqual(
+        #expect(
             buffers.resolveData(),
             []
         )

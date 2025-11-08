@@ -2,29 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersCollectBytesTests: XCTestCase {
+struct ModifiersCollectBytesTests {
 
-    var localServer: LocalServer?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        localServer?.cleanup()
-        localServer = nil
-    }
-
-    func testCollect_whenUploadStep_shouldBeValid() async throws {
+    @Test
+    func collect_whenUploadStep_shouldBeValid() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        
+        let localServer = try await LocalServer(.standard)
+        defer { localServer.cleanup() }
+
         let resource = Certificates().server()
         let message = "Hello World"
 
@@ -58,6 +47,6 @@ class ModifiersCollectBytesTests: XCTestCase {
         let data = try await Data(Array(bytes).joined())
 
         // Then
-        XCTAssertEqual(try HTTPResult(data).response, message)
+        #expect(try HTTPResult(data).response == message)
     }
 }

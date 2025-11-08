@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class AbstractKeyPathTests: XCTestCase {
+struct AbstractKeyPathTests {
 
-    func testKeyPath() async throws {
+    @Test
+    func keyPath() async throws {
         // Given
         func getValue(_ keyPath: KeyPath<AbstractKeyPath, String>) -> String {
             AbstractKeyPath()[keyPath: keyPath]
@@ -17,6 +19,6 @@ class AbstractKeyPathTests: XCTestCase {
         let keyPath = getValue(\.results)
 
         // Then
-        XCTAssertEqual(keyPath, "results")
+        #expect(keyPath == "results")
     }
 }

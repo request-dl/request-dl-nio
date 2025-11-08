@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class TaskResultTests: XCTestCase {
+struct TaskResultTests {
 
-    func testResult() async throws {
+    @Test
+    func result() async throws {
         // Given
         let head = ResponseHead(
             url: nil,
@@ -23,7 +25,7 @@ class TaskResultTests: XCTestCase {
         let result = TaskResult(head: head, payload: data)
 
         // Then
-        XCTAssertEqual(result.head, head)
-        XCTAssertEqual(result.payload, data)
+        #expect(result.head == head)
+        #expect(result.payload == data)
     }
 }

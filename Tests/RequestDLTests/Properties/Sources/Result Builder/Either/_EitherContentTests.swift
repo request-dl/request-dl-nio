@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class _EitherContentTests: XCTestCase {
+struct _EitherContentTests {
 
-    func testConditionalFirstBuilder() async throws {
+    @Test
+    func conditionalFirstBuilder() async throws {
         // Given
         let chooseFirst = true
 
@@ -24,12 +26,13 @@ class _EitherContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _EitherContent<BaseURL, OriginHeader>)
-        XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertTrue(resolved.request.headers.isEmpty)
+        #expect(result is _EitherContent<BaseURL, OriginHeader>)
+        #expect(resolved.request.url == "https://google.com")
+        #expect(resolved.request.headers.isEmpty)
     }
 
-    func testConditionalSecondBuilder() async throws {
+    @Test
+    func conditionalSecondBuilder() async throws {
         // Given
         let chooseFirst = false
 
@@ -46,12 +49,13 @@ class _EitherContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _EitherContent<OriginHeader, BaseURL>)
-        XCTAssertEqual(resolved.request.url, "https://127.0.0.1")
-        XCTAssertTrue(resolved.request.headers.isEmpty)
+        #expect(result is _EitherContent<OriginHeader, BaseURL>)
+        #expect(resolved.request.url == "https://127.0.0.1")
+        #expect(resolved.request.headers.isEmpty)
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = _EitherContent<EmptyProperty, EmptyProperty>(first: .init())
 

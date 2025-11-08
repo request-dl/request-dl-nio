@@ -2,15 +2,17 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 // swiftlint:disable file_length type_body_length function_body_length
-class FormTests: XCTestCase {
+struct FormTests {
 
     // MARK: - Init with Data
 
-    func testForm_whenInitData() async throws {
+    @Test
+    func form_whenInitData() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 1_024)
@@ -27,17 +29,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -49,7 +51,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitDataWithFilename() async throws {
+    @Test
+    func form_whenInitDataWithFilename() async throws {
         // Given
         let name = "foo"
         let filename = "bar.raw"
@@ -68,17 +71,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
@@ -90,7 +93,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitDataWithHeaders() async throws {
+    @Test
+    func form_whenInitDataWithHeaders() async throws {
         // Given
         let name = "foo"
         let filename = "bar.raw"
@@ -118,17 +122,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
@@ -142,7 +146,8 @@ class FormTests: XCTestCase {
 
     // MARK: - Init with URL
 
-    func testForm_whenInitURL() async throws {
+    @Test
+    func form_whenInitURL() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 1_024)
@@ -169,17 +174,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(url.lastPathComponent)\""),
@@ -191,7 +196,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitURLWithFilename() async throws {
+    @Test
+    func form_whenInitURLWithFilename() async throws {
         // Given
         let name = "foo"
         let filename = "bar.raw"
@@ -220,17 +226,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
@@ -243,7 +249,8 @@ class FormTests: XCTestCase {
 
     }
 
-    func testForm_whenInitURLWithHeaders() async throws {
+    @Test
+    func form_whenInitURLWithHeaders() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 1_024)
@@ -279,17 +286,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(url.lastPathComponent)\""),
@@ -303,7 +310,8 @@ class FormTests: XCTestCase {
 
     // MARK: - Init with String
 
-    func testForm_whenInitString() async throws {
+    @Test
+    func form_whenInitString() async throws {
         // Given
         let name = "foo"
         let verbatim = "Hello world!"
@@ -320,17 +328,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -342,7 +350,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitStringCharsetUTF16() async throws {
+    @Test
+    func form_whenInitStringCharsetUTF16() async throws {
         // Given
         let name = "foo"
         let verbatim = "Hello world!"
@@ -362,19 +371,19 @@ class FormTests: XCTestCase {
         let data = verbatim.data(using: .utf16) ?? Data()
 
         // Then
-        XCTAssertNotEqual(data.count, .zero)
+        #expect(data.count != .zero)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -386,7 +395,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitStringWithFilename() async throws {
+    @Test
+    func form_whenInitStringWithFilename() async throws {
         // Given
         let name = "foo"
         let filename = "bar"
@@ -405,17 +415,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
@@ -427,7 +437,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitStringWithHeaders() async throws {
+    @Test
+    func form_whenInitStringWithHeaders() async throws {
         // Given
         let name = "foo"
         let verbatim = "Hello world!"
@@ -453,17 +464,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -477,7 +488,8 @@ class FormTests: XCTestCase {
 
     // MARK: - Init with Encodable
 
-    func testForm_whenInitEncodable() async throws {
+    @Test
+    func form_whenInitEncodable() async throws {
         // Given
         let name = "_name"
         let mock = PayloadMock(
@@ -506,17 +518,17 @@ class FormTests: XCTestCase {
         let data = try encoder.encode(mock)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\""),
                 ("Content-Type", "application/json"),
@@ -524,7 +536,7 @@ class FormTests: XCTestCase {
             ])
         ])
 
-        XCTAssertEqual(
+        #expect(
             try parsed.items.map {
                 try decoder.decode(PayloadMock.self, from: $0.contents)
             },
@@ -532,7 +544,8 @@ class FormTests: XCTestCase {
         )
     }
 
-    func testForm_whenInitEncodableWithFilename() async throws {
+    @Test
+    func form_whenInitEncodableWithFilename() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -565,17 +578,17 @@ class FormTests: XCTestCase {
         let data = try encoder.encode(mock)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
                 ("Content-Type", String(contentType)),
@@ -583,7 +596,7 @@ class FormTests: XCTestCase {
             ])
         ])
 
-        XCTAssertEqual(
+        #expect(
             try parsed.items.map {
                 try decoder.decode(PayloadMock.self, from: $0.contents)
             },
@@ -591,7 +604,8 @@ class FormTests: XCTestCase {
         )
     }
 
-    func testForm_whenInitEncodableWithHeaders() async throws {
+    @Test
+    func form_whenInitEncodableWithHeaders() async throws {
         // Given
         let name = "_name"
         let mock = PayloadMock(
@@ -629,17 +643,17 @@ class FormTests: XCTestCase {
         let data = try encoder.encode(mock)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\""),
                 ("Content-Type", "application/json"),
@@ -647,7 +661,7 @@ class FormTests: XCTestCase {
             ] + headers)
         ])
 
-        XCTAssertEqual(
+        #expect(
             try parsed.items.map {
                 try decoder.decode(PayloadMock.self, from: $0.contents)
             },
@@ -655,7 +669,8 @@ class FormTests: XCTestCase {
         )
     }
 
-    func testForm_whenInitEncodableURLEncoded() async throws {
+    @Test
+    func form_whenInitEncodableURLEncoded() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -683,10 +698,7 @@ class FormTests: XCTestCase {
         let jsonData = try JSONEncoder().encode(mock)
         let json = try JSONSerialization.jsonObject(with: jsonData)
 
-        guard let dictionary = json as? [AnyHashable: Any] else {
-            XCTFail("JSON is not a dictionary")
-            return
-        }
+        let dictionary = try #require(json as? [AnyHashable: Any])
 
         let queries = try dictionary
             .reduce([]) {
@@ -698,17 +710,17 @@ class FormTests: XCTestCase {
         let data = Data(queries.utf8)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
                 ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
@@ -716,13 +728,14 @@ class FormTests: XCTestCase {
             ])
         ])
 
-        XCTAssertEqual(
+        #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) },
             [data.queries(using: .utf8)]
         )
     }
 
-    func testForm_whenInitEncodableURLEncodedUTF16() async throws {
+    @Test
+    func form_whenInitEncodableURLEncodedUTF16() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -751,10 +764,7 @@ class FormTests: XCTestCase {
         let jsonData = try JSONEncoder().encode(mock)
         let json = try JSONSerialization.jsonObject(with: jsonData)
 
-        guard let dictionary = json as? [AnyHashable: Any] else {
-            XCTFail("JSON is not a dictionary")
-            return
-        }
+        let dictionary = try #require(json as? [AnyHashable: Any])
 
         let queries = try dictionary
             .reduce([]) {
@@ -766,19 +776,19 @@ class FormTests: XCTestCase {
         let data = queries.data(using: .utf16) ?? Data()
 
         // Then
-        XCTAssertNotEqual(data.count, .zero)
+        #expect(data.count != .zero)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
                 ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
@@ -786,7 +796,7 @@ class FormTests: XCTestCase {
             ])
         ])
 
-        XCTAssertEqual(
+        #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) },
             [data.queries(using: .utf8)]
         )
@@ -794,7 +804,8 @@ class FormTests: XCTestCase {
 
     // MARK: - Init with JSON
 
-    func testForm_whenInitJSON() async throws {
+    @Test
+    func form_whenInitJSON() async throws {
         // Given
         let name = "_name"
         let jsonObject: [AnyHashable: Any] = [
@@ -820,17 +831,17 @@ class FormTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -842,7 +853,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitJSONWithFilename() async throws {
+    @Test
+    func form_whenInitJSONWithFilename() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -872,17 +884,17 @@ class FormTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
@@ -894,7 +906,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitJSONWithHeaders() async throws {
+    @Test
+    func form_whenInitJSONWithHeaders() async throws {
         // Given
         let name = "_name"
         let jsonObject: [AnyHashable: Any] = [
@@ -929,17 +942,17 @@ class FormTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -951,7 +964,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenInitJSONURLEncoded() async throws {
+    @Test
+    func form_whenInitJSONURLEncoded() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -983,17 +997,17 @@ class FormTests: XCTestCase {
         let data = Data(queries.utf8)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
                 ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
@@ -1001,13 +1015,14 @@ class FormTests: XCTestCase {
             ])
         ])
 
-        XCTAssertEqual(
+        #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) },
             [data.queries(using: .utf8)]
         )
     }
 
-    func testForm_whenInitJSONWithURLEncodedUTF16() async throws {
+    @Test
+    func form_whenInitJSONWithURLEncodedUTF16() async throws {
         // Given
         let name = "_name"
         let filename = "foo.json"
@@ -1036,10 +1051,7 @@ class FormTests: XCTestCase {
         let jsonData = try JSONEncoder().encode(mock)
         let json = try JSONSerialization.jsonObject(with: jsonData)
 
-        guard let dictionary = json as? [AnyHashable: Any] else {
-            XCTFail("JSON is not a dictionary")
-            return
-        }
+        let dictionary = try #require(json as? [AnyHashable: Any])
 
         let queries = try dictionary
             .reduce([]) {
@@ -1051,19 +1063,19 @@ class FormTests: XCTestCase {
         let data = queries.data(using: .utf16) ?? Data()
 
         // Then
-        XCTAssertNotEqual(data.count, .zero)
+        #expect(data.count != .zero)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items.map(\.headers), [
+        #expect(parsed.items.map(\.headers) == [
             HTTPHeaders([
                 ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
                 ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
@@ -1071,7 +1083,7 @@ class FormTests: XCTestCase {
             ])
         ])
 
-        XCTAssertEqual(
+        #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) },
             [data.queries(using: .utf8)]
         )
@@ -1079,7 +1091,8 @@ class FormTests: XCTestCase {
 
     // MARK: - Others tests
 
-    func testForm_whenInitDataChunkSize() async throws {
+    @Test
+    func form_whenInitDataChunkSize() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 1_024)
@@ -1102,7 +1115,7 @@ class FormTests: XCTestCase {
         let totalBytes = builtData.count
 
         // Then
-        XCTAssertEqual(
+        #expect(
             buffers.compactMap { $0.getData() },
             stride(from: .zero, to: totalBytes, by: chunkSize).map {
                 let upperBound = $0 + chunkSize
@@ -1110,17 +1123,17 @@ class FormTests: XCTestCase {
             }
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -1132,7 +1145,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenHeadersWithAddingStrategy() async throws {
+    @Test
+    func form_whenHeadersWithAddingStrategy() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 64)
@@ -1153,17 +1167,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -1177,7 +1191,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenHeadersWithSettingStrategy() async throws {
+    @Test
+    func form_whenHeadersWithSettingStrategy() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 64)
@@ -1199,17 +1214,17 @@ class FormTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -1222,7 +1237,8 @@ class FormTests: XCTestCase {
         ])
     }
 
-    func testForm_whenBodyCalled_shouldBeNever() async throws {
+    @Test
+    func form_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = Form(
             name: "foo",
@@ -1236,7 +1252,8 @@ class FormTests: XCTestCase {
 
 extension FormTests {
 
-    func testForm_whenEmptyData() async throws {
+    @Test
+    func form_whenEmptyData() async throws {
         // Given
         let name = "foo"
         let data = Data()
@@ -1253,17 +1270,17 @@ extension FormTests {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),

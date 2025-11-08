@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsSessionTests: XCTestCase {
+struct InternalsSessionTests {
 
     var localServer: LocalServer?
     var session: Internals.Session?
@@ -37,9 +38,10 @@ class InternalsSessionTests: XCTestCase {
         session = nil
     }
 
-    func testSession_whenPerformingGet_shouldBeValid() async throws {
+    @Test
+    func session_whenPerformingGet_shouldBeValid() async throws {
         // Given
-        let session = try XCTUnwrap(session)
+        let session = try #require(session)
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
@@ -53,17 +55,18 @@ class InternalsSessionTests: XCTestCase {
         let result = try await Array(task())
 
         // Then
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
 
         guard case .download? = result.first else {
-            XCTFail("The obtained result is different from the expected result")
+            Issue.record("The obtained result is different from the expected result")
             return
         }
     }
 
-    func testSession_whenPerformingPostUploadingData_shouldBeValid() async throws {
+    @Test
+    func session_whenPerformingPostUploadingData_shouldBeValid() async throws {
         // Given
-        let session = try XCTUnwrap(session)
+        let session = try #require(session)
 
         let length = 1_023
         let data = Data.randomData(length: length)
@@ -83,21 +86,22 @@ class InternalsSessionTests: XCTestCase {
         let result = try await Array(task())
 
         // Then
-        XCTAssertEqual(result.count, length + 1)
-        XCTAssertEqual(
+        #expect(result.count == length + 1)
+        #expect(
             Array(result[0..<length]),
             (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
         )
 
         guard case .download? = result.last else {
-            XCTFail("The obtained result is different from the expected result")
+            Issue.record("The obtained result is different from the expected result")
             return
         }
     }
 
-    func testSession_whenPerformingPostEmptyData_shouldBeValid() async throws {
+    @Test
+    func session_whenPerformingPostEmptyData_shouldBeValid() async throws {
         // Given
-        let session = try XCTUnwrap(session)
+        let session = try #require(session)
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
@@ -112,19 +116,20 @@ class InternalsSessionTests: XCTestCase {
         let result = try await Array(task())
 
         // Then
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
 
         guard case .download? = result.first else {
-            XCTFail("The obtained result is different from the expected result")
+            Issue.record("The obtained result is different from the expected result")
             return
         }
     }
 
     // swiftlint:disable function_body_length
-    func testSession_whenUploadingFile_shouldBeValid() async throws {
+    @Test
+    func session_whenUploadingFile_shouldBeValid() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let testingSession = try XCTUnwrap(session)
+        let localServer = try #require(localServer)
+        let testingSession = try #require(session)
 
         let certificates = Certificates().server()
         let message = "Hello World"
@@ -198,11 +203,11 @@ class InternalsSessionTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(uploadedBytes.count, Int(ceil(Double(length) / Double(fragment))))
-        XCTAssertEqual(uploadedBytes.reduce(.zero, +), fileBuffer.writerIndex)
-        XCTAssertNotNil(download)
-        XCTAssertEqual(download?.0.status.code, 200)
-        XCTAssertEqual(
+        #expect(uploadedBytes.count == Int(ceil(Double(length) / Double(fragment))))
+        #expect(uploadedBytes.reduce(.zero, +) == fileBuffer.writerIndex)
+        #expect(download != nil)
+        #expect(download?.0.status.code == 200)
+        #expect(
             try (download?.1).map(HTTPResult<String>.init),
             HTTPResult(
                 receivedBytes: length,

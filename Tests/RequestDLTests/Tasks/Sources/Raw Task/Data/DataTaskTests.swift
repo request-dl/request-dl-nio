@@ -2,11 +2,12 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 @testable import RequestDL
 
-class DataTaskTests: XCTestCase {
+struct DataTaskTests {
 
     var localServer: LocalServer?
 
@@ -22,10 +23,11 @@ class DataTaskTests: XCTestCase {
         localServer = nil
     }
 
-    func testDataTask() async throws {
+    @Test
+    func dataTask() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        
+        let localServer = try #require(localServer)
+
         let certificate = Certificates().server()
         let output = "Hello World"
 
@@ -55,10 +57,11 @@ class DataTaskTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 
-    func testDataTask_whenCAEnabled() async throws {
+    @Test
+    func dataTask_whenCAEnabled() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -97,7 +100,7 @@ class DataTaskTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 }
 
@@ -123,7 +126,8 @@ extension DataTaskTests {
         }
     }
 
-    func testDataTask_whenPSK() async throws {
+    @Test
+    func dataTask_whenPSK() async throws {
         // Given
         let output = "Hello World"
 
@@ -152,7 +156,7 @@ extension DataTaskTests {
         let data = try await DataTask {
             Session()
                 .disableNetworkFramework()
-            
+
             BaseURL(localServer.baseURL)
             Path("index")
 
@@ -174,6 +178,6 @@ extension DataTaskTests {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 }

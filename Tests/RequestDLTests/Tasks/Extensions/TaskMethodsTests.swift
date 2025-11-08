@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class TaskMethodsTests: XCTestCase {
+struct TaskMethodsTests {
 
-    func testPinging() async throws {
+    @Test
+    func pinging() async throws {
         // Given
         let data = Data()
 

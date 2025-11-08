@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class DownloadTaskTests: XCTestCase {
+struct DownloadTaskTests {
 
     var localServer: LocalServer?
 
@@ -21,10 +22,11 @@ class DownloadTaskTests: XCTestCase {
         localServer = nil
     }
 
-    func testDataTask() async throws {
+    @Test
+    func dataTask() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        
+        let localServer = try #require(localServer)
+
         let certificate = Certificates().server()
         let output = "Hello World"
 
@@ -55,6 +57,6 @@ class DownloadTaskTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 }

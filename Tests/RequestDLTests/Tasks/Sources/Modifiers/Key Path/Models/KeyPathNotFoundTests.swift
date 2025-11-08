@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class KeyPathNotFoundTests: XCTestCase {
+struct KeyPathNotFoundTests {
 
-    func testError() async throws {
+    @Test
+    func error() async throws {
         // Given
         let keyPath = "any"
 
@@ -15,6 +17,6 @@ class KeyPathNotFoundTests: XCTestCase {
         let error = KeyPathNotFound(keyPath: keyPath)
 
         // Then
-        XCTAssertEqual(error.errorDescription, "Unable to resolve the KeyPath.\(keyPath) in the current Task result")
+        #expect(error.errorDescription == "Unable to resolve the KeyPath.\(keyPath) in the current Task result")
     }
 }

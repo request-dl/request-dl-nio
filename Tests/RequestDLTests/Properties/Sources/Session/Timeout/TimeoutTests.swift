@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class TimeoutTests: XCTestCase {
+struct TimeoutTests {
 
-    func testRequestTimeout() async throws {
+    @Test
+    func requestTimeout() async throws {
         // Given
         let requestTimeout = Timeout.Source.connect
         let timeout = UnitTime.seconds(75)
@@ -18,10 +20,11 @@ class TimeoutTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.session.configuration.timeout.connect, timeout)
+        #expect(resolved.session.configuration.timeout.connect == timeout)
     }
 
-    func testResourceTimeout() async throws {
+    @Test
+    func resourceTimeout() async throws {
         // Given
         let resourceTimeout = Timeout.Source.connect
         let timeout = UnitTime.seconds(1_999)
@@ -30,10 +33,11 @@ class TimeoutTests: XCTestCase {
         let resolved = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
-        XCTAssertEqual(resolved.session.configuration.timeout.connect, timeout)
+        #expect(resolved.session.configuration.timeout.connect == timeout)
     }
 
-    func testAllTimeout() async throws {
+    @Test
+    func allTimeout() async throws {
         // Given
         let requestTimeout = Timeout.Source.all
         let timeout = UnitTime.seconds(75)
@@ -42,29 +46,31 @@ class TimeoutTests: XCTestCase {
         let resolved = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        XCTAssertEqual(resolved.session.configuration.timeout.read, timeout)
-        XCTAssertEqual(resolved.session.configuration.timeout.connect, timeout)
+        #expect(resolved.session.configuration.timeout.read == timeout)
+        #expect(resolved.session.configuration.timeout.connect == timeout)
     }
 
-    func testDefaultTimeout() async throws {
+    @Test
+    func defaultTimeout() async throws {
         let defaultConfiguration = Internals.Session.Configuration()
 
         // When
         let resolved = try await resolve(TestProperty {})
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.session.configuration.timeout.read,
             defaultConfiguration.timeout.read
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.session.configuration.timeout.connect,
             defaultConfiguration.timeout.connect
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = Timeout(.seconds(1))
 

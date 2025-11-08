@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ReadingModeTests: XCTestCase {
+struct ReadingModeTests {
 
-    func testReadingByLength() async throws {
+    @Test
+    func readingByLength() async throws {
         // Given
         let length = 1_024
 
@@ -17,10 +19,11 @@ class ReadingModeTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.readingMode, .length(length))
+        #expect(resolved.request.readingMode == .length(length))
     }
 
-    func testReadingBySeparator() async throws {
+    @Test
+    func readingBySeparator() async throws {
         // Given
         let separator = Array(Data("\n".utf8))
 
@@ -30,6 +33,6 @@ class ReadingModeTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.readingMode, .separator(separator))
+        #expect(resolved.request.readingMode == .separator(separator))
     }
 }

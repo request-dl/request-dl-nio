@@ -2,30 +2,21 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 // swiftlint:disable file_length type_body_length
-class HTTPHeadersTests: XCTestCase {
+struct HTTPHeadersTests {
 
-    var headers: HTTPHeaders?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        headers = .init()
+    @Test
+    func headers_whenEmpty_shouldBeEmpty() throws {
+        let headers = HTTPHeaders()
+        #expect(headers.isEmpty)
     }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-        headers = nil
-    }
-
-    func testHeaders_whenEmpty_shouldBeEmpty() throws {
-        let headers = try XCTUnwrap(headers)
-        XCTAssertTrue(headers.isEmpty)
-    }
-
-    func testHeaders_whenInitWithSequence() {
+    @Test
+    func headers_whenInitWithSequence() {
         // Given
         let headers = HTTPHeaders([
             ("Content-Type", "application/json"),
@@ -36,21 +27,22 @@ class HTTPHeadersTests: XCTestCase {
         ])
 
         // Then
-        XCTAssertEqual(headers.count, 5)
-        XCTAssertFalse(headers.isEmpty)
+        #expect(headers.count == 5)
+        #expect(!headers.isEmpty)
 
-        XCTAssertEqual(headers.names, [
+        #expect(headers.names == [
             "Content-Type", "Accept", "Authorization"
         ])
 
-        XCTAssertEqual(headers.first?.name, "Content-Type")
-        XCTAssertEqual(headers.first?.value, "application/json")
+        #expect(headers.first?.name == "Content-Type")
+        #expect(headers.first?.value == "application/json")
 
-        XCTAssertEqual(headers.last?.name, "Authorization")
-        XCTAssertEqual(headers.last?.value, "Bearer 123")
+        #expect(headers.last?.name == "Authorization")
+        #expect(headers.last?.value == "Bearer 123")
     }
 
-    func testHeaders_whenInitWithDictionaryLiteral() {
+    @Test
+    func headers_whenInitWithDictionaryLiteral() {
         // Given
         let headers: HTTPHeaders = [
             "Content-Type": "text/html",
@@ -58,16 +50,17 @@ class HTTPHeadersTests: XCTestCase {
         ]
 
         // Then
-        XCTAssertEqual(headers.first?.name, "Content-Type")
-        XCTAssertEqual(headers.first?.value, "text/html")
+        #expect(headers.first?.name == "Content-Type")
+        #expect(headers.first?.value == "text/html")
 
-        XCTAssertEqual(headers.last?.name, "Accept")
-        XCTAssertEqual(headers.last?.value, "audio/mp3")
+        #expect(headers.last?.name == "Accept")
+        #expect(headers.last?.value == "audio/mp3")
     }
 
-    func testHeaders_whenSetValues() throws {
+    @Test
+    func headers_whenSetValues() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -88,26 +81,25 @@ class HTTPHeadersTests: XCTestCase {
             ($0.lowercased(), $1)
         }
 
-        XCTAssertEqual(headers.count, 3)
+        #expect(headers.count == 3)
 
-        XCTAssertEqual(headers.names, [
+        #expect(headers.names == [
             "Content-Type", "Accept", "Authorization"
         ])
 
-        XCTAssertEqual(
-            headersSequence.map(\.0),
-            expectingSequence.map(\.0)
+        #expect(
+            headersSequence.map(\.0) == expectingSequence.map(\.0)
         )
 
-        XCTAssertEqual(
-            headersSequence.map(\.1),
-            expectingSequence.map(\.1)
+        #expect(
+            headersSequence.map(\.1) == expectingSequence.map(\.1)
         )
     }
 
-    func testHeaders_whenAddValues() throws {
+    @Test
+    func headers_whenAddValues() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -128,26 +120,21 @@ class HTTPHeadersTests: XCTestCase {
             ($0.lowercased(), $1)
         }
 
-        XCTAssertEqual(headers.count, 5)
+        #expect(headers.count == 5)
 
-        XCTAssertEqual(headers.names, [
+        #expect(headers.names == [
             "Content-Type", "Accept", "Authorization"
         ])
 
-        XCTAssertEqual(
-            headersSequence.map(\.0),
-            expectingSequence.map(\.0)
-        )
+        #expect(headersSequence.map(\.0) == expectingSequence.map(\.0))
 
-        XCTAssertEqual(
-            headersSequence.map(\.1),
-            expectingSequence.map(\.1)
-        )
+        #expect(headersSequence.map(\.1) == expectingSequence.map(\.1))
     }
 
-    func testHeaders_whenRemoveAddedValue() throws {
+    @Test
+    func headers_whenRemoveAddedValue() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -165,20 +152,21 @@ class HTTPHeadersTests: XCTestCase {
         headers.remove(name: "CONTENT-TYPE")
 
         // Then
-        XCTAssertEqual(headers.count, 2)
+        #expect(headers.count == 2)
 
-        XCTAssertEqual(headers.names, [
+        #expect(headers.names == [
             "Accept", "Authorization"
         ])
 
-        XCTAssertEqual(headers.map(\.value), [
+        #expect(headers.map(\.value) == [
             "audio/mp3", "Bearer 123"
         ])
     }
 
-    func testHeaders_whenFirstOfNames() throws {
+    @Test
+    func headers_whenFirstOfNames() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -198,14 +186,15 @@ class HTTPHeadersTests: XCTestCase {
         let value3 = headers.first(name: "authorization")
 
         // Then
-        XCTAssertEqual(value1, "application/json")
-        XCTAssertEqual(value2, "audio/mp3")
-        XCTAssertEqual(value3, "Bearer 123")
+        #expect(value1 == "application/json")
+        #expect(value2 == "audio/mp3")
+        #expect(value3 == "Bearer 123")
     }
 
-    func testHeaders_whenLastOfNames() throws {
+    @Test
+    func headers_whenLastOfNames() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -225,14 +214,15 @@ class HTTPHeadersTests: XCTestCase {
         let value3 = headers.last(name: "authorization")
 
         // Then
-        XCTAssertEqual(value1, "text/html")
-        XCTAssertEqual(value2, "audio/mp3")
-        XCTAssertEqual(value3, "Bearer 123")
+        #expect(value1 == "text/html")
+        #expect(value2 == "audio/mp3")
+        #expect(value3 == "Bearer 123")
     }
 
-    func testHeaders_whenContainsName() throws {
+    @Test
+    func headers_whenContainsName() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -248,7 +238,7 @@ class HTTPHeadersTests: XCTestCase {
         // Then
         let key = "content-type"
 
-        XCTAssertTrue((0 ..< key.count).allSatisfy {
+        #expect((0 ..< key.count).allSatisfy {
             let index = key.index(key.startIndex, offsetBy: $0)
 
             let uppercased = key[key.startIndex...index]
@@ -257,12 +247,13 @@ class HTTPHeadersTests: XCTestCase {
             return headers.contains(name: "\(uppercased.uppercased())\(lowercased.lowercased())")
         })
 
-        XCTAssertFalse(headers.contains(name: "Accept"))
+        #expect(!headers.contains(name: "Accept"))
     }
 
-    func testHeaders_whenContainsNameWhere() throws {
+    @Test
+    func headers_whenContainsNameWhere() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -276,18 +267,19 @@ class HTTPHeadersTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(headers.contains(name: "content-type") {
+        #expect(headers.contains(name: "content-type") {
             $0 == "text/html"
         })
 
-        XCTAssertFalse(headers.contains(name: "content-type") {
+        #expect(!headers.contains(name: "content-type") {
             $0 == "audio/mp3"
         })
     }
 
-    func testHeaders_whenSubscriptByName() throws {
+    @Test
+    func headers_whenSubscriptByName() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -301,14 +293,15 @@ class HTTPHeadersTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(headers["CONTENT-TYPE"], values.map(\.1))
+        #expect(headers["CONTENT-TYPE"] == values.map(\.1))
 
-        XCTAssertNil(headers["Accept"])
+        #expect(headers["Accept"] == nil)
     }
 
-    func testHeaders_whenMergingWithRightExclusive() throws {
+    @Test
+    func headers_whenMergingWithRightExclusive() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let sharedValues = [
             ("Content-Type", "application/json"),
@@ -332,21 +325,22 @@ class HTTPHeadersTests: XCTestCase {
         headers = headers.merging(otherHeaders, by: +)
 
         // Then
-        XCTAssertEqual(headers.count, 6)
+        #expect(headers.count == 6)
 
-        XCTAssertEqual(headers.names, [
+        #expect(headers.names == [
             "Content-Type", "Accept", "Authorization"
         ])
 
-        XCTAssertEqual(headers.map(\.value), [
+        #expect(headers.map(\.value) == [
             "application/json", "application/javascript", "text/html",
             "audio/mp3", "application/xml", "Bearer 123"
         ])
     }
 
-    func testHeaders_whenMergingWithLeftExclusive() throws {
+    @Test
+    func headers_whenMergingWithLeftExclusive() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let sharedValues = [
             ("Content-Type", "application/json"),
@@ -370,21 +364,22 @@ class HTTPHeadersTests: XCTestCase {
         headers = headers.merging(otherHeaders, by: +)
 
         // Then
-        XCTAssertEqual(headers.count, 6)
+        #expect(headers.count == 6)
 
-        XCTAssertEqual(headers.names, [
+        #expect(headers.names == [
             "Content-Type", "Accept", "Authorization"
         ])
 
-        XCTAssertEqual(headers.map(\.value), [
+        #expect(headers.map(\.value) == [
             "application/json", "application/javascript", "text/html",
             "audio/mp3", "application/xml", "Bearer 123"
         ])
     }
 
-    func testHeaders_whenUsingIndices() throws {
+    @Test
+    func headers_whenUsingIndices() throws {
         // Given
-        var headers = try XCTUnwrap(headers)
+        var headers = HTTPHeaders()
 
         let values = [
             ("Content-Type", "application/json"),
@@ -400,47 +395,29 @@ class HTTPHeadersTests: XCTestCase {
         // Then
         let value0 = headers[headers.startIndex]
 
-        XCTAssertEqual(
-            value0.name,
-            values[0].0
-        )
+        #expect(value0.name == values[0].0)
 
-        XCTAssertEqual(
-            value0.value,
-            values[0].1
-        )
+        #expect(value0.value == values[0].1)
 
         let index1 = headers.index(after: headers.startIndex)
         let value1 = headers[index1]
 
-        XCTAssertEqual(
-            value1.name,
-            values[0].0
-        )
+        #expect(value1.name == values[0].0)
 
-        XCTAssertEqual(
-            value1.value,
-            values[1].1
-        )
+        #expect(value1.value == values[1].1)
 
-        XCTAssertEqual(index1, headers.index(headers.startIndex, offsetBy: 1))
-        XCTAssertEqual(index1, headers.index(headers.endIndex, offsetBy: -2))
+        #expect(index1 == headers.index(headers.startIndex, offsetBy: 1))
+        #expect(index1 == headers.index(headers.endIndex, offsetBy: -2))
 
         let index2 = headers.index(before: headers.endIndex)
         let value2 = headers[index2]
 
-        XCTAssertEqual(
-            value2.name,
-            values[2].0
-        )
+        #expect(value2.name == values[2].0)
 
-        XCTAssertEqual(
-            value2.value,
-            values[2].1
-        )
+        #expect(value2.value == values[2].1)
 
-        XCTAssertEqual(index2, headers.index(headers.startIndex, offsetBy: 2))
-        XCTAssertEqual(index2, headers.index(headers.endIndex, offsetBy: -1))
+        #expect(index2 == headers.index(headers.startIndex, offsetBy: 2))
+        #expect(index2 == headers.index(headers.endIndex, offsetBy: -1))
     }
 }
 // swiftlint:enable file_length type_body_length

@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 #if DEBUG
-class InterceptorsBreakpointTests: XCTestCase {
+struct InterceptorsBreakpointTests {
 
-    func testBreakpoint() async throws {
+    @Test
+    func breakpoint() async throws {
         // Given
         let breakpointActivated = SendableBox(false)
 
@@ -26,7 +28,7 @@ class InterceptorsBreakpointTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(breakpointActivated())
+        #expect(breakpointActivated())
     }
 }
 #endif

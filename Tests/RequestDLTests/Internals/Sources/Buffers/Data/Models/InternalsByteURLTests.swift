@@ -2,23 +2,26 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOCore
 @testable import RequestDL
 
-class InternalsByteURLTests: XCTestCase {
+struct InternalsByteURLTests {
 
-    func testByteURL_whenInitEmpty() {
+    @Test
+    func byteURL_whenInitEmpty() {
         // Given
         let url = Internals.ByteURL()
 
         // Then
-        XCTAssertEqual(url.buffer.writerIndex, .zero)
-        XCTAssertEqual(url.buffer.readerIndex, .zero)
-        XCTAssertEqual(url.writtenBytes, .zero)
+        #expect(url.buffer.writerIndex == .zero)
+        #expect(url.buffer.readerIndex == .zero)
+        #expect(url.writtenBytes == .zero)
     }
 
-    func testByteURL_whenInitWithBuffer() {
+    @Test
+    func byteURL_whenInitWithBuffer() {
         // Given
         let buffer = ByteBuffer(data: .randomData(length: 64))
 
@@ -26,12 +29,13 @@ class InternalsByteURLTests: XCTestCase {
         let url = Internals.ByteURL(buffer)
 
         // Then
-        XCTAssertEqual(url.buffer.writerIndex, 64)
-        XCTAssertEqual(url.buffer.readerIndex, .zero)
-        XCTAssertEqual(url.writtenBytes, 64)
+        #expect(url.buffer.writerIndex == 64)
+        #expect(url.buffer.readerIndex == .zero)
+        #expect(url.writtenBytes == 64)
     }
 
-    func testByteURL_whenInitWithBufferSlice() {
+    @Test
+    func byteURL_whenInitWithBufferSlice() {
         // Given
         var buffer = ByteBuffer(data: .randomData(length: 128))
 
@@ -41,29 +45,32 @@ class InternalsByteURLTests: XCTestCase {
         let url = Internals.ByteURL(buffer)
 
         // Then
-        XCTAssertEqual(url.buffer.writerIndex, 64)
-        XCTAssertEqual(url.buffer.readerIndex, .zero)
-        XCTAssertEqual(url.writtenBytes, 64)
+        #expect(url.buffer.writerIndex == 64)
+        #expect(url.buffer.readerIndex == .zero)
+        #expect(url.writtenBytes == 64)
     }
 
-    func testByteURL_whenEquals() {
+    @Test
+    func byteURL_whenEquals() {
         // Given
         let url = Internals.ByteURL()
 
         // Then
-        XCTAssertEqual(url, url)
+        #expect(url == url)
     }
 
-    func testByteURL_whenNotEquals() {
+    @Test
+    func byteURL_whenNotEquals() {
         // Given
         let url1 = Internals.ByteURL()
         let url2 = Internals.ByteURL()
 
         // Then
-        XCTAssertNotEqual(url1, url2)
+        #expect(url1 != url2)
     }
 
-    func testByteURL_whenHashable() {
+    @Test
+    func byteURL_whenHashable() {
         // Given
         let url1 = Internals.ByteURL()
         let url2 = Internals.ByteURL()
@@ -75,7 +82,7 @@ class InternalsByteURLTests: XCTestCase {
         sut.insert(url1)
 
         // Then
-        XCTAssertEqual(sut.count, 2)
-        XCTAssertEqual(sut, [url1, url2])
+        #expect(sut.count == 2)
+        #expect(sut, [url1 == url2])
     }
 }

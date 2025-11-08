@@ -199,10 +199,8 @@ Learn more in:
 ### Configuration of Session
 
 - ``RequestDL/Session``
-
-### Adding Proxy
-
 - ``RequestDL/Proxy``
+- ``RequestDL/DNSOverride``
 
 ### Adding request timeout
 

@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class GroupTaskTests: XCTestCase {
+struct GroupTaskTests {
 
-    func testGroupTask() async throws {
+    @Test
+    func groupTask() async throws {
         // Given
         let items = Array(0 ..< 10)
 
@@ -22,8 +24,8 @@ class GroupTaskTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result.keys.count, items.count)
-        XCTAssertTrue(items.allSatisfy {
+        #expect(result.keys.count == items.count)
+        #expect(items.allSatisfy {
             switch result[$0] {
             case .failure, .none:
                 return false

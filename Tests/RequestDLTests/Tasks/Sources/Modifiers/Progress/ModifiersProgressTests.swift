@@ -2,23 +2,24 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersProgressTests: XCTestCase {
+struct ModifiersProgressTests {
 
     final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {
-        
+
         var uploadedBytes: [Int] {
             lock.withLock { _uploadedBytes }
         }
-        
+
         var totalSize: Int {
             lock.withLock { _totalSize }
         }
-        
+
         private let lock = Lock()
-        
+
         private var _uploadedBytes: [Int] = []
         private var _totalSize: Int = .zero
 
@@ -31,17 +32,17 @@ class ModifiersProgressTests: XCTestCase {
     }
 
     final class DownloadProgressMonitor: DownloadProgress, @unchecked Sendable {
-        
+
         var receivedData: [Data] {
             lock.withLock { _receivedData }
         }
-        
+
         var totalSize: Int {
             lock.withLock { _totalSize }
         }
-        
+
         private let lock = Lock()
-        
+
         private var _receivedData: [Data] = []
         private var _totalSize: Int = .zero
 
@@ -94,10 +95,11 @@ class ModifiersProgressTests: XCTestCase {
         progressMonitor = nil
     }
 
-    func testProgress_whenUploadStep_shouldBeValid() async throws {
+    @Test
+    func progress_whenUploadStep_shouldBeValid() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let uploadMonitor = try XCTUnwrap(uploadMonitor)
+        let localServer = try #require(localServer)
+        let uploadMonitor = try #require(uploadMonitor)
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -132,13 +134,14 @@ class ModifiersProgressTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(uploadMonitor.uploadedBytes.reduce(.zero, +), data.count)
+        #expect(uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count)
     }
 
-    func testProgress_whenDownloadStep_shouldBeValid() async throws {
+    @Test
+    func progress_whenDownloadStep_shouldBeValid() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+        let localServer = try #require(localServer)
+        let downloadMonitor = try #require(downloadMonitor)
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -178,24 +181,25 @@ class ModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(downloadMonitor.totalSize, data.count)
-        XCTAssertEqual(result.receivedBytes, .zero)
+        #expect(downloadMonitor.totalSize == data.count)
+        #expect(result.receivedBytes == .zero)
 
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
+            #expect(
                 completeParts.map(\.count),
                 completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
-    func testProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+    @Test
+    func progress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+        let localServer = try #require(localServer)
+        let downloadMonitor = try #require(downloadMonitor)
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -240,25 +244,26 @@ class ModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(expectingData.count, data.count)
-        XCTAssertEqual(downloadMonitor.totalSize, data.count)
-        XCTAssertEqual(result.receivedBytes, .zero)
+        #expect(expectingData.count == data.count)
+        #expect(downloadMonitor.totalSize == data.count)
+        #expect(result.receivedBytes == .zero)
 
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
+            #expect(
                 completeParts.map(\.count),
                 completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
-    func testProgress_whenCompleteProgress_shouldBeValid() async throws {
+    @Test
+    func progress_whenCompleteProgress_shouldBeValid() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let progressMonitor = try XCTUnwrap(progressMonitor)
+        let localServer = try #require(localServer)
+        let progressMonitor = try #require(progressMonitor)
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -301,24 +306,24 @@ class ModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(receivedData)
 
         // Then
-        XCTAssertEqual(result.receivedBytes, data.count)
+        #expect(result.receivedBytes == data.count)
 
-        XCTAssertEqual(progressMonitor.upload.totalSize, data.count)
-        XCTAssertEqual(progressMonitor.download.totalSize, receivedData.count)
+        #expect(progressMonitor.upload.totalSize == data.count)
+        #expect(progressMonitor.download.totalSize == receivedData.count)
 
-        XCTAssertEqual(
+        #expect(
             progressMonitor.upload.uploadedBytes,
             stride(from: .zero, to: data.count, by: 64).map { _ in 64 }
         )
 
         let completeParts = progressMonitor.download.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
+            #expect(
                 completeParts.map(\.count),
                 completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(progressMonitor.download.receivedData.last?.count ?? .zero, length)
+        #expect(progressMonitor.download.receivedData.last?.count ?? .zero <= length)
     }
 }

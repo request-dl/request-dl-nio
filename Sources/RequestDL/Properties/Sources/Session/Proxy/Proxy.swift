@@ -52,6 +52,8 @@ public struct Proxy: Property {
         bodyException()
     }
 
+    // MARK: - Internal properties
+
     let host: String
     let port: Int
     let connectionProtocol: ConnectionProtocol

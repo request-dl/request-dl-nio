@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class CachedRequestTests: XCTestCase {
+struct CachedRequestTests {
 
     private let certificate = Certificates().server()
     private let dataCache = DataCache.shared
@@ -34,7 +35,8 @@ class CachedRequestTests: XCTestCase {
         localServer = nil
     }
 
-    func testCache_whenNoCacheOnIgnoresCachedDataStrategy() async throws {
+    @Test
+    func cache_whenNoCacheOnIgnoresCachedDataStrategy() async throws {
         // Given
         let cacheKey = "https://localhost:8888"
 
@@ -50,11 +52,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertNil(cachedData)
-        XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "no-cache")
+        #expect(cachedData == nil)
+        #expect(response.head.headers.first(name: "Cache-Control") == "no-cache")
     }
 
-    func testCache_whenNoCacheOnIgnoresCachedDataStrategyWithPreviousCache() async throws {
+    @Test
+    func cache_whenNoCacheOnIgnoresCachedDataStrategyWithPreviousCache() async throws {
         // Given
         let cacheData = mockCachedData(makeHeaders(eTag: UUID()))
         let cacheKey = "https://localhost:8888"
@@ -73,11 +76,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertEqual(response.head.headers.first(name: "Cache-Control"), "no-cache")
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head.headers.first(name: "Cache-Control") == "no-cache")
     }
 
-    func testCache_whenUseCachedDataOnlyStrategyWithoutCache() async throws {
+    @Test
+    func cache_whenUseCachedDataOnlyStrategyWithoutCache() async throws {
         // Given
         var thrownError: Error?
 
@@ -92,10 +96,11 @@ class CachedRequestTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(thrownError is EmptyCachedDataError)
+        #expect(thrownError is EmptyCachedDataError)
     }
 
-    func testCache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
+    @Test
+    func cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
         let cacheData = mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888"
 
@@ -113,11 +118,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertEqual(response.head, cacheData.response)
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
     }
 
-    func testCache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge() async throws {
+    @Test
+    func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge() async throws {
         let cacheData = mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888"
         var thrownError: Error?
@@ -137,10 +143,11 @@ class CachedRequestTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(thrownError is EmptyCachedDataError)
+        #expect(thrownError is EmptyCachedDataError)
     }
 
-    func testCache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
+    @Test
+    func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let cacheData = mockCachedData(makeHeaders(maxAge: false))
         let cacheKey = "https://localhost:8888"
 
@@ -158,11 +165,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertEqual(response.head, cacheData.response)
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
     }
 
-    func testCache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires() async throws {
+    @Test
+    func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires() async throws {
         let cacheData = mockCachedData(makeHeaders(maxAge: false))
         let cacheKey = "https://localhost:8888"
         var thrownError: Error?
@@ -182,10 +190,11 @@ class CachedRequestTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(thrownError is EmptyCachedDataError)
+        #expect(thrownError is EmptyCachedDataError)
     }
 
-    func testCache_whenReturnCachedDataElseLoadWithValidCache() async throws {
+    @Test
+    func cache_whenReturnCachedDataElseLoadWithValidCache() async throws {
         let cacheData = mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888"
 
@@ -203,11 +212,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertEqual(response.head, cacheData.response)
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
     }
 
-    func testCache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
+    @Test
+    func cache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
         let cacheData = mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888"
 
@@ -227,11 +237,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertNotEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertNotEqual(response.head, cacheData.response)
+        #expect(updatedCachedData?.response != cacheData.response)
+        #expect(response.head != cacheData.response)
     }
 
-    func testCache_whenReloadAndValidateCachedDataWithValidCache() async throws {
+    @Test
+    func cache_whenReloadAndValidateCachedDataWithValidCache() async throws {
         let eTag = UUID()
         let cacheData = mockCachedData(makeHeaders(eTag: eTag))
         let cacheKey = "https://localhost:8888"
@@ -250,11 +261,12 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertEqual(response.head, cacheData.response)
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
     }
 
-    func testCache_whenReloadAndValidateCachedDataWithInvalidCache() async throws {
+    @Test
+    func cache_whenReloadAndValidateCachedDataWithInvalidCache() async throws {
         let eTag = UUID()
         let cacheData = mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888"
@@ -275,8 +287,8 @@ class CachedRequestTests: XCTestCase {
         )
 
         // Then
-        XCTAssertNotEqual(updatedCachedData?.response, cacheData.response)
-        XCTAssertNotEqual(response.head, cacheData.response)
+        #expect(updatedCachedData?.response != cacheData.response)
+        #expect(response.head != cacheData.response)
     }
 }
 
@@ -345,7 +357,7 @@ extension CachedRequestTests {
         cachePolicy: DataCache.Policy.Set = .all,
         cacheStrategy: CacheStrategy
     ) async throws -> TaskResult<Data> {
-        let localServer = try XCTUnwrap(localServer)
+        let localServer = try #require(localServer)
         let response = try responseConfiguration(headers, output)
 
         localServer.insert(response)

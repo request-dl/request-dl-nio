@@ -2,14 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class StoredObjectTests: XCTestCase {
+struct StoredObjectTests {
 
     typealias Toolbox = StoredObjectToolbox
 
-    func testStored_whenPath_shouldIndexBeOneAndPathZero() async throws {
+    @Test
+    func stored_whenPath_shouldIndexBeOneAndPathZero() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -34,12 +36,13 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 1)
-        XCTAssertEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0")
+        #expect(MainActor.sync { Factory.producer }.index == 1)
+        #expect(resolved1.request.url == resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.apple.com/0")
     }
 
-    func testStored_whenPathDifferentPosition_shouldBeNotEqual() async throws {
+    @Test
+    func stored_whenPathDifferentPosition_shouldBeNotEqual() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -66,13 +69,14 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 1)
-        XCTAssertEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.google.com/0")
-        XCTAssertEqual(resolved2.request.url, "https://www.google.com/0")
+        #expect(MainActor.sync { Factory.producer }.index == 1)
+        #expect(resolved1.request.url == resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.google.com/0")
+        #expect(resolved2.request.url == "https://www.google.com/0")
     }
 
-    func testStored_whenPathWithEqualNamespace() async throws {
+    @Test
+    func stored_whenPathWithEqualNamespace() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -99,12 +103,13 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 1)
-        XCTAssertEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0")
+        #expect(MainActor.sync { Factory.producer }.index == 1)
+        #expect(resolved1.request.url == resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.apple.com/0")
     }
 
-    func testStored_whenPathWithDifferentNamespace() async throws {
+    @Test
+    func stored_whenPathWithDifferentNamespace() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -131,12 +136,13 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 2)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0")
-        XCTAssertEqual(resolved2.request.url, "https://www.apple.com/1")
+        #expect(MainActor.sync { Factory.producer }.index == 2)
+        #expect(resolved1.request.url == "https://www.apple.com/0")
+        #expect(resolved2.request.url == "https://www.apple.com/1")
     }
 
-    func testStored_whenPathQuery_shouldURLContainsZeroAndOnes() async throws {
+    @Test
+    func stored_whenPathQuery_shouldURLContainsZeroAndOnes() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -163,12 +169,13 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 2)
-        XCTAssertEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0?index=1")
+        #expect(MainActor.sync { Factory.producer }.index == 2)
+        #expect(resolved1.request.url == resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.apple.com/0?index=1")
     }
 
-    func testStored_whenPathQueryDifferentPosition_shouldBeNotEqual() async throws {
+    @Test
+    func stored_whenPathQueryDifferentPosition_shouldBeNotEqual() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -195,13 +202,14 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 4)
-        XCTAssertNotEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0?index=1")
-        XCTAssertEqual(resolved2.request.url, "https://www.apple.com/3?index=2")
+        #expect(MainActor.sync { Factory.producer }.index == 4)
+        #expect(resolved1.request.url != resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.apple.com/0?index=1")
+        #expect(resolved2.request.url == "https://www.apple.com/3?index=2")
     }
 
-    func testStored_whenMultiplePath_shouldIndexBeOneAndPathZero() async throws {
+    @Test
+    func stored_whenMultiplePath_shouldIndexBeOneAndPathZero() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -226,12 +234,13 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 2)
-        XCTAssertEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0/1")
+        #expect(MainActor.sync { Factory.producer }.index == 2)
+        #expect(resolved1.request.url == resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.apple.com/0/1")
     }
 
-    func testStored_whenCombined_shouldRestoreEachOne() async throws {
+    @Test
+    func stored_whenCombined_shouldRestoreEachOne() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
             @MainActor
@@ -256,9 +265,9 @@ class StoredObjectTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(MainActor.sync { Factory.producer }.index, 3)
-        XCTAssertEqual(resolved1.request.url, resolved2.request.url)
-        XCTAssertEqual(resolved1.request.url, "https://www.apple.com/0/1.2")
+        #expect(MainActor.sync { Factory.producer }.index == 3)
+        #expect(resolved1.request.url == resolved2.request.url)
+        #expect(resolved1.request.url == "https://www.apple.com/0/1.2")
     }
 }
 

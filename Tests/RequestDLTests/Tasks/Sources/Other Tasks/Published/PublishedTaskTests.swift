@@ -2,12 +2,13 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 #if canImport(Combine)
 import Combine
 @testable import RequestDL
 
-class PublishedTaskTests: XCTestCase {
+struct PublishedTaskTests {
 
     enum PublisherResult {
         case success
@@ -16,7 +17,8 @@ class PublishedTaskTests: XCTestCase {
 
     struct PublisherError: Error {}
 
-    func testSuccessPublisher() async throws {
+    @Test
+    func successPublisher() async throws {
         // Given
         var cancellation = Set<AnyCancellable>()
         var isSuccess = false
@@ -40,10 +42,11 @@ class PublishedTaskTests: XCTestCase {
         await _fulfillment(of: [expectation], timeout: 3.0)
 
         // Then
-        XCTAssertTrue(isSuccess)
+        #expect(isSuccess)
     }
 
-    func testMultiplePublishes() async throws {
+    @Test
+    func multiplePublishes() async throws {
         // Given
         let subject = PassthroughSubject<Void, Never>()
         var cancellation = Set<AnyCancellable>()
@@ -76,7 +79,7 @@ class PublishedTaskTests: XCTestCase {
         await _fulfillment(of: [expectation], timeout: 3.0)
 
         // Then
-        XCTAssertTrue(isSuccess)
+        #expect(isSuccess)
     }
 }
 #endif

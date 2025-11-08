@@ -2,18 +2,21 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class HeaderGroupTests: XCTestCase {
+struct HeaderGroupTests {
 
-    func testHeaderGroupWithEmptyValue() async throws {
+    @Test
+    func headerGroupWithEmptyValue() async throws {
         let property = TestProperty(HeaderGroup {})
         let resolved = try await resolve(property)
-        XCTAssertTrue(resolved.request.headers.isEmpty)
+        #expect(resolved.request.headers.isEmpty)
     }
 
-    func testHeaderGroupWithDictionary() async throws {
+    @Test
+    func headerGroupWithDictionary() async throws {
         let property = TestProperty(HeaderGroup([
             "Content-Type": "application/json",
             "Accept": "text/html",
@@ -23,28 +26,29 @@ class HeaderGroupTests: XCTestCase {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/json"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Accept"],
             ["text/html"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Origin"],
             ["127.0.0.1:8080"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["xxx-api-key"],
             ["password"]
         )
     }
 
-    func testHeaderGroupWithMultipleHeaders() async throws {
+    @Test
+    func headerGroupWithMultipleHeaders() async throws {
         let property = TestProperty(HeaderGroup {
             CacheHeader()
                 .public(true)
@@ -55,28 +59,29 @@ class HeaderGroupTests: XCTestCase {
 
         let resolved = try await resolve(property)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Cache-Control"],
             ["public"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Accept"],
             ["application/json"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Origin"],
             ["127.0.0.1:8080"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["xxx-api-key"],
             ["password"]
         )
     }
 
-    func testGroup_whenSameHeaderWithAddingStrategy() async throws {
+    @Test
+    func group_whenSameHeaderWithAddingStrategy() async throws {
         // Given
         let contentTypes: [ContentType] = [
             .json,
@@ -96,13 +101,14 @@ class HeaderGroupTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Accept"],
             contentTypes.map { String($0) }
         )
     }
 
-    func testGroup_whenSameHeaderWithSettingStrategy() async throws {
+    @Test
+    func group_whenSameHeaderWithSettingStrategy() async throws {
         // Given
         let contentTypes: [ContentType] = [
             .json,
@@ -123,13 +129,14 @@ class HeaderGroupTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Accept"],
             contentTypes.last.map { [String($0)] } ?? []
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = HeaderGroup([:])
 

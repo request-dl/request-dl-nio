@@ -2,256 +2,319 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class StatusCodeTests: XCTestCase {
+struct StatusCodeTests {
 
-    func testContinueRawValue() async throws {
-        XCTAssertEqual(StatusCode.`continue`, 100)
+    @Test
+    func continueRawValue() async throws {
+        #expect(StatusCode.`continue` == 100)
     }
 
-    func testWwitchingProtocolsRawValue() async throws {
-        XCTAssertEqual(StatusCode.switchingProtocols, 101)
+    @Test
+    func wwitchingProtocolsRawValue() async throws {
+        #expect(StatusCode.switchingProtocols == 101)
     }
 
-    func testProcessingRawValue() async throws {
-        XCTAssertEqual(StatusCode.processing, 102)
+    @Test
+    func processingRawValue() async throws {
+        #expect(StatusCode.processing == 102)
     }
 
-    func testOkRawValue() async throws {
-        XCTAssertEqual(StatusCode.ok, 200)
+    @Test
+    func okRawValue() async throws {
+        #expect(StatusCode.ok == 200)
     }
 
-    func testCreatedRawValue() async throws {
-        XCTAssertEqual(StatusCode.created, 201)
+    @Test
+    func createdRawValue() async throws {
+        #expect(StatusCode.created == 201)
     }
 
-    func testAcceptedRawValue() async throws {
-        XCTAssertEqual(StatusCode.accepted, 202)
+    @Test
+    func acceptedRawValue() async throws {
+        #expect(StatusCode.accepted == 202)
     }
 
-    func testNonAuthoritativeInformationRawValue() async throws {
-        XCTAssertEqual(StatusCode.nonAuthoritativeInformation, 203)
+    @Test
+    func nonAuthoritativeInformationRawValue() async throws {
+        #expect(StatusCode.nonAuthoritativeInformation == 203)
     }
 
-    func testNoContentRawValue() async throws {
-        XCTAssertEqual(StatusCode.noContent, 204)
+    @Test
+    func noContentRawValue() async throws {
+        #expect(StatusCode.noContent == 204)
     }
 
-    func testResetContentRawValue() async throws {
-        XCTAssertEqual(StatusCode.resetContent, 205)
+    @Test
+    func resetContentRawValue() async throws {
+        #expect(StatusCode.resetContent == 205)
     }
 
-    func testPartialContentRawValue() async throws {
-        XCTAssertEqual(StatusCode.partialContent, 206)
+    @Test
+    func partialContentRawValue() async throws {
+        #expect(StatusCode.partialContent == 206)
     }
 
-    func testMultiStatusRawValue() async throws {
-        XCTAssertEqual(StatusCode.multiStatus, 207)
+    @Test
+    func multiStatusRawValue() async throws {
+        #expect(StatusCode.multiStatus == 207)
     }
 
-    func testAlreadyReportedRawValue() async throws {
-        XCTAssertEqual(StatusCode.alreadyReported, 208)
+    @Test
+    func alreadyReportedRawValue() async throws {
+        #expect(StatusCode.alreadyReported == 208)
     }
 
-    func testImUsedRawValue() async throws {
-        XCTAssertEqual(StatusCode.imUsed, 226)
+    @Test
+    func imUsedRawValue() async throws {
+        #expect(StatusCode.imUsed == 226)
     }
 
-    func testMultipleChoicesRawValue() async throws {
-        XCTAssertEqual(StatusCode.multipleChoices, 300)
+    @Test
+    func multipleChoicesRawValue() async throws {
+        #expect(StatusCode.multipleChoices == 300)
     }
 
-    func testMovedPermanentlyRawValue() async throws {
-        XCTAssertEqual(StatusCode.movedPermanently, 301)
+    @Test
+    func movedPermanentlyRawValue() async throws {
+        #expect(StatusCode.movedPermanently == 301)
     }
 
-    func testFoundRawValue() async throws {
-        XCTAssertEqual(StatusCode.found, 302)
+    @Test
+    func foundRawValue() async throws {
+        #expect(StatusCode.found == 302)
     }
 
-    func testSeeOtherRawValue() async throws {
-        XCTAssertEqual(StatusCode.seeOther, 303)
+    @Test
+    func seeOtherRawValue() async throws {
+        #expect(StatusCode.seeOther == 303)
     }
 
-    func testNotModifiedRawValue() async throws {
-        XCTAssertEqual(StatusCode.notModified, 304)
+    @Test
+    func notModifiedRawValue() async throws {
+        #expect(StatusCode.notModified == 304)
     }
 
-    func testUseProxyRawValue() async throws {
-        XCTAssertEqual(StatusCode.useProxy, 305)
+    @Test
+    func useProxyRawValue() async throws {
+        #expect(StatusCode.useProxy == 305)
     }
 
-    func testTemporaryRedirectRawValue() async throws {
-        XCTAssertEqual(StatusCode.temporaryRedirect, 307)
+    @Test
+    func temporaryRedirectRawValue() async throws {
+        #expect(StatusCode.temporaryRedirect == 307)
     }
 
-    func testPermanentRedirectRawValue() async throws {
-        XCTAssertEqual(StatusCode.permanentRedirect, 308)
+    @Test
+    func permanentRedirectRawValue() async throws {
+        #expect(StatusCode.permanentRedirect == 308)
     }
 
-    func testBadRequestRawValue() async throws {
-        XCTAssertEqual(StatusCode.badRequest, 400)
+    @Test
+    func badRequestRawValue() async throws {
+        #expect(StatusCode.badRequest == 400)
     }
 
-    func testUnauthorizedRawValue() async throws {
-        XCTAssertEqual(StatusCode.unauthorized, 401)
+    @Test
+    func unauthorizedRawValue() async throws {
+        #expect(StatusCode.unauthorized == 401)
     }
 
-    func testPaymentRequiredRawValue() async throws {
-        XCTAssertEqual(StatusCode.paymentRequired, 402)
+    @Test
+    func paymentRequiredRawValue() async throws {
+        #expect(StatusCode.paymentRequired == 402)
     }
 
-    func testForbiddenRawValue() async throws {
-        XCTAssertEqual(StatusCode.forbidden, 403)
+    @Test
+    func forbiddenRawValue() async throws {
+        #expect(StatusCode.forbidden == 403)
     }
 
-    func testNotFoundRawValue() async throws {
-        XCTAssertEqual(StatusCode.notFound, 404)
+    @Test
+    func notFoundRawValue() async throws {
+        #expect(StatusCode.notFound == 404)
     }
 
-    func testMethodNotAllowedRawValue() async throws {
-        XCTAssertEqual(StatusCode.methodNotAllowed, 405)
+    @Test
+    func methodNotAllowedRawValue() async throws {
+        #expect(StatusCode.methodNotAllowed == 405)
     }
 
-    func testNotAcceptableRawValue() async throws {
-        XCTAssertEqual(StatusCode.notAcceptable, 406)
+    @Test
+    func notAcceptableRawValue() async throws {
+        #expect(StatusCode.notAcceptable == 406)
     }
 
-    func testProxyAuthenticationRequiredRawValue() async throws {
-        XCTAssertEqual(StatusCode.proxyAuthenticationRequired, 407)
+    @Test
+    func proxyAuthenticationRequiredRawValue() async throws {
+        #expect(StatusCode.proxyAuthenticationRequired == 407)
     }
 
-    func testRequestTimeoutRawValue() async throws {
-        XCTAssertEqual(StatusCode.requestTimeout, 408)
+    @Test
+    func requestTimeoutRawValue() async throws {
+        #expect(StatusCode.requestTimeout == 408)
     }
 
-    func testConflictRawValue() async throws {
-        XCTAssertEqual(StatusCode.conflict, 409)
+    @Test
+    func conflictRawValue() async throws {
+        #expect(StatusCode.conflict == 409)
     }
 
-    func testGoneRawValue() async throws {
-        XCTAssertEqual(StatusCode.gone, 410)
+    @Test
+    func goneRawValue() async throws {
+        #expect(StatusCode.gone == 410)
     }
 
-    func testLengthRequiredRawValue() async throws {
-        XCTAssertEqual(StatusCode.lengthRequired, 411)
+    @Test
+    func lengthRequiredRawValue() async throws {
+        #expect(StatusCode.lengthRequired == 411)
     }
 
-    func testPreconditionFailedRawValue() async throws {
-        XCTAssertEqual(StatusCode.preconditionFailed, 412)
+    @Test
+    func preconditionFailedRawValue() async throws {
+        #expect(StatusCode.preconditionFailed == 412)
     }
 
-    func testPayloadTooLargeRawValue() async throws {
-        XCTAssertEqual(StatusCode.payloadTooLarge, 413)
+    @Test
+    func payloadTooLargeRawValue() async throws {
+        #expect(StatusCode.payloadTooLarge == 413)
     }
 
-    func testUriTooLongRawValue() async throws {
-        XCTAssertEqual(StatusCode.uriTooLong, 414)
+    @Test
+    func uriTooLongRawValue() async throws {
+        #expect(StatusCode.uriTooLong == 414)
     }
 
-    func testUnsupportedMediaTypeRawValue() async throws {
-        XCTAssertEqual(StatusCode.unsupportedMediaType, 415)
+    @Test
+    func unsupportedMediaTypeRawValue() async throws {
+        #expect(StatusCode.unsupportedMediaType == 415)
     }
 
-    func testRangeNotSatisfiableRawValue() async throws {
-        XCTAssertEqual(StatusCode.rangeNotSatisfiable, 416)
+    @Test
+    func rangeNotSatisfiableRawValue() async throws {
+        #expect(StatusCode.rangeNotSatisfiable == 416)
     }
 
-    func testExpectationFailedRawValue() async throws {
-        XCTAssertEqual(StatusCode.expectationFailed, 417)
+    @Test
+    func expectationFailedRawValue() async throws {
+        #expect(StatusCode.expectationFailed == 417)
     }
 
-    func testImATeapotRawValue() async throws {
-        XCTAssertEqual(StatusCode.imATeapot, 418)
+    @Test
+    func imATeapotRawValue() async throws {
+        #expect(StatusCode.imATeapot == 418)
     }
 
-    func testMisdirectedRequestRawValue() async throws {
-        XCTAssertEqual(StatusCode.misdirectedRequest, 421)
+    @Test
+    func misdirectedRequestRawValue() async throws {
+        #expect(StatusCode.misdirectedRequest == 421)
     }
 
-    func testUnprocessableEntityRawValue() async throws {
-        XCTAssertEqual(StatusCode.unprocessableEntity, 422)
+    @Test
+    func unprocessableEntityRawValue() async throws {
+        #expect(StatusCode.unprocessableEntity == 422)
     }
 
-    func testLockedRawValue() async throws {
-        XCTAssertEqual(StatusCode.locked, 423)
+    @Test
+    func lockedRawValue() async throws {
+        #expect(StatusCode.locked == 423)
     }
 
-    func testFailedDependencyRawValue() async throws {
-        XCTAssertEqual(StatusCode.failedDependency, 424)
+    @Test
+    func failedDependencyRawValue() async throws {
+        #expect(StatusCode.failedDependency == 424)
     }
 
-    func testTooEarlyRawValue() async throws {
-        XCTAssertEqual(StatusCode.tooEarly, 425)
+    @Test
+    func tooEarlyRawValue() async throws {
+        #expect(StatusCode.tooEarly == 425)
     }
 
-    func testUpgradeRequiredRawValue() async throws {
-        XCTAssertEqual(StatusCode.upgradeRequired, 426)
+    @Test
+    func upgradeRequiredRawValue() async throws {
+        #expect(StatusCode.upgradeRequired == 426)
     }
 
-    func testPreconditionRequiredRawValue() async throws {
-        XCTAssertEqual(StatusCode.preconditionRequired, 428)
+    @Test
+    func preconditionRequiredRawValue() async throws {
+        #expect(StatusCode.preconditionRequired == 428)
     }
 
-    func testTooManyRequestsRawValue() async throws {
-        XCTAssertEqual(StatusCode.tooManyRequests, 429)
+    @Test
+    func tooManyRequestsRawValue() async throws {
+        #expect(StatusCode.tooManyRequests == 429)
     }
 
-    func testRequestHeaderFieldsTooLargeRawValue() async throws {
-        XCTAssertEqual(StatusCode.requestHeaderFieldsTooLarge, 431)
+    @Test
+    func requestHeaderFieldsTooLargeRawValue() async throws {
+        #expect(StatusCode.requestHeaderFieldsTooLarge == 431)
     }
 
-    func testUnavailableForLegalReasonsRawValue() async throws {
-        XCTAssertEqual(StatusCode.unavailableForLegalReasons, 451)
+    @Test
+    func unavailableForLegalReasonsRawValue() async throws {
+        #expect(StatusCode.unavailableForLegalReasons == 451)
     }
 
-    func testInternalServerErrorRawValue() async throws {
-        XCTAssertEqual(StatusCode.internalServerError, 500)
+    @Test
+    func internalServerErrorRawValue() async throws {
+        #expect(StatusCode.internalServerError == 500)
     }
 
-    func testNotImplementedRawValue() async throws {
-        XCTAssertEqual(StatusCode.notImplemented, 501)
+    @Test
+    func notImplementedRawValue() async throws {
+        #expect(StatusCode.notImplemented == 501)
     }
 
-    func testBadGatewayRawValue() async throws {
-        XCTAssertEqual(StatusCode.badGateway, 502)
+    @Test
+    func badGatewayRawValue() async throws {
+        #expect(StatusCode.badGateway == 502)
     }
 
-    func testServiceUnavailableRawValue() async throws {
-        XCTAssertEqual(StatusCode.serviceUnavailable, 503)
+    @Test
+    func serviceUnavailableRawValue() async throws {
+        #expect(StatusCode.serviceUnavailable == 503)
     }
 
-    func testGatewayTimeoutRawValue() async throws {
-        XCTAssertEqual(StatusCode.gatewayTimeout, 504)
+    @Test
+    func gatewayTimeoutRawValue() async throws {
+        #expect(StatusCode.gatewayTimeout == 504)
     }
 
-    func testHttpVersionNotSupportedRawValue() async throws {
-        XCTAssertEqual(StatusCode.httpVersionNotSupported, 505)
+    @Test
+    func httpVersionNotSupportedRawValue() async throws {
+        #expect(StatusCode.httpVersionNotSupported == 505)
     }
 
-    func testVariantAlsoNegotiatesRawValue() async throws {
-        XCTAssertEqual(StatusCode.variantAlsoNegotiates, 506)
+    @Test
+    func variantAlsoNegotiatesRawValue() async throws {
+        #expect(StatusCode.variantAlsoNegotiates == 506)
     }
 
-    func testInsufficientStorageRawValue() async throws {
-        XCTAssertEqual(StatusCode.insufficientStorage, 507)
+    @Test
+    func insufficientStorageRawValue() async throws {
+        #expect(StatusCode.insufficientStorage == 507)
     }
 
-    func testLoopDetectedRawValue() async throws {
-        XCTAssertEqual(StatusCode.loopDetected, 508)
+    @Test
+    func loopDetectedRawValue() async throws {
+        #expect(StatusCode.loopDetected == 508)
     }
 
-    func testNotExtendedRawValue() async throws {
-        XCTAssertEqual(StatusCode.notExtended, 510)
+    @Test
+    func notExtendedRawValue() async throws {
+        #expect(StatusCode.notExtended == 510)
     }
 
-    func testNetworkAuthenticationRequiredRawValue() async throws {
-        XCTAssertEqual(StatusCode.networkAuthenticationRequired, 511)
+    @Test
+    func networkAuthenticationRequiredRawValue() async throws {
+        #expect(StatusCode.networkAuthenticationRequired == 511)
     }
 
-    func testStatusCode_withStringLossless() async throws {
+    @Test
+    func statusCode_withStringLossless() async throws {
         // Given
         let statusCode = StatusCode.ok
 
@@ -260,7 +323,7 @@ class StatusCodeTests: XCTestCase {
         let losslessStatusCode = StatusCode(string)
 
         // Then
-        XCTAssertEqual(string, statusCode.description)
-        XCTAssertEqual(losslessStatusCode, statusCode)
+        #expect(string == statusCode.description)
+        #expect(losslessStatusCode == statusCode)
     }
 }

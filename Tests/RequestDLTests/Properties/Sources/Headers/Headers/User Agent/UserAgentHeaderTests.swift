@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import AsyncHTTPClient
 @testable import RequestDL
 
-class UserAgentHeaderTests: XCTestCase {
+struct UserAgentHeaderTests {
 
-    func testAgent_whenNoValueIsSet() async throws {
+    @Test
+    func agent_whenNoValueIsSet() async throws {
         // Given
         let property = TestProperty(EmptyProperty())
 
@@ -16,10 +18,11 @@ class UserAgentHeaderTests: XCTestCase {
         let resolved = try await resolve(property)
 
         // Then
-        XCTAssertNil(resolved.request.headers["User-Agent"])
+        #expect(resolved.request.headers["User-Agent"] == nil)
     }
 
-    func testAgent_whenValueIsSetWithAddStrategy() async throws {
+    @Test
+    func agent_whenValueIsSetWithAddStrategy() async throws {
         // Given
         let userAgent = "A text agent specification"
 
@@ -29,10 +32,11 @@ class UserAgentHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers["User-Agent"], [userAgent])
+        #expect(resolved.request.headers["User-Agent"] == [userAgent])
     }
 
-    func testAgent_whenUsingDefaultValue() async throws {
+    @Test
+    func agent_whenUsingDefaultValue() async throws {
         // Given
         let property = TestProperty {
             UserAgentHeader()
@@ -42,10 +46,11 @@ class UserAgentHeaderTests: XCTestCase {
         let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(resolved.request.headers["User-Agent"], [ProcessInfo.processInfo.userAgent])
+        #expect(resolved.request.headers["User-Agent"] == [ProcessInfo.processInfo.userAgent])
     }
 
-    func testAgent_whenUsingDefaultValueWithCustomAgent() async throws {
+    @Test
+    func agent_whenUsingDefaultValueWithCustomAgent() async throws {
         // Given
         let userAgent = "CustomAgent"
         // When
@@ -58,13 +63,14 @@ class UserAgentHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["User-Agent"],
             [ProcessInfo.processInfo.userAgent + " \(userAgent)"]
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = UserAgentHeader("CustomAgent/1.0.0")
 

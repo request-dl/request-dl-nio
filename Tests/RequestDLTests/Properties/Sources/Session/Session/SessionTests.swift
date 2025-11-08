@@ -2,14 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import AsyncHTTPClient
 import NIOPosix
 @testable import RequestDL
 
-class SessionTests: XCTestCase {
+struct SessionTests {
 
-    func testSession_whenInitAsDefault_shouldBeValid() async throws {
+    @Test
+    func session_whenInitAsDefault_shouldBeValid() async throws {
         // Given
         let property = Session()
         let configuration = Internals.Session.Configuration()
@@ -19,20 +21,21 @@ class SessionTests: XCTestCase {
         let sut = resolved.session.configuration
 
         // Then
-        XCTAssertEqual(sut.connectionPool, configuration.connectionPool)
-        XCTAssertNil(sut.redirectConfiguration)
-        XCTAssertEqual(sut.timeout.connect, configuration.timeout.connect)
-        XCTAssertEqual(sut.timeout.read, configuration.timeout.read)
-        XCTAssertEqual(sut.proxy, configuration.proxy)
-        XCTAssertEqual(sut.ignoreUncleanSSLShutdown, configuration.ignoreUncleanSSLShutdown)
-        XCTAssertEqual(
+        #expect(sut.connectionPool == configuration.connectionPool)
+        #expect(sut.redirectConfiguration == nil)
+        #expect(sut.timeout.connect == configuration.timeout.connect)
+        #expect(sut.timeout.read == configuration.timeout.read)
+        #expect(sut.proxy == configuration.proxy)
+        #expect(sut.ignoreUncleanSSLShutdown == configuration.ignoreUncleanSSLShutdown)
+        #expect(
             String(describing: sut.decompression),
             String(describing: configuration.decompression)
         )
-        XCTAssertEqual(sut.connectionPool, configuration.connectionPool)
+        #expect(sut.connectionPool == configuration.connectionPool)
     }
 
-    func testSession_whenInitWithIdentifier_shouldBeValid() async throws {
+    @Test
+    func session_whenInitWithIdentifier_shouldBeValid() async throws {
         // Given
         let property = Session("other", numberOfThreads: 10)
         let options = SessionProviderOptions(
@@ -44,14 +47,15 @@ class SessionTests: XCTestCase {
 
         // Then
         #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
-        XCTAssertEqual(sut.uniqueIdentifier(with: options), "NTW.other.10")
+        #expect(sut.uniqueIdentifier(with: options) == "NTW.other.10")
         #else
-        XCTAssertEqual(sut.uniqueIdentifier(with: options), "other.10")
+        #expect(sut.uniqueIdentifier(with: options) == "other.10")
         #endif
-        XCTAssertTrue(sut is Internals.IdentifiedSessionProvider)
+        #expect(sut is Internals.IdentifiedSessionProvider)
     }
 
-    func testSession_whenInitWithEventLoopGroup_shouldBeValid() async throws {
+    @Test
+    func session_whenInitWithEventLoopGroup_shouldBeValid() async throws {
         // Given
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let property = Session(eventLoopGroup)
@@ -63,11 +67,12 @@ class SessionTests: XCTestCase {
         let sut = property.provider
 
         // Then
-        XCTAssertEqual(sut.uniqueIdentifier(with: options), String(describing: ObjectIdentifier(eventLoopGroup)))
-        XCTAssertTrue(sut.group(with: .init(isCompatibleWithNetworkFramework: true)) === eventLoopGroup)
+        #expect(sut.uniqueIdentifier(with: options) == String(describing: ObjectIdentifier(eventLoopGroup)))
+        #expect(sut.group(with: .init(isCompatibleWithNetworkFramework: true)) === eventLoopGroup)
     }
 
-    func testSession_whenWaitsForConnectivity_shouldBeValid() async throws {
+    @Test
+    func session_whenWaitsForConnectivity_shouldBeValid() async throws {
         // Given
         let waitsForConnectivity = true
 
@@ -78,13 +83,14 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             try resolved.session.configuration.build().networkFrameworkWaitForConnectivity,
             waitsForConnectivity
         )
     }
 
-    func testSession_whenMaxConnectionsPerHost_shouldBeValid() async throws {
+    @Test
+    func session_whenMaxConnectionsPerHost_shouldBeValid() async throws {
         // Given
         let maximumConnections = 10
 
@@ -95,13 +101,14 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit,
             maximumConnections
         )
     }
 
-    func testSession_whenDisableRedirect_shouldBeValid() async throws {
+    @Test
+    func session_whenDisableRedirect_shouldBeValid() async throws {
         // Given
         let property = Session()
             .disableRedirect()
@@ -111,17 +118,18 @@ class SessionTests: XCTestCase {
 
         // Then
         guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
-            XCTFail("Redirect Configuration is nil")
+            Issue.record("Redirect Configuration is nil")
             return
         }
 
-        XCTAssertEqual(
+        #expect(
             redirectConfiguration,
             .disallow
         )
     }
 
-    func testSession_whenEnableRedirect_shouldBeValid() async throws {
+    @Test
+    func session_whenEnableRedirect_shouldBeValid() async throws {
         // Given
         let max = 1_000
         let cycles = true
@@ -134,11 +142,11 @@ class SessionTests: XCTestCase {
 
         // Then
         guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
-            XCTFail("Redirect Configuration is nil")
+            Issue.record("Redirect Configuration is nil")
             return
         }
 
-        XCTAssertEqual(
+        #expect(
             redirectConfiguration,
             .follow(
                 max: max,
@@ -147,7 +155,8 @@ class SessionTests: XCTestCase {
         )
     }
 
-    func testSession_whenIgnoreUncleanSSLShutdown_shouldBeValid() async throws {
+    @Test
+    func session_whenIgnoreUncleanSSLShutdown_shouldBeValid() async throws {
         // Given
         let property = Session()
             .ignoreUncleanSSLShutdown()
@@ -156,10 +165,11 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertTrue(resolved.session.configuration.ignoreUncleanSSLShutdown)
+        #expect(resolved.session.configuration.ignoreUncleanSSLShutdown)
     }
 
-    func testSession_whenDecompressionDisabled_shouldBeValid() async throws {
+    @Test
+    func session_whenDecompressionDisabled_shouldBeValid() async throws {
         // Given
         let property = Session()
             .disableDecompression()
@@ -168,13 +178,14 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             String(describing: resolved.session.configuration.decompression),
             String(describing: HTTPClient.Decompression.disabled)
         )
     }
 
-    func testSession_whenDecompressionLimit_shouldBeValid() async throws {
+    @Test
+    func session_whenDecompressionLimit_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.ratio(5_000)
         let property = Session()
@@ -184,13 +195,14 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.session.configuration.decompression,
             .enabled(decompressionLimit.build())
         )
     }
 
-    func testSession_whenDNSOverride_shouldBeValid() async throws {
+    @Test
+    func session_whenDNSOverride_shouldBeValid() async throws {
         // Given
         let origin = "google.com"
         let destination = "apple.com"
@@ -202,13 +214,14 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             try resolved.session.configuration.build().dnsOverride,
             [origin: destination]
         )
     }
 
-    func testSession_whenNeverBody_shouldBeNever() async throws {
+    @Test
+    func session_whenNeverBody_shouldBeNever() async throws {
         // Given
         let property = Session()
 
@@ -216,7 +229,8 @@ class SessionTests: XCTestCase {
         try await assertNever(property.body)
     }
 
-    func testSession_whenCollidesPrefersLastDeclared() async throws {
+    @Test
+    func session_whenCollidesPrefersLastDeclared() async throws {
         // Given
         let property = TestProperty {
             Session()
@@ -229,7 +243,7 @@ class SessionTests: XCTestCase {
         let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(resolved.session.configuration.decompression, .enabled(.size(200)))
-        XCTAssertEqual(resolved.session.configuration.networkFrameworkWaitForConnectivity, true)
+        #expect(resolved.session.configuration.decompression == .enabled(.size(200)))
+        #expect(resolved.session.configuration.networkFrameworkWaitForConnectivity == true)
     }
 }

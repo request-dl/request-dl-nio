@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 // swiftlint:disable file_length type_body_length
-class PayloadTests: XCTestCase {
+struct PayloadTests {
 
-    func testPayload_whenInitJSON() async throws {
+    @Test
+    func payload_whenInitJSON() async throws {
         // Given
         let json: [String: Any] = [
             "foo": "bar",
@@ -27,23 +29,24 @@ class PayloadTests: XCTestCase {
         let data = try await resolved.request.body?.data()
 
         // When
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/json"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(data, try JSONSerialization.data(
+        #expect(data == try JSONSerialization.data(
             withJSONObject: json,
             options: .sortedKeys
         ))
     }
 
-    func testPayload_whenInitJSONArray() async throws {
+    @Test
+    func payload_whenInitJSONArray() async throws {
         // Given
         let json: [Any] = [
             ["foo", "bar"],
@@ -62,23 +65,24 @@ class PayloadTests: XCTestCase {
         let data = try await resolved.request.body?.data()
 
         // When
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/json"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(data, try JSONSerialization.data(
+        #expect(data == try JSONSerialization.data(
             withJSONObject: json,
             options: .sortedKeys
         ))
     }
 
-    func testPayload_whenInitJSONWithCustomType() async throws {
+    @Test
+    func payload_whenInitJSONWithCustomType() async throws {
         // Given
         let json: [String: Any] = [:]
         let customType = ContentType("application/json+request-dl")
@@ -95,23 +99,24 @@ class PayloadTests: XCTestCase {
         let data = try await resolved.request.body?.data()
 
         // When
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             [String(customType)]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(data, try JSONSerialization.data(
+        #expect(data == try JSONSerialization.data(
             withJSONObject: json,
             options: .sortedKeys
         ))
     }
 
-    func testPayload_whenInitEncodable() async throws {
+    @Test
+    func payload_whenInitEncodable() async throws {
         // Given
         let mock = PayloadMock(
             foo: "bar",
@@ -135,17 +140,17 @@ class PayloadTests: XCTestCase {
         let data = try await resolved.request.body?.data()
 
         // When
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/json"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
+        #expect(
             try data.map {
                 try decoder.decode(PayloadMock.self, from: $0)
             },
@@ -153,7 +158,8 @@ class PayloadTests: XCTestCase {
         )
     }
 
-    func testPayload_whenInitEncodableWithCustomType() async throws {
+    @Test
+    func payload_whenInitEncodableWithCustomType() async throws {
         // Given
         let mock = PayloadMock(
             foo: "bar",
@@ -180,17 +186,17 @@ class PayloadTests: XCTestCase {
         let data = try await resolved.request.body?.data()
 
         // When
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             [String(customType)]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
+        #expect(
             try data.map {
                 try decoder.decode(PayloadMock.self, from: $0)
             },
@@ -198,7 +204,8 @@ class PayloadTests: XCTestCase {
         )
     }
 
-    func testPayload_whenInitString() async throws {
+    @Test
+    func payload_whenInitString() async throws {
         // Given
         let verbatim = "Hello world!"
 
@@ -216,31 +223,32 @@ class PayloadTests: XCTestCase {
         let data2 = try await resolved2.request.body?.data()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved1.request.headers["Content-Type"],
             ["text/plain; charset=UTF-8"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved1.request.headers["Content-Length"],
             (data1?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved2.request.headers["Content-Type"],
             ["text/plain; charset=UTF-16"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved2.request.headers["Content-Length"],
             (data2?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(data1, verbatim.data(using: .utf8))
-        XCTAssertEqual(data2, verbatim.data(using: .utf16))
+        #expect(data1 == verbatim.data(using: .utf8))
+        #expect(data2 == verbatim.data(using: .utf16))
     }
 
-    func testPayload_whenInitStringWithCustomType() async throws {
+    @Test
+    func payload_whenInitStringWithCustomType() async throws {
         // Given
         let verbatim = "Hello world!"
         let customType = ContentType("text/plain+request-dl")
@@ -265,31 +273,32 @@ class PayloadTests: XCTestCase {
         let data2 = try await resolved2.request.body?.data()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved1.request.headers["Content-Type"],
             ["text/plain+request-dl; charset=UTF-8"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved1.request.headers["Content-Length"],
             (data1?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved2.request.headers["Content-Type"],
             ["text/plain+request-dl; charset=UTF-16"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved2.request.headers["Content-Length"],
             (data2?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(data1, verbatim.data(using: .utf8))
-        XCTAssertEqual(data2, verbatim.data(using: .utf16))
+        #expect(data1 == verbatim.data(using: .utf8))
+        #expect(data2 == verbatim.data(using: .utf16))
     }
 
-    func testPayload_whenInitData() async throws {
+    @Test
+    func payload_whenInitData() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
 
@@ -301,20 +310,21 @@ class PayloadTests: XCTestCase {
         let builtData = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/octet-stream"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
-        XCTAssertEqual(builtData, data)
+        #expect(builtData == data)
     }
 
-    func testPayload_whenInitDataWithCustomType() async throws {
+    @Test
+    func payload_whenInitDataWithCustomType() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
         let contentType = ContentType("application/octet-stream+request-dl")
@@ -330,20 +340,21 @@ class PayloadTests: XCTestCase {
         let builtData = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             [String(contentType)]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
-        XCTAssertEqual(builtData, data)
+        #expect(builtData == data)
     }
 
-    func testPayload_whenInitURL() async throws {
+    @Test
+    func payload_whenInitURL() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
 
@@ -367,20 +378,21 @@ class PayloadTests: XCTestCase {
         let builtData = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/octet-stream"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
-        XCTAssertEqual(builtData, data)
+        #expect(builtData == data)
     }
 
-    func testPayload_whenInitURLWithCustomType() async throws {
+    @Test
+    func payload_whenInitURLWithCustomType() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
         let contentType = ContentType("application/octet-stream+request-dl")
@@ -405,20 +417,21 @@ class PayloadTests: XCTestCase {
         let builtData = try await resolved.request.body?.data()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             [String(contentType)]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
-        XCTAssertEqual(builtData, data)
+        #expect(builtData == data)
     }
 
-    func testPayload_whenBodyCalled_shouldBeNever() async throws {
+    @Test
+    func payload_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = Payload(data: Data())
 
@@ -432,7 +445,8 @@ class PayloadTests: XCTestCase {
 
 extension PayloadTests {
 
-    func testPayload_whenGETInitJSONWithURLEncoded() async throws {
+    @Test
+    func payload_whenGETInitJSONWithURLEncoded() async throws {
         // Given
         let json: [String: Any] = [
             "foo": "bar",
@@ -452,11 +466,11 @@ extension PayloadTests {
         let data = try await resolved.request.body?.data()
 
         // When
-        XCTAssertNil(data)
-        XCTAssertNil(resolved.request.headers["Content-Type"])
-        XCTAssertNil(resolved.request.headers["Content-Length"])
+        #expect(data == nil)
+        #expect(resolved.request.headers["Content-Type"] == nil)
+        #expect(resolved.request.headers["Content-Length"] == nil)
 
-        XCTAssertEqual(
+        #expect(
             Set(resolved.request.queries),
             try Set(json.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
@@ -466,7 +480,8 @@ extension PayloadTests {
         )
     }
 
-    func testPayload_whenPOSTInitJSONWithURLEncodedCharsetUTF16() async throws {
+    @Test
+    func payload_whenPOSTInitJSONWithURLEncodedCharsetUTF16() async throws {
         // Given
         let json: [String: Any] = [
             "foo": "bar",
@@ -493,19 +508,19 @@ extension PayloadTests {
         }?.split(separator: "&") ?? []
 
         // When
-        XCTAssertTrue(resolved.request.queries.isEmpty)
+        #expect(resolved.request.queries.isEmpty)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/x-www-form-urlencoded; charset=UTF-16"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
+        #expect(
             Set(components),
             try Set(json.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
@@ -516,7 +531,8 @@ extension PayloadTests {
         )
     }
 
-    func testPayload_whenGETInitEncodableWithURLEncoded() async throws {
+    @Test
+    func payload_whenGETInitEncodableWithURLEncoded() async throws {
         // Given
         let mock = PayloadMock(
             foo: "bar",
@@ -542,12 +558,12 @@ extension PayloadTests {
         ) as? [String: Any]
 
         // When
-        XCTAssertNotNil(json)
-        XCTAssertNil(data)
-        XCTAssertNil(resolved.request.headers["Content-Type"])
-        XCTAssertNil(resolved.request.headers["Content-Length"])
+        #expect(json != nil)
+        #expect(data == nil)
+        #expect(resolved.request.headers["Content-Type"] == nil)
+        #expect(resolved.request.headers["Content-Length"] == nil)
 
-        XCTAssertEqual(
+        #expect(
             Set(resolved.request.queries),
             try Set(json?.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
@@ -557,7 +573,8 @@ extension PayloadTests {
         )
     }
 
-    func testPayload_whenPOSTInitEncodableWithURLEncodedCharsetUTF16() async throws {
+    @Test
+    func payload_whenPOSTInitEncodableWithURLEncodedCharsetUTF16() async throws {
         // Given
         let mock = PayloadMock(
             foo: "bar",
@@ -590,21 +607,21 @@ extension PayloadTests {
         ) as? [String: Any]
 
         // When
-        XCTAssertNotNil(json)
+        #expect(json != nil)
 
-        XCTAssertTrue(resolved.request.queries.isEmpty)
+        #expect(resolved.request.queries.isEmpty)
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/x-www-form-urlencoded; charset=UTF-16"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             (data?.count).map { [String($0)] }
         )
 
-        XCTAssertEqual(
+        #expect(
             Set(components),
             try Set(json?.reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
@@ -615,7 +632,8 @@ extension PayloadTests {
         )
     }
 
-    func testPayload_whenGETInitDataWithURLEncoded() async throws {
+    @Test
+    func payload_whenGETInitDataWithURLEncoded() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
 
@@ -632,19 +650,19 @@ extension PayloadTests {
         let resolvedData = try await resolved.request.body?.data()
 
         // When
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/x-www-form-urlencoded"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
-        XCTAssertEqual(resolvedData, data)
+        #expect(resolvedData == data)
 
-        XCTAssertEqual(resolved.request.url, "https://www.apple.com")
+        #expect(resolved.request.url == "https://www.apple.com")
     }
 }
 
@@ -652,7 +670,8 @@ extension PayloadTests {
 
 extension PayloadTests {
 
-    func testPayload_whenInitDataWithChunkSize() async throws {
+    @Test
+    func payload_whenInitDataWithChunkSize() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
         let chunkSize = 1_024
@@ -666,19 +685,19 @@ extension PayloadTests {
         let buffers = try await resolved.request.body?.buffers() ?? []
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/octet-stream"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
         let totalBytes = data.count
 
-        XCTAssertEqual(
+        #expect(
             buffers.compactMap { $0.getData() },
             stride(from: .zero, to: data.count, by: chunkSize).map {
                 let upperBound = $0 + chunkSize
@@ -687,7 +706,8 @@ extension PayloadTests {
         )
     }
 
-    func testPayload_whenInvalidJSONObject() async throws {
+    @Test
+    func payload_whenInvalidJSONObject() async throws {
         // Given
         let jsonObject: Any = { () -> Void in }
         var encodingError: EncodingPayloadError?
@@ -702,10 +722,11 @@ extension PayloadTests {
         }
 
         // Then
-        XCTAssertEqual(encodingError?.context, .invalidJSONObject)
+        #expect(encodingError?.context == .invalidJSONObject)
     }
 
-    func testPayload_whenEmptyPayload() async throws {
+    @Test
+    func payload_whenEmptyPayload() async throws {
         // Given
         let data = Data()
 
@@ -717,14 +738,14 @@ extension PayloadTests {
         let buffers = try await resolved.request.body?.buffers() ?? []
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/octet-stream"]
         )
 
-        XCTAssertNil(resolved.request.headers["Content-Length"])
+        #expect(resolved.request.headers["Content-Length"] == nil)
 
-        XCTAssertEqual(buffers.resolveData().reduce(Data(), +), data)
+        #expect(buffers.resolveData().reduce(Data(), +) == data)
     }
 }
 
@@ -733,7 +754,8 @@ extension PayloadTests {
 @available(*, deprecated)
 extension PayloadTests {
 
-    func testDeprecated_whenInitDataWithPartLength() async throws {
+    @Test
+    func deprecated_whenInitDataWithPartLength() async throws {
         // Given
         let data = Data.randomData(length: 1_024 * 1_024)
         let chunkSize = 1_024
@@ -747,19 +769,19 @@ extension PayloadTests {
         let buffers = try await resolved.request.body?.buffers() ?? []
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["application/octet-stream"]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(data.count)]
         )
 
         let totalBytes = data.count
 
-        XCTAssertEqual(
+        #expect(
             buffers.compactMap { $0.getData() },
             stride(from: .zero, to: data.count, by: chunkSize).map {
                 let upperBound = $0 + chunkSize

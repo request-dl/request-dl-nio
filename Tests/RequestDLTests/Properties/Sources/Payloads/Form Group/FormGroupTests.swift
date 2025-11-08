@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 // swiftlint:disable function_body_length
-class FormGroupTests: XCTestCase {
+struct FormGroupTests {
 
-    func testGroup_whenMultipleData() async throws {
+    @Test
+    func group_whenMultipleData() async throws {
         // Given
         let parts = (0..<10).map { _ in
             Data.randomData(length: (0...256).randomElement() ?? 256)
@@ -30,20 +32,21 @@ class FormGroupTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, partForms(parts))
+        #expect(parsed.items == partForms(parts))
     }
 
-    func testGroup_whenMultipleDataWithFormGroup() async throws {
+    @Test
+    func group_whenMultipleDataWithFormGroup() async throws {
         // Given
         let parts1 = (0..<6).map { _ in
             Data.randomData(length: (0...256).randomElement() ?? 256)
@@ -93,24 +96,25 @@ class FormGroupTests: XCTestCase {
         let parsed = try parser.parse()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, (
+        #expect(parsed.items == (
             partForms(parts1, prefix: "part1.") +
             partForms(parts2, prefix: "part2.") +
             partForms(parts3, prefix: "part3.")
         ))
     }
 
-    func testGroup_whenChunkSize() async throws {
+    @Test
+    func group_whenChunkSize() async throws {
         // Given
         let name = "foo"
         let data = Data.randomData(length: 256)
@@ -135,7 +139,7 @@ class FormGroupTests: XCTestCase {
         let totalBytes = builtData.count
 
         // Then
-        XCTAssertEqual(
+        #expect(
             buffers.compactMap { $0.getData() },
             stride(from: .zero, to: totalBytes, by: chunkSize).map {
                 let upperBound = $0 + chunkSize
@@ -143,17 +147,17 @@ class FormGroupTests: XCTestCase {
             }
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Type"],
             ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Content-Length"],
             [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
-        XCTAssertEqual(parsed.items, [
+        #expect(parsed.items == [
             PartForm(
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(name)\""),
@@ -165,7 +169,8 @@ class FormGroupTests: XCTestCase {
         ])
     }
 
-    func testGroup_whenBodyCalled_shouldBeNever() async throws {
+    @Test
+    func group_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = FormGroup {
             Form(
@@ -178,7 +183,8 @@ class FormGroupTests: XCTestCase {
         try await assertNever(property.body)
     }
 
-    func testGroup_whenEmptyContent() async throws {
+    @Test
+    func group_whenEmptyContent() async throws {
         // When
         let resolved = try await resolve(TestProperty {
             FormGroup {}
@@ -187,11 +193,11 @@ class FormGroupTests: XCTestCase {
         let data = try await resolved.request.body?.data() ?? Data()
 
         // Then
-        XCTAssertTrue(data.isEmpty)
+        #expect(data.isEmpty)
 
-        XCTAssertNil(resolved.request.headers["Content-Type"])
+        #expect(resolved.request.headers["Content-Type"] == nil)
 
-        XCTAssertNil(resolved.request.headers["Content-Length"])
+        #expect(resolved.request.headers["Content-Length"] == nil)
     }
 }
 

@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class GroupTests: XCTestCase {
+struct GroupTests {
 
-    func testSingleGroup() async throws {
+    @Test
+    func singleGroup() async throws {
         // Given
         let property = PropertyGroup {
             BaseURL("google.com")
@@ -17,10 +19,11 @@ class GroupTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertEqual(resolved.request.url, "https://google.com")
+        #expect(resolved.request.url == "https://google.com")
     }
 
-    func testMultipleGroup() async throws {
+    @Test
+    func multipleGroup() async throws {
         // Given
         let property = PropertyGroup {
             BaseURL("google.com")
@@ -32,13 +35,14 @@ class GroupTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             "https://google.com/api/v1?available_methods=all"
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = PropertyGroup {}
 

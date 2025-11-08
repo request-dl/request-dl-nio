@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class TrustsTests: XCTestCase {
+struct TrustsTests {
 
     var client: CertificateResource?
     var server: CertificateResource?
@@ -16,10 +17,11 @@ class TrustsTests: XCTestCase {
         server = Certificates().server()
     }
 
-    func testTrusts_whenCertificates_shouldBeValid() async throws {
+    @Test
+    func trusts_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try Array(Data(contentsOf: XCTUnwrap(server).certificateURL))
-        let client = try XCTUnwrap(client)
+        let server = try Array(Data(contentsOf: #require(server).certificateURL))
+        let client = try #require(client)
 
         // When
         let resolved = try await resolve(TestProperty {
@@ -32,8 +34,8 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
-        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
-        XCTAssertEqual(
+        #expect(!resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
+        #expect(
             resolved.session.configuration.secureConnection?.trustRoots,
             .certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
@@ -42,10 +44,11 @@ class TrustsTests: XCTestCase {
         )
     }
 
-    func testTrusts_whenFile_shouldBeValid() async throws {
+    @Test
+    func trusts_whenFile_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
+        let server = try #require(server)
+        let client = try #require(client)
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -68,18 +71,19 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
-        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
-        XCTAssertEqual(
+        #expect(!resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
+        #expect(
             resolved.session.configuration.secureConnection?.trustRoots,
             .file(fileURL.absolutePath(percentEncoded: false))
         )
     }
 
-    func testTrusts_whenBytes_shouldBeValid() async throws {
+    @Test
+    func trusts_whenBytes_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
-        
+        let server = try #require(server)
+        let client = try #require(client)
+
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
@@ -94,14 +98,15 @@ class TrustsTests: XCTestCase {
         })
 
         // Then
-        XCTAssertFalse(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
-        XCTAssertEqual(
+        #expect(!resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true)
+        #expect(
             resolved.session.configuration.secureConnection?.trustRoots,
             .bytes(bytes)
         )
     }
 
-    func testTrusts_whenAccessBody_shouldBeNever() async throws {
+    @Test
+    func trusts_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.Trusts {
             RequestDL.Certificate([0, 1, 2])

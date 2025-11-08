@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOHTTPCompression
 @testable import RequestDL
 
-class InternalsDecompressionLimitTests: XCTestCase {
+struct InternalsDecompressionLimitTests {
 
-    func testLimit_whenNone() {
+    @Test
+    func limit_whenNone() {
         // Given
         let limit = Internals.Decompression.Limit.none
 
@@ -16,13 +18,14 @@ class InternalsDecompressionLimitTests: XCTestCase {
         let sut = limit.build()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             String(describing: sut),
             String(describing: NIOHTTPDecompression.DecompressionLimit.none)
         )
     }
 
-    func testLimit_whenSize() {
+    @Test
+    func limit_whenSize() {
         // Given
         let limit = Internals.Decompression.Limit.size(128)
 
@@ -30,13 +33,14 @@ class InternalsDecompressionLimitTests: XCTestCase {
         let sut = limit.build()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             String(describing: sut),
             String(describing: NIOHTTPDecompression.DecompressionLimit.size(128))
         )
     }
 
-    func testLimit_whenRatio() {
+    @Test
+    func limit_whenRatio() {
         // Given
         let limit = Internals.Decompression.Limit.ratio(1_024)
 
@@ -44,27 +48,29 @@ class InternalsDecompressionLimitTests: XCTestCase {
         let sut = limit.build()
 
         // Then
-        XCTAssertEqual(
+        #expect(
             String(describing: sut),
             String(describing: NIOHTTPDecompression.DecompressionLimit.ratio(1_024))
         )
     }
 
-    func testLimit_whenEquals() {
+    @Test
+    func limit_whenEquals() {
         // Given
         let lhs = Internals.Decompression.Limit.ratio(1)
         let rhs = Internals.Decompression.Limit.ratio(1)
 
         // Then
-        XCTAssertEqual(lhs, rhs)
+        #expect(lhs == rhs)
     }
 
-    func testLimit_whenNotEquals() {
+    @Test
+    func limit_whenNotEquals() {
         // Given
         let lhs = Internals.Decompression.Limit.none
         let rhs = Internals.Decompression.Limit.ratio(1)
 
         // Then
-        XCTAssertNotEqual(lhs, rhs)
+        #expect(lhs != rhs)
     }
 }

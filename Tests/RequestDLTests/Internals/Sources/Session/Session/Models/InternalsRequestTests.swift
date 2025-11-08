@@ -2,11 +2,12 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOCore
 @testable import RequestDL
 
-class InternalsRequestTests: XCTestCase {
+struct InternalsRequestTests {
 
     private var request: Internals.Request?
 
@@ -20,33 +21,36 @@ class InternalsRequestTests: XCTestCase {
         request = nil
     }
 
-    func testRequest_whenInitURL_shouldBeEqual() async throws {
+    @Test
+    func request_whenInitURL_shouldBeEqual() async throws {
         // Given
-        var request = try XCTUnwrap(request)
+        var request = try #require(request)
         let url = "https://google.com"
 
         // When
         request.baseURL = url
 
         // Then
-        XCTAssertEqual(request.url, url)
+        #expect(request.url == url)
     }
 
-    func testRequest_whenMethodIsAssign_shouldBeEqual() async throws {
+    @Test
+    func request_whenMethodIsAssign_shouldBeEqual() async throws {
         // Given
-        var request = try XCTUnwrap(request)
+        var request = try #require(request)
         let method = "POST"
 
         // When
         request.method = method
 
         // Then
-        XCTAssertEqual(request.method, method)
+        #expect(request.method == method)
     }
 
-    func testRequest_whenHeadersAreSet_shouldContainsValues() async throws {
+    @Test
+    func request_whenHeadersAreSet_shouldContainsValues() async throws {
         // Given
-        var request = try XCTUnwrap(request)
+        var request = try #require(request)
 
         let key1 = "Content-Type"
         let value1 = "application/json"
@@ -59,27 +63,29 @@ class InternalsRequestTests: XCTestCase {
         request.headers.set(name: key2, value: value2)
 
         // Then
-        XCTAssertEqual(request.headers.count, 2)
-        XCTAssertEqual(request.headers[key1], [value1])
-        XCTAssertEqual(request.headers[key2], [value2])
+        #expect(request.headers.count == 2)
+        #expect(request.headers[key1] == [value1])
+        #expect(request.headers[key2] == [value2])
     }
 
-    func testRequest_whenSetReadingMode() async throws {
+    @Test
+    func request_whenSetReadingMode() async throws {
         // Given
-        var request = try XCTUnwrap(request)
+        var request = try #require(request)
         let readingMode = Internals.DownloadStep.ReadingMode.separator([70])
 
         // When
         request.readingMode = readingMode
 
         // Then
-        XCTAssertEqual(request.readingMode, readingMode)
+        #expect(request.readingMode == readingMode)
     }
 
-    func testRequest_whenUnsetReadingMode() async throws {
+    @Test
+    func request_whenUnsetReadingMode() async throws {
         // Given
-        var request = try XCTUnwrap(request)
+        var request = try #require(request)
         // Then
-        XCTAssertEqual(request.readingMode, .length(1_024))
+        #expect(request.readingMode == .length(1_024))
     }
 }

@@ -2,15 +2,17 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsLogTests: XCTestCase {
+struct InternalsLogTests {
 
     let line: UInt = #line
     let file: StaticString = #file
 
-    func testDebug() async {
+    @Test
+    func debug() async {
         // Given
         let message1 = "Hello World!"
         let message2 = "Earth is a small planet"
@@ -19,7 +21,7 @@ class InternalsLogTests: XCTestCase {
         let expecting = expectation(description: "print")
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
-        
+
         Internals.Override.Print.replace {
             payload(($0, $1, $2))
             expecting.fulfill()
@@ -30,14 +32,15 @@ class InternalsLogTests: XCTestCase {
         // Then
         await _fulfillment(of: [expecting])
 
-        XCTAssertEqual(payload()?.0, " ")
-        XCTAssertEqual(payload()?.1, "\n")
-        XCTAssertEqual(payload()?.2 as? [String], [
+        #expect(payload()?.0 == " ")
+        #expect(payload()?.1 == "\n")
+        #expect(payload()?.2 as? [String] == [
             debugOutput(message1, message2)
         ])
     }
 
-    func testWarning() async throws {
+    @Test
+    func warning() async throws {
         // Given
         let message1 = "Hello World!"
         let message2 = "Earth is a small planet"
@@ -58,14 +61,15 @@ class InternalsLogTests: XCTestCase {
         // Then
         await _fulfillment(of: [expecting])
 
-        XCTAssertEqual(payload()?.0, " ")
-        XCTAssertEqual(payload()?.1, "\n")
-        XCTAssertEqual(payload()?.2 as? [String], [
+        #expect(payload()?.0 == " ")
+        #expect(payload()?.1 == "\n")
+        #expect(payload()?.2 as? [String] == [
             warningOutput(message1, message2)
         ])
     }
 
-    func testFailure() async throws {
+    @Test
+    func failure() async throws {
         // Given
         let message1 = "Hello World!"
         let message2 = "Earth is a small planet"
@@ -90,9 +94,9 @@ class InternalsLogTests: XCTestCase {
         // Then
         await _fulfillment(of: [expecting])
 
-        XCTAssertEqual(payload()?.0, failureOutput(message1, message2))
-        XCTAssertEqual((payload()?.1).map { "\($0)" }, "\(file)")
-        XCTAssertEqual(payload()?.2, line)
+        #expect(payload()?.0, failureOutput(message1 == message2))
+        #expect((payload()?.1).map { "\($0)" }, "\(file)")
+        #expect(payload()?.2 == line)
     }
 }
 

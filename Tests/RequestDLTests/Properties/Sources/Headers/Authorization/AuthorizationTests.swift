@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class AuthorizationTests: XCTestCase {
+struct AuthorizationTests {
 
-    func testAuthorizationWithTypeAndStringToken() async throws {
+    @Test
+    func authorizationWithTypeAndStringToken() async throws {
         // Given
         let auth = Authorization(.bearer, token: "myToken")
 
@@ -15,13 +17,14 @@ class AuthorizationTests: XCTestCase {
         let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Authorization"],
             ["Bearer myToken"]
         )
     }
 
-    func testAuthorizationWithTypeAndLosslessStringToken() async throws {
+    @Test
+    func authorizationWithTypeAndLosslessStringToken() async throws {
         // Given
         let auth = Authorization(.bearer, token: 123)
 
@@ -29,26 +32,28 @@ class AuthorizationTests: XCTestCase {
         let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Authorization"],
             ["Bearer 123"]
         )
     }
 
-    func testAuthorizationWithUsernameAndPassword() async throws {
+    @Test
+    func authorizationWithUsernameAndPassword() async throws {
         let auth = Authorization(username: "myUser", password: "myPassword")
 
         // When
         let resolved = try await resolve(TestProperty(auth))
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.headers["Authorization"],
             ["Basic bXlVc2VyOm15UGFzc3dvcmQ="]
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = Authorization(.bearer, token: "123")
 

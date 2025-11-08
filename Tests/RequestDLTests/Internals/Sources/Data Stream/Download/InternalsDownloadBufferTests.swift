@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsDownloadBufferTests: XCTestCase {
+struct InternalsDownloadBufferTests {
 
-    func testDownload_whenAppendingTotalLength_shouldContainsOneFragment() async throws {
+    @Test
+    func download_whenAppendingTotalLength_shouldContainsOneFragment() async throws {
         // Given
         let data = Data(repeating: .min, count: 1_024)
         let download = Internals.DownloadBuffer(readingMode: .length(1_024))
@@ -22,10 +24,11 @@ class InternalsDownloadBufferTests: XCTestCase {
             stream: download.stream
         ))
 
-        XCTAssertEqual(bytes, [data])
+        #expect(bytes == [data])
     }
 
-    func testDownload_whenAppendingErrorBeforeData_shouldBeEmpty() async throws {
+    @Test
+    func download_whenAppendingErrorBeforeData_shouldBeEmpty() async throws {
         // Given
         let data = Data(repeating: .min, count: 1_024)
         let download = Internals.DownloadBuffer(readingMode: .length(1_024))
@@ -52,11 +55,12 @@ class InternalsDownloadBufferTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(receivedData.isEmpty)
-        XCTAssertEqual(errors.count, 1)
+        #expect(receivedData.isEmpty)
+        #expect(errors.count == 1)
     }
 
-    func testDownload_whenAppendingDifferentSizes_shouldMergeByLength() async throws {
+    @Test
+    func download_whenAppendingDifferentSizes_shouldMergeByLength() async throws {
         // Given
         let length = 1_024
 
@@ -84,10 +88,11 @@ class InternalsDownloadBufferTests: XCTestCase {
         let receivedBytes = try await Array(bytes)
         let expectedBytes = Array(parts).split(by: length)
 
-        XCTAssertEqual(receivedBytes, expectedBytes)
+        #expect(receivedBytes == expectedBytes)
     }
 
-    func testDownload_whenAppendingWithSplitByByte_shouldContainsFragmentsEndeingWithByte() async throws {
+    @Test
+    func download_whenAppendingWithSplitByByte_shouldContainsFragmentsEndeingWithByte() async throws {
         // Given
         let separator = Data(",".utf8)
 
@@ -112,10 +117,11 @@ class InternalsDownloadBufferTests: XCTestCase {
         let receivedBytes = try await Array(bytes)
         let expectedBytes = Array(parts).split(separator: Array(separator))
 
-        XCTAssertEqual(receivedBytes, expectedBytes)
+        #expect(receivedBytes == expectedBytes)
     }
 
-    func testDownload_whenAppendingOnlySeparator_shouldContainsTwoFragments() async throws {
+    @Test
+    func download_whenAppendingOnlySeparator_shouldContainsTwoFragments() async throws {
         // Given
         let separator = Data(",".utf8)
 
@@ -134,10 +140,11 @@ class InternalsDownloadBufferTests: XCTestCase {
         let receivedBytes = try await Array(bytes)
         let expectedBytes = Array(separator).split(separator: Array(separator))
 
-        XCTAssertEqual(receivedBytes, expectedBytes)
+        #expect(receivedBytes == expectedBytes)
     }
 
-    func testDownload_whenEmpty_shouldBeEmpty() async throws {
+    @Test
+    func download_whenEmpty_shouldBeEmpty() async throws {
         // Given
         let download = Internals.DownloadBuffer(readingMode: .length(1_024))
 
@@ -153,10 +160,11 @@ class InternalsDownloadBufferTests: XCTestCase {
         let receivedBytes = try await Array(bytes)
         let expectedBytes = [Data]()
 
-        XCTAssertEqual(receivedBytes, expectedBytes)
+        #expect(receivedBytes == expectedBytes)
     }
 
-    func testDownload_whenMBAppending_shouldBeEqual() async throws {
+    @Test
+    func download_whenMBAppending_shouldBeEqual() async throws {
         // Given
         let length = 4_096
         let data = Data(repeating: 64, count: 100_000_000)
@@ -175,6 +183,6 @@ class InternalsDownloadBufferTests: XCTestCase {
         let receivedBytes = try await Array(bytes)
         let expectedBytes = Array(data).split(by: length)
 
-        XCTAssertEqual(receivedBytes, expectedBytes)
+        #expect(receivedBytes == expectedBytes)
     }
 }

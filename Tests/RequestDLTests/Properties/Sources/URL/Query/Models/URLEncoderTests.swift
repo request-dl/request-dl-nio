@@ -2,11 +2,12 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 // swiftlint:disable file_length type_body_length
-class URLEncoderTests: XCTestCase {
+struct URLEncoderTests {
 
     var urlEncoder: URLEncoder?
 
@@ -21,14 +22,15 @@ class URLEncoderTests: XCTestCase {
     }
 
     private func encode<Value>(_ value: Value, forKey key: String) throws -> String {
-        try XCTUnwrap(urlEncoder).encode(value, forKey: key)
+        try #require(urlEncoder).encode(value, forKey: key)
             .map { $0.build() }
             .joined()
     }
 
     // MARK: - Default
 
-    func testEncoder_whenInteger() throws {
+    @Test
+    func encoder_whenInteger() throws {
         // Given
         let key = "foo"
         let value = 123
@@ -37,10 +39,11 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenString() throws {
+    @Test
+    func encoder_whenString() throws {
         // Given
         let key = "foo"
         let value = "bar"
@@ -49,12 +52,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
     // MARK: - Optional
 
-    func testEncoder_whenSomeWithLiteral() throws {
+    @Test
+    func encoder_whenSomeWithLiteral() throws {
         // Given
         let key = "foo"
         let value = "bar"
@@ -63,10 +67,11 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value as String?, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenNoneWithLiteral() throws {
+    @Test
+    func encoder_whenNoneWithLiteral() throws {
         // Given
         let key = "foo"
 
@@ -74,12 +79,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(String?.none, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=nil")
+        #expect(sut == "\(key)=nil")
     }
 
-    func testEncoder_whenSomeWithDroppingKey() throws {
+    @Test
+    func encoder_whenSomeWithDroppingKey() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = "bar"
@@ -90,12 +96,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value as String?, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenNoneWithDroppingKey() throws {
+    @Test
+    func encoder_whenNoneWithDroppingKey() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
 
@@ -105,13 +112,14 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(String?.none, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "")
+        #expect(sut == "")
     }
 
-    func testEncoder_whenSomeWithDroppingValue() throws {
+    @Test
+    func encoder_whenSomeWithDroppingValue() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
-        
+        let urlEncoder = try #require(urlEncoder)
+
         let key = "foo"
         let value = "bar"
 
@@ -121,12 +129,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value as String?, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenNoneWithDroppingValue() throws {
+    @Test
+    func encoder_whenNoneWithDroppingValue() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
 
@@ -136,12 +145,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(String?.none, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=")
+        #expect(sut == "\(key)=")
     }
 
-    func testEncoder_whenSomeWithCustom() throws {
+    @Test
+    func encoder_whenSomeWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = "bar"
@@ -155,12 +165,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value as String?, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenNoneWithCustom() throws {
+    @Test
+    func encoder_whenNoneWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
 
@@ -173,12 +184,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(String?.none, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=none")
+        #expect(sut == "\(key)=none")
     }
 
     // MARK: - Flag
 
-    func testEncoder_whenTrueWithLiteral() throws {
+    @Test
+    func encoder_whenTrueWithLiteral() throws {
         // Given
         let key = "foo"
         let value = true
@@ -187,10 +199,11 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenFalseWithLiteral() throws {
+    @Test
+    func encoder_whenFalseWithLiteral() throws {
         // Given
         let key = "foo"
         let value = false
@@ -199,12 +212,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(value)")
+        #expect(sut == "\(key)=\(value)")
     }
 
-    func testEncoder_whenTrueWithNumeric() throws {
+    @Test
+    func encoder_whenTrueWithNumeric() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = true
@@ -215,12 +229,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=1")
+        #expect(sut == "\(key)=1")
     }
 
-    func testEncoder_whenFalseWithNumeric() throws {
+    @Test
+    func encoder_whenFalseWithNumeric() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = false
@@ -231,12 +246,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=0")
+        #expect(sut == "\(key)=0")
     }
 
-    func testEncoder_whenTrueWithCustom() throws {
+    @Test
+    func encoder_whenTrueWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = true
@@ -250,12 +266,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=T")
+        #expect(sut == "\(key)=T")
     }
 
-    func testEncoder_whenFalseWithCustom() throws {
+    @Test
+    func encoder_whenFalseWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = false
@@ -269,13 +286,14 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=F")
+        #expect(sut == "\(key)=F")
     }
 
     // MARK: - Date
-    func testEncoder_whenDateWithSecondsSince1970() throws {
+    @Test
+    func encoder_whenDateWithSecondsSince1970() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -286,12 +304,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(date, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(Int64(date.timeIntervalSince1970))")
+        #expect(sut == "\(key)=\(Int64(date.timeIntervalSince1970))")
     }
 
-    func testEncoder_whenDateWithMillisecondsSince1970() throws {
+    @Test
+    func encoder_whenDateWithMillisecondsSince1970() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -302,12 +321,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(date, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "\(key)=\(Int64(date.timeIntervalSince1970) * 1_000)")
+        #expect(sut == "\(key)=\(Int64(date.timeIntervalSince1970) * 1_000)")
     }
 
-    func testEncoder_whenDateWithISO8601() throws {
+    @Test
+    func encoder_whenDateWithISO8601() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -321,12 +341,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedDate = dateFormatter.string(from: date)
 
-        XCTAssertEqual(sut, "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
+        #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
 
-    func testEncoder_whenDateWithDateFormatter() throws {
+    @Test
+    func encoder_whenDateWithDateFormatter() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -342,12 +363,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedDate = dateFormatter.string(from: date)
 
-        XCTAssertEqual(sut, "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
+        #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
 
-    func testEncoder_whenDateWithCustom() throws {
+    @Test
+    func encoder_whenDateWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -363,14 +385,15 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedDate = dateFormatter.string(from: date)
 
-        XCTAssertEqual(sut, "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
+        #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
 
     // MARK: - Array
 
-    func testEncoder_whenArrayWithDroppingIndex() throws {
+    @Test
+    func encoder_whenArrayWithDroppingIndex() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -381,14 +404,15 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, value.map {
+        #expect(sut == value.map {
             "\(key)=\($0)"
         }.joined(separator: "&"))
     }
 
-    func testEncoder_whenArrayWithSubscripted() throws {
+    @Test
+    func encoder_whenArrayWithSubscripted() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -399,15 +423,16 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, value.enumerated().map {
+        #expect(sut == value.enumerated().map {
             let key = "\(key)[\($0)]".addingRFC3986PercentEncoding()
             return "\(key)=\($1)"
         }.joined(separator: "&"))
     }
 
-    func testEncoder_whenArrayWithAccessMember() throws {
+    @Test
+    func encoder_whenArrayWithAccessMember() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -418,14 +443,15 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, value.enumerated().map {
+        #expect(sut == value.enumerated().map {
             "\(key).\($0)=\($1)"
         }.joined(separator: "&"))
     }
 
-    func testEncoder_whenArrayWithCustom() throws {
+    @Test
+    func encoder_whenArrayWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = ["a", "ab", "abc", "abcd"]
@@ -439,15 +465,16 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, value.enumerated().map {
+        #expect(sut == value.enumerated().map {
             let key = "\(key)@\($0)".addingRFC3986PercentEncoding()
             return "\(key)=\($1)"
         }.joined(separator: "&"))
     }
 
-    func testEncoder_whenHeterogeneousArrayWithDroppingIndex() throws {
+    @Test
+    func encoder_whenHeterogeneousArrayWithDroppingIndex() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -473,14 +500,15 @@ class URLEncoderTests: XCTestCase {
         .map { "foo=\($0.addingRFC3986PercentEncoding())" }
         .joined(separator: "&")
 
-        XCTAssertEqual(sut, expectedString)
+        #expect(sut == expectedString)
     }
 
     // MARK: - Dictionary
 
-    func testEncoder_whenDictionaryWithSubscripted() throws {
+    @Test
+    func encoder_whenDictionaryWithSubscripted() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = [
@@ -496,17 +524,18 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key).split(separator: "&")
 
         // Then
-        XCTAssertEqual(sut.count, value.count)
+        #expect(sut.count == value.count)
 
-        XCTAssertEqual(sut.sorted(), value.map {
+        #expect(sut.sorted() == value.map {
             let key = "\(key)[\($0)]".addingRFC3986PercentEncoding()
             return "\(key)=\($1)"
         }.sorted())
     }
 
-    func testEncoder_whenDictionaryWithAccessMember() throws {
+    @Test
+    func encoder_whenDictionaryWithAccessMember() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = [
@@ -522,17 +551,18 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key).split(separator: "&")
 
         // Then
-        XCTAssertEqual(sut.count, value.count)
+        #expect(sut.count == value.count)
 
-        XCTAssertEqual(sut.sorted(), value.map {
+        #expect(sut.sorted() == value.map {
             let key = "\(key).\($0)".addingRFC3986PercentEncoding()
             return "\(key)=\($1)"
         }.sorted())
     }
 
-    func testEncoder_whenDictionaryWithCustom() throws {
+    @Test
+    func encoder_whenDictionaryWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = [
@@ -551,17 +581,18 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key).split(separator: "&")
 
         // Then
-        XCTAssertEqual(sut.count, value.count)
+        #expect(sut.count == value.count)
 
-        XCTAssertEqual(sut.sorted(), value.map {
+        #expect(sut.sorted() == value.map {
             let key = "\(key)@\($0)".addingRFC3986PercentEncoding()
             return "\(key)=\($1)"
         }.sorted())
     }
 
-    func testEncoder_whenHeterogeneousDictionaryWithDroppingIndex() throws {
+    @Test
+    func encoder_whenHeterogeneousDictionaryWithDroppingIndex() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let date = Date()
@@ -597,9 +628,9 @@ class URLEncoderTests: XCTestCase {
             "array.2": "3"
         ]
 
-        XCTAssertEqual(sut.count, expectedValue.count)
+        #expect(sut.count == expectedValue.count)
 
-        XCTAssertEqual(sut.sorted(), expectedValue.map {
+        #expect(sut.sorted() == expectedValue.map {
             let key = "\(key).\($0)".addingRFC3986PercentEncoding()
             return "\(key)=\($1.addingRFC3986PercentEncoding())"
         }.sorted())
@@ -607,7 +638,8 @@ class URLEncoderTests: XCTestCase {
 
     // MARK: - Data
 
-    func testEncoder_whenDataWithBase64() throws {
+    @Test
+    func encoder_whenDataWithBase64() throws {
         // Given
         let key = "foo"
         let value = Data.randomData(length: 64)
@@ -620,12 +652,13 @@ class URLEncoderTests: XCTestCase {
             .base64EncodedString()
             .addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(key)=\(expectedValue)")
+        #expect(sut == "\(key)=\(expectedValue)")
     }
 
-    func testEncoder_whenDataWithCustom() throws {
+    @Test
+    func encoder_whenDataWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo"
         let value = Data.randomData(length: 64)
@@ -640,14 +673,15 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedValue = value.map { String($0) }.joined()
 
-        XCTAssertEqual(sut, "\(key)=\(expectedValue)")
+        #expect(sut == "\(key)=\(expectedValue)")
     }
 
     // MARK: - Key
 
-    func testEncoder_whenKeyWithLiteral() throws {
+    @Test
+    func encoder_whenKeyWithLiteral() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -660,12 +694,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "oneTwo[threeFour]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
-    func testEncoder_whenKeyWithSnakeCased() throws {
+    @Test
+    func encoder_whenKeyWithSnakeCased() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "_oneTwo_"
         let value = ["threeFour": "1"]
@@ -678,12 +713,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "_one_two_[three_four]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
-    func testEncoder_whenKeyWithKebabCased() throws {
+    @Test
+    func encoder_whenKeyWithKebabCased() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -696,12 +732,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "one-two[three-four]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
-    func testEncoder_whenKeyWithCapitalized() throws {
+    @Test
+    func encoder_whenKeyWithCapitalized() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -714,12 +751,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "OneTwo[ThreeFour]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
-    func testEncoder_whenKeyWithUppercased() throws {
+    @Test
+    func encoder_whenKeyWithUppercased() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -732,12 +770,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "ONETWO[THREEFOUR]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
-    func testEncoder_whenKeyWithLowercased() throws {
+    @Test
+    func encoder_whenKeyWithLowercased() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -750,12 +789,13 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "onetwo[threefour]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
-    func testEncoder_whenKeyWithCustom() throws {
+    @Test
+    func encoder_whenKeyWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "oneTwo"
         let value = ["threeFour": "1"]
@@ -775,13 +815,14 @@ class URLEncoderTests: XCTestCase {
         // Then
         let expectedKey = "one.two[three.four]".addingRFC3986PercentEncoding()
 
-        XCTAssertEqual(sut, "\(expectedKey)=1")
+        #expect(sut == "\(expectedKey)=1")
     }
 
     // MARK: - Whitespace
-    func testEncoder_whenWhitespaceWithPercentEscaping() throws {
+    @Test
+    func encoder_whenWhitespaceWithPercentEscaping() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo bar"
         let value = "one two three"
@@ -792,12 +833,13 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "foo%20bar=one%20two%20three")
+        #expect(sut == "foo%20bar=one%20two%20three")
     }
 
-    func testEncoder_whenWhitespaceWithPlus() throws {
+    @Test
+    func encoder_whenWhitespaceWithPlus() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
+        let urlEncoder = try #require(urlEncoder)
 
         let key = "foo bar"
         let value = "one two three"
@@ -808,13 +850,14 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "foo+bar=one+two+three")
+        #expect(sut == "foo+bar=one+two+three")
     }
 
-    func testEncoder_whenWhitespaceWithCustom() throws {
+    @Test
+    func encoder_whenWhitespaceWithCustom() throws {
         // Given
-        let urlEncoder = try XCTUnwrap(urlEncoder)
-        
+        let urlEncoder = try #require(urlEncoder)
+
         let key = "foo bar"
         let value = "one two three"
 
@@ -826,7 +869,7 @@ class URLEncoderTests: XCTestCase {
         let sut = try encode(value, forKey: key)
 
         // Then
-        XCTAssertEqual(sut, "foobar=onetwothree")
+        #expect(sut == "foobar=onetwothree")
     }
 }
 // swiftlint:enable file_length type_body_length

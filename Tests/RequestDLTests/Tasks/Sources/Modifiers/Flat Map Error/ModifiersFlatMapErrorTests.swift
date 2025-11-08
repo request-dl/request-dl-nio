@@ -2,16 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersFlatMapErrorTests: XCTestCase {
+struct ModifiersFlatMapErrorTests {
 
     struct FlatMapError: Error {}
 
     struct TransformedError: Error {}
 
-    func testFlatMap() async throws {
+    @Test
+    func flatMap() async throws {
         // Given
         let flatMapCalled = SendableBox(false)
 
@@ -25,10 +27,11 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertFalse(flatMapCalled())
+        #expect(!flatMapCalled())
     }
 
-    func testFlatMapWithError() async throws {
+    @Test
+    func flatMapWithError() async throws {
         // Given
         let error = FlatMapError()
 
@@ -42,7 +45,8 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         .result()
     }
 
-    func testFlatMapErrorThrowingMockError() async throws {
+    @Test
+    func flatMapErrorThrowingMockError() async throws {
         // Given
         let error = FlatMapError()
         let transformedError = TransformedError()
@@ -64,6 +68,6 @@ class ModifiersFlatMapErrorTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(mapError())
+        #expect(mapError())
     }
 }

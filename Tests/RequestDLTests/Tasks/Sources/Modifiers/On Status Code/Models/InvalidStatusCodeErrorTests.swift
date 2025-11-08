@@ -2,16 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InvalidStatusCodeErrorTests: XCTestCase {
+struct InvalidStatusCodeErrorTests {
 
-    func testError() async throws {
+    @Test
+    func error() async throws {
         // Given
         let error = InvalidStatusCodeError(data: true)
 
         // Then
-        XCTAssertTrue(error.data)
+        #expect(error.data)
     }
 }

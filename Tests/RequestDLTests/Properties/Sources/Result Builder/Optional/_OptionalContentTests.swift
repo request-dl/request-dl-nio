@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class _OptionalContentTests: XCTestCase {
+struct _OptionalContentTests {
 
-    func testConditionActiveBuilder() async throws {
+    @Test
+    func conditionActiveBuilder() async throws {
         // Given
         let applyCondition = true
 
@@ -22,12 +24,13 @@ class _OptionalContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _OptionalContent<BaseURL>)
-        XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertTrue(resolved.request.headers.isEmpty)
+        #expect(result is _OptionalContent<BaseURL>)
+        #expect(resolved.request.url == "https://google.com")
+        #expect(resolved.request.headers.isEmpty)
     }
 
-    func testConditionDisableBuilder() async throws {
+    @Test
+    func conditionDisableBuilder() async throws {
         // Given
         let applyCondition = false
 
@@ -42,11 +45,12 @@ class _OptionalContentTests: XCTestCase {
         let resolved = try await resolve(TestProperty(result))
 
         // Then
-        XCTAssertTrue(result is _OptionalContent<BaseURL>)
-        XCTAssertNotEqual(resolved.request.url, "https://google.com")
+        #expect(result is _OptionalContent<BaseURL>)
+        #expect(resolved.request.url != "https://google.com")
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = _OptionalContent<EmptyProperty>(.init())
 

@@ -2,11 +2,12 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 // swiftlint:disable type_body_length file_length
-class InternalsFileBufferTests: XCTestCase {
+struct InternalsFileBufferTests {
 
     var fileURL: URL?
 
@@ -28,9 +29,10 @@ class InternalsFileBufferTests: XCTestCase {
         fileURL = nil
     }
 
-    func testFileBuffer_whenInitURL_shouldBeEmpty() async throws {
+    @Test
+    func fileBuffer_whenInitURL_shouldBeEmpty() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let fileBuffer = Internals.FileBuffer(fileURL)
 
         // When
@@ -41,16 +43,17 @@ class InternalsFileBufferTests: XCTestCase {
         let estimatedBytes = fileBuffer.estimatedBytes
 
         // Then
-        XCTAssertEqual(writerIndex, .zero)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(readableBytes, .zero)
-        XCTAssertEqual(writableBytes, .zero)
-        XCTAssertEqual(estimatedBytes, .zero)
+        #expect(writerIndex == .zero)
+        #expect(readerIndex == .zero)
+        #expect(readableBytes == .zero)
+        #expect(writableBytes == .zero)
+        #expect(estimatedBytes == .zero)
     }
 
-    func testFileBuffer_whenContainsData_shouldWriterBeAtEndAndReaderAtZero() async throws {
+    @Test
+    func fileBuffer_whenContainsData_shouldWriterBeAtEndAndReaderAtZero() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -63,15 +66,16 @@ class InternalsFileBufferTests: XCTestCase {
         let writableBytes = fileBuffer.writableBytes
 
         // Then
-        XCTAssertEqual(writerIndex, data.count)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(readableBytes, data.count)
-        XCTAssertEqual(writableBytes, .zero)
+        #expect(writerIndex == data.count)
+        #expect(readerIndex == .zero)
+        #expect(readableBytes == data.count)
+        #expect(writableBytes == .zero)
     }
 
-    func testFileBuffer_whenContainsData_shouldReadDataAvailable() async throws {
+    @Test
+    func fileBuffer_whenContainsData_shouldReadDataAvailable() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -81,17 +85,18 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = fileBuffer.readData(data.count)
 
         // Then
-        XCTAssertEqual(fileBuffer.writerIndex, data.count)
-        XCTAssertEqual(fileBuffer.readerIndex, data.count)
-        XCTAssertEqual(fileBuffer.readableBytes, .zero)
-        XCTAssertEqual(fileBuffer.writableBytes, .zero)
-        XCTAssertEqual(readData, data)
-        XCTAssertEqual(fileBuffer.estimatedBytes, data.count)
+        #expect(fileBuffer.writerIndex == data.count)
+        #expect(fileBuffer.readerIndex == data.count)
+        #expect(fileBuffer.readableBytes == .zero)
+        #expect(fileBuffer.writableBytes == .zero)
+        #expect(readData == data)
+        #expect(fileBuffer.estimatedBytes == data.count)
     }
 
-    func testFileBuffer_whenContainsDataMovingReaderIndex_shouldReadableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenContainsDataMovingReaderIndex_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -103,16 +108,17 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.moveReaderIndex(to: index)
 
         // Then
-        XCTAssertEqual(readableIndex, data.count)
-        XCTAssertEqual(fileBuffer.writerIndex, data.count)
-        XCTAssertEqual(fileBuffer.readerIndex, index)
-        XCTAssertEqual(fileBuffer.readableBytes, data.count - index)
-        XCTAssertEqual(fileBuffer.writableBytes, .zero)
+        #expect(readableIndex == data.count)
+        #expect(fileBuffer.writerIndex == data.count)
+        #expect(fileBuffer.readerIndex == index)
+        #expect(fileBuffer.readableBytes == data.count - index)
+        #expect(fileBuffer.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenContainsDataMovingWriterIndex_shouldWritableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenContainsDataMovingWriterIndex_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
 
@@ -124,16 +130,17 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.moveWriterIndex(to: index)
 
         // Then
-        XCTAssertEqual(writableBytes, .zero)
-        XCTAssertEqual(fileBuffer.writerIndex, index)
-        XCTAssertEqual(fileBuffer.readerIndex, .zero)
-        XCTAssertEqual(fileBuffer.readableBytes, index)
-        XCTAssertEqual(fileBuffer.writableBytes, data.count - index)
+        #expect(writableBytes == .zero)
+        #expect(fileBuffer.writerIndex == index)
+        #expect(fileBuffer.readerIndex == .zero)
+        #expect(fileBuffer.readableBytes == index)
+        #expect(fileBuffer.writableBytes == data.count - index)
     }
 
-    func testFileBuffer_whenWritingWithTwoCopy_shouldWritableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenWritingWithTwoCopy_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
         var sut2 = sut1
@@ -145,17 +152,18 @@ class InternalsFileBufferTests: XCTestCase {
         sut2.writeData(data)
 
         // Then
-        XCTAssertEqual(writerIndex, sut1.writerIndex)
-        XCTAssertEqual(readerIndex, sut1.readerIndex)
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, data.count)
-        XCTAssertEqual(sut1.writableBytes, data.count)
-        XCTAssertEqual(sut1.readableBytes, .zero)
+        #expect(writerIndex == sut1.writerIndex)
+        #expect(readerIndex == sut1.readerIndex)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == data.count)
+        #expect(sut1.writableBytes == data.count)
+        #expect(sut1.readableBytes == .zero)
     }
 
-    func testFileBuffer_whenWritingWithTwoInstances_shouldWritableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenWritingWithTwoInstances_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
         var sut2 = Internals.FileBuffer(fileURL)
@@ -167,17 +175,18 @@ class InternalsFileBufferTests: XCTestCase {
         sut2.writeData(data)
 
         // Then
-        XCTAssertEqual(writerIndex, sut1.writerIndex)
-        XCTAssertEqual(readerIndex, sut1.readerIndex)
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, data.count)
-        XCTAssertEqual(sut1.writableBytes, data.count)
-        XCTAssertEqual(sut1.readableBytes, .zero)
+        #expect(writerIndex == sut1.writerIndex)
+        #expect(readerIndex == sut1.readerIndex)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == data.count)
+        #expect(sut1.writableBytes == data.count)
+        #expect(sut1.readableBytes == .zero)
     }
 
-    func testFileBuffer_whenWritingWithTwoInstancesSimultaneos_shouldWritableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenWritingWithTwoInstancesSimultaneos_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.FileBuffer(fileURL)
@@ -188,15 +197,16 @@ class InternalsFileBufferTests: XCTestCase {
         sut1.writeData(data[0..<writeSliceIndex])
 
         // Then
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, data.count)
-        XCTAssertEqual(sut1.writableBytes, data.count - writeSliceIndex)
-        XCTAssertEqual(sut1.readableBytes, writeSliceIndex)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == data.count)
+        #expect(sut1.writableBytes == data.count - writeSliceIndex)
+        #expect(sut1.readableBytes == writeSliceIndex)
     }
 
-    func testFileBuffer_whenWritingWithTwoInstancesSimultaneosBytes_shouldWritableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenWritingWithTwoInstancesSimultaneosBytes_shouldWritableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
         var sut1 = Internals.FileBuffer(fileURL)
@@ -207,15 +217,16 @@ class InternalsFileBufferTests: XCTestCase {
         sut1.writeBytes(data[0..<writeSliceIndex])
 
         // Then
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, data.count)
-        XCTAssertEqual(sut1.writableBytes, data.count - writeSliceIndex)
-        XCTAssertEqual(sut1.readableBytes, writeSliceIndex)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == data.count)
+        #expect(sut1.writableBytes == data.count - writeSliceIndex)
+        #expect(sut1.readableBytes == writeSliceIndex)
     }
 
-    func testFileBuffer_whenReadingWithTwoCopy_shouldReadableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenReadingWithTwoCopy_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -229,18 +240,19 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = sut2.readData(data.count)
 
         // Then
-        XCTAssertEqual(readData, data)
-        XCTAssertEqual(writerIndex, data.count)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, .zero)
-        XCTAssertEqual(sut1.writableBytes, .zero)
-        XCTAssertEqual(sut1.readableBytes, data.count)
+        #expect(readData == data)
+        #expect(writerIndex == data.count)
+        #expect(readerIndex == .zero)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == .zero)
+        #expect(sut1.writableBytes == .zero)
+        #expect(sut1.readableBytes == data.count)
     }
 
-    func testFileBuffer_whenReadingWithTwoInstances_shouldReadableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenReadingWithTwoInstances_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -254,18 +266,19 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = sut2.readData(data.count)
 
         // Then
-        XCTAssertEqual(readData, data)
-        XCTAssertEqual(writerIndex, data.count)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, .zero)
-        XCTAssertEqual(sut1.writableBytes, .zero)
-        XCTAssertEqual(sut1.readableBytes, data.count)
+        #expect(readData == data)
+        #expect(writerIndex == data.count)
+        #expect(readerIndex == .zero)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == .zero)
+        #expect(sut1.writableBytes == .zero)
+        #expect(sut1.readableBytes == data.count)
     }
 
-    func testFileBuffer_whenReadingWithTwoInstancesSimultaneos_shouldReadableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenReadingWithTwoInstancesSimultaneos_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -278,20 +291,21 @@ class InternalsFileBufferTests: XCTestCase {
         let readData1 = sut1.readData(readSliceIndex)
 
         // Then
-        XCTAssertEqual(readData1, data[0..<readSliceIndex])
-        XCTAssertEqual(sut1.writerIndex, data.count)
-        XCTAssertEqual(sut1.readableBytes, data.count - readSliceIndex)
-        XCTAssertEqual(sut1.writableBytes, .zero)
+        #expect(readData1 == data[0..<readSliceIndex])
+        #expect(sut1.writerIndex == data.count)
+        #expect(sut1.readableBytes == data.count - readSliceIndex)
+        #expect(sut1.writableBytes == .zero)
 
-        XCTAssertEqual(readData2, data)
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, .zero)
-        XCTAssertEqual(sut2.writableBytes, .zero)
+        #expect(readData2 == data)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == .zero)
+        #expect(sut2.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenReadingWithTwoInstancesSimultaneosBytes_shouldReadableBytesBeUpdated() async throws {
+    @Test
+    func fileBuffer_whenReadingWithTwoInstancesSimultaneosBytes_shouldReadableBytesBeUpdated() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
 
@@ -304,20 +318,21 @@ class InternalsFileBufferTests: XCTestCase {
         let readBytes1 = sut1.readBytes(readSliceIndex)
 
         // Then
-        XCTAssertEqual(readBytes1, Array(data[0..<readSliceIndex]))
-        XCTAssertEqual(sut1.writerIndex, data.count)
-        XCTAssertEqual(sut1.readableBytes, data.count - readSliceIndex)
-        XCTAssertEqual(sut1.writableBytes, .zero)
+        #expect(readBytes1 == Array(data[0..<readSliceIndex]))
+        #expect(sut1.writerIndex == data.count)
+        #expect(sut1.readableBytes == data.count - readSliceIndex)
+        #expect(sut1.writableBytes == .zero)
 
-        XCTAssertEqual(readBytes2, Array(data))
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readableBytes, .zero)
-        XCTAssertEqual(sut2.writableBytes, .zero)
+        #expect(readBytes2 == Array(data))
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readableBytes == .zero)
+        #expect(sut2.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenWritingAndReadingSimultaneos_shouldBytesBeUpdatedAndOverrided() async throws {
+    @Test
+    func fileBuffer_whenWritingAndReadingSimultaneos_shouldBytesBeUpdatedAndOverrided() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let data = Data("Hello World".utf8)
         let overrideData = Data("Earth".utf8)
 
@@ -335,24 +350,25 @@ class InternalsFileBufferTests: XCTestCase {
         let readDataAfterOverride2 = sut2.readData(sut2.readableBytes)
 
         // Then
-        XCTAssertEqual(readDataBeforeOverride2, data)
-        XCTAssertEqual(readData2, overrideData)
-        XCTAssertEqual(readDataAfterOverride2, overrideData + data[overrideData.count..<data.count])
+        #expect(readDataBeforeOverride2 == data)
+        #expect(readData2 == overrideData)
+        #expect(readDataAfterOverride2 == overrideData + data[overrideData.count..<data.count])
 
-        XCTAssertEqual(sut1.writerIndex, overrideData.count)
-        XCTAssertEqual(sut1.readerIndex, overrideData.count)
-        XCTAssertEqual(sut1.writableBytes, data.count - overrideData.count)
-        XCTAssertEqual(sut1.readableBytes, .zero)
+        #expect(sut1.writerIndex == overrideData.count)
+        #expect(sut1.readerIndex == overrideData.count)
+        #expect(sut1.writableBytes == data.count - overrideData.count)
+        #expect(sut1.readableBytes == .zero)
 
-        XCTAssertEqual(sut2.writerIndex, data.count)
-        XCTAssertEqual(sut2.readerIndex, data.count)
-        XCTAssertEqual(sut2.writableBytes, .zero)
-        XCTAssertEqual(sut2.readableBytes, .zero)
+        #expect(sut2.writerIndex == data.count)
+        #expect(sut2.readerIndex == data.count)
+        #expect(sut2.writableBytes == .zero)
+        #expect(sut2.readableBytes == .zero)
     }
 
-    func testFileBuffer_whenWritingFromOtherFileBuffer_shouldHaveContentsAppended() async throws {
+    @Test
+    func fileBuffer_whenWritingFromOtherFileBuffer_shouldHaveContentsAppended() async throws {
         // Given
-        let fileURL = try XCTUnwrap(fileURL)
+        let fileURL = try #require(fileURL)
         let otherFile = fileURL
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferOtherFile.txt")
@@ -372,19 +388,20 @@ class InternalsFileBufferTests: XCTestCase {
         sut1.writeBuffer(&sut2)
 
         // Then
-        XCTAssertEqual(sut1.writerIndex, data.count + otherData.count)
-        XCTAssertEqual(sut2.writerIndex, otherData.count)
+        #expect(sut1.writerIndex == data.count + otherData.count)
+        #expect(sut2.writerIndex == otherData.count)
 
-        XCTAssertEqual(sut1.writableBytes, .zero)
-        XCTAssertEqual(sut2.writableBytes, .zero)
+        #expect(sut1.writableBytes == .zero)
+        #expect(sut2.writableBytes == .zero)
 
-        XCTAssertEqual(sut1.readerIndex, .zero)
-        XCTAssertEqual(sut2.readerIndex, otherData.count)
+        #expect(sut1.readerIndex == .zero)
+        #expect(sut2.readerIndex == otherData.count)
 
-        XCTAssertEqual(sut1.readData(sut1.readableBytes), data + otherData)
+        #expect(sut1.readData(sut1.readableBytes) == data + otherData)
     }
 
-    func testFileBuffer_whenInitEmpty_shouldBeEmpty() async throws {
+    @Test
+    func fileBuffer_whenInitEmpty_shouldBeEmpty() async throws {
         // Given
         let fileBuffer = Internals.FileBuffer()
 
@@ -395,13 +412,14 @@ class InternalsFileBufferTests: XCTestCase {
         let writableBytes = fileBuffer.writableBytes
 
         // Then
-        XCTAssertEqual(writerIndex, .zero)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(readableBytes, .zero)
-        XCTAssertEqual(writableBytes, .zero)
+        #expect(writerIndex == .zero)
+        #expect(readerIndex == .zero)
+        #expect(readableBytes == .zero)
+        #expect(writableBytes == .zero)
     }
 
-    func testFileBuffer_whenInitData_shouldReadContents() async throws {
+    @Test
+    func fileBuffer_whenInitData_shouldReadContents() async throws {
         // Given
         let data = Data("Hello World".utf8)
         var fileBuffer = Internals.FileBuffer(data)
@@ -410,14 +428,15 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = fileBuffer.readData(fileBuffer.readableBytes)
 
         // Then
-        XCTAssertEqual(readData, data)
-        XCTAssertEqual(fileBuffer.writerIndex, data.count)
-        XCTAssertEqual(fileBuffer.readerIndex, data.count)
-        XCTAssertEqual(fileBuffer.readableBytes, .zero)
-        XCTAssertEqual(fileBuffer.writableBytes, .zero)
+        #expect(readData == data)
+        #expect(fileBuffer.writerIndex == data.count)
+        #expect(fileBuffer.readerIndex == data.count)
+        #expect(fileBuffer.readableBytes == .zero)
+        #expect(fileBuffer.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenInitBytes_shouldReadContents() async throws {
+    @Test
+    func fileBuffer_whenInitBytes_shouldReadContents() async throws {
         // Given
         let data = Data("Hello World".utf8)
         let bytes = Array(data)
@@ -427,14 +446,15 @@ class InternalsFileBufferTests: XCTestCase {
         let readBytes = fileBuffer.readBytes(fileBuffer.readableBytes)
 
         // Then
-        XCTAssertEqual(readBytes, bytes)
-        XCTAssertEqual(fileBuffer.writerIndex, bytes.count)
-        XCTAssertEqual(fileBuffer.readerIndex, bytes.count)
-        XCTAssertEqual(fileBuffer.readableBytes, .zero)
-        XCTAssertEqual(fileBuffer.writableBytes, .zero)
+        #expect(readBytes == bytes)
+        #expect(fileBuffer.writerIndex == bytes.count)
+        #expect(fileBuffer.readerIndex == bytes.count)
+        #expect(fileBuffer.readableBytes == .zero)
+        #expect(fileBuffer.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenInitString_shouldReadContents() async throws {
+    @Test
+    func fileBuffer_whenInitString_shouldReadContents() async throws {
         // Given
         let string: String = "Hello World"
         var fileBuffer = Internals.FileBuffer(string)
@@ -443,14 +463,15 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = fileBuffer.readData(fileBuffer.readableBytes)
 
         // Then
-        XCTAssertEqual(readData, Data(string.utf8))
-        XCTAssertEqual(fileBuffer.writerIndex, string.count)
-        XCTAssertEqual(fileBuffer.readerIndex, string.count)
-        XCTAssertEqual(fileBuffer.readableBytes, .zero)
-        XCTAssertEqual(fileBuffer.writableBytes, .zero)
+        #expect(readData == Data(string.utf8))
+        #expect(fileBuffer.writerIndex == string.count)
+        #expect(fileBuffer.readerIndex == string.count)
+        #expect(fileBuffer.readableBytes == .zero)
+        #expect(fileBuffer.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenInitStaticString_shouldReadContents() async throws {
+    @Test
+    func fileBuffer_whenInitStaticString_shouldReadContents() async throws {
         // Given
         let string: StaticString = "Hello World"
         var fileBuffer = Internals.FileBuffer(string)
@@ -459,14 +480,15 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = fileBuffer.readData(fileBuffer.readableBytes)
 
         // Then
-        XCTAssertEqual(readData, "\(string)".data(using: .utf8))
-        XCTAssertEqual(fileBuffer.writerIndex, string.utf8CodeUnitCount)
-        XCTAssertEqual(fileBuffer.readerIndex, string.utf8CodeUnitCount)
-        XCTAssertEqual(fileBuffer.readableBytes, .zero)
-        XCTAssertEqual(fileBuffer.writableBytes, .zero)
+        #expect(readData == "\(string)".data(using: .utf8))
+        #expect(fileBuffer.writerIndex == string.utf8CodeUnitCount)
+        #expect(fileBuffer.readerIndex == string.utf8CodeUnitCount)
+        #expect(fileBuffer.readableBytes == .zero)
+        #expect(fileBuffer.writableBytes == .zero)
     }
 
-    func testFileBuffer_whenInitFileBuffer_shouldReadContents() async throws {
+    @Test
+    func fileBuffer_whenInitFileBuffer_shouldReadContents() async throws {
         // Given
         let data = Data("Hello World".utf8)
         let fileBuffer = Internals.FileBuffer(data)
@@ -476,11 +498,12 @@ class InternalsFileBufferTests: XCTestCase {
         let readData = sut1.readData(sut1.readableBytes)
 
         // Then
-        XCTAssertEqual(sut1.writerIndex, fileBuffer.writerIndex)
-        XCTAssertEqual(readData, data)
+        #expect(sut1.writerIndex == fileBuffer.writerIndex)
+        #expect(readData == data)
     }
 
-    func testFileBuffer_whenInitByteURL_shouldBeEmpty() async throws {
+    @Test
+    func fileBuffer_whenInitByteURL_shouldBeEmpty() async throws {
         // Given
         let url = Internals.ByteURL()
 
@@ -493,13 +516,14 @@ class InternalsFileBufferTests: XCTestCase {
         let writableBytes = fileBuffer.writableBytes
 
         // Then
-        XCTAssertEqual(writerIndex, .zero)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(readableBytes, .zero)
-        XCTAssertEqual(writableBytes, .zero)
+        #expect(writerIndex == .zero)
+        #expect(readerIndex == .zero)
+        #expect(readableBytes == .zero)
+        #expect(writableBytes == .zero)
     }
 
-    func testFileBuffer_whenInitDataBuffer_shouldBeEqual() async throws {
+    @Test
+    func fileBuffer_whenInitDataBuffer_shouldBeEqual() async throws {
         // Given
         let data = Data.randomData(length: 1_000_000)
         let fileBuffer = Internals.FileBuffer(Internals.DataBuffer(data))
@@ -511,13 +535,14 @@ class InternalsFileBufferTests: XCTestCase {
         let writableBytes = fileBuffer.writableBytes
 
         // Then
-        XCTAssertEqual(writerIndex, data.count)
-        XCTAssertEqual(readerIndex, .zero)
-        XCTAssertEqual(readableBytes, data.count)
-        XCTAssertEqual(writableBytes, .zero)
+        #expect(writerIndex == data.count)
+        #expect(readerIndex == .zero)
+        #expect(readableBytes == data.count)
+        #expect(writableBytes == .zero)
     }
 
-    func testFileBuffer_whenReadZeroBytes_shouldBeNil() async throws {
+    @Test
+    func fileBuffer_whenReadZeroBytes_shouldBeNil() async throws {
         // Given
         var dataBuffer = Internals.FileBuffer()
 
@@ -525,10 +550,11 @@ class InternalsFileBufferTests: XCTestCase {
         let data = dataBuffer.readData(.zero)
 
         // Then
-        XCTAssertNil(data)
+        #expect(data == nil)
     }
 
-    func testFileBuffer_whenReadDataOutOfBounds() async throws {
+    @Test
+    func fileBuffer_whenReadDataOutOfBounds() async throws {
         // Given
         var fileBuffer = Internals.FileBuffer(
             Data.randomData(length: 64)
@@ -538,10 +564,11 @@ class InternalsFileBufferTests: XCTestCase {
         let data = fileBuffer.readData(72)
 
         // Then
-        XCTAssertNil(data)
+        #expect(data == nil)
     }
 
-    func testFileBuffer_whenReadBytesOutOfBounds() async throws {
+    @Test
+    func fileBuffer_whenReadBytesOutOfBounds() async throws {
         // Given
         var fileBuffer = Internals.FileBuffer(
             Data.randomData(length: 64)
@@ -551,19 +578,21 @@ class InternalsFileBufferTests: XCTestCase {
         let bytes = fileBuffer.readBytes(72)
 
         // Then
-        XCTAssertNil(bytes)
+        #expect(bytes == nil)
     }
 
-    func testFileBuffer_whenGetData() async throws {
+    @Test
+    func fileBuffer_whenGetData() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         let fileBuffer = Internals.FileBuffer(data)
 
         // Then
-        XCTAssertEqual(fileBuffer.getData(), data)
+        #expect(fileBuffer.getData() == data)
     }
 
-    func testFileBuffer_whenGetDataByMovingReaderIndex() async throws {
+    @Test
+    func fileBuffer_whenGetDataByMovingReaderIndex() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -572,19 +601,21 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.moveReaderIndex(to: 64)
 
         // Then
-        XCTAssertEqual(fileBuffer.getData(), data[64 ..< data.count])
+        #expect(fileBuffer.getData() == data[64 ..< data.count])
     }
 
-    func testFileBuffer_whenGetBytes() async throws {
+    @Test
+    func fileBuffer_whenGetBytes() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         let fileBuffer = Internals.FileBuffer(data)
 
         // Then
-        XCTAssertEqual(fileBuffer.getBytes(), Array(data))
+        #expect(fileBuffer.getBytes() == Array(data))
     }
 
-    func testFileBuffer_whenGetBytesByMovingReaderIndex() async throws {
+    @Test
+    func fileBuffer_whenGetBytesByMovingReaderIndex() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -593,10 +624,11 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.moveReaderIndex(to: 64)
 
         // Then
-        XCTAssertEqual(fileBuffer.getBytes(), Array(data[64 ..< data.count]))
+        #expect(fileBuffer.getBytes() == Array(data[64 ..< data.count]))
     }
 
-    func testFileBuffer_whenGetBytesAtIndexWithLength() async throws {
+    @Test
+    func fileBuffer_whenGetBytesAtIndexWithLength() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -606,13 +638,14 @@ class InternalsFileBufferTests: XCTestCase {
 
         // Then
 
-        XCTAssertEqual(
+        #expect(
             fileBuffer.getBytes(at: 32, length: 64),
             Array(data[32 ..< 96])
         )
     }
 
-    func testFileBuffer_whenGetDataAtIndexWithLength() async throws {
+    @Test
+    func fileBuffer_whenGetDataAtIndexWithLength() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -622,13 +655,14 @@ class InternalsFileBufferTests: XCTestCase {
 
         // Then
 
-        XCTAssertEqual(
+        #expect(
             fileBuffer.getData(at: 32, length: 64),
             data[32 ..< 96]
         )
     }
 
-    func testFileBuffer_whenSetDataWhenMovingWriterIndex() async throws {
+    @Test
+    func fileBuffer_whenSetDataWhenMovingWriterIndex() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -640,18 +674,19 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.setData(writeData)
 
         // Then
-        XCTAssertEqual(fileBuffer.writableBytes, writeData.count)
+        #expect(fileBuffer.writableBytes == writeData.count)
 
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        XCTAssertEqual(
+        #expect(
             fileBuffer.readData(writeData.count),
             writeData
         )
     }
 
-    func testFileBuffer_whenSetDataAtWriterIndex() async throws {
+    @Test
+    func fileBuffer_whenSetDataAtWriterIndex() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -662,18 +697,19 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.setData(writeData, at: data.count - 32)
 
         // Then
-        XCTAssertEqual(fileBuffer.writableBytes, writeData.count - 32)
+        #expect(fileBuffer.writableBytes == writeData.count - 32)
 
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex - 32)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        XCTAssertEqual(
+        #expect(
             fileBuffer.readData(writeData.count),
             writeData
         )
     }
 
-    func testFileBuffer_whenSetBytesWhenMovingWriterIndex() async throws {
+    @Test
+    func fileBuffer_whenSetBytesWhenMovingWriterIndex() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -685,18 +721,19 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.setBytes(writeBytes)
 
         // Then
-        XCTAssertEqual(fileBuffer.writableBytes, writeBytes.count)
+        #expect(fileBuffer.writableBytes == writeBytes.count)
 
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        XCTAssertEqual(
+        #expect(
             fileBuffer.readBytes(writeBytes.count),
             writeBytes
         )
     }
 
-    func testFileBuffer_whenSetBytesAtWriterIndex() async throws {
+    @Test
+    func fileBuffer_whenSetBytesAtWriterIndex() async throws {
         // Given
         let data = Data.randomData(length: 1_024)
         var fileBuffer = Internals.FileBuffer(data)
@@ -707,18 +744,19 @@ class InternalsFileBufferTests: XCTestCase {
         fileBuffer.setBytes(writeBytes, at: data.count - 32)
 
         // Then
-        XCTAssertEqual(fileBuffer.writableBytes, writeBytes.count - 32)
+        #expect(fileBuffer.writableBytes == writeBytes.count - 32)
 
         fileBuffer.moveReaderIndex(to: fileBuffer.writerIndex - 32)
         fileBuffer.moveWriterIndex(to: fileBuffer.writerIndex + fileBuffer.writableBytes)
 
-        XCTAssertEqual(
+        #expect(
             fileBuffer.readBytes(writeBytes.count),
             writeBytes
         )
     }
 
-    func testFileBuffer_whenRacingImmutable() async throws {
+    @Test
+    func fileBuffer_whenRacingImmutable() async throws {
         // Given
         let fileBuffer = Internals.FileBuffer(Data.randomData(length: 1_024))
 
@@ -738,7 +776,7 @@ class InternalsFileBufferTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(Set(datas.compactMap { $0 }).count, 1_024)
+        #expect(Set(datas.compactMap { $0 }).count == 1_024)
     }
 }
 // swiftlint:enable type_body_length file_length

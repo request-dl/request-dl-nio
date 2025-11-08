@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InterceptorsLogInConsoleTests: XCTestCase {
+struct InterceptorsLogInConsoleTests {
 
-    func testConsoleTaskResult() async throws {
+    @Test
+    func consoleTaskResult() async throws {
         // Given
         let data = Data("Hello World!".utf8)
         let strings = SendableBox([String]())
@@ -32,7 +34,7 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(strings().first?.contains(
+        #expect(strings().first?.contains(
             """
             Head: \(result.head)
             Payload: \(String(data: data, encoding: .utf8) ?? "")
@@ -40,7 +42,8 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         ) ?? false)
     }
 
-    func testConsoleData() async throws {
+    @Test
+    func consoleData() async throws {
         // Given
         let data = Data("Hello World!".utf8)
         let strings = SendableBox([String]())
@@ -66,14 +69,15 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(strings().first?.contains(
+        #expect(strings().first?.contains(
             """
             Success: \(String(data: data, encoding: .utf8) ?? "")
             """
         ) ?? false)
     }
 
-    func testConsoleDecoded() async throws {
+    @Test
+    func consoleDecoded() async throws {
         // Given
         let value = "Hello World!"
         let strings = SendableBox([String]())
@@ -102,7 +106,7 @@ class InterceptorsLogInConsoleTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(strings().first?.contains(
+        #expect(strings().first?.contains(
             "Success: \(value)"
         ) ?? false)
     }

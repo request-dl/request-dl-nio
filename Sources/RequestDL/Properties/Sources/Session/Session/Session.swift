@@ -176,6 +176,7 @@ public struct Session: Property {
      - origin: The custom origin to use for DNS resolution.
      - Returns: The modified `Session` instance with the DNS override configured.
      */
+    @available(*, deprecated, message: "Use the new 'DNSOverride' property instead of this method.")
     public func overrideDNS(_ destination: String, from origin: String) -> Self {
         edit { $0.dnsOverride[origin] = destination }
     }

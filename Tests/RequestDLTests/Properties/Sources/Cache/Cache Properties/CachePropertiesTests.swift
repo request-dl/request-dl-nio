@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class CachePropertiesTests: XCTestCase {
+struct CachePropertiesTests {
 
     override func tearDown() async throws {
         try await super.tearDown()
@@ -13,7 +14,8 @@ class CachePropertiesTests: XCTestCase {
         DataCache.shared.diskCapacity = .zero
     }
 
-    func testCache_whenCacheSharedWithoutCapacity() async throws {
+    @Test
+    func cache_whenCacheSharedWithoutCapacity() async throws {
         // When
         let resolved = try await resolve(TestProperty {
             EmptyProperty()
@@ -21,10 +23,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.dataCache, DataCache.shared)
+        #expect(resolved.dataCache == DataCache.shared)
     }
 
-    func testCache_whenCacheSharedWithCapacity() async throws {
+    @Test
+    func cache_whenCacheSharedWithCapacity() async throws {
         // Given
         let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
         let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
@@ -39,16 +42,17 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.dataCache, DataCache.shared)
+        #expect(resolved.dataCache == DataCache.shared)
 
-        XCTAssertEqual(resolved.dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(resolved.dataCache.diskCapacity, diskCapacity)
+        #expect(resolved.dataCache.memoryCapacity == memoryCapacity)
+        #expect(resolved.dataCache.diskCapacity == diskCapacity)
 
-        XCTAssertEqual(DataCache.shared.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(DataCache.shared.diskCapacity, diskCapacity)
+        #expect(DataCache.shared.memoryCapacity == memoryCapacity)
+        #expect(DataCache.shared.diskCapacity == diskCapacity)
     }
 
-    func testCache_whenCacheSuiteNameWithoutCapacity() async throws {
+    @Test
+    func cache_whenCacheSuiteNameWithoutCapacity() async throws {
         // Given
         let suiteName = "hello_world"
 
@@ -59,10 +63,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.dataCache, DataCache(suiteName: suiteName))
+        #expect(resolved.dataCache == DataCache(suiteName: suiteName))
     }
 
-    func testCache_whenCacheSuiteNameWithCapacity() async throws {
+    @Test
+    func cache_whenCacheSuiteNameWithCapacity() async throws {
         // Given
         let suiteName = "hello_world"
         let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
@@ -81,16 +86,17 @@ class CachePropertiesTests: XCTestCase {
         let dataCache = DataCache(suiteName: suiteName)
 
         // Then
-        XCTAssertEqual(resolved.dataCache, dataCache)
+        #expect(resolved.dataCache == dataCache)
 
-        XCTAssertEqual(resolved.dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(resolved.dataCache.diskCapacity, diskCapacity)
+        #expect(resolved.dataCache.memoryCapacity == memoryCapacity)
+        #expect(resolved.dataCache.diskCapacity == diskCapacity)
 
-        XCTAssertEqual(dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(dataCache.diskCapacity, diskCapacity)
+        #expect(dataCache.memoryCapacity == memoryCapacity)
+        #expect(dataCache.diskCapacity == diskCapacity)
     }
 
-    func testCache_whenCacheURLWithoutCapacity() async throws {
+    @Test
+    func cache_whenCacheURLWithoutCapacity() async throws {
         // Given
         let url = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -104,10 +110,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.dataCache, DataCache(url: url))
+        #expect(resolved.dataCache == DataCache(url: url))
     }
 
-    func testCache_whenCacheURLWithCapacity() async throws {
+    @Test
+    func cache_whenCacheURLWithCapacity() async throws {
         // Given
         let url = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -130,16 +137,17 @@ class CachePropertiesTests: XCTestCase {
         let dataCache = DataCache(url: url)
 
         // Then
-        XCTAssertEqual(resolved.dataCache, dataCache)
+        #expect(resolved.dataCache == dataCache)
 
-        XCTAssertEqual(resolved.dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(resolved.dataCache.diskCapacity, diskCapacity)
+        #expect(resolved.dataCache.memoryCapacity == memoryCapacity)
+        #expect(resolved.dataCache.diskCapacity == diskCapacity)
 
-        XCTAssertEqual(dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(dataCache.diskCapacity, diskCapacity)
+        #expect(dataCache.memoryCapacity == memoryCapacity)
+        #expect(dataCache.diskCapacity == diskCapacity)
     }
 
-    func testCache_whenMemoryCachePolicy() async throws {
+    @Test
+    func cache_whenMemoryCachePolicy() async throws {
         // Given
         let policy = DataCache.Policy.Set.memory
 
@@ -150,10 +158,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cachePolicy, policy)
+        #expect(resolved.request.cachePolicy == policy)
     }
 
-    func testCache_whenDiskCachePolicy() async throws {
+    @Test
+    func cache_whenDiskCachePolicy() async throws {
         // Given
         let policy = DataCache.Policy.Set.disk
 
@@ -164,10 +173,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cachePolicy, policy)
+        #expect(resolved.request.cachePolicy == policy)
     }
 
-    func testCache_whenAllCachePolicy() async throws {
+    @Test
+    func cache_whenAllCachePolicy() async throws {
         // Given
         let policy = DataCache.Policy.Set.all
 
@@ -178,10 +188,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cachePolicy, policy)
+        #expect(resolved.request.cachePolicy == policy)
     }
 
-    func testCache_whenIgnoreCachedDataStrategy() async throws {
+    @Test
+    func cache_whenIgnoreCachedDataStrategy() async throws {
         // Given
         let cacheStrategy = CacheStrategy.ignoreCachedData
 
@@ -192,10 +203,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cacheStrategy, cacheStrategy)
+        #expect(resolved.request.cacheStrategy == cacheStrategy)
     }
 
-    func testCache_whenReloadAndValidateCachedDataStrategy() async throws {
+    @Test
+    func cache_whenReloadAndValidateCachedDataStrategy() async throws {
         // Given
         let cacheStrategy = CacheStrategy.reloadAndValidateCachedData
 
@@ -206,10 +218,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cacheStrategy, cacheStrategy)
+        #expect(resolved.request.cacheStrategy == cacheStrategy)
     }
 
-    func testCache_whenReturnCachedDataElseLoadStrategy() async throws {
+    @Test
+    func cache_whenReturnCachedDataElseLoadStrategy() async throws {
         // Given
         let cacheStrategy = CacheStrategy.returnCachedDataElseLoad
 
@@ -220,10 +233,11 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cacheStrategy, cacheStrategy)
+        #expect(resolved.request.cacheStrategy == cacheStrategy)
     }
 
-    func testCache_whenUseCachedDataOnlyStrategy() async throws {
+    @Test
+    func cache_whenUseCachedDataOnlyStrategy() async throws {
         // Given
         let cacheStrategy = CacheStrategy.useCachedDataOnly
 
@@ -234,6 +248,6 @@ class CachePropertiesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.cacheStrategy, cacheStrategy)
+        #expect(resolved.request.cacheStrategy == cacheStrategy)
     }
 }

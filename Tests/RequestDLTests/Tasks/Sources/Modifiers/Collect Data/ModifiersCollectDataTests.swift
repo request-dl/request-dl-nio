@@ -2,28 +2,17 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersCollectDataTests: XCTestCase {
+struct ModifiersCollectDataTests {
 
-    var localServer: LocalServer?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        localServer?.cleanup()
-        localServer = nil
-    }
-
-    func testCollect_whenIsResultOfAsyncBytes() async throws {
+    @Test
+    func collect_whenIsResultOfAsyncBytes() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
+        let localServer = try await LocalServer(.standard)
+        defer { localServer.cleanup() }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -57,12 +46,14 @@ class ModifiersCollectDataTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(try HTTPResult(data).response, message)
+        #expect(try HTTPResult(data).response == message)
     }
 
-    func testCollect_whenIsAsyncBytes() async throws {
+    @Test
+    func collect_whenIsAsyncBytes() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
+        let localServer = try await LocalServer(.standard)
+        defer { localServer.cleanup() }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -96,12 +87,14 @@ class ModifiersCollectDataTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(try HTTPResult(data).response, message)
+        #expect(try HTTPResult(data).response == message)
     }
 
-    func testCollect_whenIsAsyncResponse() async throws {
+    @Test
+    func collect_whenIsAsyncResponse() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
+        let localServer = try await LocalServer(.standard)
+        defer { localServer.cleanup() }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -134,6 +127,6 @@ class ModifiersCollectDataTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(try HTTPResult(data).response, message)
+        #expect(try HTTPResult(data).response == message)
     }
 }

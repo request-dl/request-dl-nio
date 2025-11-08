@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersMapTests: XCTestCase {
+struct ModifiersMapTests {
 
-    func testMap() async throws {
+    @Test
+    func map() async throws {
         // Given
         let output = 1
 
@@ -21,6 +23,6 @@ class ModifiersMapTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result, output)
+        #expect(result == output)
     }
 }

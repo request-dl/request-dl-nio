@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 @testable import RequestDL
 
-class PSKIdentityTests: XCTestCase {
+struct PSKIdentityTests {
 
-    func testIdentity_whenClientResolver() async throws {
+    @Test
+    func identity_whenClientResolver() async throws {
         // Given
         let context = PSKClientContext(
             hint: "hint",
@@ -25,7 +27,7 @@ class PSKIdentityTests: XCTestCase {
                         key: key,
                         identity: identity,
                         received: {
-                            XCTAssertEqual($0, context)
+                            #expect($0, context)
                         }
                     )
                 )
@@ -35,11 +37,12 @@ class PSKIdentityTests: XCTestCase {
         let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(context)
 
         // Then
-        XCTAssertEqual(sut?.key, key)
-        XCTAssertEqual(sut?.identity, identity)
+        #expect(sut?.key == key)
+        #expect(sut?.identity == identity)
     }
 
-    func testPSK_whenAccessBody_shouldBeNever() async throws {
+    @Test
+    func pSK_whenAccessBody_shouldBeNever() async throws {
         // Given
         let identity = "host"
         let key = NIOSSLSecureBytes([0, 1, 2])

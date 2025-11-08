@@ -2,24 +2,28 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class OriginHeaderTests: XCTestCase {
+struct OriginHeaderTests {
 
-    func testHost() async throws {
+    @Test
+    func host() async throws {
         let property = TestProperty(OriginHeader("google.com"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Origin"], ["google.com"])
+        #expect(resolved.request.headers["Origin"] == ["google.com"])
     }
 
-    func testHostWithPort() async throws {
+    @Test
+    func hostWithPort() async throws {
         let property = TestProperty(OriginHeader("google.com", port: "8080"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Origin"], ["google.com:8080"])
+        #expect(resolved.request.headers["Origin"] == ["google.com:8080"])
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = OriginHeader("apple.com")
 

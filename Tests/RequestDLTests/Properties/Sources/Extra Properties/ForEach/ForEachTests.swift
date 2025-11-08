@@ -2,16 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ForEachTests: XCTestCase {
+struct ForEachTests {
 
     struct Value: Identifiable {
         let id: String
     }
 
-    func testForEach_whenIDByIdentifiable_shouldBeValid() async throws {
+    @Test
+    func forEach_whenIDByIdentifiable_shouldBeValid() async throws {
         // Given
         let paths = ["api", "v1", "users"].map {
             Value(id: $0)
@@ -26,13 +28,14 @@ class ForEachTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             "https://127.0.0.1/api/v1/users"
         )
     }
 
-    func testForEach_whenIDBySelf_shouldBeValid() async throws {
+    @Test
+    func forEach_whenIDBySelf_shouldBeValid() async throws {
         // Given
         let paths = ["api", "v1", "users"]
 
@@ -45,13 +48,14 @@ class ForEachTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             "https://127.0.0.1/api/v1/users"
         )
     }
 
-    func testForEach_whenRange_shouldBeValid() async throws {
+    @Test
+    func forEach_whenRange_shouldBeValid() async throws {
         // Given
         let range = 0 ..< 3
 
@@ -64,13 +68,14 @@ class ForEachTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
 
-    func testForEach_whenClosedRange_shouldBeValid() async throws {
+    @Test
+    func forEach_whenClosedRange_shouldBeValid() async throws {
         // Given
         let range = 0 ... 3
 
@@ -83,13 +88,14 @@ class ForEachTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = PropertyForEach([Int](), id: \.self) { _ in
             EmptyProperty()

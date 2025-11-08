@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class QueryTests: XCTestCase {
+struct QueryTests {
 
-    func testSingleQuery() async throws {
+    @Test
+    func singleQuery() async throws {
         // Given
         let property = Query(name: "number", value: 123)
 
@@ -18,10 +20,11 @@ class QueryTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.url, "https://127.0.0.1?number=123")
+        #expect(resolved.request.url == "https://127.0.0.1?number=123")
     }
 
-    func testMultipleQueries() async throws {
+    @Test
+    func multipleQueries() async throws {
         // Given
         let property = TestProperty {
             BaseURL("127.0.0.1")
@@ -35,7 +38,7 @@ class QueryTests: XCTestCase {
         let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             """
             https://127.0.0.1?\
@@ -48,7 +51,8 @@ class QueryTests: XCTestCase {
         )
     }
 
-    func testQuery_withModifiedURLEncoder() async throws {
+    @Test
+    func query_withModifiedURLEncoder() async throws {
         // Given
         let urlEncoder = URLEncoder()
         urlEncoder.boolEncodingStrategy = .numeric
@@ -67,7 +71,7 @@ class QueryTests: XCTestCase {
         let resolved = try await resolve(property)
 
         // Then
-        XCTAssertEqual(
+        #expect(
             resolved.request.url,
             """
             https://127.0.0.1?\
@@ -78,7 +82,8 @@ class QueryTests: XCTestCase {
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = Query(name: "key", value: 123)
 

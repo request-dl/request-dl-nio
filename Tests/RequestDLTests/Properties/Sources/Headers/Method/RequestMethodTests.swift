@@ -2,66 +2,77 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class RequestMethodTests: XCTestCase {
+struct RequestMethodTests {
 
-    func testGetHTTPMethod() async throws {
+    @Test
+    func getHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.get))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "GET")
+        #expect(resolved.request.method == "GET")
     }
 
-    func testHeadHTTPMethod() async throws {
+    @Test
+    func headHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.head))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "HEAD")
+        #expect(resolved.request.method == "HEAD")
     }
 
-    func testPostHTTPMethod() async throws {
+    @Test
+    func postHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.post))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "POST")
+        #expect(resolved.request.method == "POST")
     }
 
-    func testPutHTTPMethod() async throws {
+    @Test
+    func putHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.put))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "PUT")
+        #expect(resolved.request.method == "PUT")
     }
 
-    func testDeleteHTTPMethod() async throws {
+    @Test
+    func deleteHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.delete))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "DELETE")
+        #expect(resolved.request.method == "DELETE")
     }
 
-    func testConnectHTTPMethod() async throws {
+    @Test
+    func connectHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.connect))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "CONNECT")
+        #expect(resolved.request.method == "CONNECT")
     }
 
-    func testOptionsHTTPMethod() async throws {
+    @Test
+    func optionsHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.options))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "OPTIONS")
+        #expect(resolved.request.method == "OPTIONS")
     }
 
-    func testTraceHTTPMethod() async throws {
+    @Test
+    func traceHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.trace))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "TRACE")
+        #expect(resolved.request.method == "TRACE")
     }
 
-    func testPatchHTTPMethod() async throws {
+    @Test
+    func patchHTTPMethod() async throws {
         let property = TestProperty(RequestMethod(.patch))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.method, "PATCH")
+        #expect(resolved.request.method == "PATCH")
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = RequestMethod(.get)
 
