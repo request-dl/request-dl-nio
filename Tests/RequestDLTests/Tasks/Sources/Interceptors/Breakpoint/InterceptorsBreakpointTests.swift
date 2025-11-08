@@ -14,21 +14,20 @@ struct InterceptorsBreakpointTests {
         // Given
         let breakpointActivated = SendableBox(false)
 
-        Internals.Override.Raise.replace {
+        try await Internals.Override.Raise.replace {
             breakpointActivated($0 == SIGTRAP)
-            Internals.Override.Raise.restore()
             return $0
-        }
+        } perform: {
+            // When
+            _ = try await MockedTask {
+                BaseURL("localhost")
+            }
+            .breakpoint()
+            .result()
 
-        // When
-        _ = try await MockedTask {
-            BaseURL("localhost")
+            // Then
+            #expect(breakpointActivated())
         }
-        .breakpoint()
-        .result()
-
-        // Then
-        #expect(breakpointActivated())
     }
 }
 #endif

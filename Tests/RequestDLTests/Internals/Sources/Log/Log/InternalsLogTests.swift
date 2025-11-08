@@ -22,21 +22,21 @@ struct InternalsLogTests {
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
 
-        Internals.Override.Print.replace {
+        await Internals.Override.Print.replace {
             payload(($0, $1, $2))
             expecting.signal()
+        } perform: {
+            Internals.Log.debug(message1, message2, line: line, file: file)
+
+            // Then
+            await expecting.wait()
+
+            #expect(payload()?.0 == " ")
+            #expect(payload()?.1 == "\n")
+            #expect(payload()?.2 as? [String] == [
+                debugOutput(message1, message2)
+            ])
         }
-
-        Internals.Log.debug(message1, message2, line: line, file: file)
-
-        // Then
-        await expecting.wait()
-
-        #expect(payload()?.0 == " ")
-        #expect(payload()?.1 == "\n")
-        #expect(payload()?.2 as? [String] == [
-            debugOutput(message1, message2)
-        ])
     }
 
     @Test
@@ -49,23 +49,21 @@ struct InternalsLogTests {
         let expecting = AsyncSignal()
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
-        Internals.Override.Print.replace {
+        await Internals.Override.Print.replace {
             payload(($0, $1, $2))
             expecting.signal()
+        } perform: {
+            Internals.Log.warning(message1, message2, line: line, file: file)
+
+            // Then
+            await expecting.wait()
+
+            #expect(payload()?.0 == " ")
+            #expect(payload()?.1 == "\n")
+            #expect(payload()?.2 as? [String] == [
+                warningOutput(message1, message2)
+            ])
         }
-
-        defer { Internals.Override.Print.restore() }
-
-        Internals.Log.warning(message1, message2, line: line, file: file)
-
-        // Then
-        await expecting.wait()
-
-        #expect(payload()?.0 == " ")
-        #expect(payload()?.1 == "\n")
-        #expect(payload()?.2 as? [String] == [
-            warningOutput(message1, message2)
-        ])
     }
 
     @Test
@@ -75,24 +73,21 @@ struct InternalsLogTests {
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = AsyncSignal()
-
         let payload = SendableBox<(String, StaticString, UInt)?>(nil)
-        Internals.Override.FatalError.replace {
-            payload(($0, $1, $2))
-            expecting.signal()
-            Thread.exit()
-            return Swift.fatalError()
-        }
+        let expectation = AsyncSignal()
 
-        defer { Internals.Override.FatalError.restore() }
+        Thread {
+            Internals.Override.FatalError.replace {
+                payload(($0, $1, $2))
+                expectation.signal()
+                Thread.exit()
+                return Swift.fatalError()
+            } perform: {
+                _ = Internals.Log.failure(message1, message2, line: line, file: file)
+            }
+        }.start()
 
-        Thread.detachNewThread { [line, file] in
-            Internals.Log.failure(message1, message2, line: line, file: file)
-        }
-
-        // Then
-        await expecting.wait()
+        await expectation.wait()
 
         #expect(payload()?.0 == failureOutput(message1, message2))
         #expect((payload()?.1).map { "\($0)" } == "\(file)")

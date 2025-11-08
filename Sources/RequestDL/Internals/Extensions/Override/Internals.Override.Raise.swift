@@ -10,31 +10,14 @@ extension Internals.Override {
     enum Raise {
         typealias Closure = @Sendable (Int32) -> Int32
 
-        fileprivate final class State: @unchecked Sendable {
-
-            var closure: Closure {
-                get { lock.withLock { _closure } }
-                set { lock.withLock { _closure = newValue } }
-            }
-
-            private let lock = Lock()
-            private var _closure: Closure = defaultClosure
-
-            init() {}
-        }
-
-        fileprivate static let state = State()
-
-        private static let defaultClosure: Closure = {
+        @TaskLocal
+        fileprivate static var closure: Closure = {
             Foundation.raise($0)
         }
 
-        static func replace(with closure: @escaping Closure) {
-            self.state.closure = closure
-        }
-
-        static func restore() {
-            state.closure = defaultClosure
+        @discardableResult
+        static func replace<T: Sendable>(with closure: @escaping Closure, perform: @Sendable () async throws -> T) async rethrows -> T {
+            try await $closure.withValue(closure, operation: perform)
         }
     }
     #endif
@@ -42,7 +25,7 @@ extension Internals.Override {
     @discardableResult
     static func raise(_ value: Int32) -> Int32 {
         #if DEBUG
-        Raise.state.closure(value)
+        Raise.closure(value)
         #else
         Foundation.raise(value)
         #endif

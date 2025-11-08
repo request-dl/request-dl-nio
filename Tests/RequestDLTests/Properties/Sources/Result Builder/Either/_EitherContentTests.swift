@@ -66,18 +66,17 @@ struct _EitherContentTests {
 
 func assertNever<T>(_ closure: @autoclosure @escaping @Sendable () throws -> T) async throws {
     try await withUnsafeThrowingContinuation { continuation in
-        Internals.Override.FatalError.replace { message, file, line in
-            Internals.Override.FatalError.restore()
-            continuation.resume()
-            Thread.exit()
-            Swift.fatalError(message, file: file, line: line)
-        }
-
         Thread {
-            do {
-                _ = try closure()
-            } catch {
-                continuation.resume(with: .failure(error))
+            Internals.Override.FatalError.replace { message, file, line in
+                continuation.resume()
+                Thread.exit()
+                Swift.fatalError(message, file: file, line: line)
+            } perform: {
+                do {
+                    _ = try closure()
+                } catch {
+                    continuation.resume(with: .failure(error))
+                }
             }
         }.start()
     }
