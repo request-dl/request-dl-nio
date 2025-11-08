@@ -10,12 +10,14 @@ struct InternalsSessionTests {
 
     final class TestState: Sendable {
 
+        let uri: String
         let localServer: LocalServer
         let session: Internals.Session
 
         init() async throws {
+            uri = "/" + UUID().uuidString
             localServer = try await .init(.standard)
-            localServer.cleanup()
+            localServer.cleanup(at: uri)
 
             var configuration = Internals.Session.Configuration()
             var secureConnection = Internals.SecureConnection()
@@ -30,7 +32,7 @@ struct InternalsSessionTests {
         }
 
         deinit {
-            localServer.cleanup()
+            localServer.cleanup(at: uri)
         }
     }
 
@@ -42,6 +44,7 @@ struct InternalsSessionTests {
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
 
         // When
         let task = try await session.execute(
@@ -71,6 +74,7 @@ struct InternalsSessionTests {
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         request.method = "POST"
         request.body = Internals.Body(buffers: [
             Internals.DataBuffer(data)
@@ -103,6 +107,7 @@ struct InternalsSessionTests {
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         request.method = "POST"
         request.body = Internals.Body(buffers: [])
 
@@ -151,11 +156,12 @@ struct InternalsSessionTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         var request = Internals.Request()
         request.baseURL = "https://\(localServer.baseURL)"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         request.method = "POST"
         request.body = Internals.Body(
             chunkSize: fragment,

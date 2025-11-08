@@ -12,7 +12,8 @@ struct ModifiersIgnoresProgressTests {
     func ignores_whenUploadStep_shouldBeValid() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
-        defer { localServer.cleanup() }
+        let uri = "/" + UUID().uuidString
+        defer { localServer.cleanup(at: uri) }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -21,23 +22,18 @@ struct ModifiersIgnoresProgressTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let bytes = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .ignoresUploadProgress()
@@ -54,7 +50,8 @@ struct ModifiersIgnoresProgressTests {
     func ignores_whenDownloadStep_shouldBeValid() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
-        defer { localServer.cleanup() }
+        let uri = "/" + UUID().uuidString
+        defer { localServer.cleanup(at: uri) }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -63,23 +60,18 @@ struct ModifiersIgnoresProgressTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .ignoresUploadProgress()
@@ -95,7 +87,8 @@ struct ModifiersIgnoresProgressTests {
     func ignores_whenSkipProgress_shouldBeValid() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
-        defer { localServer.cleanup() }
+        let uri = "/" + UUID().uuidString
+        defer { localServer.cleanup(at: uri) }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -104,23 +97,18 @@ struct ModifiersIgnoresProgressTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .ignoresProgress()

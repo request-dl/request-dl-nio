@@ -13,7 +13,12 @@ public struct DataCache: Sendable, Equatable {
 
         // MARK: - Internal static properties
 
+        #if DEBUG
+        @TaskLocal
+        static var shared = Manager()
+        #else
         static let shared = Manager()
+        #endif
 
         // MARK: - Private properties
 
@@ -100,7 +105,16 @@ public struct DataCache: Sendable, Equatable {
 
     // MARK: - Public static properties
 
+    #if DEBUG
+    public static var shared: DataCache {
+        local
+    }
+
+    @TaskLocal
+    private static var local = DataCache()
+    #else
     public static let shared = DataCache()
+    #endif
 
     // MARK: - Public properties
 
@@ -120,11 +134,17 @@ public struct DataCache: Sendable, Equatable {
         nonmutating set { storage.diskCapacity = newValue }
     }
 
+    // MARK: - Internal properties
+
+    var directoryURL: URL {
+        storage.directory
+    }
+
     // MARK: - Private properties
 
     private let storage: Storage
 
-    // MARK: - Internal properties
+    // MARK: - Inits
 
     /**
      Initializes a data cache with specified memory and disk capacities and a file URL for disk storage.
@@ -232,6 +252,24 @@ public struct DataCache: Sendable, Equatable {
         temporaryURL(
             suiteName: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
         )
+    }
+
+    static func withTaskLocalDataCache<T: Sendable>(
+        dataCache: @Sendable () -> DataCache = { DataCache() },
+        operation: @Sendable () async throws -> T
+    ) async rethrows -> T {
+        try await Manager.$shared.withValue(Manager()) {
+            try await Self.$local.withValue(dataCache(), operation: operation)
+        }
+    }
+
+    static func withTaskLocalDataCache<T: Sendable>(
+        dataCache: @Sendable () -> DataCache = { DataCache() },
+        operation: @Sendable () throws -> T
+    ) rethrows -> T {
+        try Manager.$shared.withValue(Manager()) {
+            try Self.$local.withValue(dataCache(), operation: operation)
+        }
     }
 
     // MARK: - Public methods

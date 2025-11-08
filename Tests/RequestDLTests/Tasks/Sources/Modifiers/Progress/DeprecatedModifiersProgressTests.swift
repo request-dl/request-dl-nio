@@ -82,14 +82,16 @@ struct DeprecatedModifiersProgressTests {
 
     final class TestState: Sendable {
 
+        let uri: String
         let localServer: LocalServer
         let uploadMonitor: UploadProgressMonitor
         let downloadMonitor: DownloadProgressMonitor
         let progressMonitor: ProgressMonitor
 
         init() async throws {
+            uri = "/" + UUID().uuidString
             localServer = try await .init(.standard)
-            localServer.cleanup()
+            localServer.cleanup(at: uri)
 
             uploadMonitor = .init()
             downloadMonitor = .init()
@@ -97,7 +99,7 @@ struct DeprecatedModifiersProgressTests {
         }
 
         deinit {
-            localServer.cleanup()
+            localServer.cleanup(at: uri)
         }
     }
 
@@ -115,25 +117,21 @@ struct DeprecatedModifiersProgressTests {
             data: data
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         _ = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
             Payload(data: data)
 
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .uploadProgress(uploadMonitor)
@@ -159,24 +157,20 @@ struct DeprecatedModifiersProgressTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
 
             ReadingMode(length: length)
@@ -217,7 +211,7 @@ struct DeprecatedModifiersProgressTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         let expectingData = try HTTPResult(
             receivedBytes: .zero,
@@ -226,20 +220,16 @@ struct DeprecatedModifiersProgressTests {
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
 
             ReadingMode(length: length)
@@ -282,26 +272,22 @@ struct DeprecatedModifiersProgressTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         let receivedData = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             ReadingMode(length: length)
 
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
 
             Payload(data: data)

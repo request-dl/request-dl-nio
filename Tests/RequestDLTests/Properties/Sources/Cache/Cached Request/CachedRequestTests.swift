@@ -6,7 +6,7 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-@Suite(.serialized)
+@Suite(.localDataCache(.autogenerate))
 struct CachedRequestTests {
 
     final class TestState: Sendable {
@@ -15,10 +15,12 @@ struct CachedRequestTests {
         let dataCache = DataCache.shared
         let output = String.randomString(length: 64)
         let localServer: LocalServer
+        let uri: String
 
         init() async throws {
+            uri = "/" + UUID().uuidString
             localServer = try await LocalServer(.standard)
-            localServer.cleanup()
+            localServer.cleanup(at: uri)
 
             dataCache.removeAll()
             dataCache.memoryCapacity = 8 * 1_024 * 1_024
@@ -30,15 +32,17 @@ struct CachedRequestTests {
             dataCache.memoryCapacity = .zero
             dataCache.diskCapacity = .zero
 
-            localServer.cleanup()
+            localServer.cleanup(at: uri)
         }
     }
 
     @Test
     func cache_whenNoCacheOnIgnoresCachedDataStrategy() async throws {
         let testState = try await TestState()
+        defer { _ = testState }
+
         // Given
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         let response = try await performCacheRequest(
@@ -62,7 +66,7 @@ struct CachedRequestTests {
         let testState = try await TestState()
         // Given
         let cacheData = mockCachedData(makeHeaders(eTag: UUID()))
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -108,7 +112,7 @@ struct CachedRequestTests {
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
         let testState = try await TestState()
         let cacheData = mockCachedData(makeHeaders())
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -133,7 +137,7 @@ struct CachedRequestTests {
     func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge() async throws {
         let testState = try await TestState()
         let cacheData = mockCachedData(makeHeaders())
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
         var thrownError: Error?
 
         // When
@@ -159,7 +163,7 @@ struct CachedRequestTests {
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let testState = try await TestState()
         let cacheData = mockCachedData(makeHeaders(maxAge: false))
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -184,7 +188,7 @@ struct CachedRequestTests {
     func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires() async throws {
         let testState = try await TestState()
         let cacheData = mockCachedData(makeHeaders(maxAge: false))
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
         var thrownError: Error?
 
         // When
@@ -210,7 +214,7 @@ struct CachedRequestTests {
     func cache_whenReturnCachedDataElseLoadWithValidCache() async throws {
         let testState = try await TestState()
         let cacheData = mockCachedData(makeHeaders())
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -235,7 +239,7 @@ struct CachedRequestTests {
     func cache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
         let testState = try await TestState()
         let cacheData = mockCachedData(makeHeaders())
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -263,7 +267,7 @@ struct CachedRequestTests {
         let testState = try await TestState()
         let eTag = UUID()
         let cacheData = mockCachedData(makeHeaders(eTag: eTag))
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -289,7 +293,7 @@ struct CachedRequestTests {
         let testState = try await TestState()
         let eTag = UUID()
         let cacheData = mockCachedData(makeHeaders())
-        let cacheKey = "https://localhost:8888"
+        let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
         testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
@@ -381,25 +385,23 @@ extension CachedRequestTests {
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output)
 
-        testState.localServer.insert(response)
+        testState.localServer.insert(response, at: testState.uri)
 
-        let output = try await DataTask {
+        let output = try await DataTask {            
+            Session()
+                .disableNetworkFramework()
+                .cachePolicy(cachePolicy)
+                .cacheStrategy(cacheStrategy)
+                .cache(url: testState.dataCache.directoryURL)
+
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(testState.certificate.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(testState.certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
 
             BaseURL(testState.localServer.baseURL)
-                .cachePolicy(cachePolicy)
-                .cacheStrategy(cacheStrategy)
+            Path(testState.uri)
         }
         .result()
 

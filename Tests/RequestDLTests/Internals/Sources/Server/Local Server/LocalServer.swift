@@ -88,7 +88,7 @@ struct LocalServer: Sendable {
 
         // MARK: - Unsafe properties
 
-        private var _responses: [ResponseConfiguration] = []
+        private var _responses: [String: [ResponseConfiguration]] = [:]
 
         // MARK: - Inits
 
@@ -96,21 +96,27 @@ struct LocalServer: Sendable {
 
         // MARK: - Internal methods
 
-        func insert(_ response: ResponseConfiguration) {
+        func insert(_ response: ResponseConfiguration, at path: String) {
             lock.withLock {
-                _responses.insert(response, at: .zero)
+                _responses[path, default: []].insert(response, at: .zero)
             }
         }
 
-        func popLast() -> ResponseConfiguration? {
+        func popLast(at path: String) -> ResponseConfiguration? {
             lock.withLock {
-                _responses.popLast()
+                _responses[path, default: []].popLast()
             }
         }
 
-        func cleanup() {
+        func cleanup(at path: String) {
             lock.withLock {
-                _responses = []
+                _responses[path, default: []] = []
+            }
+        }
+
+        func cleanupAll() {
+            lock.withLock {
+                _responses = [:]
             }
         }
     }
@@ -131,12 +137,12 @@ struct LocalServer: Sendable {
         self.responseQueue = responseQueue
     }
 
-    func insert(_ response: ResponseConfiguration) {
-        responseQueue.insert(response)
+    func insert(_ response: ResponseConfiguration, at path: String) {
+        responseQueue.insert(response, at: path)
     }
 
-    func cleanup() {
-        responseQueue.cleanup()
+    func cleanup(at path: String) {
+        responseQueue.cleanup(at: path)
     }
 
     var baseURL: String {

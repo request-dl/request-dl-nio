@@ -14,10 +14,10 @@ struct InternalsFileBufferTests {
         let url: URL
 
         init() throws {
-            url = URL(fileURLWithPath: #file + ".\(UUID().uuidString)")
+            url = URL(fileURLWithPath: #file)
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appendingPathComponent("FileBufferTests.txt")
+                .appendingPathComponent("FileBufferTests.\(UUID().uuidString).txt")
 
             try url.removeIfNeeded()
         }
@@ -31,6 +31,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenInitURL_shouldBeEmpty() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let fileBuffer = Internals.FileBuffer(fileURL)
 
@@ -53,6 +55,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenContainsData_shouldWriterBeAtEndAndReaderAtZero() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
@@ -76,6 +80,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenContainsData_shouldReadDataAvailable() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
@@ -98,6 +104,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenContainsDataMovingReaderIndex_shouldReadableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
@@ -121,6 +129,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenContainsDataMovingWriterIndex_shouldWritableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello world".utf8)
         try data.write(to: fileURL)
@@ -144,6 +154,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenWritingWithTwoCopy_shouldWritableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
@@ -168,6 +180,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenWritingWithTwoInstances_shouldWritableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let sut1 = Internals.FileBuffer(fileURL)
@@ -192,6 +206,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenWritingWithTwoInstancesSimultaneos_shouldWritableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
@@ -213,6 +229,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenWritingWithTwoInstancesSimultaneosBytes_shouldWritableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let writeSliceIndex = 3
@@ -234,6 +252,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenReadingWithTwoCopy_shouldReadableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
@@ -261,6 +281,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenReadingWithTwoInstances_shouldReadableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
@@ -288,6 +310,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenReadingWithTwoInstancesSimultaneos_shouldReadableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
@@ -316,6 +340,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenReadingWithTwoInstancesSimultaneosBytes_shouldReadableBytesBeUpdated() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         try data.write(to: fileURL)
@@ -344,6 +370,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenWritingAndReadingSimultaneos_shouldBytesBeUpdatedAndOverrided() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let data = Data("Hello World".utf8)
         let overrideData = Data("Earth".utf8)
@@ -381,6 +409,8 @@ struct InternalsFileBufferTests {
     func fileBuffer_whenWritingFromOtherFileBuffer_shouldHaveContentsAppended() async throws {
         // Given
         let fileURLManager = try FileURLManager()
+        defer { _ = fileURLManager }
+
         let fileURL = fileURLManager.url
         let otherFile = fileURL
             .deletingLastPathComponent()

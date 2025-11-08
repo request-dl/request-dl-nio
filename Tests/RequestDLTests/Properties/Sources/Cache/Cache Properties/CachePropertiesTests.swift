@@ -6,7 +6,7 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-@Suite(.serialized)
+@Suite(.serialized, .localDataCache)
 struct CachePropertiesTests {
 
     func resetCapacity() {

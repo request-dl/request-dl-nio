@@ -12,9 +12,10 @@ struct UploadTaskTests {
     func uploadTask() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
 
-        localServer.cleanup()
-        defer { localServer.cleanup() }
+        localServer.cleanup(at: uri)
+        defer { localServer.cleanup(at: uri) }
 
         let certificate = Certificates().server()
         let output = "Hello World"
@@ -24,20 +25,18 @@ struct UploadTaskTests {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts(certificate.certificateURL.absolutePath(percentEncoded: false))
-                #else
                 Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
-                #endif
             }
 
             Payload(data: upload)

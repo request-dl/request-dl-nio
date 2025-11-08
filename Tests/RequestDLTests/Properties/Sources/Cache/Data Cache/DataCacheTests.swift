@@ -9,24 +9,29 @@ import Testing
 private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
 
-@Suite(.serialized)
+@Suite(.localDataCache)
 struct DataCacheTests {
 
     final class TestState: Sendable {
 
+        let suiteName = UUID().uuidString
+        let globalDataCache: DataCache
         let dataCache: DataCache
 
         init() {
+            globalDataCache = DataCache(suiteName: suiteName)
+
             dataCache = .init(
                 memoryCapacity: globalMemoryCapacity,
-                diskCapacity: globalDiskCapacity
+                diskCapacity: globalDiskCapacity,
+                suiteName: suiteName
             )
         }
 
         deinit {
             dataCache.removeAll()
-            DataCache.shared.memoryCapacity = .zero
-            DataCache.shared.diskCapacity = .zero
+            globalDataCache.memoryCapacity = .zero
+            globalDataCache.diskCapacity = .zero
         }
     }
 
@@ -43,6 +48,8 @@ struct DataCacheTests {
 
     @Test
     func cache_whenInitWithLowerCapacityPreviousSpecified_shouldBeMax() {
+        let testState = TestState()
+        defer { _ = testState }
         // Given
         let memoryCapacity: UInt64 = 4 * 1_024 * 1_024
         let diskCapacity: UInt64 = 16 * 1_024 * 1_024
@@ -50,7 +57,8 @@ struct DataCacheTests {
         // When
         let dataCache = DataCache(
             memoryCapacity: memoryCapacity,
-            diskCapacity: diskCapacity
+            diskCapacity: diskCapacity,
+            suiteName: testState.suiteName
         )
 
         // Then
@@ -79,6 +87,7 @@ struct DataCacheTests {
     @Test
     func cache_whenSetCachedData() throws {
         let testState = TestState()
+        defer { _ = testState }
         // Given
         let dataCache = testState.dataCache
 
@@ -153,6 +162,7 @@ struct DataCacheTests {
     @Test
     func cache_whenLowDisk() throws {
         let testState = TestState()
+        defer { _ = testState }
         // Given
         let dataCache = testState.dataCache
 
@@ -189,6 +199,8 @@ struct DataCacheTests {
     @Test
     func cache_whenRemoveKey() throws {
         let testState = TestState()
+        defer { _ = testState }
+
         // Given
         let dataCache = testState.dataCache
 

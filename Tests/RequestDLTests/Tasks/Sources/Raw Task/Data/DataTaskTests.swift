@@ -13,9 +13,7 @@ struct DataTaskTests {
     func dataTask() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
-
-        localServer.cleanup()
-        defer { localServer.cleanup() }
+        let uri = "/" + UUID().uuidString
 
         let certificate = Certificates().server()
         let output = "Hello World"
@@ -24,20 +22,20 @@ struct DataTaskTests {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
 
         // When
         let data = try await DataTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts(certificate.certificateURL.absolutePath(percentEncoded: false))
-                #else
                 Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
-                #endif
             }
         }
         .extractPayload()
@@ -55,6 +53,8 @@ struct DataTaskTests {
         let server = Certificates().server()
         let client = Certificates().client()
 
+        let uri = "/" + UUID().uuidString
+
         let localServer = try await LocalServer(
             LocalServer.Configuration(
                 host: "localhost",
@@ -69,12 +69,14 @@ struct DataTaskTests {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
 
         // When
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
                 Trusts(server.certificateURL.absolutePath(percentEncoded: false))
@@ -118,6 +120,7 @@ extension DataTaskTests {
     @Test
     func dataTask_whenPSK() async throws {
         // Given
+        let uri = "/" + UUID().uuidString
         let output = "Hello World"
 
         let identity = "client"
@@ -139,7 +142,7 @@ extension DataTaskTests {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let data = try await DataTask {
@@ -147,7 +150,7 @@ extension DataTaskTests {
                 .disableNetworkFramework()
 
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
                 PSKIdentity(

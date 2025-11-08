@@ -12,7 +12,8 @@ struct ModifiersCollectBytesTests {
     func collect_whenUploadStep_shouldBeValid() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
-        defer { localServer.cleanup() }
+        let uri = "/" + UUID().uuidString
+        defer { localServer.cleanup(at: uri) }
 
         let resource = Certificates().server()
         let message = "Hello World"
@@ -21,7 +22,7 @@ struct ModifiersCollectBytesTests {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let bytes = try await UploadTask {
