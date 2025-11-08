@@ -169,19 +169,13 @@ struct InternalsSessionTests {
         )
 
         var secureConnection = Internals.SecureConnection()
-        #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-        secureConnection.useDefaultTrustRoots = true
-        secureConnection.additionalTrustRoots = [.certificates([
-            .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
-        ])]
-        #else
         secureConnection.trustRoots = .certificates([
             .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
         ])
-        #endif
 
         var configuration = testingSession.configuration
         configuration.secureConnection = secureConnection
+        configuration.disableNetworkFramework = true
 
         let session = Internals.Session(
             provider: testingSession.provider,

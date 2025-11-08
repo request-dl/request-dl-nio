@@ -26,19 +26,16 @@ struct ModifiersCollectDataTests {
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
             Path(uri)
+
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .collectBytes()
@@ -68,19 +65,16 @@ struct ModifiersCollectDataTests {
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
             Path(uri)
+
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .collectBytes()
@@ -110,19 +104,16 @@ struct ModifiersCollectDataTests {
 
         // When
         let data = try await UploadTask {
+            Session()
+                .disableNetworkFramework()
+
             BaseURL(localServer.baseURL)
             Path(uri)
+
             SecureConnection {
-                #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-                DefaultTrusts()
-                AdditionalTrusts {
-                    RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
-                }
-                #else
                 Trusts {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
-                #endif
             }
         }
         .collectData()
