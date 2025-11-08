@@ -113,7 +113,7 @@ extension DataTaskTests {
             self.identity = identity
         }
 
-        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
+        func callAsFunction(_ context: PSKClientContext) throws -> PSKClientIdentityResponse {
             var bytes = NIOSSLSecureBytes()
             bytes.append(key.utf8)
             bytes.append(":\(identity)".utf8)
@@ -150,6 +150,9 @@ extension DataTaskTests {
 
         // When
         let data = try await DataTask {
+            Session()
+                .disableNetworkFramework()
+            
             BaseURL(localServer.baseURL)
             Path("index")
 

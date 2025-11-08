@@ -61,7 +61,7 @@ public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where
                   group.addTask {
                       do {
                           return try await TaskEnvironmentValues.$current.withValue(environment) {
-                              var task = transform(element)
+                              let task = transform(element)
                               return (element, .success(try await task.result()))
                           }
                       } catch {

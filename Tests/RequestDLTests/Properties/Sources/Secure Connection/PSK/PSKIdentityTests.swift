@@ -10,7 +10,10 @@ class PSKIdentityTests: XCTestCase {
 
     func testIdentity_whenClientResolver() async throws {
         // Given
-        let hint = "hint"
+        let context = PSKClientContext(
+            hint: "hint",
+            maxPSKLength: 3
+        )
         let identity = "host"
         let key = NIOSSLSecureBytes([0, 1, 2])
 
@@ -22,14 +25,14 @@ class PSKIdentityTests: XCTestCase {
                         key: key,
                         identity: identity,
                         received: {
-                            XCTAssertEqual($0, hint)
+                            XCTAssertEqual($0, context)
                         }
                     )
                 )
             }
         })
 
-        let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(hint)
+        let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(context)
 
         // Then
         XCTAssertEqual(sut?.key, key)
@@ -62,20 +65,20 @@ extension PSKIdentityTests {
         let key: NIOSSLSecureBytes
         let identity: String
 
-        let received: @Sendable (String) -> Void
+        let received: @Sendable (PSKClientContext) -> Void
 
         init(
             key: NIOSSLSecureBytes,
             identity: String,
-            received: @escaping @Sendable (String) -> Void
+            received: @escaping @Sendable (PSKClientContext) -> Void
         ) {
             self.key = key
             self.identity = identity
             self.received = received
         }
 
-        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
-            received(hint)
+        func callAsFunction(_ context: PSKClientContext) throws -> PSKClientIdentityResponse {
+            received(context)
             return .init(
                 key: key,
                 identity: identity

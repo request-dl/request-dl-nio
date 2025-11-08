@@ -100,6 +100,16 @@ public struct Session: Property {
     }
 
     /**
+     Disable the usage of Network framework on Apple Platforms when using RequestDL session providers
+
+     - Parameter disabled: The flag to disable the Network framework
+     - Returns: A modified property with Network framework disabled.
+     */
+    public func disableNetworkFramework(_ disabled: Bool = true) -> some Property {
+        edit { $0.disableNetworkFramework = disabled }
+    }
+
+    /**
      Configures the maximum number of connections per host for the session.
 
      - Parameter maximum: The maximum number of connections per host.

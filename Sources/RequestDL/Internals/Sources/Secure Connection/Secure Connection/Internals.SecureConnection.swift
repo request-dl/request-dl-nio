@@ -121,7 +121,7 @@ extension Internals {
             }
 
             if let pskIdentityResolver {
-                tlsConfiguration.pskClientCallback = {
+                tlsConfiguration.pskClientProvider = {
                     try pskIdentityResolver($0)
                 }
             }

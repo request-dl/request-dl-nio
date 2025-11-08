@@ -19,6 +19,8 @@ extension Internals {
         private let lock = AsyncLock()
         private let lifetime: UInt64
 
+        private let tableLock = Lock()
+
         // MARK: - Unsafe properties
 
         private var _table = [String: [Item]]()
@@ -37,19 +39,22 @@ extension Internals {
             configuration: Internals.Session.Configuration
         ) async throws -> Internals.Client {
             let options = SessionProviderOptions(
-                isCompatibleWithNetworkFramework: configuration.secureConnection?.isCompatibleWithNetworkFramework ?? true
+                isCompatibleWithNetworkFramework: configuration.isCompatibleWithNetworkFramework
             )
 
             let sessionProviderID = provider.uniqueIdentifier(with: options)
 
             return try await lock.withLock {
+                tableLock.lock()
                 if var items = _table[sessionProviderID] {
                     if let (index, item) = items.enumerated().first(where: { $1.configuration == configuration }) {
                         items[index] = item.updatingReadAt()
                         _table[sessionProviderID] = items
+                        tableLock.unlock()
                         return item.client
                     }
                 }
+                tableLock.unlock()
 
                 let eventLoopGroup = await EventLoopGroupManager.shared.provider(
                     provider,
@@ -79,7 +84,7 @@ extension Internals {
                 let now = Date()
                 let lifetime = Double(lifetime) / 1_000_000_000
 
-                for (key, items) in _table {
+                for (key, items) in tableLock.withLock({ _table }) {
                     var optionalItems = items as [Internals.ClientManager.Item?]
 
                     for (index, item) in items.enumerated() {
@@ -93,7 +98,9 @@ extension Internals {
                     }
 
                     let items = optionalItems.compactMap { $0 }
-                    _table[key] = items.isEmpty ? nil : items
+                    tableLock.withLock {
+                        _table[key] = items.isEmpty ? nil : items
+                    }
                 }
             }
         }
@@ -109,6 +116,9 @@ extension Internals {
                 eventLoopGroupProvider: .shared(eventLoopGroup),
                 configuration: try configuration.build()
             )
+
+            tableLock.lock()
+            defer { tableLock.unlock() }
 
             var items = _table[id] ?? []
 
