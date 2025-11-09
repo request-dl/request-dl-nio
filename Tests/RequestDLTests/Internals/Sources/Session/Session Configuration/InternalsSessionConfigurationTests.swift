@@ -238,7 +238,7 @@ struct InternalsSessionConfigurationTests {
     @Test
     func configuration_whenInit_shouldBeDefault() async throws {
         // When
-        var configuration = Internals.Session.Configuration()
+        let configuration = Internals.Session.Configuration()
         let builtConfiguration = try configuration.build()
 
         // Then
