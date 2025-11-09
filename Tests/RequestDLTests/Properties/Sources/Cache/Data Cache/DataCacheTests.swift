@@ -8,8 +8,9 @@ import Testing
 
 private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
+private let globalDataCache = DataCache(suiteName: UUID().uuidString)
 
-@Suite(.localDataCache(.autogenerate))
+@Suite(.serialized)
 struct DataCacheTests {
 
     final class TestState: Sendable {
@@ -20,14 +21,14 @@ struct DataCacheTests {
             dataCache = .init(
                 memoryCapacity: globalMemoryCapacity,
                 diskCapacity: globalDiskCapacity,
-                url: DataCache.shared.directoryURL
+                url: globalDataCache.directoryURL
             )
         }
 
         deinit {
             dataCache.removeAll()
-            DataCache.shared.memoryCapacity = .zero
-            DataCache.shared.diskCapacity = .zero
+            globalDataCache.memoryCapacity = .zero
+            globalDataCache.diskCapacity = .zero
         }
     }
 
@@ -54,7 +55,7 @@ struct DataCacheTests {
         let dataCache = DataCache(
             memoryCapacity: memoryCapacity,
             diskCapacity: diskCapacity,
-            url: DataCache.shared.directoryURL
+            url: globalDataCache.directoryURL
         )
 
         // Then

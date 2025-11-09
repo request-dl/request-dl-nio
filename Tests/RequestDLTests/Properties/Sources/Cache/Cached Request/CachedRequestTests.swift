@@ -6,19 +6,21 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-@Suite(.localDataCache(.autogenerate), .serialized)
+@Suite(.serialized)
 struct CachedRequestTests {
 
     final class TestState: Sendable {
 
         let certificate = Certificates().server()
-        let dataCache = DataCache.shared
+        let dataCache: DataCache
         let output = String.randomString(length: 64)
         let localServer: LocalServer
         let uri: String
 
         init() async throws {
-            uri = "/" + UUID().uuidString
+            let uniqueKey = UUID().uuidString
+            uri = "/" + uniqueKey
+            dataCache = .init(suiteName: uniqueKey)
             localServer = try await LocalServer(.standard)
             localServer.cleanup(at: uri)
 
@@ -51,7 +53,7 @@ struct CachedRequestTests {
             cacheStrategy: .ignoreCachedData
         )
 
-        let cachedData = DataCache.shared.getCachedData(
+        let cachedData = DataCache(url: testState.dataCache.directoryURL).getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -77,7 +79,7 @@ struct CachedRequestTests {
             cacheStrategy: .ignoreCachedData
         )
 
-        let updatedCachedData = DataCache.shared.getCachedData(
+        let updatedCachedData = DataCache(url: testState.dataCache.directoryURL).getCachedData(
             forKey: cacheKey,
             policy: .all
         )
