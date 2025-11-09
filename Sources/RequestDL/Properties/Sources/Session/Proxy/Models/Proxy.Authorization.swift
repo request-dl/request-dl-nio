@@ -33,10 +33,6 @@ extension Proxy {
 
         private let authorization: Internals.Proxy.Authorization
 
-        private init(authorization: Internals.Proxy.Authorization) {
-            self.authorization = authorization
-        }
-
         /**
          Creates an authorization instance using the HTTP Basic Authentication scheme with a username and password.
 

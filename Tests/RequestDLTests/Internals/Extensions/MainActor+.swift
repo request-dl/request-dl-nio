@@ -8,7 +8,7 @@
 import Foundation
 
 extension MainActor {
-    
+
     @discardableResult
     static func sync<Value: Sendable>(_ block: @MainActor () throws -> Value) rethrows -> Value {
         if Thread.isMainThread {

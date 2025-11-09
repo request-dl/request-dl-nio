@@ -668,7 +668,7 @@ extension PayloadTests {
     @Test
     func payload_whenInvalidJSONObject() async throws {
         // Given
-        let jsonObject: Any = { () -> Void in }
+        let jsonObject: Any = { () in }
         var encodingError: EncodingPayloadError?
 
         // When

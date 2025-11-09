@@ -10,7 +10,7 @@ class IndexProducer: @unchecked Sendable {
     var index: Int {
         lock.withLock { _index }
     }
-    
+
     private let lock = Lock()
     private var _index: Int = 0
 

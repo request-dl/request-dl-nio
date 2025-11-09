@@ -28,7 +28,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.30.0"
+            from: "1.31.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",

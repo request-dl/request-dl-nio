@@ -62,7 +62,7 @@ extension Internals {
         // MARK: - Private properties
 
         private func scheduleCleanup() {
-            _Concurrency.Task.detached(priority: .background) { [weak self, lifetime] in
+            _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
                 while true {
                     do {
                         try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
