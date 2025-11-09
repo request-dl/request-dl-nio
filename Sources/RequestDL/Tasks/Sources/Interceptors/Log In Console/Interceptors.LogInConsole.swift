@@ -73,9 +73,9 @@ extension RequestTask {
                 case let result as TaskResult<Data>:
                     return result.logInConsoleOutput()
                 case let data as Data:
-                    return data.logInConsoleOutput()
+                    return [data.logInConsoleOutput()]
                 default:
-                    return ["Success: \($0)"]
+                    return ["\($0)"]
                 }
             }
         ))
@@ -116,7 +116,7 @@ extension RequestTask<Data> {
         interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {
-                $0.logInConsoleOutput()
+                [$0.logInConsoleOutput()]
             }
         ))
     }
@@ -124,8 +124,8 @@ extension RequestTask<Data> {
 
 extension Data {
 
-    fileprivate func logInConsoleOutput(isPayload: Bool = false) -> [String] {
-        [(isPayload ? "Payload: " : "Success: ") + (String(data: self, encoding: .utf8) ?? debugDescription)]
+    fileprivate func logInConsoleOutput() -> String {
+        (String(data: self, encoding: .utf8) ?? debugDescription)
     }
 }
 
@@ -137,9 +137,9 @@ extension TaskResult {
         ]
 
         if let payload = payload as? Data {
-            contents.append(contentsOf: payload.logInConsoleOutput(isPayload: true))
+            contents.append("\n" + payload.logInConsoleOutput())
         } else {
-            contents.append("Payload: \(payload)")
+            contents.append("\n" + String(describing: payload))
         }
 
         return contents

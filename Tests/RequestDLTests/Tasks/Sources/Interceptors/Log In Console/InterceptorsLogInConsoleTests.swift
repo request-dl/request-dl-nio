@@ -34,7 +34,8 @@ struct InterceptorsLogInConsoleTests {
             #expect(strings().first?.contains(
                 """
                 Head: \(result.head)
-                Payload: \(String(data: data, encoding: .utf8) ?? "")
+                
+                \(String(data: data, encoding: .utf8) ?? "")
                 """
                 ) ?? false
             )
@@ -67,7 +68,8 @@ struct InterceptorsLogInConsoleTests {
             // Then
             #expect(strings().first?.contains(
                 """
-                Success: \(String(data: data, encoding: .utf8) ?? "")
+                
+                \(String(data: data, encoding: .utf8) ?? "")
                 """
             ) ?? false)
         }
@@ -101,7 +103,7 @@ struct InterceptorsLogInConsoleTests {
 
             // Then
             #expect(strings().first?.contains(
-                "Success: \(value)"
+                "\(value)"
             ) ?? false)
         }
     }
