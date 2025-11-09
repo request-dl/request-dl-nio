@@ -88,7 +88,7 @@ public struct Path: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let path = property.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let path = property.path.trimmingPrefix(in: CharacterSet(charactersIn: "/"))
 
         return .leaf(Node(path: path))
     }

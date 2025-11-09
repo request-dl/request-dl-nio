@@ -13,16 +13,11 @@ extension Internals {
         // MARK: - Internal properties
 
         var url: String {
-            let pathAllowed = CharacterSet(charactersIn: "/")
-
             let baseURL = baseURL
                 .trimmingCharacters(in: .urlHostAllowed.inverted)
-                .trimmingCharacters(in: pathAllowed)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-            let pathComponents = pathComponents
-                .joined(separator: "/")
-                .trimmingCharacters(in: .urlPathAllowed.inverted)
-                .trimmingCharacters(in: pathAllowed)
+            let pathComponents = pathComponents.joinedAsPath()
 
             let queries = queries.joined()
             let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"
