@@ -23,7 +23,11 @@ struct SecureConnectionTests {
         let sut = try #require(resolved.session.configuration.secureConnection)
 
         // Then
+        #if os(macOS) || os(tvOS) || os(iOS) || os(watchOS) || os(visionOS)
         #expect(sut.isCompatibleWithNetworkFramework)
+        #else
+        #expect(!sut.isCompatibleWithNetworkFramework)
+        #endif
         #expect(sut.certificateVerification == secureConnection.certificateVerification)
         #expect(sut.signingSignatureAlgorithms == secureConnection.signingSignatureAlgorithms)
         #expect(sut.verifySignatureAlgorithms == secureConnection.verifySignatureAlgorithms)

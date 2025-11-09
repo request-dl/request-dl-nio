@@ -12,61 +12,74 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        private(set) var count = 0
+        var count: Int {
+            lock.withLock { _count }
+        }
 
         // MARK: - Private properties
 
-        private var capacity: Int {
-            return buckets.count
+        private let lock = Lock()
+
+        // MARK: - Unsafe properties
+
+        private var _count = 0
+
+        private var _capacity: Int {
+            _buckets.count
         }
 
-        private var buckets: [Array<Element>?]
-
+        private var _buckets: [Array<Element>?]
         // MARK: - Inits
 
         init(capacity: Int = 16) {
-            buckets = Array(repeating: nil, count: capacity)
+            _buckets = Array(repeating: nil, count: capacity)
         }
 
         // MARK: - Public methods
 
         subscript(_ key: Key) -> Value? {
-            get { get(key) }
+            get {
+                lock.withLock {
+                    _get(key)
+                }
+            }
             set {
-                if let newValue {
-                    set(newValue, forKey: key)
-                } else {
-                    remove(key)
+                lock.withLock {
+                    if let newValue {
+                        _set(newValue, forKey: key)
+                    } else {
+                        _remove(key)
+                    }
                 }
             }
         }
 
-        // MARK: - Private methods
+        // MARK: - Unsafe methods
 
-        private mutating func set(_ value: Value, forKey key: Key) {
-            let index = self.index(forKey: key)
-            var bucket = buckets[index] ?? []
+        private mutating func _set(_ value: Value, forKey key: Key) {
+            let index = _index(forKey: key)
+            var bucket = _buckets[index] ?? []
 
             for i in 0..<bucket.count {
                 if bucket[i].key == key {
                     bucket[i].value = value
-                    buckets[index] = bucket
+                    _buckets[index] = bucket
                     return
                 }
             }
 
             bucket.append((key: key, value: value))
-            buckets[index] = bucket
-            count += 1
+            _buckets[index] = bucket
+            _count += 1
 
-            if Double(count) / Double(capacity) > 0.75 {
-                resize()
+            if Double(_count) / Double(_capacity) > 0.75 {
+                _resize()
             }
         }
 
-        private func get(_ key: Key) -> Value? {
-            let index = self.index(forKey: key)
-            guard let bucket = buckets[index] else { return nil }
+        private func _get(_ key: Key) -> Value? {
+            let index = _index(forKey: key)
+            guard let bucket = _buckets[index] else { return nil }
 
             for element in bucket {
                 if element.key == key {
@@ -77,38 +90,38 @@ extension Internals {
         }
 
         @discardableResult
-        private mutating func remove(_ key: Key) -> Value? {
-            let index = self.index(forKey: key)
-            guard var bucket = buckets[index] else { return nil }
+        private mutating func _remove(_ key: Key) -> Value? {
+            let index = _index(forKey: key)
+            guard var bucket = _buckets[index] else { return nil }
 
             for i in 0..<bucket.count {
                 if bucket[i].key == key {
                     let element = bucket.remove(at: i)
-                    buckets[index] = bucket.isEmpty ? nil : bucket
-                    count -= 1
+                    _buckets[index] = bucket.isEmpty ? nil : bucket
+                    _count -= 1
                     return element.value
                 }
             }
             return nil
         }
 
-        private mutating func resize() {
-            let oldBuckets = buckets
-            let newCapacity = capacity * 2
-            buckets = Array(repeating: nil, count: newCapacity)
-            count = 0
+        private mutating func _resize() {
+            let oldBuckets = _buckets
+            let newCapacity = _capacity * 2
+            _buckets = Array(repeating: nil, count: newCapacity)
+            _count = 0
 
             for bucket in oldBuckets {
                 if let bucket = bucket {
                     for element in bucket {
-                        set(element.value, forKey: element.key)
+                        _set(element.value, forKey: element.key)
                     }
                 }
             }
         }
 
-        private func index(forKey key: Key) -> Int {
-            return abs(key.hashValue) % capacity
+        private func _index(forKey key: Key) -> Int {
+            return abs(key.hashValue) % _capacity
         }
     }
 }
