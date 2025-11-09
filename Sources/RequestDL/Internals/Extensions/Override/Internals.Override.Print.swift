@@ -14,7 +14,7 @@ extension Internals.Override {
         @TaskLocal
         fileprivate static var closure: Closure = {
             Swift.print(
-                $2.map(String.init(describing:)).joined(separator: $0),
+                describing($2, separator: $0),
                 separator: $0,
                 terminator: $1
             )
@@ -30,7 +30,15 @@ extension Internals.Override {
         #if DEBUG
         Print.closure(separator, terminator, items)
         #else
-        Swift.print(items, separator: separator, terminator: terminator)
+        Swift.print(
+            describing(items, separator: separator),
+            separator: separator,
+            terminator: terminator
+        )
         #endif
     }
+}
+
+private func describing(_ items: [Sendable], separator: String) -> String {
+    items.map(String.init(describing:)).joined(separator: separator)
 }
