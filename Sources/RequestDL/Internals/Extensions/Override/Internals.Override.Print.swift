@@ -13,7 +13,11 @@ extension Internals.Override {
 
         @TaskLocal
         fileprivate static var closure: Closure = {
-            Swift.print($2, separator: $0, terminator: $1)
+            Swift.print(
+                $2.map(String.init(describing:)).joined(separator: $0),
+                separator: $0,
+                terminator: $1
+            )
         }
 
         static func replace<T: Sendable>(with closure: @escaping Closure, perform: @Sendable () async throws -> T) async rethrows -> T {
