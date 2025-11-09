@@ -4,6 +4,9 @@
 
 import Foundation
 import NIOCore
+#if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+import NIOTransportServices
+#endif
 import NIOPosix
 
 extension Internals {
@@ -18,8 +21,22 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func group() -> EventLoopGroup {
-            MultiThreadedEventLoopGroup.shared
+        func uniqueIdentifier(with options: SessionProviderOptions) -> String {
+            #if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+            if options.isCompatibleWithNetworkFramework {
+                return "NTW." + id
+            }
+            #endif
+            return id
+        }
+
+        func group(with options: SessionProviderOptions) -> EventLoopGroup {
+            #if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+            if options.isCompatibleWithNetworkFramework {
+                return NIOTSEventLoopGroup.shared
+            }
+            #endif
+            return MultiThreadedEventLoopGroup.shared
         }
     }
 }

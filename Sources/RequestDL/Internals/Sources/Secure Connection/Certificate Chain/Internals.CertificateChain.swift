@@ -37,8 +37,10 @@ extension Internals {
         func build() throws -> [NIOSSLCertificateSource] {
             switch self {
             case .certificates(let certificates):
-                return try certificates.map {
-                    .certificate(try $0.build())
+                return try certificates.reduce(into: []) {
+                    try $0.append(contentsOf: $1.build().map {
+                        .certificate($0)
+                    })
                 }
             case .bytes(let bytes):
                 return try NIOSSLCertificate.fromPEMBytes(bytes).map {

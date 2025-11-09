@@ -21,18 +21,19 @@ extension Internals {
         // MARK: - Unsafe properties
 
         @preconcurrency
-        private var _groups: [String: EventLoopGroup] = [:]
+        private var _groups = HashTable<String, EventLoopGroup>()
 
         // MARK: - Internal methods
 
         func provider(
-            _ sessionProvider: SessionProvider
+            _ sessionProvider: SessionProvider,
+            with options: SessionProviderOptions
         ) async -> EventLoopGroup {
             if case .background = _Concurrency.Task.currentPriority {
-                return await _provider(sessionProvider)
+                return await _provider(sessionProvider, with: options)
             } else {
                 return await _Concurrency.Task.detached(priority: .background) {
-                    await self._provider(sessionProvider)
+                    await self._provider(sessionProvider, with: options)
                 }.value
             }
         }
@@ -40,11 +41,13 @@ extension Internals {
         // MARK: - Unsafe methods
 
         private func _provider(
-            _ sessionProvider: SessionProvider
+            _ sessionProvider: SessionProvider,
+            with options: SessionProviderOptions
         ) async -> EventLoopGroup {
             await lock.withLock {
-                let group = _groups[sessionProvider.id] ?? sessionProvider.group()
-                _groups[sessionProvider.id] = group
+                let sessionProviderID = sessionProvider.uniqueIdentifier(with: options)
+                let group = _groups[sessionProviderID] ?? sessionProvider.group(with: options)
+                _groups[sessionProviderID] = group
                 return group
             }
         }

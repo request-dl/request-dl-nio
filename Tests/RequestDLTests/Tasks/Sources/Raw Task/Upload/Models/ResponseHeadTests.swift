@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ResponseHeadTests: XCTestCase {
+struct ResponseHeadTests {
 
-    func testHead_whenDebugDescription() {
+    @Test
+    func head_whenDebugDescription() {
         // Given
         let headers = HTTPHeaders([
             ("Content-Type", "application/json"),
@@ -26,7 +28,7 @@ class ResponseHeadTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(responseHead.debugDescription, """
+        #expect(responseHead.debugDescription == """
             https://google.com/?q=search
             200 Ok Status
 

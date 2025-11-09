@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
  */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class AcceptCharsetHeaderTests: XCTestCase {
+struct AcceptCharsetHeaderTests {
 
-    func testCharset_whenUTF8() async throws {
+    @Test
+    func charset_whenUTF8() async throws {
         // Given
         let charset = Charset.utf8
 
@@ -17,10 +19,11 @@ class AcceptCharsetHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers["Accept-Charset"], [charset.rawValue])
+        #expect(resolved.request.headers["Accept-Charset"] == [charset.rawValue])
     }
 
-    func testCharset_whenUTF16() async throws {
+    @Test
+    func charset_whenUTF16() async throws {
         // Given
         let charset = Charset.utf16
 
@@ -30,10 +33,11 @@ class AcceptCharsetHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers["Accept-Charset"], [charset.rawValue])
+        #expect(resolved.request.headers["Accept-Charset"] == [charset.rawValue])
     }
 
-    func testCharset_whenUTF32() async throws {
+    @Test
+    func charset_whenUTF32() async throws {
         // Given
         let charset = Charset.utf32
 
@@ -43,6 +47,6 @@ class AcceptCharsetHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers["Accept-Charset"], [charset.rawValue])
+        #expect(resolved.request.headers["Accept-Charset"] == [charset.rawValue])
     }
 }

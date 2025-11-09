@@ -16,9 +16,9 @@ public struct PublishedTask<Output: Sendable>: Publisher {
 
         private let lock = Lock()
         private let wrapper: () async throws -> S.Input
-        
+
         // MARK: - Unsafe properties
-        
+
         private var _task: _Concurrency.Task<Void, Never>?
         private var _subscriber: S?
 
@@ -39,7 +39,7 @@ public struct PublishedTask<Output: Sendable>: Publisher {
                 guard let subscriber = _subscriber else {
                     return
                 }
-                
+
                 _task = _Concurrency.Task {
                     do {
                         _ = subscriber.receive(try await wrapper())

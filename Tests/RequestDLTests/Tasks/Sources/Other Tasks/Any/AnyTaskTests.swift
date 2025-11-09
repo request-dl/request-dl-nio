@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class AnyTaskTests: XCTestCase {
+struct AnyTaskTests {
 
-    func testAnyTask() async throws {
+    @Test
+    func anyTask() async throws {
         // Given
         let data = Data("123".utf8)
 
@@ -21,6 +23,6 @@ class AnyTaskTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result.payload, data)
+        #expect(result.payload == data)
     }
 }

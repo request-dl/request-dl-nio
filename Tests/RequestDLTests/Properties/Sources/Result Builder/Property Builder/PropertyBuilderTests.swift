@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class PropertyBuilderTests: XCTestCase {
+struct PropertyBuilderTests {
 
-    func testSingleBuildBlock() async throws {
+    @Test
+    func singleBuildBlock() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -19,12 +21,13 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is CacheHeader)
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(property is CacheHeader)
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
     }
 
     #if !os(Linux)
-    func testLimitedNotAvailableBuildBlock() async throws {
+    @Test
+    func limitedNotAvailableBuildBlock() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -38,12 +41,13 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is _OptionalContent<CacheHeader>)
-        XCTAssertTrue(resolved.request.headers.isEmpty)
+        #expect(property is _OptionalContent<CacheHeader>)
+        #expect(resolved.request.headers.isEmpty)
     }
     #endif
 
-    func testLimitedAvailableBuildBlock() async throws {
+    @Test
+    func limitedAvailableBuildBlock() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -57,7 +61,7 @@ class PropertyBuilderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is _OptionalContent<CacheHeader>)
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(property is _OptionalContent<CacheHeader>)
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
     }
 }

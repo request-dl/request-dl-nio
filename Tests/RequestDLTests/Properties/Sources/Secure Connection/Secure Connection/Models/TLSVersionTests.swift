@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class TLSVersionTests: XCTestCase {
+struct TLSVersionTests {
 
-    func testVersion_whenV1_shouldBeV1() async throws {
+    @Test
+    func version_whenV1_shouldBeV1() async throws {
         // Given
         let version: TLSVersion = .v1
 
@@ -15,10 +17,11 @@ class TLSVersionTests: XCTestCase {
         let sut = version.build()
 
         // Then
-        XCTAssertEqual(sut, .tlsv1)
+        #expect(sut == .tlsv1)
     }
 
-    func testVersion_whenV11_shouldBeV11() async throws {
+    @Test
+    func version_whenV11_shouldBeV11() async throws {
         // Given
         let version: TLSVersion = .v1_1
 
@@ -26,10 +29,11 @@ class TLSVersionTests: XCTestCase {
         let sut = version.build()
 
         // Then
-        XCTAssertEqual(sut, .tlsv11)
+        #expect(sut == .tlsv11)
     }
 
-    func testVersion_whenV12_shouldBeV12() async throws {
+    @Test
+    func version_whenV12_shouldBeV12() async throws {
         // Given
         let version: TLSVersion = .v1_2
 
@@ -37,10 +41,11 @@ class TLSVersionTests: XCTestCase {
         let sut = version.build()
 
         // Then
-        XCTAssertEqual(sut, .tlsv12)
+        #expect(sut == .tlsv12)
     }
 
-    func testVersion_whenV13_shouldBeV13() async throws {
+    @Test
+    func version_whenV13_shouldBeV13() async throws {
         // Given
         let version: TLSVersion = .v1_3
 
@@ -48,33 +53,36 @@ class TLSVersionTests: XCTestCase {
         let sut = version.build()
 
         // Then
-        XCTAssertEqual(sut, .tlsv13)
+        #expect(sut == .tlsv13)
     }
 
-    func testVersion_whenComparableV1WithV11_shouldBeLower() async throws {
+    @Test
+    func version_whenComparableV1WithV11_shouldBeLower() async throws {
         // Given
         let lhs: TLSVersion = .v1
         let rhs: TLSVersion = .v1_1
 
         // Then
-        XCTAssertLessThan(lhs, rhs)
+        #expect(lhs < rhs)
     }
 
-    func testVersion_whenComparableV11WithV13_shouldBeLower() async throws {
+    @Test
+    func version_whenComparableV11WithV13_shouldBeLower() async throws {
         // Given
         let lhs: TLSVersion = .v1_1
         let rhs: TLSVersion = .v1_3
 
         // Then
-        XCTAssertLessThan(lhs, rhs)
+        #expect(lhs < rhs)
     }
 
-    func testVersion_whenComparableV12WithV1_shouldBeGreater() async throws {
+    @Test
+    func version_whenComparableV12WithV1_shouldBeGreater() async throws {
         // Given
         let lhs: TLSVersion = .v1_2
         let rhs: TLSVersion = .v1
 
         // Then
-        XCTAssertGreaterThan(lhs, rhs)
+        #expect(lhs > rhs)
     }
 }

@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsClientManagerTests: XCTestCase {
+struct InternalsClientManagerTests {
 
-    func testManager_whenRegister_shouldBeEqual() async throws {
+    @Test
+    func manager_whenRegister_shouldBeEqual() async throws {
         // Given
         let manager = Internals.ClientManager.shared
         let provider = Internals.SharedSessionProvider()
@@ -25,10 +27,11 @@ class InternalsClientManagerTests: XCTestCase {
         )
 
         // Then
-        XCTAssertTrue(sut1 === sut2)
+        #expect(sut1 === sut2)
     }
 
-    func testManager_whenRegisterWithDifferentConfiguration_shouldBeNotEqual() async throws {
+    @Test
+    func manager_whenRegisterWithDifferentConfiguration_shouldBeNotEqual() async throws {
         // Given
         let manager = Internals.ClientManager.shared
         let provider = Internals.SharedSessionProvider()
@@ -50,10 +53,11 @@ class InternalsClientManagerTests: XCTestCase {
         )
 
         // Then
-        XCTAssertFalse(sut1 === sut2)
+        #expect(sut1 !== sut2)
     }
 
-    func testManager_expiringClients() async throws {
+    @Test
+    func manager_expiringClients() async throws {
         // Given
         let lifetime: UInt64 = 2_500_000_000
         let manager = Internals.ClientManager(lifetime: lifetime)
@@ -74,6 +78,6 @@ class InternalsClientManagerTests: XCTestCase {
         )
 
         // Then
-        XCTAssertFalse(sut1 === sut2)
+        #expect(sut1 !== sut2)
     }
 }

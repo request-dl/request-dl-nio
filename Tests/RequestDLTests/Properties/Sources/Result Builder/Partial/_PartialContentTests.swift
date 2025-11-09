@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class _PartialContentTests: XCTestCase {
+struct _PartialContentTests {
 
-    func testTupleTwoElementsBuilder() async throws {
+    @Test
+    func tupleTwoElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -19,16 +21,17 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             BaseURL,
             OriginHeader
         >)
 
-        XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
+        #expect(resolved.request.url == "https://google.com")
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
     }
 
-    func testTupleThreeElementsBuilder() async throws {
+    @Test
+    func tupleThreeElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -42,7 +45,7 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             _PartialContent<
                 BaseURL,
                 OriginHeader
@@ -50,12 +53,13 @@ class _PartialContentTests: XCTestCase {
             CacheHeader
         >)
 
-        XCTAssertEqual(resolved.request.url, "https://google.com")
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.url == "https://google.com")
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
     }
 
-    func testTupleFourElementsBuilder() async throws {
+    @Test
+    func tupleFourElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -70,7 +74,7 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             _PartialContent<
                 _PartialContent<
                     BaseURL,
@@ -81,12 +85,13 @@ class _PartialContentTests: XCTestCase {
             Path
         >)
 
-        XCTAssertEqual(resolved.request.url, "https://google.com/search")
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.url == "https://google.com/search")
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
     }
 
-    func testTupleFiveElementsBuilder() async throws {
+    @Test
+    func tupleFiveElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -102,7 +107,7 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             _PartialContent<
                 _PartialContent<
                     _PartialContent<
@@ -116,16 +121,16 @@ class _PartialContentTests: XCTestCase {
             Query<String>
         >)
 
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://google.com/search?q=request-dl"
+        #expect(
+            resolved.request.url == "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
     }
 
-    func testTupleSixElementsBuilder() async throws {
+    @Test
+    func tupleSixElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -142,7 +147,7 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             _PartialContent<
                 _PartialContent<
                     _PartialContent<
@@ -159,19 +164,19 @@ class _PartialContentTests: XCTestCase {
             Timeout
         >)
 
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://google.com/search?q=request-dl"
+        #expect(
+            resolved.request.url == "https://google.com/search?q=request-dl"
         )
 
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
 
-        XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
-        XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
     }
 
-    func testTupleSevenElementsBuilder() async throws {
+    @Test
+    func tupleSevenElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -189,7 +194,7 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             _PartialContent<
                 _PartialContent<
                     _PartialContent<
@@ -209,19 +214,19 @@ class _PartialContentTests: XCTestCase {
             Query<Int>
         >)
 
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://google.com/search?q=request-dl&page=1"
+        #expect(
+            resolved.request.url == "https://google.com/search?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
 
-        XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
-        XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
     }
 
-    func testTupleEightElementsBuilder() async throws {
+    @Test
+    func tupleEightElementsBuilder() async throws {
         // Given
         @PropertyBuilder
         var result: some Property {
@@ -240,7 +245,7 @@ class _PartialContentTests: XCTestCase {
         let resolved = try await resolve(result)
 
         // Then
-        XCTAssertTrue(result is _PartialContent<
+        #expect(result is _PartialContent<
             _PartialContent<
                 _PartialContent<
                     _PartialContent<
@@ -263,19 +268,19 @@ class _PartialContentTests: XCTestCase {
             Path
         >)
 
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://google.com/search/results?q=request-dl&page=1"
+        #expect(
+            resolved.request.url == "https://google.com/search/results?q=request-dl&page=1"
         )
 
-        XCTAssertEqual(resolved.request.headers["Origin"], ["https://apple.com"])
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
 
-        XCTAssertEqual(resolved.session.configuration.timeout.read, .nanoseconds(40))
-        XCTAssertEqual(resolved.session.configuration.timeout.connect, .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = _PartialContent<EmptyProperty, EmptyProperty>(
             accumulated: .init(),

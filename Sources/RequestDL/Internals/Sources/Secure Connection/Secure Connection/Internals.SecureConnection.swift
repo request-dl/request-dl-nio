@@ -13,6 +13,17 @@ extension Internals {
 
         // MARK: - Internal properties
 
+        var isCompatibleWithNetworkFramework: Bool {
+            #if os(macOS) || os(tvOS) || os(iOS) || os(watchOS) || os(visionOS)
+            return certificateChain == nil
+                && privateKey == nil
+                && keyLogger == nil
+                && cipherSuites == nil
+            #else
+            return false
+            #endif
+        }
+
         var certificateChain: CertificateChain?
         var certificateVerification: NIOSSL.CertificateVerification?
         var useDefaultTrustRoots: Bool = false
@@ -110,7 +121,7 @@ extension Internals {
             }
 
             if let pskIdentityResolver {
-                tlsConfiguration.pskClientCallback = {
+                tlsConfiguration.pskClientProvider = {
                     try pskIdentityResolver($0)
                 }
             }
@@ -144,11 +155,15 @@ extension Internals {
 extension Internals.SecureConnection: Equatable {
 
     static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.certificateChain == rhs.certificateChain
+        let isSecurityPropertiesEqual = lhs.certificateChain == rhs.certificateChain
+        && lhs.privateKey == rhs.privateKey
+        && lhs.keyLogger === rhs.keyLogger
+        && lhs.cipherSuites == rhs.cipherSuites
+
+        return isSecurityPropertiesEqual
         && lhs.certificateVerification == rhs.certificateVerification
         && lhs.trustRoots == rhs.trustRoots
         && lhs.additionalTrustRoots == rhs.additionalTrustRoots
-        && lhs.privateKey == rhs.privateKey
         && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms
         && lhs.verifySignatureAlgorithms == rhs.verifySignatureAlgorithms
         && lhs.sendCANameList == rhs.sendCANameList
@@ -156,11 +171,9 @@ extension Internals.SecureConnection: Equatable {
         && lhs.shutdownTimeout == rhs.shutdownTimeout
         && lhs.pskHint == rhs.pskHint
         && lhs.applicationProtocols == rhs.applicationProtocols
-        && lhs.keyLogger === rhs.keyLogger
         && lhs.pskIdentityResolver === rhs.pskIdentityResolver
         && lhs.minimumTLSVersion == rhs.minimumTLSVersion
         && lhs.maximumTLSVersion == rhs.maximumTLSVersion
-        && lhs.cipherSuites == rhs.cipherSuites
         && lhs.cipherSuiteValues == rhs.cipherSuiteValues
     }
 }

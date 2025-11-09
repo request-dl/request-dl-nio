@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class NeverPropertyTests: XCTestCase {
+struct NeverPropertyTests {
 
     private struct NeverBuilds: Property {
 
@@ -16,7 +17,8 @@ class NeverPropertyTests: XCTestCase {
         }
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = NeverBuilds()
 

@@ -2,14 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersMapErrorTests: XCTestCase {
+struct ModifiersMapErrorTests {
 
     struct AnyError: Error {}
 
-    func testMapError() async throws {
+    @Test
+    func mapError() async throws {
         // Given
         let output = 1
         let invalidOutput = 2
@@ -32,6 +34,6 @@ class ModifiersMapErrorTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result, output)
+        #expect(result == output)
     }
 }

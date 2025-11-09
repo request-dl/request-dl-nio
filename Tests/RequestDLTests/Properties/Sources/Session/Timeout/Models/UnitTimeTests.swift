@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class UnitTimeTests: XCTestCase {
+struct UnitTimeTests {
 
-    func testUnitTime_whenNanoseconds_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenNanoseconds_shouldBeValid() async throws {
         // Given
         let nanoseconds: Int64 = 6
 
@@ -15,10 +17,11 @@ class UnitTimeTests: XCTestCase {
         let sut = UnitTime.nanoseconds(nanoseconds)
 
         // Then
-        XCTAssertEqual(sut.build(), .nanoseconds(nanoseconds))
+        #expect(sut.build() == .nanoseconds(nanoseconds))
     }
 
-    func testUnitTime_whenMicroseconds_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenMicroseconds_shouldBeValid() async throws {
         // Given
         let microseconds: Int64 = 6
 
@@ -26,10 +29,11 @@ class UnitTimeTests: XCTestCase {
         let sut = UnitTime.microseconds(microseconds)
 
         // Then
-        XCTAssertEqual(sut.build(), .microseconds(microseconds))
+        #expect(sut.build() == .microseconds(microseconds))
     }
 
-    func testUnitTime_whenMilliseconds_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenMilliseconds_shouldBeValid() async throws {
         // Given
         let milliseconds: Int64 = 6
 
@@ -37,10 +41,11 @@ class UnitTimeTests: XCTestCase {
         let sut = UnitTime.milliseconds(milliseconds)
 
         // Then
-        XCTAssertEqual(sut.build(), .milliseconds(milliseconds))
+        #expect(sut.build() == .milliseconds(milliseconds))
     }
 
-    func testUnitTime_whenSeconds_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenSeconds_shouldBeValid() async throws {
         // Given
         let seconds: Int64 = 6
 
@@ -48,10 +53,11 @@ class UnitTimeTests: XCTestCase {
         let sut = UnitTime.seconds(seconds)
 
         // Then
-        XCTAssertEqual(sut.build(), .seconds(seconds))
+        #expect(sut.build() == .seconds(seconds))
     }
 
-    func testUnitTime_whenMinutes_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenMinutes_shouldBeValid() async throws {
         // Given
         let minutes: Int64 = 6
 
@@ -59,10 +65,11 @@ class UnitTimeTests: XCTestCase {
         let sut = UnitTime.minutes(minutes)
 
         // Then
-        XCTAssertEqual(sut.build(), .minutes(minutes))
+        #expect(sut.build() == .minutes(minutes))
     }
 
-    func testUnitTime_whenHours_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenHours_shouldBeValid() async throws {
         // Given
         let hours: Int64 = 6
 
@@ -70,76 +77,82 @@ class UnitTimeTests: XCTestCase {
         let sut = UnitTime.hours(hours)
 
         // Then
-        XCTAssertEqual(sut.build(), .hours(hours))
+        #expect(sut.build() == .hours(hours))
     }
 
-    func testUnitTime_whenInteger_shouldBeValid() async throws {
+    @Test
+    func unitTime_whenInteger_shouldBeValid() async throws {
         // Given
         let nanoseconds: UnitTime = 6
 
         // Then
-        XCTAssertEqual(nanoseconds.nanoseconds, 6)
+        #expect(nanoseconds.nanoseconds == 6)
     }
 
-    func testUnitTime_whenCompareSecondsToMilliseconds_shouldBeGreater() async throws {
+    @Test
+    func unitTime_whenCompareSecondsToMilliseconds_shouldBeGreater() async throws {
         // Given
         let lhs: UnitTime = .seconds(6)
         let rhs: UnitTime = .milliseconds(6)
 
         // Then
-        XCTAssertGreaterThan(lhs, rhs)
+        #expect(lhs > rhs)
     }
 
-    func testUnitTime_whenCompareNanosecondsToHours_shouldBeLower() async throws {
+    @Test
+    func unitTime_whenCompareNanosecondsToHours_shouldBeLower() async throws {
         // Given
         let lhs: UnitTime = .nanoseconds(6)
         let rhs: UnitTime = .hours(6)
 
         // Then
-        XCTAssertLessThan(lhs, rhs)
+        #expect(lhs < rhs)
     }
 
-    func testUnitTime_whenAddSecondsToHours_shouldValid() async throws {
+    @Test
+    func unitTime_whenAddSecondsToHours_shouldValid() async throws {
         // Given
         let lhs: UnitTime = .seconds(6)
         let rhs: UnitTime = .hours(6)
 
         // Then
-        XCTAssertEqual(
-            (lhs + rhs).nanoseconds,
-            (lhs.build() + rhs.build()).nanoseconds
+        #expect(
+            (lhs + rhs).nanoseconds == (lhs.build() + rhs.build()).nanoseconds
         )
     }
 
-    func testUnitTime_whenSubtractSecondsFormHours_shouldValid() async throws {
+    @Test
+    func unitTime_whenSubtractSecondsFormHours_shouldValid() async throws {
         // Given
         let lhs: UnitTime = .hours(6)
         let rhs: UnitTime = .seconds(6)
 
         // Then
-        XCTAssertEqual(
-            (lhs - rhs).nanoseconds,
-            (lhs.build() - rhs.build()).nanoseconds
+        #expect(
+            (lhs - rhs).nanoseconds == (lhs.build() - rhs.build()).nanoseconds
         )
     }
 
-    func testUnitTime_whenHashable_shouldValid() async throws {
+    @Test
+    func unitTime_whenHashable_shouldValid() async throws {
         // Given
         let sut: Set<UnitTime> = [.seconds(6), .seconds(6), .hours(10)]
 
         // Then
-        XCTAssertEqual(sut, [.seconds(6), .hours(10)])
+        #expect(sut == [.seconds(6), .hours(10)])
     }
 
-    func testUnitTime_whenZero() async throws {
+    @Test
+    func unitTime_whenZero() async throws {
         // Given
         let sut = UnitTime.zero
 
         // Then
-        XCTAssertEqual(sut.nanoseconds, .zero)
+        #expect(sut.nanoseconds == .zero)
     }
 
-    func testUnitTime_whenAddingWithAssignment() async throws {
+    @Test
+    func unitTime_whenAddingWithAssignment() async throws {
         // Given
         var lhs = UnitTime.zero
         let rhs = UnitTime.hours(1)
@@ -148,10 +161,11 @@ class UnitTimeTests: XCTestCase {
         lhs += rhs
 
         // Then
-        XCTAssertEqual(lhs, .hours(1))
+        #expect(lhs == .hours(1))
     }
 
-    func testUnitTime_whenSubtractingWithAssignment() async throws {
+    @Test
+    func unitTime_whenSubtractingWithAssignment() async throws {
         // Given
         var lhs = UnitTime.hours(1)
         let rhs = UnitTime.minutes(45)
@@ -160,10 +174,11 @@ class UnitTimeTests: XCTestCase {
         lhs -= rhs
 
         // Then
-        XCTAssertEqual(lhs, .minutes(15))
+        #expect(lhs == .minutes(15))
     }
 
-    func testUnitTime_whenMultiplying() async throws {
+    @Test
+    func unitTime_whenMultiplying() async throws {
         // Given
         let lhs = UnitTime.hours(1)
         let value = 2
@@ -171,10 +186,11 @@ class UnitTimeTests: XCTestCase {
         // When
 
         // Then
-        XCTAssertEqual(lhs * value, .hours(2))
+        #expect(lhs * value == .hours(2))
     }
 
-    func testUnitTime_withStringLossless() async throws {
+    @Test
+    func unitTime_withStringLossless() async throws {
         // Given
         let unitTime = UnitTime.seconds(1)
 
@@ -183,7 +199,7 @@ class UnitTimeTests: XCTestCase {
         let losslessUnitTime = UnitTime(string)
 
         // Then
-        XCTAssertEqual(string, unitTime.description)
-        XCTAssertEqual(losslessUnitTime, unitTime)
+        #expect(string == unitTime.description)
+        #expect(losslessUnitTime == unitTime)
     }
 }

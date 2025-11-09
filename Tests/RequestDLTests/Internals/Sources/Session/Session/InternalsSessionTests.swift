@@ -2,47 +2,49 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsSessionTests: XCTestCase {
+struct InternalsSessionTests {
 
-    var localServer: LocalServer?
-    var session: Internals.Session?
+    final class TestState: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
+        let uri: String
+        let localServer: LocalServer
+        let session: Internals.Session
 
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
+        init() async throws {
+            uri = "/" + UUID().uuidString
+            localServer = try await .init(.standard)
+            localServer.cleanup(at: uri)
 
-        var configuration = Internals.Session.Configuration()
-        var secureConnection = Internals.SecureConnection()
+            var configuration = Internals.Session.Configuration()
+            var secureConnection = Internals.SecureConnection()
 
-        secureConnection.certificateVerification = .some(.none)
-        configuration.secureConnection = secureConnection
+            secureConnection.certificateVerification = .some(.none)
+            configuration.secureConnection = secureConnection
 
-        session = Internals.Session(
-            provider: .shared,
-            configuration: configuration
-        )
+            session = Internals.Session(
+                provider: .shared,
+                configuration: configuration
+            )
+        }
+
+        deinit {
+            localServer.cleanup(at: uri)
+        }
     }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        localServer?.cleanup()
-        localServer = nil
-
-        session = nil
-    }
-
-    func testSession_whenPerformingGet_shouldBeValid() async throws {
+    @Test
+    func session_whenPerformingGet_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let session = try XCTUnwrap(session)
+        let session = testState.session
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
 
         // When
         let task = try await session.execute(
@@ -53,23 +55,26 @@ class InternalsSessionTests: XCTestCase {
         let result = try await Array(task())
 
         // Then
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
 
         guard case .download? = result.first else {
-            XCTFail("The obtained result is different from the expected result")
+            Issue.record("The obtained result is different from the expected result")
             return
         }
     }
 
-    func testSession_whenPerformingPostUploadingData_shouldBeValid() async throws {
+    @Test
+    func session_whenPerformingPostUploadingData_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let session = try XCTUnwrap(session)
+        let session = testState.session
 
         let length = 1_023
         let data = Data.randomData(length: length)
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         request.method = "POST"
         request.body = Internals.Body(buffers: [
             Internals.DataBuffer(data)
@@ -83,24 +88,26 @@ class InternalsSessionTests: XCTestCase {
         let result = try await Array(task())
 
         // Then
-        XCTAssertEqual(result.count, length + 1)
-        XCTAssertEqual(
-            Array(result[0..<length]),
-            (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
+        #expect(result.count == length + 1)
+        #expect(
+            Array(result[0..<length]) == (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
         )
 
         guard case .download? = result.last else {
-            XCTFail("The obtained result is different from the expected result")
+            Issue.record("The obtained result is different from the expected result")
             return
         }
     }
 
-    func testSession_whenPerformingPostEmptyData_shouldBeValid() async throws {
+    @Test
+    func session_whenPerformingPostEmptyData_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let session = try XCTUnwrap(session)
+        let session = testState.session
 
         var request = Internals.Request()
         request.baseURL = "https://localhost:8888"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         request.method = "POST"
         request.body = Internals.Body(buffers: [])
 
@@ -112,19 +119,21 @@ class InternalsSessionTests: XCTestCase {
         let result = try await Array(task())
 
         // Then
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
 
         guard case .download? = result.first else {
-            XCTFail("The obtained result is different from the expected result")
+            Issue.record("The obtained result is different from the expected result")
             return
         }
     }
 
     // swiftlint:disable function_body_length
-    func testSession_whenUploadingFile_shouldBeValid() async throws {
+    @Test
+    func session_whenUploadingFile_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let testingSession = try XCTUnwrap(session)
+        let localServer = testState.localServer
+        let testingSession = testState.session
 
         let certificates = Certificates().server()
         let message = "Hello World"
@@ -147,11 +156,12 @@ class InternalsSessionTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         var request = Internals.Request()
         request.baseURL = "https://\(localServer.baseURL)"
+        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         request.method = "POST"
         request.body = Internals.Body(
             chunkSize: fragment,
@@ -191,13 +201,12 @@ class InternalsSessionTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(uploadedBytes.count, Int(ceil(Double(length) / Double(fragment))))
-        XCTAssertEqual(uploadedBytes.reduce(.zero, +), fileBuffer.writerIndex)
-        XCTAssertNotNil(download)
-        XCTAssertEqual(download?.0.status.code, 200)
-        XCTAssertEqual(
-            try (download?.1).map(HTTPResult<String>.init),
-            HTTPResult(
+        #expect(uploadedBytes.count == Int(ceil(Double(length) / Double(fragment))))
+        #expect(uploadedBytes.reduce(.zero, +) == fileBuffer.writerIndex)
+        #expect(download != nil)
+        #expect(download?.0.status.code == 200)
+        #expect(
+            try (download?.1).map(HTTPResult<String>.init) == HTTPResult(
                 receivedBytes: length,
                 response: message
             )

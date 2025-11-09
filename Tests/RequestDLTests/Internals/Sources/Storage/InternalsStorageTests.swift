@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsStorageTests: XCTestCase {
+struct InternalsStorageTests {
 
-    func testStorage_whenSetValue() async throws {
+    @Test
+    func storage_whenSetValue() async throws {
         // Given
         let key = "key"
         let value = 1
@@ -17,10 +19,11 @@ class InternalsStorageTests: XCTestCase {
         storage.setValue(value, forKey: key)
 
         // Then
-        XCTAssertEqual(storage.getValue(Int.self, forKey: key), value)
+        #expect(storage.getValue(Int.self, forKey: key) == value)
     }
 
-    func testStorage_whenExpiredLifetime() async throws {
+    @Test
+    func storage_whenExpiredLifetime() async throws {
         // Given
         let lifetime: UInt64 = 2_500_000_000
         let key = "key"
@@ -31,10 +34,10 @@ class InternalsStorageTests: XCTestCase {
         storage.setValue(value, forKey: key)
 
         // Then
-        XCTAssertNotNil(storage.getValue(Int.self, forKey: key))
+        #expect(storage.getValue(Int.self, forKey: key) != nil)
 
         try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime * 3))
 
-        XCTAssertNil(storage.getValue(Int.self, forKey: key))
+        #expect(storage.getValue(Int.self, forKey: key) == nil)
     }
 }

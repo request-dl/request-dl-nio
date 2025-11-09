@@ -2,26 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 @testable import RequestDL
 
-class InternalsCertificateChainTests: XCTestCase {
+struct InternalsCertificateChainTests {
 
-    var client: CertificateResource?
-    var server: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-
-        client = Certificates().client()
-        server = Certificates().server()
-    }
-
-    func testChain_whenCertificates_shouldBeValid() async throws {
+    @Test
+    func chain_whenCertificates_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         var chain = Internals.CertificateChain()
 
@@ -43,16 +35,18 @@ class InternalsCertificateChainTests: XCTestCase {
         let sut = try chain.build()
 
         // Then
-        XCTAssertEqual(sut, try [
+        let expectedSources: [NIOSSLCertificateSource] = try [
             .certificate(.init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
             .certificate(.init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
-        ])
+        ]
+        #expect(sut == expectedSources)
     }
 
-    func testTrustRoot_whenFilesMerged_shouldBeValid() async throws {
+    @Test
+    func trustRoot_whenFilesMerged_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -71,15 +65,17 @@ class InternalsCertificateChainTests: XCTestCase {
         let sut = try Internals.CertificateChain.file(fileURL.absolutePath(percentEncoded: false)).build()
 
         // Then
-        XCTAssertEqual(sut, try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
-            .certificate($0)
-        })
+        let expectedSources = try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
+            NIOSSLCertificateSource.certificate($0)
+        }
+        #expect(sut == expectedSources)
     }
 
-    func testTrustRoot_whenBytesMerged_shouldBeValid() async throws {
+    @Test
+    func trustRoot_whenBytesMerged_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -91,8 +87,9 @@ class InternalsCertificateChainTests: XCTestCase {
         let sut = try Internals.CertificateChain.bytes(bytes).build()
 
         // Then
-        XCTAssertEqual(sut, try NIOSSLCertificate.fromPEMBytes(bytes).map {
-            .certificate($0)
-        })
+        let expectedSources = try NIOSSLCertificate.fromPEMBytes(bytes).map {
+            NIOSSLCertificateSource.certificate($0)
+        }
+        #expect(sut == expectedSources)
     }
 }

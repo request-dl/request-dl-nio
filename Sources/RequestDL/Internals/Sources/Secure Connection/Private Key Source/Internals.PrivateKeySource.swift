@@ -9,6 +9,7 @@ extension Internals {
 
     enum PrivateKeySource: Sendable, Equatable {
 
+        @available(*, deprecated, renamed: "privateKey")
         case file(String)
         case privateKey(PrivateKey)
 

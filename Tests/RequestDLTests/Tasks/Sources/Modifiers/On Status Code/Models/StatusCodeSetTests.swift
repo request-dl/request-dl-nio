@@ -2,157 +2,171 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class StatusCodeSetTests: XCTestCase {
+struct StatusCodeSetTests {
 
-    func testInit() async throws {
+    @Test
+    func initSet_isEmpty() async throws {
         let set = StatusCodeSet()
-        XCTAssertTrue(set.isEmpty)
+        #expect(set.isEmpty)
     }
 
-    func testInitWithSequence() async throws {
+    @Test
+    func initWithSequence() async throws {
         let sequence: [StatusCode] = [.ok, .created, .accepted]
         let set = StatusCodeSet(sequence)
-        XCTAssertEqual(set.count, 3)
-        XCTAssertTrue(set.contains(.ok))
-        XCTAssertTrue(set.contains(.created))
-        XCTAssertTrue(set.contains(.accepted))
+        #expect(set.count == 3)
+        #expect(set.contains(.ok))
+        #expect(set.contains(.created))
+        #expect(set.contains(.accepted))
     }
 
-    func testUnion() async throws {
+    @Test
+    func union() async throws {
         let set1: StatusCodeSet = [.ok, .created, .badRequest]
         let set2: StatusCodeSet = [400, 401, 404]
         let expectedResult: StatusCodeSet = [200, 201, 400, 401, 404]
 
         let result = set1.union(set2)
 
-        XCTAssertEqual(result, expectedResult)
+        #expect(result == expectedResult)
     }
 
-    func testIntersection() async throws {
+    @Test
+    func intersection() async throws {
         let set1 = StatusCodeSet([.ok, .created, .noContent])
         let set2 = StatusCodeSet([.ok, .badRequest, .forbidden])
 
         let intersection = set1.intersection(set2)
 
-        XCTAssertEqual(intersection, [.ok])
+        #expect(intersection == [.ok])
 
         let set3 = StatusCodeSet([.ok, .created])
         let set4 = StatusCodeSet([.ok, .created])
 
         let intersection2 = set3.intersection(set4)
 
-        XCTAssertEqual(intersection2, [.ok, .created])
+        #expect(intersection2 == [.ok, .created])
 
         let set5 = StatusCodeSet([.ok, .created, .noContent])
         let set6 = StatusCodeSet([.notFound, .badRequest, .forbidden])
 
         let intersection3 = set5.intersection(set6)
 
-        XCTAssertTrue(intersection3.isEmpty)
+        #expect(intersection3.isEmpty)
     }
 
-    func testSymmetricDifference() async throws {
+    @Test
+    func symmetricDifference() async throws {
         let set1 = StatusCodeSet([200, 201, 204])
         let set2 = StatusCodeSet([200, 400, 404])
 
         let symmetricDifference = set1.symmetricDifference(set2)
 
-        XCTAssertEqual(symmetricDifference, [201, 204, 400, 404])
+        #expect(symmetricDifference == [201, 204, 400, 404])
     }
 
-    func testFormUnion() async throws {
+    @Test
+    func formUnion() async throws {
         var set1 = StatusCodeSet([200, 201, 202])
         let set2 = StatusCodeSet([201, 203])
 
         set1.formUnion(set2)
 
-        XCTAssertEqual(set1, [200, 201, 202, 203])
+        #expect(set1 == [200, 201, 202, 203])
     }
 
-    func testFormIntersection() async throws {
+    @Test
+    func formIntersection() async throws {
         var set1 = StatusCodeSet([200, 201, 202])
         let set2 = StatusCodeSet([201, 203])
 
         set1.formIntersection(set2)
 
-        XCTAssertEqual(set1, [201])
+        #expect(set1 == [201])
     }
 
-    func testFormSymmetricDifference() async throws {
+    @Test
+    func formSymmetricDifference() async throws {
         var statusCodeSet = StatusCodeSet([200, 201, 202, 203])
         let other = StatusCodeSet([201, 202, 204, 205])
 
         statusCodeSet.formSymmetricDifference(other)
 
-        XCTAssertEqual(statusCodeSet, [200, 203, 204, 205])
+        #expect(statusCodeSet == [200, 203, 204, 205])
     }
 
-    func testContains() async throws {
+    @Test
+    func contains() async throws {
         let statusCodeSet = StatusCodeSet([200, 201, 202, 203])
-        XCTAssertTrue(statusCodeSet.contains(200))
-        XCTAssertTrue(statusCodeSet.contains(202))
-        XCTAssertFalse(statusCodeSet.contains(204))
+        #expect(statusCodeSet.contains(200))
+        #expect(statusCodeSet.contains(202))
+        #expect(!statusCodeSet.contains(204))
     }
 
-    func testInsert() async throws {
+    @Test
+    func insert() async throws {
         var set = StatusCodeSet([.ok, .created])
         let result = set.insert(.noContent)
-        XCTAssertTrue(result.inserted)
-        XCTAssertEqual(result.memberAfterInsert, .noContent)
-        XCTAssertTrue(set.contains(.noContent))
+        #expect(result.inserted)
+        #expect(result.memberAfterInsert == .noContent)
+        #expect(set.contains(.noContent))
     }
 
-    func testRemove() async throws {
+    @Test
+    func remove() async throws {
         var set = StatusCodeSet([.ok, .created])
         let result = set.remove(.created)
-        XCTAssertEqual(result, .created)
-        XCTAssertFalse(set.contains(.created))
+        #expect(result == .created)
+        #expect(!set.contains(.created))
     }
 
-    func testUpdate() async throws {
+    @Test
+    func update() async throws {
         var set = StatusCodeSet([.ok, .created])
         let result = set.update(with: .created)
-        XCTAssertEqual(result, .created)
-        XCTAssertEqual(set, [.ok, .created])
+        #expect(result == .created)
+        #expect(set == [.ok, .created])
     }
 
-    func testSuccess() async throws {
+    @Test
+    func success() async throws {
         let success = StatusCodeSet.success
-        XCTAssertTrue(success.contains(.ok))
-        XCTAssertTrue(success.contains(.created))
-        XCTAssertTrue(success.contains(.accepted))
-        XCTAssertTrue(success.contains(.nonAuthoritativeInformation))
-        XCTAssertTrue(success.contains(.noContent))
-        XCTAssertTrue(success.contains(.resetContent))
-        XCTAssertTrue(success.contains(.partialContent))
-        XCTAssertTrue(success.contains(.multiStatus))
-        XCTAssertTrue(success.contains(.alreadyReported))
-        XCTAssertTrue(success.contains(.imUsed))
+        #expect(success.contains(.ok))
+        #expect(success.contains(.created))
+        #expect(success.contains(.accepted))
+        #expect(success.contains(.nonAuthoritativeInformation))
+        #expect(success.contains(.noContent))
+        #expect(success.contains(.resetContent))
+        #expect(success.contains(.partialContent))
+        #expect(success.contains(.multiStatus))
+        #expect(success.contains(.alreadyReported))
+        #expect(success.contains(.imUsed))
     }
 
-    func testSuccessAndRedirect() async throws {
+    @Test
+    func successAndRedirect() async throws {
         let successAndRedirect = StatusCodeSet.successAndRedirect
-        XCTAssertTrue(successAndRedirect.contains(.ok))
-        XCTAssertTrue(successAndRedirect.contains(.created))
-        XCTAssertTrue(successAndRedirect.contains(.accepted))
-        XCTAssertTrue(successAndRedirect.contains(.nonAuthoritativeInformation))
-        XCTAssertTrue(successAndRedirect.contains(.noContent))
-        XCTAssertTrue(successAndRedirect.contains(.resetContent))
-        XCTAssertTrue(successAndRedirect.contains(.partialContent))
-        XCTAssertTrue(successAndRedirect.contains(.multiStatus))
-        XCTAssertTrue(successAndRedirect.contains(.alreadyReported))
-        XCTAssertTrue(successAndRedirect.contains(.imUsed))
-        XCTAssertTrue(successAndRedirect.contains(.multipleChoices))
-        XCTAssertTrue(successAndRedirect.contains(.movedPermanently))
-        XCTAssertTrue(successAndRedirect.contains(.found))
-        XCTAssertTrue(successAndRedirect.contains(.seeOther))
-        XCTAssertTrue(successAndRedirect.contains(.notModified))
-        XCTAssertTrue(successAndRedirect.contains(.useProxy))
-        XCTAssertTrue(successAndRedirect.contains(.temporaryRedirect))
-        XCTAssertTrue(successAndRedirect.contains(.permanentRedirect))
+        #expect(successAndRedirect.contains(.ok))
+        #expect(successAndRedirect.contains(.created))
+        #expect(successAndRedirect.contains(.accepted))
+        #expect(successAndRedirect.contains(.nonAuthoritativeInformation))
+        #expect(successAndRedirect.contains(.noContent))
+        #expect(successAndRedirect.contains(.resetContent))
+        #expect(successAndRedirect.contains(.partialContent))
+        #expect(successAndRedirect.contains(.multiStatus))
+        #expect(successAndRedirect.contains(.alreadyReported))
+        #expect(successAndRedirect.contains(.imUsed))
+        #expect(successAndRedirect.contains(.multipleChoices))
+        #expect(successAndRedirect.contains(.movedPermanently))
+        #expect(successAndRedirect.contains(.found))
+        #expect(successAndRedirect.contains(.seeOther))
+        #expect(successAndRedirect.contains(.notModified))
+        #expect(successAndRedirect.contains(.useProxy))
+        #expect(successAndRedirect.contains(.temporaryRedirect))
+        #expect(successAndRedirect.contains(.permanentRedirect))
     }
-
 }

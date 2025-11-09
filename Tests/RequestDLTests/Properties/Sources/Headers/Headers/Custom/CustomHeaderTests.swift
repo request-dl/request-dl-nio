@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class CustomHeaderTests: XCTestCase {
+struct CustomHeaderTests {
 
-    func testAny_whenInitWithStringValue() async throws {
+    @Test
+    func any_whenInitWithStringValue() async throws {
         // Given
         let name = "xxx-api-key"
         let value = "password"
@@ -21,10 +23,11 @@ class CustomHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers[name], [value])
+        #expect(resolved.request.headers[name] == [value])
     }
 
-    func testAny_whenInitWithLosslessValue() async throws {
+    @Test
+    func any_whenInitWithLosslessValue() async throws {
         // Given
         let name = "xxx-api-key"
         let value = 123
@@ -38,10 +41,11 @@ class CustomHeaderTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.headers[name], ["\(value)"])
+        #expect(resolved.request.headers[name] == ["\(value)"])
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = CustomHeader(name: "key", value: 123)
 

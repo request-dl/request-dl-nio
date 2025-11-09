@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class CharsetTests: XCTestCase {
+struct CharsetTests {
 
-    func testCharset_whenUTF8() throws {
+    @Test
+    func charset_whenUTF8() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf8
@@ -16,10 +18,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf8))
+        #expect(sut == verbatim.data(using: .utf8))
     }
 
-    func testCharset_whenISOLatin1() throws {
+    @Test
+    func charset_whenISOLatin1() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.isoLatin1
@@ -28,10 +31,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .isoLatin1))
+        #expect(sut == verbatim.data(using: .isoLatin1))
     }
 
-    func testCharset_whenUTF16() throws {
+    @Test
+    func charset_whenUTF16() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf16
@@ -40,10 +44,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf16))
+        #expect(sut == verbatim.data(using: .utf16))
     }
 
-    func testCharset_whenUTF16BigEndian() throws {
+    @Test
+    func charset_whenUTF16BigEndian() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf16BigEndian
@@ -52,10 +57,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf16BigEndian))
+        #expect(sut == verbatim.data(using: .utf16BigEndian))
     }
 
-    func testCharset_whenUTF16LittleEndian() throws {
+    @Test
+    func charset_whenUTF16LittleEndian() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf16LittleEndian
@@ -64,10 +70,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf16LittleEndian))
+        #expect(sut == verbatim.data(using: .utf16LittleEndian))
     }
 
-    func testCharset_whenUTF32() throws {
+    @Test
+    func charset_whenUTF32() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf32
@@ -76,10 +83,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf32))
+        #expect(sut == verbatim.data(using: .utf32))
     }
 
-    func testCharset_whenUTF32BigEndian() throws {
+    @Test
+    func charset_whenUTF32BigEndian() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf32BigEndian
@@ -88,10 +96,11 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf32BigEndian))
+        #expect(sut == verbatim.data(using: .utf32BigEndian))
     }
 
-    func testCharset_whenUTF32LittleEndian() throws {
+    @Test
+    func charset_whenUTF32LittleEndian() throws {
         // Given
         let verbatim = "Hello world"
         let charset = Charset.utf32LittleEndian
@@ -100,6 +109,6 @@ class CharsetTests: XCTestCase {
         let sut = try charset.encode(verbatim)
 
         // Then
-        XCTAssertEqual(sut, verbatim.data(using: .utf32LittleEndian))
+        #expect(sut == verbatim.data(using: .utf32LittleEndian))
     }
 }

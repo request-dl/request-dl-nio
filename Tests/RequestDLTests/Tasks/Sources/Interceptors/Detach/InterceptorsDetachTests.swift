@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InterceptorsDetachTests: XCTestCase {
+struct InterceptorsDetachTests {
 
-    func testDetach() async throws {
+    @Test
+    func detach() async throws {
         // Given
         let taskDetached = SendableBox(false)
 
@@ -21,6 +23,6 @@ class InterceptorsDetachTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(taskDetached())
+        #expect(taskDetached())
     }
 }

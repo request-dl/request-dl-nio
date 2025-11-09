@@ -4,6 +4,7 @@
 
 import Foundation
 import NIO
+import NIOConcurrencyHelpers
 import NIOHTTP1
 
 extension LocalServer {
@@ -38,7 +39,6 @@ extension LocalServer {
 
         func channelRead(context: ChannelHandlerContext, data: NIOAny) {
             if isNewConnection {
-                _configuration = responseQueue.popLast()
                 cleanup()
                 isNewConnection = false
             }
@@ -47,6 +47,7 @@ extension LocalServer {
 
             switch request {
             case .head(let incomeHeaders):
+                _configuration = responseQueue.popLast(at: incomeHeaders.uri)
                 var headers = _incomeHeaders ?? .init()
                 for (name, value) in incomeHeaders.headers {
                     headers.add(name: name, value: value)

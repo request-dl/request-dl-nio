@@ -2,18 +2,19 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class KeyPathInvalidDataErrorTests: XCTestCase {
+struct KeyPathInvalidDataErrorTests {
 
-    func testError() async throws {
+    @Test
+    func error() async throws {
         // Given
         let error = KeyPathInvalidDataError()
 
         // Then
-        XCTAssertEqual(error.errorDescription,
-            """
+        #expect(error.errorDescription == """
             Unable to read the current data result on Task.keyPath() in key-value format
             """
         )

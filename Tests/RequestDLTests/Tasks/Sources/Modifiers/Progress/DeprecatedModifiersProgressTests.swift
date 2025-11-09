@@ -2,18 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-@available(*, deprecated)
-class DeprecatedModifiersProgressTests: XCTestCase {
+struct DeprecatedModifiersProgressTests {
 
     final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {
-        
+
         var sentBytes: [Int] {
             lock.withLock { _sentBytes }
         }
-        
+
         private let lock = Lock()
         private var _sentBytes: [Int] = []
 
@@ -25,7 +25,7 @@ class DeprecatedModifiersProgressTests: XCTestCase {
     }
 
     final class DownloadProgressMonitor: DownloadProgress, @unchecked Sendable {
-        
+
         var length: Int? {
             lock.withLock { _length }
         }
@@ -33,7 +33,7 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         var receivedData: [Data] {
             lock.withLock { _receivedData }
         }
-        
+
         private let lock = Lock()
         private var _receivedData: [Data] = []
         private var _length: Int?
@@ -47,11 +47,11 @@ class DeprecatedModifiersProgressTests: XCTestCase {
     }
 
     class ProgressMonitor: RequestDL.Progress, @unchecked Sendable {
-        
+
         var sentBytes: [Int] {
             lock.withLock { _sentBytes }
         }
-        
+
         var length: Int? {
             lock.withLock { _length }
         }
@@ -80,37 +80,35 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         }
     }
 
-    var localServer: LocalServer?
-    var uploadMonitor: UploadProgressMonitor?
-    var downloadMonitor: DownloadProgressMonitor?
-    var progressMonitor: ProgressMonitor?
+    final class TestState: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
+        let uri: String
+        let localServer: LocalServer
+        let uploadMonitor: UploadProgressMonitor
+        let downloadMonitor: DownloadProgressMonitor
+        let progressMonitor: ProgressMonitor
 
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
+        init() async throws {
+            uri = "/" + UUID().uuidString
+            localServer = try await .init(.standard)
+            localServer.cleanup(at: uri)
 
-        uploadMonitor = .init()
-        downloadMonitor = .init()
-        progressMonitor = .init()
+            uploadMonitor = .init()
+            downloadMonitor = .init()
+            progressMonitor = .init()
+        }
+
+        deinit {
+            localServer.cleanup(at: uri)
+        }
     }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        localServer?.cleanup()
-        localServer = nil
-
-        uploadMonitor = nil
-        downloadMonitor = nil
-        progressMonitor = nil
-    }
-
-    func testDeprecatedProgress_whenUploadStep_shouldBeValid() async throws {
+    @Test
+    func deprecatedProgress_whenUploadStep_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let uploadMonitor = try XCTUnwrap(uploadMonitor)
+        let localServer = testState.localServer
+        let uploadMonitor = testState.uploadMonitor
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -119,12 +117,12 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             data: data
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         _ = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
             Payload(data: data)
 
             SecureConnection {
@@ -138,13 +136,15 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(uploadMonitor.sentBytes.reduce(.zero, +), data.count)
+        #expect(uploadMonitor.sentBytes.reduce(.zero, +) == data.count)
     }
 
-    func testDeprecatedProgress_whenDownloadStep_shouldBeValid() async throws {
+    @Test
+    func deprecatedProgress_whenDownloadStep_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+        let localServer = testState.localServer
+        let downloadMonitor = testState.downloadMonitor
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -154,12 +154,12 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             SecureConnection {
                 Trusts {
@@ -177,24 +177,25 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(downloadMonitor.length, data.count)
-        XCTAssertEqual(result.receivedBytes, .zero)
+        #expect(downloadMonitor.length == data.count)
+        #expect(result.receivedBytes == .zero)
 
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+            #expect(
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
-    func testDeprecatedProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+    @Test
+    func deprecatedProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+        let localServer = testState.localServer
+        let downloadMonitor = testState.downloadMonitor
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -204,7 +205,7 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         let expectingData = try HTTPResult(
             receivedBytes: .zero,
@@ -214,7 +215,7 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         // When
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             SecureConnection {
                 Trusts {
@@ -232,25 +233,26 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(expectingData.count, data.count)
-        XCTAssertEqual(downloadMonitor.length, data.count)
-        XCTAssertEqual(result.receivedBytes, .zero)
+        #expect(expectingData.count == data.count)
+        #expect(downloadMonitor.length == data.count)
+        #expect(result.receivedBytes == .zero)
 
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+            #expect(
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
-    func testProgress_whenCompleteProgress_shouldBeValid() async throws {
+    @Test
+    func progress_whenCompleteProgress_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let progressMonitor = try XCTUnwrap(progressMonitor)
+        let localServer = testState.localServer
+        let progressMonitor = testState.progressMonitor
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -261,12 +263,12 @@ class DeprecatedModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         let receivedData = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             ReadingMode(length: length)
 
@@ -285,17 +287,16 @@ class DeprecatedModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(receivedData)
 
         // Then
-        XCTAssertEqual(progressMonitor.length, receivedData.count)
-        XCTAssertEqual(result.receivedBytes, data.count)
+        #expect(progressMonitor.length == receivedData.count)
+        #expect(result.receivedBytes == data.count)
 
         let completeParts = progressMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+            #expect(
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(progressMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(progressMonitor.receivedData.last?.count ?? .zero <= length)
     }
 }

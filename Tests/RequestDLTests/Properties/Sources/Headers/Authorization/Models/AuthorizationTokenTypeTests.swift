@@ -2,38 +2,45 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class AuthorizationTokenTypeTests: XCTestCase {
+struct AuthorizationTokenTypeTests {
 
-    func testInitRawValueBasic() async throws {
+    @Test
+    func initRawValueBasic() async throws {
         let type = Authorization.TokenType.basic
-        XCTAssertEqual(type, .basic)
+        #expect(type == .basic)
     }
 
-    func testInitRawValueBearer() async throws {
+    @Test
+    func initRawValueBearer() async throws {
         let type = Authorization.TokenType.bearer
-        XCTAssertEqual(type, .bearer)
+        #expect(type == .bearer)
     }
 
-    func testRawValueBasic() async throws {
+    @Test
+    func rawValueBasic() async throws {
         let type = Authorization.TokenType.basic
-        XCTAssertEqual(type, "Basic")
+        #expect(type == "Basic")
     }
 
-    func testRawValueBearer() async throws {
+    @Test
+    func rawValueBearer() async throws {
         let type = Authorization.TokenType.bearer
-        XCTAssertEqual(type, "Bearer")
+        #expect(type == "Bearer")
     }
 
-    func testHashable() async throws {
+    @Test
+    func hashable() async throws {
         let sut: Set<Authorization.TokenType> = [.bearer, .bearer, .basic]
 
-        XCTAssertEqual(sut, [.bearer, .basic])
+        #expect(sut == [.bearer, .basic])
     }
 
-    func testToken_withStringLossless() async throws {
+    @Test
+    func token_withStringLossless() async throws {
         // Given
         let token = Authorization.TokenType.basic
 
@@ -42,7 +49,7 @@ class AuthorizationTokenTypeTests: XCTestCase {
         let losslessToken = Authorization.TokenType(string)
 
         // Then
-        XCTAssertEqual(string, token.description)
-        XCTAssertEqual(losslessToken, token)
+        #expect(string == token.description)
+        #expect(losslessToken == token)
     }
 }

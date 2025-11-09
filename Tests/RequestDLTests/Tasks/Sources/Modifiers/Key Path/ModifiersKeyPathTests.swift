@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersKeyPathTests: XCTestCase {
+struct ModifiersKeyPathTests {
 
-    func testKeyPath() async throws {
+    @Test
+    func keyPath() async throws {
         // Given
         let jsonObject = ["key": true]
 
@@ -21,10 +23,11 @@ class ModifiersKeyPathTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result.payload, Data("true".utf8))
+        #expect(result.payload == Data("true".utf8))
     }
 
-    func testWrongKeyPath() async throws {
+    @Test
+    func wrongKeyPath() async throws {
         // Given
         let jsonObject = ["key": true]
         var keyPathNotFound = false
@@ -43,10 +46,11 @@ class ModifiersKeyPathTests: XCTestCase {
         } catch { throw error }
 
         // Then
-        XCTAssertTrue(keyPathNotFound)
+        #expect(keyPathNotFound)
     }
 
-    func testKeyPathInData() async throws {
+    @Test
+    func keyPathInData() async throws {
         // Given
         let jsonObject = ["key": true]
 
@@ -61,10 +65,11 @@ class ModifiersKeyPathTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result, Data("true".utf8))
+        #expect(result == Data("true".utf8))
     }
 
-    func testWrongKeyPathInData() async throws {
+    @Test
+    func wrongKeyPathInData() async throws {
         // Given
         let jsonObject = ["key": true]
         var keyPathNotFound = false
@@ -84,6 +89,6 @@ class ModifiersKeyPathTests: XCTestCase {
         } catch { throw error }
 
         // Then
-        XCTAssertTrue(keyPathNotFound)
+        #expect(keyPathNotFound)
     }
 }

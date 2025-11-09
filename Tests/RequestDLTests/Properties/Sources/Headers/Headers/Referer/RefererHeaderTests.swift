@@ -2,30 +2,35 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class RefererHeaderTests: XCTestCase {
+struct RefererHeaderTests {
 
-    func testReferer() async throws {
+    @Test
+    func referer() async throws {
         let property = TestProperty(RefererHeader("https://www.example.com/"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Referer"], ["https://www.example.com/"])
+        #expect(resolved.request.headers["Referer"] == ["https://www.example.com/"])
     }
 
-    func testRefererWithHTML() async throws {
+    @Test
+    func refererWithHTML() async throws {
         let property = TestProperty(RefererHeader("https://www.example.com/page1.html"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Referer"], ["https://www.example.com/page1.html"])
+        #expect(resolved.request.headers["Referer"] == ["https://www.example.com/page1.html"])
     }
 
-    func testRefererWithPathAndQuery() async throws {
+    @Test
+    func refererWithPathAndQuery() async throws {
         let property = TestProperty(RefererHeader("https://www.google.com/search?q=apple"))
         let resolved = try await resolve(property)
-        XCTAssertEqual(resolved.request.headers["Referer"], ["https://www.google.com/search?q=apple"])
+        #expect(resolved.request.headers["Referer"] == ["https://www.google.com/search?q=apple"])
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = RefererHeader("apple.com")
 

@@ -14,7 +14,7 @@ import Foundation
  struct ProjectDefaults: Property {
 
     @PropertyNamespace var projectName
-    @StateObject var pskResolver = PSKResolver()
+    @StoredObject var pskResolver = PSKResolver()
 
     var property: some Property {
         SecureConnection {
@@ -36,7 +36,7 @@ import Foundation
     @PropertyNamespace var foo
     @PropertyNamespace var bar
 
-    @StateObject var pskResolver = PSKResolver()
+    @StoredObject var pskResolver = PSKResolver()
 
     var property: some Property {
         SecureConnection {

@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ResolveTests: XCTestCase {
+struct ResolveTests {
 
-    func testDebug_whenContainsOneHierarchy_shouldBeValid() async throws {
+    @Test
+    func debug_whenContainsOneHierarchy_shouldBeValid() async throws {
         // Given
         let property = PropertyGroup {
             BaseURL("apple.com")
@@ -28,10 +30,11 @@ class ResolveTests: XCTestCase {
         let debugDescription = try await Resolve(property).description()
 
         // Then
-        XCTAssertEqual(debugDescription, Self.oneHierarchyOutput)
+        #expect(debugDescription == Self.oneHierarchyOutput)
     }
 
-    func testDebug_whenContainsTwoHierarchy_shouldBeValid() async throws {
+    @Test
+    func debug_whenContainsTwoHierarchy_shouldBeValid() async throws {
         // Given
         let property = PropertyGroup {
             BaseURL("apple.com")
@@ -55,10 +58,11 @@ class ResolveTests: XCTestCase {
         let debugDescription = try await Resolve(property).description()
 
         // Then
-        XCTAssertEqual(debugDescription, Self.twoHierarchyOutput)
+        #expect(debugDescription == Self.twoHierarchyOutput)
     }
 
-    func testDebug_whenContainsSecureConnection_shouldBeValid() async throws {
+    @Test
+    func debug_whenContainsSecureConnection_shouldBeValid() async throws {
         // Given
         let property = PropertyGroup {
             BaseURL("apple.com")
@@ -86,7 +90,7 @@ class ResolveTests: XCTestCase {
         let debugDescription = try await Resolve(property).description()
 
         // Then
-        XCTAssertEqual(debugDescription, Self.secureConnectionOutput)
+        #expect(debugDescription == Self.secureConnectionOutput)
     }
 }
 

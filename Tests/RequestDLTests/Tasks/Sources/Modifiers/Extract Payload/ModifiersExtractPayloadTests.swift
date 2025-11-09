@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersExtractPayloadTests: XCTestCase {
+struct ModifiersExtractPayloadTests {
 
-    func testExtractPayload() async throws {
+    @Test
+    func extractPayload() async throws {
         // Given
         let data = Data("--".utf8)
 
@@ -21,6 +23,6 @@ class ModifiersExtractPayloadTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result, data)
+        #expect(result == data)
     }
 }

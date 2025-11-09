@@ -2,14 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersOnStatusCodeTests: XCTestCase {
+struct ModifiersOnStatusCodeTests {
 
     struct AnyError: Error {}
 
-    func testStatusCode() async throws {
+    @Test
+    func statusCode() async throws {
         // Given
         let statusCode: StatusCode = .ok
         var throwAnyError = false
@@ -32,10 +34,11 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         } catch { throw error }
 
         // Then
-        XCTAssertTrue(throwAnyError)
+        #expect(throwAnyError)
     }
 
-    func testStatusCodeRange() async throws {
+    @Test
+    func statusCodeRange() async throws {
         // Given
         let statusCodes = StatusCode.ok ..< .badRequest
         var received = [StatusCode]()
@@ -60,13 +63,14 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(statusCodes.count, received.count)
-        XCTAssertTrue(received.allSatisfy {
+        #expect(statusCodes.count == received.count)
+        #expect(received.allSatisfy {
             statusCodes.contains($0)
         })
     }
 
-    func testSuccessStatusCodeSet() async throws {
+    @Test
+    func successStatusCodeSet() async throws {
         // Given
         let statusCodeSet: StatusCodeSet = .success
         var received = [StatusCode]()
@@ -91,13 +95,14 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(statusCodeSet.count, received.count)
-        XCTAssertTrue(received.allSatisfy {
+        #expect(statusCodeSet.count == received.count)
+        #expect(received.allSatisfy {
             statusCodeSet.contains($0)
         })
     }
 
-    func testSuccessAndRedirectStatusCodeSet() async throws {
+    @Test
+    func successAndRedirectStatusCodeSet() async throws {
         // Given
         let statusCodeSet: StatusCodeSet = .successAndRedirect
         var received = [StatusCode]()
@@ -122,8 +127,8 @@ class ModifiersOnStatusCodeTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(statusCodeSet.count, received.count)
-        XCTAssertTrue(received.allSatisfy {
+        #expect(statusCodeSet.count == received.count)
+        #expect(received.allSatisfy {
             statusCodeSet.contains($0)
         })
     }
