@@ -320,7 +320,7 @@ struct CachedRequestTests {
 extension CachedRequestTests {
 
     func waitCacheExpiration() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 2_000_000_000)
+        try await _Concurrency.Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
     }
 
     func mockCachedData(_ headers: [(String, String)] = []) -> CachedData {

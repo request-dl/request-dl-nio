@@ -21,7 +21,7 @@ extension Internals {
         // MARK: - Unsafe properties
 
         @preconcurrency
-        private var _groups: [String: EventLoopGroup] = [:]
+        private var _groups = HashTable<String, EventLoopGroup>()
 
         // MARK: - Internal methods
 
@@ -51,22 +51,5 @@ extension Internals {
                 return group
             }
         }
-    }
-}
-
-struct Table<Key: Sendable, Value: Sendable>: Sendable {
-
-    subscript(_ key: Key, default: Value) -> Value {
-        get {
-            self[key] ?? `default`
-        }
-        set {
-            self[key] = newValue
-        }
-    }
-
-    subscript(_ key: Key) -> Value? {
-        get { fatalError() }
-        set {}
     }
 }

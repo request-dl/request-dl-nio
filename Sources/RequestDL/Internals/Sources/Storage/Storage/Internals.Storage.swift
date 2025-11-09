@@ -19,7 +19,7 @@ extension Internals {
 
         // MARK: - Internal static properties
 
-        static let lifetime: UInt64 = 5_000_000_000 * 60
+        static let lifetime: UInt64 = 5 * 60 * NSEC_PER_SEC
         static let shared = Storage(lifetime: lifetime)
 
         // MARK: - Private properties
@@ -64,7 +64,11 @@ extension Internals {
         private func scheduleCleanup() {
             _Concurrency.Task.detached(priority: .background) { [weak self, lifetime] in
                 while true {
-                    try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
+                    do {
+                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
+                    } catch {
+                        await Task.yield()
+                    }
 
                     guard let self else {
                         return
@@ -78,7 +82,7 @@ extension Internals {
         private func cleanupIfNeeded() {
             lock.withLockVoid {
                 let now = Date()
-                let lifetime = Double(lifetime) / 1_000_000_000
+                let lifetime = Double(lifetime) / Double(NSEC_PER_SEC)
 
                 _table = _table.filter {
                     $1.readAt.distance(to: now) <= lifetime
