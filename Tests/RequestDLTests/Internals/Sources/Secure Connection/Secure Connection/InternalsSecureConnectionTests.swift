@@ -257,7 +257,7 @@ struct InternalsSecureConnectionTests {
     @Test
     func secureConnection_whenClient_shouldBeValid() async throws {
         // Given
-        var secureConnection = Internals.SecureConnection()
+        let secureConnection = Internals.SecureConnection()
         let configuration: TLSConfiguration = .clientDefault
 
         // When

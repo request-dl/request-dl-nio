@@ -72,7 +72,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenUnsetReadingMode() async throws {
         // Given
-        var request = Internals.Request()
+        let request = Internals.Request()
         // Then
         #expect(request.readingMode == .length(1_024))
     }

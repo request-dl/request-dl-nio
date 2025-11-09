@@ -29,7 +29,6 @@ struct MockedTaskTests {
         // Then
         let response = result.head
 
-        #expect(response != nil)
         #expect(response.status.code == statusCode)
         #expect(result.payload == data)
 
