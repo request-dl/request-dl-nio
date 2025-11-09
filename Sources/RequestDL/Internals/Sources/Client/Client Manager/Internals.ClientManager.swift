@@ -72,10 +72,16 @@ extension Internals {
         // MARK: - Private methods
 
         fileprivate func scheduleCleanup() {
-            _Concurrency.Task(priority: .background) {
-                try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
-                await cleanupIfNeeded()
-                scheduleCleanup()
+            _Concurrency.Task.detached(priority: .background) { [weak self, lifetime] in
+                while true {
+                    try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
+
+                    guard let self else {
+                        return
+                    }
+
+                    await cleanupIfNeeded()
+                }
             }
         }
 

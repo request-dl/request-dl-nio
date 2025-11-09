@@ -26,9 +26,6 @@ struct ModifiersCollectDataTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 
@@ -65,9 +62,6 @@ struct ModifiersCollectDataTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 
@@ -104,9 +98,6 @@ struct ModifiersCollectDataTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 

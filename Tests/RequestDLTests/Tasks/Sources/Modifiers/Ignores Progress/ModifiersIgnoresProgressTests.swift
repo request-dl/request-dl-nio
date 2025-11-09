@@ -26,8 +26,6 @@ struct ModifiersIgnoresProgressTests {
 
         // When
         let bytes = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
             BaseURL(localServer.baseURL)
             Path(uri)
             SecureConnection {
@@ -64,8 +62,6 @@ struct ModifiersIgnoresProgressTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
             BaseURL(localServer.baseURL)
             Path(uri)
             SecureConnection {
@@ -101,8 +97,6 @@ struct ModifiersIgnoresProgressTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
             BaseURL(localServer.baseURL)
             Path(uri)
             SecureConnection {

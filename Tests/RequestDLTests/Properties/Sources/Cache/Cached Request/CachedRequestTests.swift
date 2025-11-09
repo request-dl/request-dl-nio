@@ -389,7 +389,6 @@ extension CachedRequestTests {
 
         let output = try await DataTask {            
             Session()
-                .disableNetworkFramework()
                 .cachePolicy(cachePolicy)
                 .cacheStrategy(cacheStrategy)
                 .cache(url: testState.dataCache.directoryURL)

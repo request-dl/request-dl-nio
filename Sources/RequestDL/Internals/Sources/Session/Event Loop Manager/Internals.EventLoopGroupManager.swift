@@ -53,3 +53,20 @@ extension Internals {
         }
     }
 }
+
+struct Table<Key: Sendable, Value: Sendable>: Sendable {
+
+    subscript(_ key: Key, default: Value) -> Value {
+        get {
+            self[key] ?? `default`
+        }
+        set {
+            self[key] = newValue
+        }
+    }
+
+    subscript(_ key: Key) -> Value? {
+        get { fatalError() }
+        set {}
+    }
+}

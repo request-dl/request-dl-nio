@@ -100,13 +100,16 @@ public struct Session: Property {
     }
 
     /**
-     Disable the usage of Network framework on Apple Platforms when using RequestDL session providers
+     Enable the usage of Network framework on Apple Platforms when compatible.
 
-     - Parameter disabled: The flag to disable the Network framework
-     - Returns: A modified property with Network framework disabled.
+     Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
+     or specific secure connection settings.
+
+     - Parameter enabled: The flag to enable the Network framework
+     - Returns: A modified property with Network framework enabled.
      */
-    public func disableNetworkFramework(_ disabled: Bool = true) -> some Property {
-        edit { $0.disableNetworkFramework = disabled }
+    public func enableNetworkFramework(_ enabled: Bool = true) -> some Property {
+        edit { $0.enableNetworkFramework = enabled }
     }
 
     /**

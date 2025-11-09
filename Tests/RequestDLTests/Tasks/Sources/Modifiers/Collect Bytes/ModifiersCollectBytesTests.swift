@@ -26,9 +26,6 @@ struct ModifiersCollectBytesTests {
 
         // When
         let bytes = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 

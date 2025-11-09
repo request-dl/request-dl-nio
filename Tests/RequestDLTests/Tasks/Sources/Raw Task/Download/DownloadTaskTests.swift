@@ -28,9 +28,6 @@ struct DownloadTaskTests {
 
         // When
         let data = try await DownloadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 

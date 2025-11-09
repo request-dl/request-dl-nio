@@ -109,9 +109,6 @@ struct ModifiersProgressTests {
 
         // When
         _ = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
             Payload(data: data)
@@ -149,9 +146,6 @@ struct ModifiersProgressTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
@@ -208,9 +202,6 @@ struct ModifiersProgressTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
@@ -264,9 +255,6 @@ struct ModifiersProgressTests {
 
         // When
         let receivedData = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-            
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 

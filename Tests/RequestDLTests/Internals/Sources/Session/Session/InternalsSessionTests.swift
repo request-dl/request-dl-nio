@@ -175,7 +175,6 @@ struct InternalsSessionTests {
 
         var configuration = testingSession.configuration
         configuration.secureConnection = secureConnection
-        configuration.disableNetworkFramework = true
 
         let session = Internals.Session(
             provider: testingSession.provider,

@@ -29,9 +29,6 @@ struct UploadTaskTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 

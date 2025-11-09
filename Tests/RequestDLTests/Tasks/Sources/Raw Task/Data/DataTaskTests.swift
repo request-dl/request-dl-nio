@@ -28,9 +28,6 @@ struct DataTaskTests {
 
         // When
         let data = try await DataTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 
@@ -146,9 +143,6 @@ extension DataTaskTests {
 
         // When
         let data = try await DataTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(uri)
 

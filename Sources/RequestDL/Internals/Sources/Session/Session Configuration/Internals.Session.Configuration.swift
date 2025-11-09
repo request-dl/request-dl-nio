@@ -21,7 +21,7 @@ extension Internals.Session {
         var dnsOverride: [String: String] = [:]
         var networkFrameworkWaitForConnectivity: Bool?
         var httpVersion: Internals.HTTPVersion?
-        var disableNetworkFramework: Bool = false
+        var enableNetworkFramework: Bool = false
 
         // MARK: - Inits
 
@@ -58,10 +58,10 @@ extension Internals.Session {
 extension Internals.Session.Configuration {
 
     var isCompatibleWithNetworkFramework: Bool {
-        if disableNetworkFramework {
-            return false
+        if enableNetworkFramework {
+            return secureConnection?.isCompatibleWithNetworkFramework ?? true
         }
 
-        return secureConnection?.isCompatibleWithNetworkFramework ?? true
+        return false
     }
 }

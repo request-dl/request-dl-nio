@@ -87,5 +87,11 @@ extension Internals {
                 return true
             }
         }
+
+        deinit {
+            Task { [_client] in
+                try await _client.shutdown()
+            }
+        }
     }
 }

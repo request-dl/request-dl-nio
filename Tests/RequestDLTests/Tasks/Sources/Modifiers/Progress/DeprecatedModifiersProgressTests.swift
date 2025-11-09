@@ -121,9 +121,6 @@ struct DeprecatedModifiersProgressTests {
 
         // When
         _ = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
             Payload(data: data)
@@ -161,9 +158,6 @@ struct DeprecatedModifiersProgressTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
@@ -220,9 +214,6 @@ struct DeprecatedModifiersProgressTests {
 
         // When
         let data = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
@@ -276,9 +267,6 @@ struct DeprecatedModifiersProgressTests {
 
         // When
         let receivedData = try await UploadTask {
-            Session()
-                .disableNetworkFramework()
-
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
