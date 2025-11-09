@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 @testable import RequestDL
 
-class InternalsCertificateTests: XCTestCase {
+struct InternalsCertificateTests {
 
-    func testCertificate_whenPEMBytes_shouldBeValid() async throws {
+    @Test
+    func certificate_whenPEMBytes_shouldBeValid() async throws {
         // Given
         let certificates = Certificates().client()
         let data = try Data(contentsOf: certificates.certificateURL)
@@ -17,10 +19,14 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(Array(data), format: .pem).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(bytes: Array(data), format: .pem))
+        let expectedCertificates: [NIOSSLCertificate] = try [
+            .init(bytes: Array(data), format: .pem)
+        ]
+        #expect(resolved == expectedCertificates)
     }
 
-    func testCertificate_whenDERBytes_shouldBeValid() async throws {
+    @Test
+    func certificate_whenDERBytes_shouldBeValid() async throws {
         // Given
         let certificates = Certificates(.der).client()
         let data = try Data(contentsOf: certificates.certificateURL)
@@ -29,10 +35,14 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(Array(data), format: .der).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(bytes: Array(data), format: .der))
+        let expectedCertificates: [NIOSSLCertificate] = try [
+            .init(bytes: Array(data), format: .der)
+        ]
+        #expect(resolved == expectedCertificates)
     }
 
-    func testCertificate_whenPEMFile_shouldBeValid() async throws {
+    @Test
+    func certificate_whenPEMFile_shouldBeValid() async throws {
         // Given
         let certificates = Certificates().client()
         let path = certificates.certificateURL.path
@@ -41,10 +51,14 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(path, format: .pem).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(file: path, format: .pem))
+        let expectedCertificates: [NIOSSLCertificate] = try [
+            .init(file: path, format: .pem)
+        ]
+        #expect(resolved == expectedCertificates)
     }
 
-    func testCertificate_whenDERFile_shouldBeValid() async throws {
+    @Test
+    func certificate_whenDERFile_shouldBeValid() async throws {
         // Given
         let certificates = Certificates(.der).client()
         let path = certificates.certificateURL.path
@@ -53,6 +67,9 @@ class InternalsCertificateTests: XCTestCase {
         let resolved = try Internals.Certificate(path, format: .der).build()
 
         // Then
-        XCTAssertEqual(resolved, try .init(file: path, format: .der))
+        let expectedCertificates: [NIOSSLCertificate] = try [
+            .init(file: path, format: .der)
+        ]
+        #expect(resolved == expectedCertificates)
     }
 }

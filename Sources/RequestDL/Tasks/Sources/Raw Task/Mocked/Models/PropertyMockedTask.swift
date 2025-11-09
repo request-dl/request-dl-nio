@@ -59,7 +59,12 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         resolved: Resolved,
         cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?
     ) async throws -> Internals.AsyncResponse {
-        let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(resolved.session.provider)
+        let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(
+            resolved.session.provider,
+            with: SessionProviderOptions(
+                isCompatibleWithNetworkFramework: false
+            )
+        )
 
         var downloadBuffer = Internals.DownloadBuffer(readingMode: resolved.request.readingMode)
 

@@ -8,13 +8,13 @@ import Foundation
  This protocol defines a dynamic value used within `Property` objects.
 
  It is possible to implement a custom `DynamicValue` using the `@propertyWrapper`
- attribute along with a `@StateObject` attribute inside it.
+ attribute along with a `@StoredObject` attribute inside it.
 
  ```swift
  @propertyWrapper
  struct MyWrapper: DynamicValue {
 
-     @StateObject var manager = MyManager()
+     @StoredObject var manager = MyManager()
 
      var wrappedValue: MyManager {
          manager
@@ -23,7 +23,7 @@ import Foundation
  ```
 
  In the above example, the `MyWrapper` structure conforms to `DynamicValue` and contains
- a `@StateObject` variable named `manager`. This allows `MyWrapper` to be used as a
+ a `@StoredObject` variable named `manager`. This allows `MyWrapper` to be used as a
  property wrapper with a `MyManager` instance as its wrapped value.
 
  ```swift

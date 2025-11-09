@@ -120,11 +120,17 @@ public struct DataCache: Sendable, Equatable {
         nonmutating set { storage.diskCapacity = newValue }
     }
 
+    // MARK: - Internal properties
+
+    var directoryURL: URL {
+        storage.directory
+    }
+
     // MARK: - Private properties
 
     private let storage: Storage
 
-    // MARK: - Internal properties
+    // MARK: - Inits
 
     /**
      Initializes a data cache with specified memory and disk capacities and a file URL for disk storage.

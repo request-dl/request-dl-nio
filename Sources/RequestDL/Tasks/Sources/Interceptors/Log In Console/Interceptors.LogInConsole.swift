@@ -69,7 +69,14 @@ extension RequestTask {
         interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {
-                ["Success: \($0)"]
+                switch $0 {
+                case let result as TaskResult<Data>:
+                    return result.logInConsoleOutput()
+                case let data as Data:
+                    return data.logInConsoleOutput()
+                default:
+                    return ["Success: \($0)"]
+                }
             }
         ))
     }
@@ -89,10 +96,9 @@ extension RequestTask<TaskResult<Data>> {
     ) -> InterceptedRequestTask<Interceptors.LogInConsole<Element>> {
         interceptor(Interceptors.LogInConsole(
             isActive: isActive,
-            results: {[
-                "Head: \($0.head)",
-                "Payload: \(String(data: $0.payload, encoding: .utf8) ?? "Couldn't decode using UTF8")"
-            ]}
+            results: {
+                $0.logInConsoleOutput()
+            }
         ))
     }
 }
@@ -110,8 +116,32 @@ extension RequestTask<Data> {
         interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {
-                ["Success: \(String(data: $0, encoding: .utf8) ?? "Couldn't decode using UTF8")"]
+                $0.logInConsoleOutput()
             }
         ))
+    }
+}
+
+extension Data {
+
+    fileprivate func logInConsoleOutput(isPayload: Bool = false) -> [String] {
+        [(isPayload ? "Payload: " : "Success: ") + (String(data: self, encoding: .utf8) ?? debugDescription)]
+    }
+}
+
+extension TaskResult {
+
+    fileprivate func logInConsoleOutput() -> [String] {
+        var contents = [
+            "Head: \(head)"
+        ]
+
+        if let payload = payload as? Data {
+            contents.append(contentsOf: payload.logInConsoleOutput(isPayload: true))
+        } else {
+            contents.append("Payload: \(payload)")
+        }
+
+        return contents
     }
 }

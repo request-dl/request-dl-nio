@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import AsyncHTTPClient
 @testable import RequestDL
 
-class InternalsDecompressionTests: XCTestCase {
+struct InternalsDecompressionTests {
 
-    func testDecompression_whenDisabled() {
+    @Test
+    func decompression_whenDisabled() {
         // Given
         let decompression = Internals.Decompression.disabled
 
@@ -16,13 +18,15 @@ class InternalsDecompressionTests: XCTestCase {
         let sut = decompression.build()
 
         // Then
-        XCTAssertEqual(
-            String(describing: sut),
-            String(describing: HTTPClient.Decompression.disabled)
+        #expect(
+            String(describing: sut) == String(
+                describing: HTTPClient.Decompression.disabled
+            )
         )
     }
 
-    func testDecompression_whenEnabled() {
+    @Test
+    func decompression_whenEnabled() {
         // Given
         let decompression = Internals.Decompression.enabled(.ratio(1_024))
 
@@ -30,27 +34,30 @@ class InternalsDecompressionTests: XCTestCase {
         let sut = decompression.build()
 
         // Then
-        XCTAssertEqual(
-            String(describing: sut),
-            String(describing: HTTPClient.Decompression.enabled(limit: .ratio(1_024)))
+        #expect(
+            String(describing: sut) == String(
+                describing: HTTPClient.Decompression.enabled(limit: .ratio(1_024))
+            )
         )
     }
 
-    func testDecompression_whenEquals() {
+    @Test
+    func decompression_whenEquals() {
         // Given
         let lhs = Internals.Decompression.disabled
         let rhs = Internals.Decompression.disabled
 
         // Then
-        XCTAssertEqual(lhs, rhs)
+        #expect(lhs == rhs)
     }
 
-    func testDecompression_whenNotEquals() {
+    @Test
+    func decompression_whenNotEquals() {
         // Given
         let lhs = Internals.Decompression.disabled
         let rhs = Internals.Decompression.enabled(.none)
 
         // Then
-        XCTAssertNotEqual(lhs, rhs)
+        #expect(lhs != rhs)
     }
 }

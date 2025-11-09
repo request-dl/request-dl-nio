@@ -2,16 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersDecodeTests: XCTestCase {
+struct ModifiersDecodeTests {
 
     struct MockModel: Codable {
         let date: Date
     }
 
-    func testArrayOfDates() async throws {
+    @Test
+    func arrayOfDates() async throws {
         // Given
         let now = Date()
         let array = Array((0 ..< 10).map {
@@ -36,13 +38,11 @@ class ModifiersDecodeTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(
-            result.map(\.seconds),
-            array.map(\.seconds)
-        )
+        #expect(result.map(\.seconds) == array.map(\.seconds))
     }
 
-    func testDictionary() async throws {
+    @Test
+    func dictionary() async throws {
         // Given
         let now = Date()
         var dictionary = [Date: Int]()
@@ -70,8 +70,8 @@ class ModifiersDecodeTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result.keys.count, dictionary.keys.count)
-        XCTAssertEqual(result.values.count, dictionary.values.count)
+        #expect(result.keys.count == dictionary.keys.count)
+        #expect(result.values.count == dictionary.values.count)
 
         func transform(_ dictionary: [Date: Int]) -> [Int: Int] {
             var transformed = [Int: Int]()
@@ -83,10 +83,11 @@ class ModifiersDecodeTests: XCTestCase {
             return transformed
         }
 
-        XCTAssertEqual(transform(result), transform(dictionary))
+        #expect(transform(result) == transform(dictionary))
     }
 
-    func testPlainObject() async throws {
+    @Test
+    func plainObject() async throws {
         // Given
         let mock = MockModel(date: Date())
 
@@ -109,13 +110,11 @@ class ModifiersDecodeTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(
-            result.date.seconds,
-            mock.date.seconds
-        )
+        #expect(result.date.seconds == mock.date.seconds)
     }
 
-    func testArrayOfIntegersInData() async throws {
+    @Test
+    func arrayOfIntegersInData() async throws {
         // Given
         let array = Array(0..<10)
 
@@ -132,6 +131,6 @@ class ModifiersDecodeTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(array, result)
+        #expect(array == result)
     }
 }

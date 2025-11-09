@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class EnvironmentTests: XCTestCase {
+struct EnvironmentTests {
 
     struct IntegerEnvironmentKey: PropertyEnvironmentKey {
         static var defaultValue: Int { .zero }
@@ -22,15 +23,16 @@ class EnvironmentTests: XCTestCase {
         }
     }
 
-    func testEnvironment_whenIntegerNotSet_shouldBeZero() async throws {
+    @Test
+    func environment_whenIntegerNotSet_shouldBeZero() async throws {
         // Given
-        let expectation = expectation(description: "integer.receiver")
+        let expectation = AsyncSignal()
 
         let value = SendableBox<Int?>(nil)
 
         let receiver = IntegerReceiver {
             value($0)
-            expectation.fulfill()
+            expectation.signal()
         }
 
         // When
@@ -38,21 +40,22 @@ class EnvironmentTests: XCTestCase {
             receiver
         })
 
-        await _fulfillment(of: [expectation])
+        await expectation.wait()
 
         // Then
-        XCTAssertEqual(value(), IntegerEnvironmentKey.defaultValue)
+        #expect(value() == IntegerEnvironmentKey.defaultValue)
     }
 
-    func testEnvironment_whenIntegerSet_shouldBeUpdated() async throws {
+    @Test
+    func environment_whenIntegerSet_shouldBeUpdated() async throws {
         // Given
-        let expectation = expectation(description: "integer.receiver")
+        let expectation = AsyncSignal()
 
         let receivedValue = SendableBox<Int?>(nil)
 
         let receiver = IntegerReceiver {
             receivedValue($0)
-            expectation.fulfill()
+            expectation.signal()
         }
 
         let value = 2
@@ -63,10 +66,10 @@ class EnvironmentTests: XCTestCase {
                 .environment(\.integer, value)
         })
 
-        await _fulfillment(of: [expectation])
+        await expectation.wait()
 
         // Then
-        XCTAssertEqual(receivedValue(), value)
+        #expect(receivedValue() == value)
     }
 }
 

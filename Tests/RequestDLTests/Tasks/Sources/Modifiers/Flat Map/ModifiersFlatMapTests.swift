@@ -2,16 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersFlatMapTests: XCTestCase {
+struct ModifiersFlatMapTests {
 
     struct FlatMapError: Error {}
 
     struct FailedTaskError: Error {}
 
-    func testFlatMap() async throws {
+    @Test
+    func flatMap() async throws {
         // Given
         let flatMapCalled = SendableBox(false)
 
@@ -26,11 +28,12 @@ class ModifiersFlatMapTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(flatMapCalled())
-        XCTAssertTrue(result)
+        #expect(flatMapCalled())
+        #expect(result)
     }
 
-    func testFlatMapWithError() async throws {
+    @Test
+    func flatMapWithError() async throws {
         // Given
         let error = FlatMapError()
 
@@ -48,7 +51,8 @@ class ModifiersFlatMapTests: XCTestCase {
         }
     }
 
-    func testFailedTestWithSuccessMapping() async throws {
+    @Test
+    func failedTestWithSuccessMapping() async throws {
         // Given
         let success = Data("Hello World".utf8)
 
@@ -64,10 +68,11 @@ class ModifiersFlatMapTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(result, success)
+        #expect(result == success)
     }
 
-    func testFailedTestWithFailureMapping() async throws {
+    @Test
+    func failedTestWithFailureMapping() async throws {
         // Given
         let error = FlatMapError()
         var failed = false
@@ -90,6 +95,6 @@ class ModifiersFlatMapTests: XCTestCase {
         }
 
         // Then
-        XCTAssertTrue(failed)
+        #expect(failed)
     }
 }

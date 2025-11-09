@@ -2,28 +2,18 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOCore
 import AsyncHTTPClient
 @testable import RequestDL
 
-class InternalsSessionConfigurationTests: XCTestCase {
+struct InternalsSessionConfigurationTests {
 
-    var configuration: Internals.Session.Configuration?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        configuration = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        configuration = nil
-    }
-
-    func testConfiguration_whenSetTLSConfiguration_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenSetTLSConfiguration_shouldBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
         let secureConnection = Internals.SecureConnection()
 
         // When
@@ -32,12 +22,13 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertTrue(try builtConfiguration.tlsConfiguration?.bestEffortEquals(secureConnection.build()) ?? false)
+        #expect(try builtConfiguration.tlsConfiguration?.bestEffortEquals(secureConnection.build()) ?? false)
     }
 
-    func testConfiguration_whenSetRedirectConfiguration_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenSetRedirectConfiguration_shouldBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
         let redirectConfiguration = Internals.RedirectConfiguration.disallow
 
         // When
@@ -46,15 +37,19 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(
-            String(describing: builtConfiguration.redirectConfiguration),
-            String(describing: redirectConfiguration.build())
+        #expect(
+            String(
+                describing: builtConfiguration.redirectConfiguration
+            ) == String(
+                describing: redirectConfiguration.build()
+            )
         )
     }
 
-    func testConfiguration_whenSetTimeout_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenSetTimeout_shouldBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
 
         let connect = UnitTime.seconds(60)
         let read = UnitTime.seconds(60)
@@ -70,13 +65,14 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(builtConfiguration.timeout.connect, connect.build())
-        XCTAssertEqual(builtConfiguration.timeout.read, read.build())
+        #expect(builtConfiguration.timeout.connect == connect.build())
+        #expect(builtConfiguration.timeout.read == read.build())
     }
 
-    func testConfiguration_whenSetConnectionPool_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenSetConnectionPool_shouldBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
 
         let connectionPool = HTTPClient.Configuration.ConnectionPool(idleTimeout: .seconds(16))
 
@@ -86,16 +82,19 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(builtConfiguration.connectionPool, connectionPool)
+        #expect(builtConfiguration.connectionPool == connectionPool)
     }
 
-    func testConfiguration_whenSetProxy_shoudlBeEqual() async throws {
+    @Test
+    func configuration_whenSetHTTPProxyWith_shoudlBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
 
-        let proxy = HTTPClient.Configuration.Proxy.server(
+        let proxy = Internals.Proxy(
             host: "localhost",
-            port: 8888
+            port: 8888,
+            connection: .http,
+            authorization: nil
         )
 
         // When
@@ -104,12 +103,89 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(builtConfiguration.proxy, proxy)
+        #expect(builtConfiguration.proxy?.host == proxy.host)
+        #expect(builtConfiguration.proxy?.port == proxy.port)
+        #expect(builtConfiguration.proxy?.authorization == nil)
     }
 
-    func testConfiguration_whenSetDecompression_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenSetHTTPProxyWithAuthorization_shoudlBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
+
+        let username = UUID().uuidString
+        let password = UUID().uuidString
+
+        let proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .http,
+            authorization: .basic(username: username, password: password)
+        )
+
+        // When
+        configuration.proxy = proxy
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        #expect(builtConfiguration.proxy?.host == proxy.host)
+        #expect(builtConfiguration.proxy?.port == proxy.port)
+        #expect(builtConfiguration.proxy?.authorization == .basic(username: username, password: password))
+    }
+
+    @Test
+    func configuration_whenSetHTTPProxyWithRawAuthorization_shoudlBeEqual() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        let credentials = UUID().uuidString
+
+        let proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .http,
+            authorization: .basicRawCredentials(credentials)
+        )
+
+        // When
+        configuration.proxy = proxy
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        #expect(builtConfiguration.proxy?.host == proxy.host)
+        #expect(builtConfiguration.proxy?.port == proxy.port)
+        #expect(builtConfiguration.proxy?.authorization == .basic(credentials: credentials))
+    }
+
+    @Test
+    func configuration_whenSetSOCKSProxy_shoudlBeEqual() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        let proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .socks,
+            authorization: nil
+        )
+
+        // When
+        configuration.proxy = proxy
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        #expect(builtConfiguration.proxy?.host == proxy.host)
+        #expect(builtConfiguration.proxy?.port == proxy.port)
+        #expect(builtConfiguration.proxy?.authorization == nil)
+    }
+
+    @Test
+    func configuration_whenSetDecompression_shouldBeEqual() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
 
         let decompression = Internals.Decompression.enabled(.size(16))
 
@@ -119,15 +195,19 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(
-            String(describing: builtConfiguration.decompression),
-            String(describing: decompression.build())
+        #expect(
+            String(
+                describing: builtConfiguration.decompression
+            ) == String(
+                describing: decompression.build()
+            )
         )
     }
 
-    func testConfiguration_whenSetHttpVersion_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenSetHttpVersion_shouldBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
 
         let version = Internals.HTTPVersion.http1Only
 
@@ -137,12 +217,13 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertEqual(builtConfiguration.httpVersion, version.build())
+        #expect(builtConfiguration.httpVersion == version.build())
     }
 
-    func testConfiguration_whenWaitForConnectivity_shouldBeEqual() async throws {
+    @Test
+    func configuration_whenWaitForConnectivity_shouldBeEqual() async throws {
         // Given
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
         let waitForConnectivity = false
 
         // When
@@ -151,28 +232,35 @@ class InternalsSessionConfigurationTests: XCTestCase {
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertFalse(builtConfiguration.networkFrameworkWaitForConnectivity)
+        #expect(!builtConfiguration.networkFrameworkWaitForConnectivity)
     }
 
-    func testConfiguration_whenInit_shouldBeDefault() async throws {
+    @Test
+    func configuration_whenInit_shouldBeDefault() async throws {
         // When
-        var configuration = try XCTUnwrap(configuration)
+        var configuration = Internals.Session.Configuration()
         let builtConfiguration = try configuration.build()
 
         // Then
-        XCTAssertNil(builtConfiguration.tlsConfiguration)
-        XCTAssertEqual(
-            String(describing: builtConfiguration.redirectConfiguration),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 5, allowCycles: false))
+        #expect(builtConfiguration.tlsConfiguration == nil)
+        #expect(
+            String(
+                describing: builtConfiguration.redirectConfiguration
+            ) == String(
+                describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 5, allowCycles: false)
+            )
         )
-        XCTAssertNil(builtConfiguration.timeout.connect)
-        XCTAssertNil(builtConfiguration.timeout.read)
-        XCTAssertNil(builtConfiguration.proxy)
-        XCTAssertEqual(
-            String(describing: builtConfiguration.decompression),
-            String(describing: HTTPClient.Decompression.disabled)
+        #expect(builtConfiguration.timeout.connect == nil)
+        #expect(builtConfiguration.timeout.read == nil)
+        #expect(builtConfiguration.proxy == nil)
+        #expect(
+            String(
+                describing: builtConfiguration.decompression
+            ) == String(
+                describing: HTTPClient.Decompression.disabled
+            )
         )
-        XCTAssertEqual(builtConfiguration.httpVersion, .automatic)
-        XCTAssertTrue(builtConfiguration.networkFrameworkWaitForConnectivity)
+        #expect(builtConfiguration.httpVersion == .automatic)
+        #expect(builtConfiguration.networkFrameworkWaitForConnectivity)
     }
 }

@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import AsyncHTTPClient
 @testable import RequestDL
 
-class InternalsHTTPVersionTests: XCTestCase {
+struct InternalsHTTPVersionTests {
 
-    func testVersion_whenHTTP1Only() {
+    @Test
+    func version_whenHTTP1Only() {
         // Given
         let version = Internals.HTTPVersion.http1Only
 
@@ -16,10 +18,11 @@ class InternalsHTTPVersionTests: XCTestCase {
         let sut = version.build()
 
         // Then
-        XCTAssertEqual(sut, .http1Only)
+        #expect(sut == .http1Only)
     }
 
-    func testVersion_whenAutomatic() {
+    @Test
+    func version_whenAutomatic() {
         // Given
         let version = Internals.HTTPVersion.automatic
 
@@ -27,24 +30,26 @@ class InternalsHTTPVersionTests: XCTestCase {
         let sut = version.build()
 
         // Then
-        XCTAssertEqual(sut, .automatic)
+        #expect(sut == .automatic)
     }
 
-    func testVersion_whenEquals() {
+    @Test
+    func version_whenEquals() {
         // Given
         let lhs = Internals.HTTPVersion.http1Only
         let rhs = Internals.HTTPVersion.http1Only
 
         // Then
-        XCTAssertEqual(lhs, rhs)
+        #expect(lhs == rhs)
     }
 
-    func testVersion_whenNotEquals() {
+    @Test
+    func version_whenNotEquals() {
         // Given
         let lhs = Internals.HTTPVersion.http1Only
         let rhs = Internals.HTTPVersion.automatic
 
         // Then
-        XCTAssertNotEqual(lhs, rhs)
+        #expect(lhs != rhs)
     }
 }

@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class PathTests: XCTestCase {
+struct PathTests {
 
-    func testSinglePath() async throws {
+    @Test
+    func singlePath() async throws {
         // Given
         let path = "api"
         let host = "google.com"
@@ -19,13 +21,13 @@ class PathTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://\(host)/\(path)"
+        #expect(
+            resolved.request.url == "https://\(host)/\(path)"
         )
     }
 
-    func testPath_whenInitWithLosslessValue() async throws {
+    @Test
+    func path_whenInitWithLosslessValue() async throws {
         // Given
         let host = "google.com"
         let path = 123
@@ -37,13 +39,13 @@ class PathTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://\(host)/\(path)"
+        #expect(
+            resolved.request.url == "https://\(host)/\(path)"
         )
     }
 
-    func testSingleInstanceWithMultiplePath() async throws {
+    @Test
+    func singleInstanceWithMultiplePath() async throws {
         // Given
         let path = "api/v1/users/10/detail"
         let host = "google.com"
@@ -55,13 +57,13 @@ class PathTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://\(host)/\(path)"
+        #expect(
+            resolved.request.url == "https://\(host)/\(path)"
         )
     }
 
-    func testMultiplePath() async throws {
+    @Test
+    func multiplePath() async throws {
         // Given
         let path1 = "api"
         let path2 = "v1/"
@@ -81,13 +83,13 @@ class PathTests: XCTestCase {
         let expectedPath2 = path2.trimmingCharacters(in: characterSetRule)
         let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
 
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
+        #expect(
+            resolved.request.url == "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = Path("")
 

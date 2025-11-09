@@ -2,23 +2,24 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersProgressTests: XCTestCase {
+struct ModifiersProgressTests {
 
     final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {
-        
+
         var uploadedBytes: [Int] {
             lock.withLock { _uploadedBytes }
         }
-        
+
         var totalSize: Int {
             lock.withLock { _totalSize }
         }
-        
+
         private let lock = Lock()
-        
+
         private var _uploadedBytes: [Int] = []
         private var _totalSize: Int = .zero
 
@@ -31,17 +32,17 @@ class ModifiersProgressTests: XCTestCase {
     }
 
     final class DownloadProgressMonitor: DownloadProgress, @unchecked Sendable {
-        
+
         var receivedData: [Data] {
             lock.withLock { _receivedData }
         }
-        
+
         var totalSize: Int {
             lock.withLock { _totalSize }
         }
-        
+
         private let lock = Lock()
-        
+
         private var _receivedData: [Data] = []
         private var _totalSize: Int = .zero
 
@@ -67,37 +68,35 @@ class ModifiersProgressTests: XCTestCase {
         }
     }
 
-    var localServer: LocalServer?
-    var uploadMonitor: UploadProgressMonitor?
-    var downloadMonitor: DownloadProgressMonitor?
-    var progressMonitor: ProgressMonitor?
+    final class TestState: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
+        let uri: String
+        let localServer: LocalServer
+        let uploadMonitor: UploadProgressMonitor
+        let downloadMonitor: DownloadProgressMonitor
+        let progressMonitor: ProgressMonitor
 
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
+        init() async throws {
+            uri = "/" + UUID().uuidString
+            localServer = try await .init(.standard)
+            localServer.cleanup(at: uri)
 
-        uploadMonitor = .init()
-        downloadMonitor = .init()
-        progressMonitor = .init()
+            uploadMonitor = .init()
+            downloadMonitor = .init()
+            progressMonitor = .init()
+        }
+
+        deinit {
+            localServer.cleanup(at: uri)
+        }
     }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-
-        localServer?.cleanup()
-        localServer = nil
-
-        uploadMonitor = nil
-        downloadMonitor = nil
-        progressMonitor = nil
-    }
-
-    func testProgress_whenUploadStep_shouldBeValid() async throws {
+    @Test
+    func progress_whenUploadStep_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let uploadMonitor = try XCTUnwrap(uploadMonitor)
+        let localServer = testState.localServer
+        let uploadMonitor = testState.uploadMonitor
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -106,12 +105,12 @@ class ModifiersProgressTests: XCTestCase {
             data: data
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         _ = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
             Payload(data: data)
 
             SecureConnection {
@@ -125,13 +124,15 @@ class ModifiersProgressTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertEqual(uploadMonitor.uploadedBytes.reduce(.zero, +), data.count)
+        #expect(uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count)
     }
 
-    func testProgress_whenDownloadStep_shouldBeValid() async throws {
+    @Test
+    func progress_whenDownloadStep_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+        let localServer = testState.localServer
+        let downloadMonitor = testState.downloadMonitor
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -141,12 +142,12 @@ class ModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             SecureConnection {
                 Trusts {
@@ -164,24 +165,25 @@ class ModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(downloadMonitor.totalSize, data.count)
-        XCTAssertEqual(result.receivedBytes, .zero)
+        #expect(downloadMonitor.totalSize == data.count)
+        #expect(result.receivedBytes == .zero)
 
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+            #expect(
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
-    func testProgress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+    @Test
+    func progress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let downloadMonitor = try XCTUnwrap(downloadMonitor)
+        let localServer = testState.localServer
+        let downloadMonitor = testState.downloadMonitor
 
         let resource = Certificates().server()
         let message = String(repeating: "c", count: 1_024 * 64)
@@ -191,7 +193,7 @@ class ModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         let expectingData = try HTTPResult(
             receivedBytes: .zero,
@@ -201,7 +203,7 @@ class ModifiersProgressTests: XCTestCase {
         // When
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             SecureConnection {
                 Trusts {
@@ -219,25 +221,26 @@ class ModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(expectingData.count, data.count)
-        XCTAssertEqual(downloadMonitor.totalSize, data.count)
-        XCTAssertEqual(result.receivedBytes, .zero)
+        #expect(expectingData.count == data.count)
+        #expect(downloadMonitor.totalSize == data.count)
+        #expect(result.receivedBytes == .zero)
 
         let completeParts = downloadMonitor.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+            #expect(
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(downloadMonitor.receivedData.last?.count ?? .zero, length)
+        #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
-    func testProgress_whenCompleteProgress_shouldBeValid() async throws {
+    @Test
+    func progress_whenCompleteProgress_shouldBeValid() async throws {
+        let testState = try await TestState()
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        let progressMonitor = try XCTUnwrap(progressMonitor)
+        let localServer = testState.localServer
+        let progressMonitor = testState.progressMonitor
 
         let resource = Certificates().server()
         let data = Data.randomData(length: 1_024 * 64)
@@ -248,12 +251,12 @@ class ModifiersProgressTests: XCTestCase {
             jsonObject: message
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: testState.uri)
 
         // When
         let receivedData = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(testState.uri)
 
             ReadingMode(length: length)
 
@@ -273,24 +276,26 @@ class ModifiersProgressTests: XCTestCase {
         let result = try HTTPResult<String>(receivedData)
 
         // Then
-        XCTAssertEqual(result.receivedBytes, data.count)
+        #expect(result.receivedBytes == data.count)
 
-        XCTAssertEqual(progressMonitor.upload.totalSize, data.count)
-        XCTAssertEqual(progressMonitor.download.totalSize, receivedData.count)
+        #expect(progressMonitor.upload.totalSize == data.count)
+        #expect(progressMonitor.download.totalSize == receivedData.count)
 
-        XCTAssertEqual(
-            progressMonitor.upload.uploadedBytes,
-            stride(from: .zero, to: data.count, by: 64).map { _ in 64 }
+        #expect(
+            progressMonitor.upload.uploadedBytes == stride(
+                from: .zero,
+                to: data.count,
+                by: 64
+            ).map { _ in 64 }
         )
 
         let completeParts = progressMonitor.download.receivedData.dropLast()
         if !completeParts.isEmpty {
-            XCTAssertEqual(
-                completeParts.map(\.count),
-                completeParts.indices.map { _ in length }
+            #expect(
+                completeParts.map(\.count) == completeParts.indices.map { _ in length }
             )
         }
 
-        XCTAssertLessThanOrEqual(progressMonitor.download.receivedData.last?.count ?? .zero, length)
+        #expect(progressMonitor.download.receivedData.last?.count ?? .zero <= length)
     }
 }

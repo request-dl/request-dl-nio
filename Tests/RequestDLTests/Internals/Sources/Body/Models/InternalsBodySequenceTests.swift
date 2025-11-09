@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOCore
 @testable import RequestDL
 
-class InternalsBodySequenceTests: XCTestCase {
+struct InternalsBodySequenceTests {
 
-    func testBodySequence_whenEmpty_shouldBeEmpty() async throws {
+    @Test
+    func bodySequence_whenEmpty_shouldBeEmpty() async throws {
         // Given
         let bodySequence = makeBodySequence([])
 
@@ -16,10 +18,11 @@ class InternalsBodySequenceTests: XCTestCase {
         let sequence = Array(bodySequence).resolveData()
 
         // Then
-        XCTAssertEqual(sequence, [])
+        #expect(sequence == [])
     }
 
-    func testBodySequence_whenContainsDataLessThenSize_shouldBeEqualData() async throws {
+    @Test
+    func bodySequence_whenContainsDataLessThenSize_shouldBeEqualData() async throws {
         // Given
         let data = Data("Hello World!".utf8)
 
@@ -31,10 +34,11 @@ class InternalsBodySequenceTests: XCTestCase {
         let sequence = Array(bodySequence).resolveData()
 
         // Then
-        XCTAssertEqual(sequence, [data])
+        #expect(sequence == [data])
     }
 
-    func testBodySequence_whenContainsTwoDataLessThenSize_shouldBeEqualParts() async throws {
+    @Test
+    func bodySequence_whenContainsTwoDataLessThenSize_shouldBeEqualParts() async throws {
         // Given
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
@@ -48,10 +52,11 @@ class InternalsBodySequenceTests: XCTestCase {
         let sequence = Array(bodySequence).resolveData()
 
         // Then
-        XCTAssertEqual(sequence, [part1 + part2])
+        #expect(sequence == [part1 + part2])
     }
 
-    func testBodySequence_whenContainsTwoDataGreaterThenSize_shouldBeFragmentedIntoParts() async throws {
+    @Test
+    func bodySequence_whenContainsTwoDataGreaterThenSize_shouldBeFragmentedIntoParts() async throws {
         // Given
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
@@ -67,10 +72,11 @@ class InternalsBodySequenceTests: XCTestCase {
         let expecting = Array(part1 + part2).split(by: chunkSize)
 
         // Then
-        XCTAssertEqual(sequence, expecting)
+        #expect(sequence == expecting)
     }
 
-    func testBodySequence_whenContainsFileWithData_shouldContainsAllData() async throws {
+    @Test
+    func bodySequence_whenContainsFileWithData_shouldContainsAllData() async throws {
         // Given
 
         let part1 = Data("Hello World!".utf8)
@@ -89,10 +95,11 @@ class InternalsBodySequenceTests: XCTestCase {
         let expecting = Array(part1 + part2 + part3).split(by: chunkSize)
 
         // Then
-        XCTAssertEqual(sequence, expecting)
+        #expect(sequence == expecting)
     }
 
-    func testBodySequence_whenBiggerDataWithNilSize_shouldFragmentInto10000Parts() async throws {
+    @Test
+    func bodySequence_whenBiggerDataWithNilSize_shouldFragmentInto10000Parts() async throws {
         // Given
         let length = 20_001
         let chunkSize = Int(floor(Double(length) / 10_000))
@@ -108,7 +115,7 @@ class InternalsBodySequenceTests: XCTestCase {
         let expecting = Array(data).split(by: chunkSize)
 
         // Then
-        XCTAssertEqual(sequence, expecting)
+        #expect(sequence == expecting)
     }
 }
 

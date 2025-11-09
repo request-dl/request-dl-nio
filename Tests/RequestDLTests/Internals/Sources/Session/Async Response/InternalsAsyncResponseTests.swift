@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsAsyncResponseTests: XCTestCase {
+struct InternalsAsyncResponseTests {
 
-    func testResponse_whenOnlyUploading_shouldReceiveParts() async throws {
+    @Test
+    func response_whenOnlyUploading_shouldReceiveParts() async throws {
         // Given
         let uploadingBytes = 16
         let parts = 0 ..< uploadingBytes
@@ -25,7 +27,7 @@ class InternalsAsyncResponseTests: XCTestCase {
         let received = try await Array(configuration.response)
 
         // Then
-        XCTAssertEqual(received, parts.map {
+        #expect(received == parts.map {
             .upload(.init(
                 chunkSize: $0,
                 totalSize: uploadingBytes
@@ -33,7 +35,8 @@ class InternalsAsyncResponseTests: XCTestCase {
         })
     }
 
-    func testResponse_whenOnlyHead_shouldReceiveHead() async throws {
+    @Test
+    func response_whenOnlyHead_shouldReceiveHead() async throws {
         // Given
         let configuration = response()
 
@@ -55,13 +58,14 @@ class InternalsAsyncResponseTests: XCTestCase {
         let received = try await Array(configuration.response)
 
         // Then
-        XCTAssertEqual(received, [.download(.init(
+        #expect(received == [.download(.init(
             head: head,
             bytes: .init(totalSize: .zero, stream: configuration.download)
         ))])
     }
 
-    func testResponse_whenHeadWithBytes_shouldReceiveHeadAndBytes() async throws {
+    @Test
+    func response_whenHeadWithBytes_shouldReceiveHeadAndBytes() async throws {
         // Given
         let configuration = response()
 
@@ -86,7 +90,7 @@ class InternalsAsyncResponseTests: XCTestCase {
         let received = try await Array(configuration.response)
 
         // Then
-        XCTAssertEqual(received, [.download(.init(
+        #expect(received == [.download(.init(
             head: head,
             bytes: .init(totalSize: data.count, stream: configuration.download)
         ))])

@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class EmptyPropertyTests: XCTestCase {
+struct EmptyPropertyTests {
 
-    func testEmptyBuilder() async throws {
+    @Test
+    func emptyBuilder() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -20,10 +22,11 @@ class EmptyPropertyTests: XCTestCase {
         _ = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is EmptyProperty)
+        #expect(property is EmptyProperty)
     }
 
-    func testEmptyExplicitBuilder() async throws {
+    @Test
+    func emptyExplicitBuilder() async throws {
         // Given
         @PropertyBuilder
         var property: some Property {
@@ -34,10 +37,11 @@ class EmptyPropertyTests: XCTestCase {
         _ = try await resolve(TestProperty(property))
 
         // Then
-        XCTAssertTrue(property is EmptyProperty)
+        #expect(property is EmptyProperty)
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = EmptyProperty()
 

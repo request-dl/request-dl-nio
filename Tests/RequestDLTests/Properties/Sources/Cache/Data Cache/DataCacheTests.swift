@@ -2,43 +2,51 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class DataCacheTests: XCTestCase {
+private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
+private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
+private let globalDataCache = DataCache(suiteName: UUID().uuidString)
 
-    let memoryCapacity: UInt64 = 8 * 1_024 * 1_024
-    let diskCapacity: UInt64 = 64 * 1_024 * 1_024
+@Suite(.serialized)
+struct DataCacheTests {
 
-    var dataCache: DataCache?
+    final class TestState: Sendable {
 
-    override func setUp() async throws {
-        try await super.setUp()
-        dataCache = .init(
-            memoryCapacity: 8 * 1_024 * 1_024,
-            diskCapacity: 64 * 1_024 * 1_024
-        )
+        let dataCache: DataCache
+
+        init() {
+            dataCache = .init(
+                memoryCapacity: globalMemoryCapacity,
+                diskCapacity: globalDiskCapacity,
+                url: globalDataCache.directoryURL
+            )
+        }
+
+        deinit {
+            dataCache.removeAll()
+            globalDataCache.memoryCapacity = .zero
+            globalDataCache.diskCapacity = .zero
+        }
     }
 
-    override func tearDown() async throws {
-        try await super.tearDown()
-        dataCache?.removeAll()
-        dataCache = nil
-
-        DataCache.shared.memoryCapacity = .zero
-        DataCache.shared.diskCapacity = .zero
-    }
-
-    func testCache_whenInit_shouldCapacityBeKnown() throws {
+    @Test
+    func cache_whenInit_shouldCapacityBeKnown() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         // Then
-        XCTAssertEqual(dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(dataCache.diskCapacity, diskCapacity)
+        #expect(dataCache.memoryCapacity == globalMemoryCapacity)
+        #expect(dataCache.diskCapacity == globalDiskCapacity)
     }
 
-    func testCache_whenInitWithLowerCapacityPreviousSpecified_shouldBeMax() {
+    @Test
+    func cache_whenInitWithLowerCapacityPreviousSpecified_shouldBeMax() {
+        let testState = TestState()
+        defer { _ = testState }
         // Given
         let memoryCapacity: UInt64 = 4 * 1_024 * 1_024
         let diskCapacity: UInt64 = 16 * 1_024 * 1_024
@@ -46,17 +54,20 @@ class DataCacheTests: XCTestCase {
         // When
         let dataCache = DataCache(
             memoryCapacity: memoryCapacity,
-            diskCapacity: diskCapacity
+            diskCapacity: diskCapacity,
+            url: globalDataCache.directoryURL
         )
 
         // Then
-        XCTAssertEqual(dataCache.memoryCapacity, self.memoryCapacity)
-        XCTAssertEqual(dataCache.diskCapacity, self.diskCapacity)
+        #expect(dataCache.memoryCapacity == globalMemoryCapacity)
+        #expect(dataCache.diskCapacity == globalDiskCapacity)
     }
 
-    func testCache_whenSetCapacityDirectly_shouldBeValid() throws {
+    @Test
+    func cache_whenSetCapacityDirectly_shouldBeValid() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         let memoryCapacity: UInt64 = 4 * 1_024 * 1_024
         let diskCapacity: UInt64 = 16 * 1_024 * 1_024
@@ -66,13 +77,16 @@ class DataCacheTests: XCTestCase {
         dataCache.diskCapacity = diskCapacity
 
         // Then
-        XCTAssertEqual(dataCache.memoryCapacity, memoryCapacity)
-        XCTAssertEqual(dataCache.diskCapacity, diskCapacity)
+        #expect(dataCache.memoryCapacity == memoryCapacity)
+        #expect(dataCache.diskCapacity == diskCapacity)
     }
 
-    func testCache_whenSetCachedData() throws {
+    @Test
+    func cache_whenSetCachedData() throws {
+        let testState = TestState()
+        defer { _ = testState }
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
@@ -99,16 +113,18 @@ class DataCacheTests: XCTestCase {
         let cachedDisk2 = dataCache.getCachedData(forKey: key2, policy: .disk)
 
         // Then
-        XCTAssertEqual(cachedMemory1?.data, data1)
-        XCTAssertEqual(cachedDisk1?.data, data1)
+        #expect(cachedMemory1?.data == data1)
+        #expect(cachedDisk1?.data == data1)
 
-        XCTAssertEqual(cachedMemory2?.data, data2)
-        XCTAssertEqual(cachedDisk2?.data, data2)
+        #expect(cachedMemory2?.data == data2)
+        #expect(cachedDisk2?.data == data2)
     }
 
-    func testCache_whenLowMemory() throws {
+    @Test
+    func cache_whenLowMemory() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         dataCache.memoryCapacity = 1_024
 
@@ -135,14 +151,17 @@ class DataCacheTests: XCTestCase {
         let cachedMemory2 = dataCache.getCachedData(forKey: key2, policy: .memory)
 
         // Then
-        XCTAssertNil(cachedMemory1)
+        #expect(cachedMemory1 == nil)
 
-        XCTAssertEqual(cachedMemory2?.data, cachedData2.data)
+        #expect(cachedMemory2?.data == cachedData2.data)
     }
 
-    func testCache_whenLowDisk() throws {
+    @Test
+    func cache_whenLowDisk() throws {
+        let testState = TestState()
+        defer { _ = testState }
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         dataCache.diskCapacity = 1_024
 
@@ -169,14 +188,18 @@ class DataCacheTests: XCTestCase {
         let cachedDisk2 = dataCache.getCachedData(forKey: key2, policy: .disk)
 
         // Then
-        XCTAssertNil(cachedDisk1)
+        #expect(cachedDisk1 == nil)
 
-        XCTAssertEqual(cachedDisk2?.data, cachedData2.data)
+        #expect(cachedDisk2?.data == cachedData2.data)
     }
 
-    func testCache_whenRemoveKey() throws {
+    @Test
+    func cache_whenRemoveKey() throws {
+        let testState = TestState()
+        defer { _ = testState }
+
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
@@ -208,19 +231,21 @@ class DataCacheTests: XCTestCase {
         let diskCached1_v2 = dataCache.getCachedData(forKey: key1, policy: .disk)
 
         // Then
-        XCTAssertEqual(memoryCached1?.data, cachedData1.data)
-        XCTAssertEqual(diskCached1Data, cachedData1.data)
+        #expect(memoryCached1?.data == cachedData1.data)
+        #expect(diskCached1Data == cachedData1.data)
 
-        XCTAssertEqual(memoryCached2?.data, cachedData2.data)
-        XCTAssertEqual(diskCached2?.data, cachedData2.data)
+        #expect(memoryCached2?.data == cachedData2.data)
+        #expect(diskCached2?.data == cachedData2.data)
 
-        XCTAssertNil(memoryCached1_v2)
-        XCTAssertNil(diskCached1_v2)
+        #expect(memoryCached1_v2 == nil)
+        #expect(diskCached1_v2 == nil)
     }
 
-    func testCache_whenRemoveSince() throws {
+    @Test
+    func cache_whenRemoveSince() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         let cachedDatas = (0 ..< 3) .map {
             mockCachedData(
@@ -241,14 +266,16 @@ class DataCacheTests: XCTestCase {
         }
 
         // Then
-        XCTAssertNil(storedDatas[0])
-        XCTAssertNil(storedDatas[1])
-        XCTAssertEqual(storedDatas[2]?.data, cachedDatas[2].data)
+        #expect(storedDatas[0] == nil)
+        #expect(storedDatas[1] == nil)
+        #expect(storedDatas[2]?.data == cachedDatas[2].data)
     }
 
-    func testCache_whenRemoveAll() throws {
+    @Test
+    func cache_whenRemoveAll() throws {
+        let testState = TestState()
         // Given
-        let dataCache = try XCTUnwrap(dataCache)
+        let dataCache = testState.dataCache
 
         let cachedDatas = (0 ..< 3) .map {
             mockCachedData(
@@ -269,12 +296,13 @@ class DataCacheTests: XCTestCase {
         }
 
         // Then
-        XCTAssertNil(storedDatas[0])
-        XCTAssertNil(storedDatas[1])
-        XCTAssertNil(storedDatas[2])
+        #expect(storedDatas[0] == nil)
+        #expect(storedDatas[1] == nil)
+        #expect(storedDatas[2] == nil)
     }
 
-    func testCache_whenInitWithSuiteName() {
+    @Test
+    func cache_whenInitWithSuiteName() {
         // Given
         let suiteName = "shared_other_lib"
 
@@ -284,7 +312,7 @@ class DataCacheTests: XCTestCase {
         let suiteURL = DataCache.temporaryURL(suiteName: suiteName)
 
         // Then
-        XCTAssertEqual(dataCache, DataCache(url: suiteURL))
+        #expect(dataCache == DataCache(url: suiteURL))
     }
 }
 

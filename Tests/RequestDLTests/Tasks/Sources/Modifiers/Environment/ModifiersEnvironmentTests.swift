@@ -3,10 +3,10 @@
 */
 
 import Foundation
-import XCTest
+import Testing
 @testable import RequestDL
 
-class ModifiersEnvironmentTests: XCTestCase {
+struct ModifiersEnvironmentTests {
 
     struct NumberTask: RequestTask {
 
@@ -17,7 +17,8 @@ class ModifiersEnvironmentTests: XCTestCase {
         }
     }
 
-    func testEnvironment_whenNotSet() async throws {
+    @Test
+    func environment_whenNotSet() async throws {
         // Given
         let numberTask = NumberTask()
 
@@ -25,10 +26,11 @@ class ModifiersEnvironmentTests: XCTestCase {
         let value = try await numberTask.result()
 
         // Then
-        XCTAssertEqual(value, 1)
+        #expect(value == 1)
     }
 
-    func testEnvironment_whenUpdatedWithValue() async throws {
+    @Test
+    func environment_whenUpdatedWithValue() async throws {
         // Given
         let number = 2
         let numberTask = NumberTask()
@@ -39,7 +41,7 @@ class ModifiersEnvironmentTests: XCTestCase {
             .result()
 
         // Then
-        XCTAssertEqual(value, number)
+        #expect(value == number)
     }
 }
 

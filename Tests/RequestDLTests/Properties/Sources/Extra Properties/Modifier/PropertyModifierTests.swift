@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class PropertyModifierTests: XCTestCase {
+struct PropertyModifierTests {
 
     struct CustomModifier: PropertyModifier {
 
@@ -27,7 +28,8 @@ class PropertyModifierTests: XCTestCase {
         }
     }
 
-    func testModifier_whenIncludesContent() async throws {
+    @Test
+    func modifier_whenIncludesContent() async throws {
         // Given
         let modifier = CustomModifier(includesContent: true)
 
@@ -38,13 +40,13 @@ class PropertyModifierTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://apple.com/api/v2?id=123"
+        #expect(
+            resolved.request.url == "https://apple.com/api/v2?id=123"
         )
     }
 
-    func testModifier_whenNotIncludesContent() async throws {
+    @Test
+    func modifier_whenNotIncludesContent() async throws {
         // Given
         let modifier = CustomModifier(includesContent: false)
 
@@ -55,9 +57,8 @@ class PropertyModifierTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://google.com/api/v2?id=123"
+        #expect(
+            resolved.request.url == "https://google.com/api/v2?id=123"
         )
     }
 }
@@ -72,7 +73,8 @@ extension PropertyModifierTests {
         }
     }
 
-    func testModifier_whenSecureConnectionFaker() async throws {
+    @Test
+    func modifier_whenSecureConnectionFaker() async throws {
         // Given
         let resource = Certificates().server()
         let certificatePath = resource.certificateURL.absolutePath(percentEncoded: false)
@@ -88,7 +90,7 @@ extension PropertyModifierTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        XCTAssertEqual(sut?.additionalTrustRoots, [
+        #expect(sut?.additionalTrustRoots == [
             .certificates([.init(certificatePath, format: .pem)])
         ])
     }
@@ -113,7 +115,8 @@ extension PropertyModifierTests {
         }
     }
 
-    func testModifier_whenPathEnvironmentSet() async throws {
+    @Test
+    func modifier_whenPathEnvironmentSet() async throws {
         // Given
         let additionalPath = "api"
         let modifier = PathModifier()
@@ -126,13 +129,13 @@ extension PropertyModifierTests {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://www.google.com/\(additionalPath)"
+        #expect(
+            resolved.request.url == "https://www.google.com/\(additionalPath)"
         )
     }
 
-    func testModifier_whenPathEnvironmentIsNotSet() async throws {
+    @Test
+    func modifier_whenPathEnvironmentIsNotSet() async throws {
         // Given
         let modifier = PathModifier()
 
@@ -143,9 +146,8 @@ extension PropertyModifierTests {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            "https://www.google.com"
+        #expect(
+            resolved.request.url == "https://www.google.com"
         )
     }
 }

@@ -2,46 +2,38 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 import NIOCore
 @testable import RequestDL
 
-class InternalsSecureConnectionTests: XCTestCase {
+struct InternalsSecureConnectionTests {
 
-    var secureConnection: Internals.SecureConnection?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        secureConnection = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        secureConnection = nil
-    }
-
-    func testSecureConnection_whenDefaultTrustNotSet_shouldBeFalse() async throws {
+    @Test
+    func secureConnection_whenDefaultTrustNotSet_shouldBeFalse() async throws {
         // Given
-        let secureConnection = try XCTUnwrap(secureConnection)
+        let secureConnection = Internals.SecureConnection()
         // Then
-        XCTAssertFalse(secureConnection.useDefaultTrustRoots)
+        #expect(!secureConnection.useDefaultTrustRoots)
     }
 
-    func testSecureConnection_whenSetDefaultTrust() async throws {
+    @Test
+    func secureConnection_whenSetDefaultTrust() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         // When
         secureConnection.useDefaultTrustRoots = true
 
         // Then
-        XCTAssertTrue(secureConnection.useDefaultTrustRoots)
+        #expect(secureConnection.useDefaultTrustRoots)
     }
 
-    func testSecureConnection_whenTrustRoots_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenTrustRoots_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let server = Certificates().server()
         let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
@@ -52,12 +44,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.trustRoots, .file(certificatePath))
+        #expect(sut.trustRoots == .file(certificatePath))
     }
 
-    func testSecureConnection_whenAdditionalTrustRoots_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenAdditionalTrustRoots_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let server = Certificates().server()
         let certificatePath = server.certificateURL.absolutePath(percentEncoded: false)
@@ -68,12 +61,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.additionalTrustRoots, [.file(certificatePath)])
+        #expect(sut.additionalTrustRoots == [.file(certificatePath)])
     }
 
-    func testSecureConnection_whenPrivateKey_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenPrivateKey_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let server = Certificates().server()
         let privateKeyPath = server.privateKeyURL.absolutePath(percentEncoded: false)
@@ -84,12 +78,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.privateKey, .file(privateKeyPath))
+        #expect(sut.privateKey == .file(privateKeyPath))
     }
 
-    func testSecureConnection_whenCertificateVerification_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let certificateVerification: NIOSSL.CertificateVerification = .noHostnameVerification
 
         // When
@@ -98,13 +93,14 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.certificateVerification, certificateVerification)
+        #expect(sut.certificateVerification == certificateVerification)
     }
 
-    func testSecureConnection_whenSigningSignatureAlgorithms_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenSigningSignatureAlgorithms_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
-        
+        var secureConnection = Internals.SecureConnection()
+
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
             .ecdsaSecp384R1Sha384
@@ -116,12 +112,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.signingSignatureAlgorithms, signatureAlgorithms)
+        #expect(sut.signingSignatureAlgorithms == signatureAlgorithms)
     }
 
-    func testSecureConnection_whenVerifySignatureAlgorithms_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenVerifySignatureAlgorithms_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
@@ -134,12 +131,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.verifySignatureAlgorithms, signatureAlgorithms)
+        #expect(sut.verifySignatureAlgorithms == signatureAlgorithms)
     }
 
-    func testSecureConnection_whenSendCANameList_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenSendCANameList_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let sendCANameList = true
 
         // When
@@ -148,12 +146,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.sendCANameList, sendCANameList)
+        #expect(sut.sendCANameList == sendCANameList)
     }
 
-    func testSecureConnection_whenRenegotiationSupport_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenRenegotiationSupport_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let renegotiationSupport: NIORenegotiationSupport = .once
 
         // When
@@ -162,12 +161,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.renegotiationSupport, renegotiationSupport)
+        #expect(sut.renegotiationSupport == renegotiationSupport)
     }
 
-    func testSecureConnection_whenShutdownTimeout_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenShutdownTimeout_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let timeout = NIOCore.TimeAmount.seconds(50)
 
         // When
@@ -176,12 +176,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.shutdownTimeout, timeout)
+        #expect(sut.shutdownTimeout == timeout)
     }
 
-    func testSecureConnection_whenPSKHint_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenPSKHint_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let pskHint = "example.com"
 
         // When
@@ -190,12 +191,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.pskHint, pskHint)
+        #expect(sut.pskHint == pskHint)
     }
 
-    func testSecureConnection_whenApplicationProtocols_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenApplicationProtocols_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let applicationProtocolos = ["h2"]
 
         // When
@@ -204,12 +206,13 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.applicationProtocols, applicationProtocolos)
+        #expect(sut.applicationProtocols == applicationProtocolos)
     }
 
-    func testSecureConnection_whenTLSVersion_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenTLSVersion_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let minimumVersion = TLSVersion.tlsv11
         let maximumVersion = TLSVersion.tlsv13
@@ -221,13 +224,14 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.minimumTLSVersion, minimumVersion)
-        XCTAssertEqual(sut.maximumTLSVersion, maximumVersion)
+        #expect(sut.minimumTLSVersion == minimumVersion)
+        #expect(sut.maximumTLSVersion == maximumVersion)
     }
 
-    func testSecureConnection_whenCipherSuites_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenCipherSuites_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
 
         let cipherSuitesValues: [NIOTLSCipher] = [
             .TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
@@ -246,50 +250,53 @@ class InternalsSecureConnectionTests: XCTestCase {
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.cipherSuites, cipherSuites)
-        XCTAssertEqual(sut.cipherSuiteValues, cipherSuitesValues)
+        #expect(sut.cipherSuites == cipherSuites)
+        #expect(sut.cipherSuiteValues == cipherSuitesValues)
     }
 
-    func testSecureConnection_whenClient_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenClient_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let configuration: TLSConfiguration = .clientDefault
 
         // When
         let sut = try secureConnection.build()
 
         // Then
-        XCTAssertEqual(sut.certificateChain, configuration.certificateChain)
-        XCTAssertEqual(sut.certificateVerification, configuration.certificateVerification)
-        XCTAssertEqual(sut.trustRoots, configuration.trustRoots)
-        XCTAssertEqual(sut.additionalTrustRoots, configuration.additionalTrustRoots)
-        XCTAssertEqual(sut.privateKey, configuration.privateKey)
-        XCTAssertEqual(sut.signingSignatureAlgorithms, configuration.signingSignatureAlgorithms)
-        XCTAssertEqual(sut.verifySignatureAlgorithms, configuration.verifySignatureAlgorithms)
-        XCTAssertEqual(sut.sendCANameList, configuration.sendCANameList)
-        XCTAssertEqual(sut.renegotiationSupport, configuration.renegotiationSupport)
-        XCTAssertEqual(sut.shutdownTimeout, configuration.shutdownTimeout)
-        XCTAssertEqual(sut.pskHint, configuration.pskHint)
-        XCTAssertEqual(sut.applicationProtocols, configuration.applicationProtocols)
-        XCTAssertNil(sut.keyLogCallback)
-        XCTAssertNil(sut.pskClientCallback)
-        XCTAssertNil(sut.pskServerCallback)
-        XCTAssertEqual(sut.minimumTLSVersion, configuration.minimumTLSVersion)
-        XCTAssertEqual(sut.maximumTLSVersion, configuration.maximumTLSVersion)
-        XCTAssertEqual(sut.cipherSuites, configuration.cipherSuites)
-        XCTAssertEqual(sut.cipherSuiteValues, configuration.cipherSuiteValues)
+        #expect(sut.certificateChain == configuration.certificateChain)
+        #expect(sut.certificateVerification == configuration.certificateVerification)
+        #expect(sut.trustRoots == configuration.trustRoots)
+        #expect(sut.additionalTrustRoots == configuration.additionalTrustRoots)
+        #expect(sut.privateKey == configuration.privateKey)
+        #expect(sut.signingSignatureAlgorithms == configuration.signingSignatureAlgorithms)
+        #expect(sut.verifySignatureAlgorithms == configuration.verifySignatureAlgorithms)
+        #expect(sut.sendCANameList == configuration.sendCANameList)
+        #expect(sut.renegotiationSupport == configuration.renegotiationSupport)
+        #expect(sut.shutdownTimeout == configuration.shutdownTimeout)
+        #expect(sut.pskHint == configuration.pskHint)
+        #expect(sut.applicationProtocols == configuration.applicationProtocols)
+        #expect(sut.keyLogCallback == nil)
+        #expect(sut.pskClientCallback == nil)
+        #expect(sut.pskServerCallback == nil)
+        #expect(sut.minimumTLSVersion == configuration.minimumTLSVersion)
+        #expect(sut.maximumTLSVersion == configuration.maximumTLSVersion)
+        #expect(sut.cipherSuites == configuration.cipherSuites)
+        #expect(sut.cipherSuiteValues == configuration.cipherSuiteValues)
     }
 
-    func testSecureConnection_whenEquals() async throws {
+    @Test
+    func secureConnection_whenEquals() async throws {
         // Given
         let lhs = Internals.SecureConnection()
         let rhs = Internals.SecureConnection()
 
         // Then
-        XCTAssertEqual(lhs, rhs)
+        #expect(lhs == rhs)
     }
 
-    func testSecureConnection_whenNotEquals() async throws {
+    @Test
+    func secureConnection_whenNotEquals() async throws {
         // Given
         var lhs = Internals.SecureConnection()
         var rhs = Internals.SecureConnection()
@@ -299,7 +306,7 @@ class InternalsSecureConnectionTests: XCTestCase {
         rhs.maximumTLSVersion = .tlsv13
 
         // Then
-        XCTAssertNotEqual(lhs, rhs)
+        #expect(lhs != rhs)
     }
 }
 
@@ -318,14 +325,15 @@ extension InternalsSecureConnectionTests {
         }
     }
 
-    func testSecureConnection_whenKeyLog_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenKeyLog_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let data = Data("Hello World".utf8)
 
         // When
         secureConnection.keyLogger = KeyLogger {
-            XCTAssertEqual($0, data)
+            #expect($0 == data)
         }
 
         let sut = try secureConnection.build()
@@ -339,17 +347,19 @@ extension InternalsSecureConnectionTests {
 
     private final class ClientResolver: SSLPSKIdentityResolver {
 
-        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
-            .init(
+        func callAsFunction(_ context: PSKClientContext) throws -> PSKClientIdentityResponse {
+            let hint = context.hint ?? "pskHint"
+            return .init(
                 key: .init(Data(hint.utf8)),
                 identity: hint
             )
         }
     }
 
-    func testSecureConnection_whenPSKClient_shouldBeValid() async throws {
+    @Test
+    func secureConnection_whenPSKClient_shouldBeValid() async throws {
         // Given
-        var secureConnection = try XCTUnwrap(secureConnection)
+        var secureConnection = Internals.SecureConnection()
         let identity = "apple.com"
         let resolver = ClientResolver()
 
@@ -357,18 +367,12 @@ extension InternalsSecureConnectionTests {
         secureConnection.pskIdentityResolver = resolver
 
         let sut = try secureConnection.build()
-        let result = try sut.pskClientCallback.map { try $0(identity) }
+        let result = try sut.pskClientProvider.map { try $0(.init(hint: identity, maxPSKLength: 1_000)) }
 
         // Then
 
-        XCTAssertEqual(
-            result?.identity,
-            identity
-        )
+        #expect(result?.identity == identity)
 
-        XCTAssertEqual(
-            result.map { Data($0.key) },
-            Data(identity.utf8)
-        )
+        #expect(result.map { Data($0.key) } == Data(identity.utf8))
     }
 }

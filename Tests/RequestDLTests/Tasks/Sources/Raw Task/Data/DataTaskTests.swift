@@ -2,30 +2,19 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 @testable import RequestDL
 
-class DataTaskTests: XCTestCase {
+struct DataTaskTests {
 
-    var localServer: LocalServer?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        localServer?.cleanup()
-        localServer = nil
-    }
-
-    func testDataTask() async throws {
+    @Test
+    func dataTask() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
-        
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
         let certificate = Certificates().server()
         let output = "Hello World"
 
@@ -33,12 +22,14 @@ class DataTaskTests: XCTestCase {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
 
         // When
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
                 Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
@@ -50,13 +41,16 @@ class DataTaskTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 
-    func testDataTask_whenCAEnabled() async throws {
+    @Test
+    func dataTask_whenCAEnabled() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
+
+        let uri = "/" + UUID().uuidString
 
         let localServer = try await LocalServer(
             LocalServer.Configuration(
@@ -72,12 +66,14 @@ class DataTaskTests: XCTestCase {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
 
         // When
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
                 Trusts(server.certificateURL.absolutePath(percentEncoded: false))
@@ -92,7 +88,7 @@ class DataTaskTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 }
 
@@ -108,7 +104,7 @@ extension DataTaskTests {
             self.identity = identity
         }
 
-        func callAsFunction(_ hint: String) throws -> PSKClientIdentityResponse {
+        func callAsFunction(_ context: PSKClientContext) throws -> PSKClientIdentityResponse {
             var bytes = NIOSSLSecureBytes()
             bytes.append(key.utf8)
             bytes.append(":\(identity)".utf8)
@@ -118,8 +114,10 @@ extension DataTaskTests {
         }
     }
 
-    func testDataTask_whenPSK() async throws {
+    @Test
+    func dataTask_whenPSK() async throws {
         // Given
+        let uri = "/" + UUID().uuidString
         let output = "Hello World"
 
         let identity = "client"
@@ -141,12 +139,12 @@ extension DataTaskTests {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
                 PSKIdentity(
@@ -166,6 +164,6 @@ extension DataTaskTests {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.response, output)
+        #expect(result.response == output)
     }
 }

@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import AsyncHTTPClient
 @testable import RequestDL
 
-class InternalsRedirectConfigurationTests: XCTestCase {
+struct InternalsRedirectConfigurationTests {
 
-    func testRedirect_whenDisallow() {
+    @Test
+    func redirect_whenDisallow() {
         // Given
         let redirect = Internals.RedirectConfiguration.disallow
 
@@ -16,13 +18,15 @@ class InternalsRedirectConfigurationTests: XCTestCase {
         let sut = redirect.build()
 
         // Then
-        XCTAssertEqual(
-            String(describing: sut),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.disallow)
+        #expect(
+            String(describing: sut) == String(
+                describing: HTTPClient.Configuration.RedirectConfiguration.disallow
+            )
         )
     }
 
-    func testRedirect_whenFollow() {
+    @Test
+    func redirect_whenFollow() {
         // Given
         let redirect = Internals.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
 
@@ -30,27 +34,30 @@ class InternalsRedirectConfigurationTests: XCTestCase {
         let sut = redirect.build()
 
         // Then
-        XCTAssertEqual(
-            String(describing: sut),
-            String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 1_024, allowCycles: true))
+        #expect(
+            String(describing: sut) == String(
+                describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
+            )
         )
     }
 
-    func testRedirect_whenEquals() {
+    @Test
+    func redirect_whenEquals() {
         // Given
         let lhs = Internals.RedirectConfiguration.disallow
         let rhs = Internals.RedirectConfiguration.disallow
 
         // Then
-        XCTAssertEqual(lhs, rhs)
+        #expect(lhs == rhs)
     }
 
-    func testRedirect_whenNotEquals() {
+    @Test
+    func redirect_whenNotEquals() {
         // Given
         let lhs = Internals.RedirectConfiguration.disallow
         let rhs = Internals.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
 
         // Then
-        XCTAssertNotEqual(lhs, rhs)
+        #expect(lhs != rhs)
     }
 }

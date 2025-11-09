@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InterceptedRequestTaskTests: XCTestCase {
+struct InterceptedRequestTaskTests {
 
     struct Intercepted<Element: Sendable>: RequestTaskInterceptor {
 
@@ -16,9 +17,10 @@ class InterceptedRequestTaskTests: XCTestCase {
         }
     }
 
-    func testInterceptor() async throws {
+    @Test
+    func interceptor() async throws {
         // Given
-        let expectation = expectation(description: "Interceptor callback")
+        let expectation = AsyncSignal()
         let taskIntercepted = SendableBox(false)
 
         // When
@@ -27,12 +29,12 @@ class InterceptedRequestTaskTests: XCTestCase {
         }
         .interceptor(Intercepted {
             taskIntercepted(true)
-            expectation.fulfill()
+            expectation.signal()
         })
         .result()
 
         // Then
-        await _fulfillment(of: [expectation], timeout: 3)
-        XCTAssertTrue(taskIntercepted())
+        await expectation.wait()
+        #expect(taskIntercepted())
     }
 }

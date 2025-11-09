@@ -2,38 +2,30 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
+import NIOSSL
 @testable import RequestDL
 
-class InternalsPrivateKeySourceTests: XCTestCase {
+struct InternalsPrivateKeySourceTests {
 
-    var certificate: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        certificate = Certificates().client()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        certificate = nil
-    }
-
-    func testPrivateKeyByFile() async throws {
+    @Test
+    func privateKeyByFile() async throws {
         // Given
-        let certificate = try XCTUnwrap(certificate)
+        let certificate = Certificates().client()
         let path = certificate.privateKeyURL.absolutePath(percentEncoded: false)
 
         // When
         let resolved = try Internals.PrivateKeySource.file(path).build()
 
         // Then
-        XCTAssertEqual(resolved, .file(path))
+        #expect(resolved == .file(path))
     }
 
-    func testPrivateKeyByRepresentable() async throws {
+    @Test
+    func privateKeyByRepresentable() async throws {
         // Given
-        let certificate = try XCTUnwrap(certificate)
+        let certificate = Certificates().client()
         let path = certificate.privateKeyURL.absolutePath(percentEncoded: false)
 
         // When
@@ -42,6 +34,7 @@ class InternalsPrivateKeySourceTests: XCTestCase {
         ).build()
 
         // Then
-        XCTAssertEqual(resolved, try .privateKey(.init(file: path, format: .pem)))
+        let expectedSource: NIOSSL.NIOSSLPrivateKeySource = try .privateKey(.init(file: path, format: .pem))
+        #expect(resolved == expectedSource)
     }
 }

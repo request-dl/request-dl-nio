@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiedRequestTaskTests: XCTestCase {
+struct ModifiedRequestTaskTests {
 
     struct Modified<Input: Sendable>: RequestTaskModifier {
 
@@ -17,7 +18,8 @@ class ModifiedRequestTaskTests: XCTestCase {
         }
     }
 
-    func testModified() async throws {
+    @Test
+    func modified() async throws {
         // Given
         let taskModified = SendableBox(false)
 
@@ -31,6 +33,6 @@ class ModifiedRequestTaskTests: XCTestCase {
         .result()
 
         // Then
-        XCTAssertTrue(taskModified())
+        #expect(taskModified())
     }
 }

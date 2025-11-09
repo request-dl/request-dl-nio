@@ -2,28 +2,21 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class UploadTaskTests: XCTestCase {
+struct UploadTaskTests {
 
-    var localServer: LocalServer?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        localServer = try await .init(.standard)
-        localServer?.cleanup()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        localServer?.cleanup()
-        localServer = nil
-    }
-
-    func testUploadTask() async throws {
+    @Test
+    func uploadTask() async throws {
         // Given
-        let localServer = try XCTUnwrap(localServer)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.cleanup(at: uri)
+        defer { localServer.cleanup(at: uri) }
+
         let certificate = Certificates().server()
         let output = "Hello World"
         let upload = Data.randomData(length: 1_024)
@@ -32,12 +25,12 @@ class UploadTaskTests: XCTestCase {
             jsonObject: output
         )
 
-        localServer.insert(response)
+        localServer.insert(response, at: uri)
 
         // When
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
-            Path("index")
+            Path(uri)
 
             SecureConnection {
                 Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
@@ -52,7 +45,7 @@ class UploadTaskTests: XCTestCase {
         let result = try HTTPResult<String>(data)
 
         // Then
-        XCTAssertEqual(result.receivedBytes, upload.count)
-        XCTAssertEqual(result.response, output)
+        #expect(result.receivedBytes == upload.count)
+        #expect(result.response == output)
     }
 }

@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOPosix
 @testable import RequestDL
 
-class MultiThreadedEventLoopGroupTests: XCTestCase {
+struct MultiThreadedEventLoopGroupTests {
 
-    func testMultiThreaded_whenObtainShared_shouldBeTheSameInSecondAccess() async throws {
+    @Test
+    func multiThreaded_whenObtainShared_shouldBeTheSameInSecondAccess() async throws {
         // Given
         let sut = MultiThreadedEventLoopGroup.shared
 
@@ -16,6 +18,6 @@ class MultiThreadedEventLoopGroupTests: XCTestCase {
         let multiThreaded = MultiThreadedEventLoopGroup.shared
 
         // Then
-        XCTAssertTrue(sut === multiThreaded)
+        #expect(sut === multiThreaded)
     }
 }

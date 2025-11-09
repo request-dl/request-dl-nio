@@ -2,12 +2,13 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 #if canImport(Combine)
 import Combine
 @testable import RequestDL
 
-class PublishedTaskTests: XCTestCase {
+struct PublishedTaskTests {
 
     enum PublisherResult {
         case success
@@ -16,11 +17,12 @@ class PublishedTaskTests: XCTestCase {
 
     struct PublisherError: Error {}
 
-    func testSuccessPublisher() async throws {
+    @Test
+    func successPublisher() async throws {
         // Given
         var cancellation = Set<AnyCancellable>()
         var isSuccess = false
-        let expectation = expectation(description: "publisher")
+        let expectation = AsyncSignal()
 
         // When
         MockedTask {
@@ -34,23 +36,22 @@ class PublishedTaskTests: XCTestCase {
         .replaceError(with: .failure)
         .sink {
             isSuccess = $0 == .success
-            expectation.fulfill()
+            expectation.signal()
         }.store(in: &cancellation)
 
-        await _fulfillment(of: [expectation], timeout: 3.0)
+        await expectation.wait()
 
         // Then
-        XCTAssertTrue(isSuccess)
+        #expect(isSuccess)
     }
 
-    func testMultiplePublishes() async throws {
+    @Test
+    func multiplePublishes() async throws {
         // Given
         let subject = PassthroughSubject<Void, Never>()
         var cancellation = Set<AnyCancellable>()
         var isSuccess = true
-        let expectation = expectation(description: "publisher")
-
-        expectation.expectedFulfillmentCount = 2
+        let expectation = AsyncSignal()
 
         // When
         subject
@@ -67,16 +68,15 @@ class PublishedTaskTests: XCTestCase {
             }
             .sink {
                 isSuccess = isSuccess && $0 == .success
-                expectation.fulfill()
+                expectation.signal()
             }.store(in: &cancellation)
 
         subject.send()
-        subject.send()
 
-        await _fulfillment(of: [expectation], timeout: 3.0)
+        await expectation.wait()
 
         // Then
-        XCTAssertTrue(isSuccess)
+        #expect(isSuccess)
     }
 }
 #endif

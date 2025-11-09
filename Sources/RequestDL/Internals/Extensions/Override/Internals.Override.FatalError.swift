@@ -11,31 +11,17 @@ extension Internals.Override {
 
         typealias Closure = @Sendable (String, StaticString, UInt) -> Never
 
-        fileprivate final class State: @unchecked Sendable {
-
-            var closure: Closure {
-                get { lock.withLock { _closure } }
-                set { lock.withLock { _closure = newValue } }
-            }
-
-            private let lock = Lock()
-            private var _closure: Closure = defaultClosure
-
-            init() {}
-        }
-
-        fileprivate static let state = State()
-
-        private static let defaultClosure: Closure = {
+        @TaskLocal
+        fileprivate static var closure: Closure = {
             Swift.fatalError($0, file: $1, line: $2)
         }
 
-        static func replace(with closure: @escaping Closure) {
-            self.state.closure = closure
+        static func replace<T: Sendable>(with closure: @escaping Closure, perform: @Sendable () async throws -> T) async rethrows -> T {
+            try await $closure.withValue(closure, operation: perform)
         }
 
-        static func restore() {
-            state.closure = defaultClosure
+        static func replace<T>(with closure: @escaping Closure, perform: @Sendable () throws -> T) rethrows -> T {
+            try $closure.withValue(closure, operation: perform)
         }
     }
     #endif
@@ -46,7 +32,7 @@ extension Internals.Override {
         line: UInt = #line
     ) -> Never {
         #if DEBUG
-        FatalError.state.closure(message(), file, line)
+        FatalError.closure(message(), file, line)
         #else
         Swift.fatalError(
             message(),

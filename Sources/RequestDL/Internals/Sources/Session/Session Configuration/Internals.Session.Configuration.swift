@@ -15,12 +15,13 @@ extension Internals.Session {
         var redirectConfiguration: Internals.RedirectConfiguration?
         var timeout: Internals.Timeout = .init()
         var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
-        var proxy: HTTPClient.Configuration.Proxy?
+        var proxy: Internals.Proxy?
         var ignoreUncleanSSLShutdown: Bool = false
         var decompression: Internals.Decompression = .disabled
         var dnsOverride: [String: String] = [:]
         var networkFrameworkWaitForConnectivity: Bool?
         var httpVersion: Internals.HTTPVersion?
+        var enableNetworkFramework: Bool = false
 
         // MARK: - Inits
 
@@ -34,7 +35,7 @@ extension Internals.Session {
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
                 connectionPool: connectionPool,
-                proxy: proxy,
+                proxy: proxy?.build(),
                 ignoreUncleanSSLShutdown: ignoreUncleanSSLShutdown,
                 decompression: decompression.build()
             )
@@ -51,5 +52,16 @@ extension Internals.Session {
 
             return configuration
         }
+    }
+}
+
+extension Internals.Session.Configuration {
+
+    var isCompatibleWithNetworkFramework: Bool {
+        if enableNetworkFramework {
+            return secureConnection?.isCompatibleWithNetworkFramework ?? true
+        }
+
+        return false
     }
 }

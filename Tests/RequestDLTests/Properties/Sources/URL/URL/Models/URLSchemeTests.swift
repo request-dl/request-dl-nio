@@ -2,48 +2,59 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class URLSchemeTests: XCTestCase {
+struct URLSchemeTests {
 
-    func testHttpRawValue() async throws {
-        XCTAssertEqual(URLScheme.http, "http")
+    @Test
+    func httpRawValue() async throws {
+        #expect(URLScheme.http == "http")
     }
 
-    func testHttpsRawValue() async throws {
-        XCTAssertEqual(URLScheme.https, "https")
+    @Test
+    func httpsRawValue() async throws {
+        #expect(URLScheme.https == "https")
     }
 
-    func testFtpRawValue() async throws {
-        XCTAssertEqual(URLScheme.ftp, "ftp")
+    @Test
+    func ftpRawValue() async throws {
+        #expect(URLScheme.ftp == "ftp")
     }
 
-    func testSmtpRawValue() async throws {
-        XCTAssertEqual(URLScheme.smtp, "smtp")
+    @Test
+    func smtpRawValue() async throws {
+        #expect(URLScheme.smtp == "smtp")
     }
 
-    func testImapRawValue() async throws {
-        XCTAssertEqual(URLScheme.imap, "imap")
+    @Test
+    func imapRawValue() async throws {
+        #expect(URLScheme.imap == "imap")
     }
 
-    func testPopRawValue() async throws {
-        XCTAssertEqual(URLScheme.pop, "pop")
+    @Test
+    func popRawValue() async throws {
+        #expect(URLScheme.pop == "pop")
     }
 
-    func testDnsRawValue() async throws {
-        XCTAssertEqual(URLScheme.dns, "dns")
+    @Test
+    func dnsRawValue() async throws {
+        #expect(URLScheme.dns == "dns")
     }
 
-    func testSshRawValue() async throws {
-        XCTAssertEqual(URLScheme.ssh, "ssh")
+    @Test
+    func sshRawValue() async throws {
+        #expect(URLScheme.ssh == "ssh")
     }
 
-    func testTelnetRawValue() async throws {
-        XCTAssertEqual(URLScheme.telnet, "telnet")
+    @Test
+    func telnetRawValue() async throws {
+        #expect(URLScheme.telnet == "telnet")
     }
 
-    func testScheme_withStringLossless() async throws {
+    @Test
+    func scheme_withStringLossless() async throws {
         // Given
         let scheme = URLScheme.dns
 
@@ -52,7 +63,7 @@ class URLSchemeTests: XCTestCase {
         let losslessScheme = URLScheme(string)
 
         // Then
-        XCTAssertEqual(string, scheme.description)
-        XCTAssertEqual(losslessScheme, scheme)
+        #expect(string == scheme.description)
+        #expect(losslessScheme == scheme)
     }
 }

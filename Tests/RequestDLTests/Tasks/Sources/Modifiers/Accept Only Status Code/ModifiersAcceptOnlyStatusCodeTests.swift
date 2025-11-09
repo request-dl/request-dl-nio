@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class ModifiersStatusCodeTests: XCTestCase {
+struct ModifiersStatusCodeTests {
 
-    func testSuccessStatusCodeSet() async throws {
+    @Test
+    func successStatusCodeSet() async throws {
         // Given
         let statusCodes = StatusCode(0) ..< 600
         let statusCodeSet: StatusCodeSet = .success
@@ -33,19 +35,20 @@ class ModifiersStatusCodeTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(statusCodeSet.count, received.count)
-        XCTAssert(received.allSatisfy {
+        #expect(statusCodeSet.count == received.count)
+        #expect(received.allSatisfy {
             statusCodeSet.contains($0)
         })
 
-        XCTAssertTrue(failures.allSatisfy {
+        #expect(failures.allSatisfy {
             !statusCodeSet.contains($0) && statusCodes.contains($0)
         })
 
-        XCTAssertEqual(failures.count, statusCodes.count - statusCodeSet.count)
+        #expect(failures.count == statusCodes.count - statusCodeSet.count)
     }
 
-    func testSuccessAndRedirectStatusCodeSet() async throws {
+    @Test
+    func successAndRedirectStatusCodeSet() async throws {
         // Given
         let statusCodes = StatusCode(0) ..< 600
         let statusCodeSet: StatusCodeSet = .successAndRedirect
@@ -71,16 +74,16 @@ class ModifiersStatusCodeTests: XCTestCase {
         }
 
         // Then
-        XCTAssertEqual(statusCodeSet.count, received.count)
-        XCTAssert(received.allSatisfy {
+        #expect(statusCodeSet.count == received.count)
+        #expect(received.allSatisfy {
             statusCodeSet.contains($0)
         })
 
-        XCTAssertTrue(failures.allSatisfy {
+        #expect(failures.allSatisfy {
             !statusCodeSet.contains($0) && statusCodes.contains($0)
         })
 
-        XCTAssertEqual(failures.count, statusCodes.count - statusCodeSet.count)
+        #expect(failures.count == statusCodes.count - statusCodeSet.count)
     }
 }
 

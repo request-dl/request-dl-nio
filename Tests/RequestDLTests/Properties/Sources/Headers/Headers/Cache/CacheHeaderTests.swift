@@ -2,30 +2,33 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class CacheHeaderTests: XCTestCase {
+struct CacheHeaderTests {
 
-    func testDefaultValues() async throws {
+    @Test
+    func defaultValues() async throws {
         let cache = CacheHeader()
 
-        XCTAssertTrue(cache.isCached)
-        XCTAssertTrue(cache.isStored)
-        XCTAssertTrue(cache.isTransformed)
-        XCTAssertFalse(cache.isOnlyIfCached)
-        XCTAssertNil(cache.isPublic)
-        XCTAssertNil(cache.maxAge)
-        XCTAssertNil(cache.sharedMaxAge)
-        XCTAssertNil(cache.maxStale)
-        XCTAssertNil(cache.staleWhileRevalidate)
-        XCTAssertNil(cache.staleIfError)
-        XCTAssertFalse(cache.needsRevalidate)
-        XCTAssertFalse(cache.needsProxyRevalidate)
-        XCTAssertFalse(cache.isImmutable)
+        #expect(cache.isCached)
+        #expect(cache.isStored)
+        #expect(cache.isTransformed)
+        #expect(!cache.isOnlyIfCached)
+        #expect(cache.isPublic == nil)
+        #expect(cache.maxAge == nil)
+        #expect(cache.sharedMaxAge == nil)
+        #expect(cache.maxStale == nil)
+        #expect(cache.staleWhileRevalidate == nil)
+        #expect(cache.staleIfError == nil)
+        #expect(!cache.needsRevalidate)
+        #expect(!cache.needsProxyRevalidate)
+        #expect(!cache.isImmutable)
     }
 
-    func testInitializationWithPolicy() async throws {
+    @Test
+    func initializationWithPolicy() async throws {
         // Given
         let cache = CacheHeader()
 
@@ -33,24 +36,25 @@ class CacheHeaderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(cache))
 
         // Then
-        XCTAssertTrue(cache.isCached)
-        XCTAssertTrue(cache.isStored)
-        XCTAssertTrue(cache.isTransformed)
-        XCTAssertFalse(cache.isOnlyIfCached)
-        XCTAssertNil(cache.isPublic)
-        XCTAssertNil(cache.maxAge)
-        XCTAssertNil(cache.sharedMaxAge)
-        XCTAssertNil(cache.maxStale)
-        XCTAssertNil(cache.staleWhileRevalidate)
-        XCTAssertNil(cache.staleIfError)
-        XCTAssertFalse(cache.needsRevalidate)
-        XCTAssertFalse(cache.needsProxyRevalidate)
-        XCTAssertFalse(cache.isImmutable)
+        #expect(cache.isCached)
+        #expect(cache.isStored)
+        #expect(cache.isTransformed)
+        #expect(!cache.isOnlyIfCached)
+        #expect(cache.isPublic == nil)
+        #expect(cache.maxAge == nil)
+        #expect(cache.sharedMaxAge == nil)
+        #expect(cache.maxStale == nil)
+        #expect(cache.staleWhileRevalidate == nil)
+        #expect(cache.staleIfError == nil)
+        #expect(!cache.needsRevalidate)
+        #expect(!cache.needsProxyRevalidate)
+        #expect(!cache.isImmutable)
 
-        XCTAssertTrue(resolved.request.headers.isEmpty)
+        #expect(resolved.request.headers.isEmpty)
     }
 
-    func testModifiedCacheWithAllProperties() async throws {
+    @Test
+    func modifiedCacheWithAllProperties() async throws {
         // Given
         let cache = CacheHeader()
 
@@ -73,23 +77,22 @@ class CacheHeaderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(modifiedCache))
 
         // Then
-        XCTAssertFalse(modifiedCache.isCached)
-        XCTAssertFalse(modifiedCache.isStored)
-        XCTAssertFalse(modifiedCache.isTransformed)
-        XCTAssertTrue(modifiedCache.isOnlyIfCached)
-        XCTAssertEqual(modifiedCache.isPublic, false)
-        XCTAssertEqual(modifiedCache.maxAge, 1_000)
-        XCTAssertEqual(modifiedCache.sharedMaxAge, 16_000)
-        XCTAssertEqual(modifiedCache.maxStale, 300)
-        XCTAssertEqual(modifiedCache.staleWhileRevalidate, 120)
-        XCTAssertEqual(modifiedCache.staleIfError, 86400)
-        XCTAssertTrue(modifiedCache.needsRevalidate)
-        XCTAssertTrue(modifiedCache.needsProxyRevalidate)
-        XCTAssertTrue(modifiedCache.isImmutable)
+        #expect(!modifiedCache.isCached)
+        #expect(!modifiedCache.isStored)
+        #expect(!modifiedCache.isTransformed)
+        #expect(modifiedCache.isOnlyIfCached)
+        #expect(modifiedCache.isPublic == false)
+        #expect(modifiedCache.maxAge == 1_000)
+        #expect(modifiedCache.sharedMaxAge == 16_000)
+        #expect(modifiedCache.maxStale == 300)
+        #expect(modifiedCache.staleWhileRevalidate == 120)
+        #expect(modifiedCache.staleIfError == 86400)
+        #expect(modifiedCache.needsRevalidate)
+        #expect(modifiedCache.needsProxyRevalidate)
+        #expect(modifiedCache.isImmutable)
 
-        XCTAssertEqual(
-            resolved.request.headers["Cache-Control"],
-            [
+        #expect(
+            resolved.request.headers["Cache-Control"] == [
                 """
                 no-cache,no-store,no-transform,only-if-cached,private,max-age=1000,\
                 s-maxage=16000,max-stale=300,stale-while-revalidate=120,stale-if-error=86400,\
@@ -99,7 +102,8 @@ class CacheHeaderTests: XCTestCase {
         )
     }
 
-    func testPublicCache() async throws {
+    @Test
+    func publicCache() async throws {
         // Given
         let cache = CacheHeader()
             .public(true)
@@ -108,10 +112,11 @@ class CacheHeaderTests: XCTestCase {
         let resolved = try await resolve(TestProperty(cache))
 
         // Then
-        XCTAssertEqual(resolved.request.headers["Cache-Control"], ["public"])
+        #expect(resolved.request.headers["Cache-Control"] == ["public"])
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = CacheHeader()
 

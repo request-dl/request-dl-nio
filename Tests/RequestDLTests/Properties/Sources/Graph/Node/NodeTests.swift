@@ -2,10 +2,11 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class NodeTests: XCTestCase {
+struct NodeTests {
 
     struct Node<Value: Sendable>: PropertyNode {
         let value: Value
@@ -13,7 +14,8 @@ class NodeTests: XCTestCase {
         func make(_ make: inout Make) async throws {}
     }
 
-    func testNode_whenLeafInitWithNode() async {
+    @Test
+    func node_whenLeafInitWithNode() async {
         // Given
         let value = 1
 
@@ -21,10 +23,11 @@ class NodeTests: XCTestCase {
         let leaf = LeafNode(Node(value: value))
 
         // Then
-        XCTAssertEqual(leaf.value, 1)
+        #expect(leaf.value == 1)
     }
 
-    func testNode_whenLeafNextIsCalled_shouldBeNil() async {
+    @Test
+    func node_whenLeafNextIsCalled_shouldBeNil() async {
         // Given
         let node = Node(value: true)
 
@@ -35,11 +38,12 @@ class NodeTests: XCTestCase {
         let next2 = leaf.next()
 
         // Then
-        XCTAssertNil(next1)
-        XCTAssertNil(next2)
+        #expect(next1 == nil)
+        #expect(next2 == nil)
     }
 
-    func testNode_whenEmptyLeafNextIsCalled_shouldBeNil() async {
+    @Test
+    func node_whenEmptyLeafNextIsCalled_shouldBeNil() async {
         // Given
         var empty = EmptyLeafNode()
 
@@ -48,11 +52,12 @@ class NodeTests: XCTestCase {
         let next2 = empty.next()
 
         // Then
-        XCTAssertNil(next1)
-        XCTAssertNil(next2)
+        #expect(next1 == nil)
+        #expect(next2 == nil)
     }
 
-    func testNode_whenChildrenNextIsCalledWithEmptyNodes_shouldBeNil() async {
+    @Test
+    func node_whenChildrenNextIsCalledWithEmptyNodes_shouldBeNil() async {
         // Given
         var children = ChildrenNode()
 
@@ -61,11 +66,12 @@ class NodeTests: XCTestCase {
         let next2 = children.next()
 
         // Then
-        XCTAssertNil(next1)
-        XCTAssertNil(next2)
+        #expect(next1 == nil)
+        #expect(next2 == nil)
     }
 
-    func testNode_whenChildrenAppendNodesAndCallNext_shouldBeEqualNodes() async {
+    @Test
+    func node_whenChildrenAppendNodesAndCallNext_shouldBeEqualNodes() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: true))
@@ -81,12 +87,13 @@ class NodeTests: XCTestCase {
         let next3 = children.next()
 
         // Then
-        XCTAssertEqual((next1 as? LeafNode<Node<Int>>)?.value, 1)
-        XCTAssertEqual((next2 as? LeafNode<Node<Bool>>)?.value, true)
-        XCTAssertNil(next3)
+        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
+        #expect(next3 == nil)
     }
 
-    func testNode_whenChildrenAppendChildrenWithoutGrouping_shouldContainsEach() async {
+    @Test
+    func node_whenChildrenAppendChildrenWithoutGrouping_shouldContainsEach() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: true))
@@ -108,17 +115,18 @@ class NodeTests: XCTestCase {
         let next4 = children1.next()
 
         // Then
-        XCTAssertEqual((next1 as? LeafNode<Node<Int>>)?.value, 1)
-        XCTAssertEqual((next2 as? LeafNode<Node<Bool>>)?.value, true)
-        XCTAssertNotNil(next3)
-        XCTAssertNil(next4)
+        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
+        #expect(next3 != nil)
+        #expect(next4 == nil)
 
         if let next3 {
-            XCTAssertTrue(next3 is ChildrenNode)
+            #expect(next3 is ChildrenNode)
         }
     }
 
-    func testNode_whenChildrenAppendChildrenByGrouping_shouldContainsCombined() async {
+    @Test
+    func node_whenChildrenAppendChildrenByGrouping_shouldContainsCombined() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: true))
@@ -141,14 +149,15 @@ class NodeTests: XCTestCase {
         let next5 = children1.next()
 
         // Then
-        XCTAssertEqual((next1 as? LeafNode<Node<Int>>)?.value, 1)
-        XCTAssertEqual((next2 as? LeafNode<Node<Bool>>)?.value, true)
-        XCTAssertEqual((next3 as? LeafNode<Node<Int>>)?.value, 1)
-        XCTAssertEqual((next4 as? LeafNode<Node<Bool>>)?.value, true)
-        XCTAssertNil(next5)
+        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
+        #expect((next3 as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((next4 as? LeafNode<Node<Bool>>)?.value == true)
+        #expect(next5 == nil)
     }
 
-    func testNode_whenFirstOfContainsNode() async {
+    @Test
+    func node_whenFirstOfContainsNode() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: 2))
@@ -162,10 +171,11 @@ class NodeTests: XCTestCase {
         let node = children.first(of: Node<Int>.self)
 
         // Then
-        XCTAssertEqual(node?.value, 1)
+        #expect(node?.value == 1)
     }
 
-    func testNode_whenFirstOfNotContainsNode() async {
+    @Test
+    func node_whenFirstOfNotContainsNode() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: 2))
@@ -179,10 +189,11 @@ class NodeTests: XCTestCase {
         let node = children.first(of: Node<Bool>.self)
 
         // Then
-        XCTAssertNil(node)
+        #expect(node == nil)
     }
 
-    func testNode_whenSearchAllNodes() async {
+    @Test
+    func node_whenSearchAllNodes() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: 2))
@@ -201,17 +212,17 @@ class NodeTests: XCTestCase {
         let nodes = children.search(for: Node<Int>.self)
 
         // Then
-        XCTAssertEqual(nodes.count, 8)
+        #expect(nodes.count == 8)
 
         if nodes.count == 8 {
-            XCTAssertEqual(nodes[0].value, 1)
-            XCTAssertEqual(nodes[1].value, 2)
-            XCTAssertEqual(nodes[2].value, 1)
-            XCTAssertEqual(nodes[3].value, 2)
-            XCTAssertEqual(nodes[4].value, 1)
-            XCTAssertEqual(nodes[5].value, 2)
-            XCTAssertEqual(nodes[6].value, 1)
-            XCTAssertEqual(nodes[7].value, 2)
+            #expect(nodes[0].value == 1)
+            #expect(nodes[1].value == 2)
+            #expect(nodes[2].value == 1)
+            #expect(nodes[3].value == 2)
+            #expect(nodes[4].value == 1)
+            #expect(nodes[5].value == 2)
+            #expect(nodes[6].value == 1)
+            #expect(nodes[7].value == 2)
         }
     }
 }

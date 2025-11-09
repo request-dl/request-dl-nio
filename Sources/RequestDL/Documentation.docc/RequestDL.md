@@ -15,7 +15,7 @@ A network layer written in Swift based on the declarative programming paradigm.
     @Available(tvOS, introduced: "13.0")
     @Available(watchOS, introduced: "6.0")
     @Available(visionOS, introduced: "1.0")
-    @Available("Swift", introduced: "5.7")
+    @Available("Swift", introduced: "6.1")
 
     @SupportedLanguage(swift)
 }

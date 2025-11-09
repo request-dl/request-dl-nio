@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class DefaultTrustsTests: XCTestCase {
+struct DefaultTrustsTests {
 
-    func testTrusts_whenDefault_shouldBeDefault() async throws {
+    @Test
+    func trusts_whenDefault_shouldBeDefault() async throws {
         // Given
         let property = DefaultTrusts()
 
@@ -19,7 +21,7 @@ class DefaultTrustsTests: XCTestCase {
         })
 
         // Then
-        XCTAssertNil(resolved.session.configuration.secureConnection?.trustRoots)
-        XCTAssertTrue(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? false)
+        #expect(resolved.session.configuration.secureConnection?.trustRoots == nil)
+        #expect(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? false)
     }
 }

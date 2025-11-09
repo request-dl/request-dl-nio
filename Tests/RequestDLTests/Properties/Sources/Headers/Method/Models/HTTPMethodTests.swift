@@ -2,48 +2,59 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class HTTPMethodTests: XCTestCase {
+struct HTTPMethodTests {
 
-    func testGetMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.get, "GET")
+    @Test
+    func getMethodRawValue() async throws {
+        #expect(HTTPMethod.get == "GET")
     }
 
-    func testHeadMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.head, "HEAD")
+    @Test
+    func headMethodRawValue() async throws {
+        #expect(HTTPMethod.head == "HEAD")
     }
 
-    func testPostMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.post, "POST")
+    @Test
+    func postMethodRawValue() async throws {
+        #expect(HTTPMethod.post == "POST")
     }
 
-    func testPutMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.put, "PUT")
+    @Test
+    func putMethodRawValue() async throws {
+        #expect(HTTPMethod.put == "PUT")
     }
 
-    func testDeleteMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.delete, "DELETE")
+    @Test
+    func deleteMethodRawValue() async throws {
+        #expect(HTTPMethod.delete == "DELETE")
     }
 
-    func testConnectMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.connect, "CONNECT")
+    @Test
+    func connectMethodRawValue() async throws {
+        #expect(HTTPMethod.connect == "CONNECT")
     }
 
-    func testOptionsMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.options, "OPTIONS")
+    @Test
+    func optionsMethodRawValue() async throws {
+        #expect(HTTPMethod.options == "OPTIONS")
     }
 
-    func testTraceMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.trace, "TRACE")
+    @Test
+    func traceMethodRawValue() async throws {
+        #expect(HTTPMethod.trace == "TRACE")
     }
 
-    func testPatchMethodRawValue() async throws {
-        XCTAssertEqual(HTTPMethod.patch, "PATCH")
+    @Test
+    func patchMethodRawValue() async throws {
+        #expect(HTTPMethod.patch == "PATCH")
     }
 
-    func testMethod_withStringLossless() async throws {
+    @Test
+    func method_withStringLossless() async throws {
         // Given
         let method = HTTPMethod.trace
 
@@ -52,7 +63,7 @@ class HTTPMethodTests: XCTestCase {
         let losslessMethod = HTTPMethod(string)
 
         // Then
-        XCTAssertEqual(string, method.description)
-        XCTAssertEqual(losslessMethod, method)
+        #expect(string == method.description)
+        #expect(losslessMethod == method)
     }
 }

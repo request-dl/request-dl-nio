@@ -81,7 +81,7 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
         let dictionary = (dictionary as? [String: String]) ?? dictionary.mapValues {
             "\($0)"
         }
-        
+
         self.init {
             PropertyForEach(dictionary, id: \.key) {
                 CustomHeader(

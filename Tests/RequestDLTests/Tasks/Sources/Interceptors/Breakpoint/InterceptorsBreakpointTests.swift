@@ -2,31 +2,32 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
 #if DEBUG
-class InterceptorsBreakpointTests: XCTestCase {
+struct InterceptorsBreakpointTests {
 
-    func testBreakpoint() async throws {
+    @Test
+    func breakpoint() async throws {
         // Given
         let breakpointActivated = SendableBox(false)
 
-        Internals.Override.Raise.replace {
+        try await Internals.Override.Raise.replace {
             breakpointActivated($0 == SIGTRAP)
-            Internals.Override.Raise.restore()
             return $0
-        }
+        } perform: {
+            // When
+            _ = try await MockedTask {
+                BaseURL("localhost")
+            }
+            .breakpoint()
+            .result()
 
-        // When
-        _ = try await MockedTask {
-            BaseURL("localhost")
+            // Then
+            #expect(breakpointActivated())
         }
-        .breakpoint()
-        .result()
-
-        // Then
-        XCTAssertTrue(breakpointActivated())
     }
 }
 #endif

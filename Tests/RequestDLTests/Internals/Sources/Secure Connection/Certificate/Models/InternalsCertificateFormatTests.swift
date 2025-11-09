@@ -2,13 +2,15 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 import NIOSSL
 @testable import RequestDL
 
-class InternalsCertificateFormatTests: XCTestCase {
+struct InternalsCertificateFormatTests {
 
-    func testFormat_whenIsPEM_shouldBePEM() async throws {
+    @Test
+    func format_whenIsPEM_shouldBePEM() async throws {
         // Given
         let format = Internals.Certificate.Format.pem
 
@@ -16,10 +18,11 @@ class InternalsCertificateFormatTests: XCTestCase {
         let resolved = format.build()
 
         // Then
-        XCTAssertEqual(resolved, .pem)
+        #expect(resolved == .pem)
     }
 
-    func testFormat_whenIsDER_shouldBeDER() async throws {
+    @Test
+    func format_whenIsDER_shouldBeDER() async throws {
         // Given
         let format = Internals.Certificate.Format.der
 
@@ -27,6 +30,6 @@ class InternalsCertificateFormatTests: XCTestCase {
         let resolved = format.build()
 
         // Then
-        XCTAssertEqual(resolved, .der)
+        #expect(resolved == .der)
     }
 }

@@ -2,26 +2,16 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsAsyncBytesTests: XCTestCase {
+struct InternalsAsyncBytesTests {
 
-    var stream: Internals.AsyncStream<Internals.DataBuffer>?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        stream = .init()
-    }
-
-    override func tearDown() async throws {
-        try await super.tearDown()
-        stream = nil
-    }
-
-    func testAsyncBytes_whenAppendData_shouldContainsAll() async throws {
+    @Test
+    func asyncBytes_whenAppendData_shouldContainsAll() async throws {
         // Given
-        let stream = try XCTUnwrap(stream)
+        let stream = Internals.AsyncStream<Internals.DataBuffer>()
 
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
@@ -39,13 +29,14 @@ class InternalsAsyncBytesTests: XCTestCase {
         // Them
         let data = try await Data(bytes)
 
-        XCTAssertEqual(data, part1 + part2)
+        #expect(data == part1 + part2)
     }
 
-    func testAsyncBytes_whenAppendError_shouldContaiAnyError() async throws {
+    @Test
+    func asyncBytes_whenAppendError_shouldContaiAnyError() async throws {
         // Given
-        let stream = try XCTUnwrap(stream)
-        
+        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
         let error = AnyError()
@@ -72,8 +63,8 @@ class InternalsAsyncBytesTests: XCTestCase {
         }
 
         // Them
-        XCTAssertEqual(data, part1 + part2)
+        #expect(data == part1 + part2)
 
-        XCTAssertEqual(errors.count, 1)
+        #expect(errors.count == 1)
     }
 }

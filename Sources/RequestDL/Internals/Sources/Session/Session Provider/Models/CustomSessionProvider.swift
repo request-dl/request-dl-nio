@@ -27,7 +27,11 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func group() -> EventLoopGroup {
+        func uniqueIdentifier(with options: SessionProviderOptions) -> String {
+            id
+        }
+
+        func group(with options: SessionProviderOptions) -> any EventLoopGroup {
             _group
         }
     }

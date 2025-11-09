@@ -2,97 +2,96 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class InternalsLogTests: XCTestCase {
+struct InternalsLogTests {
 
     let line: UInt = #line
     let file: StaticString = #file
 
-    func testDebug() async {
+    @Test
+    func debug() async {
         // Given
         let message1 = "Hello World!"
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = expectation(description: "print")
+        let expecting = AsyncSignal()
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
-        
-        Internals.Override.Print.replace {
+
+        await Internals.Override.Print.replace {
             payload(($0, $1, $2))
-            expecting.fulfill()
+            expecting.signal()
+        } perform: {
+            Internals.Log.debug(message1, message2, line: line, file: file)
+
+            // Then
+            await expecting.wait()
+
+            #expect(payload()?.0 == " ")
+            #expect(payload()?.1 == "\n")
+            #expect(payload()?.2 as? [String] == [
+                debugOutput(message1, message2)
+            ])
         }
-
-        Internals.Log.debug(message1, message2, line: line, file: file)
-
-        // Then
-        await _fulfillment(of: [expecting])
-
-        XCTAssertEqual(payload()?.0, " ")
-        XCTAssertEqual(payload()?.1, "\n")
-        XCTAssertEqual(payload()?.2 as? [String], [
-            debugOutput(message1, message2)
-        ])
     }
 
-    func testWarning() async throws {
+    @Test
+    func warning() async throws {
         // Given
         let message1 = "Hello World!"
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = expectation(description: "print")
+        let expecting = AsyncSignal()
 
         let payload = SendableBox<(String, String, [Sendable])?>(nil)
-        Internals.Override.Print.replace {
+        await Internals.Override.Print.replace {
             payload(($0, $1, $2))
-            expecting.fulfill()
+            expecting.signal()
+        } perform: {
+            Internals.Log.warning(message1, message2, line: line, file: file)
+
+            // Then
+            await expecting.wait()
+
+            #expect(payload()?.0 == " ")
+            #expect(payload()?.1 == "\n")
+            #expect(payload()?.2 as? [String] == [
+                warningOutput(message1, message2)
+            ])
         }
-
-        defer { Internals.Override.Print.restore() }
-
-        Internals.Log.warning(message1, message2, line: line, file: file)
-
-        // Then
-        await _fulfillment(of: [expecting])
-
-        XCTAssertEqual(payload()?.0, " ")
-        XCTAssertEqual(payload()?.1, "\n")
-        XCTAssertEqual(payload()?.2 as? [String], [
-            warningOutput(message1, message2)
-        ])
     }
 
-    func testFailure() async throws {
+    @Test
+    func failure() async throws {
         // Given
         let message1 = "Hello World!"
         let message2 = "Earth is a small planet"
 
         // When
-        let expecting = expectation(description: "print")
-
         let payload = SendableBox<(String, StaticString, UInt)?>(nil)
-        Internals.Override.FatalError.replace {
-            payload(($0, $1, $2))
-            expecting.fulfill()
-            Thread.exit()
-            return Swift.fatalError()
-        }
+        let expectation = AsyncSignal()
 
-        defer { Internals.Override.FatalError.restore() }
+        Thread {
+            Internals.Override.FatalError.replace {
+                payload(($0, $1, $2))
+                expectation.signal()
+                Thread.exit()
+                return Swift.fatalError()
+            } perform: {
+                _ = Internals.Log.failure(message1, message2, line: line, file: file)
+            }
+        }.start()
 
-        Thread.detachNewThread { [line, file] in
-            Internals.Log.failure(message1, message2, line: line, file: file)
-        }
+        await expectation.wait()
 
-        // Then
-        await _fulfillment(of: [expecting])
-
-        XCTAssertEqual(payload()?.0, failureOutput(message1, message2))
-        XCTAssertEqual((payload()?.1).map { "\($0)" }, "\(file)")
-        XCTAssertEqual(payload()?.2, line)
+        #expect(payload()?.0 == failureOutput(message1, message2))
+        #expect((payload()?.1).map { "\($0)" } == "\(file)")
+        #expect(payload()?.2 == line)
     }
 }
 

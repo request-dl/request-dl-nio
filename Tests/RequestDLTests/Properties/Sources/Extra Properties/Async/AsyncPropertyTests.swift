@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class AsyncPropertyTests: XCTestCase {
+struct AsyncPropertyTests {
 
-    func testAsyncProperty() async throws {
+    @Test
+    func asyncProperty() async throws {
         // Given
         var apiKey: String? {
             get async {
@@ -25,13 +27,13 @@ class AsyncPropertyTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.headers["Authorization"],
-            ["Bearer 123ddf4"]
+        #expect(
+            resolved.request.headers["Authorization"] == ["Bearer 123ddf4"]
         )
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = AsyncProperty {
             EmptyProperty()

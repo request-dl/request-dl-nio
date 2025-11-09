@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class QueryGroupTests: XCTestCase {
+struct QueryGroupTests {
 
-    func testGroupOfQueries() async throws {
+    @Test
+    func groupOfQueries() async throws {
         // Given
         let property = QueryGroup {
             Query(name: "number", value: 123)
@@ -21,9 +23,8 @@ class QueryGroupTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            """
+        #expect(
+            resolved.request.url == """
             https://127.0.0.1?\
             number=123&\
             page=1
@@ -31,7 +32,8 @@ class QueryGroupTests: XCTestCase {
         )
     }
 
-    func testGroupOfQueriesIgnoringOtherTypes() async throws {
+    @Test
+    func groupOfQueriesIgnoringOtherTypes() async throws {
         // Given
         let property = QueryGroup {
             Query(name: "number", value: 123)
@@ -46,19 +48,19 @@ class QueryGroupTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.request.url,
-            """
+        #expect(
+            resolved.request.url == """
             https://127.0.0.1?\
             number=123&\
             page=1
             """
         )
 
-        XCTAssertNil(resolved.request.headers["api_key"])
+        #expect(resolved.request.headers["api_key"] == nil)
     }
 
-    func testQueries_whenInitWithDictionary_shouldBeValid() async throws {
+    @Test
+    func queries_whenInitWithDictionary_shouldBeValid() async throws {
         // Given
         let queries = [
             "number": 123,
@@ -78,14 +80,14 @@ class QueryGroupTests: XCTestCase {
             .flatMap(\.queryItems) ?? []
 
         // Then
-        XCTAssertEqual(queryItems.count, 2)
-        XCTAssertTrue(queryItems.contains(
+        #expect(queryItems.count == 2)
+        #expect(queryItems.contains(
             URLQueryItem(
                 name: "number",
                 value: "123"
             )
         ))
-        XCTAssertTrue(queryItems.contains(
+        #expect(queryItems.contains(
             URLQueryItem(
                 name: "page",
                 value: "1"
@@ -93,7 +95,8 @@ class QueryGroupTests: XCTestCase {
         ))
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = QueryGroup {}
 

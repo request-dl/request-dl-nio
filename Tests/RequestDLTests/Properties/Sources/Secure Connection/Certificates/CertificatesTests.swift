@@ -2,43 +2,36 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class CertificatesTests: XCTestCase {
+struct CertificatesTests {
 
-    var client: CertificateResource?
-    var server: CertificateResource?
-
-    override func setUp() async throws {
-        try await super.setUp()
-        client = Certificates().client()
-        server = Certificates().server()
-    }
-
-    func testCertificates_whenCertificates_shouldBeValid() async throws {
+    @Test
+    func certificates_whenCertificates_shouldBeValid() async throws {
         // Given
-        let client = try XCTUnwrap(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
-        let server = try Array(Data(contentsOf: XCTUnwrap(server).certificateURL))
+        let serverCertificate = try Array(Data(contentsOf: server.certificateURL))
 
         // When
         let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
                 RequestDL.Certificates {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificate(server)
+                    RequestDL.Certificate(serverCertificate)
                     RequestDL.Certificate("client.public", in: .module)
                 }
             }
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.session.configuration.secureConnection?.certificateChain,
-            .certificates([
+        #expect(
+            resolved.session.configuration.secureConnection?.certificateChain == .certificates([
                 .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                .init(server, format: .pem),
+                .init(serverCertificate, format: .pem),
                 .init(
                     Bundle.module
                         .url(forResource: "client.public", withExtension: "pem")?
@@ -49,10 +42,11 @@ class CertificatesTests: XCTestCase {
         )
     }
 
-    func testCertificates_whenFile_shouldBeValid() async throws {
+    @Test
+    func certificates_whenFile_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -75,16 +69,18 @@ class CertificatesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.session.configuration.secureConnection?.certificateChain,
-            .file(fileURL.absolutePath(percentEncoded: false))
+        #expect(
+            resolved.session.configuration.secureConnection?.certificateChain == .file(
+                fileURL.absolutePath(percentEncoded: false)
+            )
         )
     }
 
-    func testCertificates_whenBytes_shouldBeValid() async throws {
+    @Test
+    func certificates_whenBytes_shouldBeValid() async throws {
         // Given
-        let server = try XCTUnwrap(server)
-        let client = try XCTUnwrap(client)
+        let server = Certificates().server()
+        let client = Certificates().client()
 
         let data = try [client, server]
             .map { try Data(contentsOf: $0.certificateURL) }
@@ -100,13 +96,13 @@ class CertificatesTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(
-            resolved.session.configuration.secureConnection?.certificateChain,
-            .bytes(bytes)
+        #expect(
+            resolved.session.configuration.secureConnection?.certificateChain == .bytes(bytes)
         )
     }
 
-    func testCertificates_whenAccessBody_shouldBeNever() async throws {
+    @Test
+    func certificates_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.Certificates {
             RequestDL.Certificate([0, 1, 2])

@@ -2,7 +2,8 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 
 struct PayloadMock: Codable, Hashable {
 

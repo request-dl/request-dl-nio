@@ -2,12 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import XCTest
+import Foundation
+import Testing
 @testable import RequestDL
 
-class BaseURLTests: XCTestCase {
+struct BaseURLTests {
 
-    func testHttpURL() async throws {
+    @Test
+    func httpURL() async throws {
         // Given
         let scheme = URLScheme.http
         let host = "google.com"
@@ -17,10 +19,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testHttpsURL() async throws {
+    @Test
+    func httpsURL() async throws {
         // Given
         let scheme = URLScheme.https
         let host = "google.com"
@@ -30,10 +33,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testFtpURL() async throws {
+    @Test
+    func ftpURL() async throws {
         // Given
         let scheme = URLScheme.ftp
         let host = "google.com"
@@ -43,10 +47,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testSmtpURL() async throws {
+    @Test
+    func smtpURL() async throws {
         // Given
         let scheme = URLScheme.smtp
         let host = "google.com"
@@ -56,10 +61,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testImapURL() async throws {
+    @Test
+    func imapURL() async throws {
         // Given
         let scheme = URLScheme.imap
         let host = "google.com"
@@ -69,10 +75,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testPopURL() async throws {
+    @Test
+    func popURL() async throws {
         // Given
         let scheme = URLScheme.pop
         let host = "google.com"
@@ -82,10 +89,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testDnsURL() async throws {
+    @Test
+    func dnsURL() async throws {
         // Given
         let scheme = URLScheme.dns
         let host = "google.com"
@@ -95,10 +103,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testSshURL() async throws {
+    @Test
+    func sshURL() async throws {
         // Given
         let scheme = URLScheme.ssh
         let host = "google.com"
@@ -108,10 +117,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testTelnetURL() async throws {
+    @Test
+    func telnetURL() async throws {
         // Given
         let scheme = URLScheme.telnet
         let host = "google.com"
@@ -121,10 +131,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "\(scheme)://\(host)")
+        #expect(resolved.request.url == "\(scheme)://\(host)")
     }
 
-    func testDefaultURLWithoutProtocol() async throws {
+    @Test
+    func defaultURLWithoutProtocol() async throws {
         // Given
         let host = "google.com.br"
 
@@ -133,10 +144,11 @@ class BaseURLTests: XCTestCase {
         let resolved = try await resolve(baseURL)
 
         // Then
-        XCTAssertEqual(resolved.request.url, "https://google.com.br")
+        #expect(resolved.request.url == "https://google.com.br")
     }
 
-    func testCollisionBaseURL() async throws {
+    @Test
+    func collisionBaseURL() async throws {
         // Given
         let host1 = "apple.com"
         let host2 = "google.com"
@@ -148,10 +160,11 @@ class BaseURLTests: XCTestCase {
         })
 
         // Then
-        XCTAssertEqual(resolved.request.url, "https://google.com")
+        #expect(resolved.request.url == "https://google.com")
     }
 
-    func testURL_whenIncludingScheme() async throws {
+    @Test
+    func uRL_whenIncludingScheme() async throws {
         // Given
         let baseURL = "https://www.apple.com"
 
@@ -162,11 +175,11 @@ class BaseURLTests: XCTestCase {
             })
 
             // Then
-            XCTFail("Not expecting success")
+            Issue.record("Not expecting success")
         } catch let error as BaseURLError {
-            XCTAssertEqual(error.context, .invalidHost)
-            XCTAssertEqual(error.baseURL, baseURL)
-            XCTAssertEqual(error.errorDescription, """
+            #expect(error.context == .invalidHost)
+            #expect(error.baseURL == baseURL)
+            #expect(error.errorDescription == """
                 Invalid host string: The url scheme should not be \
                 included; BaseURL: \(baseURL)
                 """
@@ -176,7 +189,8 @@ class BaseURLTests: XCTestCase {
         }
     }
 
-    func testURL_whenEmptyString() async throws {
+    @Test
+    func uRL_whenEmptyString() async throws {
         // Given
         let baseURL = ""
 
@@ -187,11 +201,11 @@ class BaseURLTests: XCTestCase {
             })
 
             // Then
-            XCTFail("Not expecting success")
+            Issue.record("Not expecting success")
         } catch let error as BaseURLError {
-            XCTAssertEqual(error.context, .unexpectedHost)
-            XCTAssertEqual(error.baseURL, baseURL)
-            XCTAssertEqual(error.errorDescription, """
+            #expect(error.context == .unexpectedHost)
+            #expect(error.baseURL == baseURL)
+            #expect(error.errorDescription == """
                 Unexpected format for host string: Could not extract the \
                 host; BaseURL: \(baseURL)
                 """
@@ -201,7 +215,8 @@ class BaseURLTests: XCTestCase {
         }
     }
 
-    func testNeverBody() async throws {
+    @Test
+    func neverBody() async throws {
         // Given
         let property = BaseURL("apple.com")
 

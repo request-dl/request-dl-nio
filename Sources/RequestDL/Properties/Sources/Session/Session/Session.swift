@@ -100,6 +100,19 @@ public struct Session: Property {
     }
 
     /**
+     Enable the usage of Network framework on Apple Platforms when compatible.
+
+     Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
+     or specific secure connection settings.
+
+     - Parameter enabled: The flag to enable the Network framework
+     - Returns: A modified property with Network framework enabled.
+     */
+    public func enableNetworkFramework(_ enabled: Bool = true) -> some Property {
+        edit { $0.enableNetworkFramework = enabled }
+    }
+
+    /**
      Configures the maximum number of connections per host for the session.
 
      - Parameter maximum: The maximum number of connections per host.
@@ -166,6 +179,7 @@ public struct Session: Property {
      - origin: The custom origin to use for DNS resolution.
      - Returns: The modified `Session` instance with the DNS override configured.
      */
+    @available(*, deprecated, message: "Use the new 'DNSOverride' property instead of this method.")
     public func overrideDNS(_ destination: String, from origin: String) -> Self {
         edit { $0.dnsOverride[origin] = destination }
     }
