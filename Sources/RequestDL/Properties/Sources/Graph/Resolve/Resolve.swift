@@ -9,13 +9,13 @@ struct Resolve<Root: Property>: Sendable {
     // MARK: - Private properties
 
     private let root: _GraphValue<_Root>
-    private let environment: PropertyEnvironmentValues
+    private let environment: RequestEnvironmentValues
 
     // MARK: - Inits
 
     init(
         root: Root,
-        environment: PropertyEnvironmentValues
+        environment: RequestEnvironmentValues
     ) {
         self.root = .root(.init(body: root))
         self.environment = environment

@@ -8,6 +8,8 @@ import Foundation
 @preconcurrency import Foundation
 #endif
 
+import Logging
+
 extension Interceptors {
 
     /**
@@ -42,18 +44,21 @@ extension Interceptors {
                 return
             }
 
+            #if DEBUG
             switch result {
             case .failure(let error):
-                Internals.Log.debug("Failure: \(error)")
+                Logger.current.debug("Failure: \(error)")
             case .success(let result):
-                Internals.Log.debug(results(result).joined(separator: "\n"))
+                Logger.current.debug(.init(stringLiteral: results(result).joined(separator: "\n")))
             }
+            #endif
         }
     }
 }
 
 // MARK: - RequestTask extension
 
+@available(*, deprecated, message: "Manual console logging is no longer needed—`RequestTask` logs results automatically.")
 extension RequestTask {
 
     /**
@@ -73,7 +78,7 @@ extension RequestTask {
                 case let result as TaskResult<Data>:
                     return result.logInConsoleOutput()
                 case let data as Data:
-                    return [data.logInConsoleOutput()]
+                    return [data.safeLogDescription()]
                 default:
                     return ["\($0)"]
                 }
@@ -82,6 +87,7 @@ extension RequestTask {
     }
 }
 
+@available(*, deprecated, message: "Manual console logging is no longer needed—`RequestTask` logs results automatically.")
 extension RequestTask<TaskResult<Data>> {
 
     /**
@@ -103,6 +109,7 @@ extension RequestTask<TaskResult<Data>> {
     }
 }
 
+@available(*, deprecated, message: "Manual console logging is no longer needed—`RequestTask` logs results automatically.")
 extension RequestTask<Data> {
 
     /**
@@ -116,16 +123,9 @@ extension RequestTask<Data> {
         interceptor(Interceptors.LogInConsole(
             isActive: isActive,
             results: {
-                [$0.logInConsoleOutput()]
+                [$0.safeLogDescription()]
             }
         ))
-    }
-}
-
-extension Data {
-
-    fileprivate func logInConsoleOutput() -> String {
-        (String(data: self, encoding: .utf8) ?? debugDescription)
     }
 }
 
@@ -137,7 +137,7 @@ extension TaskResult {
         ]
 
         if let payload = payload as? Data {
-            contents.append("\n" + payload.logInConsoleOutput())
+            contents.append("\n" + payload.safeLogDescription())
         } else {
             contents.append("\n" + String(describing: payload))
         }

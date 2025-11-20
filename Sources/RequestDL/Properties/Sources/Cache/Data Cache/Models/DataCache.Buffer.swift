@@ -8,6 +8,10 @@ extension DataCache {
 
     struct Buffer: Sendable {
 
+        var readableBytes: Int {
+            (memoryBuffer ?? diskBuffer)?.readableBytes ?? .zero
+        }
+
         // MARK: - Private properties
 
         private var memoryBuffer: Internals.AnyBuffer?

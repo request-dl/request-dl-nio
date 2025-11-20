@@ -4,10 +4,8 @@
 
 import Foundation
 
-// swiftlint:disable file_length
 extension Internals {
 
-    // swiftlint:disable type_body_length
     struct Buffer<Stream: StreamBuffer>: Sendable {
 
         private final class Storage: @unchecked Sendable {
@@ -143,7 +141,7 @@ extension Internals {
                     try _storedInputStream?.close()
                     try _storedOutputStream?.close()
                 } catch {
-                    Internals.Log.failure(error)
+                    Internals.preconditionFailure(.init(describing: error))
                 }
             }
         }
@@ -343,7 +341,6 @@ extension Internals {
             }
         }
     }
-    // swiftlint:enable type_body_length
 }
 
 extension Internals.Buffer {
@@ -469,4 +466,3 @@ extension Internals.Buffer {
         }
     }
 }
-// swiftlint:enable file_length

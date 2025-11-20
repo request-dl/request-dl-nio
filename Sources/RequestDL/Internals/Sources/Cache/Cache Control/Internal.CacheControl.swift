@@ -6,7 +6,6 @@ import Foundation
 import AsyncHTTPClient
 import Logging
 
-// swiftlint:disable type_body_length
 extension Internals {
 
     struct CacheControl: Sendable {
@@ -25,6 +24,18 @@ extension Internals {
         // MARK: - Internal methods
 
         func callAsFunction(_ client: Internals.Client) async -> Output {
+            #if DEBUG
+            logger.debug(
+                "Evaluating cache for request",
+                metadata: [
+                    "method": .stringConvertible(request.method ?? "GET"),
+                    "host": .string(request.baseURL),
+                    "path": .string(request.pathComponents.isEmpty ? "/" : request.pathComponents.joinedAsPath()),
+                    "cache_strategy": .stringConvertible(String(describing: request.cacheStrategy))
+                ]
+            )
+            #endif
+
             if request.cacheStrategy != .ignoreCachedData {
                 if let cachedData = storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
@@ -36,6 +47,9 @@ extension Internals {
                         return .task(cachedSessionTask)
                     }
                 } else if case .useCachedDataOnly = request.cacheStrategy {
+                    #if DEBUG
+                    logger.warning("No cached data available, but strategy is 'useCachedDataOnly' — returning error")
+                    #endif
                     return .task(SessionTask(Internals.AsyncResponse(
                         uploadingBytes: .zero,
                         upload: .empty(),
@@ -43,6 +57,10 @@ extension Internals {
                         download: .empty()
                     )))
                 }
+            } else {
+                #if DEBUG
+                logger.trace("Cache ignored by strategy: ignoreCachedData")
+                #endif
             }
 
             return .cache(try? await cacheIfNeeded(
@@ -185,6 +203,9 @@ extension Internals {
             ).response() else { return nil }
 
             if response.status.code == 304 {
+                #if DEBUG
+                logger.debug("Cache validated (304 Not Modified) — reusing cached data")
+                #endif
                 return cachedData.response.headers
             }
 
@@ -192,10 +213,16 @@ extension Internals {
             let eTag = response.headers["ETag"]
 
             if lastModified != cachedData.response.headers["Last-Modified"] ?? [] {
+                #if DEBUG
+                logger.debug("Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
+                #endif
                 return nil
             }
 
             if eTag != cachedData.response.headers["ETag"] ?? [] {
+                #if DEBUG
+                logger.debug("Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
+                #endif
                 return nil
             }
 
@@ -286,7 +313,16 @@ extension Internals {
                         for try await buffer in asyncBuffers {
                             cacheBuffer.writeBuffer(buffer)
                         }
+                        #if DEBUG
+                        logger.debug("Cached response saved", metadata: [
+                            "url": .stringConvertible(request.url),
+                            "size_bytes": .stringConvertible(cacheBuffer.readableBytes)
+                        ])
+                        #endif
                     } catch {
+                        #if DEBUG
+                        logger.error("Failed to cache response: \(error)")
+                        #endif
                         dataCache.remove(forKey: request.url)
                     }
                 }
@@ -383,4 +419,3 @@ extension Internals {
         }
     }
 }
-// swiftlint:enable type_body_length

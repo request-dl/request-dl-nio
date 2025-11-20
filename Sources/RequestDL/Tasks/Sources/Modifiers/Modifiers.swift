@@ -44,8 +44,8 @@ import Foundation
  ### The task environment **(Alpha)**
 
  - ``RequestDL/TaskEnvironment``
- - ``RequestDL/TaskEnvironmentKey``
- - ``RequestDL/TaskEnvironmentValues``
+ - ``RequestDL/RequestEnvironmentKey``
+ - ``RequestDL/RequestEnvironmentValues``
  - ``RequestDL/Modifiers/Environment``
 
  ### Erasing the task type

@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 protocol SecureConnectionCollectorPropertyNode: Sendable {
 
@@ -149,9 +150,11 @@ struct SecureConnectionNode: PropertyNode {
 
     func make(_ make: inout Make) async throws {
         guard let secureConnection = make.configuration.secureConnection else {
-            Internals.Log.warning(
+            #if DEBUG
+            Logger.current.info(
                 .cantCreateCertificateOutsideSecureConnection()
             )
+            #endif
             return
         }
 

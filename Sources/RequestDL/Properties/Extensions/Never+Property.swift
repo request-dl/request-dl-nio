@@ -15,7 +15,7 @@ extension Never: Property {
 extension Property {
 
     func bodyException() -> Never {
-        Internals.Log.failure(
+        Internals.preconditionFailure(
             .accessingNeverBody(self)
         )
     }

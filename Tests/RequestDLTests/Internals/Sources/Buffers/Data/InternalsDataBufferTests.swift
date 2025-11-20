@@ -7,7 +7,6 @@ import Testing
 import NIOCore
 @testable import RequestDL
 
-// swiftlint:disable type_body_length file_length
 struct InternalsDataBufferTests {
 
     @Test
@@ -755,4 +754,3 @@ struct InternalsDataBufferTests {
         #expect(Set(datas.compactMap { $0 }).count == 1_024)
     }
 }
-// swiftlint:enable type_body_length file_length

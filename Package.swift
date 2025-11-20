@@ -20,11 +20,11 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.29.1"
+            from: "1.30.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.88.0"
+            from: "2.90.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",

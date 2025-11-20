@@ -10,7 +10,7 @@ public struct _RequestTaskModifier_Content<Modifier: RequestTaskModifier>: Reque
 
     // MARK: - Private properties
 
-    private var task: any RequestTask<Modifier.Input>
+    private let task: any RequestTask<Modifier.Input>
 
     // MARK: - Inits
 

@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 /**
  Set a certificate of type `PEM` or `DER`.
@@ -49,7 +50,7 @@ public struct Certificate: Property {
             }()
 
             guard let resourceURL = bundle.resolveURL(forResourceName: resourceName) else {
-                Internals.Log.failure(
+                Internals.preconditionFailure(
                     .cantOpenCertificateFile(
                         resourceName,
                         bundle
@@ -125,9 +126,11 @@ public struct Certificate: Property {
         property.assertPathway()
 
         guard let certificateProperty = inputs.environment.certificateProperty else {
-            Internals.Log.warning(
+            #if DEBUG
+            Logger.current.info(
                 .cantCreateCertificateOutsideSecureConnection()
             )
+            #endif
             return .empty
         }
 

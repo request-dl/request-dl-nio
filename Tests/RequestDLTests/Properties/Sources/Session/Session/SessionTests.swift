@@ -45,7 +45,7 @@ struct SessionTests {
         let sut = property.provider
 
         // Then
-        #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
+        #if canImport(Darwin)
         #expect(sut.uniqueIdentifier(with: options) == "NTW.other.10")
         #else
         #expect(sut.uniqueIdentifier(with: options) == "other.10")

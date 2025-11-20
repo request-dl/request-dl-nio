@@ -53,7 +53,7 @@ import Foundation
 
  ## See Also
  
- - ``RequestDL/TaskEnvironmentValues``
+ - ``RequestDL/RequestEnvironmentValues``
  */
 @propertyWrapper
 public struct TaskEnvironment<Value: Sendable>: Sendable {
@@ -66,12 +66,12 @@ public struct TaskEnvironment<Value: Sendable>: Sendable {
     ///
     /// - Returns: The environment-provided value of type `Value`.
     public var wrappedValue: Value {
-        keyPath(TaskEnvironmentValues.current)
+        keyPath(RequestEnvironmentValues.current)
     }
 
     // MARK: - Private Properties
 
-    private let keyPath: @Sendable (TaskEnvironmentValues) -> Value
+    private let keyPath: @Sendable (RequestEnvironmentValues) -> Value
 
     // MARK: - Initializers
 
@@ -79,7 +79,7 @@ public struct TaskEnvironment<Value: Sendable>: Sendable {
     ///
     /// - Parameter keyPath: A `KeyPath` identifying the desired value in the task environment.
     ///                      Must be `Sendable` to ensure thread safety.
-    public init(_ keyPath: KeyPath<TaskEnvironmentValues, Value> & Sendable) {
+    public init(_ keyPath: KeyPath<RequestEnvironmentValues, Value> & Sendable) {
         self.keyPath = {
             $0[keyPath: keyPath]
         }

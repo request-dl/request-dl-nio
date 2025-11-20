@@ -4,7 +4,6 @@
 
 import Foundation
 
-// swiftlint:disable line_length
 /**
  It's a task that groups multiple requests of the same collection type.
 
@@ -26,7 +25,6 @@ import Foundation
  You can get the result individually or by using the `\.keys`, `\.values` properties of dictionary or by using the `subscript` method.
  */
 public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where Data.Element: Hashable & Sendable, Data: Sendable {
-    // swiftlint:enable line_length
 
     // MARK: - Private properties
 
@@ -60,7 +58,7 @@ public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where
               for element in data {
                   group.addTask {
                       do {
-                          return try await TaskEnvironmentValues.$current.withValue(environment) {
+                          return try await RequestEnvironmentValues.$current.withValue(environment) {
                               let task = transform(element)
                               return (element, .success(try await task.result()))
                           }

@@ -9,4 +9,8 @@ extension Logger {
     static let disabled = Logger(label: "RDL-do-not-log") { _ in
         SwiftLogNoOpLogHandler()
     }
+
+    static var current: Logger {
+        RequestEnvironmentValues.current.logger
+    }
 }

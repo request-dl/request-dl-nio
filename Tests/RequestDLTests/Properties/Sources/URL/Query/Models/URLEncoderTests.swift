@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-// swiftlint:disable file_length type_body_length
 struct URLEncoderTests {
 
     // MARK: - Default
@@ -861,7 +860,6 @@ struct URLEncoderTests {
         #expect(sut == "foobar=onetwothree")
     }
 }
-// swiftlint:enable file_length type_body_length
 
 private extension URLEncoder {
 

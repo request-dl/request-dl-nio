@@ -5,7 +5,6 @@
 import Foundation
 import NIOHTTP1
 
-// swiftlint:disable file_length
 /// Provides methods and properties for HTTP headers.
 public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByDictionaryLiteral {
 
@@ -449,4 +448,3 @@ extension HTTPHeaders: CustomDebugStringConvertible {
         return lines.joined(separator: "\n")
     }
 }
-// swiftlint:enable file_length

@@ -5,7 +5,7 @@
 import Foundation
 
 public struct _PropertyInputs: Sendable {
-    var environment: PropertyEnvironmentValues
+    var environment: RequestEnvironmentValues
     var namespaceID: PropertyNamespace.ID
     let seedFactory: SeedFactory
 }

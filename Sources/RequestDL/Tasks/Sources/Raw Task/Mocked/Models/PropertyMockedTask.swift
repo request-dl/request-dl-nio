@@ -16,10 +16,10 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     // MARK: - Internal methods
 
-    func result(_ environment: TaskEnvironmentValues) async throws -> AsyncResponse {
+    func result(_ environment: RequestEnvironmentValues) async throws -> AsyncResponse {
         let resolved = try await Resolve(
             root: content,
-            environment: environment()
+            environment: environment
         ).build()
 
         var request = resolved.request

@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 extension RequestTask {
 
@@ -23,18 +24,22 @@ extension RequestTask {
         }
 
         for index in 0 ..< times {
+            #if DEBUG
             if debug {
-                Internals.Log.debug("Pinging \(index + 1) started")
+                Logger.current.debug("Pinging \(index + 1) started")
             }
+            #endif
 
             let time = Date()
             _ = try await result()
 
+            #if DEBUG
             if debug {
                 let interval = Date().timeIntervalSince(time)
 
-                Internals.Log.debug("Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
+                Logger.current.debug("Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
             }
+            #endif
         }
     }
 }

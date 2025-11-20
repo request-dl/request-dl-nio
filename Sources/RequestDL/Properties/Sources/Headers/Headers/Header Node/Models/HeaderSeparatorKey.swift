@@ -4,11 +4,11 @@
 
 import Foundation
 
-private struct HeaderSeparatorKey: PropertyEnvironmentKey {
+private struct HeaderSeparatorKey: RequestEnvironmentKey {
     static let defaultValue: String? = nil
 }
 
-extension PropertyEnvironmentValues {
+extension RequestEnvironmentValues {
 
     var headerSeparator: String? {
         get { self[HeaderSeparatorKey.self] }

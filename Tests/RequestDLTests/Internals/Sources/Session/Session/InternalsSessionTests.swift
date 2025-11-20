@@ -127,7 +127,6 @@ struct InternalsSessionTests {
         }
     }
 
-    // swiftlint:disable function_body_length
     @Test
     func session_whenUploadingFile_shouldBeValid() async throws {
         let testState = try await TestState()
@@ -212,5 +211,4 @@ struct InternalsSessionTests {
             )
         )
     }
-    // swiftlint:enable function_body_length
 }

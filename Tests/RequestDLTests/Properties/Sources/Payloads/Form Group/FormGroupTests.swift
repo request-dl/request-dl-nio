@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-// swiftlint:disable function_body_length
 struct FormGroupTests {
 
     @Test
@@ -219,4 +218,3 @@ extension FormGroupTests {
         }
     }
 }
-// swiftlint:enable function_body_length

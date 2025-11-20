@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 /**
  A data cache that stores and retrieves data based on specified capacities and policies.
@@ -152,12 +153,14 @@ public struct DataCache: Sendable, Equatable {
         let isDiskLowerThatAlreadySet = diskCapacity > .zero && diskCapacity < storage.diskCapacity
 
         if isMemoryLowerThatAlreadySet || isDiskLowerThatAlreadySet {
-            Internals.Log.warning(
+            #if DEBUG
+            Logger.current.info(
                 .loweringCacheCapacityOnInitNotPermitted(
                     memoryCapacity,
                     diskCapacity
                 )
             )
+            #endif
         }
 
         storage.memoryCapacity = max(memoryCapacity, storage.memoryCapacity)

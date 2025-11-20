@@ -15,7 +15,7 @@ extension Modifiers {
 
         // MARK: - Internal properties
 
-        let update: @Sendable (inout TaskEnvironmentValues) -> Void
+        let update: @Sendable (inout RequestEnvironmentValues) -> Void
 
         // MARK: - Public methods
 
@@ -27,9 +27,9 @@ extension Modifiers {
          - Returns: The result of the original task.
          */
         public func body(_ task: Content) async throws -> Input {
-            var environment = TaskEnvironmentValues.current
+            var environment = RequestEnvironmentValues.current
             update(&environment)
-            return try await TaskEnvironmentValues.$current.withValue(environment) {
+            return try await RequestEnvironmentValues.$current.withValue(environment) {
                 try await task.result()
             }
         }
@@ -47,7 +47,7 @@ extension RequestTask {
      - Returns: A modified `RequestTask` with the applied environment modifier.
      */
     public func environment<Value: Sendable>(
-        _ keyPath: WritableKeyPath<TaskEnvironmentValues, Value> & Sendable,
+        _ keyPath: WritableKeyPath<RequestEnvironmentValues, Value> & Sendable,
         _ value: Value
     ) -> ModifiedRequestTask<Modifiers.Environment<Element>> {
         modifier(Modifiers.Environment {

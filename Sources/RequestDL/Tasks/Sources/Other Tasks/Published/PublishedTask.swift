@@ -3,7 +3,7 @@
 */
 
 import Foundation
-#if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+#if canImport(Darwin)
 @preconcurrency import Combine
 import _Concurrency
 

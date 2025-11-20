@@ -61,7 +61,6 @@ extension Modifiers {
 
 // MARK: - RequestTask extension
 
-// swiftlint:disable line_length
 extension RequestTask<AsyncResponse> {
 
     /// Returns a modified request task that collects and combines the individual bytes into a consolidated `Data` object.
@@ -85,4 +84,3 @@ extension RequestTask<AsyncBytes> {
         modifier(Modifiers.CollectData())
     }
 }
-// swiftlint:enable line_length

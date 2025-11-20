@@ -13,9 +13,7 @@ struct EmptyPropertyTests {
         // Given
         @PropertyBuilder
         var property: some Property {
-            // swiftlint:disable redundant_discardable_let
             let _ = 1
-            // swiftlint:enable redundant_discardable_let
         }
 
         // When

@@ -193,7 +193,7 @@ extension Internals {
         // MARK: - Unsafe methods
 
         private func _unexpectedStateOrPhase(error: Error? = nil, line: UInt = #line) -> Never {
-            Internals.Log.failure(
+            Internals.preconditionFailure(
                 .unexpectedStateOrPhase(
                     state: _state,
                     phase: _phase,

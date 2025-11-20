@@ -42,3 +42,15 @@ extension Internals.Override {
         #endif
     }
 }
+
+
+extension Internals {
+
+    static func preconditionFailure(_ message: String, file: StaticString = #file, line: UInt = #line) -> Never {
+        #if DEBUG
+        Internals.Override.fatalError("🐞 RequestDL bug: \(message)", file: file, line: line)
+        #else
+        Internals.Override.fatalError("RequestDL internal error", file: file, line: line)
+        #endif
+    }
+}

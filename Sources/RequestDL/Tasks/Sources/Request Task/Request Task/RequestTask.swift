@@ -73,7 +73,7 @@ extension RequestTask {
 
 extension RequestTask {
 
-    var environment: TaskEnvironmentValues {
-        TaskEnvironmentValues.current
+    var environment: RequestEnvironmentValues {
+        RequestEnvironmentValues.current
     }
 }

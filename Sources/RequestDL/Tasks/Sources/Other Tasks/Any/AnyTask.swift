@@ -22,7 +22,7 @@ public struct AnyTask<Element: Sendable>: RequestTask {
 
     // MARK: - Private properties
 
-    private var task: any RequestTask<Element>
+    private let task: any RequestTask<Element>
 
     // MARK: - Inits
 

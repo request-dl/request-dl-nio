@@ -234,7 +234,6 @@ public struct CacheHeader: Property {
 
     // MARK: - Private methods
 
-    // swiftlint:disable cyclomatic_complexity
 
     private func makeContents() -> [String] {
         var contents = [String]()
@@ -294,5 +293,4 @@ public struct CacheHeader: Property {
         return contents
     }
 
-    // swiftlint:enable cyclomatic_complexity
 }
