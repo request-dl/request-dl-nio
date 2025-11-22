@@ -93,6 +93,8 @@ For each `@PropertyNamespace` defined, RequestDL combines the values to form a u
 - ``RequestDL/RequestEnvironmentValues``
 - ``RequestDL/PropertyEnvironment``
 - ``RequestDL/Property/environment(_:_:)``
+- ``RequestDL/PropertyEnvironmentKey``
+- ``RequestDL/PropertyEnvironmentValues``
 
 ### Keep objects in memory
 
