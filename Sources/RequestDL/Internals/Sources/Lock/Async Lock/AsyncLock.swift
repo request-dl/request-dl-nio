@@ -48,10 +48,20 @@ public final class AsyncLock: Sendable {
                 return
             }
 
-            let continuation = _storage.pendingOperations.popLast()
+            var scheduledOperation: AsyncOperation?
+
+            while let operation = _storage.pendingOperations.popLast() {
+                if !operation.isScheduled {
+                    continue
+                }
+
+                scheduledOperation = operation
+                break
+            }
+
             _storage.isLocked = !_storage.pendingOperations.isEmpty
 
-            continuation?.resume()
+            scheduledOperation?.resume()
         }
     }
 
@@ -66,17 +76,18 @@ public final class AsyncLock: Sendable {
                 operation.schedule($0)
 
                 lock.withLock {
-                    guard storage?.isLocked ?? false else {
-                        storage?.isLocked = true
+                    guard let storage else {
                         operation.resume()
                         return
                     }
 
-                    guard storage?.pendingOperations.insert(operation, at: .zero) == nil else {
+                    guard storage.isLocked else {
+                        storage.isLocked = true
+                        operation.resume()
                         return
                     }
 
-                    operation.resume()
+                    storage.pendingOperations.insert(operation, at: .zero)
                 }
             }
         } onCancel: {

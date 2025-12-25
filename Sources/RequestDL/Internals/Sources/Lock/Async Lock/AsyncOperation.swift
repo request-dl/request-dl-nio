@@ -8,6 +8,16 @@ final class AsyncOperation: @unchecked Sendable {
         case cancelled
     }
 
+    var isScheduled: Bool {
+        lock.withLock {
+            if case .scheduled = _state {
+                return true
+            } else {
+                return false
+            }
+        }
+    }
+
     private let lock = Lock()
     private var _state: State = .idle
 
@@ -24,6 +34,7 @@ final class AsyncOperation: @unchecked Sendable {
     func resume() {
         lock.withLock {
             if case .scheduled(let continuation) = _state {
+                _state = .idle
                 continuation.resume()
             }
         }
