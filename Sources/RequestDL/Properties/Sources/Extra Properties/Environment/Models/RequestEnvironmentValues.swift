@@ -4,18 +4,20 @@
 
 import Foundation
 
+import Logging
+
 /**
  ``RequestEnvironmentValues`` is a type that contains all of the environment values
  for a property hierarchy. It is accessible via a subscript on a property's ``PropertyEnvironment`` wrapper.
  */
 public struct RequestEnvironmentValues: Sendable {
 
-    private struct Entry: Sendable, CustomDebugStringConvertible {
+    fileprivate struct Entry: Sendable, CustomDebugStringConvertible {
         let value: Sendable
-        let debugDescriptionBuilder: @Sendable (Sendable) -> String
+        let keyStringLiteral: @Sendable () -> String
 
         var debugDescription: String {
-            debugDescriptionBuilder(value)
+            "\(keyStringLiteral()): \(String(reflecting: self))"
         }
     }
 
@@ -24,7 +26,7 @@ public struct RequestEnvironmentValues: Sendable {
 
     // MARK: - Private properties
 
-    private var values = [ObjectIdentifier: Entry]()
+    fileprivate var values = [ObjectIdentifier: Entry]()
 
     // MARK: - Inits
 
@@ -50,8 +52,8 @@ public struct RequestEnvironmentValues: Sendable {
         set {
             values[ObjectIdentifier(key)] = .init(
                 value: newValue,
-                debugDescriptionBuilder: {
-                    "\(key): \(String(reflecting: $0))"
+                keyStringLiteral: {
+                    String(describing: key)
                 }
             )
         }

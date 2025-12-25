@@ -32,8 +32,7 @@ extension IdentifiedGraphValue {
             return
         }
 
-        Internals.preconditionFailure(
-            .unexpectedGraphPathway()
-        )
+        Internals.Log.unexpectedGraphPathway()
+            .preconditionFailure()
     }
 }

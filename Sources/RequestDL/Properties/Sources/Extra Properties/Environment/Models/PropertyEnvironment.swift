@@ -77,9 +77,8 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
      */
     public var wrappedValue: Value {
         guard let value else {
-            Internals.preconditionFailure(
-                .environmentNilValue(keyPath)
-            )
+            Internals.Log.environmentNilValue(keyPath)
+                .preconditionFailure()
         }
 
         return value

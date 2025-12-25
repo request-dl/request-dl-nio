@@ -50,12 +50,10 @@ public struct Certificate: Property {
             }()
 
             guard let resourceURL = bundle.resolveURL(forResourceName: resourceName) else {
-                Internals.preconditionFailure(
-                    .cantOpenCertificateFile(
-                        resourceName,
-                        bundle
-                    )
-                )
+                Internals.Log.cantOpenCertificateFile(
+                    resourceName,
+                    bundle
+                ).preconditionFailure()
             }
 
             return resourceURL.absolutePath(percentEncoded: false)
@@ -127,8 +125,9 @@ public struct Certificate: Property {
 
         guard let certificateProperty = inputs.environment.certificateProperty else {
             #if DEBUG
-            Logger.current.info(
-                .cantCreateCertificateOutsideSecureConnection()
+            Internals.Log.cantCreateCertificateOutsideSecureConnection().log(
+                level: .warning,
+                logger: inputs.environment.logger
             )
             #endif
             return .empty
@@ -139,7 +138,8 @@ public struct Certificate: Property {
                 source: property.source,
                 property: certificateProperty,
                 format: property.format()
-            )
+            ),
+            logger: inputs.environment.logger
         ))
     }
 }

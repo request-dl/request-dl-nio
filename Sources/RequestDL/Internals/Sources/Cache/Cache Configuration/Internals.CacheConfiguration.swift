@@ -8,6 +8,8 @@ import Foundation
 @preconcurrency import Foundation
 #endif
 
+import Logging
+
 extension Internals {
 
     struct CacheConfiguration: Sendable, Equatable {
@@ -30,7 +32,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func build() -> DataCache {
+        func build(logger: Logger?) -> DataCache {
             let directory = directory ?? .main
             let directoryURL: URL
 
@@ -43,7 +45,7 @@ extension Internals {
                 directoryURL = url
             }
 
-            let lazyDataCache = DataCache(url: directoryURL)
+            let lazyDataCache = DataCache(url: directoryURL, logger: logger)
 
             if memoryCapacity == nil || memoryCapacity == .zero {
                 lazyDataCache.memoryCapacity = max(lazyDataCache.memoryCapacity, 1_024 * 1_024 * 2)
@@ -56,7 +58,8 @@ extension Internals {
             return .init(
                 memoryCapacity: memoryCapacity ?? .zero,
                 diskCapacity: diskCapacity  ?? .zero,
-                url: directoryURL
+                url: directoryURL,
+                logger: logger
             )
         }
     }

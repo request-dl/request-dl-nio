@@ -55,3 +55,10 @@ extension RequestTask {
         })
     }
 }
+
+extension RequestTask {
+
+    var environment: RequestEnvironmentValues {
+        RequestEnvironmentValues.current
+    }
+}

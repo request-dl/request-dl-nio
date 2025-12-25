@@ -5,9 +5,9 @@
 import Foundation
 import Logging
 
-extension Logger {
+extension Internals {
 
-    struct Payload: Sendable {
+    struct Log: Sendable {
 
         let message: @Sendable () -> Logger.Message
         let metadata: (@Sendable () -> Logger.Metadata)?
@@ -25,14 +25,14 @@ extension Logger {
 }
 
 // MARK: [Internals] - Session
-extension Logger.Payload {
+extension Internals.Log {
 
     static func unexpectedStateOrPhase<State: Sendable, Phase: Sendable>(
         state: State,
         phase: Phase,
         error: Error? = nil
-    ) -> Logger.Payload {
-        Logger.Payload(
+    ) -> Internals.Log {
+        Internals.Log(
             """
             An invalid state or phase has been detected, which could \
             cause unexpected behavior within the application.
@@ -51,10 +51,10 @@ extension Logger.Payload {
 }
 
 // MARK: - Secure Connection
-extension Logger.Payload {
+extension Internals.Log {
 
-    static func cantCreateCertificateOutsideSecureConnection() -> Logger.Payload {
-        Logger.Payload(
+    static func cantCreateCertificateOutsideSecureConnection() -> Internals.Log {
+        Internals.Log(
             """
             It seems that you are attempting to create a Certificate \
             property outside of the allowed context.
@@ -72,8 +72,8 @@ extension Logger.Payload {
     static func cantOpenCertificateFile<Resource: Sendable, Bundle: Sendable>(
         _ resource: Resource,
         _ bundle: Bundle
-    ) -> Logger.Payload {
-        Logger.Payload(
+    ) -> Internals.Log {
+        Internals.Log(
             """
             An error occurred while trying to access an invalid file path.
             """,
@@ -86,21 +86,21 @@ extension Logger.Payload {
 }
 
 // MARK: - Property
-extension Logger.Payload {
+extension Internals.Log {
 
     static func accessingNeverBody<Property: Sendable>(
         _ property: Property
-    ) -> Logger.Payload {
-        Logger.Payload(
+    ) -> Internals.Log {
+        Internals.Log(
             """
             An unexpected attempt was made to access the property body.
             """,
-            metadata: [String(describing: type(of: property)): .string(.init(reflecting: property))]
+            metadata: [String(describing: type(of: property)): .string(.init(describing: property))]
         )
     }
 
-    static func unexpectedGraphPathway() -> Logger.Payload {
-        Logger.Payload(
+    static func unexpectedGraphPathway() -> Internals.Log {
+        Internals.Log(
             """
             You are attempting to modify the graph pathway, which is not \
             allowed. Please do not call the _makeProperty function or \
@@ -114,8 +114,8 @@ extension Logger.Payload {
         )
     }
 
-    static func environmentNilValue<KeyPath: Sendable>(_ keyPath: KeyPath) -> Logger.Payload {
-        Logger.Payload(
+    static func environmentNilValue<KeyPath: Sendable>(_ keyPath: KeyPath) -> Internals.Log {
+        Internals.Log(
             """
             This can occur if the property wrapper's key path does not \
             exist in the current environment, or if the environment has \
@@ -133,13 +133,13 @@ extension Logger.Payload {
 }
 
 // MARK: - Cache
-extension Logger.Payload {
+extension Internals.Log {
 
     static func loweringCacheCapacityOnInitNotPermitted<Memory: Sendable, Disk: Sendable>(
         _ memoryCapacity: Memory,
         _ diskCapacity: Disk
-    ) -> Logger.Payload {
-        Logger.Payload(
+    ) -> Internals.Log {
+        Internals.Log(
             """
             Cannot decrease the capacity of the disk or memory during \
             DataCache initialization.
@@ -155,70 +155,89 @@ extension Logger.Payload {
     }
 }
 
-extension Logger {
+extension Internals.Log {
 
-    fileprivate func debugParameters(
-        metadata: () -> Logger.Metadata,
-        file: StaticString,
-        function: String,
-        line: UInt
-    ) {
-        func debugDescription() -> String {
-            metadata().reduce([String]()) {
-                $0 + ["\($1.key) = \(String(describing: $1.value))"]
-            }
-            .joined(separator: "\n")
-        }
-
-        debug(
-            .init(stringLiteral: debugDescription()),
-            file: file.withUTF8Buffer {
-                String(decoding: $0, as: UTF8.self)
-            },
-            function: function,
-            line: line
-        )
-    }
-
-    func info(
-        _ payload: Logger.Payload,
-        file: String = #fileID,
+    func preconditionFailure(
+        file: StaticString = #fileID,
         function: String = #function,
-        line: UInt = #line
-    ) {
-        info(
-            payload.message(),
-            metadata: payload.metadata?(),
+        line: UInt = #line,
+        logger: Logger? = nil
+    ) -> Never {
+        logMetadata(
+            level: .error,
+            logger: logger ?? RequestEnvironmentValues.current.logger
+        )
+
+        Internals.preconditionFailure(
+            message().description,
             file: file,
-            function: function,
             line: line
         )
     }
 }
 
-extension Internals {
+extension Internals.Log {
 
-    static func preconditionFailure(
-        _ payload: Logger.Payload,
-        file: StaticString = #fileID,
+    func log(
+        level: Logger.Level,
+        file: String = #fileID,
         function: String = #function,
-        line: UInt = #line
-    ) -> Never {
-        #if DEBUG
-        if let metadata = payload.metadata {
-            Logger.current.debugParameters(
-                metadata: metadata,
+        line: UInt = #line,
+        logger: Logger?
+    ) {
+        if let logger {
+            logger.log(
+                level: level,
+                message(),
+                metadata: metadata?(),
                 file: file,
                 function: function,
                 line: line
             )
-        }
-        #endif
+        } else {
+            var content = ["RequestDL.Log \(level)"]
 
-        preconditionFailure(
-            payload.message().description,
-            file: file,
-            line: line
-        )
+            content.append(message().description)
+
+            if let metadata {
+                content.append(metadata().description)
+            }
+
+            content.append("-> \(file):\(line)")
+
+            print(content.joined(separator: "\n\n"))
+        }
+    }
+
+    fileprivate func logMetadata(
+        level: Logger.Level,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line,
+        logger: Logger?
+    ) {
+        guard let metadata else {
+            return
+        }
+
+        if let logger {
+            logger.log(
+                level: level,
+                .init(stringLiteral: metadata().description),
+                file: file,
+                function: function,
+                line: line
+            )
+        } else {
+            print(
+                """
+                Crash Metadata Information
+                
+                \(metadata().description)
+                
+                -> \(file):\(line)
+                """
+            )
+        }
     }
 }

@@ -32,6 +32,8 @@ extension Interceptors {
         let isActive: Bool
         let results: @Sendable (Element) -> [String]
 
+        @TaskEnvironment(\.logger) private var logger
+
         // MARK: - Public methods
 
         /**
@@ -45,11 +47,19 @@ extension Interceptors {
             }
 
             #if DEBUG
+            let message: String
+
             switch result {
             case .failure(let error):
-                Logger.current.debug("Failure: \(error)")
+                message = "Failure: \(error)"
             case .success(let result):
-                Logger.current.debug(.init(stringLiteral: results(result).joined(separator: "\n")))
+                message = results(result).joined(separator: "\n")
+            }
+
+            if let logger = logger {
+                logger.debug(.init(stringLiteral: message))
+            } else {
+                print(message)
             }
             #endif
         }

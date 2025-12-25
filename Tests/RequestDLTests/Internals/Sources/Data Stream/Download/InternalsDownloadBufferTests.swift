@@ -20,6 +20,7 @@ struct InternalsDownloadBufferTests {
 
         // Then
         let bytes = try await Array(Internals.AsyncBytes(
+            logger: nil,
             totalSize: data.count,
             stream: download.stream
         ))
@@ -42,6 +43,7 @@ struct InternalsDownloadBufferTests {
         var errors = [Error]()
 
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: data.count,
             stream: download.stream
         )
@@ -81,6 +83,7 @@ struct InternalsDownloadBufferTests {
         // Then
         let parts = part1 + part2 + part3 + part4
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: parts.count,
             stream: download.stream
         )
@@ -110,6 +113,7 @@ struct InternalsDownloadBufferTests {
         // Then
         let parts = line1 + line2 + line3
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: parts.count,
             stream: download.stream
         )
@@ -133,6 +137,7 @@ struct InternalsDownloadBufferTests {
 
         // Then
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: separator.count,
             stream: download.stream
         )
@@ -153,6 +158,7 @@ struct InternalsDownloadBufferTests {
 
         // Then
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: .zero,
             stream: download.stream
         )
@@ -176,6 +182,7 @@ struct InternalsDownloadBufferTests {
 
         // Then
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: data.count,
             stream: download.stream
         )

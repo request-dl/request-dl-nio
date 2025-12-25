@@ -17,26 +17,24 @@ extension Internals {
         let provider: SessionProvider
         let configuration: Internals.Session.Configuration
         let manager: Internals.ClientManager
-        let logger: Logger
 
         // MARK: - Inits
 
         init(
             provider: SessionProvider,
-            configuration: Configuration,
-            logger: Logger = .disabled
+            configuration: Configuration
         ) {
             self.provider = provider
             self.configuration = configuration
             self.manager = .shared
-            self.logger = logger
         }
 
         // MARK: - Internal methods
 
         func execute(
             request: Request,
-            dataCache: DataCache
+            dataCache: DataCache,
+            logger: Internals.TaskLogger?
         ) async throws -> SessionTask {
             let client = try await manager.client(
                 provider: provider,
@@ -56,7 +54,8 @@ extension Internals {
                 return try await execute(
                     client: client,
                     request: request,
-                    cache: cache
+                    cache: cache,
+                    logger: logger
                 )
             }
         }
@@ -66,7 +65,8 @@ extension Internals {
         private func execute(
             client: Internals.Client,
             request: Internals.Request,
-            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?
+            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            logger: Internals.TaskLogger?
         ) async throws -> SessionTask {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
@@ -77,10 +77,12 @@ extension Internals {
                 upload: upload,
                 head: head,
                 download: download,
-                cache: cache
+                cache: cache,
+                logger: logger
             )
 
             let response = Internals.AsyncResponse(
+                logger: logger,
                 uploadingBytes: request.body?.totalSize ?? .zero,
                 upload: upload,
                 head: head,
@@ -96,8 +98,8 @@ extension Internals {
             )
 
             return SessionTask(
-                response: response,
-                seed: unsafeTask()
+                seed: unsafeTask(),
+                response: response
             )
         }
     }

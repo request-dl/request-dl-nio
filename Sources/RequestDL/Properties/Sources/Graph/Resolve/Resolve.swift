@@ -35,14 +35,15 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
-            configuration: make.configuration,
-            logger: environment.logger
+            configuration: make.configuration
         )
 
         return Resolved(
             session: session,
             request: make.request,
-            dataCache: make.cacheConfiguration.build()
+            dataCache: make.cacheConfiguration.build(
+                logger: environment.logger
+            )
         )
     }
 

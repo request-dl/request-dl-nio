@@ -19,22 +19,18 @@ extension Internals {
 
         let request: Internals.Request
         let dataCache: DataCache
-        let logger: Logger
+        let logger: Internals.TaskLogger?
 
         // MARK: - Internal methods
 
         func callAsFunction(_ client: Internals.Client) async -> Output {
-            #if DEBUG
-            logger.debug(
+            logger?.log(
+                level: .debug,
                 "Evaluating cache for request",
-                metadata: [
-                    "method": .stringConvertible(request.method ?? "GET"),
-                    "host": .string(request.baseURL),
-                    "path": .string(request.pathComponents.isEmpty ? "/" : request.pathComponents.joinedAsPath()),
+                additionalMetadata: [
                     "cache_strategy": .stringConvertible(String(describing: request.cacheStrategy))
                 ]
             )
-            #endif
 
             if request.cacheStrategy != .ignoreCachedData {
                 if let cachedData = storedCachedData() {
@@ -47,10 +43,9 @@ extension Internals {
                         return .task(cachedSessionTask)
                     }
                 } else if case .useCachedDataOnly = request.cacheStrategy {
-                    #if DEBUG
-                    logger.warning("No cached data available, but strategy is 'useCachedDataOnly' — returning error")
-                    #endif
+                    logger?.log(level: .warning, "No cached data available, but strategy is 'useCachedDataOnly' — returning error")
                     return .task(SessionTask(Internals.AsyncResponse(
+                        logger: logger,
                         uploadingBytes: .zero,
                         upload: .empty(),
                         head: .throwing(EmptyCachedDataError()),
@@ -58,9 +53,7 @@ extension Internals {
                     )))
                 }
             } else {
-                #if DEBUG
-                logger.trace("Cache ignored by strategy: ignoreCachedData")
-                #endif
+                logger?.log(level: .info, "Cache ignored by strategy: ignoreCachedData")
             }
 
             return .cache(try? await cacheIfNeeded(
@@ -92,6 +85,7 @@ extension Internals {
             case .useCachedDataOnly:
                 return makeCachedSession(cachedData) ?? {
                     SessionTask(AsyncResponse(
+                        logger: logger,
                         uploadingBytes: .zero,
                         upload: .empty(),
                         head: .throwing(EmptyCachedDataError()),
@@ -129,16 +123,17 @@ extension Internals {
             }
 
             return SessionTask(
+                seed: .init {
+                    download.failed(HTTPClientError.cancelled)
+                    download.close()
+                },
                 response: .init(
+                    logger: logger,
                     uploadingBytes: .zero,
                     upload: .empty(),
                     head: .constant(cachedData.cachedResponse.response),
                     download: download.stream
-                ),
-                seed: .init {
-                    download.failed(HTTPClientError.cancelled)
-                    download.close()
-                }
+                )
             )
         }
 
@@ -203,9 +198,7 @@ extension Internals {
             ).response() else { return nil }
 
             if response.status.code == 304 {
-                #if DEBUG
-                logger.debug("Cache validated (304 Not Modified) — reusing cached data")
-                #endif
+                logger?.log(level: .info, "Cache validated (304 Not Modified) — reusing cached data")
                 return cachedData.response.headers
             }
 
@@ -213,16 +206,12 @@ extension Internals {
             let eTag = response.headers["ETag"]
 
             if lastModified != cachedData.response.headers["Last-Modified"] ?? [] {
-                #if DEBUG
-                logger.debug("Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
-                #endif
+                logger?.log(level: .info, "Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
                 return nil
             }
 
             if eTag != cachedData.response.headers["ETag"] ?? [] {
-                #if DEBUG
-                logger.debug("Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
-                #endif
+                logger?.log(level: .info, "Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
                 return nil
             }
 
@@ -313,16 +302,11 @@ extension Internals {
                         for try await buffer in asyncBuffers {
                             cacheBuffer.writeBuffer(buffer)
                         }
-                        #if DEBUG
-                        logger.debug("Cached response saved", metadata: [
-                            "url": .stringConvertible(request.url),
+                        logger?.log(level: .debug, "Cached response saved", additionalMetadata: [
                             "size_bytes": .stringConvertible(cacheBuffer.readableBytes)
                         ])
-                        #endif
                     } catch {
-                        #if DEBUG
-                        logger.error("Failed to cache response: \(error)")
-                        #endif
+                        logger?.log(level: .error, "Failed to cache response: \(error.localizedDescription)")
                         dataCache.remove(forKey: request.url)
                     }
                 }

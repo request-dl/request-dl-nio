@@ -23,6 +23,8 @@ extension Internals {
         private let head: Internals.AsyncStream<ResponseHead>
         private let cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
 
+        private let logger: Internals.TaskLogger?
+
         // MARK: - Unsafe properties
 
         private var _download: DownloadBuffer
@@ -38,13 +40,15 @@ extension Internals {
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<ResponseHead>,
             download: DownloadBuffer,
-            cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
+            cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?,
+            logger: Internals.TaskLogger?
         ) {
             self.url = url
             self.upload = upload
             self.head = head
             self._download = download
             self.cache = cache
+            self.logger = logger
         }
 
         // MARK: - Internal methods
@@ -193,14 +197,11 @@ extension Internals {
         // MARK: - Unsafe methods
 
         private func _unexpectedStateOrPhase(error: Error? = nil, line: UInt = #line) -> Never {
-            Internals.preconditionFailure(
-                .unexpectedStateOrPhase(
-                    state: _state,
-                    phase: _phase,
-                    error: error
-                ),
-                line: line
-            )
+            Internals.Log.unexpectedStateOrPhase(
+                state: _state,
+                phase: _phase,
+                error: error
+            ).preconditionFailure(line: line, logger: logger?.logger)
         }
     }
 }

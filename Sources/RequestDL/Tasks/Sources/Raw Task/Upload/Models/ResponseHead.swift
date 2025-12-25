@@ -12,9 +12,13 @@ import Foundation
 public struct ResponseHead: Sendable, Hashable {
 
     /// A structure representing the status of an HTTP response.
-    public struct Status: Sendable, Hashable, CustomDebugStringConvertible {
+    public struct Status: Sendable, Hashable, CustomDebugStringConvertible, CustomStringConvertible {
 
         // MARK: - Public properties
+
+        public var description: String {
+            String(code)
+        }
 
         public var debugDescription: String {
             String(code) + " " + reason
@@ -52,9 +56,13 @@ public struct ResponseHead: Sendable, Hashable {
     }
 
     /// A structure representing the version of the HTTP protocol used in an HTTP response.
-    public struct Version: Sendable, Hashable, CustomDebugStringConvertible {
+    public struct Version: Sendable, Hashable, CustomDebugStringConvertible, CustomStringConvertible {
 
         // MARK: - Public properties
+
+        public var description: String {
+            debugDescription
+        }
 
         public var debugDescription: String {
             String(minor) + " ... " + String(major)

@@ -4,6 +4,7 @@
 
 import Foundation
 import NIOHTTP1
+import Logging
 
 /// Provides methods and properties for HTTP headers.
 public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByDictionaryLiteral {
