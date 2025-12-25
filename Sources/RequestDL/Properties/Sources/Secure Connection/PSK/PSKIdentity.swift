@@ -53,7 +53,8 @@ public struct PSKIdentity: Property {
             Node(
                 resolver: property.resolver,
                 hint: property.hint
-            )
+            ),
+            logger: inputs.environment.logger
         ))
     }
 

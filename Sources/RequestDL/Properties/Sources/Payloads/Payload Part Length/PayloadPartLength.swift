@@ -4,11 +4,11 @@
 
 import Foundation
 
-private struct PayloadChunkSizeKey: PropertyEnvironmentKey {
+private struct PayloadChunkSizeKey: RequestEnvironmentKey {
     static var defaultValue: Int? { nil }
 }
 
-extension PropertyEnvironmentValues {
+extension RequestEnvironmentValues {
 
     var payloadChunkSize: Int? {
         get { self[PayloadChunkSizeKey.self] }

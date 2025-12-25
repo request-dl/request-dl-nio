@@ -4,7 +4,6 @@
 
 import Foundation
 
-// swiftlint:disable file_length
 /**
  A structure representing a form with headers.
 
@@ -426,4 +425,3 @@ public struct Form<Headers: Property>: Property {
         return headers
     }
 }
-// swiftlint:enable file_length

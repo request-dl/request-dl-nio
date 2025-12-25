@@ -15,7 +15,7 @@ public struct InterceptedRequestTask<Interceptor: RequestTaskInterceptor>: Reque
 
     // MARK: - Internal properties
 
-    var task: any RequestTask<Element>
+    let task: any RequestTask<Element>
     let interceptor: Interceptor
 
     // MARK: - Public methods

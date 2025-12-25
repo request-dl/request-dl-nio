@@ -124,11 +124,13 @@ public struct Certificates<Content: Property>: Property {
         switch property.source {
         case .file(let file):
             return .leaf(SecureConnectionNode(
-                Node(source: .file(file))
+                Node(source: .file(file)),
+                logger: inputs.environment.logger
             ))
         case .bytes(let bytes):
             return .leaf(SecureConnectionNode(
-                Node(source: .bytes(bytes))
+                Node(source: .bytes(bytes)),
+                logger: inputs.environment.logger
             ))
         case .content(let content):
             var inputs = inputs
@@ -143,7 +145,8 @@ public struct Certificates<Content: Property>: Property {
                 Node(source: .nodes(outputs.node
                     .search(for: SecureConnectionNode.self)
                     .filter { $0.contains(CertificateNode.self) }
-                ))
+                )),
+                logger: inputs.environment.logger
             ))
         }
     }

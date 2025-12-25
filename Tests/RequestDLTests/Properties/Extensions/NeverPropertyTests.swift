@@ -12,7 +12,7 @@ struct NeverPropertyTests {
 
         var body: some Property {
             if true {
-                Internals.Log.failure("Never builds")
+                Internals.preconditionFailure("Never builds")
             }
         }
     }

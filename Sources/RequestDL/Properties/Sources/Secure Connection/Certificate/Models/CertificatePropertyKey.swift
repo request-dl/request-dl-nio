@@ -4,11 +4,11 @@
 
 import Foundation
 
-struct CertificatePropertyKey: PropertyEnvironmentKey {
+struct CertificatePropertyKey: RequestEnvironmentKey {
     static var defaultValue: CertificateProperty? { nil }
 }
 
-extension PropertyEnvironmentValues {
+extension RequestEnvironmentValues {
 
     var certificateProperty: CertificateProperty? {
         get { self[CertificatePropertyKey.self] }

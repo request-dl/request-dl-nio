@@ -9,13 +9,13 @@ struct Resolve<Root: Property>: Sendable {
     // MARK: - Private properties
 
     private let root: _GraphValue<_Root>
-    private let environment: PropertyEnvironmentValues
+    private let environment: RequestEnvironmentValues
 
     // MARK: - Inits
 
     init(
         root: Root,
-        environment: PropertyEnvironmentValues
+        environment: RequestEnvironmentValues
     ) {
         self.root = .root(.init(body: root))
         self.environment = environment
@@ -35,14 +35,15 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
-            configuration: make.configuration,
-            logger: environment.logger
+            configuration: make.configuration
         )
 
         return Resolved(
             session: session,
             request: make.request,
-            dataCache: make.cacheConfiguration.build()
+            dataCache: make.cacheConfiguration.build(
+                logger: environment.logger
+            )
         )
     }
 

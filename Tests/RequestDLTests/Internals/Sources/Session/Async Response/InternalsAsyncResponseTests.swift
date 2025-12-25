@@ -60,7 +60,11 @@ struct InternalsAsyncResponseTests {
         // Then
         #expect(received == [.download(.init(
             head: head,
-            bytes: .init(totalSize: .zero, stream: configuration.download)
+            bytes: .init(
+                logger: nil,
+                totalSize: .zero,
+                stream: configuration.download
+            )
         ))])
     }
 
@@ -92,7 +96,11 @@ struct InternalsAsyncResponseTests {
         // Then
         #expect(received == [.download(.init(
             head: head,
-            bytes: .init(totalSize: data.count, stream: configuration.download)
+            bytes: .init(
+                logger: nil,
+                totalSize: data.count,
+                stream: configuration.download
+            )
         ))])
     }
 }
@@ -114,6 +122,7 @@ extension InternalsAsyncResponseTests {
         download: Internals.AsyncStream<Internals.DataBuffer> = .init()
     ) -> Configuration {
         let response = Internals.AsyncResponse(
+            logger: nil,
             uploadingBytes: uploadingBytes,
             upload: upload,
             head: head,

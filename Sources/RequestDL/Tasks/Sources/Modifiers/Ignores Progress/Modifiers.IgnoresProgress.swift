@@ -83,7 +83,6 @@ extension Modifiers {
 
 // MARK: - RequestTask extension
 
-// swiftlint:disable line_length
 extension RequestTask {
 
     @available(*, deprecated, renamed: "collectData")
@@ -110,4 +109,3 @@ extension RequestTask {
         modifier(Modifiers.IgnoresProgress())
     }
 }
-// swiftlint:enable line_length

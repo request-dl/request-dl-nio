@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-// swiftlint:disable file_length type_body_length
 struct HTTPHeadersTests {
 
     @Test
@@ -420,4 +419,3 @@ struct HTTPHeadersTests {
         #expect(index2 == headers.index(headers.endIndex, offsetBy: -1))
     }
 }
-// swiftlint:enable file_length type_body_length

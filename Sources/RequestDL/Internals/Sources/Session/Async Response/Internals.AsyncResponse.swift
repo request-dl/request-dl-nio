@@ -13,6 +13,7 @@ extension Internals {
 
             // MARK: - Internal properties
 
+            let logger: Internals.TaskLogger?
             let uploadingBytes: Int
             let upload: AsyncStream<Int>.AsyncIterator?
             let download: (
@@ -25,6 +26,7 @@ extension Internals {
             mutating func next() async throws -> Element? {
                 if var upload = upload, let chunkSize = try await upload.next() {
                     self = .init(
+                        logger: logger,
                         uploadingBytes: uploadingBytes,
                         upload: upload,
                         download: download
@@ -47,6 +49,7 @@ extension Internals {
                 }
 
                 self = .init(
+                    logger: logger,
                     uploadingBytes: uploadingBytes,
                     upload: nil,
                     download: nil
@@ -61,6 +64,7 @@ extension Internals {
                     return .download(DownloadStep(
                         head: head,
                         bytes: AsyncBytes(
+                            logger: logger,
                             totalSize: totalSize ?? .zero,
                             stream: data
                         )
@@ -70,6 +74,10 @@ extension Internals {
         }
 
         typealias Element = ResponseStep
+
+        // MARK: - Internal properties
+
+        let logger: Internals.TaskLogger?
 
         // MARK: - Private properties
 
@@ -81,11 +89,13 @@ extension Internals {
         // MARK: - Inits
 
         init(
+            logger: Internals.TaskLogger?,
             uploadingBytes: Int,
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             download: Internals.AsyncStream<Internals.DataBuffer>
         ) {
+            self.logger = logger
             self.uploadingBytes = uploadingBytes
             self.upload = upload
             self.head = head
@@ -96,6 +106,7 @@ extension Internals {
 
         func makeAsyncIterator() -> Iterator {
             Iterator(
+                logger: logger,
                 uploadingBytes: uploadingBytes,
                 upload: upload.makeAsyncIterator(),
                 download: (head, download)

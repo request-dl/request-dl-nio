@@ -4,7 +4,7 @@
 
 import Foundation
 import NIOCore
-#if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+#if canImport(Darwin)
 import NIOTransportServices
 #endif
 import NIOPosix
@@ -22,7 +22,7 @@ extension Internals {
         // MARK: - Internal methods
 
         func uniqueIdentifier(with options: SessionProviderOptions) -> String {
-            #if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+            #if canImport(Darwin)
             if options.isCompatibleWithNetworkFramework {
                 return "NTW." + id
             }
@@ -31,7 +31,7 @@ extension Internals {
         }
 
         func group(with options: SessionProviderOptions) -> EventLoopGroup {
-            #if os(iOS) || os(tvOS) || os(macOS) || os(watchOS) || os(visionOS)
+            #if canImport(Darwin)
             if options.isCompatibleWithNetworkFramework {
                 return NIOTSEventLoopGroup.shared
             }

@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 /**
  A data cache that stores and retrieves data based on specified capacities and policies.
@@ -129,6 +130,7 @@ public struct DataCache: Sendable, Equatable {
     // MARK: - Private properties
 
     private let storage: Storage
+    private let logger: Logger?
 
     // MARK: - Inits
 
@@ -143,21 +145,20 @@ public struct DataCache: Sendable, Equatable {
     public init(
         memoryCapacity: UInt64 = .zero,
         diskCapacity: UInt64 = .zero,
-        url: URL
+        url: URL,
+        logger: Logger? = nil
     ) {
-        self.init(url: url)
+        self.init(url: url, logger: logger)
 
         let isMemoryLowerThatAlreadySet = memoryCapacity > .zero && memoryCapacity < storage.memoryCapacity
 
         let isDiskLowerThatAlreadySet = diskCapacity > .zero && diskCapacity < storage.diskCapacity
 
         if isMemoryLowerThatAlreadySet || isDiskLowerThatAlreadySet {
-            Internals.Log.warning(
-                .loweringCacheCapacityOnInitNotPermitted(
-                    memoryCapacity,
-                    diskCapacity
-                )
-            )
+            Internals.Log.loweringCacheCapacityOnInitNotPermitted(
+                memoryCapacity,
+                diskCapacity
+            ).log(level: .info, logger: logger)
         }
 
         storage.memoryCapacity = max(memoryCapacity, storage.memoryCapacity)
@@ -175,12 +176,14 @@ public struct DataCache: Sendable, Equatable {
     public init(
         memoryCapacity: UInt64 = .zero,
         diskCapacity: UInt64 = .zero,
-        suiteName: String
+        suiteName: String,
+        logger: Logger? = nil
     ) {
         self.init(
             memoryCapacity: memoryCapacity,
             diskCapacity: diskCapacity,
-            url: Self.temporaryURL(suiteName: suiteName)
+            url: Self.temporaryURL(suiteName: suiteName),
+            logger: logger
         )
     }
 
@@ -193,21 +196,24 @@ public struct DataCache: Sendable, Equatable {
      */
     public init(
         memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero
+        diskCapacity: UInt64 = .zero,
+        logger: Logger? = nil
     ) {
         self.init(
             memoryCapacity: memoryCapacity,
             diskCapacity: diskCapacity,
-            url: Self.mainTemporaryURL()
+            url: Self.mainTemporaryURL(),
+            logger: logger
         )
     }
 
-    init(url: URL) {
+    init(url: URL, logger: Logger? = nil) {
         let url = url
             .deletingLastPathComponent()
             .appendingPathComponent(url.lastPathComponent, isDirectory: true)
 
         self.storage = Manager.shared.storage(url)
+        self.logger = logger
     }
 
     // MARK: - Public static methods

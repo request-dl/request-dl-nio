@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 protocol SecureConnectionCollectorPropertyNode: Sendable {
 
@@ -134,24 +135,30 @@ struct SecureConnectionNode: PropertyNode {
     // MARK: - Private properties
 
     private let source: Source
+    private let logger: Logger?
 
     // MARK: - Inits
 
-    init(_ node: SecureConnectionCollectorPropertyNode) {
+    init(_ node: SecureConnectionCollectorPropertyNode, logger: Logger?) {
         self.source = .collectorNode(node)
+        self.logger = logger
     }
 
-    init(_ node: SecureConnectionPropertyNode) {
+    init(_ node: SecureConnectionPropertyNode, logger: Logger?) {
         self.source = .node(node)
+        self.logger = logger
     }
 
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
         guard let secureConnection = make.configuration.secureConnection else {
-            Internals.Log.warning(
-                .cantCreateCertificateOutsideSecureConnection()
+            #if DEBUG
+            Internals.Log.cantCreateCertificateOutsideSecureConnection().log(
+                level: .warning,
+                logger: logger
             )
+            #endif
             return
         }
 

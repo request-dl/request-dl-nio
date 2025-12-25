@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-// swiftlint:disable file_length type_body_length function_body_length
 struct FormTests {
 
     // MARK: - Init with Data
@@ -1288,4 +1287,3 @@ extension FormTests {
         ])
     }
 }
-// swiftlint:enable file_length type_body_length function_body_length

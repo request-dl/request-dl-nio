@@ -15,12 +15,15 @@ struct RawTask<Content: Property>: RequestTask {
     func result() async throws -> AsyncResponse {
         let resolved = try await Resolve(
             root: content,
-            environment: environment()
+            environment: environment
         ).build()
+
+        let logger = Internals.TaskLogger(request: resolved.request, logger: environment.logger)
 
         let sessionTask = try await resolved.session.execute(
             request: resolved.request,
-            dataCache: resolved.dataCache
+            dataCache: resolved.dataCache,
+            logger: logger
         )
 
         return sessionTask()

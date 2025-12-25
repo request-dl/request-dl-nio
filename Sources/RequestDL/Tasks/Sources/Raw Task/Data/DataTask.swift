@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import Logging
 
 /**
  Performs a request.
@@ -27,7 +28,7 @@ public struct DataTask<Content: Property>: RequestTask {
 
     // MARK: - Private properties
 
-    private var task: RawTask<Content>
+    private let task: RawTask<Content>
 
     // MARK: - Inits
 

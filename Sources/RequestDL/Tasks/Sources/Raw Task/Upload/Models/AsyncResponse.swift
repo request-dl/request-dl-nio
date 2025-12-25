@@ -44,6 +44,12 @@ public struct AsyncResponse: Sendable, AsyncSequence {
 
     public typealias Element = ResponseStep
 
+    // MARK: - Internal properties
+
+    var logger: Internals.TaskLogger? {
+        response.logger
+    }
+
     // MARK: - Private properties
 
     private let seed: Internals.TaskSeed

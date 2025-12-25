@@ -45,7 +45,7 @@ extension Internals {
 
         func execute(
             request: HTTPClient.Request,
-            logger: Logger
+            logger: TaskLogger?
         ) -> UnsafeTask<ResponseAccumulator.Response> {
             execute(
                 request: request,
@@ -57,15 +57,24 @@ extension Internals {
         func execute<Delegate: HTTPClientResponseDelegate>(
             request: HTTPClient.Request,
             delegate: Delegate,
-            logger: Logger
+            logger: TaskLogger?
         ) -> UnsafeTask<Delegate.Response> {
             let operation = manager.operation()
 
-            let task = _client.execute(
-                request: request,
-                delegate: delegate,
-                logger: logger
-            )
+            let task: HTTPClient.Task<Delegate.Response>
+
+            if let logger {
+                task = _client.execute(
+                    request: request,
+                    delegate: delegate,
+                    logger: logger.logger
+                )
+            } else {
+                task = _client.execute(
+                    request: request,
+                    delegate: delegate
+                )
+            }
 
             return UnsafeTask(task) {
                 _Concurrency.Task {

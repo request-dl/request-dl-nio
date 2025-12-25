@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-// swiftlint:disable file_length type_body_length
 struct PayloadTests {
 
     @Test
@@ -411,7 +410,6 @@ struct PayloadTests {
         try await assertNever(property.body)
     }
 }
-// swiftlint:enable type_body_length
 
 // MARK: - Form URL encoded tests
 
@@ -746,4 +744,3 @@ extension PayloadTests {
         )
     }
 }
-// swiftlint:enable file_length

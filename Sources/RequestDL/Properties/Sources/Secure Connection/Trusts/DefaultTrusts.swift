@@ -39,6 +39,11 @@ public struct DefaultTrusts: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(SecureConnectionNode(Node()))
+        return .leaf(
+            SecureConnectionNode(
+                Node(),
+                logger: inputs.environment.logger
+            )
+        )
     }
 }

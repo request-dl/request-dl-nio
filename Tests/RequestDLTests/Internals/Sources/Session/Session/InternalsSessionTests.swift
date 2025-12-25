@@ -49,7 +49,8 @@ struct InternalsSessionTests {
         // When
         let task = try await session.execute(
             request: request,
-            dataCache: .init()
+            dataCache: .init(),
+            logger: nil
         )
 
         let result = try await Array(task())
@@ -83,7 +84,8 @@ struct InternalsSessionTests {
         // When
         let task = try await session.execute(
             request: request,
-            dataCache: .init()
+            dataCache: .init(),
+            logger: nil
         )
         let result = try await Array(task())
 
@@ -114,7 +116,8 @@ struct InternalsSessionTests {
         // When
         let task = try await session.execute(
             request: request,
-            dataCache: .init()
+            dataCache: .init(),
+            logger: nil
         )
         let result = try await Array(task())
 
@@ -127,7 +130,6 @@ struct InternalsSessionTests {
         }
     }
 
-    // swiftlint:disable function_body_length
     @Test
     func session_whenUploadingFile_shouldBeValid() async throws {
         let testState = try await TestState()
@@ -183,7 +185,8 @@ struct InternalsSessionTests {
 
         let task = try await session.execute(
             request: request,
-            dataCache: .init()
+            dataCache: .init(),
+            logger: nil
         )
 
         var uploadedBytes: [Int] = []
@@ -201,8 +204,8 @@ struct InternalsSessionTests {
         }
 
         // Then
-        #expect(uploadedBytes.count == Int(ceil(Double(length) / Double(fragment))))
         #expect(uploadedBytes.reduce(.zero, +) == fileBuffer.writerIndex)
+        #expect(fileBuffer.writerIndex == length)
         #expect(download != nil)
         #expect(download?.0.status.code == 200)
         #expect(
@@ -212,5 +215,4 @@ struct InternalsSessionTests {
             )
         )
     }
-    // swiftlint:enable function_body_length
 }

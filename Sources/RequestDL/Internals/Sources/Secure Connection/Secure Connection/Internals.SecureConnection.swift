@@ -14,7 +14,7 @@ extension Internals {
         // MARK: - Internal properties
 
         var isCompatibleWithNetworkFramework: Bool {
-            #if os(macOS) || os(tvOS) || os(iOS) || os(watchOS) || os(visionOS)
+            #if canImport(Darwin)
             return certificateChain == nil
                 && privateKey == nil
                 && keyLogger == nil
@@ -50,7 +50,6 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        // swiftlint:disable cyclomatic_complexity function_body_length
         func build() throws -> NIOSSL.TLSConfiguration {
             var tlsConfiguration = try makeTLSConfigurationByContext()
 
@@ -128,7 +127,6 @@ extension Internals {
 
             return tlsConfiguration
         }
-        // swiftlint:enable cyclomatic_complexity function_body_length
 
         // MARK: - Private methods
 

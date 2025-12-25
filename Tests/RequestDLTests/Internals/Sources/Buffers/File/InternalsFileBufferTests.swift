@@ -6,7 +6,6 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-// swiftlint:disable type_body_length file_length
 struct InternalsFileBufferTests {
 
     final class FileURLManager: Sendable {
@@ -804,4 +803,3 @@ struct InternalsFileBufferTests {
         #expect(Set(datas.compactMap { $0 }).count == 1_024)
     }
 }
-// swiftlint:enable type_body_length file_length

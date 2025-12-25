@@ -27,7 +27,7 @@ extension Internals.Body {
                     buffers(buffers() + [.init(data)])
                 }
             case .fileRegion:
-                Internals.Log.failure(
+                Internals.preconditionFailure(
                     """
                     RequestBody currently doesn't support stream using \
                     IOData.fileRegion.

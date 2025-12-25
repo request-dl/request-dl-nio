@@ -16,10 +16,10 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     // MARK: - Internal methods
 
-    func result(_ environment: TaskEnvironmentValues) async throws -> AsyncResponse {
+    func result(_ environment: RequestEnvironmentValues) async throws -> AsyncResponse {
         let resolved = try await Resolve(
             root: content,
-            environment: environment()
+            environment: environment
         ).build()
 
         var request = resolved.request
@@ -28,10 +28,15 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             request.cacheStrategy = .useCachedDataOnly
         }
 
+        let logger = Internals.TaskLogger(
+            request: request,
+            logger: environment.logger
+        )
+
         let cacheControl = Internals.CacheControl(
             request: request,
             dataCache: resolved.dataCache,
-            logger: environment.logger
+            logger: logger
         )
 
         let client = try await Internals.ClientManager.shared.client(
@@ -44,10 +49,11 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             return task()
         case .cache(let cache):
             return try await .init(
-                seed: .withoutCancellation,
+                seed: Internals.TaskSeed.withoutCancellation,
                 response: mockRequest(
                     resolved: resolved,
-                    cache: cache
+                    cache: cache,
+                    logger: logger
                 )
             )
         }
@@ -57,7 +63,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     private func mockRequest(
         resolved: Resolved,
-        cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?
+        cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        logger: Internals.TaskLogger?
     ) async throws -> Internals.AsyncResponse {
         let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(
             resolved.session.provider,
@@ -85,6 +92,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         }
 
         return Internals.AsyncResponse(
+            logger: logger,
             uploadingBytes: .zero,
             upload: .empty(),
             head: .constant(mockResponseHead(resolved)),

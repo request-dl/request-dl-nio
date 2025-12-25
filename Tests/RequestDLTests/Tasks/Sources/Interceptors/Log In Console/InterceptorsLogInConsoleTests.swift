@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import Logging
 @testable import RequestDL
 
 struct InterceptorsLogInConsoleTests {
@@ -12,51 +13,55 @@ struct InterceptorsLogInConsoleTests {
     func consoleTaskResult() async throws {
         // Given
         let data = Data("Hello World!".utf8)
-        let strings = SendableBox([String]())
+        let records = SendableBox([TestLogHandler.LogRecord]())
+        let expectation = AsyncSignal()
 
-        try await Internals.Override.Print.replace { separator, _, items in
-            strings(
-                strings() + [items
-                    .map { "\($0)" }
-                    .joined(separator: separator)]
+        let result = try await Logger.withTesting {
+            records(
+                records() + [$0]
             )
+            expectation.signal()
         } perform: {
             // When
             let result = try await MockedTask(content: {
                 BaseURL("localhost")
                 Payload(data: data)
             })
-                .collectData()
-                .logInConsole(true)
-                .result()
+            .collectData()
+            .logInConsole(true)
+            .result()
 
-            // Then
-            #expect(strings().first?.contains(
-                """
-                Head: \(result.head)
-                
-                \(String(data: data, encoding: .utf8) ?? "")
-                """
-                ) ?? false
-            )
+            await expectation.wait()
+
+            return result
         }
+
+        // Then
+        #expect(records().last?.description.contains(
+            """
+            Head: \(result.head)
+            
+            \(String(data: data, encoding: .utf8) ?? "")
+            """
+            ) ?? false
+        )
     }
 
     @Test
     func consoleData() async throws {
         // Given
         let data = Data("Hello World!".utf8)
-        let strings = SendableBox([String]())
+        let records = SendableBox([TestLogHandler.LogRecord]())
+        let expectation = AsyncSignal()
 
-        try await Internals.Override.Print.replace { separator, _, items in
-            strings(
-                strings() + [items
-                    .map { "\($0)" }
-                    .joined(separator: separator)]
+        _ = try await Logger.withTesting {
+            records(
+                records() + [$0]
             )
+            expectation.signal()
         } perform: {
             // When
-            _ = try await MockedTask(content: {
+            let result = try await MockedTask(content: {
                 BaseURL("localhost")
                 Payload(data: data)
             })
@@ -65,33 +70,36 @@ struct InterceptorsLogInConsoleTests {
             .logInConsole(true)
             .result()
 
-            // Then
-            #expect(strings().first?.contains(
-                """
-                
-                \(String(data: data, encoding: .utf8) ?? "")
-                """
-            ) ?? false)
+            await expectation.wait()
+
+            return result
         }
+
+        // Then
+        #expect(records().last?.description.contains(
+            """
+            \(String(data: data, encoding: .utf8) ?? "")
+            """
+        ) ?? false)
     }
 
     @Test
     func consoleDecoded() async throws {
         // Given
         let value = "Hello World!"
-        let strings = SendableBox([String]())
+        let records = SendableBox([TestLogHandler.LogRecord]())
+        let expectation = AsyncSignal()
 
-        try await Internals.Override.Print.replace { separator, _, items in
-            strings(
-                strings() + [items
-                    .map { "\($0)" }
-                    .joined(separator: separator)]
+        _ = try await Logger.withTesting {
+            records(
+                records() + [$0]
             )
+            expectation.signal()
         } perform: {
             // When
             let data = try JSONEncoder().encode(value)
 
-            _ = try await MockedTask(content: {
+            let result = try await MockedTask(content: {
                 BaseURL("localhost")
                 Payload(data: data)
             })
@@ -101,10 +109,14 @@ struct InterceptorsLogInConsoleTests {
             .logInConsole(true)
             .result()
 
-            // Then
-            #expect(strings().first?.contains(
-                "\(value)"
-            ) ?? false)
+            await expectation.wait()
+
+            return result
         }
+
+        // Then
+        #expect(records().last?.description.contains(
+            "\(value)"
+        ) ?? false)
     }
 }

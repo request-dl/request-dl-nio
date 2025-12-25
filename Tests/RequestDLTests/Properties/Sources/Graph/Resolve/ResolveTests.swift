@@ -278,13 +278,15 @@ extension ResolveTests {
                                                                     property = .chain,
                                                                     format = .pem
                                                                 }
-                                                            )
+                                                            ),
+                                                            logger = nil
                                                         }
                                                     }
                                                 ]
                                             )
                                         }
-                                    )
+                                    ),
+                                    logger = nil
                                 }
                             },
                             LeafNode<SecureConnectionNode> {
@@ -301,7 +303,8 @@ extension ResolveTests {
                                                                     property = .trust,
                                                                     format = .pem
                                                                 }
-                                                            )
+                                                            ),
+                                                            logger = nil
                                                         }
                                                     },
                                                     LeafNode<SecureConnectionNode> {
@@ -312,13 +315,15 @@ extension ResolveTests {
                                                                     property = .trust,
                                                                     format = .pem
                                                                 }
-                                                            )
+                                                            ),
+                                                            logger = nil
                                                         }
                                                     }
                                                 ]
                                             )
                                         }
-                                    )
+                                    ),
+                                    logger = nil
                                 }
                             },
                             LeafNode<SecureConnectionNode> {
@@ -335,7 +340,8 @@ extension ResolveTests {
                                                                     property = .additionalTrust,
                                                                     format = .pem
                                                                 }
-                                                            )
+                                                            ),
+                                                            logger = nil
                                                         }
                                                     },
                                                     LeafNode<SecureConnectionNode> {
@@ -346,13 +352,15 @@ extension ResolveTests {
                                                                     property = .additionalTrust,
                                                                     format = .pem
                                                                 }
-                                                            )
+                                                            ),
+                                                            logger = nil
                                                         }
                                                     }
                                                 ]
                                             )
                                         }
-                                    )
+                                    ),
+                                    logger = nil
                                 }
                             }
                         ]
@@ -370,7 +378,8 @@ extension ResolveTests {
                                     }
                                 )
                             }
-                        )
+                        ),
+                        logger = nil
                     }
                 }
             }

@@ -8,18 +8,18 @@ The integration of various important resources in a request was made possible du
 
 ### Environment
 
-``RequestDL/PropertyEnvironment`` allows you to obtain the value of a property from ``RequestDL/PropertyEnvironmentValues`` during the construction of a property.
+``RequestDL/PropertyEnvironment`` allows you to obtain the value of a property from ``RequestDL/RequestEnvironmentValues`` during the construction of a property.
 
 Internally, some objects in RequestDL use the environment to retrieve important objects that influence the request's outcome. Therefore, you can explore these resources to create your own tools aligned with your system's requirements.
 
-You can start by specifying a ``RequestDL/PropertyEnvironmentKey`` as follows:
+You can start by specifying a ``RequestDL/RequestEnvironmentKey`` as follows:
 
 ```swift
-struct PayloadKey: PropertyEnvironmentKey {
+struct PayloadKey: RequestEnvironmentKey {
     public static let defaultValue: Data?
 }
 
-extension PropertyEnvironmentValues {
+extension RequestEnvironmentValues {
 
     var payload: Data? {
         get { self[PayloadKey.self] }
@@ -89,10 +89,12 @@ For each `@PropertyNamespace` defined, RequestDL combines the values to form a u
 
 ### Meet the environment
 
-- ``RequestDL/PropertyEnvironmentKey``
-- ``RequestDL/PropertyEnvironmentValues``
+- ``RequestDL/RequestEnvironmentKey``
+- ``RequestDL/RequestEnvironmentValues``
 - ``RequestDL/PropertyEnvironment``
 - ``RequestDL/Property/environment(_:_:)``
+- ``RequestDL/PropertyEnvironmentKey``
+- ``RequestDL/PropertyEnvironmentValues``
 
 ### Keep objects in memory
 

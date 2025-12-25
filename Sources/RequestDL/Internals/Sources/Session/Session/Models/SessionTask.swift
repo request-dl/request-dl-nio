@@ -7,19 +7,19 @@ import NIOCore
 
 struct SessionTask: Sendable {
 
-    // MARK: - Internal properties
+    // MARK: - Private properties
 
-    private let response: Internals.AsyncResponse
     private let seed: Internals.TaskSeed
+    private let response: Internals.AsyncResponse
 
     // MARK: - Inits
 
     init(
-        response: Internals.AsyncResponse,
-        seed: Internals.TaskSeed
+        seed: Internals.TaskSeed,
+        response: Internals.AsyncResponse
     ) {
-        self.response = response
         self.seed = seed
+        self.response = response
     }
 
     init(_ response: Internals.AsyncResponse) {
@@ -30,6 +30,9 @@ struct SessionTask: Sendable {
     // MARK: - Internal methods
 
     func callAsFunction() -> AsyncResponse {
-        .init(seed: seed, response: response)
+        AsyncResponse(
+            seed: seed,
+            response: response
+        )
     }
 }

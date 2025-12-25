@@ -19,7 +19,7 @@ public struct ModifiedRequestTask<Modifier: RequestTaskModifier>: RequestTask {
 
     // MARK: - Internal properties
 
-    var task: Modifier.Content
+    let task: Modifier.Content
     let modifier: Modifier
 
     // MARK: - Public properties

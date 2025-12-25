@@ -55,7 +55,7 @@ public struct DownloadTask<Content: Property>: RequestTask {
 
     // MARK: - Private properties
 
-    private var task: RawTask<Content>
+    private let task: RawTask<Content>
 
     // MARK: - Inits
 

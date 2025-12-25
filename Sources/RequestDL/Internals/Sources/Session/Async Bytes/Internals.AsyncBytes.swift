@@ -36,6 +36,7 @@ extension Internals {
 
         // MARK: - Internal properties
 
+        let logger: Internals.TaskLogger?
         let totalSize: Int
 
         // MARK: - Private properties
@@ -45,9 +46,11 @@ extension Internals {
         // MARK: - Inits
 
         init(
+            logger: Internals.TaskLogger?,
             totalSize: Int,
             stream asyncBuffers: Internals.AsyncStream<DataBuffer>
         ) {
+            self.logger = logger
             self.totalSize = totalSize
             self.asyncBuffers = asyncBuffers
         }

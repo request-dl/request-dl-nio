@@ -23,7 +23,7 @@ struct SecureConnectionTests {
         let sut = try #require(resolved.session.configuration.secureConnection)
 
         // Then
-        #if os(macOS) || os(tvOS) || os(iOS) || os(watchOS) || os(visionOS)
+        #if canImport(Darwin)
         #expect(sut.isCompatibleWithNetworkFramework)
         #else
         #expect(!sut.isCompatibleWithNetworkFramework)

@@ -20,15 +20,15 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.29.1"
+            from: "1.30.2"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.88.0"
+            from: "2.92.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.31.0"
+            from: "1.31.2"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
@@ -36,11 +36,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
-            from: "1.25.2"
+            from: "1.26.0"
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.6.4"
+            from: "1.8.0"
         )
     ],
     targets: [

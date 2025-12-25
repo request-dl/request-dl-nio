@@ -17,6 +17,7 @@ struct InternalsAsyncBytesTests {
         let part2 = Data("Earth is a small planet to live".utf8)
 
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: part1.count + part2.count,
             stream: stream
         )
@@ -42,6 +43,7 @@ struct InternalsAsyncBytesTests {
         let error = AnyError()
 
         let bytes = Internals.AsyncBytes(
+            logger: nil,
             totalSize: part1.count + part2.count,
             stream: stream
         )

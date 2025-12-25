@@ -155,7 +155,8 @@ public struct PrivateKey: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
         return .leaf(SecureConnectionNode(
-            Node(source: property.source)
+            Node(source: property.source),
+            logger: inputs.environment.logger
         ))
     }
 }

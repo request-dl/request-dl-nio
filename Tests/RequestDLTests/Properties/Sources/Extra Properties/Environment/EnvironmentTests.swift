@@ -8,7 +8,7 @@ import Testing
 
 struct EnvironmentTests {
 
-    struct IntegerEnvironmentKey: PropertyEnvironmentKey {
+    struct IntegerEnvironmentKey: RequestEnvironmentKey {
         static var defaultValue: Int { .zero }
     }
 
@@ -73,7 +73,7 @@ struct EnvironmentTests {
     }
 }
 
-extension PropertyEnvironmentValues {
+extension RequestEnvironmentValues {
 
     fileprivate var integer: Int {
         get { self[EnvironmentTests.IntegerEnvironmentKey.self] }

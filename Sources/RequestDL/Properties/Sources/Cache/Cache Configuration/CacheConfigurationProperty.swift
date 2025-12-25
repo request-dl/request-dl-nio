@@ -4,7 +4,6 @@
 
 import Foundation
 
-// swiftlint:disable line_length
 private struct CacheConfigurationProperty: Property {
 
     private struct Node: PropertyNode {
@@ -116,4 +115,3 @@ extension Property {
         )
     }
 }
-// swiftlint:enable line_length

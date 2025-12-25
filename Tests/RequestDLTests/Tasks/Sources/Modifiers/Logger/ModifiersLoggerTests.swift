@@ -12,7 +12,7 @@ struct ModifiersLoggerTests {
     private struct LogCaptureProperty: Property {
         @PropertyEnvironment(\.logger) var logger
 
-        let closure: @Sendable (Logger) -> Void
+        let closure: @Sendable (Logger?) -> Void
 
         var body: some Property {
             BaseURL(baseURL())
@@ -42,7 +42,7 @@ struct ModifiersLoggerTests {
         // Then
         await expectation.wait()
 
-        #expect(logger()?.label == Logger.disabled.label)
+        #expect(logger()?.label == nil)
     }
 
     @Test

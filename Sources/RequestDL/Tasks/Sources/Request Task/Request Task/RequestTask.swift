@@ -70,10 +70,3 @@ extension RequestTask {
         )
     }
 }
-
-extension RequestTask {
-
-    var environment: TaskEnvironmentValues {
-        TaskEnvironmentValues.current
-    }
-}

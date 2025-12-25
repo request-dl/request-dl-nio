@@ -41,6 +41,12 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
         bytes.totalSize
     }
 
+    // MARK: - Internal properties
+
+    var logger: Internals.TaskLogger? {
+        bytes.logger
+    }
+
     // MARK: - Private properties
 
     private let seed: Internals.TaskSeed

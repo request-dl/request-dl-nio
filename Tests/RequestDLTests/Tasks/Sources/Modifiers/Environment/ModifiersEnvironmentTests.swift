@@ -45,11 +45,11 @@ struct ModifiersEnvironmentTests {
     }
 }
 
-private struct NumberKey: TaskEnvironmentKey {
+private struct NumberKey: RequestEnvironmentKey {
     static let defaultValue = 1
 }
 
-extension TaskEnvironmentValues {
+extension RequestEnvironmentValues {
 
     fileprivate var number: Int {
         get { self[NumberKey.self] }
