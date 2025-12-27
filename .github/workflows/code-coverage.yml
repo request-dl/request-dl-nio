@@ -43,15 +43,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - destination: "platform=iOS Simulator,arch=arm64,name=iPhone 16 Pro,OS=18.5"
+          - destination: "platform=iOS Simulator,arch=arm64,name=iPhone 16 Pro,OS=26.2"
             name: "iOS"
-          - destination: "platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=18.5"
+          - destination: "platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=26.2"
             name: "iPadOS"
-          - destination: "platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 10 (42mm),OS=11.5"
+          - destination: "platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 10 (42mm),OS=26.2"
             name: "watchOS"
-          - destination: "platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=18.5"
+          - destination: "platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=26.2"
             name: "tvOS"
-          - destination: "platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=2.5"
+          - destination: "platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=26.2"
             name: "visionOS"
           - destination: "platform=macOS,arch=arm64,name=My Mac"
             name: "macOS"
