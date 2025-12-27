@@ -24,8 +24,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
         var request = resolved.request
 
-        if [.returnCachedDataElseLoad, .reloadAndValidateCachedData].contains(request.cacheStrategy) {
-            request.cacheStrategy = .useCachedDataOnly
+        if [.useCachedDataOnly].contains(request.cacheStrategy) {
+            request.cacheStrategy = .returnCachedDataElseLoad
         }
 
         let logger = Internals.TaskLogger(
@@ -124,7 +124,13 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     }
 
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {
-        .init(
+        var headers = resolved.request.headers
+
+        if let method = resolved.request.method {
+            headers.set(name: "rdl-request-method", value: method)
+        }
+
+        return .init(
             url: resolved.request.url,
             status: .init(code: status.code, reason: status.reason),
             version: .init(minor: version.minor, major: version.major),
