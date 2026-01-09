@@ -29,14 +29,14 @@ public final class AsyncLock: Sendable {
     // MARK: - Public properties
 
     public func withLock<Value: Sendable>(isolation: isolated (any Actor)? = #isolation, _ block: @Sendable () async throws -> Value) async rethrows -> Value {
-        await lock()
+        await lock(isolation: isolation)
         defer { unlock() }
 
         return try await block()
     }
 
     public func withLockVoid(isolation: isolated (any Actor)? = #isolation, _ block: @Sendable () async throws -> Void) async rethrows {
-        await lock()
+        await lock(isolation: isolation)
         defer { unlock() }
 
         try await block()
@@ -67,7 +67,7 @@ public final class AsyncLock: Sendable {
         runningOperation?.resume()
     }
 
-    public func lock() async {
+    public func lock(isolation: isolated (any Actor)? = #isolation) async {
         let operation = AsyncOperation()
 
         let lock = lock
@@ -77,52 +77,56 @@ public final class AsyncLock: Sendable {
         weak var storage = _storage
         #endif
 
-        await withTaskCancellationHandler {
-            await withUnsafeContinuation {
-                operation.schedule($0)
+        await withTaskCancellationHandler(
+            operation: {
+                await withUnsafeContinuation(isolation: isolation) {
+                    operation.schedule($0)
 
-                let runningOperation = lock.withLock { () -> AsyncOperation? in
-                    guard let storage else {
-                        return operation
+                    let runningOperation = lock.withLock { () -> AsyncOperation? in
+                        guard let storage else {
+                            return operation
+                        }
+
+                        guard storage.runningOperation != nil else {
+                            storage.runningOperation = operation
+                            return operation
+                        }
+
+                        storage.pendingOperations.insert(operation, at: .zero)
+                        return nil
                     }
 
-                    guard storage.runningOperation != nil else {
-                        storage.runningOperation = operation
-                        return operation
+                    runningOperation?.resume()
+                }
+            },
+            onCancel: { [weak self] in
+                #if swift(<6.2.3)
+                let storage = self?._storage
+                #endif
+
+                Task.detached {
+                    guard let self else {
+                        return
                     }
 
-                    storage.pendingOperations.insert(operation, at: .zero)
-                    return nil
-                }
+                    operation.cancelled()
 
-                runningOperation?.resume()
-            }
-        } onCancel: { [weak self] in
-            #if swift(<6.2.3)
-            let storage = self?._storage
-            #endif
+                    let didCancelRunningOperation = lock.withLock {
+                        guard let storage else {
+                            return false
+                        }
 
-            Task.detached {
-                guard let self else {
-                    return
-                }
-
-                operation.cancelled()
-
-                let didCancelRunningOperation = lock.withLock {
-                    guard let storage else {
-                        return false
+                        return operation === storage.runningOperation
                     }
 
-                    return operation === storage.runningOperation
-                }
+                    guard didCancelRunningOperation else {
+                        return
+                    }
 
-                guard didCancelRunningOperation else {
-                    return
+                    self.unlock()
                 }
-
-                self.unlock()
-            }
-        }
+            },
+            isolation: isolation
+        )
     }
 }
