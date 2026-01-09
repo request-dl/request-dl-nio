@@ -62,7 +62,7 @@ public final class AsyncSignal: Sendable {
         #if swift(>=6.2.3)
         weak let storage = _storage
         #else
-        weak var storage = storage
+        weak var storage = _storage
         #endif
 
         await withTaskCancellationHandler {
