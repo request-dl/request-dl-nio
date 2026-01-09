@@ -110,11 +110,9 @@ public final class AsyncLock: Sendable {
                 operation.cancelled()
 
                 let didCancelRunningOperation = lock.withLock {
-                    #if swift(>=6.2)
                     guard let storage else {
                         return false
                     }
-                    #endif
 
                     return operation === storage.runningOperation
                 }
