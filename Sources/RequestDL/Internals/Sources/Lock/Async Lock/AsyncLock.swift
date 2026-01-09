@@ -98,6 +98,13 @@ public final class AsyncLock: Sendable {
                 runningOperation?.resume()
             }
         } onCancel: { [weak self] in
+            #if swift(<6.2)
+            guard let storage else {
+                operation.cancelled()
+                return
+            }
+            #endif
+
             Task.detached {
                 guard let self else {
                     return
@@ -106,9 +113,11 @@ public final class AsyncLock: Sendable {
                 operation.cancelled()
 
                 let didCancelRunningOperation = lock.withLock {
+                    #if swift(>=6.2)
                     guard let storage else {
                         return false
                     }
+                    #endif
 
                     return operation === storage.runningOperation
                 }
