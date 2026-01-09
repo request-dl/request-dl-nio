@@ -4,77 +4,92 @@ public final class AsyncSignal: Sendable {
 
     private final class Storage: @unchecked Sendable {
 
-        let lock = Lock()
-
-        var _isLocked = false
-        var _pendingOperations = [AsyncOperation]()
+        var isLocked = false
+        var pendingOperations = [AsyncOperation]()
 
         init(isLocked: Bool) {
-            _isLocked = isLocked
+            self.isLocked = isLocked
         }
 
         deinit {
-            while let operation = _pendingOperations.popLast() {
+            while let operation = pendingOperations.popLast() {
                 operation.resume()
             }
         }
     }
 
+    // MARK: - Private properties
+
+    private let locker = Lock()
+
     // MARK: - Unsafe properties
 
-    private let storage: Storage
+    private let _storage: Storage
 
     // MARK: - Inits
 
     public init(_ signal: Bool = false) {
-        storage = .init(isLocked: !signal)
+        _storage = .init(isLocked: !signal)
     }
 
     // MARK: - Public properties
 
     public func signal() {
-        storage.lock.withLock {
-            storage._isLocked = false
+        var operations = locker.withLock {
+            _storage.isLocked = false
 
-            while let operation = storage._pendingOperations.popLast() {
-                operation.resume()
-            }
+            let operations = _storage.pendingOperations
+            _storage.pendingOperations = []
+            return operations
+        }
+
+        while let operation = operations.popLast() {
+            operation.resume()
         }
     }
 
     public func lock() {
-        storage.lock.withLock {
-            storage._isLocked = true
+        locker.withLock {
+            _storage.isLocked = true
         }
     }
 
-    public func wait() async {
+    public func wait(isolation: isolated (any Actor)? = #isolation) async {
         let operation = AsyncOperation()
 
-        let lock = storage.lock
-        weak var storage = storage
+        let lock = locker
 
-        await withTaskCancellationHandler {
-            await withUnsafeContinuation {
-                operation.schedule($0)
+        #if swift(>=6.2.3)
+        weak let storage = _storage
+        #else
+        weak var storage = _storage
+        #endif
 
-                lock.withLock {
-                    guard storage?._isLocked ?? false else {
-                        operation.resume()
-                        return
+        await withTaskCancellationHandler(
+            operation: {
+                await withUnsafeContinuation(isolation: isolation) {
+                    operation.schedule($0)
+
+                    let operation = lock.withLock { () -> AsyncOperation? in
+                        guard let storage, storage.isLocked else {
+                            return operation
+                        }
+
+                        storage.pendingOperations.insert(operation, at: .zero)
+                        return nil
                     }
 
-                    guard storage?._pendingOperations.insert(operation, at: .zero) == nil else {
-                        return
-                    }
-
-                    operation.resume()
+                    operation?.resume()
                 }
-            }
-        } onCancel: {
-            lock.withLock {
-                operation.cancelled()
-            }
-        }
+            },
+            onCancel: {
+                Task.detached {
+                    lock.withLock {
+                        operation.cancelled()
+                    }
+                }
+            },
+            isolation: isolation
+        )
     }
 }
