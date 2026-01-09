@@ -2,24 +2,34 @@ import Foundation
 
 final class AsyncOperation: @unchecked Sendable {
 
-    private enum State {
-        case idle
-        case scheduled(UnsafeContinuation<Void, Never>)
+    enum State: Hashable {
+        case waiting
+        case finished
         case cancelled
     }
 
-    var isScheduled: Bool {
+    private enum _State {
+        case idle
+        case scheduled(UnsafeContinuation<Void, Never>)
+        case finished
+        case cancelled
+    }
+
+    var state: State {
         lock.withLock {
-            if case .scheduled = _state {
-                return true
-            } else {
-                return false
+            switch _state {
+            case .idle, .scheduled:
+                return .waiting
+            case .finished:
+                return .finished
+            case .cancelled:
+                return .cancelled
             }
         }
     }
 
     private let lock = Lock()
-    private var _state: State = .idle
+    private var _state: _State = .idle
 
     init() {}
 
@@ -32,12 +42,16 @@ final class AsyncOperation: @unchecked Sendable {
     }
 
     func resume() {
-        lock.withLock {
-            if case .scheduled(let continuation) = _state {
-                _state = .idle
-                continuation.resume()
+        let continuation = lock.withLock { () -> UnsafeContinuation<Void, Never>? in
+            guard case .scheduled(let continuation) = _state else {
+                return nil
             }
+
+            _state = .finished
+            return continuation
         }
+
+        continuation?.resume()
     }
 
     func cancelled() {

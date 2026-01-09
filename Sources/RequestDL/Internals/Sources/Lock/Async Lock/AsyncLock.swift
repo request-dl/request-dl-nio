@@ -4,7 +4,7 @@ public final class AsyncLock: Sendable {
 
     private final class Storage: @unchecked Sendable {
 
-        var isLocked = false
+        var runningOperation: AsyncOperation?
         var pendingOperations = [AsyncOperation]()
 
         deinit {
@@ -43,56 +43,81 @@ public final class AsyncLock: Sendable {
     }
 
     public func unlock() {
-        lock.withLock {
-            guard _storage.isLocked else {
-                return
-            }
+        let runningOperation = lock.withLock { () -> AsyncOperation? in
+            guard
+                let  runningOperation = _storage.runningOperation,
+                [.cancelled, .finished].contains(runningOperation.state)
+            else { return nil }
 
-            var scheduledOperation: AsyncOperation?
+            var pendingOperation: AsyncOperation?
 
             while let operation = _storage.pendingOperations.popLast() {
-                if !operation.isScheduled {
+                if operation.state != .waiting {
                     continue
                 }
 
-                scheduledOperation = operation
+                pendingOperation = operation
                 break
             }
 
-            _storage.isLocked = !_storage.pendingOperations.isEmpty
-
-            scheduledOperation?.resume()
+            _storage.runningOperation = pendingOperation
+            return pendingOperation
         }
+
+        runningOperation?.resume()
     }
 
     public func lock() async {
         let operation = AsyncOperation()
 
         let lock = lock
+        #if swift(>=6.2)
+        weak let storage = _storage
+        #else
         weak var storage = _storage
+        #endif
 
         await withTaskCancellationHandler {
             await withUnsafeContinuation {
                 operation.schedule($0)
 
-                lock.withLock {
+                let runningOperation = lock.withLock { () -> AsyncOperation? in
                     guard let storage else {
-                        operation.resume()
-                        return
+                        return operation
                     }
 
-                    guard storage.isLocked else {
-                        storage.isLocked = true
-                        operation.resume()
-                        return
+                    guard storage.runningOperation != nil else {
+                        storage.runningOperation = operation
+                        return operation
                     }
 
                     storage.pendingOperations.insert(operation, at: .zero)
+                    return nil
                 }
+
+                runningOperation?.resume()
             }
-        } onCancel: {
-            lock.withLock {
+        } onCancel: { [weak self] in
+            Task.detached {
+                guard let self else {
+                    return
+                }
+
                 operation.cancelled()
+
+                let didCancelRunningOperation = lock.withLock {
+                    guard let storage else {
+                        return false
+                    }
+
+                    return operation === storage.runningOperation
+                }
+
+                guard didCancelRunningOperation else {
+                    return
+                }
+
+                self.unlock()
             }
         }
     }
