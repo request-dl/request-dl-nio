@@ -99,10 +99,7 @@ public final class AsyncLock: Sendable {
             }
         } onCancel: { [weak self] in
             #if swift(<6.2)
-            guard let storage else {
-                operation.cancelled()
-                return
-            }
+            let storage = self?._storage
             #endif
 
             Task.detached {
