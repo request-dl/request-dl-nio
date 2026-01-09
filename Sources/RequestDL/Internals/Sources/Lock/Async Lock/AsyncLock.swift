@@ -71,7 +71,7 @@ public final class AsyncLock: Sendable {
         let operation = AsyncOperation()
 
         let lock = lock
-        #if swift(>=6.2)
+        #if swift(>=6.2.3)
         weak let storage = _storage
         #else
         weak var storage = _storage
@@ -98,7 +98,7 @@ public final class AsyncLock: Sendable {
                 runningOperation?.resume()
             }
         } onCancel: { [weak self] in
-            #if swift(<6.2)
+            #if swift(<6.2.3)
             let storage = self?._storage
             #endif
 

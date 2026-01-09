@@ -59,7 +59,7 @@ public final class AsyncSignal: Sendable {
 
         let lock = locker
 
-        #if swift(>=6.2)
+        #if swift(>=6.2.3)
         weak let storage = _storage
         #else
         weak var storage = storage
