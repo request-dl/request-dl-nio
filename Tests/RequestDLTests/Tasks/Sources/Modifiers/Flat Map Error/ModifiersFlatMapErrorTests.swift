@@ -15,19 +15,19 @@ struct ModifiersFlatMapErrorTests {
     @Test
     func flatMap() async throws {
         // Given
-        let flatMapCalled = SendableBox(false)
+        let flatMapCalled = InlineProperty(wrappedValue: false)
 
         // When
         _ = try await MockedTask {
             BaseURL("localhost")
         }
         .flatMapError { _ in
-            flatMapCalled(true)
+            flatMapCalled.wrappedValue = true
         }
         .result()
 
         // Then
-        #expect(!flatMapCalled())
+        #expect(!flatMapCalled.wrappedValue)
     }
 
     @Test
@@ -50,7 +50,7 @@ struct ModifiersFlatMapErrorTests {
         // Given
         let error = FlatMapError()
         let transformedError = TransformedError()
-        let mapError = SendableBox(false)
+        let mapError = InlineProperty(wrappedValue: false)
 
         // When
         do {
@@ -59,7 +59,7 @@ struct ModifiersFlatMapErrorTests {
             }
             .flatMap { _ in throw error }
             .flatMapError(FlatMapError.self) { _ in
-                mapError(true)
+                mapError.wrappedValue = true
                 throw transformedError
             }
             .result()
@@ -68,6 +68,6 @@ struct ModifiersFlatMapErrorTests {
         }
 
         // Then
-        #expect(mapError())
+        #expect(mapError.wrappedValue)
     }
 }

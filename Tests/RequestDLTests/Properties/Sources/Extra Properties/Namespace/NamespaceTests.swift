@@ -28,17 +28,17 @@ struct NamespaceTests {
     @Test
     func namespace_whenNotSet() async throws {
         // Given
-        let namespaceID = SendableBox<PropertyNamespace.ID?>(nil)
+        let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
         _ = try await resolve(TestProperty {
             NamespaceSpy {
-                namespaceID($0)
+                namespaceID.wrappedValue = $0
             }
         })
 
         // Then
-        #expect(namespaceID() == .global)
+        #expect(namespaceID.wrappedValue == .global)
     }
 }
 
@@ -63,20 +63,20 @@ extension NamespaceTests {
     @Test
     func namespace_whenSet() async throws {
         // Given
-        let namespaceID = SendableBox<PropertyNamespace.ID?>(nil)
+        let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
         let resolved = try await resolve(TestProperty {
             SingleNamespace {
                 NamespaceSpy {
-                    namespaceID($0)
+                    namespaceID.wrappedValue = $0
                 }
             }
         })
 
         // Then
         #expect(resolved.request.url == "https://www.apple.com/v1")
-        #expect(namespaceID() == PropertyNamespace.ID(
+        #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
             base: SingleNamespace<NamespaceSpy>.self,
             namespace: "_v1"
         ))
@@ -105,13 +105,13 @@ extension NamespaceTests {
     @Test
     func namespace_whenSetWithMultiple() async throws {
         // Given
-        let namespaceID = SendableBox<PropertyNamespace.ID?>(nil)
+        let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
         let resolved = try await resolve(TestProperty {
             MultipleNamespace {
                 NamespaceSpy {
-                    namespaceID($0)
+                    namespaceID.wrappedValue = $0
                 }
             }
         })
@@ -121,7 +121,7 @@ extension NamespaceTests {
             resolved.request.url == "https://www.apple.com/multiple/namespace"
         )
 
-        #expect(namespaceID() == PropertyNamespace.ID(
+        #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
             base: MultipleNamespace<NamespaceSpy>.self,
             namespace: "_multiple._namespace"
         ))
@@ -146,13 +146,13 @@ extension NamespaceTests {
     @Test
     func namespace_whenModifier() async throws {
         // Given
-        let namespaceID = SendableBox<PropertyNamespace.ID?>(nil)
+        let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
         let resolved = try await resolve(TestProperty {
             Path("v1")
                 .modifier(NamespaceModifier {
-                    namespaceID($0)
+                    namespaceID.wrappedValue = $0
                 })
         })
 
@@ -161,7 +161,7 @@ extension NamespaceTests {
             resolved.request.url == "https://www.apple.com/v1/namespace"
         )
 
-        #expect(namespaceID() == PropertyNamespace.ID(
+        #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
             base: NamespaceModifier.self,
             namespace: "_namespace"
         ))

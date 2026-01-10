@@ -11,18 +11,18 @@ struct InterceptorsDetachTests {
     @Test
     func detach() async throws {
         // Given
-        let taskDetached = SendableBox(false)
+        let taskDetached = InlineProperty(wrappedValue: false)
 
         // When
         _ = try await MockedTask {
             BaseURL("localhost")
         }
         .detach { _ in
-            taskDetached(true)
+            taskDetached.wrappedValue = true
         }
         .result()
 
         // Then
-        #expect(taskDetached())
+        #expect(taskDetached.wrappedValue)
     }
 }

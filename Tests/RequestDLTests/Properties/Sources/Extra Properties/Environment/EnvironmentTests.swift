@@ -28,10 +28,10 @@ struct EnvironmentTests {
         // Given
         let expectation = AsyncSignal()
 
-        let value = SendableBox<Int?>(nil)
+        let value = InlineProperty<Int?>(wrappedValue: nil)
 
         let receiver = IntegerReceiver {
-            value($0)
+            value.wrappedValue = $0
             expectation.signal()
         }
 
@@ -43,7 +43,7 @@ struct EnvironmentTests {
         await expectation.wait()
 
         // Then
-        #expect(value() == IntegerEnvironmentKey.defaultValue)
+        #expect(value.wrappedValue == IntegerEnvironmentKey.defaultValue)
     }
 
     @Test
@@ -51,10 +51,10 @@ struct EnvironmentTests {
         // Given
         let expectation = AsyncSignal()
 
-        let receivedValue = SendableBox<Int?>(nil)
+        let receivedValue = InlineProperty<Int?>(wrappedValue: nil)
 
         let receiver = IntegerReceiver {
-            receivedValue($0)
+            receivedValue.wrappedValue = $0
             expectation.signal()
         }
 
@@ -69,7 +69,7 @@ struct EnvironmentTests {
         await expectation.wait()
 
         // Then
-        #expect(receivedValue() == value)
+        #expect(receivedValue.wrappedValue == value)
     }
 }
 

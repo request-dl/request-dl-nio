@@ -21,18 +21,18 @@ struct ModifiedRequestTaskTests {
     @Test
     func modified() async throws {
         // Given
-        let taskModified = SendableBox(false)
+        let taskModified = InlineProperty(wrappedValue: false)
 
         // When
         _ = try await MockedTask {
             BaseURL("localhost")
         }
         .modifier(Modified {
-            taskModified(true)
+            taskModified.wrappedValue = true
         })
         .result()
 
         // Then
-        #expect(taskModified())
+        #expect(taskModified.wrappedValue)
     }
 }
