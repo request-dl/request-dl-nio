@@ -13,13 +13,11 @@ struct InterceptorsLogInConsoleTests {
     func consoleTaskResult() async throws {
         // Given
         let data = Data("Hello World!".utf8)
-        let records = SendableBox([TestLogHandler.LogRecord]())
+        let records = InlineProperty(wrappedValue: [TestLogHandler.LogRecord]())
         let expectation = AsyncSignal()
 
         let result = try await Logger.withTesting {
-            records(
-                records() + [$0]
-            )
+            records.wrappedValue += [$0]
             expectation.signal()
         } perform: {
             // When
@@ -37,7 +35,7 @@ struct InterceptorsLogInConsoleTests {
         }
 
         // Then
-        #expect(records().last?.description.contains(
+        #expect(records.wrappedValue.last?.description.contains(
             """
             Head: \(result.head)
             
@@ -51,13 +49,11 @@ struct InterceptorsLogInConsoleTests {
     func consoleData() async throws {
         // Given
         let data = Data("Hello World!".utf8)
-        let records = SendableBox([TestLogHandler.LogRecord]())
+        let records = InlineProperty(wrappedValue: [TestLogHandler.LogRecord]())
         let expectation = AsyncSignal()
 
         _ = try await Logger.withTesting {
-            records(
-                records() + [$0]
-            )
+            records.wrappedValue += [$0]
             expectation.signal()
         } perform: {
             // When
@@ -76,7 +72,7 @@ struct InterceptorsLogInConsoleTests {
         }
 
         // Then
-        #expect(records().last?.description.contains(
+        #expect(records.wrappedValue.last?.description.contains(
             """
             \(String(data: data, encoding: .utf8) ?? "")
             """
@@ -87,13 +83,11 @@ struct InterceptorsLogInConsoleTests {
     func consoleDecoded() async throws {
         // Given
         let value = "Hello World!"
-        let records = SendableBox([TestLogHandler.LogRecord]())
+        let records = InlineProperty(wrappedValue: [TestLogHandler.LogRecord]())
         let expectation = AsyncSignal()
 
         _ = try await Logger.withTesting {
-            records(
-                records() + [$0]
-            )
+            records.wrappedValue += [$0]
             expectation.signal()
         } perform: {
             // When
@@ -115,7 +109,7 @@ struct InterceptorsLogInConsoleTests {
         }
 
         // Then
-        #expect(records().last?.description.contains(
+        #expect(records.wrappedValue.last?.description.contains(
             "\(value)"
         ) ?? false)
     }

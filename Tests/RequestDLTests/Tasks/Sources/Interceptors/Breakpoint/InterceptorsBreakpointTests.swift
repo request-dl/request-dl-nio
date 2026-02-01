@@ -12,10 +12,10 @@ struct InterceptorsBreakpointTests {
     @Test
     func breakpoint() async throws {
         // Given
-        let breakpointActivated = SendableBox(false)
+        let breakpointActivated = InlineProperty(wrappedValue: false)
 
         try await Internals.Override.Raise.replace {
-            breakpointActivated($0 == SIGTRAP)
+            breakpointActivated.wrappedValue = $0 == SIGTRAP
             return $0
         } perform: {
             // When
@@ -26,7 +26,7 @@ struct InterceptorsBreakpointTests {
             .result()
 
             // Then
-            #expect(breakpointActivated())
+            #expect(breakpointActivated.wrappedValue)
         }
     }
 }

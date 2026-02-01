@@ -21,20 +21,20 @@ struct InterceptedRequestTaskTests {
     func interceptor() async throws {
         // Given
         let expectation = AsyncSignal()
-        let taskIntercepted = SendableBox(false)
+        let taskIntercepted = InlineProperty(wrappedValue: false)
 
         // When
         _ = try await MockedTask {
             BaseURL("localhost")
         }
         .interceptor(Intercepted {
-            taskIntercepted(true)
+            taskIntercepted.wrappedValue = true
             expectation.signal()
         })
         .result()
 
         // Then
         await expectation.wait()
-        #expect(taskIntercepted())
+        #expect(taskIntercepted.wrappedValue)
     }
 }

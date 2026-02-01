@@ -28,12 +28,12 @@ struct ModifiersLoggerTests {
     func logger_whenNotSet() async throws {
         // Given
         let expectation = AsyncSignal()
-        let logger = SendableBox<Logger?>(nil)
+        let logger = InlineProperty<Logger?>(wrappedValue: nil)
 
         // When
         _ = try await MockedTask(content: {
             LogCaptureProperty {
-                logger($0)
+                logger.wrappedValue = $0
                 expectation.signal()
             }
         })
@@ -42,20 +42,20 @@ struct ModifiersLoggerTests {
         // Then
         await expectation.wait()
 
-        #expect(logger()?.label == nil)
+        #expect(logger.wrappedValue?.label == nil)
     }
 
     @Test
     func logger_whenSet() async throws {
         // Given
         let expectation = AsyncSignal()
-        let logger = SendableBox<Logger?>(nil)
+        let logger = InlineProperty<Logger?>(wrappedValue: nil)
         let customLogger = Logger(label: "custom")
 
         // When
         _ = try await MockedTask(content: {
             LogCaptureProperty {
-                logger($0)
+                logger.wrappedValue = $0
                 expectation.signal()
             }
         })
@@ -65,6 +65,6 @@ struct ModifiersLoggerTests {
         // Then
         await expectation.wait()
 
-        #expect(logger()?.label == customLogger.label)
+        #expect(logger.wrappedValue?.label == customLogger.label)
     }
 }

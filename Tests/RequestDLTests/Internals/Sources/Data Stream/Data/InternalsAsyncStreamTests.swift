@@ -13,7 +13,7 @@ struct InternalsDataStreamTests {
         // Given
         let stream = Internals.AsyncStream<Int>()
 
-        let values = SendableBox([Result<Int, Error>]())
+        let values = InlineProperty(wrappedValue: [Result<Int, Error>]())
         let expectation = AsyncSignal()
 
         // When
@@ -28,7 +28,7 @@ struct InternalsDataStreamTests {
         // Then
         await expectation.wait()
 
-        #expect(values().isEmpty)
+        #expect(values.wrappedValue.isEmpty)
     }
 
     @Test
@@ -36,7 +36,7 @@ struct InternalsDataStreamTests {
         // Given
         let stream = Internals.AsyncStream<Int>()
 
-        let values = SendableBox<[Result<Int, Error>]>([])
+        let values = InlineProperty(wrappedValue: [Result<Int, Error>]())
         let expectation = AsyncSignal()
 
         // When
@@ -60,7 +60,7 @@ struct InternalsDataStreamTests {
         await expectation.wait()
 
         #expect(
-            try values().compactMap { try $0.get() } == Array(0...5)
+            try values.wrappedValue.compactMap { try $0.get() } == Array(0...5)
         )
     }
 
@@ -69,7 +69,7 @@ struct InternalsDataStreamTests {
         // Given
         let stream = Internals.AsyncStream<Int>()
 
-        let values = SendableBox<[Result<Int, Error>]>([])
+        let values = InlineProperty(wrappedValue: [Result<Int, Error>]())
         let expectation = AsyncSignal()
 
         // When
@@ -87,7 +87,7 @@ struct InternalsDataStreamTests {
         // Then
         await expectation.wait()
 
-        let _values = values()
+        let _values = values.wrappedValue
 
         #expect(_values.count == 2)
         #expect(try _values[0].get() == 0)
@@ -101,7 +101,7 @@ struct InternalsDataStreamTests {
         // Given
         let stream = Internals.AsyncStream<Int>()
 
-        let values = SendableBox<[Result<Int, Error>]>([])
+        let values = InlineProperty(wrappedValue: [Result<Int, Error>]())
         let expectation = AsyncSignal()
 
         // When
@@ -120,7 +120,7 @@ struct InternalsDataStreamTests {
         // Then
         await expectation.wait()
 
-        let _values = values()
+        let _values = values.wrappedValue
 
         #expect(_values.count == 2)
         #expect(try _values[0].get() == 0)
@@ -201,7 +201,7 @@ struct InternalsDataStreamTests {
         let range = 0 ..< 100
 
         let values = range.map { _ in
-            SendableBox([Result<Int, Error>]())
+            InlineProperty(wrappedValue: [Result<Int, Error>]())
         }
 
         let expectations = range.map { _ in
@@ -236,7 +236,7 @@ struct InternalsDataStreamTests {
         }
 
         for value in values {
-            #expect(value().count == 10)
+            #expect(value.wrappedValue.count == 10)
         }
     }
 }
@@ -244,21 +244,21 @@ struct InternalsDataStreamTests {
 extension InternalsDataStreamTests {
 
     func listenToValues(
-        values: SendableBox<[Result<Int, Error>]>,
+        values: InlineProperty<[Result<Int, Error>]>,
         expectation: AsyncSignal,
         stream: Internals.AsyncStream<Int>
     ) {
         _Concurrency.Task {
             do {
                 for try await value in stream {
-                    var _values = values()
+                    var _values = values.wrappedValue
                     _values.append(.success(value))
-                    values(_values)
+                    values.wrappedValue = _values
                 }
             } catch {
-                var _values = values()
+                var _values = values.wrappedValue
                 _values.append(.failure(error))
-                values(_values)
+                values.wrappedValue = _values
             }
 
             expectation.signal()

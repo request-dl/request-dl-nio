@@ -1,5 +1,7 @@
 import Foundation
 
+/// A synchronization primitive that provides mutual exclusion for asynchronous operations.
+/// It allows only one task to access a critical section at a time.
 public final class AsyncLock: Sendable {
 
     private final class Storage: @unchecked Sendable {
@@ -24,10 +26,14 @@ public final class AsyncLock: Sendable {
 
     // MARK: - Inits
 
+    /// Creates a new AsyncLock instance.
     public init() {}
 
     // MARK: - Public properties
 
+    /// Executes the provided closure while maintaining the lock.
+    /// - Parameter block: The closure to execute while holding the lock.
+    /// - Returns: The result of the closure.
     public func withLock<Value: Sendable>(isolation: isolated (any Actor)? = #isolation, _ block: @Sendable () async throws -> Value) async rethrows -> Value {
         await lock(isolation: isolation)
         defer { unlock() }
@@ -35,6 +41,8 @@ public final class AsyncLock: Sendable {
         return try await block()
     }
 
+    /// Executes the provided closure while maintaining the lock, without returning a value.
+    /// - Parameter block: The closure to execute while holding the lock.
     public func withLockVoid(isolation: isolated (any Actor)? = #isolation, _ block: @Sendable () async throws -> Void) async rethrows {
         await lock(isolation: isolation)
         defer { unlock() }
@@ -42,6 +50,7 @@ public final class AsyncLock: Sendable {
         try await block()
     }
 
+    /// Unlocks the lock and allows the next waiting operation to proceed.
     public func unlock() {
         let runningOperation = lock.withLock { () -> AsyncOperation? in
             guard
@@ -67,6 +76,8 @@ public final class AsyncLock: Sendable {
         runningOperation?.resume()
     }
 
+    /// Acquires the lock. If the lock is already held by another task, this method will suspend
+    /// until the lock becomes available.
     public func lock(isolation: isolated (any Actor)? = #isolation) async {
         let operation = AsyncOperation()
 

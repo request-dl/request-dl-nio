@@ -15,20 +15,20 @@ struct ModifiersFlatMapTests {
     @Test
     func flatMap() async throws {
         // Given
-        let flatMapCalled = SendableBox(false)
+        let flatMapCalled = InlineProperty(wrappedValue: false)
 
         // When
         let result = try await MockedTask {
             BaseURL("localhost")
         }
         .flatMap { _ in
-            flatMapCalled(true)
+            flatMapCalled.wrappedValue = true
             return true
         }
         .result()
 
         // Then
-        #expect(flatMapCalled())
+        #expect(flatMapCalled.wrappedValue)
         #expect(result)
     }
 
