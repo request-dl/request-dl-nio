@@ -19,16 +19,16 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/swift-server/async-http-client",
-            from: "1.30.2"
+            url: "https://github.com/o-nnerb/async-http-client",
+            branch: "main"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.92.1"
+            from: "2.94.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.31.2"
+            from: "1.32.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
@@ -40,7 +40,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.8.0"
+            from: "1.9.1"
         )
     ],
     targets: [

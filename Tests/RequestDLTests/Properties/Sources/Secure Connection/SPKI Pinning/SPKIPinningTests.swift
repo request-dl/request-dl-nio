@@ -10,7 +10,7 @@ struct SPKIPinningTests {
     @Test
     func pinning() async throws {
         _ = try await DataTask {
-            BaseURL(.https, host: "www.apple.com")
+            BaseURL(.https, host: "www.google.com")
             SecureConnection {
                 SPKIPinning {
                     SPKIPrimaryPins {
