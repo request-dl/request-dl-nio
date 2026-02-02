@@ -30,7 +30,7 @@ struct ModifiersCollectBytesTests {
             Path(uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }

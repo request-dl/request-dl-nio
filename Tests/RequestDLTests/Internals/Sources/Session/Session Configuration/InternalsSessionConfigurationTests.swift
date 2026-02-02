@@ -22,7 +22,11 @@ struct InternalsSessionConfigurationTests {
         let builtConfiguration = try configuration.build()
 
         // Then
-        #expect(try builtConfiguration.tlsConfiguration?.bestEffortEquals(secureConnection.build()) ?? false)
+        #expect(
+            try builtConfiguration.tlsConfiguration?.bestEffortEquals(
+                secureConnection.build().tlsConfiguration
+            ) ?? false
+        )
     }
 
     @Test

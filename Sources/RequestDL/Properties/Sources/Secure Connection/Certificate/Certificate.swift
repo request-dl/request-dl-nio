@@ -11,7 +11,7 @@ import Logging
  It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
  with the server. There are several options to utilize the ``RequestDL/Certificate``.
 
- You can use it to configure the ``RequestDL/Trusts`` or ``RequestDL/AdditionalTrusts`` to
+ You can use it to configure the ``RequestDL/TrustRoots`` or ``RequestDL/AdditionalTrustRoots`` to
  validate if the server is trustworthy.
 
  Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication

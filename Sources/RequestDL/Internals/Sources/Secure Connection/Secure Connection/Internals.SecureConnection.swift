@@ -19,6 +19,7 @@ extension Internals {
                 && privateKey == nil
                 && keyLogger == nil
                 && cipherSuites == nil
+                && tlsPinning == nil
             #else
             return false
             #endif
@@ -29,6 +30,7 @@ extension Internals {
         var useDefaultTrustRoots: Bool = false
         var trustRoots: TrustRoots?
         var additionalTrustRoots: [AdditionalTrustRoots]?
+        var tlsPinning: SPKIPinningConfiguration?
         var privateKey: PrivateKeySource?
         var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
@@ -50,7 +52,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func build() throws -> NIOSSL.TLSConfiguration {
+        func build() throws -> Output {
             var tlsConfiguration = try makeTLSConfigurationByContext()
 
             if let minimumTLSVersion {
@@ -125,7 +127,10 @@ extension Internals {
                 }
             }
 
-            return tlsConfiguration
+            return .init(
+                tlsConfiguration: tlsConfiguration,
+                tlsPinning: tlsPinning
+            )
         }
 
         // MARK: - Private methods
@@ -173,5 +178,13 @@ extension Internals.SecureConnection: Equatable {
         && lhs.minimumTLSVersion == rhs.minimumTLSVersion
         && lhs.maximumTLSVersion == rhs.maximumTLSVersion
         && lhs.cipherSuiteValues == rhs.cipherSuiteValues
+    }
+}
+
+extension Internals.SecureConnection {
+
+    struct Output: Sendable {
+        let tlsConfiguration: TLSConfiguration
+        let tlsPinning: SPKIPinningConfiguration?
     }
 }

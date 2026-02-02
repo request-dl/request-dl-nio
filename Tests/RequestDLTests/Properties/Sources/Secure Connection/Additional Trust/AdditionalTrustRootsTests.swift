@@ -6,10 +6,10 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-struct TrustsTests {
+struct AdditionalTrustRootsTests {
 
     @Test
-    func trusts_whenCertificates_shouldBeValid() async throws {
+    func additional_whenCertificates_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -19,7 +19,7 @@ struct TrustsTests {
         // When
         let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Trusts {
+                RequestDL.AdditionalTrustRoots {
                     RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
                     RequestDL.Certificate(serverCertificate)
                 }
@@ -27,17 +27,17 @@ struct TrustsTests {
         })
 
         // Then
-        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots == .certificates([
-                .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                .init(serverCertificate, format: .pem)
+            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init([.certificates([
+                    .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+                    .init(serverCertificate, format: .pem)
+                ])
             ])
         )
     }
 
     @Test
-    func trusts_whenFile_shouldBeValid() async throws {
+    func additional_whenFile_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -58,21 +58,20 @@ struct TrustsTests {
         // When
         let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Trusts(fileURL.absolutePath(percentEncoded: false))
+                RequestDL.AdditionalTrustRoots(fileURL.absolutePath(percentEncoded: false))
             }
         })
 
         // Then
-        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots == .file(
-                fileURL.absolutePath(percentEncoded: false)
+            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init(
+                [.file(fileURL.absolutePath(percentEncoded: false))]
             )
         )
     }
 
     @Test
-    func trusts_whenBytes_shouldBeValid() async throws {
+    func additional_whenBytes_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -86,21 +85,22 @@ struct TrustsTests {
         // When
         let resolved = try await resolve(TestProperty {
             RequestDL.SecureConnection {
-                RequestDL.Trusts(bytes)
+                RequestDL.AdditionalTrustRoots(bytes)
             }
         })
 
         // Then
-        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots == .bytes(bytes)
+            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init(
+                [.bytes(bytes)]
+            )
         )
     }
 
     @Test
     func trusts_whenAccessBody_shouldBeNever() async throws {
         // Given
-        let sut = RequestDL.Trusts {
+        let sut = RequestDL.AdditionalTrustRoots {
             RequestDL.Certificate([0, 1, 2])
         }
 

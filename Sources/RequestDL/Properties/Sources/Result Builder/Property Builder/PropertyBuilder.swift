@@ -70,7 +70,7 @@ public struct PropertyBuilder: Sendable {
     }
 
     /// A helper method for the `PropertyBuilder` to include optional content in the result builder.
-    public static func buildIf<Content: Property>(_ content: Content?) -> _OptionalContent<Content> {
+    public static func buildOptional<Content: Property>(_ content: Content?) -> _OptionalContent<Content> {
         _OptionalContent(content)
     }
 

@@ -33,7 +33,7 @@ struct UploadTaskTests {
             Path(uri)
 
             SecureConnection {
-                Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
 
             Payload(data: upload)

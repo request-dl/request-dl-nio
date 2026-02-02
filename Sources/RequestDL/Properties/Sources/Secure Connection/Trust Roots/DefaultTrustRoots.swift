@@ -4,14 +4,16 @@
 
 import Foundation
 
-/**
- A structure that represents default trusts.
- */
-public struct DefaultTrusts: Property {
+/// A structure that represents default trusts.
+@available(*, deprecated, renamed: "DefaultTrustRoots")
+public typealias DefaultTrusts = DefaultTrustRoots
+
+/// A structure that represents default trust roots.
+public struct DefaultTrustRoots: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection.trustRoots = nil
             secureConnection.useDefaultTrustRoots = true
         }
@@ -27,7 +29,7 @@ public struct DefaultTrusts: Property {
     // MARK: - Inits
 
     /**
-     Initializes a new instance of the DefaultTrusts structure.
+     Initializes a new instance of the DefaultTrustRoots structure.
      */
     public init() {}
 
@@ -35,7 +37,7 @@ public struct DefaultTrusts: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<DefaultTrusts>,
+        property: _GraphValue<DefaultTrustRoots>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()

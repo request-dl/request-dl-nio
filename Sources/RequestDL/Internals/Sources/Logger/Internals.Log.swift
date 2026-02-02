@@ -59,7 +59,7 @@ extension Internals.Log {
             It seems that you are attempting to create a Certificate \
             property outside of the allowed context.
 
-            Please note that Certificates, Trusts, and AdditionalTrusts \
+            Please note that Certificates, TrustRoots, and AdditionalTrustRoots \
             are the only valid contexts in which you can create a \
             Certificate property.
 

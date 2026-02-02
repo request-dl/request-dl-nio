@@ -29,7 +29,7 @@ struct ModifiersIgnoresProgressTests {
             BaseURL(localServer.baseURL)
             Path(uri)
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -65,7 +65,7 @@ struct ModifiersIgnoresProgressTests {
             BaseURL(localServer.baseURL)
             Path(uri)
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -100,7 +100,7 @@ struct ModifiersIgnoresProgressTests {
             BaseURL(localServer.baseURL)
             Path(uri)
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }

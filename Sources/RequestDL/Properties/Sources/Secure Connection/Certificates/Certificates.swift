@@ -22,7 +22,7 @@ public struct Certificates<Content: Property>: Property {
 
         let source: Source
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             switch source {
             case .file(let file):
                 secureConnection.certificateChain = .file(file)
@@ -31,7 +31,7 @@ public struct Certificates<Content: Property>: Property {
             case .nodes(let nodes):
                 var collector = secureConnection.collector()
                 for node in nodes {
-                    node.passthrough(&collector)
+                    try node.passthrough(&collector)
                 }
                 secureConnection = collector(\.certificateChain)
             }

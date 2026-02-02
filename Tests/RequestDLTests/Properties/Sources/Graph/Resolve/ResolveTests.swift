@@ -72,12 +72,12 @@ struct ResolveTests {
                     Certificate([0, 1, 2])
                 }
 
-                Trusts {
+                TrustRoots {
                     Certificate([6, 7, 8])
                     Certificate([8, 9, 10])
                 }
 
-                AdditionalTrusts {
+                AdditionalTrustRoots {
                     Certificate([2, 3, 4])
                     Certificate([4, 5, 6])
                 }
@@ -248,6 +248,7 @@ extension ResolveTests {
                             useDefaultTrustRoots = false,
                             trustRoots = nil,
                             additionalTrustRoots = nil,
+                            tlsPinning = nil,
                             privateKey = nil,
                             signingSignatureAlgorithms = nil,
                             verifySignatureAlgorithms = nil,

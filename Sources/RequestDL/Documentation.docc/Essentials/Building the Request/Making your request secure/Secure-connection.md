@@ -26,18 +26,18 @@ As supported by SwiftNIO, we have the following definitions:
 
 There are two layers of server validation configuration. The first layer is the base certificates to trust the server we are connecting to. The second layer is additional certificates that are also used for the same purpose.
 
-There are two ways to configure the base certificates: one using ``RequestDL/DefaultTrusts`` and the other using ``RequestDL/Trusts``. The first one uses system certificates, while the second one completely replaces the certificate validation to use only the specified ones.
+There are two ways to configure the base certificates: one using ``RequestDL/DefaultTrustRoots`` and the other using ``RequestDL/TrustRoots``. The first one uses system certificates, while the second one completely replaces the certificate validation to use only the specified ones.
 
-#### DefaultTrusts
+#### DefaultTrustRoots
 
 ```swift
-DefaultTrusts()
+DefaultTrustRoots()
 ```
 
-#### Trusts
+#### TrustRoots
 
 ```swift
-Trusts {
+TrustRoots {
   Certificate(file1, format: .pem)
   Certificate(file2, format: .pem)
 }
@@ -45,7 +45,7 @@ Trusts {
 
 After defining the base certificates, you need to specify additional certificates to be used as alternative server validation. It is optional and can be explored depending on the server's specifications.
 
-> Tip: In an application where security is not a priority, you can combine ``RequestDL/DefaultTrusts`` with ``RequestDL/AdditionalTrusts`` to include both system certificates and the ones you want to trust.
+> Tip: In an application where security is not a priority, you can combine ``RequestDL/DefaultTrustRoots`` with ``RequestDL/AdditionalTrustRoots`` to include both system certificates and the ones you want to trust.
 
 ### Client Authorization
 
@@ -110,7 +110,10 @@ This rule is necessary to avoid the instantiation of new clients provided by `As
 
 ### Configuring the server trust
 
-- ``RequestDL/DefaultTrusts``
+- ``RequestDL/DefaultTrustRoots``
+- ``RequestDL/TrustRoots``
+- ``RequestDL/AdditionalTrustRoots``
+- ``RequestDL/DefaultTrustRoots``
 - ``RequestDL/Trusts``
 - ``RequestDL/AdditionalTrusts``
 

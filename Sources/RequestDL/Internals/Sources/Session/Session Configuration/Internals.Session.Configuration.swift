@@ -30,8 +30,11 @@ extension Internals.Session {
         // MARK: - Internal methods
 
         func build() throws -> HTTPClient.Configuration {
-            var configuration = try HTTPClient.Configuration(
-                tlsConfiguration: secureConnection?.build(),
+            let secureConnectionOutput = try secureConnection?.build()
+
+            var configuration = HTTPClient.Configuration(
+                tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
+                tlsPinning: secureConnectionOutput?.tlsPinning,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
                 connectionPool: connectionPool,

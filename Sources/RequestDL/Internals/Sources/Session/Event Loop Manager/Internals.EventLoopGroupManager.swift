@@ -4,7 +4,6 @@
 
 import Foundation
 import NIOCore
-import AsyncHTTPClient
 
 extension Internals {
 

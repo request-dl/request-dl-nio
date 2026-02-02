@@ -12,7 +12,7 @@ public struct PrivateKey: Property {
 
         let source: Source
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             switch source {
             case .file(let file):
                 secureConnection.privateKey = .file(file)

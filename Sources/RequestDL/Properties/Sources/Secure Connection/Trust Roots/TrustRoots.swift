@@ -5,7 +5,11 @@
 import Foundation
 
 /// Configure the trusted certificates to validate the server using TLS.
-public struct Trusts<Content: Property>: Property {
+@available(*, deprecated, renamed: "TrustRoots")
+public typealias Trusts<Content: Property> = TrustRoots<Content>
+
+/// Configure the trusted roots certificates to validate the server using TLS.
+public struct TrustRoots<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -17,7 +21,7 @@ public struct Trusts<Content: Property>: Property {
 
         let source: Source
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection.useDefaultTrustRoots = false
 
             switch source {
@@ -28,7 +32,7 @@ public struct Trusts<Content: Property>: Property {
             case .nodes(let nodes):
                 var collector = secureConnection.collector()
                 for node in nodes {
-                    node.passthrough(&collector)
+                    try node.passthrough(&collector)
                 }
                 secureConnection = collector(\.trustRoots)
             }
@@ -60,7 +64,7 @@ public struct Trusts<Content: Property>: Property {
      ```swift
      DataTask {
         SecureConnection {
-            Trusts {
+            TrustRoots {
                 Certificate(rootPath, format: .der)
                 Certificate(secondPath, format: .pem)
             }
@@ -111,7 +115,7 @@ public struct Trusts<Content: Property>: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<Trusts<Content>>,
+        property: _GraphValue<TrustRoots<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()

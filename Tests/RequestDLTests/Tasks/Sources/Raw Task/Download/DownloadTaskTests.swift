@@ -32,7 +32,7 @@ struct DownloadTaskTests {
             Path(uri)
 
             SecureConnection {
-                Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
         }
         .collectData()

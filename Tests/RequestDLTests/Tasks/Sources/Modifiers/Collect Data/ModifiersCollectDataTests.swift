@@ -30,7 +30,7 @@ struct ModifiersCollectDataTests {
             Path(uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -66,7 +66,7 @@ struct ModifiersCollectDataTests {
             Path(uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -102,7 +102,7 @@ struct ModifiersCollectDataTests {
             Path(uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }

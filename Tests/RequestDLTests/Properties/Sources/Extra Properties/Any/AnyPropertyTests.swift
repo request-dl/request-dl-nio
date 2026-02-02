@@ -32,7 +32,7 @@ struct AnyPropertyTests {
         // When
         let resolved = try await resolve(TestProperty {
             SecureConnection {
-                AdditionalTrusts {
+                AdditionalTrustRoots {
                     AnyProperty(Certificate(path))
                 }
             }

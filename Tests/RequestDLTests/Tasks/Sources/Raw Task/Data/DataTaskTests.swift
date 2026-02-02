@@ -32,7 +32,7 @@ struct DataTaskTests {
             Path(uri)
 
             SecureConnection {
-                Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
         }
         .extractPayload()
@@ -76,7 +76,7 @@ struct DataTaskTests {
             Path(uri)
 
             SecureConnection {
-                Trusts(server.certificateURL.absolutePath(percentEncoded: false))
+                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
                 RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
                 PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
             }

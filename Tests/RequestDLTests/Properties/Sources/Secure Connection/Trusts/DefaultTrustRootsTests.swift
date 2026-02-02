@@ -6,12 +6,12 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-struct DefaultTrustsTests {
+struct DefaultTrustRootsTests {
 
     @Test
     func trusts_whenDefault_shouldBeDefault() async throws {
         // Given
-        let property = DefaultTrusts()
+        let property = DefaultTrustRoots()
 
         // When
         let resolved = try await resolve(TestProperty {

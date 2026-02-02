@@ -114,7 +114,7 @@ struct ModifiersProgressTests {
             Payload(data: data)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -150,7 +150,7 @@ struct ModifiersProgressTests {
             Path(testState.uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -206,7 +206,7 @@ struct ModifiersProgressTests {
             Path(testState.uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -261,7 +261,7 @@ struct ModifiersProgressTests {
             ReadingMode(length: length)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }

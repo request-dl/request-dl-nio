@@ -65,7 +65,7 @@ struct PropertyModifierTests {
 
 extension PropertyModifierTests {
 
-    struct AdditionalTrustsFaker: PropertyModifier {
+    struct AdditionalTrustRootsFaker: PropertyModifier {
 
         func body(content: Content) -> some Property {
             content
@@ -83,7 +83,7 @@ extension PropertyModifierTests {
         let resolved = try await resolve(TestProperty {
             SecureConnection {
                 Certificate(certificatePath)
-                    .modifier(AdditionalTrustsFaker())
+                    .modifier(AdditionalTrustRootsFaker())
             }
         })
 

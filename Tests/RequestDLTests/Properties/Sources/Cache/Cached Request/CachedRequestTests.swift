@@ -396,7 +396,7 @@ extension CachedRequestTests {
                 .cache(url: testState.dataCache.directoryURL)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(testState.certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
