@@ -140,6 +140,7 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 - ``RequestDL/DefaultTrustRoots``
 - ``RequestDL/TrustRoots``
 - ``RequestDL/AdditionalTrustRoots``
+- ``RequestDL/DefaultTrusts``
 - ``RequestDL/Trusts``
 - ``RequestDL/AdditionalTrusts``
 
