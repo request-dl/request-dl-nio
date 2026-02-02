@@ -5,12 +5,12 @@
 import Foundation
 
 enum SPKIHashAnchor: Sendable, Hashable {
-    case primary
+    case active
     case backup
 }
 
 private struct SPKIHashAnchorEnvironmentKey: RequestEnvironmentKey {
-    static let defaultValue: SPKIHashAnchor = .primary
+    static let defaultValue: SPKIHashAnchor = .active
 }
 
 extension RequestEnvironmentValues {

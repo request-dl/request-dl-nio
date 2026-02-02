@@ -19,7 +19,7 @@ extension Internals {
                 && privateKey == nil
                 && keyLogger == nil
                 && cipherSuites == nil
-                && tlsPinning == nil
+                && tlsPins == nil
             #else
             return false
             #endif
@@ -30,7 +30,8 @@ extension Internals {
         var useDefaultTrustRoots: Bool = false
         var trustRoots: TrustRoots?
         var additionalTrustRoots: [AdditionalTrustRoots]?
-        var tlsPinning: SPKIPinningConfiguration?
+        var tlsPinningPolicy: SPKIPinningPolicy?
+        var tlsPins: [SPKIHash]?
         var privateKey: PrivateKeySource?
         var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
@@ -127,9 +128,9 @@ extension Internals {
                 }
             }
 
-            return .init(
+            return try .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsPinning: tlsPinning
+                tlsPinning: buildTLSPinning()
             )
         }
 
@@ -149,6 +150,22 @@ extension Internals {
             }
 
             return tlsConfiguration
+        }
+
+        private func buildTLSPinning() throws -> SPKIPinningConfiguration? {
+            guard let tlsPins else {
+                return nil
+            }
+
+            let resolved = try tlsPins.reduce(into: [SPKIHashAnchor: [AsyncHTTPClient.SPKIHash]]()) {
+                try $1.resolve(&$0)
+            }
+
+            return .init(
+                activePins: resolved[.active] ?? [],
+                backupPins: resolved[.backup] ?? [],
+                policy: tlsPinningPolicy ?? .strict
+            )
         }
     }
 }
@@ -178,6 +195,8 @@ extension Internals.SecureConnection: Equatable {
         && lhs.minimumTLSVersion == rhs.minimumTLSVersion
         && lhs.maximumTLSVersion == rhs.maximumTLSVersion
         && lhs.cipherSuiteValues == rhs.cipherSuiteValues
+        && lhs.tlsPins == rhs.tlsPins
+        && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
     }
 }
 

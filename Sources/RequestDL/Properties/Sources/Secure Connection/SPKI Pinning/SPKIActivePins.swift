@@ -4,10 +4,10 @@
 
 import Foundation
 
-/// Backup SPKI pins for certificate pinning.
+/// Active SPKI pins for certificate pinning.
 ///
-/// Pre-deployed hashes for upcoming certificate rotations.
-public struct SPKIBackupPins<Content: Property>: Property {
+/// Represents currently deployed certificates in production.
+public struct SPKIActivePins<Content: Property>: Property {
 
     // MARK: - Public properties
 
@@ -20,7 +20,7 @@ public struct SPKIBackupPins<Content: Property>: Property {
 
     private let content: Content
 
-    /// Creates a backup pins declaration block.
+    /// Creates an active pins declaration block.
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
@@ -29,13 +29,13 @@ public struct SPKIBackupPins<Content: Property>: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<SPKIBackupPins>,
+        property: _GraphValue<SPKIActivePins>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
         var inputs = inputs
-        inputs.environment.spkiHashAnchor = .backup
+        inputs.environment.spkiHashAnchor = .active
 
         return try await Content._makeProperty(
             property: property.detach(next: property.content),

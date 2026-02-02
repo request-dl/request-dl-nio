@@ -8,19 +8,62 @@ Having and maintaining a secure connection is extremely critical in any applicat
 
 As supported by SwiftNIO, we have the following definitions:
 
-1. Trust
+1. **Trust**  
+   Validated after receiving the server's certificate to determine whether it is trustworthy.
 
-   It is validated after receiving the server's certificate to determine whether it is trustworthy or not to maintain the connection and proceed with the ongoing request.
+2. **Client Authorization**  
+   A local certificate is sent to the server to establish client trust.
 
-2. Client Authorization
+3. **PSK**  
+   Authentication using a pre-shared symmetric key between client and server.
 
-   A local certificate is sent to the server to establish client trust and retrieve the resulting data from the API process.
+4. **SPKI Pinning**  
+   Cryptographic pinning of the server's public key structure for explicit trust validation.
 
-3. PSK
+> Warning: Any TLS configuration must be performed within ``RequestDL/SecureConnection``. Otherwise, RequestDL will not recognize the declarations.
 
-   An alternative form of authentication where the client and server share a symmetric key to proceed with the current request.
+### SPKI Pinning
 
-> Warning: Any configuration involving TLS should be performed within the ``RequestDL/SecureConnection``. Otherwise, RequestDL will not be able to recognize the declared code.
+SPKI (SubjectPublicKeyInfo) pinning provides defense-in-depth security beyond standard certificate validation. By pinning the cryptographic hash of the server's public key structure, you ensure connections only succeed with certificates containing the exact expected public key — even if a compromised Certificate Authority issues a fraudulent certificate.
+
+#### Key benefits
+- ✅ Survives legitimate certificate rotations (same key, new expiration)
+- ✅ Prevents algorithm downgrade attacks (algorithm identifier is included in SPKI)
+- ✅ Blocks MITM attacks from compromised CAs
+- ✅ Stronger security than full-certificate pinning
+
+#### Configuration essentials
+- **Active pins**: Hashes of currently deployed production certificates
+- **Backup pins**: Pre-deployed hashes for upcoming rotations (*required in production*)
+- **Policy modes**:
+  - `.strict`: Terminate connections on pin mismatch (production)
+  - `.audit`: Allow connections but log warnings (staging/debugging)
+
+#### Example implementation
+```swift
+SecureConnection {
+    SPKIPinning(policy: .strict) {
+        SPKIActivePins {
+            SPKIHash("base64-active-pin-1")
+            SPKIHash("base64-active-pin-2")
+        }
+        SPKIBackupPins {
+            SPKIHash("base64-backup-pin")
+        }
+    }
+}
+```
+
+> Warning: Always deploy non-empty backup pins in production. Omitting backup pins risks catastrophic service disruption during certificate rotation. Deploy backup pins ≥30 days before certificate expiration.
+
+> Important: Generate SPKI hashes from the DER-encoded public key structure (not the full certificate):
+> ```bash
+> openssl s_client -connect example.com:443 -servername example.com 2>/dev/null | \
+>   openssl x509 -pubkey -noout | \
+>   openssl pkey -pubin -outform der | \
+>   openssl dgst -sha256 -binary | \
+>   openssl base64 -A
+> ```
 
 ### Trust
 
@@ -29,13 +72,11 @@ There are two layers of server validation configuration. The first layer is the 
 There are two ways to configure the base certificates: one using ``RequestDL/DefaultTrustRoots`` and the other using ``RequestDL/TrustRoots``. The first one uses system certificates, while the second one completely replaces the certificate validation to use only the specified ones.
 
 #### DefaultTrustRoots
-
 ```swift
 DefaultTrustRoots()
 ```
 
 #### TrustRoots
-
 ```swift
 TrustRoots {
   Certificate(file1, format: .pem)
@@ -45,16 +86,14 @@ TrustRoots {
 
 After defining the base certificates, you need to specify additional certificates to be used as alternative server validation. It is optional and can be explored depending on the server's specifications.
 
-> Tip: In an application where security is not a priority, you can combine ``RequestDL/DefaultTrustRoots`` with ``RequestDL/AdditionalTrustRoots`` to include both system certificates and the ones you want to trust.
+> Tip: In applications where security is not the highest priority, combine ``RequestDL/DefaultTrustRoots`` with ``RequestDL/AdditionalTrustRoots`` to include both system certificates and custom trust anchors.
 
 ### Client Authorization
 
-Authentication of the client is performed by combining two certificates, the public and the private. The implementation is done using ``RequestDL/Certificates`` and ``RequestDL/PrivateKey``.
+Authentication of the client is performed by combining public and private certificates using ``RequestDL/Certificates`` and ``RequestDL/PrivateKey``.
 
 #### Certificates
-
-Represents the public certificates used by the client to authenticate with the server.
-
+Represents public certificates used by the client to authenticate with the server.
 ```swift
 Certificates {
     Certificate(file1, format: .pem)
@@ -63,28 +102,20 @@ Certificates {
 ```
 
 #### PrivateKey
-
-The private certificate is typically used to generate the public certificate.
-
+The private key corresponding to the public certificate.
 ```swift
 PrivateKey(privateFile1)
 ```
-
-> Important: Private certificates protected by a password can be used by adding the **`password:`** parameter during initialization.
+> Important: Password-protected private keys use the `password:` parameter during initialization.
 
 ### PSK
 
-Using shared symmetric keys between the server and the client, PSK is a secure way to communicate with the server.
-
-The configuration is simple and only requires implementing the ``SSLPSKIdentityResolver``. When using it in the ``Property``, you should secure the instance of the implemented resolver using ``StoredObject`` to optimize the code.
-
+Pre-Shared Key (PSK) authentication uses symmetric keys shared between client and server. Configure using ``SSLPSKIdentityResolver``, secured via ``StoredObject`` for efficiency:
 ```swift 
 struct GithubAPI: Property {
-
     @StoredObject var psk = GithubPSKResolver()
 
     var body: some Property {
-        // Other property specifications
         SecureConnection {
             PSKIdentity(psk)
         }
@@ -92,43 +123,41 @@ struct GithubAPI: Property {
 }
 ```
 
-> Warning: You should exclusively choose either Trust/Client Authorization or PSK. Defining both in the same request can result in unexpected behavior.
+> Warning: Exclusively choose either Trust/Client Authorization *or* PSK. Defining both may cause undefined behavior.
 
 ### Optimizations
 
-Despite the fact that ``RequestDL/Property/body-swift.property`` is called constantly for each request made, RequestDL contains some optimizations to avoid the need to reload the file.
+Although ``RequestDL/Property/body-swift.property`` executes per request, RequestDL optimizes certificate loading to avoid redundant file reads.
 
-> Warning: If the certificates are updated at runtime, RequestDL will not automatically switch to the new version. Therefore, when updating the certificate, change the file name to one that has not been used before.
-
-This rule is necessary to avoid the instantiation of new clients provided by `AsyncHTTPClient`. Additionally, if your application remains idle for a certain period of time, RequestDL expires the saved information and then starts using the new certificate, unless measures are taken. 
+> Warning: Runtime certificate updates require changing the filename. RequestDL caches certificates by filename and won't detect content changes. Idle periods may trigger cache expiration, causing fallback to original certificates unless filenames change.
 
 ## Topics
 
-### The basics about certificates
-
+### Certificate fundamentals
 - ``RequestDL/Certificate``
 
-### Configuring the server trust
-
+### Server trust configuration
 - ``RequestDL/DefaultTrustRoots``
 - ``RequestDL/TrustRoots``
 - ``RequestDL/AdditionalTrustRoots``
-- ``RequestDL/DefaultTrustRoots``
 - ``RequestDL/Trusts``
 - ``RequestDL/AdditionalTrusts``
 
-### Setting up the client authorization
+### SPKI Pinning
+- ``RequestDL/SPKIPinning``
+- ``RequestDL/SPKIActivePins``
+- ``RequestDL/SPKIBackupPins``
+- ``RequestDL/SPKIHash``
 
+### Client authorization
 - ``RequestDL/Certificates``
 - ``RequestDL/PrivateKey``
 
-### Working with PSK
-
+### PSK authentication
 - ``RequestDL/PSKIdentity``
 - ``RequestDL/SSLPSKIdentityResolver``
 
-### The TLS configuration
-
+### TLS configuration
 - ``RequestDL/SecureConnection``
 - ``RequestDL/TLSVersion``
 - ``RequestDL/TLSCipher``
