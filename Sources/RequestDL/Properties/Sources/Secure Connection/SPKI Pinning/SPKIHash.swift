@@ -17,7 +17,7 @@ import Crypto
 ///
 /// Example:
 /// ```swift
-/// let pin: SPKIHash<SHA256> = SPKIHash("base64-encoded-hash")
+/// SPKIHash("base64-encoded-hash") // SPKIHash<SHA256>
 /// ```
 ///
 /// Generate pins using OpenSSL:
@@ -83,7 +83,6 @@ public struct SPKIHash<Algorithm: HashFunction>: Property {
         property.assertPathway()
 
         let hash = Internals.SPKIHash(
-            anchor: inputs.environment.spkiHashAnchor,
             source: property.source,
             algorithm: Algorithm.self
         )

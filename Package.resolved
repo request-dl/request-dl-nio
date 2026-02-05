@@ -1,13 +1,13 @@
 {
-  "originHash" : "c1bdbfb57bfb66f4650e349c7b2295f4fd8958782df5071280365038dd934966",
+  "originHash" : "4d66907c3459fc4adb4d9b5c41f1b8f03de553d468858859a26d6f3b9b0d4368",
   "pins" : [
     {
       "identity" : "async-http-client",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/o-nnerb/async-http-client",
       "state" : {
-        "branch" : "main",
-        "revision" : "26675d1fc13069998b9be9a37cd77a822436bcd0"
+        "revision" : "c5c0198acc8f3361d8f721eab002332800a53d42",
+        "version" : "1.30.4-alpha.1"
       }
     },
     {

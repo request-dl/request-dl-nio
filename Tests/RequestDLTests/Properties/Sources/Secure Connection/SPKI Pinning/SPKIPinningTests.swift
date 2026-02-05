@@ -13,9 +13,7 @@ struct SPKIPinningTests {
             BaseURL(.https, host: "www.google.com")
             SecureConnection {
                 SPKIPinning {
-                    SPKIActivePins {
-                        SPKIHash("dJEGUdm2BuEalPybF+8enWB7R4AeiwE0gsQHyQrhzhY=")
-                    }
+                    SPKIHash("dJEGUdm2BuEalPybF+8enWB7R4AeiwE0gsQHyQrhzhY=")
                 }
             }
         }

@@ -157,13 +157,12 @@ extension Internals {
                 return nil
             }
 
-            let resolved = try tlsPins.reduce(into: [SPKIHashAnchor: [AsyncHTTPClient.SPKIHash]]()) {
+            let pins = try tlsPins.reduce(into: [AsyncHTTPClient.SPKIHash]()) {
                 try $1.resolve(&$0)
             }
 
             return .init(
-                activePins: resolved[.active] ?? [],
-                backupPins: resolved[.backup] ?? [],
+                pins: pins,
                 policy: tlsPinningPolicy ?? .strict
             )
         }

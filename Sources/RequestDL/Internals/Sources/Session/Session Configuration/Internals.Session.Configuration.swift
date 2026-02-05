@@ -16,7 +16,6 @@ extension Internals.Session {
         var timeout: Internals.Timeout = .init()
         var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
         var proxy: Internals.Proxy?
-        var ignoreUncleanSSLShutdown: Bool = false
         var decompression: Internals.Decompression = .disabled
         var dnsOverride: [String: String] = [:]
         var networkFrameworkWaitForConnectivity: Bool?
@@ -32,15 +31,15 @@ extension Internals.Session {
         func build() throws -> HTTPClient.Configuration {
             let secureConnectionOutput = try secureConnection?.build()
 
-            var configuration = HTTPClient.Configuration(
+            var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
                 tlsPinning: secureConnectionOutput?.tlsPinning,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
                 connectionPool: connectionPool,
                 proxy: proxy?.build(),
-                ignoreUncleanSSLShutdown: ignoreUncleanSSLShutdown,
-                decompression: decompression.build()
+                decompression: decompression.build(),
+                tracing: .init()
             )
 
             configuration.dnsOverride = dnsOverride

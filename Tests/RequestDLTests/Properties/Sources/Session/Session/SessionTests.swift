@@ -26,7 +26,6 @@ struct SessionTests {
         #expect(sut.timeout.connect == configuration.timeout.connect)
         #expect(sut.timeout.read == configuration.timeout.read)
         #expect(sut.proxy == configuration.proxy)
-        #expect(sut.ignoreUncleanSSLShutdown == configuration.ignoreUncleanSSLShutdown)
         #expect(
             String(describing: sut.decompression) == String(describing: configuration.decompression)
         )
@@ -148,19 +147,6 @@ struct SessionTests {
                 allowCycles: cycles
             )
         )
-    }
-
-    @Test
-    func session_whenIgnoreUncleanSSLShutdown_shouldBeValid() async throws {
-        // Given
-        let property = Session()
-            .ignoreUncleanSSLShutdown()
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.ignoreUncleanSSLShutdown)
     }
 
     @Test

@@ -148,8 +148,9 @@ public struct Session: Property {
 
      - Returns: The modified `Session` instance with unclean SSL shutdown ignored.
      */
+    @available(*, deprecated, message: "Is internally handle now. Will be removed in a future major release.")
     public func ignoreUncleanSSLShutdown() -> Self {
-        edit { $0.ignoreUncleanSSLShutdown = true }
+        self
     }
 
     /**

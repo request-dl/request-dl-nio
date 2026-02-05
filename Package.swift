@@ -20,7 +20,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/o-nnerb/async-http-client",
-            branch: "main"
+            from: "1.30.4-alpha.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",

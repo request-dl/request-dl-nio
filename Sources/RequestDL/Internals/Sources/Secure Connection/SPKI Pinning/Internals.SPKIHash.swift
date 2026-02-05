@@ -13,18 +13,15 @@ extension Internals {
 
     struct SPKIHash: Sendable, Hashable {
 
-        let anchor: SPKIHashAnchor
         private let source: SPKIHashSource
 
         private let algorithmID: ObjectIdentifier
         private let producer: @Sendable (SPKIHashSource) throws -> AsyncHTTPClient.SPKIHash
 
         init<Algorithm: HashFunction>(
-            anchor: SPKIHashAnchor,
             source: SPKIHashSource,
             algorithm: Algorithm.Type
         ) {
-            self.anchor = anchor
             self.source = source
             self.algorithmID = .init(algorithm)
             self.producer = {
@@ -33,18 +30,16 @@ extension Internals {
         }
 
         static func ==(lhs: Self, rhs: Self) -> Bool {
-            lhs.anchor == rhs.anchor
-                && lhs.source == rhs.source
+            lhs.source == rhs.source
                 && lhs.algorithmID == rhs.algorithmID
         }
 
-        func resolve(_ tlsPins: inout [SPKIHashAnchor: [AsyncHTTPClient.SPKIHash]]) throws {
+        func resolve(_ tlsPins: inout [AsyncHTTPClient.SPKIHash]) throws {
             let hash = try producer(source)
-            tlsPins[anchor, default: []].append(hash)
+            tlsPins.append(hash)
         }
 
         func hash(into hasher: inout Hasher) {
-            hasher.combine(anchor)
             hasher.combine(source)
             hasher.combine(algorithmID)
         }
