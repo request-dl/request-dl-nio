@@ -46,10 +46,11 @@ extension String {
 extension Array where Element == String {
 
     func joinedAsPath() -> String {
-        var cleanedComponents = self.map { component in
+        var cleanedComponents = Array(self.lazy.map { component in
             let trimmed = component.trimmingCharacters(in: .urlPathAllowed.inverted)
             return trimmed.trimmingCharacters(in: .init(charactersIn: "/"))
-        }.filter { !$0.isEmpty }
+        }
+        .filter { !$0.isEmpty })
 
         if let lastOriginal = self.last, lastOriginal.hasSuffix("/"), !cleanedComponents.isEmpty {
             cleanedComponents[cleanedComponents.count - 1] += "/"

@@ -120,9 +120,9 @@ public final class AsyncLock: Sendable {
                         return
                     }
 
-                    operation.cancelled()
-
                     let didCancelRunningOperation = lock.withLock {
+                        operation.cancelled()
+
                         guard let storage else {
                             return false
                         }

@@ -100,9 +100,9 @@ extension ResolveTests {
         """
         Resolve {
             ChildrenNode {
-                LeafNode<Node> {
-                    property = Node {
-                        baseURL = https://apple.com
+                LeafNode<URLNode> {
+                    property = URLNode {
+                        endpoint = https://apple.com
                     }
                 },
                 LeafNode<Node> {
@@ -160,9 +160,9 @@ extension ResolveTests {
         """
         Resolve {
             ChildrenNode {
-                LeafNode<Node> {
-                    property = Node {
-                        baseURL = https://apple.com
+                LeafNode<URLNode> {
+                    property = URLNode {
+                        endpoint = https://apple.com
                     }
                 },
                 LeafNode<Node> {
@@ -235,9 +235,9 @@ extension ResolveTests {
         """
         Resolve {
             ChildrenNode {
-                LeafNode<Node> {
-                    property = Node {
-                        baseURL = https://apple.com
+                LeafNode<URLNode> {
+                    property = URLNode {
+                        endpoint = https://apple.com
                     }
                 },
                 LeafNode<Node> {

@@ -164,7 +164,7 @@ struct BaseURLTests {
     }
 
     @Test
-    func uRL_whenIncludingScheme() async throws {
+    func url_whenIncludingScheme() async throws {
         // Given
         let baseURL = "https://www.apple.com"
 
@@ -190,7 +190,7 @@ struct BaseURLTests {
     }
 
     @Test
-    func uRL_whenEmptyString() async throws {
+    func url_whenEmptyString() async throws {
         // Given
         let baseURL = ""
 
@@ -202,14 +202,9 @@ struct BaseURLTests {
 
             // Then
             Issue.record("Not expecting success")
-        } catch let error as BaseURLError {
-            #expect(error.context == .unexpectedHost)
-            #expect(error.baseURL == baseURL)
-            #expect(error.errorDescription == """
-                Unexpected format for host string: Could not extract the \
-                host; BaseURL: \(baseURL)
-                """
-            )
+        } catch let error as EndpointError {
+            #expect(error.context == .invalidHost)
+            #expect(error.url == baseURL)
         } catch {
             throw error
         }

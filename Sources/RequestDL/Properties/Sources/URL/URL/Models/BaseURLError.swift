@@ -14,6 +14,7 @@ import Foundation
  )
  ```
  */
+@available(*, deprecated, renamed: "EndpointURL")
 public struct BaseURLError: LocalizedError {
 
     /**

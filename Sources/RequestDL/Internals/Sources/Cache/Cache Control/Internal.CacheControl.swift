@@ -40,6 +40,7 @@ extension Internals {
                     )
 
                     if let cachedSessionTask {
+                        logger?.log(level: .debug, "Cache hit - returning cached session task")
                         return .task(cachedSessionTask)
                     }
                 } else if case .useCachedDataOnly = request.cacheStrategy {
