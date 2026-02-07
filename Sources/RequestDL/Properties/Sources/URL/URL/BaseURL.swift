@@ -37,10 +37,25 @@ public struct BaseURL: Property {
 
     private struct Node: PropertyNode {
 
-        let baseURL: String
+        let scheme: URLScheme
+        let host: String
 
         func make(_ make: inout Make) async throws {
-            make.request.baseURL = baseURL
+            if host.contains("://") {
+                throw BaseURLError(
+                    context: .invalidHost,
+                    baseURL: host
+                )
+            }
+
+            guard let host = host.split(separator: "/").first else {
+                throw BaseURLError(
+                    context: .unexpectedHost,
+                    baseURL: host
+                )
+            }
+
+            make.request.baseURL = "\(scheme.rawValue)://\(host)"
         }
     }
 
@@ -110,26 +125,11 @@ public struct BaseURL: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return try .leaf(Node(baseURL: property.pointer().path()))
-    }
-
-    // MARK: - Private methods
-
-    private func path() throws -> String {
-        if host.contains("://") {
-            throw BaseURLError(
-                context: .invalidHost,
-                baseURL: host
+        return .leaf(
+            Node(
+                scheme: property.scheme,
+                host: property.host
             )
-        }
-
-        guard let host = host.split(separator: "/").first else {
-            throw BaseURLError(
-                context: .unexpectedHost,
-                baseURL: host
-            )
-        }
-
-        return "\(scheme.rawValue)://\(host)"
+        )
     }
 }

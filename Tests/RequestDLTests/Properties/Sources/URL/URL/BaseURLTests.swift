@@ -164,7 +164,7 @@ struct BaseURLTests {
     }
 
     @Test
-    func uRL_whenIncludingScheme() async throws {
+    func url_whenIncludingScheme() async throws {
         // Given
         let baseURL = "https://www.apple.com"
 
@@ -190,7 +190,7 @@ struct BaseURLTests {
     }
 
     @Test
-    func uRL_whenEmptyString() async throws {
+    func url_whenEmptyString() async throws {
         // Given
         let baseURL = ""
 

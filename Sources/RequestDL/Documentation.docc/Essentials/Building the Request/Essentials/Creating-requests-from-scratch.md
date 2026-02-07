@@ -22,6 +22,17 @@ The URL of a request consists of four main parts: scheme, host, paths, and query
     BaseURL(.http, host: "apple.com")
     ```
 
+- **[Endpoint](<doc:RequestDL/Endpoint>)**
+
+    Defines the complete URL or a relative path for the request, including optional path components and query parameters. It can also specify or override the base URL if a complete URL is provided.
+
+    ```swift
+    Endpoint("https://api.example.com/v1/users")
+    ```
+    ```swift
+    Endpoint("/users/123")
+    ```
+
 - **[Path](<doc:RequestDL/Path>)**
 
     Adds paths to the URL. It enables you to include specific path segments in the URL, providing a hierarchical structure for locating the desired resources.
@@ -154,6 +165,8 @@ Learn more in:
 - ``RequestDL/URLScheme``
 - ``RequestDL/InternetProtocol``
 - ``RequestDL/BaseURLError``
+- ``RequestDL/Endpoint``
+- ``RequestDL/EndpointError``
 - ``RequestDL/Path``
 
 ### Adding query parameters

@@ -102,7 +102,10 @@ extension ResolveTests {
             ChildrenNode {
                 LeafNode<Node> {
                     property = Node {
-                        baseURL = https://apple.com
+                        scheme = URLScheme {
+                            rawValue = https
+                        },
+                        host = apple.com
                     }
                 },
                 LeafNode<Node> {
@@ -162,7 +165,10 @@ extension ResolveTests {
             ChildrenNode {
                 LeafNode<Node> {
                     property = Node {
-                        baseURL = https://apple.com
+                        scheme = URLScheme {
+                            rawValue = https
+                        },
+                        host = apple.com
                     }
                 },
                 LeafNode<Node> {
@@ -237,7 +243,10 @@ extension ResolveTests {
             ChildrenNode {
                 LeafNode<Node> {
                     property = Node {
-                        baseURL = https://apple.com
+                        scheme = URLScheme {
+                            rawValue = https
+                        },
+                        host = apple.com
                     }
                 },
                 LeafNode<Node> {
