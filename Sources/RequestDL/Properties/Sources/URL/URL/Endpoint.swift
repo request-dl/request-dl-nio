@@ -82,6 +82,6 @@ public struct Endpoint: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(URLNode(endpoint: property.endpoint))
+        return .leaf(EndpointNode(endpoint: property.endpoint))
     }
 }

@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct URLNode: PropertyNode {
+struct EndpointNode: PropertyNode {
 
     let endpoint: String
 
@@ -66,7 +66,7 @@ struct URLNode: PropertyNode {
     }
 }
 
-private extension URLNode {
+private extension EndpointNode {
 
     func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
         guard !host.isEmpty else {
