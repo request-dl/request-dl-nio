@@ -35,6 +35,30 @@ import Foundation
  */
 public struct BaseURL: Property {
 
+    private struct Node: PropertyNode {
+
+        let scheme: URLScheme
+        let host: String
+
+        func make(_ make: inout Make) async throws {
+            if host.contains("://") {
+                throw BaseURLError(
+                    context: .invalidHost,
+                    baseURL: host
+                )
+            }
+
+            guard let host = host.split(separator: "/").first else {
+                throw BaseURLError(
+                    context: .unexpectedHost,
+                    baseURL: host
+                )
+            }
+
+            make.request.baseURL = "\(scheme.rawValue)://\(host)"
+        }
+    }
+
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -101,25 +125,11 @@ public struct BaseURL: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return try .leaf(URLNode(endpoint: property.pointer().path()))
-    }
-
-    // MARK: - Private methods
-
-    private func path() throws -> String {
-        var candidate = host.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if let schemeRange = candidate.range(of: "://") {
-            candidate = String(candidate.suffix(from: schemeRange.upperBound))
-        }
-
-        guard !candidate.isEmpty else {
-            throw EndpointError(
-                context: .invalidHost,
-                url: candidate
+        return .leaf(
+            Node(
+                scheme: property.scheme,
+                host: property.host
             )
-        }
-
-        return "\(scheme.rawValue)://\(candidate)"
+        )
     }
 }

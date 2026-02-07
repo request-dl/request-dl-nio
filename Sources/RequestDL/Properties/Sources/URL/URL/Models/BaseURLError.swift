@@ -14,8 +14,7 @@ import Foundation
  )
  ```
  */
-@available(*, deprecated, renamed: "EndpointURL")
-public struct BaseURLError: LocalizedError {
+public struct BaseURLError: Error {
 
     /**
      The possible contexts for the base URL error.
@@ -36,21 +35,6 @@ public struct BaseURLError: LocalizedError {
     /// The base URL associated with the error.
     public let baseURL: String
 
-    public var errorDescription: String? {
-        switch context {
-        case .invalidHost:
-            return """
-                Invalid host string: The url scheme should not be \
-                included; BaseURL: \(baseURL)
-                """
-        case .unexpectedHost:
-            return """
-                Unexpected format for host string: Could not extract the \
-                host; BaseURL: \(baseURL)
-                """
-        }
-    }
-
     // MARK: - Initializer
 
     /**
@@ -66,5 +50,24 @@ public struct BaseURLError: LocalizedError {
     ) {
         self.context = context
         self.baseURL = baseURL
+    }
+}
+
+@available(*, deprecated)
+extension BaseURLError: LocalizedError {
+
+    public var errorDescription: String? {
+        switch context {
+        case .invalidHost:
+            return """
+                Invalid host string: The url scheme should not be \
+                included; BaseURL: \(baseURL)
+                """
+        case .unexpectedHost:
+            return """
+                Unexpected format for host string: Could not extract the \
+                host; BaseURL: \(baseURL)
+                """
+        }
     }
 }
