@@ -24,18 +24,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -68,18 +68,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -121,18 +121,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -175,18 +175,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -229,16 +229,16 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(
                 parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
             )]
         )
@@ -289,16 +289,16 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(
                 parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
             )]
         )
@@ -331,16 +331,16 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -372,7 +372,7 @@ struct FormTests {
             .charset(.utf16)
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = verbatim.data(using: .utf16) ?? Data()
@@ -381,11 +381,11 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items == [
@@ -416,16 +416,16 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -465,16 +465,16 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -517,18 +517,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = try encoder.encode(mock)
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -574,18 +574,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = try encoder.encode(mock)
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -636,18 +636,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = try encoder.encode(mock)
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -688,7 +688,7 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
@@ -707,11 +707,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
         )
 
         #expect(parsed.items.map(\.headers) == [
@@ -751,7 +751,7 @@ struct FormTests {
             .charset(.utf16)
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
@@ -772,11 +772,11 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -814,7 +814,7 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = try JSONSerialization.data(
@@ -824,11 +824,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -867,7 +867,7 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = try JSONSerialization.data(
@@ -877,11 +877,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -925,7 +925,7 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let data = try JSONSerialization.data(
@@ -935,11 +935,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -976,7 +976,7 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let queries = try jsonObject
@@ -990,11 +990,11 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -1036,7 +1036,7 @@ struct FormTests {
             .charset(.utf16)
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
@@ -1057,11 +1057,11 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -1097,10 +1097,10 @@ struct FormTests {
             .payloadChunkSize(chunkSize)
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
-        let buffers = try await resolved.request.body?.buffers() ?? []
+        let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
         let builtData = buffers.compactMap { $0.getData() }.reduce(Data(), +)
         let totalBytes = builtData.count
 
@@ -1113,11 +1113,11 @@ struct FormTests {
         )
 
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -1152,18 +1152,18 @@ struct FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -1201,18 +1201,18 @@ struct FormTests {
             .headerStrategy(.setting)
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )
@@ -1259,18 +1259,18 @@ extension FormTests {
             )
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [
+            resolved.requestConfiguration.headers["Content-Length"] == [
                 String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
             ]
         )

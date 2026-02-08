@@ -19,7 +19,7 @@ struct GroupTests {
         let resolved = try await resolve(TestProperty(property))
 
         // Then
-        #expect(resolved.request.url == "https://google.com")
+        #expect(resolved.requestConfiguration.url == "https://google.com")
     }
 
     @Test
@@ -36,7 +36,7 @@ struct GroupTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://google.com/api/v1?available_methods=all"
+            resolved.requestConfiguration.url == "https://google.com/api/v1?available_methods=all"
         )
     }
 

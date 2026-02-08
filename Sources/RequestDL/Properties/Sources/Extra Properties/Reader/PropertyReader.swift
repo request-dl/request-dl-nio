@@ -66,20 +66,3 @@ public struct PropertyReader<Readable: Property, Content: Property>: Property {
         return .children(children)
     }
 }
-
-public struct PropertyContext: Sendable {
-
-    public var url: String {
-        make.request.url
-    }
-
-    public var headers: HTTPHeaders {
-        make.request.headers
-    }
-
-    private let make: Make
-
-    init(_ make: Make) {
-        self.make = make
-    }
-}

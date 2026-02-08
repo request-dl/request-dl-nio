@@ -22,7 +22,7 @@ struct PathTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://\(host)/\(path)"
+            resolved.requestConfiguration.url == "https://\(host)/\(path)"
         )
     }
 
@@ -40,7 +40,7 @@ struct PathTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://\(host)/\(path)"
+            resolved.requestConfiguration.url == "https://\(host)/\(path)"
         )
     }
 
@@ -58,7 +58,7 @@ struct PathTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://\(host)/\(path)"
+            resolved.requestConfiguration.url == "https://\(host)/\(path)"
         )
     }
 
@@ -84,7 +84,7 @@ struct PathTests {
         let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
 
         #expect(
-            resolved.request.url == "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
+            resolved.requestConfiguration.url == "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
         )
     }
 
@@ -111,7 +111,7 @@ struct PathTests {
         let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
 
         #expect(
-            resolved.request.url == "https://\(host)/\(expectedPath1)/\(expectedPath2)/\(expectedPath3)/"
+            resolved.requestConfiguration.url == "https://\(host)/\(expectedPath1)/\(expectedPath2)/\(expectedPath3)/"
         )
     }
 

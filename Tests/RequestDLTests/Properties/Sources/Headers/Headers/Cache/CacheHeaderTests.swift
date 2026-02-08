@@ -50,7 +50,7 @@ struct CacheHeaderTests {
         #expect(!cache.needsProxyRevalidate)
         #expect(!cache.isImmutable)
 
-        #expect(resolved.request.headers.isEmpty)
+        #expect(resolved.requestConfiguration.headers.isEmpty)
     }
 
     @Test
@@ -92,7 +92,7 @@ struct CacheHeaderTests {
         #expect(modifiedCache.isImmutable)
 
         #expect(
-            resolved.request.headers["Cache-Control"] == [
+            resolved.requestConfiguration.headers["Cache-Control"] == [
                 """
                 no-cache,no-store,no-transform,only-if-cached,private,max-age=1000,\
                 s-maxage=16000,max-stale=300,stale-while-revalidate=120,stale-if-error=86400,\
@@ -112,7 +112,7 @@ struct CacheHeaderTests {
         let resolved = try await resolve(TestProperty(cache))
 
         // Then
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 
     @Test

@@ -13,7 +13,7 @@ struct InternalsBodyTests {
         // Given
         let string = "Hello World"
 
-        let body = Internals.Body(buffers: [
+        let body = RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -34,7 +34,7 @@ struct InternalsBodyTests {
         // Given
         let string = "Hello World"
 
-        let body = Internals.Body(chunkSize: string.count, buffers: [
+        let body = RequestBody(chunkSize: string.count, buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -55,7 +55,7 @@ struct InternalsBodyTests {
         // Given
         let string = ""
 
-        let body = Internals.Body(buffers: [
+        let body = RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -74,7 +74,7 @@ struct InternalsBodyTests {
     @Test
     func requestBody_whenEmptyBuffer() async throws {
         // Given
-        let body = Internals.Body(buffers: [])
+        let body = RequestBody(buffers: [])
 
         // When
         let buffers = try await body.buffers()

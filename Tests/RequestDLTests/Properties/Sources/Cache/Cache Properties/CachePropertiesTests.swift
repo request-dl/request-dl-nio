@@ -165,7 +165,7 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cachePolicy == policy)
+        #expect(resolved.requestConfiguration.cachePolicy == policy)
     }
 
     @Test
@@ -181,7 +181,7 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cachePolicy == policy)
+        #expect(resolved.requestConfiguration.cachePolicy == policy)
     }
 
     @Test
@@ -197,7 +197,7 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cachePolicy == policy)
+        #expect(resolved.requestConfiguration.cachePolicy == policy)
     }
 
     @Test
@@ -213,7 +213,7 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cacheStrategy == cacheStrategy)
+        #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
     }
 
     @Test
@@ -229,7 +229,7 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cacheStrategy == cacheStrategy)
+        #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
     }
 
     @Test
@@ -245,7 +245,7 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cacheStrategy == cacheStrategy)
+        #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
     }
 
     @Test
@@ -261,6 +261,6 @@ struct CachePropertiesTests {
         })
 
         // Then
-        #expect(resolved.request.cacheStrategy == cacheStrategy)
+        #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
     }
 }

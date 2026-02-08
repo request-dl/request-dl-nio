@@ -55,7 +55,7 @@ public struct BaseURL: Property {
                 )
             }
 
-            make.request.baseURL = "\(scheme.rawValue)://\(host)"
+            make.requestConfiguration.baseURL = "\(scheme.rawValue)://\(host)"
         }
     }
 

@@ -13,17 +13,17 @@ struct InternalsClientManagerTests {
         // Given
         let manager = Internals.ClientManager.shared
         let provider = Internals.SharedSessionProvider()
-        let configuration = Internals.Session.Configuration()
+        let sessionConfiguration = Internals.Session.Configuration()
 
         // When
         let sut1 = try await manager.client(
             provider: provider,
-            configuration: configuration
+            sessionConfiguration: sessionConfiguration
         )
 
         let sut2 = try await manager.client(
             provider: provider,
-            configuration: configuration
+            sessionConfiguration: sessionConfiguration
         )
 
         // Then
@@ -36,20 +36,20 @@ struct InternalsClientManagerTests {
         let manager = Internals.ClientManager.shared
         let provider = Internals.SharedSessionProvider()
 
-        let configuration1 = Internals.Session.Configuration()
+        let sessionConfiguration1 = Internals.Session.Configuration()
 
-        var configuration2 = Internals.Session.Configuration()
-        configuration2.timeout.connect = .seconds(1_000)
+        var sessionConfiguration2 = Internals.Session.Configuration()
+        sessionConfiguration2.timeout.connect = .seconds(1_000)
 
         // When
         let sut1 = try await manager.client(
             provider: provider,
-            configuration: configuration1
+            sessionConfiguration: sessionConfiguration1
         )
 
         let sut2 = try await manager.client(
             provider: provider,
-            configuration: configuration2
+            sessionConfiguration: sessionConfiguration2
         )
 
         // Then
@@ -62,19 +62,19 @@ struct InternalsClientManagerTests {
         let lifetime: UInt64 = 2_500_000_000
         let manager = Internals.ClientManager(lifetime: lifetime)
         let provider = Internals.SharedSessionProvider()
-        let configuration = Internals.Session.Configuration()
+        let sessionConfiguration = Internals.Session.Configuration()
 
         // When
         let sut1 = try await manager.client(
             provider: provider,
-            configuration: configuration
+            sessionConfiguration: sessionConfiguration
         )
 
         try await _Concurrency.Task.sleep(nanoseconds: lifetime * 3)
 
         let sut2 = try await manager.client(
             provider: provider,
-            configuration: configuration
+            sessionConfiguration: sessionConfiguration
         )
 
         // Then

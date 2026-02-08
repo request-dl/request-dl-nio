@@ -12,7 +12,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenInitURL_shouldBeEqual() async throws {
         // Given
-        var request = Internals.Request()
+        var request = RequestConfiguration()
         let url = "https://google.com"
 
         // When
@@ -25,7 +25,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenMethodIsAssign_shouldBeEqual() async throws {
         // Given
-        var request = Internals.Request()
+        var request = RequestConfiguration()
         let method = "POST"
 
         // When
@@ -38,7 +38,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenHeadersAreSet_shouldContainsValues() async throws {
         // Given
-        var request = Internals.Request()
+        var request = RequestConfiguration()
 
         let key1 = "Content-Type"
         let value1 = "application/json"
@@ -59,7 +59,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenSetReadingMode() async throws {
         // Given
-        var request = Internals.Request()
+        var request = RequestConfiguration()
         let readingMode = Internals.DownloadStep.ReadingMode.separator([70])
 
         // When
@@ -72,7 +72,7 @@ struct InternalsRequestTests {
     @Test
     func request_whenUnsetReadingMode() async throws {
         // Given
-        let request = Internals.Request()
+        let request = RequestConfiguration()
         // Then
         #expect(request.readingMode == .length(1_024))
     }

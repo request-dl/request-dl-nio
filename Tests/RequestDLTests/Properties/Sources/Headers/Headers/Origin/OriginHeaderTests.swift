@@ -12,14 +12,14 @@ struct OriginHeaderTests {
     func host() async throws {
         let property = TestProperty(OriginHeader("google.com"))
         let resolved = try await resolve(property)
-        #expect(resolved.request.headers["Origin"] == ["google.com"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["google.com"])
     }
 
     @Test
     func hostWithPort() async throws {
         let property = TestProperty(OriginHeader("google.com", port: "8080"))
         let resolved = try await resolve(property)
-        #expect(resolved.request.headers["Origin"] == ["google.com:8080"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["google.com:8080"])
     }
 
     @Test

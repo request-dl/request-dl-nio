@@ -14,7 +14,7 @@ public struct SecureConnection<Content: Property>: Property {
         let nodes: [LeafNode<SecureConnectionNode>]
 
         func make(_ make: inout Make) async throws {
-            make.configuration.secureConnection = secureConnection
+            make.sessionConfiguration.secureConnection = secureConnection
 
             for node in nodes {
                 try await node.make(&make)

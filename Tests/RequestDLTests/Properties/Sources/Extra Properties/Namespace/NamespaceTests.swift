@@ -75,7 +75,7 @@ extension NamespaceTests {
         })
 
         // Then
-        #expect(resolved.request.url == "https://www.apple.com/v1")
+        #expect(resolved.requestConfiguration.url == "https://www.apple.com/v1")
         #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
             base: SingleNamespace<NamespaceSpy>.self,
             namespace: "_v1"
@@ -118,7 +118,7 @@ extension NamespaceTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://www.apple.com/multiple/namespace"
+            resolved.requestConfiguration.url == "https://www.apple.com/multiple/namespace"
         )
 
         #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
@@ -158,7 +158,7 @@ extension NamespaceTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://www.apple.com/v1/namespace"
+            resolved.requestConfiguration.url == "https://www.apple.com/v1/namespace"
         )
 
         #expect(namespaceID.wrappedValue == PropertyNamespace.ID(

@@ -11,7 +11,7 @@ private struct CachePolicyProperty: Property {
         let policy: DataCache.Policy.Set
 
         func make(_ make: inout Make) async throws {
-            make.request.cachePolicy = policy
+            make.requestConfiguration.cachePolicy = policy
         }
     }
 

@@ -16,7 +16,7 @@ struct EndpointTests {
         let resolved = try await resolve(Endpoint(endpointString))
 
         // Then
-        #expect(resolved.request.url == endpointString)
+        #expect(resolved.requestConfiguration.url == endpointString)
     }
 
     @Test func completeURLWithQuery() async throws {
@@ -27,7 +27,7 @@ struct EndpointTests {
         let resolved = try await resolve(Endpoint(endpointString))
 
         // Then
-        #expect(resolved.request.url == endpointString)
+        #expect(resolved.requestConfiguration.url == endpointString)
     }
 
     @Test func completeURLWithPort() async throws {
@@ -38,7 +38,7 @@ struct EndpointTests {
         let resolved = try await resolve(Endpoint(endpointString))
 
         // Then
-        #expect(resolved.request.url == endpointString)
+        #expect(resolved.requestConfiguration.url == endpointString)
     }
 
     @Test func relativePath() async throws {
@@ -53,7 +53,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func relativePathWithoutLeadingSlash() async throws {
@@ -68,7 +68,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func queryParametersOnly() async throws {
@@ -84,7 +84,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func relativePathWithTrailingSlash() async throws {
@@ -99,7 +99,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func relativePathWithTrailingSlashFollowedByAnotherPath() async throws {
@@ -115,7 +115,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func relativePathAppendedToExistingPath() async throws {
@@ -131,7 +131,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func completeURLWithRelativePathOverridesBaseURL() async throws {
@@ -145,7 +145,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == completeEndpointURL)
+        #expect(resolved.requestConfiguration.url == completeEndpointURL)
     }
 
     @Test func completeURLWithPathPrependsToExistingPath() async throws {
@@ -162,7 +162,7 @@ struct EndpointTests {
         // Then
         // The path from the complete URL ("new/endpoint") should prepend to the existing path ("old").
         // Result should be the base URL from the complete URL plus the prepended path.
-        #expect(resolved.request.url == "https://api.service.com/new/endpoint/old")
+        #expect(resolved.requestConfiguration.url == "https://api.service.com/new/endpoint/old")
     }
 
     @Test func endpointWithSpacesTrimmed() async throws {
@@ -177,7 +177,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func invalidURLStringThrowsError() async throws {
@@ -189,7 +189,7 @@ struct EndpointTests {
         let resolved = try await resolve(Endpoint(invalidEndpointString))
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func endpointWithQueryAppendsToExistingQuery() async throws {
@@ -205,7 +205,7 @@ struct EndpointTests {
         })
 
         // Then
-        #expect(resolved.request.url == expectedUrl)
+        #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
     @Test func completeURLWithQueryOverridesBaseURLAndAppendsQueries() async throws {
@@ -222,7 +222,7 @@ struct EndpointTests {
         // Then
         // BaseURL is overridden. Existing query is appended *after* the query from the complete URL.
         // Result: New base URL + complete endpoint path + complete endpoint query + existing query.
-        #expect(resolved.request.url == "https://new-api.com/v2/items?new_param=42&old_query=value")
+        #expect(resolved.requestConfiguration.url == "https://new-api.com/v2/items?new_param=42&old_query=value")
     }
 
     @Test func neverBody() async throws {

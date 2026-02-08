@@ -18,7 +18,7 @@ struct UserAgentHeaderTests {
         let resolved = try await resolve(property)
 
         // Then
-        #expect(resolved.request.headers["User-Agent"] == nil)
+        #expect(resolved.requestConfiguration.headers["User-Agent"] == nil)
     }
 
     @Test
@@ -32,7 +32,7 @@ struct UserAgentHeaderTests {
         })
 
         // Then
-        #expect(resolved.request.headers["User-Agent"] == [userAgent])
+        #expect(resolved.requestConfiguration.headers["User-Agent"] == [userAgent])
     }
 
     @Test
@@ -46,7 +46,7 @@ struct UserAgentHeaderTests {
         let resolved = try await resolve(property)
 
         // Then
-        #expect(resolved.request.headers["User-Agent"] == [ProcessInfo.processInfo.userAgent])
+        #expect(resolved.requestConfiguration.headers["User-Agent"] == [ProcessInfo.processInfo.userAgent])
     }
 
     @Test
@@ -64,7 +64,7 @@ struct UserAgentHeaderTests {
 
         // Then
         #expect(
-            resolved.request.headers["User-Agent"] == [
+            resolved.requestConfiguration.headers["User-Agent"] == [
                 ProcessInfo.processInfo.userAgent + " \(userAgent)"
             ]
         )

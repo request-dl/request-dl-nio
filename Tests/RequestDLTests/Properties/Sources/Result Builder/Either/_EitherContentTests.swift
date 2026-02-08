@@ -27,8 +27,8 @@ struct _EitherContentTests {
 
         // Then
         #expect(result is _EitherContent<BaseURL, OriginHeader>)
-        #expect(resolved.request.url == "https://google.com")
-        #expect(resolved.request.headers.isEmpty)
+        #expect(resolved.requestConfiguration.url == "https://google.com")
+        #expect(resolved.requestConfiguration.headers.isEmpty)
     }
 
     @Test
@@ -50,8 +50,8 @@ struct _EitherContentTests {
 
         // Then
         #expect(result is _EitherContent<OriginHeader, BaseURL>)
-        #expect(resolved.request.url == "https://127.0.0.1")
-        #expect(resolved.request.headers.isEmpty)
+        #expect(resolved.requestConfiguration.url == "https://127.0.0.1")
+        #expect(resolved.requestConfiguration.headers.isEmpty)
     }
 
     @Test

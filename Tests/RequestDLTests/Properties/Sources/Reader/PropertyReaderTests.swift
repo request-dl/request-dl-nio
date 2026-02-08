@@ -19,19 +19,19 @@ struct PropertyReaderTests {
 
             let resolved = try await resolve(TestProperty {
                 PropertyReader(content) { context in
-                    if context.url.contains("apple.com:1090") {
+                    if context.requestConfiguration.url.contains("apple.com:1090") {
                         BaseURL(.http, host: "google.com")
                     }
 
-                    if context.headers.contains(name: "Authorization") {
+                    if context.requestConfiguration.headers.contains(name: "Authorization") {
                         Authorization(.bearer, token: UUID().uuidString)
                     }
                 }
             })
 
-            #expect(resolved.request.url == "http://google.com?counter=0")
+            #expect(resolved.requestConfiguration.url == "http://google.com?counter=0")
             #expect(
-                resolved.request.headers.contains(name: "Authorization") {
+                resolved.requestConfiguration.headers.contains(name: "Authorization") {
                     $0.hasPrefix("Bearer")
                 }
             )
@@ -41,7 +41,7 @@ struct PropertyReaderTests {
 
         let resolved = try await resolve(ReferenceMemoryProperty())
 
-        #expect(resolved.request.url.contains("counter=0"))
+        #expect(resolved.requestConfiguration.url.contains("counter=0"))
     }
 }
 

@@ -23,7 +23,7 @@ struct CustomHeaderTests {
         })
 
         // Then
-        #expect(resolved.request.headers[name] == [value])
+        #expect(resolved.requestConfiguration.headers[name] == [value])
     }
 
     @Test
@@ -41,7 +41,7 @@ struct CustomHeaderTests {
         })
 
         // Then
-        #expect(resolved.request.headers[name] == ["\(value)"])
+        #expect(resolved.requestConfiguration.headers[name] == ["\(value)"])
     }
 
     @Test

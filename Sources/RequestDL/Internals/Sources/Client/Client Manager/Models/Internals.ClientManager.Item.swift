@@ -14,18 +14,18 @@ extension Internals.ClientManager {
 
         // MARK: - Internal properties
 
-        let configuration: Internals.Session.Configuration
+        let sessionConfiguration: Internals.Session.Configuration
         let client: Internals.Client
         let readAt: Date
 
         // MARK: - Internal static methods
 
         static func createNew(
-            configuration: Internals.Session.Configuration,
+            sessionConfiguration: Internals.Session.Configuration,
             client: Internals.Client
         ) -> Internals.ClientManager.Item {
             .init(
-                configuration: configuration,
+                sessionConfiguration: sessionConfiguration,
                 client: client,
                 readAt: .init()
             )
@@ -35,7 +35,7 @@ extension Internals.ClientManager {
 
         func updatingReadAt() -> Internals.ClientManager.Item {
             .init(
-                configuration: configuration,
+                sessionConfiguration: sessionConfiguration,
                 client: client,
                 readAt: .init()
             )

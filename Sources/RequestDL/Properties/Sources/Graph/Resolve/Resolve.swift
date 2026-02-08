@@ -28,12 +28,12 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
-            configuration: make.configuration
+            configuration: make.sessionConfiguration
         )
 
         return Resolved(
             session: session,
-            request: make.request,
+            requestConfiguration: make.requestConfiguration,
             dataCache: make.cacheConfiguration.build(
                 logger: environment.logger
             )
@@ -44,8 +44,8 @@ struct Resolve<Root: Property>: Sendable {
         let output = try await outputs()
 
         var make = Make(
-            configuration: .init(),
-            request: .init()
+            sessionConfiguration: .init(),
+            requestConfiguration: .init()
         )
 
         try await output.node._make(&make)

@@ -19,7 +19,7 @@ struct ReadingModeTests {
         })
 
         // Then
-        #expect(resolved.request.readingMode == .length(length))
+        #expect(resolved.requestConfiguration.readingMode == .length(length))
     }
 
     @Test
@@ -33,6 +33,6 @@ struct ReadingModeTests {
         })
 
         // Then
-        #expect(resolved.request.readingMode == .separator(separator))
+        #expect(resolved.requestConfiguration.readingMode == .separator(separator))
     }
 }

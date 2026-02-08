@@ -24,7 +24,7 @@ struct QueryGroupTests {
 
         // Then
         #expect(
-            resolved.request.url == """
+            resolved.requestConfiguration.url == """
             https://127.0.0.1?\
             number=123&\
             page=1
@@ -49,14 +49,14 @@ struct QueryGroupTests {
 
         // Then
         #expect(
-            resolved.request.url == """
+            resolved.requestConfiguration.url == """
             https://127.0.0.1?\
             number=123&\
             page=1
             """
         )
 
-        #expect(resolved.request.headers["api_key"] == nil)
+        #expect(resolved.requestConfiguration.headers["api_key"] == nil)
     }
 
     @Test
@@ -73,7 +73,7 @@ struct QueryGroupTests {
             QueryGroup(queries)
         })
 
-        let queryItems = URL(string: resolved.request.url)
+        let queryItems = URL(string: resolved.requestConfiguration.url)
             .flatMap {
                 URLComponents(url: $0, resolvingAgainstBaseURL: true)
             }

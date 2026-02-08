@@ -22,7 +22,7 @@ struct PropertyBuilderTests {
 
         // Then
         #expect(property is CacheHeader)
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 
     #if !os(Linux)
@@ -42,7 +42,7 @@ struct PropertyBuilderTests {
 
         // Then
         #expect(property is _OptionalContent<CacheHeader>)
-        #expect(resolved.request.headers.isEmpty)
+        #expect(resolved.requestConfiguration.headers.isEmpty)
     }
     #endif
 
@@ -62,6 +62,6 @@ struct PropertyBuilderTests {
 
         // Then
         #expect(property is _OptionalContent<CacheHeader>)
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 }
