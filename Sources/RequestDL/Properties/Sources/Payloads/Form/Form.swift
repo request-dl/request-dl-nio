@@ -342,7 +342,7 @@ public struct Form<Headers: Property>: Property {
         - name: The name of the form field.
         - filename: The filename associated with the form field, if applicable.
         - contentType: The content type of the form field.
-        - json: The JSON object to be associated with the form field.
+        - jsonObject: The JSON object to be associated with the form field.
         - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
         - headers: A closure that returns custom headers for the form.
      */

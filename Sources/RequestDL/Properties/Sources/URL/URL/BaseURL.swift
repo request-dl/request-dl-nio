@@ -89,7 +89,7 @@ public struct BaseURL: Property {
 
      - Parameters:
         - scheme: The url scheme chosen.
-        - path: The string host only.
+        - host: The string host only.
      */
     public init(_ scheme: URLScheme, host: String) {
         self.scheme = scheme
@@ -111,7 +111,7 @@ public struct BaseURL: Property {
      ```
 
      - Parameters:
-        - path: The string host only.
+        - host: The string host only.
      */
     public init(_ host: String) {
         self.init(.https, host: host)

@@ -119,7 +119,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the key log object for the secure connection.
     ///
-    /// - Parameter closure: The `SSLKeyLogger` object.
+    /// - Parameter keyLogger: The `SSLKeyLogger` object.
     /// - Returns: A modified `SecureConnection` with the key logger set.
     public func keyLogger(_ keyLogger: SSLKeyLogger) -> Self {
         edit {

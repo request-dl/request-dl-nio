@@ -1,6 +1,6 @@
 /*
  See LICENSE for this package's licensing information.
-*/
+ */
 
 import Foundation
 import Testing
@@ -9,7 +9,7 @@ import Testing
 struct PropertyReaderTests {
 
     @Test
-    func example() async throws {
+    func propertyReaderModifiesBasedOnResolvedConfiguration() async throws {
         for _ in 1 ... 5 {
             let content = PropertyGroup {
                 BaseURL(.https, host: "apple.com:1090")
@@ -32,21 +32,24 @@ struct PropertyReaderTests {
             #expect(resolved.requestConfiguration.url == "http://google.com?counter=0")
             #expect(
                 resolved.requestConfiguration.headers.contains(name: "Authorization") {
-                    $0.hasPrefix("Bearer")
+                    $0.hasPrefix("Bearer ")
                 }
             )
 
             try await Task.sleep(nanoseconds: 1 * NSEC_PER_SEC)
         }
 
+        // Checks if the shared property (ReferenceMemoryProperty) also reflects the expected state
+        // This also tests the consistency of the counter after multiple PropertyReader executions
         let resolved = try await resolve(ReferenceMemoryProperty())
 
+        // Expects the counter parameter to be present with its initial value '0'
+        // This verifies the initial state captured by the first execution of ReferenceMemoryProperty
         #expect(resolved.requestConfiguration.url.contains("counter=0"))
     }
 }
 
-struct ReferenceMemoryProperty: Property {
-
+private struct ReferenceMemoryProperty: Property {
     @StoredObject private var object = MemoryReference()
 
     var body: some Property {
@@ -76,6 +79,5 @@ private final class ReadCounter: @unchecked Sendable {
     }
 
     private let lock = Lock()
-
     private var _counter: Int = .zero
 }

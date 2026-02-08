@@ -45,8 +45,8 @@ extension Property {
      - Returns: A property with the added cache policy.
      */
     @PropertyBuilder
-    public func cachePolicy(_ cachePolity: DataCache.Policy.Set) -> some Property {
+    public func cachePolicy(_ cachePolicy: DataCache.Policy.Set) -> some Property {
         self
-        CachePolicyProperty(policy: cachePolity)
+        CachePolicyProperty(policy: cachePolicy)
     }
 }
