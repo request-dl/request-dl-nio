@@ -32,17 +32,17 @@ extension Internals {
         // MARK: - Internal methods
 
         func execute(
-            request: Request,
+            requestConfiguration: RequestConfiguration,
             dataCache: DataCache,
             logger: Internals.TaskLogger?
         ) async throws -> SessionTask {
             let client = try await manager.client(
                 provider: provider,
-                configuration: configuration
+                sessionConfiguration: configuration
             )
 
             let cacheControl = CacheControl(
-                request: request,
+                requestConfiguration: requestConfiguration,
                 dataCache: dataCache,
                 logger: logger
             )
@@ -53,7 +53,7 @@ extension Internals {
             case .cache(let cache):
                 return try await execute(
                     client: client,
-                    request: request,
+                    requestConfiguration: requestConfiguration,
                     cache: cache,
                     logger: logger
                 )
@@ -64,16 +64,16 @@ extension Internals {
 
         private func execute(
             client: Internals.Client,
-            request: Internals.Request,
+            requestConfiguration: RequestConfiguration,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?
         ) async throws -> SessionTask {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
-            let download = Internals.DownloadBuffer(readingMode: request.readingMode)
+            let download = Internals.DownloadBuffer(readingMode: requestConfiguration.readingMode)
 
             let delegate = Internals.ClientResponseReceiver(
-                url: request.url,
+                url: requestConfiguration.url,
                 upload: upload,
                 head: head,
                 download: download,
@@ -83,13 +83,13 @@ extension Internals {
 
             let response = Internals.AsyncResponse(
                 logger: logger,
-                uploadingBytes: request.body?.totalSize ?? .zero,
+                uploadingBytes: requestConfiguration.body?.totalSize ?? .zero,
                 upload: upload,
                 head: head,
                 download: download.stream
             )
 
-            let request = try request.build()
+            let request = try requestConfiguration.build()
 
             let unsafeTask = client.execute(
                 request: request,

@@ -11,7 +11,7 @@ private struct CacheStrategyProperty: Property {
         let strategy: CacheStrategy
 
         func make(_ make: inout Make) async throws {
-            make.request.cacheStrategy = strategy
+            make.requestConfiguration.cacheStrategy = strategy
         }
     }
 

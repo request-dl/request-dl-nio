@@ -24,7 +24,7 @@ public struct RequestMethod: Property {
         let httpMethod: String
 
         func make(_ make: inout Make) async throws {
-            make.request.method = .init(httpMethod)
+            make.requestConfiguration.method = .init(httpMethod)
         }
     }
 

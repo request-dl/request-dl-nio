@@ -19,7 +19,7 @@ struct AcceptCharsetHeaderTests {
         })
 
         // Then
-        #expect(resolved.request.headers["Accept-Charset"] == [charset.rawValue])
+        #expect(resolved.requestConfiguration.headers["Accept-Charset"] == [charset.rawValue])
     }
 
     @Test
@@ -33,7 +33,7 @@ struct AcceptCharsetHeaderTests {
         })
 
         // Then
-        #expect(resolved.request.headers["Accept-Charset"] == [charset.rawValue])
+        #expect(resolved.requestConfiguration.headers["Accept-Charset"] == [charset.rawValue])
     }
 
     @Test
@@ -47,6 +47,6 @@ struct AcceptCharsetHeaderTests {
         })
 
         // Then
-        #expect(resolved.request.headers["Accept-Charset"] == [charset.rawValue])
+        #expect(resolved.requestConfiguration.headers["Accept-Charset"] == [charset.rawValue])
     }
 }

@@ -82,3 +82,7 @@ We are excited to expand this list with many other features. Start by making you
 
 - <doc:Building-the-request>
 - <doc:Executing-the-request>
+
+### Advanced
+
+- <doc:Request-Customization>

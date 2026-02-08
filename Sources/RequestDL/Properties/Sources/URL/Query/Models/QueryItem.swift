@@ -5,7 +5,7 @@
 import Foundation
 
 ///  A struct that represents a single query item in a URL request.
-public struct QueryItem: Sendable {
+public struct QueryItem: Sendable, Equatable, Hashable {
 
     // MARK: - Public properties
 
@@ -17,7 +17,7 @@ public struct QueryItem: Sendable {
 
     // MARK: - Internal methods
 
-    func build() -> Internals.Query {
+    func build() -> QueryItem {
         .init(
             name: name,
             value: value
@@ -56,5 +56,10 @@ extension [QueryItem] {
                 value: $0.value.replacingOccurrences(of: " ", with: representable)
             )
         }
+    }
+
+    func joined() -> String {
+        map { "\($0.name)=\($0.value)" }
+            .joined(separator: "&")
     }
 }

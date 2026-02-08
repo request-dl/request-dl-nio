@@ -22,26 +22,26 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             environment: environment
         ).build()
 
-        var request = resolved.request
+        var requestConfiguration = resolved.requestConfiguration
 
-        if [.useCachedDataOnly].contains(request.cacheStrategy) {
-            request.cacheStrategy = .returnCachedDataElseLoad
+        if [.useCachedDataOnly].contains(requestConfiguration.cacheStrategy) {
+            requestConfiguration.cacheStrategy = .returnCachedDataElseLoad
         }
 
         let logger = Internals.TaskLogger(
-            request: request,
+            requestConfiguration: requestConfiguration,
             logger: environment.logger
         )
 
         let cacheControl = Internals.CacheControl(
-            request: request,
+            requestConfiguration: requestConfiguration,
             dataCache: resolved.dataCache,
             logger: logger
         )
 
         let client = try await Internals.ClientManager.shared.client(
             provider: resolved.session.provider,
-            configuration: resolved.session.configuration
+            sessionConfiguration: resolved.session.configuration
         )
 
         switch await cacheControl(client) {
@@ -73,7 +73,9 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             )
         )
 
-        var downloadBuffer = Internals.DownloadBuffer(readingMode: resolved.request.readingMode)
+        var downloadBuffer = Internals.DownloadBuffer(
+            readingMode: resolved.requestConfiguration.readingMode
+        )
 
         let responseHead = mockResponseHead(resolved)
 
@@ -81,7 +83,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             downloadBuffer.cacheStream(cacheStream)
         }
 
-        if let body = resolved.request.body {
+        if let body = resolved.requestConfiguration.body {
             mockBodyResponse(
                 group: eventLoopGroup,
                 buffer: downloadBuffer,
@@ -103,7 +105,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     private func mockBodyResponse(
         group eventLoopGroup: EventLoopGroup,
         buffer: Internals.DownloadBuffer,
-        body: Internals.Body
+        body: RequestBody
     ) {
         let eventLoop = eventLoopGroup.next()
         let body = body.build()
@@ -124,17 +126,17 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     }
 
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {
-        var headers = resolved.request.headers
+        var headers = resolved.requestConfiguration.headers
 
-        if let method = resolved.request.method {
+        if let method = resolved.requestConfiguration.method {
             headers.set(name: "rdl-request-method", value: method)
         }
 
         return .init(
-            url: resolved.request.url,
+            url: resolved.requestConfiguration.url,
             status: .init(code: status.code, reason: status.reason),
             version: .init(minor: version.minor, major: version.major),
-            headers: resolved.request.headers,
+            headers: resolved.requestConfiguration.headers,
             isKeepAlive: isKeepAlive
         )
     }

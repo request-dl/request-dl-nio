@@ -19,7 +19,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -33,7 +33,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -47,7 +47,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -61,7 +61,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -75,7 +75,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -89,7 +89,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -103,7 +103,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -117,7 +117,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -131,7 +131,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "\(scheme)://\(host)")
+        #expect(resolved.requestConfiguration.url == "\(scheme)://\(host)")
     }
 
     @Test
@@ -144,7 +144,7 @@ struct BaseURLTests {
         let resolved = try await resolve(baseURL)
 
         // Then
-        #expect(resolved.request.url == "https://google.com.br")
+        #expect(resolved.requestConfiguration.url == "https://google.com.br")
     }
 
     @Test
@@ -160,11 +160,11 @@ struct BaseURLTests {
         })
 
         // Then
-        #expect(resolved.request.url == "https://google.com")
+        #expect(resolved.requestConfiguration.url == "https://google.com")
     }
 
     @Test
-    func uRL_whenIncludingScheme() async throws {
+    func url_whenIncludingScheme() async throws {
         // Given
         let baseURL = "https://www.apple.com"
 
@@ -190,7 +190,7 @@ struct BaseURLTests {
     }
 
     @Test
-    func uRL_whenEmptyString() async throws {
+    func url_whenEmptyString() async throws {
         // Given
         let baseURL = ""
 

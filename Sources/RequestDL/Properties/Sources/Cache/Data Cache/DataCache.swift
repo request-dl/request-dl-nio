@@ -141,6 +141,7 @@ public struct DataCache: Sendable, Equatable {
         - memoryCapacity: The maximum memory capacity in bytes for the data cache.
         - diskCapacity: The maximum disk capacity in bytes for the data cache.
         - url: The file URL representing the location for disk storage.
+        - logger: The logger for cache usage.
      */
     public init(
         memoryCapacity: UInt64 = .zero,
@@ -172,6 +173,7 @@ public struct DataCache: Sendable, Equatable {
         - memoryCapacity: The maximum memory capacity in bytes for the data cache.
         - diskCapacity: The maximum disk capacity in bytes for the data cache.
         - suiteName: The name of the shared user defaults suite for disk storage.
+        - logger: The logger for cache usage.
      */
     public init(
         memoryCapacity: UInt64 = .zero,
@@ -193,6 +195,7 @@ public struct DataCache: Sendable, Equatable {
      - Parameters:
         - memoryCapacity: The maximum memory capacity in bytes for the data cache.
         - diskCapacity: The maximum disk capacity in bytes for the data cache.
+        - logger: The logger for cache usage.        
      */
     public init(
         memoryCapacity: UInt64 = .zero,

@@ -31,7 +31,7 @@ public struct Session: Property {
         let provider: SessionProvider
 
         func make(_ make: inout Make) async throws {
-            configuration?(&make.configuration)
+            configuration?(&make.sessionConfiguration)
             make.provider = provider
         }
     }

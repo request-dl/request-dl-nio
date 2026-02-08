@@ -189,13 +189,23 @@ struct AsyncLockTests {
         let tasks = (0 ..< 100).map { index in
             Task {
                 await lock.lock()
+                do {
+                    try Task.checkCancellation()
+                } catch {
+                    if index == 0 || index == 99 {
+                        Issue.record("Index \(index) not expected to be cancelled")
+                        return
+                    }
+
+                    throw error
+                }
 
                 guard index > .zero else {
                     return
                 }
 
                 if index < 99 || !isListeningTheSignal.wrappedValue {
-                    Issue.record("Not expected to be called")
+                    Issue.record("Index \(index) was not expected to be called")
                     return
                 }
 
@@ -206,14 +216,23 @@ struct AsyncLockTests {
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        tasks[1 ..< 99].forEach { $0.cancel() }
+        for task in tasks[1 ..< 99] {
+            task.cancel()
+            await Task.yield()
+        }
+
+        await Task.yield()
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
+
         tasks[0].cancel()
+        await Task.yield()
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
         isListeningTheSignal.wrappedValue = true
+        try await Task.sleep(nanoseconds: 500_000_000)
         lock.unlock()
+        await Task.yield()
 
         try await withTaskTimeout(seconds: 1) {
             await lastOperationSignal.wait()

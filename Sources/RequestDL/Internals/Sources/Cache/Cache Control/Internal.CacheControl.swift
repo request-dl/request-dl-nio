@@ -17,7 +17,7 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        let request: Internals.Request
+        let requestConfiguration: RequestConfiguration
         let dataCache: DataCache
         let logger: Internals.TaskLogger?
 
@@ -28,11 +28,11 @@ extension Internals {
                 level: .debug,
                 "Evaluating cache for request",
                 additionalMetadata: [
-                    "cache_strategy": .stringConvertible(String(describing: request.cacheStrategy))
+                    "cache_strategy": .stringConvertible(String(describing: requestConfiguration.cacheStrategy))
                 ]
             )
 
-            if request.cacheStrategy != .ignoreCachedData {
+            if requestConfiguration.cacheStrategy != .ignoreCachedData {
                 if let cachedData = storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
                         client: client,
@@ -40,9 +40,10 @@ extension Internals {
                     )
 
                     if let cachedSessionTask {
+                        logger?.log(level: .debug, "Cache hit - returning cached session task")
                         return .task(cachedSessionTask)
                     }
-                } else if case .useCachedDataOnly = request.cacheStrategy {
+                } else if case .useCachedDataOnly = requestConfiguration.cacheStrategy {
                     logger?.log(level: .warning, "No cached data available, but strategy is 'useCachedDataOnly' — returning error")
                     return .task(SessionTask(Internals.AsyncResponse(
                         logger: logger,
@@ -58,20 +59,20 @@ extension Internals {
 
             return .cache(try? await cacheIfNeeded(
                 dataCache: dataCache,
-                request: request
+                requestConfiguration: requestConfiguration
             ))
         }
 
         // MARK: - Private methods
 
         private func storedCachedData() -> CachedData? {
-            guard request.isCacheEnabled else {
+            guard requestConfiguration.isCacheEnabled else {
                 return nil
             }
 
             return dataCache.getCachedData(
-                forKey: request.url,
-                policy: request.cachePolicy
+                forKey: requestConfiguration.url,
+                policy: requestConfiguration.cachePolicy
             )
         }
 
@@ -79,7 +80,7 @@ extension Internals {
             client: Internals.Client,
             cached cachedData: CachedData
         ) async -> SessionTask? {
-            switch request.cacheStrategy {
+            switch requestConfiguration.cacheStrategy {
             case .ignoreCachedData:
                 return nil
             case .useCachedDataOnly:
@@ -99,7 +100,7 @@ extension Internals {
                     client: client,
                     dataCache: dataCache,
                     cached: cachedData,
-                    request: request
+                    requestConfiguration: requestConfiguration
                 ) else { return nil }
 
                 return makeCachedSession(cachedData)
@@ -108,12 +109,12 @@ extension Internals {
 
         private func makeCachedSession(_ cachedData: CachedData) -> SessionTask? {
             if !isCachedDataValid(cachedData) {
-                dataCache.remove(forKey: request.url)
+                dataCache.remove(forKey: requestConfiguration.url)
                 return nil
             }
 
             let download = Internals.DownloadBuffer(
-                readingMode: request.readingMode
+                readingMode: requestConfiguration.readingMode
             )
 
             _Concurrency.Task(priority: .background) {
@@ -141,7 +142,7 @@ extension Internals {
             client: Internals.Client,
             dataCache: DataCache,
             cached cachedData: CachedData,
-            request: Internals.Request
+            requestConfiguration: RequestConfiguration
         ) async -> CachedData? {
             guard let headers = await getUpdatedHeadersForCache(
                 client: client,
@@ -163,13 +164,13 @@ extension Internals {
             )
 
             dataCache.updateCached(
-                key: request.url,
+                key: requestConfiguration.url,
                 cachedResponse: cachedResponse
             )
 
             return dataCache.getCachedData(
-                forKey: request.url,
-                policy: request.cachePolicy
+                forKey: requestConfiguration.url,
+                policy: requestConfiguration.cachePolicy
             )
         }
 
@@ -177,23 +178,23 @@ extension Internals {
             client: Internals.Client,
             cached cachedData: CachedData
         ) async -> HTTPHeaders? {
-            var request = request
-            request.method = "HEAD"
+            var requestConfiguration = requestConfiguration
+            requestConfiguration.method = "HEAD"
 
             updateHeaders(
-                &request.headers,
+                &requestConfiguration.headers,
                 cachedHeaders: cachedData.response.headers,
                 for: "Last-Modified"
             )
 
             updateHeaders(
-                &request.headers,
+                &requestConfiguration.headers,
                 cachedHeaders: cachedData.response.headers,
                 for: "ETag"
             )
 
             guard let response = try? await client.execute(
-                request: request.build(),
+                request: requestConfiguration.build(),
                 logger: logger
             ).response() else { return nil }
 
@@ -273,9 +274,9 @@ extension Internals {
 
         private func cacheIfNeeded(
             dataCache: DataCache,
-            request: Internals.Request
+            requestConfiguration: RequestConfiguration
         ) async throws -> (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)? {
-            guard request.isCacheEnabled else {
+            guard requestConfiguration.isCacheEnabled else {
                 return nil
             }
 
@@ -290,10 +291,10 @@ extension Internals {
 
                 _Concurrency.Task(priority: .background) {
                     guard var cacheBuffer = dataCache.allocateBuffer(
-                        key: request.url,
+                        key: requestConfiguration.url,
                         cachedResponse: .init(
                             response: head,
-                            policy: request.cachePolicy
+                            policy: requestConfiguration.cachePolicy
                         ),
                         contentLength: UInt64(contentLength)
                     ) else { return }
@@ -307,7 +308,7 @@ extension Internals {
                         ])
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(error.localizedDescription)")
-                        dataCache.remove(forKey: request.url)
+                        dataCache.remove(forKey: requestConfiguration.url)
                     }
                 }
 

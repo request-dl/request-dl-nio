@@ -26,8 +26,8 @@ struct _PartialContentTests {
             OriginHeader
         >)
 
-        #expect(resolved.request.url == "https://google.com")
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.url == "https://google.com")
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
     }
 
     @Test
@@ -53,9 +53,9 @@ struct _PartialContentTests {
             CacheHeader
         >)
 
-        #expect(resolved.request.url == "https://google.com")
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.url == "https://google.com")
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 
     @Test
@@ -85,9 +85,9 @@ struct _PartialContentTests {
             Path
         >)
 
-        #expect(resolved.request.url == "https://google.com/search")
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.url == "https://google.com/search")
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 
     @Test
@@ -122,11 +122,11 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url == "https://google.com/search?q=request-dl"
+            resolved.requestConfiguration.url == "https://google.com/search?q=request-dl"
         )
 
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 
     @Test
@@ -165,11 +165,11 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url == "https://google.com/search?q=request-dl"
+            resolved.requestConfiguration.url == "https://google.com/search?q=request-dl"
         )
 
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
 
         #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
         #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
@@ -215,11 +215,11 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url == "https://google.com/search?q=request-dl&page=1"
+            resolved.requestConfiguration.url == "https://google.com/search?q=request-dl&page=1"
         )
 
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
 
         #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
         #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
@@ -269,11 +269,11 @@ struct _PartialContentTests {
         >)
 
         #expect(
-            resolved.request.url == "https://google.com/search/results?q=request-dl&page=1"
+            resolved.requestConfiguration.url == "https://google.com/search/results?q=request-dl&page=1"
         )
 
-        #expect(resolved.request.headers["Origin"] == ["https://apple.com"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
 
         #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
         #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))

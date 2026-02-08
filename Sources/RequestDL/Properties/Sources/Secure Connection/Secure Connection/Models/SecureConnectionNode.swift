@@ -152,7 +152,7 @@ struct SecureConnectionNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        guard let secureConnection = make.configuration.secureConnection else {
+        guard let secureConnection = make.sessionConfiguration.secureConnection else {
             #if DEBUG
             Internals.Log.cantCreateCertificateOutsideSecureConnection().log(
                 level: .warning,
@@ -164,7 +164,7 @@ struct SecureConnectionNode: PropertyNode {
 
         var collector = secureConnection.collector()
         try passthrough(&collector)
-        make.configuration.secureConnection = collector(\.self)
+        make.sessionConfiguration.secureConnection = collector(\.self)
     }
 }
 

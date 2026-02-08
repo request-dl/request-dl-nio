@@ -38,7 +38,7 @@ public struct GroupTask<Data: Sequence, Content: RequestTask>: RequestTask where
 
      - Parameters:
         - data: The type of the collection that contains the elements.
-        - content: The closure map function that transform each element of data into of task.
+        - transform: The closure map function that transform each element of data into of task.
      */
     public init(_ data: Data, content transform: @escaping @Sendable (Data.Element) -> Content) {
         self.data = data

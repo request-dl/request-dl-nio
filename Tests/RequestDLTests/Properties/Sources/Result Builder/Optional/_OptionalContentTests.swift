@@ -25,8 +25,8 @@ struct _OptionalContentTests {
 
         // Then
         #expect(result is _OptionalContent<BaseURL>)
-        #expect(resolved.request.url == "https://google.com")
-        #expect(resolved.request.headers.isEmpty)
+        #expect(resolved.requestConfiguration.url == "https://google.com")
+        #expect(resolved.requestConfiguration.headers.isEmpty)
     }
 
     @Test
@@ -46,7 +46,7 @@ struct _OptionalContentTests {
 
         // Then
         #expect(result is _OptionalContent<BaseURL>)
-        #expect(resolved.request.url != "https://google.com")
+        #expect(resolved.requestConfiguration.url != "https://google.com")
     }
 
     @Test

@@ -36,11 +36,11 @@ public struct Timeout: Property {
 
         func make(_ make: inout Make) async throws {
             if source.contains(.connect) {
-                make.configuration.timeout.connect = timeout
+                make.sessionConfiguration.timeout.connect = timeout
             }
 
             if source.contains(.read) {
-                make.configuration.timeout.read = timeout
+                make.sessionConfiguration.timeout.read = timeout
             }
         }
     }

@@ -8,7 +8,7 @@ import NIOPosix
 import AsyncHTTPClient
 @testable import RequestDL
 
-extension Internals.Body {
+extension RequestBody {
 
     func data() async throws -> Data {
         try await buffers().resolveData().reduce(Data(), +)

@@ -32,7 +32,7 @@ public struct DNSOverride: Property {
         let destination: String
 
         func make(_ make: inout Make) async throws {
-            make.configuration.dnsOverride[origin] = destination
+            make.sessionConfiguration.dnsOverride[origin] = destination
         }
     }
 

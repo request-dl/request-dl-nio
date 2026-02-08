@@ -34,7 +34,7 @@ struct HeaderNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        self(&make.request.headers)
+        self(&make.requestConfiguration.headers)
     }
 
     // MARK: - Private methods

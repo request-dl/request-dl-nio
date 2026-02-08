@@ -27,18 +27,18 @@ struct FormGroupTests {
             }
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(
                 parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
             )]
         )
@@ -93,18 +93,18 @@ struct FormGroupTests {
             }
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.request.headers["Content-Type"] == [
+            resolved.requestConfiguration.headers["Content-Type"] == [
                 "multipart/form-data; boundary=\"\(parsed.boundary)\""
             ]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(
                 parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
             )]
         )
@@ -134,10 +134,10 @@ struct FormGroupTests {
             .payloadChunkSize(chunkSize)
         })
 
-        let parser = try await MultipartFormParser(resolved.request)
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
-        let buffers = try await resolved.request.body?.buffers() ?? []
+        let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
         let builtData = buffers.compactMap { $0.getData() }.reduce(Data(), +)
         let totalBytes = builtData.count
 
@@ -150,11 +150,11 @@ struct FormGroupTests {
         )
 
         #expect(
-            resolved.request.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
         )
 
         #expect(
-            resolved.request.headers["Content-Length"] == [String(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(
                 parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
             )]
         )
@@ -192,14 +192,14 @@ struct FormGroupTests {
             FormGroup {}
         })
 
-        let data = try await resolved.request.body?.data() ?? Data()
+        let data = try await resolved.requestConfiguration.body?.data() ?? Data()
 
         // Then
         #expect(data.isEmpty)
 
-        #expect(resolved.request.headers["Content-Type"] == nil)
+        #expect(resolved.requestConfiguration.headers["Content-Type"] == nil)
 
-        #expect(resolved.request.headers["Content-Length"] == nil)
+        #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
     }
 }
 
