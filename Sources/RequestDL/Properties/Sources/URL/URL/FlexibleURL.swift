@@ -5,11 +5,11 @@
 import Foundation
 
 /**
- The `Endpoint` defines the complete URL or relative path for a request, combining base URL, path components, and query parameters.
+ The `FlexibleURL` defines the complete URL or relative path for a request, combining base URL, path components, and query parameters.
 
  ## Overview
 
- The `Endpoint` can be used in several ways:
+ The `FlexibleURL` can be used in several ways:
 
  - **Complete URL**: Specify a full URL including scheme, host, and optional path/query components.
  - **Relative Path**: Provide just the path and query components to be appended to a configured base URL.
@@ -17,28 +17,28 @@ import Foundation
 
  ```swift
  // Complete URL (overrides any configured BaseURL)
- Endpoint("https://api.example.com/v1/users?id=123")
+ FlexibleURL("https://api.example.com/v1/users?id=123")
 
  // Relative path (uses configured BaseURL)
- Endpoint("/users")
- Endpoint("/users/123")
- Endpoint("?search=term&page=1")
+ FlexibleURL("/users")
+ FlexibleURL("/users/123")
+ FlexibleURL("?search=term&page=1")
  ```
 
- > Important: When specifying a complete URL within the `Endpoint`, if it includes path components, RequestDL will prepend these paths from the beginning, potentially overriding existing path components configured elsewhere.
+ > Important: When specifying a complete URL within the `FlexibleURL`, if it includes path components, RequestDL will prepend these paths from the beginning, potentially overriding existing path components configured elsewhere.
 
  > Note: If no scheme is provided in a complete URL, `https` is assumed by default.
 
  ### Supported Formats
 
- The `Endpoint` accepts:
+ The `FlexibleURL` accepts:
  - Base URLs (`scheme://host:port`)
  - Path components (`path/to/resource`)
  - Query parameters (`?key=value&another=param`)
 
  You can combine these elements in a single string.
  */
-public struct Endpoint: Property {
+public struct FlexibleURL: Property {
 
     // MARK: - Public properties
 
@@ -49,32 +49,32 @@ public struct Endpoint: Property {
 
     // MARK: - Internal properties
 
-    let endpoint: String
+    let url: String
 
     // MARK: - Init
 
     /**
-     Creates an Endpoint from a string representation.
+     Creates an FlexibleURL from a string representation.
 
      The input can be:
      - A complete URL: "https://example.com/path?query=value"
      - A relative path: "/path/to/resource"
      - Query parameters only: "?key=value"
 
-     - Parameter endpoint: The URL string defining the endpoint.
+     - Parameter url: The URL string.
      */
-    public init<S: StringProtocol>(_ endpoint: S) {
-        self.endpoint = String(endpoint)
+    public init<S: StringProtocol>(_ url: S) {
+        self.url = String(url)
     }
 
     // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<Endpoint>,
+        property: _GraphValue<FlexibleURL>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(EndpointNode(endpoint: property.endpoint))
+        return .leaf(FlexibleURLNode(url: property.url))
     }
 }

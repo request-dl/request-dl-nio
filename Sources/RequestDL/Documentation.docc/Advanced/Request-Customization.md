@@ -4,7 +4,7 @@ Explore advanced techniques for customizing HTTP requests, such as accessing and
 
 ## Overview
 
-While RequestDL's high-level APIs like `Endpoint`, `Payload`, and `Headers` cover most common scenarios, there are cases where you need deeper control or insight into the request being built. RequestDL provides mechanisms like `PropertyReader` and `PropertyContext` that allow you to inspect and potentially modify aspects of a request based on its configuration, such as the URL, headers, or other parameters, as it is being constructed. This enables powerful customization patterns, like conditionally applying authorization tokens based on the target host.
+While RequestDL's high-level APIs like `FlexibleURL`, `Payload`, and `Headers` cover most common scenarios, there are cases where you need deeper control or insight into the request being built. RequestDL provides mechanisms like `PropertyReader` and `PropertyContext` that allow you to inspect and potentially modify aspects of a request based on its configuration, such as the URL, headers, or other parameters, as it is being constructed. This enables powerful customization patterns, like conditionally applying authorization tokens based on the target host.
 
 ## Accessing Configuration During Build
 
