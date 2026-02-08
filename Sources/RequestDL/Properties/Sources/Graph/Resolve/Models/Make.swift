@@ -9,19 +9,19 @@ struct Make: Sendable {
     // MARK: - Internal properties
 
     var provider: SessionProvider?
-    var configuration: Internals.Session.Configuration
-    var request: Internals.Request
+    var sessionConfiguration: Internals.Session.Configuration
+    var requestConfiguration: RequestConfiguration
     var cacheConfiguration: Internals.CacheConfiguration
 
     // MARK: - Inits
 
     init(
-        configuration: Internals.Session.Configuration,
-        request: Internals.Request
+        sessionConfiguration: Internals.Session.Configuration,
+        requestConfiguration: RequestConfiguration
     ) {
         self.provider = nil
-        self.configuration = configuration
-        self.request = request
+        self.sessionConfiguration = sessionConfiguration
+        self.requestConfiguration = requestConfiguration
         self.cacheConfiguration = .init()
     }
 }

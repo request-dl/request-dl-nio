@@ -42,13 +42,13 @@ struct InternalsSessionTests {
         // Given
         let session = testState.session
 
-        var request = Internals.Request()
-        request.baseURL = "https://localhost:8888"
-        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
+        var requestConfiguration = RequestConfiguration()
+        requestConfiguration.baseURL = "https://localhost:8888"
+        requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
 
         // When
         let task = try await session.execute(
-            request: request,
+            requestConfiguration: requestConfiguration,
             dataCache: .init(),
             logger: nil
         )
@@ -73,17 +73,17 @@ struct InternalsSessionTests {
         let length = 1_023
         let data = Data.randomData(length: length)
 
-        var request = Internals.Request()
-        request.baseURL = "https://localhost:8888"
-        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
-        request.method = "POST"
-        request.body = Internals.Body(buffers: [
+        var requestConfiguration = RequestConfiguration()
+        requestConfiguration.baseURL = "https://localhost:8888"
+        requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
+        requestConfiguration.method = "POST"
+        requestConfiguration.body = RequestBody(buffers: [
             Internals.DataBuffer(data)
         ])
 
         // When
         let task = try await session.execute(
-            request: request,
+            requestConfiguration: requestConfiguration,
             dataCache: .init(),
             logger: nil
         )
@@ -107,15 +107,15 @@ struct InternalsSessionTests {
         // Given
         let session = testState.session
 
-        var request = Internals.Request()
-        request.baseURL = "https://localhost:8888"
-        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
-        request.method = "POST"
-        request.body = Internals.Body(buffers: [])
+        var requestConfiguration = RequestConfiguration()
+        requestConfiguration.baseURL = "https://localhost:8888"
+        requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
+        requestConfiguration.method = "POST"
+        requestConfiguration.body = RequestBody(buffers: [])
 
         // When
         let task = try await session.execute(
-            request: request,
+            requestConfiguration: requestConfiguration,
             dataCache: .init(),
             logger: nil
         )
@@ -161,11 +161,11 @@ struct InternalsSessionTests {
         localServer.insert(response, at: testState.uri)
 
         // When
-        var request = Internals.Request()
-        request.baseURL = "https://\(localServer.baseURL)"
-        request.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
-        request.method = "POST"
-        request.body = Internals.Body(
+        var requestConfiguration = RequestConfiguration()
+        requestConfiguration.baseURL = "https://\(localServer.baseURL)"
+        requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
+        requestConfiguration.method = "POST"
+        requestConfiguration.body = RequestBody(
             chunkSize: fragment,
             buffers: [fileBuffer]
         )
@@ -184,7 +184,7 @@ struct InternalsSessionTests {
         )
 
         let task = try await session.execute(
-            request: request,
+            requestConfiguration: requestConfiguration,
             dataCache: .init(),
             logger: nil
         )

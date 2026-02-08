@@ -37,13 +37,6 @@ import Foundation
  - Query parameters (`?key=value&another=param`)
 
  You can combine these elements in a single string.
-
- ### Learn the fundamentals
-
- @Links(visualStyle: list) {
-     - <doc:Defining-endpoints>
-     - <doc:URL-composition>
- }
  */
 public struct Endpoint: Property {
 

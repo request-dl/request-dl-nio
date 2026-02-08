@@ -17,7 +17,7 @@ struct PayloadNode: PropertyNode {
 
     func make(_ make: inout Make) async throws {
         let input = PayloadInput(
-            method: make.request.method,
+            method: make.requestConfiguration.method,
             charset: charset,
             urlEncoder: urlEncoder
         )
@@ -35,9 +35,9 @@ struct PayloadNode: PropertyNode {
         case .urlEncoded(let queries):
             let queries = queries.map { $0.build() }
 
-            guard ![nil, "GET", "HEAD"].contains(make.request.method) else {
-                removeAnySetHeaders(&make.request.headers)
-                make.request.queries.append(contentsOf: queries)
+            guard ![nil, "GET", "HEAD"].contains(make.requestConfiguration.method) else {
+                removeAnySetHeaders(&make.requestConfiguration.headers)
+                make.requestConfiguration.queries.append(contentsOf: queries)
                 return
             }
 
@@ -60,26 +60,26 @@ struct PayloadNode: PropertyNode {
         output: PayloadOutput,
         make: inout Make
     ) {
-        make.request.headers.set(
+        make.requestConfiguration.headers.set(
             name: "Content-Type",
             value: String(output.contentType)
         )
 
-        let body = Internals.Body(
+        let body = RequestBody(
             chunkSize: chunkSize,
             buffers: [buffer]
         )
 
         if body.totalSize > .zero {
-            make.request.headers.set(
+            make.requestConfiguration.headers.set(
                 name: "Content-Length",
                 value: String(body.totalSize)
             )
         } else {
-            make.request.headers.remove(name: "Content-Length")
+            make.requestConfiguration.headers.remove(name: "Content-Length")
         }
 
-        make.request.body = body
+        make.requestConfiguration.body = body
     }
 
     private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {

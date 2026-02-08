@@ -19,6 +19,6 @@ struct QueryNode: PropertyNode {
             $0.build()
         }
 
-        make.request.queries.append(contentsOf: queries)
+        make.requestConfiguration.queries.append(contentsOf: queries)
     }
 }

@@ -20,10 +20,10 @@ struct HeadersTests {
 
         let resolved = try await resolve(property)
 
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
-        #expect(resolved.request.headers["Accept"] == ["application/json"])
-        #expect(resolved.request.headers["Origin"] == ["127.0.0.1:8080"])
-        #expect(resolved.request.headers["xxx-api-key"] == ["password"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["application/json"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["127.0.0.1:8080"])
+        #expect(resolved.requestConfiguration.headers["xxx-api-key"] == ["password"])
     }
 
     @Test
@@ -43,9 +43,9 @@ struct HeadersTests {
 
         let resolved = try await resolve(property)
 
-        #expect(resolved.request.headers["Cache-Control"] == ["proxy-revalidate"])
-        #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
-        #expect(resolved.request.headers["xxx-api-key"] == ["password123"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["proxy-revalidate"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["image/jpeg"])
+        #expect(resolved.requestConfiguration.headers["xxx-api-key"] == ["password123"])
     }
 
     @Test
@@ -68,9 +68,9 @@ struct HeadersTests {
 
         let resolved = try await resolve(property)
 
-        #expect(resolved.request.headers["Cache-Control"] == ["proxy-revalidate"])
-        #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
-        #expect(resolved.request.headers["xxx-api-key"] == ["password123"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["proxy-revalidate"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["image/jpeg"])
+        #expect(resolved.requestConfiguration.headers["xxx-api-key"] == ["password123"])
     }
 
     @Test
@@ -94,13 +94,13 @@ struct HeadersTests {
 
         // Then
         #expect(
-            resolved.request.headers["Cache-Control"] == ["public,proxy-revalidate"]
+            resolved.requestConfiguration.headers["Cache-Control"] == ["public,proxy-revalidate"]
         )
 
-        #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["image/jpeg"])
 
         #expect(
-            resolved.request.headers["xxx-api-key"] == ["password", "password123"]
+            resolved.requestConfiguration.headers["xxx-api-key"] == ["password", "password123"]
         )
     }
 
@@ -127,13 +127,13 @@ struct HeadersTests {
 
         // Then
         #expect(
-            resolved.request.headers["Cache-Control"] == ["public,proxy-revalidate"]
+            resolved.requestConfiguration.headers["Cache-Control"] == ["public,proxy-revalidate"]
         )
 
-        #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["image/jpeg"])
 
         #expect(
-            resolved.request.headers["xxx-api-key"] == ["password", "password123"]
+            resolved.requestConfiguration.headers["xxx-api-key"] == ["password", "password123"]
         )
     }
 
@@ -155,11 +155,11 @@ struct HeadersTests {
 
         let resolved = try await resolve(property)
 
-        #expect(resolved.request.headers["Host"] == ["127.0.0.1:8080"])
-        #expect(resolved.request.headers["Cache-Control"] == ["public"])
-        #expect(resolved.request.headers["xxx-api-key"] == ["password"])
-        #expect(resolved.request.headers["Accept"] == ["image/jpeg"])
-        #expect(resolved.request.headers["Origin"] == ["google.com"])
+        #expect(resolved.requestConfiguration.headers["Host"] == ["127.0.0.1:8080"])
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
+        #expect(resolved.requestConfiguration.headers["xxx-api-key"] == ["password"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["image/jpeg"])
+        #expect(resolved.requestConfiguration.headers["Origin"] == ["google.com"])
     }
 
     @Test
@@ -176,6 +176,6 @@ struct HeadersTests {
         let resolved = try await resolve(property)
 
         // Then
-        #expect(resolved.request.url == "https://127.0.0.1")
+        #expect(resolved.requestConfiguration.url == "https://127.0.0.1")
     }
 }

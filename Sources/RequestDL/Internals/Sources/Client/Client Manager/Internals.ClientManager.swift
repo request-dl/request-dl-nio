@@ -36,10 +36,10 @@ extension Internals {
 
         func client(
             provider: SessionProvider,
-            configuration: Internals.Session.Configuration
+            sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.Client {
             let options = SessionProviderOptions(
-                isCompatibleWithNetworkFramework: configuration.isCompatibleWithNetworkFramework
+                isCompatibleWithNetworkFramework: sessionConfiguration.isCompatibleWithNetworkFramework
             )
 
             let sessionProviderID = provider.uniqueIdentifier(with: options)
@@ -47,7 +47,7 @@ extension Internals {
             return try await lock.withLock {
                 tableLock.lock()
                 if var items = _table[sessionProviderID] {
-                    if let (index, item) = items.enumerated().first(where: { $1.configuration == configuration }) {
+                    if let (index, item) = items.enumerated().first(where: { $1.sessionConfiguration == sessionConfiguration }) {
                         items[index] = item.updatingReadAt()
                         _table[sessionProviderID] = items
                         tableLock.unlock()
@@ -64,7 +64,7 @@ extension Internals {
                 return try _createNewClient(
                     id: sessionProviderID,
                     eventLoopGroup: eventLoopGroup,
-                    configuration: configuration
+                    sessionConfiguration: sessionConfiguration
                 )
             }
         }
@@ -120,11 +120,11 @@ extension Internals {
         private func _createNewClient(
             id: String,
             eventLoopGroup: EventLoopGroup,
-            configuration: Internals.Session.Configuration
+            sessionConfiguration: Internals.Session.Configuration
         ) throws -> Internals.Client {
             let client = Internals.Client(
                 eventLoopGroupProvider: .shared(eventLoopGroup),
-                configuration: try configuration.build()
+                configuration: try sessionConfiguration.build()
             )
 
             tableLock.lock()
@@ -133,7 +133,7 @@ extension Internals {
             var items = _table[id] ?? []
 
             items.append(.createNew(
-                configuration: configuration,
+                sessionConfiguration: sessionConfiguration,
                 client: client
             ))
 

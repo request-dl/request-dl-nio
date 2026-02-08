@@ -41,7 +41,7 @@ public struct Path: Property {
                 return
             }
 
-            make.request.pathComponents.append(path)
+            make.requestConfiguration.pathComponents.append(path)
         }
     }
 

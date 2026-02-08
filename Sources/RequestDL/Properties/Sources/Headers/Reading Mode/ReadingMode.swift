@@ -12,7 +12,7 @@ public struct ReadingMode: Property {
         let mode: Internals.DownloadStep.ReadingMode
 
         func make(_ make: inout Make) async throws {
-            make.request.readingMode = mode
+            make.requestConfiguration.readingMode = mode
         }
     }
 

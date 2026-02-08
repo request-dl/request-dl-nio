@@ -30,25 +30,25 @@ struct LocalServer: Sendable {
 
         // MARK: - Internal methods
 
-        func remove(_ configuration: Configuration) async throws {
-            try await _channels[configuration]?.0.close()
-            _channels[configuration] = nil
+        func remove(_ serverConfiguration: Configuration) async throws {
+            try await _channels[serverConfiguration]?.0.close()
+            _channels[serverConfiguration] = nil
         }
 
-        func channel(_ configuration: Configuration) async throws -> (Channel, ResponseQueue) {
+        func channel(_ serverConfiguration: Configuration) async throws -> (Channel, ResponseQueue) {
             try await lock.withLock {
-                if let output = _channels[configuration] {
+                if let output = _channels[serverConfiguration] {
                     return output
                 }
 
                 guard
                     !_channels.keys.contains(where: {
-                        $0.host == configuration.host &&
-                        $0.port == configuration.port
+                        $0.host == serverConfiguration.host &&
+                        $0.port == serverConfiguration.port
                     })
                 else { fatalError() }
 
-                let tlsConfiguration = try configuration.option.build()
+                let tlsConfiguration = try serverConfiguration.option.build()
                 let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
                 let responseQueue = ResponseQueue()
 
@@ -71,10 +71,10 @@ struct LocalServer: Sendable {
                     .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                     .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
                     .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
-                    .bind(host: configuration.host, port: Int(configuration.port))
+                    .bind(host: serverConfiguration.host, port: Int(serverConfiguration.port))
 
                 let channel = try await futureChannel.get()
-                _channels[configuration] = (channel, responseQueue)
+                _channels[serverConfiguration] = (channel, responseQueue)
                 return (channel, responseQueue)
             }
         }
@@ -123,16 +123,16 @@ struct LocalServer: Sendable {
 
     // MARK: - Private properties
 
-    private let configuration: Configuration
+    private let serverConfiguration: Configuration
     private let channel: Channel
     private let responseQueue: ResponseQueue
 
     // MARK: - Inits
 
-    init(_ configuration: Configuration) async throws {
-        let (channel, responseQueue) = try await ServerManager.shared.channel(configuration)
+    init(_ serverConfiguration: Configuration) async throws {
+        let (channel, responseQueue) = try await ServerManager.shared.channel(serverConfiguration)
 
-        self.configuration = configuration
+        self.serverConfiguration = serverConfiguration
         self.channel = channel
         self.responseQueue = responseQueue
     }
@@ -146,6 +146,6 @@ struct LocalServer: Sendable {
     }
 
     var baseURL: String {
-        configuration.host + ":" + String(configuration.port)
+        serverConfiguration.host + ":" + String(serverConfiguration.port)
     }
 }

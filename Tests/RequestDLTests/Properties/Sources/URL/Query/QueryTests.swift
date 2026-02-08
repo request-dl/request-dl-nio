@@ -20,7 +20,7 @@ struct QueryTests {
         })
 
         // Then
-        #expect(resolved.request.url == "https://127.0.0.1?number=123")
+        #expect(resolved.requestConfiguration.url == "https://127.0.0.1?number=123")
     }
 
     @Test
@@ -39,7 +39,7 @@ struct QueryTests {
 
         // Then
         #expect(
-            resolved.request.url == """
+            resolved.requestConfiguration.url == """
             https://127.0.0.1?\
             number=123&\
             page=1&\
@@ -71,7 +71,7 @@ struct QueryTests {
 
         // Then
         #expect(
-            resolved.request.url == """
+            resolved.requestConfiguration.url == """
             https://127.0.0.1?\
             flag=1&\
             array.0=9&\

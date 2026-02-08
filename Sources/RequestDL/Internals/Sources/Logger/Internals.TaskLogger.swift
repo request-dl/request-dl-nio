@@ -15,14 +15,14 @@ extension Internals {
         private let baseURL: String
         private let pathComponents: [String]
 
-        init?(request: Internals.Request, logger: Logger?) {
+        init?(requestConfiguration: RequestConfiguration, logger: Logger?) {
             guard let logger else {
                 return nil
             }
 
             self.id = UUID().uuidString
-            baseURL = request.baseURL
-            pathComponents = request.pathComponents
+            baseURL = requestConfiguration.baseURL
+            pathComponents = requestConfiguration.pathComponents
             self.logger = logger
         }
 

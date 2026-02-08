@@ -35,30 +35,30 @@ struct FormNode: PropertyNode {
 
     func make(_ make: inout Make) async throws {
         guard !items.isEmpty else {
-            removeAnySetHeaders(&make.request.headers)
+            removeAnySetHeaders(&make.requestConfiguration.headers)
             return
         }
 
         let constructor = FormGroupBuilder(items)
 
-        make.request.headers.set(
+        make.requestConfiguration.headers.set(
             name: "Content-Type",
             value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
         )
 
         let buffers = try constructor()
 
-        let body = Internals.Body(
+        let body = RequestBody(
             chunkSize: chunkSize,
             buffers: buffers
         )
 
-        make.request.headers.set(
+        make.requestConfiguration.headers.set(
             name: "Content-Length",
             value: String(body.totalSize)
         )
 
-        make.request.body = body
+        make.requestConfiguration.body = body
     }
 
     // MARK: - Private methods

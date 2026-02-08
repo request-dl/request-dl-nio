@@ -48,7 +48,7 @@ public struct OriginHeader: Property {
     /**
      Initializes an `OriginHeader` header field with the given origin value.
 
-     - Parameter host: A `StringProtocol` representing the host.
+     - Parameter origin: A `StringProtocol` representing the host.
      */
     public init<S: StringProtocol>(_ origin: S) {
         self.value = String(origin)

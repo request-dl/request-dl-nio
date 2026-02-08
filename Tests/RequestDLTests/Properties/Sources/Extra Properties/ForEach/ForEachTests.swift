@@ -29,7 +29,7 @@ struct ForEachTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://127.0.0.1/api/v1/users"
+            resolved.requestConfiguration.url == "https://127.0.0.1/api/v1/users"
         )
     }
 
@@ -48,7 +48,7 @@ struct ForEachTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://127.0.0.1/api/v1/users"
+            resolved.requestConfiguration.url == "https://127.0.0.1/api/v1/users"
         )
     }
 
@@ -67,7 +67,7 @@ struct ForEachTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
+            resolved.requestConfiguration.url == "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
 
@@ -86,7 +86,7 @@ struct ForEachTests {
 
         // Then
         #expect(
-            resolved.request.url == "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
+            resolved.requestConfiguration.url == "https://127.0.0.1/\(range.map { "\($0)" }.joined(separator: "/"))"
         )
     }
 

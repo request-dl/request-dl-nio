@@ -36,7 +36,7 @@ public struct Proxy: Property {
         let authorization: Internals.Proxy.Authorization?
 
         func make(_ make: inout Make) async throws {
-            make.configuration.proxy = .init(
+            make.sessionConfiguration.proxy = .init(
                 host: host,
                 port: port,
                 connection: connectionProtocol,

@@ -37,8 +37,8 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 1)
-        #expect(resolved1.request.url == resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.apple.com/0")
+        #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
     }
 
     @Test
@@ -70,9 +70,9 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 1)
-        #expect(resolved1.request.url == resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.google.com/0")
-        #expect(resolved2.request.url == "https://www.google.com/0")
+        #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.google.com/0")
+        #expect(resolved2.requestConfiguration.url == "https://www.google.com/0")
     }
 
     @Test
@@ -104,8 +104,8 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 1)
-        #expect(resolved1.request.url == resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.apple.com/0")
+        #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
     }
 
     @Test
@@ -137,8 +137,8 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 2)
-        #expect(resolved1.request.url == "https://www.apple.com/0")
-        #expect(resolved2.request.url == "https://www.apple.com/1")
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
+        #expect(resolved2.requestConfiguration.url == "https://www.apple.com/1")
     }
 
     @Test
@@ -170,8 +170,8 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 2)
-        #expect(resolved1.request.url == resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.apple.com/0?index=1")
+        #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0?index=1")
     }
 
     @Test
@@ -203,9 +203,9 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 4)
-        #expect(resolved1.request.url != resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.apple.com/0?index=1")
-        #expect(resolved2.request.url == "https://www.apple.com/3?index=2")
+        #expect(resolved1.requestConfiguration.url != resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0?index=1")
+        #expect(resolved2.requestConfiguration.url == "https://www.apple.com/3?index=2")
     }
 
     @Test
@@ -235,8 +235,8 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 2)
-        #expect(resolved1.request.url == resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.apple.com/0/1")
+        #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0/1")
     }
 
     @Test
@@ -266,8 +266,8 @@ struct StoredObjectTests {
 
         // Then
         #expect(MainActor.sync { Factory.producer }.index == 3)
-        #expect(resolved1.request.url == resolved2.request.url)
-        #expect(resolved1.request.url == "https://www.apple.com/0/1.2")
+        #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0/1.2")
     }
 }
 

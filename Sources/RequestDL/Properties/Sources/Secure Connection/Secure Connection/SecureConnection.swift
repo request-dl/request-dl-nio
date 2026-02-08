@@ -14,7 +14,7 @@ public struct SecureConnection<Content: Property>: Property {
         let nodes: [LeafNode<SecureConnectionNode>]
 
         func make(_ make: inout Make) async throws {
-            make.configuration.secureConnection = secureConnection
+            make.sessionConfiguration.secureConnection = secureConnection
 
             for node in nodes {
                 try await node.make(&make)
@@ -119,7 +119,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the key log object for the secure connection.
     ///
-    /// - Parameter closure: The `SSLKeyLogger` object.
+    /// - Parameter keyLogger: The `SSLKeyLogger` object.
     /// - Returns: A modified `SecureConnection` with the key logger set.
     public func keyLogger(_ keyLogger: SSLKeyLogger) -> Self {
         edit {

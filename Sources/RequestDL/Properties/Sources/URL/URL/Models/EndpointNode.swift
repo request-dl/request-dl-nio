@@ -20,7 +20,7 @@ struct EndpointNode: PropertyNode {
                 throw EndpointError(context: .invalidURL, url: endpoint)
             }
 
-            try processFullURL(components: components, into: &make.request)
+            try processFullURL(components: components, into: &make.requestConfiguration)
         } else {
             let needsSeparator = !["/", "?"].contains(where: normalized.starts(with:))
             let placeholderURLString = "https://placeholder.com\(needsSeparator ? "/": "")\(normalized)"
@@ -29,13 +29,13 @@ struct EndpointNode: PropertyNode {
                 throw EndpointError(context: .invalidURL, url: endpoint)
             }
 
-            try appendPathAndQueries(components: components, into: &make.request, fromStart: false)
+            try appendPathAndQueries(components: components, into: &make.requestConfiguration, fromStart: false)
         }
     }
 
     // MARK: - Private Methods
 
-    private func processFullURL(components: URLComponents, into request: inout Internals.Request) throws {
+    private func processFullURL(components: URLComponents, into request: inout RequestConfiguration) throws {
         if let host = components.host {
             request.baseURL = try constructBaseURLString(from: components, host: host)
         }
@@ -45,7 +45,7 @@ struct EndpointNode: PropertyNode {
 
     private func appendPathAndQueries(
         components: URLComponents,
-        into request: inout Internals.Request,
+        into request: inout RequestConfiguration,
         fromStart: Bool
     ) throws {
         let newPathComponents = pathComponents(from: components)
@@ -102,9 +102,9 @@ private extension EndpointNode {
         return splitComponents
     }
 
-    func queries(from components: URLComponents) -> [Internals.Query] {
+    func queries(from components: URLComponents) -> [QueryItem] {
         return components.queryItems?.compactMap { item in
-            Internals.Query(name: item.name, value: item.value ?? "")
+            QueryItem(name: item.name, value: item.value ?? "")
         } ?? []
     }
 }

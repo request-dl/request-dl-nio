@@ -18,10 +18,13 @@ struct RawTask<Content: Property>: RequestTask {
             environment: environment
         ).build()
 
-        let logger = Internals.TaskLogger(request: resolved.request, logger: environment.logger)
+        let logger = Internals.TaskLogger(
+            requestConfiguration: resolved.requestConfiguration,
+            logger: environment.logger
+        )
 
         let sessionTask = try await resolved.session.execute(
-            request: resolved.request,
+            requestConfiguration: resolved.requestConfiguration,
             dataCache: resolved.dataCache,
             logger: logger
         )

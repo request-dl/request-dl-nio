@@ -20,7 +20,7 @@ struct AnyPropertyTests {
         })
 
         // Then
-        #expect(resolved.request.url == "https://127.0.0.1?number=123")
+        #expect(resolved.requestConfiguration.url == "https://127.0.0.1?number=123")
     }
 
     @Test
