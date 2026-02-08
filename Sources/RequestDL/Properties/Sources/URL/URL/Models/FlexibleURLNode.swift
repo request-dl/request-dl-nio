@@ -4,20 +4,20 @@
 
 import Foundation
 
-struct EndpointNode: PropertyNode {
+struct FlexibleURLNode: PropertyNode {
 
-    let endpoint: String
+    let url: String
 
     func make(_ make: inout Make) async throws {
-        let normalized = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if normalized.contains("://") {
             guard let url = URL(string: normalized) else {
-                throw EndpointError(context: .invalidURL, url: endpoint)
+                throw FlexibleURLError(context: .invalidURL, url: url)
             }
 
             guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-                throw EndpointError(context: .invalidURL, url: endpoint)
+                throw FlexibleURLError(context: .invalidURL, url: self.url)
             }
 
             try processFullURL(components: components, into: &make.requestConfiguration)
@@ -26,7 +26,7 @@ struct EndpointNode: PropertyNode {
             let placeholderURLString = "https://placeholder.com\(needsSeparator ? "/": "")\(normalized)"
 
             guard let components = URLComponents(string: placeholderURLString) else {
-                throw EndpointError(context: .invalidURL, url: endpoint)
+                throw FlexibleURLError(context: .invalidURL, url: url)
             }
 
             try appendPathAndQueries(components: components, into: &make.requestConfiguration, fromStart: false)
@@ -66,11 +66,11 @@ struct EndpointNode: PropertyNode {
     }
 }
 
-private extension EndpointNode {
+private extension FlexibleURLNode {
 
     func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
         guard !host.isEmpty else {
-            throw EndpointError(context: .invalidHost, url: endpoint)
+            throw FlexibleURLError(context: .invalidHost, url: url)
         }
 
         var fullHost = host

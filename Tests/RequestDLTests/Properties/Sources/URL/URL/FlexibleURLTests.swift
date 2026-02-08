@@ -6,14 +6,14 @@ import Foundation
 import Testing
 @testable import RequestDL
 
-struct EndpointTests {
+struct FlexibleURLTests {
 
     @Test func completeURL() async throws {
         // Given
         let endpointString = "https://api.example.com/v1/users"
 
         // When
-        let resolved = try await resolve(Endpoint(endpointString))
+        let resolved = try await resolve(FlexibleURL(endpointString))
 
         // Then
         #expect(resolved.requestConfiguration.url == endpointString)
@@ -24,7 +24,7 @@ struct EndpointTests {
         let endpointString = "https://api.example.com/v1/users?status=active&page=1"
 
         // When
-        let resolved = try await resolve(Endpoint(endpointString))
+        let resolved = try await resolve(FlexibleURL(endpointString))
 
         // Then
         #expect(resolved.requestConfiguration.url == endpointString)
@@ -35,7 +35,7 @@ struct EndpointTests {
         let endpointString = "http://localhost:8080/api/debug"
 
         // When
-        let resolved = try await resolve(Endpoint(endpointString))
+        let resolved = try await resolve(FlexibleURL(endpointString))
 
         // Then
         #expect(resolved.requestConfiguration.url == endpointString)
@@ -49,7 +49,7 @@ struct EndpointTests {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
-            Endpoint(endpointPath)
+            FlexibleURL(endpointPath)
         })
 
         // Then
@@ -64,7 +64,7 @@ struct EndpointTests {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
-            Endpoint(endpointPath)
+            FlexibleURL(endpointPath)
         })
 
         // Then
@@ -80,7 +80,7 @@ struct EndpointTests {
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
             Path("search")
-            Endpoint(queryParamString)
+            FlexibleURL(queryParamString)
         })
 
         // Then
@@ -95,7 +95,7 @@ struct EndpointTests {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
-            Endpoint(endpointPath)
+            FlexibleURL(endpointPath)
         })
 
         // Then
@@ -110,7 +110,7 @@ struct EndpointTests {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
-            Endpoint(endpointPath)
+            FlexibleURL(endpointPath)
             Path("item_id")
         })
 
@@ -127,7 +127,7 @@ struct EndpointTests {
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
             Path("api/v1")
-            Endpoint(endpointPath)
+            FlexibleURL(endpointPath)
         })
 
         // Then
@@ -136,27 +136,27 @@ struct EndpointTests {
 
     @Test func completeURLWithRelativePathOverridesBaseURL() async throws {
         // Given
-        let completeEndpointURL = "https://different-api.com/v3/status"
+        let completeFlexibleURL = "https://different-api.com/v3/status"
 
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("should-be-overridden.com")
-            Endpoint(completeEndpointURL)
+            FlexibleURL(completeFlexibleURL)
         })
 
         // Then
-        #expect(resolved.requestConfiguration.url == completeEndpointURL)
+        #expect(resolved.requestConfiguration.url == completeFlexibleURL)
     }
 
     @Test func completeURLWithPathPrependsToExistingPath() async throws {
         // Given
-        let completeEndpointWithPrependPath = "https://api.service.com/new/endpoint"
+        let completeFlexibleURLWithPrependPath = "https://api.service.com/new/endpoint"
 
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
             Path("old")
-            Endpoint(completeEndpointWithPrependPath)
+            FlexibleURL(completeFlexibleURLWithPrependPath)
         })
 
         // Then
@@ -173,7 +173,7 @@ struct EndpointTests {
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
-            Endpoint(endpointPath)
+            FlexibleURL(endpointPath)
         })
 
         // Then
@@ -182,11 +182,11 @@ struct EndpointTests {
 
     @Test func invalidURLStringThrowsError() async throws {
         // Given
-        let invalidEndpointString = "not a valid url at all!"
+        let invalidFlexibleURLString = "not a valid url at all!"
         let expectedUrl = "/not a valid url at all!"
 
         // When
-        let resolved = try await resolve(Endpoint(invalidEndpointString))
+        let resolved = try await resolve(FlexibleURL(invalidFlexibleURLString))
 
         // Then
         #expect(resolved.requestConfiguration.url == expectedUrl)
@@ -201,7 +201,7 @@ struct EndpointTests {
         let resolved = try await resolve(TestProperty {
             BaseURL("api.service.com")
             Query(name: "initial", value: "param")
-            Endpoint(endpointQueryString)
+            FlexibleURL(endpointQueryString)
         })
 
         // Then
@@ -210,13 +210,13 @@ struct EndpointTests {
 
     @Test func completeURLWithQueryOverridesBaseURLAndAppendsQueries() async throws {
         // Given
-        let completeEndpointWithQuery = "https://new-api.com/v2/items?new_param=42"
+        let completeFlexibleURLWithQuery = "https://new-api.com/v2/items?new_param=42"
 
         // When
         let resolved = try await resolve(TestProperty {
             BaseURL("should-be-overridden.com")
             Query(name: "old_query", value: "value")
-            Endpoint(completeEndpointWithQuery)
+            FlexibleURL(completeFlexibleURLWithQuery)
         })
 
         // Then
@@ -227,7 +227,7 @@ struct EndpointTests {
 
     @Test func neverBody() async throws {
         // Given
-        let property = Endpoint("/some/path")
+        let property = FlexibleURL("/some/path")
 
         // Then
         try await assertNever(property.body)
