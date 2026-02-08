@@ -1,13 +1,13 @@
 {
-  "originHash" : "4d66907c3459fc4adb4d9b5c41f1b8f03de553d468858859a26d6f3b9b0d4368",
+  "originHash" : "9bb7e6c55bd4d62387f44c595bccbe702929211e18640ffe0e53392bf2fc449d",
   "pins" : [
     {
       "identity" : "async-http-client",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/o-nnerb/async-http-client",
       "state" : {
-        "revision" : "c5c0198acc8f3361d8f721eab002332800a53d42",
-        "version" : "1.30.4-alpha.1"
+        "revision" : "b71085fc89f7251c0e16153cae0521f6ed863104",
+        "version" : "1.30.4-alpha.2"
       }
     },
     {
@@ -62,6 +62,15 @@
       "state" : {
         "revision" : "7b847a3b7008b2dc2f47ca3110d8c782fb2e5c7e",
         "version" : "1.3.0"
+      }
+    },
+    {
+      "identity" : "swift-configuration",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-configuration.git",
+      "state" : {
+        "revision" : "b4768bd68d8a6fb356bd372cb41905046244fcae",
+        "version" : "1.0.2"
       }
     },
     {
