@@ -56,7 +56,7 @@ public final class AsyncLock: Sendable {
     public func unlock() {
         let runningOperation = lock.withLock { () -> AsyncOperation? in
             guard
-                let  runningOperation = _storage.runningOperation,
+                let runningOperation = _storage.runningOperation,
                 [.cancelled, .finished].contains(runningOperation.state)
             else { return nil }
 
