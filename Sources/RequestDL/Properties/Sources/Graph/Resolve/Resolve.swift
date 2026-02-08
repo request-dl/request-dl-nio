@@ -24,14 +24,7 @@ struct Resolve<Root: Property>: Sendable {
     // MARK: - Internal methods
 
     func build() async throws -> Resolved {
-        let output = try await outputs()
-
-        var make = Make(
-            configuration: .init(),
-            request: .init()
-        )
-
-        try await output.node._make(&make)
+        let (_, make) = try await partiallyBuild()
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
@@ -45,6 +38,18 @@ struct Resolve<Root: Property>: Sendable {
                 logger: environment.logger
             )
         )
+    }
+
+    func partiallyBuild() async throws -> (_PropertyOutputs, Make) {
+        let output = try await outputs()
+
+        var make = Make(
+            configuration: .init(),
+            request: .init()
+        )
+
+        try await output.node._make(&make)
+        return (output, make)
     }
 
     func description() async throws -> String {
