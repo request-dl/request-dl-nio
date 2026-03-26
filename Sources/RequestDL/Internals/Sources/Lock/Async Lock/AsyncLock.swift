@@ -113,33 +113,31 @@ public final class AsyncLock: Sendable {
                 }
             },
             onCancel: { [weak self] in
-                #if swift(<6.2.3)
-                let storage = self?._storage
-                #endif
-
-                Task.detached {
-                    guard let self else {
-                        return
-                    }
-
-                    let didCancelRunningOperation = lock.withLock {
-                        operation.cancelled()
-
-                        guard let storage else {
-                            return false
-                        }
-
-                        return operation === storage.runningOperation
-                    }
-
-                    guard didCancelRunningOperation else {
-                        return
-                    }
-
-                    self.unlock()
+                guard let self else {
+                    return
                 }
+
+                self.cleanup(operation)
             },
             isolation: isolation
         )
+    }
+
+    private func cleanup(_ operation: AsyncOperation) {
+        let lock = lock
+        let storage = _storage
+
+        Task.detached {
+            let didCancelRunningOperation = lock.withLock {
+                operation.cancelled()
+                return operation === storage.runningOperation
+            }
+
+            guard didCancelRunningOperation else {
+                return
+            }
+
+            self.unlock()
+        }
     }
 }
