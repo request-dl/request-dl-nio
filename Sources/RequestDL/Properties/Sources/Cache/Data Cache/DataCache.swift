@@ -42,13 +42,13 @@ public struct DataCache: Sendable, Equatable {
         // MARK: - Internal properties
 
         var memoryStorage: MemoryStorage {
-            get { _memoryStorage }
-            set { _memoryStorage = newValue }
+            get { lock.withLock { _memoryStorage } }
+            set { lock.withLock { _memoryStorage = newValue } }
         }
 
         var diskStorage: DiskStorage {
-            get { _diskStorage }
-            set { _diskStorage = newValue }
+            get { lock.withLock { _diskStorage } }
+            set { lock.withLock { _diskStorage = newValue } }
         }
 
         var memoryCapacity: UInt64 {
