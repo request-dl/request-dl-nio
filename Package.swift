@@ -24,23 +24,27 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.94.0"
+            from: "2.99.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.32.1"
+            from: "1.34.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.36.0"
+            from: "2.37.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
-            from: "1.26.0"
+            from: "1.28.0"
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.9.1"
+            from: "1.12.0"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-collections",
+            from: "1.4.1"
         )
     ],
     targets: [
@@ -56,7 +60,8 @@ let package = Package(
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
-                .product(name: "Logging", package: "swift-log")
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Collections", package: "swift-collections")
             ]
         ),
 

@@ -350,3 +350,46 @@ extension DataCacheTests {
         )
     }
 }
+
+extension DataCacheTests {
+
+
+    @Test
+    func accessingAllocateBufferMultipleTimes() async throws {
+        let dataCache = DataCache(
+            memoryCapacity: 100 * 1_024 * 1_024,
+            suiteName: UUID().uuidString
+        )
+
+        let key = UUID().uuidString
+        var locks = [AsyncSignal]()
+
+        for index in 0 ..< 1_000 {
+            let lock = AsyncSignal()
+            locks.append(lock)
+
+            Task.detached(priority: .background) {
+                defer { lock.signal() }
+
+                _ = dataCache.allocateBuffer(
+                    key: key + "\(index)",
+                    cachedResponse: .init(
+                        response: .init(
+                            url: UUID().uuidString,
+                            status: .init(code: 200, reason: UUID().uuidString),
+                            version: .init(minor: 0, major: 10),
+                            headers: .init(),
+                            isKeepAlive: false
+                        ),
+                        policy: .memory
+                    ),
+                    contentLength: 1_024 * 1_024
+                )
+            }
+        }
+
+        for lock in locks {
+            await lock.wait()
+        }
+    }
+}
