@@ -51,7 +51,7 @@ public struct _GraphValue<Content: Property>: Sendable {
 
     // MARK: - Internal methods
 
-    subscript<Value>(dynamicMember keyPath: KeyPath<Content, Value>) -> Value {
+    public subscript<Value>(dynamicMember keyPath: KeyPath<Content, Value>) -> Value {
         content[keyPath: keyPath]
     }
 

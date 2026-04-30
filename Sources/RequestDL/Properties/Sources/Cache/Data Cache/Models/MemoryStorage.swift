@@ -8,6 +8,8 @@ import Foundation
 @preconcurrency import Foundation
 #endif
 
+import Collections
+
 struct MemoryStorage: Sendable {
 
     private struct Record: Sendable, Hashable {
@@ -40,7 +42,7 @@ struct MemoryStorage: Sendable {
     // MARK: - Private properties
 
     private let directory: URL
-    private var identifiers = Set<String>()
+    private var identifiers = OrderedSet<String>()
     private var records = [String: Record]()
 
     // MARK: - Inits
@@ -103,7 +105,7 @@ struct MemoryStorage: Sendable {
 
         identifiers.remove(key)
         records[key] = newRecord
-        identifiers.insert(key)
+        identifiers.append(key)
     }
 
     mutating func allocateBuffer(
@@ -124,7 +126,7 @@ struct MemoryStorage: Sendable {
         )
 
         identifiers.remove(key)
-        identifiers.insert(key)
+        identifiers.append(key)
 
         records[key] = record
 

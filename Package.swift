@@ -41,6 +41,10 @@ let package = Package(
         .package(
             url: "https://github.com/apple/swift-log",
             from: "1.8.0"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-collections",
+            from: "1.4.1"
         )
     ],
     targets: [
@@ -56,7 +60,8 @@ let package = Package(
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
-                .product(name: "Logging", package: "swift-log")
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Collections", package: "swift-collections")
             ]
         ),
 
