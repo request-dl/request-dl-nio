@@ -136,7 +136,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             url: resolved.requestConfiguration.url,
             status: .init(code: status.code, reason: status.reason),
             version: .init(minor: version.minor, major: version.major),
-            headers: resolved.requestConfiguration.headers,
+            headers: headers,
             isKeepAlive: isKeepAlive
         )
     }
