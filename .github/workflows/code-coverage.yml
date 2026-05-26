@@ -34,7 +34,6 @@ jobs:
       platform: ${{ matrix.platform }}
       name: ${{ matrix.name }}
       coverage-enabled: true
-      swift-version: "6.1"
     secrets: inherit
 
   apple-tests:
@@ -43,15 +42,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - destination: "platform=iOS Simulator,arch=arm64,name=iPhone 17 Pro,OS=26.2"
+          - destination: "platform=iOS Simulator,arch=arm64,name=iPhone 17 Pro,OS=26.5"
             name: "iOS"
-          - destination: "platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=26.2"
+          - destination: "platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=26.5"
             name: "iPadOS"
-          - destination: "platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 11 (46mm),OS=26.2"
+          - destination: "platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 11 (42mm),OS=26.5"
             name: "watchOS"
-          - destination: "platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=26.2"
+          - destination: "platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=26.5"
             name: "tvOS"
-          - destination: "platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=26.2"
+          - destination: "platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=26.5"
             name: "visionOS"
           - destination: "platform=macOS,arch=arm64,name=My Mac"
             name: "macOS"
