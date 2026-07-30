@@ -30,6 +30,12 @@ extension Internals {
             self.url = url
         }
 
+        // MARK: - Internal static methods
+
+        static func make(from url: Internals.ByteURL) -> Internals.ByteBufferURL? {
+            .init(url)
+        }
+
         // MARK: - Internal methods
 
         func isResourceAvailable() -> Bool {
@@ -37,6 +43,10 @@ extension Internals {
         }
 
         func createResourceIfNeeded() {}
+
+        func truncate() {
+            url.replace(with: Data())
+        }
 
         func absoluteURL() -> ByteURL {
             url

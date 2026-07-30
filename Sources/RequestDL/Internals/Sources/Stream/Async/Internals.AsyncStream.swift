@@ -4,15 +4,36 @@
 
 import SwiftAsyncStream
 
+/// Thrown when a response body is read a second time.
+///
+/// The bytes of a response are buffered until somebody starts reading them, and released to
+/// that reader as it advances. There is nothing left for a second reader, so this is raised
+/// instead of handing back whatever survived, which would be a partial result that changes
+/// with how far the first reader got.
+public struct AlreadyConsumedError: Error, CustomStringConvertible {
+
+    public var description: String {
+        """
+        This response body has already been consumed. Read it once and keep the result, or \
+        issue the request again.
+        """
+    }
+
+    init() {}
+}
+
 extension Internals {
 
     /// A replaying broadcast stream of values, terminated by completion or by an error.
     ///
-    /// Backed by `ReplaySubject`, so every iterator starts at the first element ever appended.
-    /// That is load bearing rather than incidental: `constant(_:)`, `throwing(_:)` and
-    /// `empty()` produce and finish during construction, and on the live path the download
-    /// iterator is only created when the caller reaches for the bytes, long after they start
-    /// arriving.
+    /// Backed by `ReplaySubject`. Replay is load bearing rather than incidental: `constant(_:)`,
+    /// `throwing(_:)` and `empty()` produce and finish during construction, and on the live path
+    /// the download iterator is only created when the caller reaches for the bytes, long after
+    /// they start arriving.
+    ///
+    /// Streams that are only ever read once should be built with `.untilFirstIteration`, which
+    /// keeps that guarantee while dropping the retained bytes to the gap between producer and
+    /// reader once reading starts.
     struct AsyncStream<Element: Sendable>: Sendable, Hashable, AsyncSequence {
 
         // MARK: - Inner types
@@ -36,32 +57,48 @@ extension Internals {
 
         struct AsyncIterator: Sendable, AsyncIteratorProtocol {
 
+            // MARK: - Inner types
+
+            fileprivate enum State: @unchecked Sendable {
+                case iterating(SubjectAsyncIterator<Value>)
+                /// Raised on the first `next()`. `makeAsyncIterator()` cannot throw, so a
+                /// stream with nothing left to give hands back an iterator that explains
+                /// itself the moment somebody reads from it.
+                case failed(any Error)
+                case done
+            }
+
             // MARK: - Private properties
 
-            fileprivate var iterator: SubjectAsyncIterator<Value>?
+            fileprivate var state: State
 
             // MARK: - Internal methods
 
             mutating func next() async throws -> Element? {
-                guard var iterator = self.iterator else {
+                switch state {
+                case .done:
                     return nil
-                }
 
-                guard let value = await iterator.next() else {
-                    self.iterator = nil
-                    return nil
-                }
-
-                self.iterator = iterator
-
-                switch value {
-                case .success(let element):
-                    return element
-
-                case .failure(let error):
-                    // Terminal. Anything after a throw stays finished.
-                    self.iterator = nil
+                case .failed(let error):
+                    state = .done
                     throw error
+
+                case .iterating(var iterator):
+                    guard let value = await iterator.next() else {
+                        state = .done
+                        return nil
+                    }
+
+                    state = .iterating(iterator)
+
+                    switch value {
+                    case .success(let element):
+                        return element
+
+                    case .failure(let error):
+                        state = .done
+                        throw error
+                    }
                 }
             }
         }
@@ -73,8 +110,12 @@ extension Internals {
 
         // MARK: - Inits
 
-        init() {
-            subject = .init(bufferingPolicy: .unbounded)
+        /// Creates a new stream.
+        /// - Parameter bufferingPolicy: `.unbounded` keeps everything for every reader.
+        /// `.untilFirstIteration` keeps everything until somebody starts reading and then
+        /// releases it to that reader, which makes the stream single use.
+        init(bufferingPolicy: SubjectBufferingPolicy = .unbounded) {
+            subject = .init(bufferingPolicy: bufferingPolicy)
             identity = .init()
         }
 
@@ -124,7 +165,11 @@ extension Internals {
         }
 
         func makeAsyncIterator() -> AsyncIterator {
-            .init(iterator: subject.makeAsyncIterator())
+            guard let iterator = subject.makeIteratorIfAvailable() else {
+                return .init(state: .failed(AlreadyConsumedError()))
+            }
+
+            return .init(state: .iterating(iterator))
         }
 
         func hash(into hasher: inout Hasher) {

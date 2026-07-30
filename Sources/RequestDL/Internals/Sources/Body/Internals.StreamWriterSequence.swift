@@ -4,7 +4,7 @@
 
 import Foundation
 import NIOCore
-@preconcurrency import AsyncHTTPClient
+import AsyncHTTPClient
 
 extension Internals {
 

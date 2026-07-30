@@ -53,6 +53,8 @@ struct CachedRequestTests {
             cacheStrategy: .ignoreCachedData
         )
 
+        await testState.dataCache.waitUntilIdle()
+
         let cachedData = DataCache(url: testState.dataCache.directoryURL).getCachedData(
             forKey: cacheKey,
             policy: .all
@@ -78,6 +80,8 @@ struct CachedRequestTests {
             headers: makeHeaders(noCache: true),
             cacheStrategy: .ignoreCachedData
         )
+
+        await testState.dataCache.waitUntilIdle()
 
         let updatedCachedData = DataCache(url: testState.dataCache.directoryURL).getCachedData(
             forKey: cacheKey,
@@ -124,6 +128,8 @@ struct CachedRequestTests {
             headers: makeHeaders(eTag: UUID()),
             cacheStrategy: .useCachedDataOnly
         )
+
+        await testState.dataCache.waitUntilIdle()
 
         let updatedCachedData = testState.dataCache.getCachedData(
             forKey: cacheKey,
@@ -176,6 +182,8 @@ struct CachedRequestTests {
             cacheStrategy: .useCachedDataOnly
         )
 
+        await testState.dataCache.waitUntilIdle()
+
         let updatedCachedData = testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
@@ -227,6 +235,8 @@ struct CachedRequestTests {
             cacheStrategy: .returnCachedDataElseLoad
         )
 
+        await testState.dataCache.waitUntilIdle()
+
         let updatedCachedData = testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
@@ -254,6 +264,8 @@ struct CachedRequestTests {
             cacheStrategy: .returnCachedDataElseLoad
         )
 
+        await testState.dataCache.waitUntilIdle()
+
         let updatedCachedData = testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
@@ -279,6 +291,8 @@ struct CachedRequestTests {
             headers: makeHeaders(eTag: eTag),
             cacheStrategy: .reloadAndValidateCachedData
         )
+
+        await testState.dataCache.waitUntilIdle()
 
         let updatedCachedData = testState.dataCache.getCachedData(
             forKey: cacheKey,
@@ -308,6 +322,8 @@ struct CachedRequestTests {
             cacheStrategy: .reloadAndValidateCachedData
         )
 
+        await testState.dataCache.waitUntilIdle()
+
         let updatedCachedData = testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
@@ -321,8 +337,13 @@ struct CachedRequestTests {
 
 extension CachedRequestTests {
 
+    /// Sleeps past the two second `max-age` used by `makeHeaders`.
+    ///
+    /// The comparison in `isCachedDataValid` is a strict `<` against `date + maxAge`, so
+    /// sleeping exactly two seconds sits right on the boundary. The margin costs nothing and
+    /// removes one more reason for these tests to flicker.
     func waitCacheExpiration() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
+        try await _Concurrency.Task.sleep(nanoseconds: 2 * NSEC_PER_SEC + 250 * NSEC_PER_MSEC)
     }
 
     func mockCachedData(_ headers: [(String, String)] = []) -> CachedData {

@@ -12,14 +12,17 @@ extension Internals {
 
         // MARK: - Internal properties
 
+        /// A copy of the current bytes.
+        ///
+        /// - Warning: Reading this hands out a second reference to the buffer's storage, so the
+        /// next write has to copy it before it can mutate. Use ``withStorage(_:)`` for anything
+        /// that touches the buffer rather than just inspecting it.
         var buffer: NIOCore.ByteBuffer {
-            get { lock.withLock { _buffer } }
-            set { lock.withLock { _buffer = newValue } }
+            lock.withLock { _buffer }
         }
 
         var writtenBytes: Int {
-            get { lock.withLock { _writtenBytes } }
-            set { lock.withLock { _writtenBytes = newValue } }
+            lock.withLock { _writtenBytes }
         }
 
         // MARK: - Private properties
@@ -28,7 +31,10 @@ extension Internals {
 
         // MARK: - Unsafe properties
 
-        private lazy var _buffer = NIOCore.ByteBuffer()
+        // Deliberately not `lazy`. A lazy var is reached through a getter and a setter, so
+        // `&_buffer` would become a read, a modify and a write, which is exactly what
+        // ``withStorage(_:)`` exists to avoid.
+        private var _buffer = NIOCore.ByteBuffer()
         private var _writtenBytes: Int = .zero
 
         // MARK: - Inits
@@ -40,6 +46,42 @@ extension Internals {
             let buffer = buffer.slice()
             self._buffer = buffer
             self._writtenBytes = buffer.readableBytes
+        }
+
+        // MARK: - Internal methods
+
+        /// Reads and writes the bytes and the written count inside a single critical section.
+        ///
+        /// Two things depend on this rather than on the properties above.
+        ///
+        /// Atomicity: a seek followed by a read is one logical operation, and there are always
+        /// two handles on the same `ByteURL`, one reading and one writing. Moving the indices
+        /// through a computed property makes every line a separate critical section, and the
+        /// two handles interleave between them.
+        ///
+        /// Cost: `ByteBuffer` is copy on write. Reading it out of a getter leaves the storage
+        /// referenced twice, so every write copies everything written so far before appending.
+        /// Mutating it in place through `inout` keeps the reference unique, which turns filling
+        /// a buffer from quadratic back into linear.
+        func withStorage<Result>(
+            _ body: (inout NIOCore.ByteBuffer, inout Int) -> Result
+        ) -> Result {
+            lock.withLock {
+                body(&_buffer, &_writtenBytes)
+            }
+        }
+
+        /// Replaces the whole content.
+        ///
+        /// Unlike writing through a handle, this shortens the resource when the new content is
+        /// smaller. A handle seeks and overwrites, and the written count only ever rises, so
+        /// the tail of the previous content survives and keeps counting as written.
+        func replace<Bytes: DataProtocol>(with data: Bytes) {
+            withStorage { buffer, writtenBytes in
+                buffer.clear()
+                buffer.writeData(data)
+                writtenBytes = buffer.writerIndex
+            }
         }
     }
 }
@@ -61,9 +103,8 @@ extension Internals.ByteURL: Hashable {
 
 extension Data {
 
+    /// Replaces the whole content of `url` with this data.
     func write(to url: Internals.ByteURL) throws {
-        let handle = Internals.ByteHandle(forWritingTo: url)
-        try handle.write(contentsOf: self)
-        try handle.close()
+        url.replace(with: self)
     }
 }

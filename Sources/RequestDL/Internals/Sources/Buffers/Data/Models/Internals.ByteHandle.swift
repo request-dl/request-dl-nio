@@ -38,8 +38,6 @@ extension Internals {
 
         func seek(toOffset offset: UInt64) throws {
             try lock.withLockVoid {
-                precondition(offset >= .zero)
-
                 guard !_isClosed else {
                     throw ClosedError()
                 }
@@ -59,31 +57,44 @@ extension Internals {
         }
 
         func read(upToCount count: Int) throws -> Data? {
-            try lock.withLock {
-                precondition(count >= .zero)
-
+            try lock.withLock { () throws -> Data? in
                 guard !_isClosed else {
                     throw ClosedError()
                 }
 
-                switch mode {
-                case .write:
+                // Reporting rather than returning nil. A read on a write handle is a wiring
+                // mistake, and the silent nil made it indistinguishable from an empty buffer,
+                // which is the hardest possible shape to debug.
+                guard case .read = mode else {
+                    throw InvalidModeError(requested: .read, actual: mode)
+                }
+
+                guard count > .zero else {
                     return nil
-                case .read:
-                    guard count > .zero else {
+                }
+
+                let index = Int(_index)
+
+                // Seeking and reading are one operation. There is always a second handle
+                // writing to the same `ByteURL`, and moving the indices one statement at a
+                // time let the two interleave, which reads from whatever offset the other
+                // side happened to leave behind.
+                let data = url.withStorage { buffer, writtenBytes -> Data? in
+                    // Out of range is a possible outcome of a truncated or concurrently reset
+                    // buffer, not a programming error, so it reports rather than traps. The
+                    // previous `precondition` here turned every such race into a crash.
+                    guard index >= .zero, index + count <= writtenBytes else {
                         return nil
                     }
 
-                    let index = Int(_index)
-                    precondition(count + index <= url.writtenBytes)
+                    buffer.moveWriterIndex(to: writtenBytes)
+                    buffer.moveReaderIndex(to: index)
 
-                    url.buffer.moveWriterIndex(to: url.writtenBytes)
-                    url.buffer.moveReaderIndex(to: index)
-
-                    let data = url.buffer.readData(length: count)
-                    _index = UInt64((data == nil ? .zero : count) + index)
-                    return data
+                    return buffer.readData(length: count)
                 }
+
+                _index = UInt64((data == nil ? .zero : count) + index)
+                return data
             }
         }
 
@@ -93,20 +104,36 @@ extension Internals {
                     throw ClosedError()
                 }
 
-                switch mode {
-                case .write:
-                    let index = Int(_index)
-
-                    url.buffer.moveReaderIndex(to: .zero)
-                    url.buffer.moveWriterIndex(to: index)
-
-                    let written = url.buffer.writeData(data)
-                    url.writtenBytes = max(url.writtenBytes, url.buffer.writerIndex)
-
-                    self._index += UInt64(written)
-                case .read:
-                    return
+                guard case .write = mode else {
+                    throw InvalidModeError(requested: .write, actual: mode)
                 }
+
+                let index = Int(_index)
+
+                // Same reasoning as `read`, plus the cost: mutating the buffer in place keeps
+                // its storage uniquely referenced, so appending no longer copies everything
+                // written so far on every call.
+                let written = url.withStorage { buffer, writtenBytes -> Int in
+                    buffer.moveReaderIndex(to: .zero)
+
+                    let gap = index - buffer.writerIndex
+
+                    if gap > .zero {
+                        // Seeked past the end. A file handle leaves a hole there and carries
+                        // on, so match it. Handing the index straight to `moveWriterIndex`
+                        // trips NIO's capacity precondition and takes the process down.
+                        _ = buffer.writeRepeatingByte(.zero, count: gap)
+                    } else {
+                        buffer.moveWriterIndex(to: index)
+                    }
+
+                    let written = buffer.writeData(data)
+                    writtenBytes = max(writtenBytes, buffer.writerIndex)
+
+                    return written
+                }
+
+                _index += UInt64(written)
             }
         }
 
@@ -124,14 +151,38 @@ extension Internals {
 
 extension Internals.ByteHandle {
 
-    fileprivate struct ClosedError: Error {
+    fileprivate struct ClosedError: Error, CustomStringConvertible {
+
+        var description: String {
+            "This byte handle has already been closed"
+        }
+    }
+
+    fileprivate struct InvalidModeError: Error, CustomStringConvertible {
+
+        let requested: Mode
+        let actual: Mode
+
+        var description: String {
+            "Attempted to \(requested) through a byte handle opened for \(actual)"
+        }
     }
 }
 
 extension Internals.ByteHandle {
 
-    fileprivate enum Mode {
+    fileprivate enum Mode: CustomStringConvertible {
+
         case write
         case read
+
+        var description: String {
+            switch self {
+            case .write:
+                return "writing"
+            case .read:
+                return "reading"
+            }
+        }
     }
 }

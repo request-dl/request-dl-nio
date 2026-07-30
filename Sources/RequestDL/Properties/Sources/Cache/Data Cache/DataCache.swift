@@ -43,14 +43,15 @@ public struct DataCache: Sendable, Equatable {
         // MARK: - Internal properties
 
         var memoryStorage: MemoryStorage {
-            get { lock.withLock { _memoryStorage } }
-            set { lock.withLock { _memoryStorage = newValue } }
+            lock.withLock { _memoryStorage }
         }
 
         var diskStorage: DiskStorage {
-            get { lock.withLock { _diskStorage } }
-            set { lock.withLock { _diskStorage = newValue } }
+            lock.withLock { _diskStorage }
         }
+
+        /// Cache writes started and not yet finished.
+        let pendingWrites = Internals.PendingTasks(priority: .background)
 
         var memoryCapacity: UInt64 {
             get { lock.withLock { _memoryCapacity } }
@@ -88,6 +89,21 @@ public struct DataCache: Sendable, Equatable {
 
         private var _memoryStorage: MemoryStorage
         private var _diskStorage: DiskStorage
+
+        // MARK: - Internal methods
+
+        /// Mutates the memory tier inside a single critical section.
+        ///
+        /// `MemoryStorage` is a struct whose mutating methods would otherwise be reached
+        /// through a computed property, making every call a read, a modify and a write across
+        /// two separate lock acquisitions. Two concurrent cache writes can lose each other's
+        /// records that way.
+        ///
+        /// - Warning: The lock is not reentrant. Do not touch any other property of this
+        /// storage from inside `body`, including the capacities.
+        func withMemoryStorage<Output>(_ body: (inout MemoryStorage) -> Output) -> Output {
+            lock.withLock { body(&_memoryStorage) }
+        }
 
         // MARK: - Init
 
@@ -272,6 +288,10 @@ public struct DataCache: Sendable, Equatable {
         }
 
         return nil
+        // Memory is consulted first, which is only safe because `allocateBuffer` evicts the
+        // memory entry whenever the memory tier refuses the new one. Without that, a response
+        // too large for memory but small enough for disk would leave a stale entry in front of
+        // a fresh one.
     }
 
     /**
@@ -299,7 +319,7 @@ public struct DataCache: Sendable, Equatable {
     public func remove(forKey key: String) {
         let key = base64EncodedKey(key)
 
-        storage.memoryStorage.remove(key)
+        storage.withMemoryStorage { $0.remove(key) }
         storage.diskStorage.remove(key)
     }
 
@@ -307,7 +327,7 @@ public struct DataCache: Sendable, Equatable {
      Removes all cached data from the cache.
      */
     public func removeAll() {
-        storage.memoryStorage.removeAll()
+        storage.withMemoryStorage { $0.removeAll() }
         storage.diskStorage.removeAll()
     }
 
@@ -317,7 +337,7 @@ public struct DataCache: Sendable, Equatable {
      - Parameter date: The date to filter cached data removal.
      */
     public func removeAll(since date: Date) {
-        storage.memoryStorage.removeAll(since: date)
+        storage.withMemoryStorage { $0.removeAll(since: date) }
         storage.diskStorage.removeAll(since: date)
     }
 
@@ -333,12 +353,18 @@ public struct DataCache: Sendable, Equatable {
 
         let key = base64EncodedKey(key)
 
+        // Read before entering the critical section below: the lock is not reentrant, and
+        // these getters take it.
+        let memoryCapacity = self.memoryCapacity
+
         if cachedResponse.policy.contains(.memory) {
-            storage.memoryStorage.updateCached(
-                key: key,
-                cachedResponse: cachedResponse,
-                maximumCapacity: memoryCapacity
-            )
+            storage.withMemoryStorage {
+                $0.updateCached(
+                    key: key,
+                    cachedResponse: cachedResponse,
+                    maximumCapacity: memoryCapacity
+                )
+            }
         }
 
         if cachedResponse.policy.contains(.disk) {
@@ -361,16 +387,30 @@ public struct DataCache: Sendable, Equatable {
 
         let key = base64EncodedKey(key)
 
+        // Read before entering the critical section below: the lock is not reentrant, and
+        // these getters take it.
+        let memoryCapacity = self.memoryCapacity
+
         var memoryBuffer: Internals.AnyBuffer?
         var diskBuffer: Internals.AnyBuffer?
 
         if cachedResponse.policy.contains(.memory) {
-            memoryBuffer = storage.memoryStorage.allocateBuffer(
-                key: key,
-                cachedResponse: cachedResponse,
-                contentLength: contentLength,
-                maximumCapacity: memoryCapacity
-            )
+            memoryBuffer = storage.withMemoryStorage { memoryStorage -> Internals.AnyBuffer? in
+                guard let buffer = memoryStorage.allocateBuffer(
+                    key: key,
+                    cachedResponse: cachedResponse,
+                    contentLength: contentLength,
+                    maximumCapacity: memoryCapacity
+                ) else {
+                    // The memory tier turned the new entry down, usually for size. Dropping
+                    // whatever was there keeps `getCachedData` from serving it in front of a
+                    // disk entry that is about to be updated.
+                    memoryStorage.remove(key)
+                    return nil
+                }
+
+                return buffer
+            }
         }
 
         if cachedResponse.policy.contains(.disk) {
@@ -386,6 +426,19 @@ public struct DataCache: Sendable, Equatable {
             memoryBuffer: memoryBuffer,
             diskBuffer: diskBuffer
         )
+    }
+
+    /// Runs a cache write and keeps track of it, so `waitUntilIdle()` can join it later.
+    func trackWrite(_ operation: @escaping @Sendable () async -> Void) {
+        storage.pendingWrites.run(operation)
+    }
+
+    /// Suspends until every cache write started so far has finished.
+    ///
+    /// Caching happens after the caller already has its response, so without this there is no
+    /// point at which "the request is done" also means "the cache is written".
+    func waitUntilIdle() async {
+        await storage.pendingWrites.waitUntilIdle()
     }
 
     // MARK: - Private methods

@@ -47,7 +47,13 @@ extension Internals {
             init(readingMode: Internals.DownloadStep.ReadingMode) {
                 self._buffer = DataBuffer()
                 self.readingMode = readingMode
-                self.stream = .init()
+
+                // The body is buffered until somebody starts reading it, which covers both the
+                // live path, where bytes arrive long before the caller reaches for them, and
+                // the cached path, where the whole body is dumped before the response object
+                // even exists. From the first read on, only the gap between producer and reader
+                // stays in memory instead of the entire download.
+                self.stream = .init(bufferingPolicy: .untilFirstIteration)
             }
 
             // MARK: - Internal methods

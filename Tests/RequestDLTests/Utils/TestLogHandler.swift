@@ -1,6 +1,6 @@
 import Foundation
 import NIOConcurrencyHelpers
-@preconcurrency import Logging
+import Logging
 @testable import RequestDL
 
 final class TestLogHandler: LogHandler, @unchecked Sendable {

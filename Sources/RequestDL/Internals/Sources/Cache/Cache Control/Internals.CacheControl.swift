@@ -181,16 +181,21 @@ extension Internals {
             var requestConfiguration = requestConfiguration
             requestConfiguration.method = "HEAD"
 
-            updateHeaders(
+            // Conditional request headers. Copying `ETag` and `Last-Modified` straight onto the
+            // request, which is what this used to do, tells the server nothing: those are
+            // response headers. A server only answers 304 when it is asked with `If-None-Match`
+            // or `If-Modified-Since`, so without these the 304 branch below was unreachable and
+            // every revalidation downloaded the whole body again.
+            setConditionalHeader(
                 &requestConfiguration.headers,
-                cachedHeaders: cachedData.response.headers,
-                for: "Last-Modified"
+                named: "If-None-Match",
+                from: cachedData.response.headers["ETag"]
             )
 
-            updateHeaders(
+            setConditionalHeader(
                 &requestConfiguration.headers,
-                cachedHeaders: cachedData.response.headers,
-                for: "ETag"
+                named: "If-Modified-Since",
+                from: cachedData.response.headers["Last-Modified"]
             )
 
             guard let response = try? await client.execute(
@@ -219,41 +224,59 @@ extension Internals {
             return .init(response.headers)
         }
 
-        private func updateHeaders(
+        /// Sets a conditional request header from the values the cached response carries.
+        private func setConditionalHeader(
             _ headers: inout HTTPHeaders,
-            cachedHeaders: HTTPHeaders,
-            for name: String
+            named name: String,
+            from values: [String]?
         ) {
-            let values = headers[name] ?? cachedHeaders[name]
+            guard let values, !values.isEmpty else {
+                return
+            }
 
-            if let values, headers[name] ?? [] != values {
-                headers.remove(name: name)
+            headers.remove(name: name)
 
-                for value in values {
-                    headers.add(name: name, value: value)
-                }
+            for value in values {
+                headers.add(name: name, value: value)
             }
         }
 
+        /// Folds the freshness directives the server just sent into the cached response.
+        ///
+        /// The new value has to win. The previous version passed the new headers through the
+        /// `cachedHeaders` parameter of a helper that preferred whatever was already there, so
+        /// it could only ever add a directive that was missing and never refresh one that
+        /// existed. Picking up a fresher `max-age` is the entire point of revalidating.
         private func updateCacheHeaders(
             _ cachedHeaders: HTTPHeaders,
             with newHeaders: HTTPHeaders
         ) -> HTTPHeaders {
-            var cachedHeaders = cachedHeaders
+            var merged = cachedHeaders
 
-            updateHeaders(
-                &cachedHeaders,
-                cachedHeaders: newHeaders,
-                for: "Cache-Control"
-            )
+            replaceHeader(&merged, with: newHeaders, for: "Cache-Control")
+            replaceHeader(&merged, with: newHeaders, for: "Expires")
 
-            updateHeaders(
-                &cachedHeaders,
-                cachedHeaders: newHeaders,
-                for: "Expires"
-            )
+            return merged
+        }
 
-            return cachedHeaders
+        private func replaceHeader(
+            _ headers: inout HTTPHeaders,
+            with newHeaders: HTTPHeaders,
+            for name: String
+        ) {
+            guard let values = newHeaders[name], !values.isEmpty else {
+                return
+            }
+
+            guard headers[name] ?? [] != values else {
+                return
+            }
+
+            headers.remove(name: name)
+
+            for value in values {
+                headers.add(name: name, value: value)
+            }
         }
 
         private func updateCachedResponse(
@@ -287,9 +310,21 @@ extension Internals {
 
                 let contentLength = contentLength(headers: head.headers["Content-Length"] ?? [])
 
-                let asyncBuffers = Internals.AsyncStream<Internals.DataBuffer>()
+                // Read exactly once, by the task below. Buffering until that read begins
+                // covers the hop it takes to get going, and from then on only the gap between
+                // the download and the disk writer stays in memory.
+                let asyncBuffers = Internals.AsyncStream<Internals.DataBuffer>(
+                    bufferingPolicy: .untilFirstIteration
+                )
 
-                _Concurrency.Task(priority: .background) {
+                dataCache.trackWrite {
+                    // On every exit path. Without it, a task that gives up before reaching the
+                    // loop leaves behind a stream nobody will ever drain, and the download goes
+                    // on feeding it for the rest of the response. Closing makes every later
+                    // append a no op, so the producer stops buffering without having to know
+                    // that its reader is gone.
+                    defer { asyncBuffers.close() }
+
                     guard var cacheBuffer = dataCache.allocateBuffer(
                         key: requestConfiguration.url,
                         cachedResponse: .init(
@@ -297,7 +332,13 @@ extension Internals {
                             policy: requestConfiguration.cachePolicy
                         ),
                         contentLength: UInt64(contentLength)
-                    ) else { return }
+                    ) else {
+                        logger?.log(
+                            level: .warning,
+                            "Could not allocate a cache buffer - response will not be cached"
+                        )
+                        return
+                    }
 
                     do {
                         for try await buffer in asyncBuffers {

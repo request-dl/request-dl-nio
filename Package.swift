@@ -24,15 +24,15 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.92.1"
+            from: "2.101.3"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.31.2"
+            from: "1.34.3"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.36.0"
+            from: "2.37.2"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
@@ -40,11 +40,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.8.0"
+            from: "1.14.0"
         ),
         .package(
             url: "https://github.com/apple/swift-collections",
-            from: "1.4.1"
+            from: "1.6.0"
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
