@@ -2,10 +2,14 @@
  See LICENSE for this package's licensing information.
 */
 
-import Foundation
+import SwiftAsyncStream
 
 extension Internals {
 
+    /// Runs submitted operations one at a time, in submission order, off the caller's thread.
+    ///
+    /// Enqueueing is synchronous, which is what makes the order well defined: a caller's
+    /// position is decided when it calls, not when a task it created happens to get scheduled.
     final class AsyncQueue: @unchecked Sendable {
 
         // MARK: - Private properties
@@ -15,48 +19,77 @@ extension Internals {
 
         // MARK: - Unsafe properties
 
-        private var _operations: [() async -> Void]
-        private var _isRunning = false
+        private var _operations = FIFOQueue<@Sendable () async -> Void>()
+
+        // Non nil exactly while the queue is running, and replaced on every busy epoch.
+        //
+        // A single long lived signal cannot work here. Closing it has to happen under the lock,
+        // together with the state it describes, but opening it resumes continuations and so has
+        // to happen outside. That ordering can invert, leaving the signal open while the queue
+        // runs, and anyone in `waitUntilIdle` then spins hot. One signal per epoch removes the
+        // inversion: a waiter released by the previous epoch simply picks up the current one.
+        private var _idleSignal: AsyncSignal?
 
         // MARK: - Inits
 
         init(priority: _Concurrency.TaskPriority = .utility) {
             self.priority = priority
-            self._operations = []
         }
 
-        // MARK: - Internal properties
+        // MARK: - Internal methods
 
-        func addOperation(_ operation: @escaping () async -> Void) {
-            lock.withLock {
-                _operations.insert(operation, at: .zero)
-                _runIfNeeded()
+        func addOperation(_ operation: @escaping @Sendable () async -> Void) {
+            let didStart = lock.withLock { () -> Bool in
+                _operations.append(operation)
+
+                guard _idleSignal == nil else {
+                    return false
+                }
+
+                // Closing a signal only flips a flag, so it is safe to do while holding a lock.
+                _idleSignal = AsyncSignal()
+                return true
+            }
+
+            guard didStart else {
+                return
+            }
+
+            runNext()
+        }
+
+        /// Suspends until the queue has drained.
+        ///
+        /// Loops rather than awaiting once: an operation submitted while the queue is going
+        /// idle opens a new epoch, and the caller has to wait for that one too.
+        func waitUntilIdle() async {
+            while let signal = lock.withLock({ _idleSignal }) {
+                try? await signal.wait()
             }
         }
 
         // MARK: - Private methods
 
-        private func _runIfNeeded() {
-            guard !_isRunning else {
-                return
+        private func runNext() {
+            let next = lock.withLock { () -> (operation: (@Sendable () async -> Void)?, idle: AsyncSignal?) in
+                if let operation = _operations.popFirst() {
+                    return (operation, nil)
+                }
+
+                let signal = _idleSignal
+                _idleSignal = nil
+                return (nil, signal)
             }
 
-            _isRunning = true
-            _runFirstOperation(true)
-        }
-
-        private func _runFirstOperation(_ isStateLock: Bool) {
-            isStateLock ? () : lock.lock()
-            defer { isStateLock ? () : lock.unlock() }
-
-            guard let operation = _operations.popLast() else {
-                _isRunning = false
+            guard let operation = next.operation else {
+                // Outside the critical section: this resumes continuations.
+                next.idle?.signal()
                 return
             }
 
             _Concurrency.Task(priority: priority) {
                 await operation()
-                _runFirstOperation(false)
+                self.runNext()
             }
         }
     }

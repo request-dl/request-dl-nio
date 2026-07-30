@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,10 +6,10 @@ import PackageDescription
 let package = Package(
     name: "request-dl",
     platforms: [
-        .macOS(.v10_15),
-        .iOS(.v13),
-        .tvOS(.v13),
-        .watchOS(.v6)
+        .macOS(.v12),
+        .iOS(.v15),
+        .tvOS(.v15),
+        .watchOS(.v8)
     ],
     products: [
         .library(
@@ -45,6 +45,10 @@ let package = Package(
         .package(
             url: "https://github.com/apple/swift-collections",
             from: "1.4.1"
+        ),
+        .package(
+            url: "https://github.com/o-nnerb/swift-async-stream",
+            branch: "release-2.0"
         )
     ],
     targets: [
@@ -52,6 +56,7 @@ let package = Package(
             name: "RequestDL",
             dependencies: [
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),

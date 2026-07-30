@@ -14,6 +14,9 @@ extension Internals {
 
         typealias Response = Void
 
+        /// A stream operation deferred until the state lock is released.
+        private typealias Effect = () -> Void
+
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -22,13 +25,12 @@ extension Internals {
 
         private let upload: Internals.AsyncStream<Int>
         private let head: Internals.AsyncStream<ResponseHead>
+        private let download: DownloadBuffer
         private let cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
 
         private let logger: Internals.TaskLogger?
 
         // MARK: - Unsafe properties
-
-        private var _download: DownloadBuffer
 
         private var _phase: Phase = .upload
         private var _state: State = .idle
@@ -47,7 +49,7 @@ extension Internals {
             self.url = url
             self.upload = upload
             self.head = head
-            self._download = download
+            self.download = download
             self.cache = cache
             self.logger = logger
         }
@@ -55,34 +57,35 @@ extension Internals {
         // MARK: - Internal methods
 
         func didSendRequestPart(task: HTTPClient.Task<Response>, _ part: IOData) {
-            lock.withLockVoid {
+            decide {
                 guard [.idle, .uploading].contains(_state) && _phase == .upload else {
-                    return
+                    return []
                 }
 
                 _state = .uploading
                 _reference = .upload
 
-                upload.append(.success(part.readableBytes))
+                let readableBytes = part.readableBytes
+                return [{ self.upload.append(.success(readableBytes)) }]
             }
         }
 
         func didSendRequest(task: HTTPClient.Task<Response>) {
-            lock.withLockVoid {
+            decide {
                 guard [.idle, .uploading].contains(_state) && _phase == .upload else {
-                    return
+                    return []
                 }
 
                 _state = .uploading
                 _phase = .upload
                 _reference = .head
 
-                upload.close()
+                return [{ self.upload.close() }]
             }
         }
 
         func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void> {
-            lock.withLock {
+            decide {
                 guard
                     ([.idle, .uploading].contains(_state) && _phase == .upload)
                         || [.head].contains(_state) && _phase == .download
@@ -104,44 +107,52 @@ extension Internals {
                     isKeepAlive: head.isKeepAlive
                 )
 
-                self.head.append(.success(responseHead))
-                self.upload.close()
-                self.head.close()
-
                 _state = .head
                 _phase = .download
                 _reference = .download
 
-                if let cache = self.cache?(responseHead) {
-                    _download.cacheStream(cache)
-                }
+                return [
+                    { self.head.append(.success(responseHead)) },
+                    { self.upload.close() },
+                    { self.head.close() },
+                    {
+                        // The cache factory allocates a buffer and starts a task, so it is
+                        // caller supplied work that has no business running under the lock.
+                        guard let cacheStream = self.cache?(responseHead) else {
+                            return
+                        }
 
-                return task.eventLoop.makeSucceededVoidFuture()
+                        self.download.cacheStream(cacheStream)
+                    }
+                ]
             }
+
+            return task.eventLoop.makeSucceededVoidFuture()
         }
 
         func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void> {
-            lock.withLock {
+            decide {
                 guard [.head, .downloading].contains(_state) && _phase == .download else {
                     _unexpectedStateOrPhase()
                 }
-
-                _download.append(Internals.DataBuffer(
-                    Internals.ByteURL(buffer)
-                ))
 
                 _state = .downloading
                 _phase = .download
                 _reference = .download
 
-                head.close()
+                let dataBuffer = Internals.DataBuffer(Internals.ByteURL(buffer))
 
-                return task.eventLoop.makeSucceededVoidFuture()
+                return [
+                    { self.download.append(dataBuffer) },
+                    { self.head.close() }
+                ]
             }
+
+            return task.eventLoop.makeSucceededVoidFuture()
         }
 
         func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
-            lock.withLock {
+            decide {
                 guard [.head, .downloading, .end].contains(_state) && _phase == .download else {
                     _unexpectedStateOrPhase()
                 }
@@ -150,49 +161,70 @@ extension Internals {
                 _phase = .download
                 _reference = .lockout
 
-                _download.close()
-                head.close()
-                upload.close()
+                return [
+                    { self.download.close() },
+                    { self.head.close() },
+                    { self.upload.close() }
+                ]
             }
         }
 
         func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
-            lock.withLockVoid {
-                defer {
-                    _state = .failure
-                    upload.close()
-                    head.close()
-                    _download.close()
-                }
+            decide {
+                var effects = [Effect]()
 
+                // The cascade picks the furthest stream the request actually reached, so the
+                // error surfaces where a consumer is listening.
                 switch _state {
                 case .idle:
                     guard _reference <= .head else {
                         fallthrough
                     }
-                    head.append(.failure(error))
+
+                    effects.append { self.head.append(.failure(error)) }
                 case .uploading:
                     guard _reference <= .upload else {
                         fallthrough
                     }
 
-                    upload.append(.failure(error))
+                    effects.append { self.upload.append(.failure(error)) }
                 case .head:
                     guard _reference <= .head else {
                         fallthrough
                     }
 
-                    head.append(.failure(error))
+                    effects.append { self.head.append(.failure(error)) }
                 case .downloading:
                     guard _reference <= .download else {
                         fallthrough
                     }
 
-                    _download.failed(error)
+                    effects.append { self.download.failed(error) }
                 case .end, .failure:
                     _unexpectedStateOrPhase(error: error)
                 }
+
+                _state = .failure
+
+                effects.append { self.upload.close() }
+                effects.append { self.head.close() }
+                effects.append { self.download.close() }
+
+                return effects
             }
+        }
+
+        // MARK: - Private methods
+
+        /// Runs `body` under the state lock and its returned side effects after releasing it.
+        ///
+        /// Appending to or closing a stream resumes consumer continuations synchronously, and
+        /// these callbacks run on the NIO event loop. Doing that inside the critical section
+        /// would hand the event loop's thread to arbitrary consumer code while the receiver's
+        /// lock is held, which is a priority inversion sitting directly on the network path.
+        private func decide(_ body: () -> [Effect]) {
+            let effects = lock.withLock(body)
+            effects.forEach { $0() }
         }
 
         // MARK: - Unsafe methods
