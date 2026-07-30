@@ -9,10 +9,9 @@ import Testing
 struct InternalsBodyTests {
 
     @Test
-    func requestBody_whenFragmentByOne_shouldContainsAllCharacters() async throws {
+    func requestBody_whenSmallBody_shouldSendItInASingleChunk() async throws {
         // Given
         let string = "Hello World"
-
         let body = RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
@@ -21,12 +20,12 @@ struct InternalsBodyTests {
         let buffers = try await body.buffers()
 
         // Then
-        #expect(body.chunkSize == 1)
         #expect(body.totalSize == string.count)
 
-        #expect(
-            buffers.resolveData() == Array(string.utf8).split(by: 1)
-        )
+        // Anything under the minimum chunk goes out whole. Eleven characters used to become
+        // eleven writes, each with its own future and its own progress event.
+        #expect(body.chunkSize == string.count)
+        #expect(buffers.resolveData() == Array(string.utf8).split(by: string.count))
     }
 
     @Test

@@ -99,11 +99,9 @@ struct InternalsBodySequenceTests {
     }
 
     @Test
-    func bodySequence_whenBiggerDataWithNilSize_shouldFragmentInto10000Parts() async throws {
+    func bodySequence_whenBiggerDataWithNilSize_shouldFragmentByTheDefaultPolicy() async throws {
         // Given
         let length = 20_001
-        let chunkSize = Int(floor(Double(length) / 10_000))
-
         let data = Data.randomData(length: length)
 
         let bodySequence = makeBodySequence([
@@ -112,10 +110,19 @@ struct InternalsBodySequenceTests {
 
         // When
         let sequence = Array(bodySequence).resolveData()
-        let expecting = Array(data).split(by: chunkSize)
+
+        // Deriving the expectation from the sequence's own chunk size keeps this about the
+        // contract, every byte in order and nothing over the limit, instead of restating the
+        // sizing formula and breaking whenever it is tuned.
+        let expecting = Array(data).split(by: bodySequence.chunkSize)
 
         // Then
         #expect(sequence == expecting)
+
+        // The sizing itself, asserted on purpose and separately: twenty kilobytes used to go out
+        // as ten thousand two byte chunks.
+        #expect(bodySequence.chunkSize == 16 * 1_024)
+        #expect(sequence.count == 2)
     }
 }
 

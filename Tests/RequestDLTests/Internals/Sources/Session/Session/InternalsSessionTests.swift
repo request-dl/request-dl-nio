@@ -1,6 +1,6 @@
 /*
  See LICENSE for this package's licensing information.
-*/
+ */
 
 import Foundation
 import Testing
@@ -67,9 +67,9 @@ struct InternalsSessionTests {
     @Test
     func session_whenPerformingPostUploadingData_shouldBeValid() async throws {
         let testState = try await TestState()
+
         // Given
         let session = testState.session
-
         let length = 1_023
         let data = Data.randomData(length: length)
 
@@ -87,13 +87,27 @@ struct InternalsSessionTests {
             dataCache: .init(),
             logger: nil
         )
+
         let result = try await Array(task())
 
         // Then
-        #expect(result.count == length + 1)
-        #expect(
-            Array(result[0..<length]) == (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
-        )
+        let uploadSteps = result.compactMap { step -> UploadStep? in
+            guard case .upload(let step) = step else {
+                return nil
+            }
+
+            return step
+        }
+
+        // Whatever the chunking policy is, every part has to report the same total and the
+        // parts have to add up to the body. Asserting a step count instead pinned the policy.
+        #expect(uploadSteps.count == result.count - 1)
+        #expect(uploadSteps.allSatisfy { $0.totalSize == length })
+        #expect(uploadSteps.map(\.chunkSize).reduce(.zero, +) == length)
+
+        // A body this small belongs in one chunk. This is the regression guard: it used to go
+        // out one byte at a time.
+        #expect(uploadSteps.count == 1)
 
         guard case .download? = result.last else {
             Issue.record("The obtained result is different from the expected result")
@@ -204,8 +218,11 @@ struct InternalsSessionTests {
         }
 
         // Then
-        #expect(uploadedBytes.reduce(.zero, +) == fileBuffer.writerIndex)
+        let uploadedTotal = uploadedBytes.reduce(.zero, +)
+
         #expect(fileBuffer.writerIndex == length)
+        #expect(uploadedTotal == length)
+        #expect(uploadedBytes.allSatisfy { $0 <= fragment })
         #expect(download != nil)
         #expect(download?.0.status.code == 200)
         #expect(
