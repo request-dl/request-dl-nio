@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 @testable import RequestDL
 
 struct InternalsDataStreamTests {
@@ -26,7 +27,7 @@ struct InternalsDataStreamTests {
         stream.close()
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
 
         #expect(values.wrappedValue.isEmpty)
     }
@@ -57,7 +58,7 @@ struct InternalsDataStreamTests {
         stream.close()
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
 
         #expect(
             try values.wrappedValue.compactMap { try $0.get() } == Array(0...5)
@@ -85,7 +86,7 @@ struct InternalsDataStreamTests {
         stream.append(.success(1))
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
 
         let _values = values.wrappedValue
 
@@ -118,7 +119,7 @@ struct InternalsDataStreamTests {
         stream.append(.success(2))
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
 
         let _values = values.wrappedValue
 
@@ -232,7 +233,7 @@ struct InternalsDataStreamTests {
 
         // Then
         for expectation in expectations {
-            await expectation.wait()
+            try await expectation.wait()
         }
 
         for value in values {

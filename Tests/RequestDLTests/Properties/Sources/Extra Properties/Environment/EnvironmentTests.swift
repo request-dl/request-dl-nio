@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 @testable import RequestDL
 
 struct EnvironmentTests {
@@ -40,7 +41,7 @@ struct EnvironmentTests {
             receiver
         })
 
-        await expectation.wait()
+        try await expectation.wait()
 
         // Then
         #expect(value.wrappedValue == IntegerEnvironmentKey.defaultValue)
@@ -66,7 +67,7 @@ struct EnvironmentTests {
                 .environment(\.integer, value)
         })
 
-        await expectation.wait()
+        try await expectation.wait()
 
         // Then
         #expect(receivedValue.wrappedValue == value)

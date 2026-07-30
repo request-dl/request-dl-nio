@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import SwiftAsyncStream
 @testable import RequestDL
 
 class IndexProducer: @unchecked Sendable {

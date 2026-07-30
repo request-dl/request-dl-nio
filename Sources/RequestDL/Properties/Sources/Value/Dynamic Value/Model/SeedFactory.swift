@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import SwiftAsyncStream
 
 struct SeedFactory: Sendable {
 

@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 @testable import RequestDL
 
 struct InterceptedRequestTaskTests {
@@ -34,7 +35,7 @@ struct InterceptedRequestTaskTests {
         .result()
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
         #expect(taskIntercepted.wrappedValue)
     }
 }

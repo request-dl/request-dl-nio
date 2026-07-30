@@ -6,6 +6,7 @@ import Foundation
 import NIO
 import NIOSSL
 import NIOHTTP1
+import SwiftAsyncStream
 #if canImport(Darwin)
 import NIOTransportServices
 #endif

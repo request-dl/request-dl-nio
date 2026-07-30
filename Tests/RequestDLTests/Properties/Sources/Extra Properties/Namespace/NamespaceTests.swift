@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 @testable @_spi(Private) import RequestDL
 
 struct NamespaceTests {

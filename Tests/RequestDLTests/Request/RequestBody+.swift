@@ -6,6 +6,7 @@ import Foundation
 import NIOCore
 import NIOPosix
 import AsyncHTTPClient
+import SwiftAsyncStream
 @testable import RequestDL
 
 extension RequestBody {

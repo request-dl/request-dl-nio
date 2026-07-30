@@ -6,6 +6,7 @@ import Foundation
 #if canImport(Darwin)
 @preconcurrency import Combine
 import _Concurrency
+import SwiftAsyncStream
 
 /// A publisher for any ``RequestTask``.
 public struct PublishedTask<Output: Sendable>: Publisher {

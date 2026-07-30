@@ -213,11 +213,7 @@ extension ResolveTests {
                                     name = q,
                                     value = some question,
                                     urlEncoder = URLEncoder {
-                                        lock = Lock {
-                                            _lock = NIOLock {
-                                                _storage = NIOConcurrencyHelpers.LockStorage<()>
-                                            }
-                                        },
+                                        lock = Lock,
                                         _dateEncodingStrategy = .iso8601,
                                         _keyEncodingStrategy = .literal,
                                         _dataEncodingStrategy = .base64,

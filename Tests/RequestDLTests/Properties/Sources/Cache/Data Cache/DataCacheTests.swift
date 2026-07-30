@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 @testable import RequestDL
 
 private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
@@ -389,7 +390,7 @@ extension DataCacheTests {
         }
 
         for lock in locks {
-            await lock.wait()
+            try await lock.wait()
         }
     }
 }

@@ -5,6 +5,7 @@
 import Foundation
 import NIOCore
 import AsyncHTTPClient
+import SwiftAsyncStream
 
 extension Internals {
 

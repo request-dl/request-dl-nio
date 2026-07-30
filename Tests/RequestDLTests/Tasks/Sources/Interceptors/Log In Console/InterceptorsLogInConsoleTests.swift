@@ -5,6 +5,7 @@
 import Foundation
 import Testing
 import Logging
+import SwiftAsyncStream
 @testable import RequestDL
 
 struct InterceptorsLogInConsoleTests {
@@ -29,7 +30,7 @@ struct InterceptorsLogInConsoleTests {
             .logInConsole(true)
             .result()
 
-            await expectation.wait()
+            try await expectation.wait()
 
             return result
         }
@@ -66,7 +67,7 @@ struct InterceptorsLogInConsoleTests {
             .logInConsole(true)
             .result()
 
-            await expectation.wait()
+            try await expectation.wait()
 
             return result
         }
@@ -103,7 +104,7 @@ struct InterceptorsLogInConsoleTests {
             .logInConsole(true)
             .result()
 
-            await expectation.wait()
+            try await expectation.wait()
 
             return result
         }

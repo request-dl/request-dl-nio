@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 #if canImport(Combine)
 import Combine
 @testable import RequestDL
@@ -39,7 +40,7 @@ struct PublishedTaskTests {
             expectation.signal()
         }.store(in: &cancellation)
 
-        await expectation.wait()
+        try await expectation.wait()
 
         // Then
         #expect(isSuccess)
@@ -73,7 +74,7 @@ struct PublishedTaskTests {
 
         subject.send()
 
-        await expectation.wait()
+        try await expectation.wait()
 
         // Then
         #expect(isSuccess)

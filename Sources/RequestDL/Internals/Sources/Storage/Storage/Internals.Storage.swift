@@ -7,6 +7,7 @@ import Foundation
 #else
 @preconcurrency import Foundation
 #endif
+import SwiftAsyncStream
 
 extension Internals {
 

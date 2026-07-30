@@ -4,6 +4,7 @@
 
 import Foundation
 import Logging
+import SwiftAsyncStream
 
 /**
  A data cache that stores and retrieves data based on specified capacities and policies.

@@ -4,6 +4,7 @@
 
 import Foundation
 import NIOCore
+import SwiftAsyncStream
 
 extension Internals {
 

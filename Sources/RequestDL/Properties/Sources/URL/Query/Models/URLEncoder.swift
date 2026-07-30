@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import SwiftAsyncStream
 
 /// A class that encodes values into query items for use in URL requests.
 public final class URLEncoder: @unchecked Sendable {

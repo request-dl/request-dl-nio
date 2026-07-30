@@ -3,6 +3,7 @@
 */
 
 import Foundation
+import SwiftAsyncStream
 
 @propertyWrapper
 struct _Container<Value>: DynamicValue {

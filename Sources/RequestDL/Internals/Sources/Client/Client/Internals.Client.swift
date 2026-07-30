@@ -4,6 +4,7 @@
 
 import Foundation
 import NIOCore
+import SwiftAsyncStream
 import AsyncHTTPClient
 import Logging
 

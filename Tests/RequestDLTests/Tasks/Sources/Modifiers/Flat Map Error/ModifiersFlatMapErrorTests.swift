@@ -4,6 +4,7 @@
 
 import Foundation
 import Testing
+import SwiftAsyncStream
 @testable import RequestDL
 
 struct ModifiersFlatMapErrorTests {
