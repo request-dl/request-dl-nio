@@ -17,7 +17,7 @@ import struct Foundation.Date
 
 extension Internals {
 
-    class ClientManager: @unchecked Sendable {
+    final class ClientManager: @unchecked Sendable {
 
         // MARK: - Internal static properties
 
@@ -55,18 +55,11 @@ extension Internals {
             let sessionProviderID = provider.uniqueIdentifier(with: options)
 
             return try await lock.withLock {
-                tableLock.lock()
-                if var items = _table[sessionProviderID] {
-                    if let (index, item) = items.enumerated().first(where: {
-                        $1.sessionConfiguration == sessionConfiguration
-                    }) {
-                        items[index] = item.updatingReadAt()
-                        _table[sessionProviderID] = items
-                        tableLock.unlock()
-                        return item.client
-                    }
+                // `withLock` rather than a manual lock and unlock pair with a return in the
+                // middle of it, which balances today and stops balancing on the next edit.
+                if let client = tableLock.withLock({ _reusableClient(id: sessionProviderID, sessionConfiguration: sessionConfiguration) }) {
+                    return client
                 }
-                tableLock.unlock()
 
                 let eventLoopGroup = await EventLoopGroupManager.shared.provider(
                     provider,
@@ -83,13 +76,16 @@ extension Internals {
 
         // MARK: - Private methods
 
-        fileprivate func scheduleCleanup() {
+        private func scheduleCleanup() {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
                 while true {
                     do {
-                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
+                        try await _Concurrency.Task.sleep(nanoseconds: lifetime)
                     } catch {
-                        await Task.yield()
+                        // Sleeping fails on cancellation and nothing else. Yielding and looping
+                        // meant the next sleep failed immediately too, turning this into a
+                        // tight loop that never slept again and never stopped.
+                        return
                     }
 
                     guard let self else {
@@ -103,25 +99,32 @@ extension Internals {
 
         private func cleanupIfNeeded() async {
             await lock.withLock {
-                let now = Date()
-                let lifetime = Double(lifetime) / Double(NSEC_PER_SEC)
+                // Monotonic, not wall clock. `Date` moves when the user or NTP moves the system
+                // clock: backwards and no client is ever recycled, forwards and every client is
+                // eligible at once, including one handed out a moment ago and about to be used.
+                let now = DispatchTime.now().uptimeNanoseconds
 
                 for (key, items) in tableLock.withLock({ _table }) {
-                    var optionalItems = items as [Internals.ClientManager.Item?]
+                    var surviving = [Item]()
 
-                    for (index, item) in items.enumerated() {
+                    for item in items {
                         if item.client.isRunning {
-                            optionalItems[index] = item.updatingReadAt()
-                        } else if item.readAt.distance(to: now) > lifetime {
-                            if (try? await item.client.shutdown()) ?? false {
-                                optionalItems[index] = nil
-                            }
+                            surviving.append(item.updatingReadAt())
+                            continue
+                        }
+
+                        guard now - item.readAt > lifetime else {
+                            surviving.append(item)
+                            continue
+                        }
+
+                        if (try? await item.client.shutdown()) != true {
+                            surviving.append(item)
                         }
                     }
 
-                    let items = optionalItems.compactMap { $0 }
                     tableLock.withLock {
-                        _table[key] = items.isEmpty ? nil : items
+                        _table[key] = surviving.isEmpty ? nil : surviving
                     }
                 }
             }
@@ -129,6 +132,25 @@ extension Internals {
 
         // MARK: - Unsafe methods
 
+        /// - Warning: Lockless. The caller must be holding ``tableLock``.
+        private func _reusableClient(
+            id: String,
+            sessionConfiguration: Internals.Session.Configuration
+        ) -> Internals.Client? {
+            guard
+                var items = _table[id],
+                let index = items.firstIndex(where: { $0.sessionConfiguration == sessionConfiguration })
+            else { return nil }
+
+            let item = items[index]
+
+            items[index] = item.updatingReadAt()
+            _table[id] = items
+
+            return item.client
+        }
+
+        /// - Warning: Lockless with respect to ``tableLock``, which it takes itself.
         private func _createNewClient(
             id: String,
             eventLoopGroup: EventLoopGroup,
@@ -139,19 +161,17 @@ extension Internals {
                 configuration: try sessionConfiguration.build()
             )
 
-            tableLock.lock()
-            defer { tableLock.unlock() }
+            tableLock.withLock {
+                var items = _table[id] ?? []
 
-            var items = _table[id] ?? []
-
-            items.append(
-                .createNew(
+                items.append(.createNew(
                     sessionConfiguration: sessionConfiguration,
                     client: client
-                )
-            )
+                ))
 
-            _table[id] = items
+                _table[id] = items
+            }
+
             return client
         }
     }

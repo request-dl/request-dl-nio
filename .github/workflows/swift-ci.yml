@@ -50,9 +50,6 @@ jobs:
       third-party-coverage-enabled: true
       test-foundation-essentials: true
 
-      # Step 3 – WebAssembly
-      enable-wasm: true
-
       # Step 4
       enable-coverage-upload: true
     secrets: inherit

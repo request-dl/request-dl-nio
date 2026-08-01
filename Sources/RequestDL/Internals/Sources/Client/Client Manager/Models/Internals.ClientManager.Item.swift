@@ -16,7 +16,10 @@ extension Internals.ClientManager {
 
         let sessionConfiguration: Internals.Session.Configuration
         let client: Internals.Client
-        let readAt: Date
+
+        /// Monotonic. See ``Internals/ClientManager/cleanupIfNeeded()`` for why this is not a
+        /// `Date`.
+        let readAt: UInt64
 
         // MARK: - Internal static methods
 
@@ -27,7 +30,7 @@ extension Internals.ClientManager {
             .init(
                 sessionConfiguration: sessionConfiguration,
                 client: client,
-                readAt: .init()
+                readAt: DispatchTime.now().uptimeNanoseconds
             )
         }
 
@@ -37,7 +40,7 @@ extension Internals.ClientManager {
             .init(
                 sessionConfiguration: sessionConfiguration,
                 client: client,
-                readAt: .init()
+                readAt: DispatchTime.now().uptimeNanoseconds
             )
         }
     }

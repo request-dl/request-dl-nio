@@ -41,6 +41,22 @@ extension Internals {
             )
         }
 
+        deinit {
+            // Shutting down from here is a last resort, so it is guarded by the same flag the
+            // explicit path sets. Without the guard this shut down a client the manager had
+            // already closed, and the second call is an error nobody was positioned to see.
+            //
+            // The client is captured, not `self`, and the task keeps it alive until the
+            // shutdown finishes, so it is never released mid shutdown.
+            guard !_isClosed else {
+                return
+            }
+
+            _Concurrency.Task { [_client] in
+                try? await _client.shutdown()
+            }
+        }
+
         // MARK: - Internal methods
 
         func execute(
@@ -59,6 +75,8 @@ extension Internals {
             delegate: Delegate,
             logger: TaskLogger?
         ) -> UnsafeTask<Delegate.Response> {
+            // Registered before the request goes out, so the client counts as busy from the
+            // moment it is asked to do anything.
             let operation = manager.operation()
 
             let task: HTTPClient.Task<Delegate.Response>
@@ -77,11 +95,10 @@ extension Internals {
             }
 
             return UnsafeTask(task) {
-                _Concurrency.Task {
-                    await self.lock.withLockVoid {
-                        operation.complete()
-                    }
-                }
+                // No lock and no task hop. Completing an operation is a counter decrement now,
+                // so wrapping it in `AsyncLock` only bought a suspension on a path that can be
+                // reached from an event loop.
+                operation.complete()
             }
         }
 
@@ -94,12 +111,6 @@ extension Internals {
                 try await _client.shutdown()
                 _isClosed = true
                 return true
-            }
-        }
-
-        deinit {
-            Task { [_client] in
-                try await _client.shutdown()
             }
         }
     }

@@ -2,8 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import NIOCore
+import AsyncHTTPClient
 import SwiftAsyncStream
 
 extension Internals {
@@ -25,22 +25,18 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// Returns the event loop group for a provider, creating it the first time.
+        ///
+        /// The hop through `Task.detached(priority: .background)` that used to wrap this is
+        /// gone. `Task.detached` does not inherit priority, and the caller awaited its result,
+        /// so a `.userInitiated` request ended up waiting on a `.background` task: a textbook
+        /// priority inversion, right on the path that has to run before any request goes out.
+        /// Background is also the first thing the system defers under thermal pressure or Low
+        /// Power Mode, which is exactly when a request should not be stalling.
+        ///
+        /// - Note: If the hop was there to work around something, that something is still
+        /// there and needs a different answer.
         func provider(
-            _ sessionProvider: SessionProvider,
-            with options: SessionProviderOptions
-        ) async -> EventLoopGroup {
-            if case .background = _Concurrency.Task.currentPriority {
-                return await _provider(sessionProvider, with: options)
-            } else {
-                return await _Concurrency.Task.detached(priority: .background) {
-                    await self._provider(sessionProvider, with: options)
-                }.value
-            }
-        }
-
-        // MARK: - Unsafe methods
-
-        private func _provider(
             _ sessionProvider: SessionProvider,
             with options: SessionProviderOptions
         ) async -> EventLoopGroup {
