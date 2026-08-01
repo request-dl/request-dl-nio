@@ -41,10 +41,12 @@ struct InternalsCertificateChainTests {
         let sut = try chain.build()
 
         // Then
-        let expectedSources: [NIOSSLCertificateSource] = try [
-            .certificate(.init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
-            .certificate(.init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
-        ]
+        let expectedSources: [NIOSSLCertificateSource] = try
+            (NIOSSLCertificate.fromPEMFile(client.certificateURL.absolutePath(percentEncoded: false))
+            + NIOSSLCertificate.fromPEMFile(server.certificateURL.absolutePath(percentEncoded: false))).map {
+                .certificate($0)
+            }
+
         #expect(sut == expectedSources)
     }
 

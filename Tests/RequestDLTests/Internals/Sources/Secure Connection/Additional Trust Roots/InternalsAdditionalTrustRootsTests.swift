@@ -29,10 +29,10 @@ struct InternalsAdditionalTrustRootsTests {
         let sut = try trustRoots.build()
 
         // Then
-        let expectedAdditionalTrustRoots = try NIOSSLAdditionalTrustRoots.certificates([
-            .init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-            .init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-        ])
+        let expectedAdditionalTrustRoots = try NIOSSLAdditionalTrustRoots.certificates(
+            NIOSSLCertificate.fromPEMFile(client.certificateURL.absolutePath(percentEncoded: false))
+                + NIOSSLCertificate.fromPEMFile(server.certificateURL.absolutePath(percentEncoded: false))
+        )
         #expect(sut == expectedAdditionalTrustRoots)
     }
 

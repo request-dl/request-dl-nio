@@ -37,7 +37,7 @@ jobs:
       # Step 2
       enable-breaking-changes: true
       skip-on-major-update: true
-      force-skip-breaking-changes: ${{ contains(github.event.pull_request.labels.*.name, 'force-skip-ci') }}
+      force-skip-breaking-changes: ${{ contains(github.event.pull_request.labels.*.name, 'force-skip-ci') }}
 
       # Step 3 – Apple
       enable-apple-tests: true
@@ -48,7 +48,9 @@ jobs:
       # Step 3 – Third Party
       enable-third-party-tests: true
       third-party-coverage-enabled: true
-      test-foundation-essentials: true
+
+      # Step 3 – Linkage Test (renomeado de test-foundation-essentials)
+      enable-linkage-test: true
 
       # Step 4
       enable-coverage-upload: true

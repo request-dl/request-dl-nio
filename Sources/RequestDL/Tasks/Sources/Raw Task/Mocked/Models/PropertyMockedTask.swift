@@ -72,7 +72,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             )
         )
 
-        var downloadBuffer = Internals.DownloadBuffer(
+        let downloadBuffer = Internals.DownloadBuffer(
             readingMode: resolved.requestConfiguration.readingMode
         )
 

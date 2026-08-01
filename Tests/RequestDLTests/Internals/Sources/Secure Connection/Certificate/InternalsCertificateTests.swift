@@ -57,9 +57,7 @@ struct InternalsCertificateTests {
         let resolved = try Internals.Certificate(path, format: .pem).build()
 
         // Then
-        let expectedCertificates: [NIOSSLCertificate] = try [
-            .init(file: path, format: .pem)
-        ]
+        let expectedCertificates = try NIOSSLCertificate.fromPEMFile(path)
         #expect(resolved == expectedCertificates)
     }
 
@@ -73,9 +71,7 @@ struct InternalsCertificateTests {
         let resolved = try Internals.Certificate(path, format: .der).build()
 
         // Then
-        let expectedCertificates: [NIOSSLCertificate] = try [
-            .init(file: path, format: .der)
-        ]
+        let expectedCertificates = try [NIOSSLCertificate.fromDERFile(path)]
         #expect(resolved == expectedCertificates)
     }
 }
