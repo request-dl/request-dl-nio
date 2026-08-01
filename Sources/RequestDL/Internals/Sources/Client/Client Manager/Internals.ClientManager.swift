@@ -141,9 +141,19 @@ extension Internals {
             id: String,
             sessionConfiguration: Internals.Session.Configuration
         ) -> Internals.Client? {
+            let now = DispatchTime.now().uptimeNanoseconds
+
+            // Age checked here, not only in the sweep. The sweep runs every `lifetime` and
+            // retires what is older than `lifetime`, so a client that went idle just after one
+            // pass was still handed out until the next, at nearly twice its lifetime. `readAt`
+            // is refreshed on every hand out, so a client in active use never ages out; only an
+            // idle one does, which is the whole intent.
             guard
                 var items = _table[id],
-                let index = items.firstIndex(where: { $0.sessionConfiguration == sessionConfiguration })
+                let index = items.firstIndex(where: {
+                    $0.sessionConfiguration == sessionConfiguration
+                        && now - $0.readAt <= lifetime
+                })
             else { return nil }
 
             let item = items[index]

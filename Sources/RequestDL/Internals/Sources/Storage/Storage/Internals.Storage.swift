@@ -80,7 +80,21 @@ extension Internals {
 
         func getValue<Value: Sendable>(_ type: Value.Type, forKey key: AnyHashable) -> Value? {
             lock.withLock {
-                guard let value = _table[key]?.value as? Value else {
+                guard let register = _table[key] else {
+                    return nil
+                }
+
+                // Age checked here, not only in the sweep. The sweep runs every `lifetime` and
+                // removes what is older than `lifetime`, so an entry that went idle just after
+                // one pass survived until the next and could be handed out at nearly twice its
+                // lifetime. That made the sweep interval a correctness parameter; it should
+                // only be a memory one.
+                guard DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime else {
+                    _table[key] = nil
+                    return nil
+                }
+
+                guard let value = register.value as? Value else {
                     return nil
                 }
 
