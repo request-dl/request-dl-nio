@@ -30,12 +30,12 @@ public struct RequestEnvironmentValues: Sendable {
 
     // MARK: - Public methods
 
-    /**
-     Subscript for retrieving an `Value` for a given ``RequestEnvironmentKey`` type.
-
-     - Parameter key: The ``RequestEnvironmentKey`` type to retrieve the `Value` for.
-     - Returns: The `Value` in the environment for the given `Key`.
-     */
+    ///
+    /// Subscript for retrieving an `Value` for a given ``RequestEnvironmentKey`` type.
+    ///
+    /// - Parameter key: The ``RequestEnvironmentKey`` type to retrieve the `Value` for.
+    /// - Returns: The `Value` in the environment for the given `Key`.
+    ///
     public subscript<Key: RequestEnvironmentKey>(key: Key.Type) -> Key.Value {
         get {
             guard

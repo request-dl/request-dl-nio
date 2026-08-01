@@ -38,11 +38,11 @@ extension Authorization {
 
         // MARK: - Inits
 
-        /**
-         Initializes with a given string value.
-
-         - Parameter rawValue: The string value of the authorization type.
-         */
+        ///
+        /// Initializes with a given string value.
+        ///
+        /// - Parameter rawValue: The string value of the authorization type.
+        ///
         public init<S: StringProtocol>(_ rawValue: S) {
             self.rawValue = String(rawValue)
         }
@@ -53,14 +53,14 @@ extension Authorization {
 
 extension Authorization.TokenType: ExpressibleByStringLiteral {
 
-    /**
-     Initializes a ``RequestDL/Authorization/TokenType`` instance using a string literal.
-
-     - Parameter value: A string literal representing the authorization type.
-     - Returns: An instance of ``RequestDL/Authorization/TokenType`` with the specified media type.
-
-     > Note: Use this initializer to create a ``RequestDL/Authorization/TokenType`` instance from a string literal.
-     */
+    ///
+    /// Initializes a ``RequestDL/Authorization/TokenType`` instance using a string literal.
+    ///
+    /// - Parameter value: A string literal representing the authorization type.
+    /// - Returns: An instance of ``RequestDL/Authorization/TokenType`` with the specified media type.
+    ///
+    /// > Note: Use this initializer to create a ``RequestDL/Authorization/TokenType`` instance from a string literal.
+    ///
     public init(stringLiteral value: StringLiteralType) {
         self.rawValue = value
     }

@@ -21,13 +21,13 @@ public struct TaskResult<Element: Sendable>: TaskResultPrimitive {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of the TaskResult struct.
-
-     - Parameters:
-        - head: The response head of the task result.
-        - payload: The payload of the task result.
-     */
+    ///
+    /// Initializes a new instance of the TaskResult struct.
+    ///
+    /// - Parameters:
+    ///    - head: The response head of the task result.
+    ///    - payload: The payload of the task result.
+    ///
     public init(
         head: ResponseHead,
         payload: Element

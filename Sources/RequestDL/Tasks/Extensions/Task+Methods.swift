@@ -12,19 +12,19 @@ import struct Foundation.Date
 
 extension RequestTask {
 
-    /**
-     A convenience method to send a simple ping request to the server and wait for the response.
-
-     - Parameters:
-        - times: Number of times the ping should be sent. Must be greater than zero. Default is `1`.
-        - logger: An optional `Logger` used to record timing and lifecycle events for each ping attempt.
-                  Log messages are emitted at the `.debug` level and will only appear if the logger’s
-                  effective log level includes `.debug` (e.g., in debug builds or when explicitly enabled).
-
-     - Throws: An error if any ping request fails (i.e., if the underlying `result()` call throws).
-
-     - Returns: `Void`. This method does not return data—it only ensures the request completes successfully.
-     */
+    ///
+    /// A convenience method to send a simple ping request to the server and wait for the response.
+    ///
+    /// - Parameters:
+    ///    - times: Number of times the ping should be sent. Must be greater than zero. Default is `1`.
+    ///    - logger: An optional `Logger` used to record timing and lifecycle events for each ping attempt.
+    ///              Log messages are emitted at the `.debug` level and will only appear if the logger’s
+    ///              effective log level includes `.debug` (e.g., in debug builds or when explicitly enabled).
+    ///
+    /// - Throws: An error if any ping request fails (i.e., if the underlying `result()` call throws).
+    ///
+    /// - Returns: `Void`. This method does not return data—it only ensures the request completes successfully.
+    ///
     public func ping(_ times: Int = 1, logger: Logger? = nil) async throws {
         if times <= 0 {
             return

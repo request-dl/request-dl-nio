@@ -29,14 +29,14 @@ public protocol RequestTaskInterceptor<Element>: Sendable {
 
     associatedtype Element: Sendable
 
-    /**
-     This method allows an object to intercept and handle the result of a task execution.
-
-     The `output` method is called when the task completes, and receives a `Result`
-     object containing either a successful `Element` result or a failure `Error`.
-
-     - Parameter result: A `Result` object containing either a successful `Element`
-     result or a failure `Error`.
-     */
+    ///
+    /// This method allows an object to intercept and handle the result of a task execution.
+    ///
+    /// The `output` method is called when the task completes, and receives a `Result`
+    /// object containing either a successful `Element` result or a failure `Error`.
+    ///
+    /// - Parameter result: A `Result` object containing either a successful `Element`
+    /// result or a failure `Error`.
+    ///
     func output(_ result: Result<Element, Error>)
 }

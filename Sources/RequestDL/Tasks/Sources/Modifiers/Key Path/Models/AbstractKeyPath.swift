@@ -10,12 +10,12 @@
 @dynamicMemberLookup
 public struct AbstractKeyPath {
 
-    /**
-     A subscript that allows accessing a member of a AbstractKeyPath instance dynamically.
-
-     - Parameter member: The name of the member to access.
-     - Returns: The name of the member as a String.
-     */
+    ///
+    /// A subscript that allows accessing a member of a AbstractKeyPath instance dynamically.
+    ///
+    /// - Parameter member: The name of the member to access.
+    /// - Returns: The name of the member as a String.
+    ///
     public subscript(dynamicMember member: String) -> String {
         member
     }

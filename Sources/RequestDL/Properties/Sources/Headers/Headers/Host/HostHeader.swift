@@ -18,13 +18,13 @@ public struct HostHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `Host` property with the given `host` and `port`.
-
-     - Parameters:
-        - host: A `StringProtocol` representing the host.
-        - port: A `StringProtocol` representing the port.
-     */
+    ///
+    /// Initializes a `Host` property with the given `host` and `port`.
+    ///
+    /// - Parameters:
+    ///    - host: A `StringProtocol` representing the host.
+    ///    - port: A `StringProtocol` representing the port.
+    ///
     public init<Host, Port>(
         _ host: Host,
         port: Port
@@ -32,11 +32,11 @@ public struct HostHeader: Property {
         self.value = "\(host):\(port)"
     }
 
-    /**
-     Initializes a `Host` property with the given `host`.
-
-     - Parameter host: A `StringProtocol` representing the host.
-     */
+    ///
+    /// Initializes a `Host` property with the given `host`.
+    ///
+    /// - Parameter host: A `StringProtocol` representing the host.
+    ///
     public init<S: StringProtocol>(_ host: S) {
         self.value = String(host)
     }

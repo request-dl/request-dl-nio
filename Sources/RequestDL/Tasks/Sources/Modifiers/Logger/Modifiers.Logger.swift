@@ -15,13 +15,13 @@ extension Modifiers {
 
         // MARK: - Public methods
 
-        /**
-         Applies the logger to the request task.
-
-         - Parameter task: The request task to modify.
-         - Returns: The task result.
-         - Throws: An error if the modification fails.
-         */
+        ///
+        /// Applies the logger to the request task.
+        ///
+        /// - Parameter task: The request task to modify.
+        /// - Returns: The task result.
+        /// - Throws: An error if the modification fails.
+        ///
         public func body(_ task: Content) async throws -> Input {
             try await task
                 .environment(\.logger, logger)
@@ -32,12 +32,12 @@ extension Modifiers {
 
 extension RequestTask {
 
-    /**
-     Adds a logger to the request task.
-
-     - Parameter logger: The logger to add.
-     - Returns: A modified request task with the added logger.
-     */
+    ///
+    /// Adds a logger to the request task.
+    ///
+    /// - Parameter logger: The logger to add.
+    /// - Returns: A modified request task with the added logger.
+    ///
     public func logger(
         _ logger: Logger
     ) -> ModifiedRequestTask<Modifiers.Logger<Element>> {

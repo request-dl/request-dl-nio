@@ -22,9 +22,9 @@ public struct DefaultTrustRoots: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of the DefaultTrusts structure.
-     */
+    ///
+    /// Initializes a new instance of the DefaultTrusts structure.
+    ///
     public init() {}
 
     // MARK: - Public static methods

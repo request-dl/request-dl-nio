@@ -55,18 +55,18 @@ public struct Timeout: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `Timeout`.
-
-     - Parameters:
-        - timeout: The duration of time before the timeout occurs.
-        - source: The type of timeout to be applied.
-
-     - Returns: A new instance of `Timeout`.
-
-     > Note: By default, the `source` parameter is set to `.all`.
-
-     */
+    ///
+    /// Initializes a new instance of `Timeout`.
+    ///
+    /// - Parameters:
+    ///    - timeout: The duration of time before the timeout occurs.
+    ///    - source: The type of timeout to be applied.
+    ///
+    /// - Returns: A new instance of `Timeout`.
+    ///
+    /// > Note: By default, the `source` parameter is set to `.all`.
+    ///
+    ///
     public init(_ timeout: UnitTime, for source: Source = .all) {
         self.timeout = timeout
         self.source = source

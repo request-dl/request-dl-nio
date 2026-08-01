@@ -22,11 +22,11 @@ public struct AcceptCharsetHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance for the given `Charset`.
-
-     - Parameter charset: The charset to be accepted. Defaults is UTF-8.
-     */
+    ///
+    /// Initializes a new instance for the given `Charset`.
+    ///
+    /// - Parameter charset: The charset to be accepted. Defaults is UTF-8.
+    ///
     public init(_ charset: Charset) {
         self.charset = charset
     }

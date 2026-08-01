@@ -84,11 +84,11 @@ public struct ContentType: Sendable, Hashable {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `ContentType` instance with a given string value.
-
-     - Parameter rawValue: The string value of the content type.
-     */
+    ///
+    /// Initializes a `ContentType` instance with a given string value.
+    ///
+    /// - Parameter rawValue: The string value of the content type.
+    ///
     public init<S: StringProtocol>(_ rawValue: S) {
         self.rawValue = String(rawValue)
     }
@@ -98,14 +98,14 @@ public struct ContentType: Sendable, Hashable {
 
 extension ContentType: ExpressibleByStringLiteral {
 
-    /**
-     Initializes a `ContentType` instance using a string literal.
-
-     - Parameter value: A string literal representing the media type.
-     - Returns: An instance of `ContentType` with the specified media type.
-
-     > Note: Use this initializer to create a `ContentType` instance from a string literal.
-     */
+    ///
+    /// Initializes a `ContentType` instance using a string literal.
+    ///
+    /// - Parameter value: A string literal representing the media type.
+    /// - Returns: An instance of `ContentType` with the specified media type.
+    ///
+    /// > Note: Use this initializer to create a `ContentType` instance from a string literal.
+    ///
     public init(stringLiteral value: StringLiteralType) {
         self.rawValue = value
     }

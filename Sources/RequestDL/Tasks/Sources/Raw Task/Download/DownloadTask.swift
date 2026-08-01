@@ -55,23 +55,23 @@ public struct DownloadTask<Content: Property>: RequestTask {
 
     // MARK: - Inits
 
-    /**
-     Initializes with a ``Property`` as its content.
-
-     - Parameter content: The content of the request.
-     */
+    ///
+    /// Initializes with a ``Property`` as its content.
+    ///
+    /// - Parameter content: The content of the request.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.task = RawTask(content: content())
     }
 
     // MARK: - Public methods
 
-    /**
-     Returns a task result that encapsulates the response async bytes.
-
-     - Returns: A ``TaskResult`` with ``AsyncBytes`` as its `payload`.
-     - Throws: An error of type `Error` that indicates an issue with the request or response.
-     */
+    ///
+    /// Returns a task result that encapsulates the response async bytes.
+    ///
+    /// - Returns: A ``TaskResult`` with ``AsyncBytes`` as its `payload`.
+    /// - Throws: An error of type `Error` that indicates an issue with the request or response.
+    ///
     public func result() async throws -> TaskResult<AsyncBytes> {
         try await task
             .collectBytes()

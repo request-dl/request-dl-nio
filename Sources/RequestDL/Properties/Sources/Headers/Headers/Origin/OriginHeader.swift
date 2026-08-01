@@ -27,13 +27,13 @@ public struct OriginHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `OriginHeader` property with the given `host` and `port`.
-
-     - Parameters:
-     - host: A `StringProtocol` representing the host.
-     - port: A `StringProtocol` representing the port.
-     */
+    ///
+    /// Initializes a `OriginHeader` property with the given `host` and `port`.
+    ///
+    /// - Parameters:
+    /// - host: A `StringProtocol` representing the host.
+    /// - port: A `StringProtocol` representing the port.
+    ///
     public init<Host, Port>(
         _ host: Host,
         port: Port
@@ -41,11 +41,11 @@ public struct OriginHeader: Property {
         self.value = "\(host):\(port)"
     }
 
-    /**
-     Initializes an `OriginHeader` header field with the given origin value.
-
-     - Parameter origin: A `StringProtocol` representing the host.
-     */
+    ///
+    /// Initializes an `OriginHeader` header field with the given origin value.
+    ///
+    /// - Parameter origin: A `StringProtocol` representing the host.
+    ///
     public init<S: StringProtocol>(_ origin: S) {
         self.value = String(origin)
     }

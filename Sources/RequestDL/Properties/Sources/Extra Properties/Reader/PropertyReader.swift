@@ -1,6 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
- */
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A property that reads data from a source property and provides it to a content closure.
 /// This type allows you to create a dependency between two properties, where the `source`
@@ -23,14 +23,14 @@ public struct PropertyReader<Source: Property, Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new `PropertyReader`.
-
-     - Parameters:
-       - source: The property whose output will be made available to the `content` closure.
-       - content: A closure that receives a `PropertyContext` and returns the main content property.
-                  The context provides access to the resolved output of the `readable` property.
-     */
+    ///
+    /// Initializes a new `PropertyReader`.
+    ///
+    /// - Parameters:
+    ///   - source: The property whose output will be made available to the `content` closure.
+    ///   - content: A closure that receives a `PropertyContext` and returns the main content property.
+    ///              The context provides access to the resolved output of the `readable` property.
+    ///
     public init(
         _ source: Source,
         @PropertyBuilder _ content: @escaping @Sendable (PropertyContext) -> Content

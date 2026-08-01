@@ -17,13 +17,13 @@ public protocol RequestTask<Element>: Sendable {
 
     associatedtype Element: Sendable
 
-    /**
-     Runs the task and gets the result asynchronously.
-
-     - Returns: The expected result of the task wrapped in an asynchronous task.
-
-     - Throws: If there was an error during the execution of the task.
-     */
+    ///
+    /// Runs the task and gets the result asynchronously.
+    ///
+    /// - Returns: The expected result of the task wrapped in an asynchronous task.
+    ///
+    /// - Throws: If there was an error during the execution of the task.
+    ///
     func result() async throws -> Element
 }
 
@@ -31,15 +31,15 @@ public protocol RequestTask<Element>: Sendable {
 
 extension RequestTask {
 
-    /**
-     Returns an ``InterceptedRequestTask`` that executes the base task and intercepts
-     its result using the provided ``RequestTaskInterceptor``.
-
-     - Parameter interceptor: A ``RequestTaskInterceptor`` that intercepts the result of the
-     task.
-
-     - Returns: A ``RequestTaskInterceptor`` with result being intercepted.
-     */
+    ///
+    /// Returns an ``InterceptedRequestTask`` that executes the base task and intercepts
+    /// its result using the provided ``RequestTaskInterceptor``.
+    ///
+    /// - Parameter interceptor: A ``RequestTaskInterceptor`` that intercepts the result of the
+    /// task.
+    ///
+    /// - Returns: A ``RequestTaskInterceptor`` with result being intercepted.
+    ///
     public func interceptor<Interceptor>(
         _ interceptor: Interceptor
     ) -> InterceptedRequestTask<Interceptor> where Interceptor: RequestTaskInterceptor<Element> {
@@ -49,14 +49,14 @@ extension RequestTask {
         )
     }
 
-    /**
-     Returns a ``ModifiedRequestTask`` that executes the base task and modifies its result using
-     the provided ``RequestTaskModifier``.
-
-     - Parameter modifier: A ``RequestTaskModifier`` that modifies the result of the task.
-
-     - Returns: A ``ModifiedRequestTask`` with new result type.
-     */
+    ///
+    /// Returns a ``ModifiedRequestTask`` that executes the base task and modifies its result using
+    /// the provided ``RequestTaskModifier``.
+    ///
+    /// - Parameter modifier: A ``RequestTaskModifier`` that modifies the result of the task.
+    ///
+    /// - Returns: A ``ModifiedRequestTask`` with new result type.
+    ///
     public func modifier<Modifier: RequestTaskModifier>(
         _ modifier: Modifier
     ) -> ModifiedRequestTask<Modifier> where Modifier.Input == Element {

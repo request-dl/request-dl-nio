@@ -60,23 +60,23 @@ public struct Path: Property {
 
     // MARK: - Inits
 
-    /**
-     Instantiate the Path with a string.
-
-     - Parameters:
-        - path: The string path. Any leading or trailing slashes will be trimmed.
-        If you want to include a slash as a part of the path, escape it using a backslash (\\).
-     */
+    ///
+    /// Instantiate the Path with a string.
+    ///
+    /// - Parameters:
+    ///    - path: The string path. Any leading or trailing slashes will be trimmed.
+    ///    If you want to include a slash as a part of the path, escape it using a backslash (\\).
+    ///
     public init<S: StringProtocol>(_ path: S) {
         self.path = String(path)
     }
 
-    /**
-     Instantiate the Path with a value that is string convertible.
-
-     - Parameters:
-        - path: The path object. If it contains any leading or trailing slashes will be trimmed.
-     */
+    ///
+    /// Instantiate the Path with a value that is string convertible.
+    ///
+    /// - Parameters:
+    ///    - path: The path object. If it contains any leading or trailing slashes will be trimmed.
+    ///
     public init<S: LosslessStringConvertible>(_ path: S) {
         self.path = String(path)
     }

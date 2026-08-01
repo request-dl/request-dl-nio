@@ -57,16 +57,16 @@ public struct Proxy: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of HTTP `Proxy` with authorization credentials.
-
-     - Parameters:
-        - host: The hostname or IP address of the proxy server.
-        - port: The port number on which the proxy server is listening.
-        - authorization: Optional credentials for authenticating with the proxy server.
-
-     - Returns: A new instance of `Proxy`.
-     */
+    ///
+    /// Initializes a new instance of HTTP `Proxy` with authorization credentials.
+    ///
+    /// - Parameters:
+    ///    - host: The hostname or IP address of the proxy server.
+    ///    - port: The port number on which the proxy server is listening.
+    ///    - authorization: Optional credentials for authenticating with the proxy server.
+    ///
+    /// - Returns: A new instance of `Proxy`.
+    ///
     public init(host: String, port: Int, authorization: Authorization) {
         self.host = host
         self.port = port
@@ -74,18 +74,18 @@ public struct Proxy: Property {
         self.authorization = authorization
     }
 
-    /**
-     Initializes a new instance of `Proxy` without authorization credentials.
-
-     > Warning: SOCKS currently not available with authorization.
-
-     - Parameters:
-        - host: The hostname or IP address of the proxy server.
-        - port: The port number on which the proxy server is listening.
-        - connectionProtocol: The protocol used by the proxy (e.g., HTTP, HTTPS, SOCKS).
-
-     - Returns: A new instance of `Proxy`.
-     */
+    ///
+    /// Initializes a new instance of `Proxy` without authorization credentials.
+    ///
+    /// > Warning: SOCKS currently not available with authorization.
+    ///
+    /// - Parameters:
+    ///    - host: The hostname or IP address of the proxy server.
+    ///    - port: The port number on which the proxy server is listening.
+    ///    - connectionProtocol: The protocol used by the proxy (e.g., HTTP, HTTPS, SOCKS).
+    ///
+    /// - Returns: A new instance of `Proxy`.
+    ///
     public init(host: String, port: Int, connection connectionProtocol: ConnectionProtocol) {
         self.host = host
         self.port = port

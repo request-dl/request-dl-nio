@@ -65,14 +65,14 @@ public struct Payload: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `Payload` with a JSON object.
-
-     - Parameters:
-        - json: A JSON object to be serialized.
-        - options: Options for serializing the JSON object.
-        - contentType: The content type of the payload (default is JSON).
-     */
+    ///
+    /// Initializes a `Payload` with a JSON object.
+    ///
+    /// - Parameters:
+    ///    - json: A JSON object to be serialized.
+    ///    - options: Options for serializing the JSON object.
+    ///    - contentType: The content type of the payload (default is JSON).
+    ///
     public init(
         _ json: Any,
         options: JSONSerialization.WritingOptions = .prettyPrinted,
@@ -85,14 +85,14 @@ public struct Payload: Property {
         )
     }
 
-    /**
-     Initializes a `Payload` with an encodable value.
-
-     - Parameters:
-        - object: An encodable value to be serialized.
-        - encoder: An encoder to use for the serialization.
-        - contentType: The content type of the payload (default is JSON).
-     */
+    ///
+    /// Initializes a `Payload` with an encodable value.
+    ///
+    /// - Parameters:
+    ///    - object: An encodable value to be serialized.
+    ///    - encoder: An encoder to use for the serialization.
+    ///    - contentType: The content type of the payload (default is JSON).
+    ///
     public init<Object: Encodable & Sendable>(
         _ object: Object,
         encoder: JSONEncoder = .init(),
@@ -105,13 +105,13 @@ public struct Payload: Property {
         )
     }
 
-    /**
-     Initializes a `Payload` with a string verbatim.
-
-     - Parameters:
-        - verbatim: The verbatim string value.
-        - contentType: The content type of the payload (default is text).
-     */
+    ///
+    /// Initializes a `Payload` with a string verbatim.
+    ///
+    /// - Parameters:
+    ///    - verbatim: The verbatim string value.
+    ///    - contentType: The content type of the payload (default is text).
+    ///
     public init<Verbatim: StringProtocol>(
         verbatim: Verbatim,
         contentType: ContentType = .text
@@ -122,13 +122,13 @@ public struct Payload: Property {
         )
     }
 
-    /**
-     Initializes a `Payload` with raw data.
-
-     - Parameters:
-        - data: The raw data.
-        - contentType: The content type of the payload (default is octet-stream).
-     */
+    ///
+    /// Initializes a `Payload` with raw data.
+    ///
+    /// - Parameters:
+    ///    - data: The raw data.
+    ///    - contentType: The content type of the payload (default is octet-stream).
+    ///
     public init(
         data: Data,
         contentType: ContentType = .octetStream
@@ -139,13 +139,13 @@ public struct Payload: Property {
         )
     }
 
-    /**
-     Initializes a `Payload` with a file URL.
-
-     - Parameters:
-        - url: The file URL.
-        - contentType: The content type of the payload.
-     */
+    ///
+    /// Initializes a `Payload` with a file URL.
+    ///
+    /// - Parameters:
+    ///    - url: The file URL.
+    ///    - contentType: The content type of the payload.
+    ///
     public init(
         url: URL,
         contentType: ContentType

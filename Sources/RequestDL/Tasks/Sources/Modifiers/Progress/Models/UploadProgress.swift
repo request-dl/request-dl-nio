@@ -35,12 +35,12 @@
 /// ``RequestDL/Property/payloadChunkSize(_:)``.
 public protocol UploadProgress: Sendable {
 
-    /**
-     Notifies the progress of an upload operation.
-
-     - Parameters:
-       - chunkSize: The size of each chunk during upload.
-       - totalSize: The total size of the upload.
-     */
+    ///
+    /// Notifies the progress of an upload operation.
+    ///
+    /// - Parameters:
+    ///   - chunkSize: The size of each chunk during upload.
+    ///   - totalSize: The total size of the upload.
+    ///
     func upload(_ chunkSize: Int, totalSize: Int)
 }

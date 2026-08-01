@@ -69,46 +69,46 @@ public struct BaseURL: Property {
 
     // MARK: - Init
 
-    /**
-     Creates a BaseURL by combining the url scheme and the string host.
-
-     ```swift
-     import RequestDL
-
-     struct AppleDeveloperBaseURL: Property {
-
-         var body: some Property {
-             BaseURL(.https, host: "developer.apple.com")
-         }
-     }
-     ```
-
-     - Parameters:
-        - scheme: The url scheme chosen.
-        - host: The string host only.
-     */
+    ///
+    /// Creates a BaseURL by combining the url scheme and the string host.
+    ///
+    /// ```swift
+    /// import RequestDL
+    ///
+    /// struct AppleDeveloperBaseURL: Property {
+    ///
+    ///     var body: some Property {
+    ///         BaseURL(.https, host: "developer.apple.com")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///    - scheme: The url scheme chosen.
+    ///    - host: The string host only.
+    ///
     public init(_ scheme: URLScheme, host: String) {
         self.scheme = scheme
         self.host = host
     }
 
-    /**
-     Defines the base URL from the host with the default HTTPS scheme.
-
-     ```swift
-     import RequestDL
-
-     struct AppleDeveloperBaseURL: Property {
-
-         var body: some Property {
-             BaseURL("developer.apple.com")
-         }
-     }
-     ```
-
-     - Parameters:
-        - host: The string host only.
-     */
+    ///
+    /// Defines the base URL from the host with the default HTTPS scheme.
+    ///
+    /// ```swift
+    /// import RequestDL
+    ///
+    /// struct AppleDeveloperBaseURL: Property {
+    ///
+    ///     var body: some Property {
+    ///         BaseURL("developer.apple.com")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///    - host: The string host only.
+    ///
     public init(_ host: String) {
         self.init(.https, host: host)
     }

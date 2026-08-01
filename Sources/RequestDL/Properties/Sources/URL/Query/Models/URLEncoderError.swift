@@ -18,11 +18,11 @@ public struct URLEncoderError: Error {
     /// The type of the error.
     let errorType: ErrorType
 
-    /**
-    Initializes a new instance of `URLEncoderError`.
-
-    - Parameter errorType: The type of the error.
-    */
+    ///
+    /// Initializes a new instance of `URLEncoderError`.
+    ///
+    /// - Parameter errorType: The type of the error.
+    ///
     init(_ errorType: ErrorType) {
         self.errorType = errorType
     }

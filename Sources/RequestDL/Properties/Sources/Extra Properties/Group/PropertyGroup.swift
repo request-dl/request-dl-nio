@@ -34,11 +34,11 @@ public struct PropertyGroup<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Groups ``Property`` using ``PropertyBuilder`` result builder.
-
-     - Parameter content: The properties to be grouped.
-     */
+    ///
+    /// Groups ``Property`` using ``PropertyBuilder`` result builder.
+    ///
+    /// - Parameter content: The properties to be grouped.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }

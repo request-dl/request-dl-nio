@@ -30,13 +30,13 @@ where Data.Element: Hashable & Sendable, Data: Sendable {
 
     // MARK: - Inits
 
-    /**
-     Initializes with a `Data` collection to performs the `Content` requests.
-
-     - Parameters:
-        - data: The type of the collection that contains the elements.
-        - transform: The closure map function that transform each element of data into of task.
-     */
+    ///
+    /// Initializes with a `Data` collection to performs the `Content` requests.
+    ///
+    /// - Parameters:
+    ///    - data: The type of the collection that contains the elements.
+    ///    - transform: The closure map function that transform each element of data into of task.
+    ///
     public init(_ data: Data, content transform: @escaping @Sendable (Data.Element) -> Content) {
         self.data = data
         self.transform = transform
@@ -44,12 +44,12 @@ where Data.Element: Hashable & Sendable, Data: Sendable {
 
     // MARK: - Public methods
 
-    /**
-      Retrieves the results of the task group that encapsulates the results of each individual task.
-
-      - Returns: A ``GroupResult`` object that combines the result of each individual task by `ID`.
-      - Throws: An error if the operation failed for any reason.
-      */
+    ///
+    ///  Retrieves the results of the task group that encapsulates the results of each individual task.
+    ///
+    ///  - Returns: A ``GroupResult`` object that combines the result of each individual task by `ID`.
+    ///  - Throws: An error if the operation failed for any reason.
+    ///
     public func result() async throws -> GroupResult<Data.Element, Content.Element> {
         await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
             for element in data {

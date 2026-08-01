@@ -4,24 +4,24 @@
 
 extension Timeout {
 
-    /**
-     A set of options representing the types of timeout available for each request.
-
-     Use the static properties of this struct to set the timeout interval for requests and resources.
-
-     1. `connect`: The connect timeout case. The default value is 30s.
-     2. `read`: The read timeout case.
-     3. `all`: Defines the same timeout interval for both connect and read.
-
-     In the example below, a request is made to the Google's website with the timeout for all types.
-
-     ```swift
-     DataTask {
-         BaseURL("google.com")
-         Timeout(.seconds(60), for: .all)
-     }
-     ```
-     */
+    ///
+    /// A set of options representing the types of timeout available for each request.
+    ///
+    /// Use the static properties of this struct to set the timeout interval for requests and resources.
+    ///
+    /// 1. `connect`: The connect timeout case. The default value is 30s.
+    /// 2. `read`: The read timeout case.
+    /// 3. `all`: Defines the same timeout interval for both connect and read.
+    ///
+    /// In the example below, a request is made to the Google's website with the timeout for all types.
+    ///
+    /// ```swift
+    /// DataTask {
+    ///     BaseURL("google.com")
+    ///     Timeout(.seconds(60), for: .all)
+    /// }
+    /// ```
+    ///
     public struct Source: Sendable, OptionSet {
 
         // MARK: - Public static properties
@@ -42,11 +42,11 @@ extension Timeout {
 
         // MARK: - Inits
 
-        /**
-         Initializes a new timeout source with the given raw value.
-
-         - parameter rawValue: The raw value to use for the timeout source.
-         */
+        ///
+        /// Initializes a new timeout source with the given raw value.
+        ///
+        /// - parameter rawValue: The raw value to use for the timeout source.
+        ///
         public init(rawValue: UInt8) {
             self.rawValue = rawValue
         }

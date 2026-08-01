@@ -197,7 +197,9 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter suites: The cipher suites to use as string representations.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
     public func cipherSuites(_ suites: String...) -> Self {
-        suites.forEach { precondition(!$0.contains(":")) }
+        for suite in suites {
+            precondition(!suite.contains(":"))
+        }
         return edit { $0.secureConnection.cipherSuites = suites.joined(separator: ":") }
     }
 

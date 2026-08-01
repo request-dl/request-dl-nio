@@ -46,17 +46,17 @@ public struct DNSOverride: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `DNSOverride`.
-
-     This initializer maps a destination hostname to a specific origin address for DNS resolution.
-
-     - Parameters:
-        - destination: The custom IP address or hostname to which the `origin` will be resolved.
-        - origin: The original hostname for which the DNS setting is to be overridden.
-
-     > Note: The parameter order is `(_ destination, from origin)`, meaning the `origin` hostname will resolve to the `destination` address.
-     */
+    ///
+    /// Initializes a new instance of `DNSOverride`.
+    ///
+    /// This initializer maps a destination hostname to a specific origin address for DNS resolution.
+    ///
+    /// - Parameters:
+    ///    - destination: The custom IP address or hostname to which the `origin` will be resolved.
+    ///    - origin: The original hostname for which the DNS setting is to be overridden.
+    ///
+    /// > Note: The parameter order is `(_ destination, from origin)`, meaning the `origin` hostname will resolve to the `destination` address.
+    ///
     public init(_ destination: String, from origin: String) {
         self.origin = origin
         self.destination = destination

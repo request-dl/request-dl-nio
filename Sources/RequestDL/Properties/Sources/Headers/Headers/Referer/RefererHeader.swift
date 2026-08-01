@@ -22,12 +22,12 @@ public struct RefererHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initialize the `RefererHeader` header with a URL that specifies the resource from which
-     the requested resource was obtained.
-
-     - Parameter url: The URL of the resource.
-     */
+    ///
+    /// Initialize the `RefererHeader` header with a URL that specifies the resource from which
+    /// the requested resource was obtained.
+    ///
+    /// - Parameter url: The URL of the resource.
+    ///
     public init<S: StringProtocol>(_ url: S) {
         self.value = String(url)
     }

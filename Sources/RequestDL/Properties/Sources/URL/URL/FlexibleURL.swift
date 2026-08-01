@@ -49,16 +49,16 @@ public struct FlexibleURL: Property {
 
     // MARK: - Init
 
-    /**
-     Creates an FlexibleURL from a string representation.
-
-     The input can be:
-     - A complete URL: "https://example.com/path?query=value"
-     - A relative path: "/path/to/resource"
-     - Query parameters only: "?key=value"
-
-     - Parameter url: The URL string.
-     */
+    ///
+    /// Creates an FlexibleURL from a string representation.
+    ///
+    /// The input can be:
+    /// - A complete URL: "https://example.com/path?query=value"
+    /// - A relative path: "/path/to/resource"
+    /// - Query parameters only: "?key=value"
+    ///
+    /// - Parameter url: The URL string.
+    ///
     public init<S: StringProtocol>(_ url: S) {
         self.url = String(url)
     }

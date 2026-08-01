@@ -10,17 +10,17 @@ import Foundation
 
 extension Modifiers {
 
-    /**
-     A type that modifies the behavior of a `RequestTask`.
-
-     The `KeyPath` modifier allows you to extract a sub-value from the data returned
-     by the task using a key path.
-
-     ```swift
-     DataTask { ... }
-         .keyPath(\.data)
-     ```
-     */
+    ///
+    /// A type that modifies the behavior of a `RequestTask`.
+    ///
+    /// The `KeyPath` modifier allows you to extract a sub-value from the data returned
+    /// by the task using a key path.
+    ///
+    /// ```swift
+    /// DataTask { ... }
+    ///     .keyPath(\.data)
+    /// ```
+    ///
     public struct KeyPath<Input: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
@@ -34,13 +34,13 @@ extension Modifiers {
 
         // MARK: - Public methods
 
-        /**
-         Transforms the result of the task by extracting a sub-value using the given key path.
-
-         - Parameter task: The task to modify.
-
-         - Returns: A `TaskResult` containing the extracted sub-value.
-         */
+        ///
+        /// Transforms the result of the task by extracting a sub-value using the given key path.
+        ///
+        /// - Parameter task: The task to modify.
+        ///
+        /// - Returns: A `TaskResult` containing the extracted sub-value.
+        ///
         public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
@@ -72,13 +72,13 @@ extension Modifiers {
 
 extension RequestTask<TaskResult<Data>> {
 
-    /**
-     Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
-
-     - Parameter keyPath: The key path to extract the sub-value from the data.
-
-     - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
-     */
+    ///
+    /// Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
+    ///
+    /// - Parameter keyPath: The key path to extract the sub-value from the data.
+    ///
+    /// - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
+    ///
     public func keyPath(
         _ keyPath: KeyPath<AbstractKeyPath, String> & Sendable
     ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
@@ -99,13 +99,13 @@ extension RequestTask<TaskResult<Data>> {
 
 extension RequestTask<Data> {
 
-    /**
-     Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
-
-     - Parameter keyPath: The key path to extract the sub-value from the data.
-
-     - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
-     */
+    ///
+    /// Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
+    ///
+    /// - Parameter keyPath: The key path to extract the sub-value from the data.
+    ///
+    /// - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
+    ///
     public func keyPath(
         _ keyPath: KeyPath<AbstractKeyPath, String> & Sendable
     ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {

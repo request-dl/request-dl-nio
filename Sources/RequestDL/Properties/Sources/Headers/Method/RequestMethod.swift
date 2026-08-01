@@ -37,19 +37,19 @@ public struct RequestMethod: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `RequestMethod` instance with the specified HTTP request method.
-
-     - Parameter httpMethod: The HTTP request method to use.
-
-     In the following example, a GET request is made to the Apple developers website:
-
-     ```swift
-     DataTask {
-         BaseURL("developer.apple.com")
-         RequestMethod(.get)
-     }
-     */
+    ///
+    /// Initializes a `RequestMethod` instance with the specified HTTP request method.
+    ///
+    /// - Parameter httpMethod: The HTTP request method to use.
+    ///
+    /// In the following example, a GET request is made to the Apple developers website:
+    ///
+    /// ```swift
+    /// DataTask {
+    ///     BaseURL("developer.apple.com")
+    ///     RequestMethod(.get)
+    /// }
+    ///
     public init(_ httpMethod: HTTPMethod) {
         self.httpMethod = httpMethod
     }

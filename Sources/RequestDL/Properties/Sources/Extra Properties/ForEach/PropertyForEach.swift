@@ -39,15 +39,15 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
 
     private let id: @Sendable (Data.Element) -> ID
 
-    /**
-     Creates a new instance with `Data` identified by a `keyPath`.
-
-     - Parameters:
-     - data: The sequence of data to be iterated over.
-     - id: A `KeyPath` that identifies each element in the data sequence.
-     - content: A closure that takes an element of the data sequence as input and produces
-     a property for that element.
-     */
+    ///
+    /// Creates a new instance with `Data` identified by a `keyPath`.
+    ///
+    /// - Parameters:
+    /// - data: The sequence of data to be iterated over.
+    /// - id: A `KeyPath` that identifies each element in the data sequence.
+    /// - content: A closure that takes an element of the data sequence as input and produces
+    /// a property for that element.
+    ///
     public init(
         _ data: Data,
         id: KeyPath<Data.Element, ID> & Sendable,
@@ -58,14 +58,14 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
         self.content = content
     }
 
-    /**
-     Creates a new instance where the elements of the data sequence are identifiable.
-
-     - Parameters:
-        - data: The sequence of data to be iterated over.
-        - content: A closure that takes an element of the data sequence as input and produces a
-     property for that element.
-     */
+    ///
+    /// Creates a new instance where the elements of the data sequence are identifiable.
+    ///
+    /// - Parameters:
+    ///    - data: The sequence of data to be iterated over.
+    ///    - content: A closure that takes an element of the data sequence as input and produces a
+    /// property for that element.
+    ///
     public init(
         _ data: Data,
         @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
@@ -77,14 +77,14 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
         )
     }
 
-    /**
-      Creates a new instance for a `Range` of `Int`.
-
-      - Parameters:
-        - data: The `Range` of `Int` values to be iterated over.
-        - content: A closure that takes an `Int` value as input and produces a
-        property for that value.
-     */
+    ///
+    ///  Creates a new instance for a `Range` of `Int`.
+    ///
+    ///  - Parameters:
+    ///    - data: The `Range` of `Int` values to be iterated over.
+    ///    - content: A closure that takes an `Int` value as input and produces a
+    ///    property for that value.
+    ///
     public init<Bound>(
         _ data: Data,
         @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content
@@ -96,13 +96,13 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
         )
     }
 
-    /**
-      Creates a new instance for a `ClosedRange` of `Int`.
-
-      - Parameters:
-        - data: The `ClosedRange` of `Int` values to be iterated over.
-        - content: A closure that takes an `Int` value as input and produces a property for that value.
-     */
+    ///
+    ///  Creates a new instance for a `ClosedRange` of `Int`.
+    ///
+    ///  - Parameters:
+    ///    - data: The `ClosedRange` of `Int` values to be iterated over.
+    ///    - content: A closure that takes an `Int` value as input and produces a property for that value.
+    ///
     public init<Bound>(
         _ data: Data,
         @PropertyBuilder content: @escaping @Sendable (Data.Element) -> Content

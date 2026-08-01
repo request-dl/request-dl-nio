@@ -1,6 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
- */
+//
+// See LICENSE for this package's licensing information.
+//
 
 import AsyncHTTPClient
 import NIOCore
@@ -88,29 +88,29 @@ public struct RequestBody: Sendable {
 
 extension RequestBody: Sequence {
 
-    /**
-     An iterator for traversing the `RequestBody`'s underlying buffer sequence.
-     This allows the body to be treated as a sequence of `ByteBuffer` chunks.
-     */
+    ///
+    /// An iterator for traversing the `RequestBody`'s underlying buffer sequence.
+    /// This allows the body to be treated as a sequence of `ByteBuffer` chunks.
+    ///
     public struct Iterator: IteratorProtocol {
 
         fileprivate var iterator: Internals.BodySequence.Iterator
 
-        /**
-         Advances to the next element in the sequence of buffer chunks.
-
-         - Returns: The next `ByteBuffer` in the sequence, or `nil` if there are no more elements.
-         */
+        ///
+        /// Advances to the next element in the sequence of buffer chunks.
+        ///
+        /// - Returns: The next `ByteBuffer` in the sequence, or `nil` if there are no more elements.
+        ///
         public mutating func next() -> NIOCore.ByteBuffer? {
             iterator.next()
         }
     }
 
-    /**
-     Creates an iterator over the buffer chunks in this request body.
-
-     - Returns: An instance of `RequestBody.Iterator`.
-     */
+    ///
+    /// Creates an iterator over the buffer chunks in this request body.
+    ///
+    /// - Returns: An instance of `RequestBody.Iterator`.
+    ///
     public func makeIterator() -> Iterator {
         Iterator(iterator: _body.makeIterator())
     }

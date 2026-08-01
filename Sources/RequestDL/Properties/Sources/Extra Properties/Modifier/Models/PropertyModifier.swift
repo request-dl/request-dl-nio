@@ -13,11 +13,11 @@ public protocol PropertyModifier: Sendable {
 
     associatedtype Body: Property
 
-    /**
-     Returns a modified ``Property`` type based on the given `Content`.
-
-     - Parameter content: The `Content` used to modify the ``Property``.
-     - Returns: A modified ``Property`` type.
-     */
+    ///
+    /// Returns a modified ``Property`` type based on the given `Content`.
+    ///
+    /// - Parameter content: The `Content` used to modify the ``Property``.
+    /// - Returns: A modified ``Property`` type.
+    ///
     @PropertyBuilder func body(content: Self.Content) -> Self.Body
 }

@@ -1,6 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
- */
+//
+// See LICENSE for this package's licensing information.
+//
 
 import NIOCore
 
@@ -32,62 +32,62 @@ public struct UnitTime: Sendable, Hashable {
 
     // MARK: - Public static methods
 
-    /**
-     Creates a `UnitTime` representing the specified number of nanoseconds.
-
-     - Parameter amount: The number of nanoseconds.
-     - Returns: A `UnitTime` representing the specified number of nanoseconds.
-     */
+    ///
+    /// Creates a `UnitTime` representing the specified number of nanoseconds.
+    ///
+    /// - Parameter amount: The number of nanoseconds.
+    /// - Returns: A `UnitTime` representing the specified number of nanoseconds.
+    ///
     public static func nanoseconds(_ amount: Int64) -> UnitTime {
         .init(amount)
     }
 
-    /**
-     Creates a `UnitTime` representing the specified number of microseconds.
-
-     - Parameter amount: The number of microseconds.
-     - Returns: A `UnitTime` representing the specified number of microseconds.
-     */
+    ///
+    /// Creates a `UnitTime` representing the specified number of microseconds.
+    ///
+    /// - Parameter amount: The number of microseconds.
+    /// - Returns: A `UnitTime` representing the specified number of microseconds.
+    ///
     public static func microseconds(_ amount: Int64) -> UnitTime {
         amount * 1_000
     }
 
-    /**
-     Creates a `UnitTime` representing the specified number of milliseconds.
-
-     - Parameter amount: The number of milliseconds.
-     - Returns: A `UnitTime` representing the specified number of milliseconds.
-     */
+    ///
+    /// Creates a `UnitTime` representing the specified number of milliseconds.
+    ///
+    /// - Parameter amount: The number of milliseconds.
+    /// - Returns: A `UnitTime` representing the specified number of milliseconds.
+    ///
     public static func milliseconds(_ amount: Int64) -> UnitTime {
         amount * 1_000_000
     }
 
-    /**
-     Creates a `UnitTime` representing the specified number of seconds.
-
-     - Parameter amount: The number of seconds.
-     - Returns: A `UnitTime` representing the specified number of seconds.
-     */
+    ///
+    /// Creates a `UnitTime` representing the specified number of seconds.
+    ///
+    /// - Parameter amount: The number of seconds.
+    /// - Returns: A `UnitTime` representing the specified number of seconds.
+    ///
     public static func seconds(_ amount: Int64) -> UnitTime {
         amount * 1_000_000_000
     }
 
-    /**
-     Creates a `UnitTime` representing the specified number of minutes.
-
-     - Parameter amount: The number of minutes.
-     - Returns: A `UnitTime` representing the specified number of minutes.
-     */
+    ///
+    /// Creates a `UnitTime` representing the specified number of minutes.
+    ///
+    /// - Parameter amount: The number of minutes.
+    /// - Returns: A `UnitTime` representing the specified number of minutes.
+    ///
     public static func minutes(_ amount: Int64) -> UnitTime {
         amount * 60_000_000_000
     }
 
-    /**
-     Creates a `UnitTime` representing the specified number of hours.
-
-     - Parameter amount: The number of hours.
-     - Returns: A `UnitTime` representing the specified number of hours.
-     */
+    ///
+    /// Creates a `UnitTime` representing the specified number of hours.
+    ///
+    /// - Parameter amount: The number of hours.
+    /// - Returns: A `UnitTime` representing the specified number of hours.
+    ///
     public static func hours(_ amount: Int64) -> UnitTime {
         amount * 3_600_000_000_000
     }
@@ -157,26 +157,26 @@ extension UnitTime: AdditiveArithmetic {
         lhs = lhs - rhs
     }
 
-    /**
-     Multiplies a unit of time by an integer value.
-
-     - Parameters:
-     - lhs: The integer value to multiply.
-     - rhs: The unit of time to multiply.
-     - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
-     */
+    ///
+    /// Multiplies a unit of time by an integer value.
+    ///
+    /// - Parameters:
+    /// - lhs: The integer value to multiply.
+    /// - rhs: The unit of time to multiply.
+    /// - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
+    ///
     public static func * <T: BinaryInteger>(lhs: T, rhs: UnitTime) -> UnitTime {
         .init(Int64(lhs) * rhs.nanoseconds)
     }
 
-    /**
-     Multiplies a unit of time by an integer value.
-
-     - Parameters:
-     - lhs: The unit of time to multiply.
-     - rhs: The integer value to multiply.
-     - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
-     */
+    ///
+    /// Multiplies a unit of time by an integer value.
+    ///
+    /// - Parameters:
+    /// - lhs: The unit of time to multiply.
+    /// - rhs: The integer value to multiply.
+    /// - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
+    ///
     public static func * <T: BinaryInteger>(lhs: UnitTime, rhs: T) -> UnitTime {
         .init(lhs.nanoseconds * Int64(rhs))
     }

@@ -58,52 +58,52 @@ public struct TrustRoots<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Instantiate using a group of ``RequestDL/Certificates`` that forms a hierarchy of trusted certificates.
-
-     ```swift
-     DataTask {
-        SecureConnection {
-            Trusts {
-                Certificate(rootPath, format: .der)
-                Certificate(secondPath, format: .pem)
-            }
-        }
-        .verification(.fullVerification)
-     }
-     ```
-
-     - Parameter content: A closure that returns the content of ``RequestDL/Certificate``.
-     */
+    ///
+    /// Instantiate using a group of ``RequestDL/Certificates`` that forms a hierarchy of trusted certificates.
+    ///
+    /// ```swift
+    /// DataTask {
+    ///    SecureConnection {
+    ///        Trusts {
+    ///            Certificate(rootPath, format: .der)
+    ///            Certificate(secondPath, format: .pem)
+    ///        }
+    ///    }
+    ///    .verification(.fullVerification)
+    /// }
+    /// ```
+    ///
+    /// - Parameter content: A closure that returns the content of ``RequestDL/Certificate``.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
-    /**
-     Initializes with the specified `PEM` file.
-
-     - Parameter file: The path to the file.
-     */
+    ///
+    /// Initializes with the specified `PEM` file.
+    ///
+    /// - Parameter file: The path to the file.
+    ///
     public init(_ file: String) where Content == Never {
         source = .file(file)
     }
 
-    /**
-     Initializes with the specified bytes in `PEM` format.
-
-     - Parameter bytes: An array of bytes.
-     */
+    ///
+    /// Initializes with the specified bytes in `PEM` format.
+    ///
+    /// - Parameter bytes: An array of bytes.
+    ///
     public init(_ bytes: [UInt8]) where Content == Never {
         source = .bytes(bytes)
     }
 
-    /**
-     Initializes with the specified `PEM` file in some bundle.
-
-     - Parameters:
-        - file: The path to the file.
-        - bundle: The bundle containing the file.
-     */
+    ///
+    /// Initializes with the specified `PEM` file in some bundle.
+    ///
+    /// - Parameters:
+    ///    - file: The path to the file.
+    ///    - bundle: The bundle containing the file.
+    ///
     public init(
         _ file: String,
         in bundle: Bundle

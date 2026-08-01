@@ -223,7 +223,9 @@ extension Internals {
         /// lock is held, which is a priority inversion sitting directly on the network path.
         private func decide(_ body: () -> [Effect]) {
             let effects = lock.withLock(body)
-            effects.forEach { $0() }
+            for effect in effects {
+                effect()
+            }
         }
 
         // MARK: - Unsafe methods

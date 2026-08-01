@@ -19,11 +19,11 @@ public struct AcceptHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `Accept` header for the given `ContentType`.
-
-     - Parameter contentType: The content type to be accepted.
-     */
+    ///
+    /// Initializes a new instance of `Accept` header for the given `ContentType`.
+    ///
+    /// - Parameter contentType: The content type to be accepted.
+    ///
     public init(_ contentType: RequestDL.ContentType) {
         self.type = contentType
     }

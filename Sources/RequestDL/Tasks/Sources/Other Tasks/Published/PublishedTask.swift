@@ -73,11 +73,11 @@ public struct PublishedTask<Output: Sendable>: Publisher {
 
     // MARK: - Public methods
 
-    /**
-     Subscribes the given `Subscriber` to this publisher.
-
-     - Parameter subscriber: The `Subscriber` to receive values and completion.
-     */
+    ///
+    /// Subscribes the given `Subscriber` to this publisher.
+    ///
+    /// - Parameter subscriber: The `Subscriber` to receive values and completion.
+    ///
     public func receive<S>(
         subscriber: S
     ) where S: Subscriber, Failure == S.Failure, Output == S.Input {
@@ -90,11 +90,11 @@ public struct PublishedTask<Output: Sendable>: Publisher {
 
 extension RequestTask {
 
-    /**
-     Creates a ``PublishedTask`` publisher from the current ``RequestTask`` instance.
-
-     - Returns: A publisher that emits the output of the current ``RequestTask`` instance.
-     */
+    ///
+    /// Creates a ``PublishedTask`` publisher from the current ``RequestTask`` instance.
+    ///
+    /// - Returns: A publisher that emits the output of the current ``RequestTask`` instance.
+    ///
     public func publisher() -> PublishedTask<Element> {
         .init(self)
     }

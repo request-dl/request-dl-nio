@@ -44,12 +44,12 @@ import struct Foundation.Data
 /// long as you add the ``RequestDL/RequestTask/collectBytes()`` method.
 public protocol DownloadProgress: Sendable {
 
-    /**
-     Notifies the progress of a download operation.
-
-     - Parameters:
-       - slice: The data slice downloaded in the current progress update.
-       - totalSize: The total size of the download.
-     */
+    ///
+    /// Notifies the progress of a download operation.
+    ///
+    /// - Parameters:
+    ///   - slice: The data slice downloaded in the current progress update.
+    ///   - totalSize: The total size of the download.
+    ///
     func download(_ slice: Data, totalSize: Int)
 }

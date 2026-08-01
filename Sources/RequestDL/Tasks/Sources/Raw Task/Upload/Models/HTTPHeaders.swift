@@ -1,6 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
- */
+//
+// See LICENSE for this package's licensing information.
+//
 
 import Logging
 import NIOHTTP1
@@ -158,19 +158,19 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     // MARK: - Inits
 
-    /**
-     Initializes an empty headers.
-     */
+    ///
+    /// Initializes an empty headers.
+    ///
     public init() {
         self._names = []
         self.values = []
     }
 
-    /**
-     Initializes an sequence of elements representing header name-value pairs.
-
-     - Parameter headers: A sequence of tuples representing header name-value pairs.
-     */
+    ///
+    /// Initializes an sequence of elements representing header name-value pairs.
+    ///
+    /// - Parameter headers: A sequence of tuples representing header name-value pairs.
+    ///
     public init<S: Sequence>(_ headers: S) where S.Element == (String, String) {
         self.init()
 
@@ -189,13 +189,13 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     // MARK: - Public methods
 
-    /**
-     Sets the value of the specified header field.
-
-     - Parameters:
-       - name: The name of the header field.
-       - value: The value to set for the header field.
-     */
+    ///
+    /// Sets the value of the specified header field.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the header field.
+    ///   - value: The value to set for the header field.
+    ///
     public mutating func set(name: String, value: String) {
         let name = self.name(name)
         let value = trimmingCharacters(value)
@@ -208,13 +208,13 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         }
     }
 
-    /**
-     Adds a new value to the specified header field.
-
-     - Parameters:
-        - name: The name of the header field.
-        - value: The value to add for the header field.
-     */
+    ///
+    /// Adds a new value to the specified header field.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the header field.
+    ///    - value: The value to add for the header field.
+    ///
     public mutating func add(name: String, value: String) {
         let name = self.name(name)
         let value = trimmingCharacters(value)
@@ -227,56 +227,56 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         }
     }
 
-    /**
-     Removes the specified header field.
-
-     - Parameter name: The name of the header field to remove.
-     */
+    ///
+    /// Removes the specified header field.
+    ///
+    /// - Parameter name: The name of the header field to remove.
+    ///
     public mutating func remove(name: String) {
         _remove(self.name(name))
     }
 
-    /**
-     Returns the first occurrence of the value associated with the specified header field name.
-
-     - Parameter name: The name of the header field.
-     - Returns: The first occurrence of the value associated with the header field, or `nil`
-     if the header field is not found.
-     */
+    ///
+    /// Returns the first occurrence of the value associated with the specified header field name.
+    ///
+    /// - Parameter name: The name of the header field.
+    /// - Returns: The first occurrence of the value associated with the header field, or `nil`
+    /// if the header field is not found.
+    ///
     public func first(name: String) -> String? {
         self[name]?.first
     }
 
-    /**
-     Returns the last occurrence of the value associated with the specified header field name.
-
-     - Parameter name: The name of the header field.
-     - Returns: The last occurrence of the value associated with the header field, or `nil`
-     if the header field is not found.
-     */
+    ///
+    /// Returns the last occurrence of the value associated with the specified header field name.
+    ///
+    /// - Parameter name: The name of the header field.
+    /// - Returns: The last occurrence of the value associated with the header field, or `nil`
+    /// if the header field is not found.
+    ///
     public func last(name: String) -> String? {
         self[name]?.last
     }
 
-    /**
-     Checks if the specified header field exists.
-
-     - Parameter name: The name of the header field.
-     - Returns: `true` if the header field exists, `false` otherwise.
-     */
+    ///
+    /// Checks if the specified header field exists.
+    ///
+    /// - Parameter name: The name of the header field.
+    /// - Returns: `true` if the header field exists, `false` otherwise.
+    ///
     public func contains(name: String) -> Bool {
         _names.contains(self.name(name))
     }
 
-    /**
-     Checks if the specified header field exists and satisfies the given closure.
-
-     - Parameters:
-        - name: The name of the header field.
-        - closure: A closure to evaluate the header field's value.
-     - Returns: `true` if the header field exists and satisfies the closure, `false` otherwise.
-     - Throws: Any error thrown by the closure.
-     */
+    ///
+    /// Checks if the specified header field exists and satisfies the given closure.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the header field.
+    ///    - closure: A closure to evaluate the header field's value.
+    /// - Returns: `true` if the header field exists and satisfies the closure, `false` otherwise.
+    /// - Throws: Any error thrown by the closure.
+    ///
     public func contains(name: String, where closure: (String) throws -> Bool) rethrows -> Bool {
         guard let index = _names.firstIndex(of: self.name(name)) else {
             return false
@@ -285,13 +285,13 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         return try values[index].contains(where: closure)
     }
 
-    /**
-     Accesses the header field values associated with the specified name.
-
-     - Parameter name: The name of the header field.
-     - Returns: An array of values associated with the header field name, or `nil`
-     if the header field is not found.
-     */
+    ///
+    /// Accesses the header field values associated with the specified name.
+    ///
+    /// - Parameter name: The name of the header field.
+    /// - Returns: An array of values associated with the header field name, or `nil`
+    /// if the header field is not found.
+    ///
     public subscript(_ name: String) -> [String]? {
         _values(self.name(name))
     }

@@ -14,11 +14,11 @@ public protocol RequestTaskModifier<Input, Output>: Sendable {
 
     associatedtype Output: Sendable
 
-    /**
-     Returns a modified `Output` based on the given `Content`.
-
-     - Parameter task: The `Content` used to modify the ``RequestTask``.
-     - Returns: A modified `Output` object.
-     */
+    ///
+    /// Returns a modified `Output` based on the given `Content`.
+    ///
+    /// - Parameter task: The `Content` used to modify the ``RequestTask``.
+    /// - Returns: A modified `Output` object.
+    ///
     func body(_ task: Self.Content) async throws -> Output
 }

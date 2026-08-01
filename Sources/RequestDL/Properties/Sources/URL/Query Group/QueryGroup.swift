@@ -43,11 +43,11 @@ public struct QueryGroup<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Creates a new query group from the content.
-
-     - Parameter content: A closure that returns the content of the query group.
-     */
+    ///
+    /// Creates a new query group from the content.
+    ///
+    /// - Parameter content: A closure that returns the content of the query group.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }

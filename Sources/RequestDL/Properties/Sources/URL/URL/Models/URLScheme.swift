@@ -57,11 +57,11 @@ public struct URLScheme: Sendable, Hashable {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `ContentType` instance with a given string value.
-
-     - Parameter rawValue: The string value of the content type.
-     */
+    ///
+    /// Initializes a `ContentType` instance with a given string value.
+    ///
+    /// - Parameter rawValue: The string value of the content type.
+    ///
     public init<S: StringProtocol>(_ rawValue: S) {
         self.rawValue = String(rawValue)
     }
@@ -71,14 +71,14 @@ public struct URLScheme: Sendable, Hashable {
 
 extension URLScheme: ExpressibleByStringLiteral {
 
-    /**
-     Initializes a `URLScheme` instance using a string literal.
-
-     - Parameter value: A string literal representing the url scheme type.
-     - Returns: An instance of `URLScheme` with the specified url scheme type.
-
-     > Note: Use this initializer to create a `URLScheme` instance from a string literal.
-     */
+    ///
+    /// Initializes a `URLScheme` instance using a string literal.
+    ///
+    /// - Parameter value: A string literal representing the url scheme type.
+    /// - Returns: An instance of `URLScheme` with the specified url scheme type.
+    ///
+    /// > Note: Use this initializer to create a `URLScheme` instance from a string literal.
+    ///
     public init(stringLiteral value: StringLiteralType) {
         self.init(value)
     }

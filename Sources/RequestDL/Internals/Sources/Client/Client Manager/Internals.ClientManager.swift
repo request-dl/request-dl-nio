@@ -11,8 +11,10 @@ import var Foundation.NSEC_PER_SEC
 
 #if canImport(FoundationEssentials)
 import struct FoundationEssentials.Date
+import struct FoundationEssentials.DispatchTime
 #else
 import struct Foundation.Date
+import struct Foundation.DispatchTime
 #endif
 
 extension Internals {
@@ -57,7 +59,9 @@ extension Internals {
             return try await lock.withLock {
                 // `withLock` rather than a manual lock and unlock pair with a return in the
                 // middle of it, which balances today and stops balancing on the next edit.
-                if let client = tableLock.withLock({ _reusableClient(id: sessionProviderID, sessionConfiguration: sessionConfiguration) }) {
+                if let client = tableLock.withLock({
+                    _reusableClient(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                }) {
                     return client
                 }
 
@@ -164,10 +168,12 @@ extension Internals {
             tableLock.withLock {
                 var items = _table[id] ?? []
 
-                items.append(.createNew(
-                    sessionConfiguration: sessionConfiguration,
-                    client: client
-                ))
+                items.append(
+                    .createNew(
+                        sessionConfiguration: sessionConfiguration,
+                        client: client
+                    )
+                )
 
                 _table[id] = items
             }

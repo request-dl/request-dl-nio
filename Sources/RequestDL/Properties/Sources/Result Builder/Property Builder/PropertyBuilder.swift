@@ -31,12 +31,12 @@
 @resultBuilder
 public struct PropertyBuilder: Sendable {
 
-    /**
-     The buildBlock method that returns an empty `EmptyProperty`.
-
-     Use this method when you want to return an empty `EmptyProperty` block in your
-     `PropertyBuilder` implementation.
-     */
+    ///
+    /// The buildBlock method that returns an empty `EmptyProperty`.
+    ///
+    /// Use this method when you want to return an empty `EmptyProperty` block in your
+    /// `PropertyBuilder` implementation.
+    ///
     public static func buildBlock() -> EmptyProperty {
         EmptyProperty()
     }
@@ -70,56 +70,56 @@ public struct PropertyBuilder: Sendable {
         _OptionalContent(content)
     }
 
-    /**
-     Constructs a property builder that can build a conditional block of properties.
-
-     > Note: This is a result builder method that is called when the builder encounters an `if` statement
-     with a condition that evaluates to `true`.
-     */
+    ///
+    /// Constructs a property builder that can build a conditional block of properties.
+    ///
+    /// > Note: This is a result builder method that is called when the builder encounters an `if` statement
+    /// with a condition that evaluates to `true`.
+    ///
     public static func buildEither<First: Property, Second: Property>(
         first component: First
     ) -> _EitherContent<First, Second> {
         .init(first: component)
     }
 
-    /**
-     A helper method for the `@PropertyBuilder` to build conditional content.
-
-     Use `buildEither(first:)` to specify content when a condition is true and
-     `buildEither(second:)` to specify content when it's false.
-
-     ```swift
-     PropertyGroup {
-         if condition {
-             Query(name: "password", value: "foo")
-         } else {
-             Query(name: "password", value: "bar")
-         }
-     }
-     */
+    ///
+    /// A helper method for the `@PropertyBuilder` to build conditional content.
+    ///
+    /// Use `buildEither(first:)` to specify content when a condition is true and
+    /// `buildEither(second:)` to specify content when it's false.
+    ///
+    /// ```swift
+    /// PropertyGroup {
+    ///     if condition {
+    ///         Query(name: "password", value: "foo")
+    ///     } else {
+    ///         Query(name: "password", value: "bar")
+    ///     }
+    /// }
+    ///
     public static func buildEither<First: Property, Second: Property>(
         second component: Second
     ) -> _EitherContent<First, Second> {
         .init(second: component)
     }
 
-    /**
-     This function is used by Swift when there is an `if #available()` statement in the code. It allows a
-     property to be conditionally included in the request if the necessary API is available on the user's device.
-
-     Here's an example of how it can be used:
-
-     ```swift
-     PropertyGroup {
-         if #available(iOS 15, *) {
-             Headers(...)
-         }
-     }
-     ```
-
-     In this example, the `Header` property will only be included if the user's device is running iOS 15 or later.
-     If the device is running an older version of iOS, the `Header` property will be excluded from the request.
-     */
+    ///
+    /// This function is used by Swift when there is an `if #available()` statement in the code. It allows a
+    /// property to be conditionally included in the request if the necessary API is available on the user's device.
+    ///
+    /// Here's an example of how it can be used:
+    ///
+    /// ```swift
+    /// PropertyGroup {
+    ///     if #available(iOS 15, *) {
+    ///         Headers(...)
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// In this example, the `Header` property will only be included if the user's device is running iOS 15 or later.
+    /// If the device is running an older version of iOS, the `Header` property will be excluded from the request.
+    ///
     public static func buildLimitedAvailability<Content: Property>(_ component: Content) -> Content {
         component
     }

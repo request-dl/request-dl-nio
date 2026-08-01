@@ -2,15 +2,19 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import AsyncHTTPClient
+import NIOCore
 import SwiftAsyncStream
 
 extension Internals {
 
     struct UnsafeTask<Element: Sendable>: Sendable, Hashable {
 
-        /// Guards the three things that end a request, so exactly one of them wins.
+        /// Orders the ending against the request itself.
+        ///
+        /// `TaskSeed` already guarantees that cancelling and releasing cannot both fire, so
+        /// what is left to arbitrate is those against `whenComplete`, which runs on the event
+        /// loop. Both sides claim through here, on that loop, so exactly one wins.
         private final class State: @unchecked Sendable {
 
             private let lock = Lock()

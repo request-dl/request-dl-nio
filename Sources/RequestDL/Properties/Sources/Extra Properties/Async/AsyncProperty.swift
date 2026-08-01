@@ -32,12 +32,12 @@ public struct AsyncProperty<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes with an asynchronous content provided.
-
-     - Parameters:
-        - content: The content of the request to be built.
-     */
+    ///
+    /// Initializes with an asynchronous content provided.
+    ///
+    /// - Parameters:
+    ///    - content: The content of the request to be built.
+    ///
     public init(@PropertyBuilder content: @escaping @Sendable () async throws -> Content) {
         self.content = content
     }

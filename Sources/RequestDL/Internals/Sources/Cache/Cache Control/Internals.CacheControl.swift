@@ -466,10 +466,11 @@ extension Internals {
                 .max()
         }
 
-        private func flatAndCombineHeadersValues(_ headers: [String]) -> LazyMapSequence<[Substring], String> {
-            headers.reduce([]) { $0 + $1.split(separator: ";") }
-                .reduce([]) { $0 + $1.split(separator: ",") }
+        private func flatAndCombineHeadersValues(_ headers: [String]) -> some Sequence<String> {
+            headers
                 .lazy
+                .flatMap { $0.split(separator: ";") }
+                .flatMap { $0.split(separator: ",") }
                 .map { $0.trimmingCharacters(in: .whitespaces) }
         }
     }

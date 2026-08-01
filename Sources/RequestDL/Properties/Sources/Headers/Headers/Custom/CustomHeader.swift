@@ -19,13 +19,13 @@ public struct CustomHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `CustomHeader` for the given value and name.
-
-     - Parameters:
-        - name: The name to reference the header property.
-        - value: The value for the header property.
-     */
+    ///
+    /// Initializes a new instance of `CustomHeader` for the given value and name.
+    ///
+    /// - Parameters:
+    ///    - name: The name to reference the header property.
+    ///    - value: The value for the header property.
+    ///
     public init<Name: StringProtocol, Value: StringProtocol>(
         name: Name,
         value: Value
@@ -34,13 +34,13 @@ public struct CustomHeader: Property {
         self.value = String(value)
     }
 
-    /**
-     Initializes a new instance of `CustomHeader` for the given value and name.
-
-     - Parameters:
-        - name: The name to reference the header property.
-        - value: The value for the header property.
-     */
+    ///
+    /// Initializes a new instance of `CustomHeader` for the given value and name.
+    ///
+    /// - Parameters:
+    ///    - name: The name to reference the header property.
+    ///    - value: The value for the header property.
+    ///
     public init<Name: StringProtocol, Value: LosslessStringConvertible>(
         name: Name,
         value: Value

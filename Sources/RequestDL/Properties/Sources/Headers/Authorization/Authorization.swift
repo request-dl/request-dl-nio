@@ -38,37 +38,37 @@ public struct Authorization: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes with the specified token type and token.
-
-     - Parameters:
-        - type: The type of token.
-        - token: The token value.
-     */
+    ///
+    /// Initializes with the specified token type and token.
+    ///
+    /// - Parameters:
+    ///    - type: The type of token.
+    ///    - token: The token value.
+    ///
     public init<Token: StringProtocol>(_ type: TokenType, token: Token) {
         self.type = type
         self.token = String(token)
     }
 
-    /**
-     Initializes with the specified token type and token.
-
-     - Parameters:
-        - type: The type of token.
-        - token: The token value.
-     */
+    ///
+    /// Initializes with the specified token type and token.
+    ///
+    /// - Parameters:
+    ///    - type: The type of token.
+    ///    - token: The token value.
+    ///
     public init<Token: LosslessStringConvertible>(_ type: TokenType, token: Token) {
         self.type = type
         self.token = String(token)
     }
 
-    /**
-     Creates an `Authorization` instance for basic authentication using the given username and password.
-
-     - Parameters:
-        - username: The username to be used for authentication.
-        - password: The password to be used for authentication.
-     */
+    ///
+    /// Creates an `Authorization` instance for basic authentication using the given username and password.
+    ///
+    /// - Parameters:
+    ///    - username: The username to be used for authentication.
+    ///    - password: The password to be used for authentication.
+    ///
     public init<Username: StringProtocol, Password: StringProtocol>(
         username: Username,
         password: Password

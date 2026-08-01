@@ -39,11 +39,11 @@ public struct HeaderGroup<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new `HeaderGroup` with a closure that contains the header properties.
-
-     - Parameter content: A closure that returns the `Content` containing the header properties.
-     */
+    ///
+    /// Initializes a new `HeaderGroup` with a closure that contains the header properties.
+    ///
+    /// - Parameter content: A closure that returns the `Content` containing the header properties.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
@@ -68,11 +68,11 @@ public struct HeaderGroup<Content: Property>: Property {
 
 extension HeaderGroup where Content == PropertyForEach<[String: String], String, CustomHeader> {
 
-    /**
-     Initializes a new `HeaderGroup` with a dictionary of headers.
-
-     - Parameter dictionary: A dictionary containing header properties.
-     */
+    ///
+    /// Initializes a new `HeaderGroup` with a dictionary of headers.
+    ///
+    /// - Parameter dictionary: A dictionary containing header properties.
+    ///
     public init(_ dictionary: [String: Any]) {
         let dictionary =
             (dictionary as? [String: String])

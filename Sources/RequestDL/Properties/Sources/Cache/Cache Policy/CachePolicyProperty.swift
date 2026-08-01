@@ -36,12 +36,12 @@ private struct CachePolicyProperty: Property {
 
 extension Property {
 
-    /**
-     Adds a cache policy to the request using the specified cache policy set.
-
-     - Parameter cachePolicy: The cache policy set to be added to the request.
-     - Returns: A property with the added cache policy.
-     */
+    ///
+    /// Adds a cache policy to the request using the specified cache policy set.
+    ///
+    /// - Parameter cachePolicy: The cache policy set to be added to the request.
+    /// - Returns: A property with the added cache policy.
+    ///
     @PropertyBuilder
     public func cachePolicy(_ cachePolicy: DataCache.Policy.Set) -> some Property {
         self

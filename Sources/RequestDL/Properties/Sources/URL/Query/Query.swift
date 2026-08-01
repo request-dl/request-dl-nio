@@ -37,13 +37,13 @@ public struct Query<Value: Sendable>: Property {
 
     // MARK: - Inits
 
-    /**
-     Creates a new `Query` instance with a name and value.
-
-     - Parameters:
-        - name: The name of the query parameter.
-        - value: The value of the query parameter.
-     */
+    ///
+    /// Creates a new `Query` instance with a name and value.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the query parameter.
+    ///    - value: The value of the query parameter.
+    ///
     public init<Name: StringProtocol>(name: Name, value: Value) {
         self.name = String(name)
         self.value = value

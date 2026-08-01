@@ -38,12 +38,12 @@ public struct FormGroup<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `Form` with the specified list of properties.
-
-     - Parameters:
-        - content: A property builder closure that creates a list of `Property` objects.
-     */
+    ///
+    /// Initializes a new instance of `Form` with the specified list of properties.
+    ///
+    /// - Parameters:
+    ///    - content: A property builder closure that creates a list of `Property` objects.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }

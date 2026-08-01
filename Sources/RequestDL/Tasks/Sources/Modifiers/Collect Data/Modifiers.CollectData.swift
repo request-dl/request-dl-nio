@@ -46,13 +46,13 @@ extension Modifiers {
 
         // MARK: - Public methods
 
-        /**
-         Combines individual bytes into `Data` object.
-
-         - Parameter task: The request task to modify.
-         - Returns: The task result.
-         - Throws: An error if the modification fails.
-         */
+        ///
+        /// Combines individual bytes into `Data` object.
+        ///
+        /// - Parameter task: The request task to modify.
+        /// - Returns: The task result.
+        /// - Throws: An error if the modification fails.
+        ///
         public func body(_ task: Content) async throws -> Output {
             try await transform(task.result())
         }

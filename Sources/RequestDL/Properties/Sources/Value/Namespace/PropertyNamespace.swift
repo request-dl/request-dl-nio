@@ -47,10 +47,10 @@ public struct PropertyNamespace: DynamicValue {
 
     // MARK: - Public properties
 
-    /**
-     The identifier for the namespace that automatically is used to store objects inside
-     the `Property` declaration in a isolated memory.
-     */
+    ///
+    /// The identifier for the namespace that automatically is used to store objects inside
+    /// the `Property` declaration in a isolated memory.
+    ///
     public var wrappedValue: ID {
         id ?? .global
     }
@@ -61,8 +61,8 @@ public struct PropertyNamespace: DynamicValue {
 
     // MARK: - Inits
 
-    /**
-     Instantiates a namespace identifier for `Property` objects.
-     */
+    ///
+    /// Instantiates a namespace identifier for `Property` objects.
+    ///
     public init() {}
 }

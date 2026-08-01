@@ -32,13 +32,13 @@ public struct ResponseHead: Sendable, Hashable {
 
         // MARK: - Inits
 
-        /**
-         Initializes the status of HTTP response.
-
-         - Parameters:
-           - code: The HTTP status code of the response.
-           - reason: The reason phrase associated with the HTTP status code.
-        */
+        ///
+        /// Initializes the status of HTTP response.
+        ///
+        /// - Parameters:
+        ///   - code: The HTTP status code of the response.
+        ///   - reason: The reason phrase associated with the HTTP status code.
+        ///
         public init(
             code: UInt,
             reason: String
@@ -76,13 +76,13 @@ public struct ResponseHead: Sendable, Hashable {
 
         // MARK: - Inits
 
-        /**
-         Initializes the version of HTTP response.
-
-         - Parameters:
-           - minor: The minor version number of the HTTP protocol used in the response.
-           - major: The major version number of the HTTP protocol used in the response.
-         */
+        ///
+        /// Initializes the version of HTTP response.
+        ///
+        /// - Parameters:
+        ///   - minor: The minor version number of the HTTP protocol used in the response.
+        ///   - major: The major version number of the HTTP protocol used in the response.
+        ///
         public init(
             minor: Int,
             major: Int
@@ -118,16 +118,16 @@ public struct ResponseHead: Sendable, Hashable {
 
     // MARK: - Inits
 
-    /**
-     Initializes the head of a HTTP response.
-
-     - Parameters:
-        - url: The URL of the response.
-        - status: The status of the response.
-        - version: The version of the HTTP protocol used in the response.
-        - headers: The headers of the response.
-        - isKeepAlive: A boolean value indicating whether the connection should be kept alive after the response.
-     */
+    ///
+    /// Initializes the head of a HTTP response.
+    ///
+    /// - Parameters:
+    ///    - url: The URL of the response.
+    ///    - status: The status of the response.
+    ///    - version: The version of the HTTP protocol used in the response.
+    ///    - headers: The headers of the response.
+    ///    - isKeepAlive: A boolean value indicating whether the connection should be kept alive after the response.
+    ///
     public init(
         url: URL?,
         status: Status,

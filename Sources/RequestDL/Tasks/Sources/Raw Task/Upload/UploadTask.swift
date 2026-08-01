@@ -39,24 +39,24 @@ public struct UploadTask<Content: Property>: RequestTask {
 
     // MARK: - Inits
 
-    /**
-     Initializes with a ``Property`` as its content.
-
-     - Parameter content: The content of the request.
-     */
+    ///
+    /// Initializes with a ``Property`` as its content.
+    ///
+    /// - Parameter content: The content of the request.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.task = RawTask(content: content())
     }
 
     // MARK: - Public methods
 
-    /**
-     Returns the asynchronous response for a request.
-
-     - Returns: An ``AsyncResponse`` sequence of request upload and download steps.
-
-     - Throws: An error of type `Error` that indicates an issue with the request or response.
-     */
+    ///
+    /// Returns the asynchronous response for a request.
+    ///
+    /// - Returns: An ``AsyncResponse`` sequence of request upload and download steps.
+    ///
+    /// - Throws: An error of type `Error` that indicates an issue with the request or response.
+    ///
     public func result() async throws -> AsyncResponse {
         try await task.result()
     }

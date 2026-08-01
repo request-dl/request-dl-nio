@@ -47,30 +47,30 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
 
     // MARK: - Public properties
 
-    /**
-     The wrapped value that provides access to the value stored in the ``RequestEnvironmentValues`` object.
-
-     To access the value stored in the ``RequestEnvironmentValues`` object, use the
-     ``PropertyEnvironment/wrappedValue`` property on the ``PropertyEnvironment`` property
-     wrapper. This property returns the value that is stored in the ``RequestEnvironmentValues``
-     object for the key path provided to the initializer.
-
-     ### Example
-
-     The following example shows how to use the ``PropertyEnvironment/wrappedValue`` property to access the
-     `contentType` value in a ``Property``:
-
-     ```swift
-     struct DefaultHeader: Property {
-
-         @PropertyEnvironment(\.contentType) var contentType: ContentType
-
-         var body: some Property {
-             Headers.ContentType(contentType)
-         }
-     }
-     ```
-     */
+    ///
+    /// The wrapped value that provides access to the value stored in the ``RequestEnvironmentValues`` object.
+    ///
+    /// To access the value stored in the ``RequestEnvironmentValues`` object, use the
+    /// ``PropertyEnvironment/wrappedValue`` property on the ``PropertyEnvironment`` property
+    /// wrapper. This property returns the value that is stored in the ``RequestEnvironmentValues``
+    /// object for the key path provided to the initializer.
+    ///
+    /// ### Example
+    ///
+    /// The following example shows how to use the ``PropertyEnvironment/wrappedValue`` property to access the
+    /// `contentType` value in a ``Property``:
+    ///
+    /// ```swift
+    /// struct DefaultHeader: Property {
+    ///
+    ///     @PropertyEnvironment(\.contentType) var contentType: ContentType
+    ///
+    ///     var body: some Property {
+    ///         Headers.ContentType(contentType)
+    ///     }
+    /// }
+    /// ```
+    ///
     public var wrappedValue: Value {
         // Falls back to the environment's own default instead of trapping. Reading this before
         // the graph has populated it, or from a property never resolved through a graph at
@@ -94,11 +94,11 @@ public struct PropertyEnvironment<Value: Sendable>: DynamicValue {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of the ``PropertyEnvironment`` property wrapper.
-
-     - Parameter keyPath: The key path that points to the value in the ``RequestEnvironmentValues`` object.
-     */
+    ///
+    /// Initializes a new instance of the ``PropertyEnvironment`` property wrapper.
+    ///
+    /// - Parameter keyPath: The key path that points to the value in the ``RequestEnvironmentValues`` object.
+    ///
     public init(_ keyPath: KeyPath<RequestEnvironmentValues, Value> & Sendable) {
         self.keyPath = keyPath
     }

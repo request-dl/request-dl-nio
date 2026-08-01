@@ -28,7 +28,7 @@
 /// This `DefaultHeaders` struct conforms to the Property protocol and sets default
 /// headers for all requests. We can use many different objects to configure requests in
 /// order to meet specific application requirements.
-public protocol Property: Sendable {
+public protocol Property: Sendable, ~Copyable, ~Escapable {
 
     associatedtype Body: Property
 

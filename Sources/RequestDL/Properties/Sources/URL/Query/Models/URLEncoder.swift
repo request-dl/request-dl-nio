@@ -92,17 +92,17 @@ public final class URLEncoder: @unchecked Sendable {
 
     // MARK: - Public properties
 
-    /**
-     Encodes the given value for the specified key into an array of query items.
-
-     - Parameters:
-        - value: The value to encode.
-        - key: The key to associate with the value.
-
-     - Returns: An array of query items representing the encoded value and key.
-
-     - Throws: An error if encoding fails.
-     */
+    ///
+    /// Encodes the given value for the specified key into an array of query items.
+    ///
+    /// - Parameters:
+    ///    - value: The value to encode.
+    ///    - key: The key to associate with the value.
+    ///
+    /// - Returns: An array of query items representing the encoded value and key.
+    ///
+    /// - Throws: An error if encoding fails.
+    ///
     public func encode(_ value: Any, forKey key: String) throws -> [QueryItem] {
         try lock.withLock {
             let items = try _recursiveEncode(value, forKey: key).addingRFC3986PercentEncoding(

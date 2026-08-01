@@ -37,11 +37,11 @@ public struct UserAgentHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initialize with a custom agent to be added to the headers.
-
-     - Parameter userAgent: The custom agent value.
-     */
+    ///
+    /// Initialize with a custom agent to be added to the headers.
+    ///
+    /// - Parameter userAgent: The custom agent value.
+    ///
     public init<S: StringProtocol>(_ userAgent: S) {
         self.value = String(userAgent)
     }
