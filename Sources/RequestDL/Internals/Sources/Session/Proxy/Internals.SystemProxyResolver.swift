@@ -10,8 +10,12 @@ import struct Foundation.URL
 import class Foundation.NSNumber
 #endif
 
-#if canImport(Darwin) && canImport(CFNetwork)
+#if canImport(Darwin)
+#if canImport(CFNetwork)
 import CFNetwork
+#else
+import Foundation
+#endif
 #endif
 
 extension Internals {
