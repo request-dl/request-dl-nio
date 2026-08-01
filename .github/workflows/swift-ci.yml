@@ -24,7 +24,7 @@ concurrency:
 jobs:
   ci:
     name: "Swift CI"
-    uses: request-dl/.github/.github/workflows/swift-ci.yml@main
+    uses: request-dl/.github/.github/workflows/swift-ci.yml@ci-cleanup
     with:
       name: request-dl
       swift-version: '6.2'
