@@ -9,7 +9,7 @@ import Testing
 struct DefaultTrustRootsTests {
 
     @Test
-    func trusts_whenDefault_shouldBeDefault() async throws {
+    func trustRoots_whenDefault_shouldBeDefault() async throws {
         // Given
         let property = DefaultTrustRoots()
 

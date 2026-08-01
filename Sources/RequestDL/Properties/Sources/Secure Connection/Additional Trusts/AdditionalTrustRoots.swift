@@ -61,7 +61,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     // MARK: - Inits
 
     ///
-    /// Initializes a new instance of the AdditionalTrusts struct.
+    /// Initializes a new instance of the AdditionalTrustRoots struct.
     ///
     /// ```swift
     /// DataTask {
@@ -75,14 +75,14 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     /// }
     /// ```
     ///
-    /// - Parameter content: A closure that returns the content of the AdditionalTrusts.
+    /// - Parameter content: A closure that returns the content of the AdditionalTrustRoots.
     ///
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
     ///
-    /// Initializes a new instance of the AdditionalTrusts struct with the specified file
+    /// Initializes a new instance of the AdditionalTrustRoots struct with the specified file
     /// in `PEM` format.
     ///
     /// - Parameter file: The path to the file.
@@ -92,7 +92,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     }
 
     ///
-    /// Initializes a new instance of the AdditionalTrusts struct with the specified bytes
+    /// Initializes a new instance of the AdditionalTrustRoots struct with the specified bytes
     /// in `PEM` format.
     ///
     /// - Parameter bytes: An array of bytes.
@@ -102,7 +102,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     }
 
     ///
-    /// Initializes a new instance of the AdditionalTrusts struct with the specified file in the specified bundle
+    /// Initializes a new instance of the AdditionalTrustRoots struct with the specified file in the specified bundle
     /// in `PEM` format.
     ///
     /// - Parameters:

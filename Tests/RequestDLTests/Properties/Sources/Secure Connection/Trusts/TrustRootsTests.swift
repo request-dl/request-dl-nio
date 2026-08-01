@@ -15,7 +15,7 @@ import Foundation
 struct TrustRootsTests {
 
     @Test
-    func trusts_whenCertificates_shouldBeValid() async throws {
+    func trustRoots_whenCertificates_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -46,7 +46,7 @@ struct TrustRootsTests {
     }
 
     @Test
-    func trusts_whenFile_shouldBeValid() async throws {
+    func trustRoots_whenFile_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -84,7 +84,7 @@ struct TrustRootsTests {
     }
 
     @Test
-    func trusts_whenBytes_shouldBeValid() async throws {
+    func trustRoots_whenBytes_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
@@ -112,7 +112,7 @@ struct TrustRootsTests {
     }
 
     @Test
-    func trusts_whenAccessBody_shouldBeNever() async throws {
+    func trustRoots_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.TrustRoots {
             RequestDL.Certificate([0, 1, 2])

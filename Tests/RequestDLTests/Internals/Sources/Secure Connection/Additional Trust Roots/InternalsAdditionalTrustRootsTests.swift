@@ -16,17 +16,17 @@ import Foundation
 struct InternalsAdditionalTrustRootsTests {
 
     @Test
-    func trusts_whenCertificates_shouldBeValid() async throws {
+    func trustRoots_whenCertificates_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
 
-        var trusts = Internals.AdditionalTrustRoots()
-        trusts.append(.init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem))
-        trusts.append(.init(server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
+        var trustRoots = Internals.AdditionalTrustRoots()
+        trustRoots.append(.init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem))
+        trustRoots.append(.init(server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
 
         // When
-        let sut = try trusts.build()
+        let sut = try trustRoots.build()
 
         // Then
         let expectedAdditionalTrustRoots = try NIOSSLAdditionalTrustRoots.certificates([

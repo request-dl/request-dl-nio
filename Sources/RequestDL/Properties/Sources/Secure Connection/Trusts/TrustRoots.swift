@@ -64,7 +64,7 @@ public struct TrustRoots<Content: Property>: Property {
     /// ```swift
     /// DataTask {
     ///    SecureConnection {
-    ///        Trusts {
+    ///        TrustRoots {
     ///            Certificate(rootPath, format: .der)
     ///            Certificate(secondPath, format: .pem)
     ///        }

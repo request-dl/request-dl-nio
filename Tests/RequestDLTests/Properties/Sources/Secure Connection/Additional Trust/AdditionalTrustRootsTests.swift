@@ -114,7 +114,7 @@ struct AdditionalTrustRootsTests {
     }
 
     @Test
-    func trusts_whenAccessBody_shouldBeNever() async throws {
+    func trustRoots_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.AdditionalTrustRoots {
             RequestDL.Certificate([0, 1, 2])
