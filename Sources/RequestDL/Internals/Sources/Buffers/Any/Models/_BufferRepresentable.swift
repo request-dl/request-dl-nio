@@ -27,7 +27,7 @@ protocol _BufferRepresentable<Stream>: Sendable {
 
     var estimatedBytes: Int { get }
 
-    init(_ url: Foundation.URL)
+    init(_ url: URL)
 
     init(_ url: Internals.ByteURL)
 

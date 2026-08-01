@@ -22,7 +22,11 @@ extension Internals {
 
         // MARK: - Private properties
 
+        #if canImport(FoundationEssentials)
+        private let fileHandle: FoundationEssentials.FileHandle
+        #else
         private let fileHandle: Foundation.FileHandle
+        #endif
 
         // MARK: - Inits
 

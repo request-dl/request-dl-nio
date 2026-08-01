@@ -17,7 +17,7 @@ protocol BufferURL: Sendable {
     /// Replaces a runtime `Stream.self is FileStreamBuffer.Type` test. With the conversion
     /// declared per type, a third kind of storage has to say what it can address instead of
     /// silently falling into whichever branch happens to be last.
-    static func make(from url: Foundation.URL) -> Self?
+    static func make(from url: URL) -> Self?
 
     /// Addresses an in memory location, or `nil` when this kind of storage cannot.
     static func make(from url: Internals.ByteURL) -> Self?
@@ -41,7 +41,7 @@ protocol BufferURL: Sendable {
 
 extension BufferURL {
 
-    static func make(from url: Foundation.URL) -> Self? {
+    static func make(from url: URL) -> Self? {
         nil
     }
 

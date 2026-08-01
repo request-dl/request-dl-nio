@@ -46,7 +46,7 @@ extension Internals {
         // MARK: - Private properties
 
         private let _path: String
-        private let url: Foundation.URL
+        private let url: URL
 
         // Only a URL this type minted itself is one it may delete. A caller supplied path
         // belongs to the caller.
@@ -54,11 +54,11 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(_ url: Foundation.URL) {
+        init(_ url: URL) {
             self.init(url: url, isTemporary: false)
         }
 
-        private init(url: Foundation.URL, isTemporary: Bool) {
+        private init(url: URL, isTemporary: Bool) {
             self.url = url
             self._path = url.absolutePath(percentEncoded: false)
             self.isTemporary = isTemporary
@@ -66,7 +66,7 @@ extension Internals {
 
         // MARK: - Internal static methods
 
-        static func make(from url: Foundation.URL) -> Internals.FileBufferURL? {
+        static func make(from url: URL) -> Internals.FileBufferURL? {
             .init(url)
         }
 
@@ -113,7 +113,7 @@ extension Internals {
             try? FileManager.default.removeItem(at: url)
         }
 
-        func absoluteURL() -> Foundation.URL {
+        func absoluteURL() -> URL {
             url
         }
     }

@@ -198,7 +198,7 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(_ url: Foundation.URL) {
+        init(_ url: URL) {
             // Asking the storage type what it can address, instead of testing `Stream.self`
             // against a concrete type at runtime.
             if let url = Stream.URL.make(from: url) {
