@@ -1,8 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import class FoundationEssentials.Bundle
+import struct FoundationEssentials.URL
+#else
+import class Foundation.Bundle
+import struct Foundation.URL
+#endif
 
 extension Bundle {
 
@@ -45,11 +51,12 @@ extension Bundle {
     func resolveURL(forResourceName name: String) -> URL? {
         let file = resolve(name: name)
 
-        let urls = urls(
-            forResourcesWithExtension: file.extension,
-            subdirectory: file.subdirectory,
-            localization: nil
-        ) ?? []
+        let urls =
+            urls(
+                forResourcesWithExtension: file.extension,
+                subdirectory: file.subdirectory,
+                localization: nil
+            ) ?? []
 
         return (urls as [URL]).first(where: {
             if let pathExtension = file.extension {
@@ -65,7 +72,8 @@ extension Bundle {
             return resourceURL
         }
 
-        return bundleURL
+        return
+            bundleURL
             .appendingPathComponent("Contents", isDirectory: true)
             .appendingPathComponent("Resources", isDirectory: true)
     }

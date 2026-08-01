@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOSSL
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsCertificateChainTests {
 
@@ -37,7 +43,7 @@ struct InternalsCertificateChainTests {
         // Then
         let expectedSources: [NIOSSLCertificateSource] = try [
             .certificate(.init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
-            .certificate(.init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
+            .certificate(.init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem)),
         ]
         #expect(sut == expectedSources)
     }

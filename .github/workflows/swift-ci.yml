@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Package.swift'
+      - 'Sources/'
+      - 'Tests/'
+      - '.swift-format'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Package.swift'
+      - 'Sources/'
+      - 'Tests/'
+      - '.swift-format'
+      - '.github/workflows/ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: "Swift CI"
+    uses: request-dl/.github/.github/workflows/swift-ci.yml@main
+    with:
+      name: request-dl
+      swift-version: '6.2'
+      platform: macos-26
+
+      # Step 1
+      enable-format: true
+      format-swift-version: '6.3'
+
+      # Step 2
+      enable-breaking-changes: true
+      skip-on-major-update: true
+      force-skip-breaking-changes: ${{ contains(github.event.pull_request.labels.*.name, 'force-skip-ci') }}
+
+      # Step 3 – Apple
+      enable-apple-tests: true
+      package-name: "request-dl"
+      xcode-version: '26.6'
+      apple-coverage-enabled: true
+
+      # Step 3 – Third Party
+      enable-third-party-tests: true
+      third-party-coverage-enabled: true
+      test-foundation-essentials: true
+
+      # Step 3 – WebAssembly
+      enable-wasm: true
+
+      # Step 4
+      enable-coverage-upload: true
+    secrets: inherit

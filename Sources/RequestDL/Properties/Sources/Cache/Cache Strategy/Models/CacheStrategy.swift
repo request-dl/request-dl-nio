@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A cache strategy enumeration that represents different strategies for handling cached data.
 public enum CacheStrategy: Sendable, Hashable {

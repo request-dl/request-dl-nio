@@ -1,16 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIO
-import NIOSSL
 import NIOHTTP1
+import NIOSSL
 import SwiftAsyncStream
+
+@testable import RequestDL
+
 #if canImport(Darwin)
 import NIOTransportServices
 #endif
-@testable import RequestDL
 
 struct LocalServer: Sendable {
 
@@ -44,8 +45,7 @@ struct LocalServer: Sendable {
 
                 guard
                     !_channels.keys.contains(where: {
-                        $0.host == serverConfiguration.host &&
-                        $0.port == serverConfiguration.port
+                        $0.host == serverConfiguration.host && $0.port == serverConfiguration.port
                     })
                 else { fatalError() }
 
@@ -60,7 +60,7 @@ struct LocalServer: Sendable {
                         channel.pipeline
                             .addHandlers([
                                 BackPressureHandler(),
-                                NIOSSLServerHandler(context: sslContext)
+                                NIOSSLServerHandler(context: sslContext),
                             ])
                             .flatMap {
                                 channel.pipeline.configureHTTPServerPipeline()

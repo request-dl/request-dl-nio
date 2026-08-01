@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension URLEncoder {
 
@@ -35,23 +33,23 @@ extension URLEncoder {
         // MARK: - Private methods
 
         private func encodeLiteral(_ flag: Bool, in encoder: URLEncoder.Encoder) throws {
-           var container = encoder.valueContainer()
+            var container = encoder.valueContainer()
 
-           if flag {
-               try container.encode("true")
-           } else {
-               try container.encode("false")
-           }
-       }
+            if flag {
+                try container.encode("true")
+            } else {
+                try container.encode("false")
+            }
+        }
 
         private func encodeNumeric(_ flag: Bool, in encoder: URLEncoder.Encoder) throws {
-           var container = encoder.valueContainer()
+            var container = encoder.valueContainer()
 
-           if flag {
-               try container.encode("1")
-           } else {
-               try container.encode("0")
-           }
-       }
+            if flag {
+                try container.encode("1")
+            } else {
+                try container.encode("0")
+            }
+        }
     }
 }

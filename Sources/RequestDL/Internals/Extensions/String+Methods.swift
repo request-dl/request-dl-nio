@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.CharacterSet
+#else
+import struct Foundation.CharacterSet
+#endif
 
 extension String {
 
@@ -32,13 +36,17 @@ extension String {
 
     func trimmingPrefix(in characterSet: CharacterSet) -> String {
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
-            return String(self.trimmingPrefix(while: {
-                $0.unicodeScalars.allSatisfy(characterSet.contains)
-            }))
+            return String(
+                self.trimmingPrefix(while: {
+                    $0.unicodeScalars.allSatisfy(characterSet.contains)
+                })
+            )
         } else {
-            return String(self.drop(while: {
-                $0.unicodeScalars.allSatisfy(characterSet.contains)
-            }))
+            return String(
+                self.drop(while: {
+                    $0.unicodeScalars.allSatisfy(characterSet.contains)
+                })
+            )
         }
     }
 }
@@ -46,11 +54,13 @@ extension String {
 extension Array where Element == String {
 
     func joinedAsPath() -> String {
-        var cleanedComponents = Array(self.lazy.map { component in
-            let trimmed = component.trimmingCharacters(in: .urlPathAllowed.inverted)
-            return trimmed.trimmingCharacters(in: .init(charactersIn: "/"))
-        }
-        .filter { !$0.isEmpty })
+        var cleanedComponents = Array(
+            self.lazy.map { component in
+                let trimmed = component.trimmingCharacters(in: .urlPathAllowed.inverted)
+                return trimmed.trimmingCharacters(in: .init(charactersIn: "/"))
+            }
+            .filter { !$0.isEmpty }
+        )
 
         if let lastOriginal = self.last, lastOriginal.hasSuffix("/"), !cleanedComponents.isEmpty {
             cleanedComponents[cleanedComponents.count - 1] += "/"

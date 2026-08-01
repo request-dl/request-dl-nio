@@ -1,14 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
+
+import Dispatch
+import SwiftAsyncStream
 
 #if canImport(Darwin)
 import Foundation
 #else
 @preconcurrency import Foundation
 #endif
-import Dispatch
-import SwiftAsyncStream
 
 extension Internals {
 
@@ -90,6 +91,32 @@ extension Internals {
             }
         }
 
+        /// Stores `value` only when `key` is free, and returns whatever ends up stored.
+        ///
+        /// Exists because reading, deciding and writing through the two calls above is a
+        /// check then act: two callers can both miss, both build a value, and both store one,
+        /// which is exactly what a memoised object must never do. Here the decision and the
+        /// write are one critical section, so at most one value is ever handed out.
+        ///
+        /// The value is built by the caller, outside the lock, on purpose. Running a caller
+        /// supplied factory inside would deadlock the moment it touched this storage again,
+        /// and the lock is not reentrant. The price is that a loser may build a value that is
+        /// immediately discarded.
+        func setValueIfAbsent<Value: Sendable>(_ value: Value, forKey key: AnyHashable) -> Value {
+            lock.withLock {
+                if let existing = _table[key]?.value as? Value {
+                    // Same refresh a read would do.
+                    _table[key] = .init(value: existing)
+                    return existing
+                }
+
+                _table[key] = .init(value: value)
+                _evictIfNeeded()
+
+                return value
+            }
+        }
+
         // MARK: - Private methods
 
         private func scheduleCleanup() {
@@ -146,7 +173,8 @@ extension Internals {
             let target = max(maximumCount - (maximumCount / 4), 1)
             let excess = _table.count - target
 
-            let oldest = _table
+            let oldest =
+                _table
                 .sorted { $0.value.readAt < $1.value.readAt }
                 .prefix(excess)
 

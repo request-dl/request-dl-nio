@@ -1,29 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The `URLScheme` struct is a data type that represents the protocol type used in a request
-
- ```swift
- let scheme: URLScheme = .https
- ```
-
- > Note: For a complete list of the available types, please see the corresponding static
- properties.
-
- > Important: If the url scheme type is not included in the predefined static properties, use
- a string literal to initialize an instance of URLScheme.
-
- The URLScheme struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
- it to be initialized with a string literal.
-
- ```swift
- let customScheme: URLScheme = "www"
- ```
- */
+/// The `URLScheme` struct is a data type that represents the protocol type used in a request
+///
+/// ```swift
+/// let scheme: URLScheme = .https
+/// ```
+///
+/// > Note: For a complete list of the available types, please see the corresponding static
+/// properties.
+///
+/// > Important: If the url scheme type is not included in the predefined static properties, use
+/// a string literal to initialize an instance of URLScheme.
+///
+/// The URLScheme struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
+/// it to be initialized with a string literal.
+///
+/// ```swift
+/// let customScheme: URLScheme = "www"
+/// ```
 public struct URLScheme: Sendable, Hashable {
 
     // MARK: - Public static methods
@@ -96,8 +92,3 @@ extension URLScheme: LosslessStringConvertible {
         rawValue
     }
 }
-
-// MARK: - Deprecated
-
-@available(*, deprecated, renamed: "URLScheme")
-public typealias InternetProtocol = URLScheme

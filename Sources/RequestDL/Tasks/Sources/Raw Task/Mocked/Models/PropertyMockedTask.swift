@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
@@ -111,15 +110,19 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         let body = body.build()
 
         eventLoop.execute {
-            body.stream(.init {
-                if case .byteBuffer(let byteBuffer) = $0 {
-                    buffer.append(Internals.DataBuffer(
-                        Internals.ByteURL(byteBuffer)
-                    ))
-                }
+            body.stream(
+                .init {
+                    if case .byteBuffer(let byteBuffer) = $0 {
+                        buffer.append(
+                            Internals.DataBuffer(
+                                Internals.ByteURL(byteBuffer)
+                            )
+                        )
+                    }
 
-                return eventLoop.makeSucceededVoidFuture()
-            }).whenComplete { _ in
+                    return eventLoop.makeSucceededVoidFuture()
+                }
+            ).whenComplete { _ in
                 buffer.close()
             }
         }

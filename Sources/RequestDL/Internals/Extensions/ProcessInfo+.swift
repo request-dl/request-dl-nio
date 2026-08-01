@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 extension ProcessInfo {
 
@@ -16,7 +20,9 @@ extension ProcessInfo {
 
         let systemVersionString = String(
             format: "%d.%d.%d",
-            systemVersion.majorVersion, systemVersion.minorVersion, systemVersion.patchVersion
+            systemVersion.majorVersion,
+            systemVersion.minorVersion,
+            systemVersion.patchVersion
         )
 
         return "\(appName)/\(appVersion) \(systemName)/\(systemVersionString)"

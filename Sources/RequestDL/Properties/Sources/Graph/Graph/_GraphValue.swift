@@ -1,17 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 @dynamicMemberLookup
 public struct _GraphValue<Content: Property>: Sendable {
 
     // MARK: - Internal properties
 
-    var pathway: Int {
-        _identified.pathway
-    }
+    let pathway: Int
 
     func assertPathway() {
         _identified.assertPathway()
@@ -22,8 +18,6 @@ public struct _GraphValue<Content: Property>: Sendable {
     private let content: Content
 
     private let id: GraphID
-    private var nextID: GraphID?
-
     private let previousValue: IdentifiedGraphValue?
 
     // MARK: - Inits
@@ -36,7 +30,7 @@ public struct _GraphValue<Content: Property>: Sendable {
         self.id = id
         self.content = content
         self.previousValue = previousValue
-        self.nextID = nil
+        self.pathway = Identified.pathway(id: id, previousValue: previousValue)
     }
 
     // MARK: - Internal static methods
@@ -78,12 +72,19 @@ public struct _GraphValue<Content: Property>: Sendable {
         id: GraphID,
         next: (Content) -> Next
     ) -> _GraphValue<Next> {
-        var mutableSelf = self
-        mutableSelf.nextID = id
-        return .init(
+        .init(
             id: id,
             content: next(content),
-            previousValue: mutableSelf._identified
+            // The link the child will assert against is built here, rather than by mutating a
+            // throwaway copy of `self`. `nextID` was a stored `var` that no reachable value
+            // ever carried: `access` set it on a copy, used it, and dropped it, so every
+            // `_GraphValue` anyone could hold reported `nil`.
+            previousValue: Identified(
+                id: self.id,
+                nextID: id,
+                pathway: pathway,
+                previousValue: previousValue
+            )
         )
     }
 }
@@ -92,16 +93,18 @@ public struct _GraphValue<Content: Property>: Sendable {
 
 extension _GraphValue {
 
-    private struct Identified: IdentifiedGraphValue {
+    fileprivate struct Identified: IdentifiedGraphValue {
         let id: GraphID
         let nextID: GraphID?
+        let pathway: Int
         let previousValue: IdentifiedGraphValue?
     }
 
     var _identified: IdentifiedGraphValue {
         Identified(
             id: id,
-            nextID: nextID,
+            nextID: nil,
+            pathway: pathway,
             previousValue: previousValue
         )
     }

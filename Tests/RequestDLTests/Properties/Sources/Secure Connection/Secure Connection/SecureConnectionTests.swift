@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOCore
 import NIOSSL
+import Testing
+
 @testable import RequestDL
 
 struct SecureConnectionTests {
@@ -16,9 +16,11 @@ struct SecureConnectionTests {
         let secureConnection = Internals.SecureConnection()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+            }
+        )
 
         let sut = try #require(resolved.session.configuration.secureConnection)
 
@@ -48,10 +50,12 @@ struct SecureConnectionTests {
         let verification: RequestDL.CertificateVerification = .noHostnameVerification
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .verification(verification)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .verification(verification)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -66,17 +70,22 @@ struct SecureConnectionTests {
         let algorithm2 = RequestDL.SignatureAlgorithm.rsaPssRsaeSha512
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .signingSignatureAlgorithms(algorithm1, algorithm2)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .signingSignatureAlgorithms(algorithm1, algorithm2)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.signingSignatureAlgorithms == [algorithm1, algorithm2].map {
-            $0.build()
-        })
+        #expect(
+            sut?.signingSignatureAlgorithms
+                == [algorithm1, algorithm2].map {
+                    $0.build()
+                }
+        )
     }
 
     @Test
@@ -86,17 +95,22 @@ struct SecureConnectionTests {
         let algorithm2 = RequestDL.SignatureAlgorithm.ecdsaSecp521R1Sha512
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .verifySignatureAlgorithms(algorithm1, algorithm2)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .verifySignatureAlgorithms(algorithm1, algorithm2)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.verifySignatureAlgorithms == [algorithm1, algorithm2].map {
-            $0.build()
-        })
+        #expect(
+            sut?.verifySignatureAlgorithms
+                == [algorithm1, algorithm2].map {
+                    $0.build()
+                }
+        )
     }
 
     @Test
@@ -105,10 +119,12 @@ struct SecureConnectionTests {
         let isDisabled = true
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .sendCANameListDisabled(isDisabled)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .sendCANameListDisabled(isDisabled)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -122,10 +138,12 @@ struct SecureConnectionTests {
         let renegotiationSupport: NIORenegotiationSupport = .always
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .renegotiationSupport(.always)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .renegotiationSupport(.always)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -139,10 +157,12 @@ struct SecureConnectionTests {
         let timeout = UnitTime.seconds(60)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .shutdownTimeout(timeout)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .shutdownTimeout(timeout)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -157,10 +177,12 @@ struct SecureConnectionTests {
         let protocol2 = "https"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .applicationProtocols(protocol1, protocol2)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .applicationProtocols(protocol1, protocol2)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -175,10 +197,12 @@ struct SecureConnectionTests {
         let maxVersion: RequestDL.TLSVersion = .v1_3
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .version(minVersion ... maxVersion)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .version(minVersion...maxVersion)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -194,10 +218,12 @@ struct SecureConnectionTests {
         let maxVersion: RequestDL.TLSVersion = .v1_3
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .version(minVersion ..< maxVersion)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .version(minVersion..<maxVersion)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -212,10 +238,12 @@ struct SecureConnectionTests {
         let maxVersion: RequestDL.TLSVersion = .v1_1
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .version(maximum: maxVersion)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .version(maximum: maxVersion)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -229,10 +257,12 @@ struct SecureConnectionTests {
         let minVersion: RequestDL.TLSVersion = .v1_3
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .version(minimum: minVersion)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .version(minimum: minVersion)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -247,10 +277,12 @@ struct SecureConnectionTests {
         let maxVersion: RequestDL.TLSVersion = .v1_2
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .version(minimum: minVersion, maximum: maxVersion)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .version(minimum: minVersion, maximum: maxVersion)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -266,10 +298,12 @@ struct SecureConnectionTests {
         let suite2 = "TLS_CHACHA20_POLY1305_SHA256"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .cipherSuites(suite1, suite2)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .cipherSuites(suite1, suite2)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
@@ -284,17 +318,22 @@ struct SecureConnectionTests {
         let suite2: RequestDL.TLSCipher = .TLS_CHACHA20_POLY1305_SHA256
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .cipherSuites(suite1, suite2)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .cipherSuites(suite1, suite2)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.cipherSuiteValues == [suite1, suite2].map {
-            $0.build()
-        })
+        #expect(
+            sut?.cipherSuiteValues
+                == [suite1, suite2].map {
+                    $0.build()
+                }
+        )
     }
 
     @Test
@@ -307,10 +346,12 @@ struct SecureConnectionTests {
         let logger = KeyLogger()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {}
-                .keyLogger(logger)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .keyLogger(logger)
+            }
+        )
 
         let sut = resolved.session.configuration.secureConnection
 

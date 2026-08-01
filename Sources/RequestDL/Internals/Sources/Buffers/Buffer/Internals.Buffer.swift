@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import SwiftAsyncStream
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 extension Internals {
 
@@ -228,10 +233,12 @@ extension Internals {
         }
 
         init(_ staticString: StaticString) {
-            self.init(UnsafeBufferPointer(
-                start: staticString.utf8Start,
-                count: staticString.utf8CodeUnitCount
-            ))
+            self.init(
+                UnsafeBufferPointer(
+                    start: staticString.utf8Start,
+                    count: staticString.utf8CodeUnitCount
+                )
+            )
         }
 
         init() {

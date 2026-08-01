@@ -1,9 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
+// `@unchecked` because `jsonObject` is `Any`, which cannot be `Sendable`. The assumption is
+// that a JSON object is made of value types, which holds for anything `JSONSerialization`
+// accepts, but nothing here enforces it: a mutable reference smuggled in would cross isolation
+// boundaries unchecked.
 struct JSONPayloadFactory: @unchecked Sendable, PayloadFactory {
 
     // MARK: - Internal properties

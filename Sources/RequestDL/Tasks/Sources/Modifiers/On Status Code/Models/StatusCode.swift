@@ -1,29 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The HTTP status code for a response.
-
- ```swift
- let statusCode: StatusCode = .continue
- ```
-
- > Note: For a complete list of the available status codes, please see the corresponding static
- properties.
-
- > Important: If the status code is not included in the predefined static properties, use
- a integer literal to initialize an instance of StatusCode.
-
- The StatusCode struct conforms to the `ExpressibleByIntegerLiteral` protocol, allowing
- it to be initialized with a integer literal.
-
- ```swift
- let customStatusCode: StatusCode = 99
- ```
-*/
+/// The HTTP status code for a response.
+///
+/// ```swift
+/// let statusCode: StatusCode = .continue
+/// ```
+///
+/// > Note: For a complete list of the available status codes, please see the corresponding static
+/// properties.
+///
+/// > Important: If the status code is not included in the predefined static properties, use
+/// a integer literal to initialize an instance of StatusCode.
+///
+/// The StatusCode struct conforms to the `ExpressibleByIntegerLiteral` protocol, allowing
+/// it to be initialized with a integer literal.
+///
+/// ```swift
+/// let customStatusCode: StatusCode = 99
+/// ```
 public struct StatusCode: Sendable, Hashable {
 
     // MARK: - Public static 1xx properties

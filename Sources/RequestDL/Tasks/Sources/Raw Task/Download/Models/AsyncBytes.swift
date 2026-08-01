@@ -1,12 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Data
+#else
+import struct Foundation.Data
+#endif
 
-/**
- A structure that represents asynchronous bytes.
- */
+/// A structure that represents asynchronous bytes.
 public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
     /**

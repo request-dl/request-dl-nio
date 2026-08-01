@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import Foundation
 #endif
 
 extension Modifiers {
@@ -93,10 +93,12 @@ extension RequestTask<AsyncResponse> {
         upload: Upload,
         download: Download
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
-        modifier(Modifiers.Progress(
-            upload: upload,
-            download: download
-        ))
+        modifier(
+            Modifiers.Progress(
+                upload: upload,
+                download: download
+            )
+        )
     }
 
     /// Sets a progress tracking object for upload.
@@ -136,38 +138,5 @@ extension RequestTask<AsyncBytes> {
         download: Download
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, Data>> {
         modifier(Modifiers.Progress(download))
-    }
-}
-
-// MARK: - Deprecated
-
-extension RequestTask<AsyncResponse> {
-
-    @available(*, deprecated, renamed: "progress(upload:)")
-    public func uploadProgress(
-        _ upload: UploadProgress
-    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<AsyncBytes>>> {
-        progress(upload: upload)
-    }
-}
-
-extension RequestTask<TaskResult<AsyncBytes>> {
-
-    @available(*, deprecated, renamed: "progress(download:)")
-    public func downloadProgress(
-        _ download: DownloadProgress
-    ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
-        progress(download: download)
-    }
-}
-
-extension RequestTask<AsyncBytes> {
-
-    @available(*, deprecated, renamed: "progress(download:)")
-    public func downloadProgress(
-        _ download: DownloadProgress,
-        length: Int? = nil
-    ) -> ModifiedRequestTask<Modifiers.Progress<Element, Data>> {
-        progress(download: download)
     }
 }

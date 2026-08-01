@@ -2,33 +2,41 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
-import Testing
 import SwiftAsyncStream
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct PropertyReaderTests {
 
     @Test
     func propertyReaderModifiesBasedOnResolvedConfiguration() async throws {
-        for _ in 1 ... 5 {
+        for _ in 1...5 {
             let content = PropertyGroup {
                 BaseURL(.https, host: "apple.com:1090")
                 CustomHeader(name: "Authorization", value: UUID().uuidString)
                 ReferenceMemoryProperty()
             }
 
-            let resolved = try await resolve(TestProperty {
-                PropertyReader(content) { context in
-                    if context.requestConfiguration.url.contains("apple.com:1090") {
-                        BaseURL(.http, host: "google.com")
-                    }
+            let resolved = try await resolve(
+                TestProperty {
+                    PropertyReader(content) { context in
+                        if context.requestConfiguration.url.contains("apple.com:1090") {
+                            BaseURL(.http, host: "google.com")
+                        }
 
-                    if context.requestConfiguration.headers.contains(name: "Authorization") {
-                        Authorization(.bearer, token: UUID().uuidString)
+                        if context.requestConfiguration.headers.contains(name: "Authorization") {
+                            Authorization(.bearer, token: UUID().uuidString)
+                        }
                     }
                 }
-            })
+            )
 
             #expect(resolved.requestConfiguration.url == "http://google.com?counter=0")
             #expect(

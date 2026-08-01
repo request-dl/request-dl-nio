@@ -1,14 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct GraphID: Sendable, Hashable {
 
     private enum Source: Sendable, Hashable {
         case identified(ObjectIdentifier)
-        case constant(Int)
+        // Carries the type alongside the hash. Two custom ids of different types can no longer
+        // be conflated by a hash that happens to match.
+        case constant(ObjectIdentifier, Int)
     }
 
     // MARK: - Private properties
@@ -28,6 +28,6 @@ struct GraphID: Sendable, Hashable {
     }
 
     static func custom<Value: Hashable>(_ value: Value) -> GraphID {
-        .init(.constant(value.hashValue))
+        .init(.constant(.init(Value.self), value.hashValue))
     }
 }

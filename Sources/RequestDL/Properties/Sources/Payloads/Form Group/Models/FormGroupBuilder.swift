@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct FormGroupBuilder: Sendable {
 
@@ -17,6 +15,10 @@ struct FormGroupBuilder: Sendable {
 
     // MARK: - Internal properties
 
+    /// The CRLF that separates multipart lines.
+    ///
+    /// A single `Character` on purpose, and valid: CRLF is one extended grapheme cluster in
+    /// Unicode, so this holds both bytes. `eol.utf8` yields `0x0D 0x0A`.
     var eol: Character {
         "\r\n"
     }
@@ -63,7 +65,7 @@ struct FormGroupBuilder: Sendable {
 
         return [
             buildHeadersBuffer(output.headers),
-            output.buffer
+            output.buffer,
         ]
     }
 

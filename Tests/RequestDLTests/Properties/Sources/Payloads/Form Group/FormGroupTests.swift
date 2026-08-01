@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct FormGroupTests {
 
@@ -16,16 +22,18 @@ struct FormGroupTests {
         }
 
         // When
-        let resolved = try await resolve(TestProperty {
-            FormGroup {
-                PropertyForEach(parts.enumerated(), id: \.offset) {
-                    Form(
-                        name: "part\($0)",
-                        data: $1
-                    )
+        let resolved = try await resolve(
+            TestProperty {
+                FormGroup {
+                    PropertyForEach(parts.enumerated(), id: \.offset) {
+                        Form(
+                            name: "part\($0)",
+                            data: $1
+                        )
+                    }
                 }
             }
-        })
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -38,9 +46,11 @@ struct FormGroupTests {
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(
-                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
-            )]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(
+                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                )
+            ]
         )
 
         #expect(parsed.items == partForms(parts))
@@ -62,36 +72,38 @@ struct FormGroupTests {
         }
 
         // When
-        let resolved = try await resolve(TestProperty {
-            FormGroup {
+        let resolved = try await resolve(
+            TestProperty {
                 FormGroup {
-                    PropertyForEach(parts1.enumerated(), id: \.offset) {
-                        Form(
-                            name: "part1.\($0)",
-                            data: $1
-                        )
+                    FormGroup {
+                        PropertyForEach(parts1.enumerated(), id: \.offset) {
+                            Form(
+                                name: "part1.\($0)",
+                                data: $1
+                            )
+                        }
                     }
-                }
 
-                FormGroup {
-                    PropertyForEach(parts2.enumerated(), id: \.offset) {
-                        Form(
-                            name: "part2.\($0)",
-                            data: $1
-                        )
+                    FormGroup {
+                        PropertyForEach(parts2.enumerated(), id: \.offset) {
+                            Form(
+                                name: "part2.\($0)",
+                                data: $1
+                            )
+                        }
                     }
-                }
 
-                FormGroup {
-                    PropertyForEach(parts3.enumerated(), id: \.offset) {
-                        Form(
-                            name: "part3.\($0)",
-                            data: $1
-                        )
+                    FormGroup {
+                        PropertyForEach(parts3.enumerated(), id: \.offset) {
+                            Form(
+                                name: "part3.\($0)",
+                                data: $1
+                            )
+                        }
                     }
                 }
             }
-        })
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -104,16 +116,18 @@ struct FormGroupTests {
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(
-                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
-            )]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(
+                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                )
+            ]
         )
 
-        #expect(parsed.items == (
-            partForms(parts1, prefix: "part1.") +
-            partForms(parts2, prefix: "part2.") +
-            partForms(parts3, prefix: "part3.")
-        ))
+        #expect(
+            parsed.items
+                == (partForms(parts1, prefix: "part1.") + partForms(parts2, prefix: "part2.")
+                    + partForms(parts3, prefix: "part3."))
+        )
     }
 
     @Test
@@ -124,15 +138,17 @@ struct FormGroupTests {
         let chunkSize = 64
 
         // When
-        let resolved = try await resolve(TestProperty {
-            FormGroup {
-                Form(
-                    name: name,
-                    data: data
-                )
+        let resolved = try await resolve(
+            TestProperty {
+                FormGroup {
+                    Form(
+                        name: name,
+                        data: data
+                    )
+                }
+                .payloadChunkSize(chunkSize)
             }
-            .payloadChunkSize(chunkSize)
-        })
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -143,32 +159,39 @@ struct FormGroupTests {
 
         // Then
         #expect(
-            buffers.compactMap { $0.getData() } == stride(from: .zero, to: totalBytes, by: chunkSize).map {
-                let upperBound = $0 + chunkSize
-                return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
-            }
+            buffers.compactMap { $0.getData() }
+                == stride(from: .zero, to: totalBytes, by: chunkSize).map {
+                    let upperBound = $0 + chunkSize
+                    return builtData[$0..<(upperBound <= totalBytes ? upperBound : totalBytes)]
+                }
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(
-                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
-            )]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(
+                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                )
+            ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -188,9 +211,11 @@ struct FormGroupTests {
     @Test
     func group_whenEmptyContent() async throws {
         // When
-        let resolved = try await resolve(TestProperty {
-            FormGroup {}
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                FormGroup {}
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data() ?? Data()
 
@@ -211,7 +236,7 @@ extension FormGroupTests {
                 headers: HTTPHeaders([
                     ("Content-Disposition", "form-data; name=\"\(prefix)\(offset)\""),
                     ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
+                    ("Content-Length", String(data.count)),
                 ]),
                 contents: data
             )

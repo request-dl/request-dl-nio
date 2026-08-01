@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import AsyncHTTPClient
 import NIOCore
 import NIOHTTP1
@@ -123,7 +122,7 @@ extension Internals {
                         }
 
                         self.download.cacheStream(cacheStream)
-                    }
+                    },
                 ]
             }
 
@@ -144,7 +143,7 @@ extension Internals {
 
                 return [
                     { self.download.append(dataBuffer) },
-                    { self.head.close() }
+                    { self.head.close() },
                 ]
             }
 
@@ -164,7 +163,7 @@ extension Internals {
                 return [
                     { self.download.close() },
                     { self.head.close() },
-                    { self.upload.close() }
+                    { self.upload.close() },
                 ]
             }
         }

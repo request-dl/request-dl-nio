@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct PayloadNode: PropertyNode {
 
@@ -35,7 +33,12 @@ struct PayloadNode: PropertyNode {
         case .urlEncoded(let queries):
             let queries = queries.map { $0.build() }
 
-            guard ![nil, "GET", "HEAD"].contains(make.requestConfiguration.method) else {
+            // Uppercased before comparing. HTTP methods are conventionally uppercase but the
+            // value comes from the caller, and `.method("get")` used to fall through and send
+            // the fields as a body instead of as a query.
+            let method = make.requestConfiguration.method?.uppercased()
+
+            guard ![nil, "GET", "HEAD"].contains(method) else {
                 removeAnySetHeaders(&make.requestConfiguration.headers)
                 make.requestConfiguration.queries.append(contentsOf: queries)
                 return

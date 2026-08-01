@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsFileBufferTests {
 
@@ -411,7 +417,8 @@ struct InternalsFileBufferTests {
         defer { _ = fileURLManager }
 
         let fileURL = fileURLManager.url
-        let otherFile = fileURL
+        let otherFile =
+            fileURL
             .deletingLastPathComponent()
             .appendingPathComponent("FileBufferOtherFile.txt")
 
@@ -643,7 +650,7 @@ struct InternalsFileBufferTests {
         fileBuffer.moveReaderIndex(to: 64)
 
         // Then
-        #expect(fileBuffer.getData() == data[64 ..< data.count])
+        #expect(fileBuffer.getData() == data[64..<data.count])
     }
 
     @Test
@@ -666,7 +673,7 @@ struct InternalsFileBufferTests {
         fileBuffer.moveReaderIndex(to: 64)
 
         // Then
-        #expect(fileBuffer.getBytes() == Array(data[64 ..< data.count]))
+        #expect(fileBuffer.getBytes() == Array(data[64..<data.count]))
     }
 
     @Test
@@ -680,7 +687,7 @@ struct InternalsFileBufferTests {
 
         // Then
 
-        #expect(fileBuffer.getBytes(at: 32, length: 64) == Array(data[32 ..< 96]))
+        #expect(fileBuffer.getBytes(at: 32, length: 64) == Array(data[32..<96]))
     }
 
     @Test
@@ -694,7 +701,7 @@ struct InternalsFileBufferTests {
 
         // Then
 
-        #expect(fileBuffer.getData(at: 32, length: 64) == data[32 ..< 96])
+        #expect(fileBuffer.getData(at: 32, length: 64) == data[32..<96])
     }
 
     @Test
@@ -744,9 +751,9 @@ struct InternalsFileBufferTests {
 
         // When
         let datas = await withTaskGroup(of: Data?.self) { group in
-            for index in 0 ..< 1_024 {
+            for index in 0..<1_024 {
                 group.addTask {
-                    return fileBuffer.getData(at: index, length: 1_024 - index)
+                    fileBuffer.getData(at: index, length: 1_024 - index)
                 }
             }
 

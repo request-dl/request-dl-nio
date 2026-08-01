@@ -2,24 +2,21 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
 import NIOCore
 
-/**
- A unit of time represented in nanoseconds.
-
- Use this struct to represent time intervals with nanosecond precision.
-
- Conforms to Hashable and Sendable protocols.
-
- > Note: The maximum representable time interval is limited by the range of Int64.
-
- > Warning: Be careful when working with large time intervals to avoid overflow.
-
- - Remark: Time intervals can be created using various factory methods, such as `nanoseconds(_:)`,
- `microseconds(_:)`, `milliseconds(_:)`, `seconds(_:)`, `minutes(_:)`, and
- `hours(_:)`.
- */
+/// A unit of time represented in nanoseconds.
+///
+/// Use this struct to represent time intervals with nanosecond precision.
+///
+/// Conforms to Hashable and Sendable protocols.
+///
+/// > Note: The maximum representable time interval is limited by the range of Int64.
+///
+/// > Warning: Be careful when working with large time intervals to avoid overflow.
+///
+/// - Remark: Time intervals can be created using various factory methods, such as `nanoseconds(_:)`,
+/// `microseconds(_:)`, `milliseconds(_:)`, `seconds(_:)`, `minutes(_:)`, and
+/// `hours(_:)`.
 public struct UnitTime: Sendable, Hashable {
 
     // MARK: - Public properties

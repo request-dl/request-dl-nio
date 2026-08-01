@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import AsyncHTTPClient
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct UserAgentHeaderTests {
 
@@ -27,9 +33,11 @@ struct UserAgentHeaderTests {
         let userAgent = "A text agent specification"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            UserAgentHeader(userAgent)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                UserAgentHeader(userAgent)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.headers["User-Agent"] == [userAgent])
@@ -54,13 +62,15 @@ struct UserAgentHeaderTests {
         // Given
         let userAgent = "CustomAgent"
         // When
-        let resolved = try await resolve(TestProperty {
-            HeaderGroup {
-                UserAgentHeader()
-                UserAgentHeader(userAgent)
+        let resolved = try await resolve(
+            TestProperty {
+                HeaderGroup {
+                    UserAgentHeader()
+                    UserAgentHeader(userAgent)
+                }
+                .headerStrategy(.adding)
             }
-            .headerStrategy(.adding)
-        })
+        )
 
         // Then
         #expect(

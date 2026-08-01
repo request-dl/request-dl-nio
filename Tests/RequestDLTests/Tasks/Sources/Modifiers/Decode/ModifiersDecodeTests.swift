@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct ModifiersDecodeTests {
 
@@ -16,9 +22,11 @@ struct ModifiersDecodeTests {
     func arrayOfDates() async throws {
         // Given
         let now = Date()
-        let array = Array((0 ..< 10).map {
-            Date(timeInterval: Double($0), since: now)
-        })
+        let array = Array(
+            (0..<10).map {
+                Date(timeInterval: Double($0), since: now)
+            }
+        )
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
@@ -53,7 +61,7 @@ struct ModifiersDecodeTests {
         encoder.dateEncodingStrategy = .secondsSince1970
         decoder.dateDecodingStrategy = .secondsSince1970
 
-        for index in 0 ..< 10 {
+        for index in 0..<10 {
             dictionary[Date(timeInterval: Double(index), since: now)] = index
         }
 

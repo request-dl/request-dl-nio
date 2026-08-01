@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import Foundation
 #endif
 
 struct DiskStorage: Sendable {
@@ -136,7 +136,8 @@ struct DiskStorage: Sendable {
         // MARK: - Private static methods
 
         private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
-            var components = url
+            var components =
+                url
                 .deletingPathExtension()
                 .lastPathComponent
                 .split(separator: ".")

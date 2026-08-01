@@ -1,15 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct ChildrenNode: Node {
 
-    // MARK: - Private properties
+    // MARK: - Internal properties
 
-    private var nodes: [Node] = []
-    private var index: Int = .zero
+    // The traversal cursor that used to live here is gone. It was state about *reading* the
+    // node kept inside the node itself, which is what forced every walk to copy defensively.
+    private(set) var children: [Node] = []
 
     // MARK: - Inits
 
@@ -19,18 +18,9 @@ struct ChildrenNode: Node {
 
     mutating func append(_ node: Node, grouping: Bool = false) {
         if grouping, let group = node as? ChildrenNode {
-            nodes.append(contentsOf: group.nodes)
+            children.append(contentsOf: group.children)
         } else {
-            nodes.append(node)
+            children.append(node)
         }
-    }
-
-    mutating func next() -> Node? {
-        guard nodes.indices.contains(index) else {
-            return nil
-        }
-
-        defer { index += 1 }
-        return nodes[index]
     }
 }

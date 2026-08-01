@@ -1,12 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
-struct TrustsTests {
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+struct TrustRootsTests {
 
     @Test
     func trusts_whenCertificates_shouldBeValid() async throws {
@@ -17,22 +23,25 @@ struct TrustsTests {
         let serverCertificate = try Array(Data(contentsOf: server.certificateURL))
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.Trusts {
-                    RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificate(serverCertificate)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.TrustRoots {
+                        RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
+                        RequestDL.Certificate(serverCertificate)
+                    }
                 }
             }
-        })
+        )
 
         // Then
         #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots == .certificates([
-                .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                .init(serverCertificate, format: .pem)
-            ])
+            resolved.session.configuration.secureConnection?.trustRoots
+                == .certificates([
+                    .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+                    .init(serverCertificate, format: .pem),
+                ])
         )
     }
 
@@ -56,18 +65,21 @@ struct TrustsTests {
         try data.write(to: fileURL)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.Trusts(fileURL.absolutePath(percentEncoded: false))
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.TrustRoots(fileURL.absolutePath(percentEncoded: false))
+                }
             }
-        })
+        )
 
         // Then
         #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
         #expect(
-            resolved.session.configuration.secureConnection?.trustRoots == .file(
-                fileURL.absolutePath(percentEncoded: false)
-            )
+            resolved.session.configuration.secureConnection?.trustRoots
+                == .file(
+                    fileURL.absolutePath(percentEncoded: false)
+                )
         )
     }
 
@@ -84,11 +96,13 @@ struct TrustsTests {
         let bytes = Array(data)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.Trusts(bytes)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.TrustRoots(bytes)
+                }
             }
-        })
+        )
 
         // Then
         #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
@@ -100,7 +114,7 @@ struct TrustsTests {
     @Test
     func trusts_whenAccessBody_shouldBeNever() async throws {
         // Given
-        let sut = RequestDL.Trusts {
+        let sut = RequestDL.TrustRoots {
             RequestDL.Certificate([0, 1, 2])
         }
 

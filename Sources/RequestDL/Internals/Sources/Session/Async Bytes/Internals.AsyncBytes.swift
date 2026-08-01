@@ -1,9 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
 import NIOCore
+
+//
+// See LICENSE for this package's licensing information.
+//
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 extension Internals {
 

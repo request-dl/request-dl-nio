@@ -1,14 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-#if canImport(Darwin)
-import Foundation
-#else
-@preconcurrency import Foundation
-#endif
+//
+// See LICENSE for this package's licensing information.
+//
 
 import Logging
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 extension Internals {
 
@@ -57,7 +57,7 @@ extension Internals {
 
             return .init(
                 memoryCapacity: memoryCapacity ?? .zero,
-                diskCapacity: diskCapacity  ?? .zero,
+                diskCapacity: diskCapacity ?? .zero,
                 url: directoryURL,
                 logger: logger
             )

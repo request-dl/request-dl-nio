@@ -1,29 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- `DNSOverride` is a struct that allows overriding DNS resolution for a specific destination hostname with a custom IP address or hostname.
-
- This property is useful for testing, bypassing regional restrictions, or routing requests through specific servers by directly mapping a domain name to an IP address.
-
- ```swift
- DNSOverride("127.0.0.1", from: "example.com")
- ```
-
- In the example below, requests to "api.example.com" will be resolved to the IP address "10.0.0.1" instead of its standard DNS record.
-
- ```swift
- DataTask {
-     BaseURL("api.example.com")
-     DNSOverride("10.0.0.1", from: "api.example.com")
- }
- ```
-
- > Warning: Misusing DNS overrides can lead to connection errors or security risks if the custom origin is incorrect or untrusted. Ensure the override is intentional and correct.
- */
+/// `DNSOverride` is a struct that allows overriding DNS resolution for a specific destination hostname with a custom IP address or hostname.
+///
+/// This property is useful for testing, bypassing regional restrictions, or routing requests through specific servers by directly mapping a domain name to an IP address.
+///
+/// ```swift
+/// DNSOverride("127.0.0.1", from: "example.com")
+/// ```
+///
+/// In the example below, requests to "api.example.com" will be resolved to the IP address "10.0.0.1" instead of its standard DNS record.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("api.example.com")
+///     DNSOverride("10.0.0.1", from: "api.example.com")
+/// }
+/// ```
+///
+/// > Warning: Misusing DNS overrides can lead to connection errors or security risks if the custom origin is incorrect or untrusted. Ensure the override is intentional and correct.
 public struct DNSOverride: Property {
 
     private struct Node: PropertyNode {
@@ -74,10 +70,12 @@ public struct DNSOverride: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            origin: property.origin,
-            destination: property.destination
-        ))
+        return .leaf(
+            Node(
+                origin: property.origin,
+                destination: property.destination
+            )
+        )
     }
 
 }

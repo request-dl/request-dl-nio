@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct ModifiersOnStatusCodeTests {
@@ -64,9 +64,11 @@ struct ModifiersOnStatusCodeTests {
 
         // Then
         #expect(statusCodes.count == received.count)
-        #expect(received.allSatisfy {
-            statusCodes.contains($0)
-        })
+        #expect(
+            received.allSatisfy {
+                statusCodes.contains($0)
+            }
+        )
     }
 
     @Test
@@ -96,9 +98,11 @@ struct ModifiersOnStatusCodeTests {
 
         // Then
         #expect(statusCodeSet.count == received.count)
-        #expect(received.allSatisfy {
-            statusCodeSet.contains($0)
-        })
+        #expect(
+            received.allSatisfy {
+                statusCodeSet.contains($0)
+            }
+        )
     }
 
     @Test
@@ -128,9 +132,11 @@ struct ModifiersOnStatusCodeTests {
 
         // Then
         #expect(statusCodeSet.count == received.count)
-        #expect(received.allSatisfy {
-            statusCodeSet.contains($0)
-        })
+        #expect(
+            received.allSatisfy {
+                statusCodeSet.contains($0)
+            }
+        )
     }
 }
 

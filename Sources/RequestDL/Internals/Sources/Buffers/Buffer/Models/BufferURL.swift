@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.URL
+#else
+import struct Foundation.URL
+#endif
 
 protocol BufferURL: Sendable {
 

@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct StoredObjectTests {
@@ -18,25 +18,31 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.Path()
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.Path()
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 1)
+        #expect(performOnMainThread { Factory.producer }.index == 1)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
     }
@@ -49,27 +55,33 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            BaseURL("www.google.com")
-            toolbox.Path()
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                BaseURL("www.google.com")
+                toolbox.Path()
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.Path()
-            BaseURL("www.google.com")
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                BaseURL("www.google.com")
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 1)
+        #expect(performOnMainThread { Factory.producer }.index == 1)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.google.com/0")
         #expect(resolved2.requestConfiguration.url == "https://www.google.com/0")
@@ -83,27 +95,33 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.Path()
-                .modifier(toolbox.OneNamespaceModifier())
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                    .modifier(toolbox.OneNamespaceModifier())
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.Path()
-                .modifier(toolbox.OneNamespaceModifier())
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                    .modifier(toolbox.OneNamespaceModifier())
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 1)
+        #expect(performOnMainThread { Factory.producer }.index == 1)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
     }
@@ -116,27 +134,33 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.Path()
-                .modifier(toolbox.OneNamespaceModifier())
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                    .modifier(toolbox.OneNamespaceModifier())
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.Path()
-                .modifier(toolbox.TwoNamespaceModifier())
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                    .modifier(toolbox.TwoNamespaceModifier())
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 2)
+        #expect(performOnMainThread { Factory.producer }.index == 2)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
         #expect(resolved2.requestConfiguration.url == "https://www.apple.com/1")
     }
@@ -149,27 +173,33 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.Path()
-            toolbox.Query()
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                toolbox.Query()
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.Path()
-            toolbox.Query()
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                toolbox.Query()
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 2)
+        #expect(performOnMainThread { Factory.producer }.index == 2)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0?index=1")
     }
@@ -182,27 +212,33 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.Path()
-            toolbox.Query()
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.Path()
+                toolbox.Query()
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.Query()
-            toolbox.Path()
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.Query()
+                toolbox.Path()
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 4)
+        #expect(performOnMainThread { Factory.producer }.index == 4)
         #expect(resolved1.requestConfiguration.url != resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0?index=1")
         #expect(resolved2.requestConfiguration.url == "https://www.apple.com/3?index=2")
@@ -216,25 +252,31 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.MultiplePath()
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.MultiplePath()
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.MultiplePath()
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.MultiplePath()
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 2)
+        #expect(performOnMainThread { Factory.producer }.index == 2)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0/1")
     }
@@ -247,25 +289,31 @@ struct StoredObjectTests {
             static let producer = IndexProducer()
 
             init() {
-                super.init(MainActor.sync {
-                    Self.producer
-                })
+                super.init(
+                    performOnMainThread {
+                        Self.producer
+                    }
+                )
             }
         }
 
         let toolbox = toolbox(Factory.self)
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            toolbox.CombinedPath()
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                toolbox.CombinedPath()
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            toolbox.CombinedPath()
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                toolbox.CombinedPath()
+            }
+        )
 
         // Then
-        #expect(MainActor.sync { Factory.producer }.index == 3)
+        #expect(performOnMainThread { Factory.producer }.index == 3)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0/1.2")
     }

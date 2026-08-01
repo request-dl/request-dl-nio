@@ -1,28 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 
-/**
- The Session object is used to set various properties related to the request context.
-
- By using this object, we can centralize the creation of a single type of session to be used
- in all requests.
-
- ```swift
- struct MyAppConfiguration: Property {
-
-     var body: some Property {
-         Session()
-             .waitsForConnectivity(true)
-
-         Timeout(10)
-     }
- }
- ```
- */
+/// The Session object is used to set various properties related to the request context.
+///
+/// By using this object, we can centralize the creation of a single type of session to be used
+/// in all requests.
+///
+/// ```swift
+/// struct MyAppConfiguration: Property {
+///
+///     var body: some Property {
+///         Session()
+///             .waitsForConnectivity(true)
+///
+///         Timeout(10)
+///     }
+/// }
+/// ```
 public struct Session: Property {
 
     private struct Node: PropertyNode {
@@ -81,10 +78,12 @@ public struct Session: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            configuration: property.configuration,
-            provider: property.provider
-        ))
+        return .leaf(
+            Node(
+                configuration: property.configuration,
+                provider: property.provider
+            )
+        )
     }
 
     // MARK: - Public methods
@@ -144,15 +143,6 @@ public struct Session: Property {
     }
 
     /**
-     Ignores unclean SSL shutdown for the session.
-
-     - Returns: The modified `Session` instance with unclean SSL shutdown ignored.
-     */
-    public func ignoreUncleanSSLShutdown() -> Self {
-        edit { $0.ignoreUncleanSSLShutdown = true }
-    }
-
-    /**
      Disables decompression for the session.
 
      - Returns: The modified `Session` instance with decompression disabled.
@@ -169,19 +159,6 @@ public struct Session: Property {
      */
     public func decompressionLimit(_ decompressionLimit: DecompressionLimit) -> Self {
         edit { $0.decompression = .enabled(decompressionLimit.build()) }
-    }
-
-    /**
-     Overrides DNS settings for a specific destination with a custom origin.
-
-     - Parameters:
-     - destination: The destination for which DNS settings are to be overridden.
-     - origin: The custom origin to use for DNS resolution.
-     - Returns: The modified `Session` instance with the DNS override configured.
-     */
-    @available(*, deprecated, message: "Use the new 'DNSOverride' property instead of this method.")
-    public func overrideDNS(_ destination: String, from origin: String) -> Self {
-        edit { $0.dnsOverride[origin] = destination }
     }
 
     // MARK: - Private properties

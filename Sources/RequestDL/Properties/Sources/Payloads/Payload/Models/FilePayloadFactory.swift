@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.URL
 #else
-@preconcurrency import Foundation
+import struct Foundation.URL
 #endif
 
 struct FilePayloadFactory: PayloadFactory {

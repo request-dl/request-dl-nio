@@ -1,22 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A group of header properties that can be applied to a view.
-
- Use a HeaderGroup to combine multiple header properties into a single property. The properties can be defined
- either directly in the initializer or using a closure with a PropertyBuilder.
-
- ```swift
- HeaderGroup {
-     Headers.ContentType(.json)
-     CustomHeader("123", forKey: "key")
- }
- ```
- */
+/// A group of header properties that can be applied to a view.
+///
+/// Use a HeaderGroup to combine multiple header properties into a single property. The properties can be defined
+/// either directly in the initializer or using a closure with a PropertyBuilder.
+///
+/// ```swift
+/// HeaderGroup {
+///     Headers.ContentType(.json)
+///     CustomHeader("123", forKey: "key")
+/// }
+/// ```
 public struct HeaderGroup<Content: Property>: Property {
 
     private struct Node: PropertyNode {
@@ -78,9 +74,11 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
      - Parameter dictionary: A dictionary containing header properties.
      */
     public init(_ dictionary: [String: Any]) {
-        let dictionary = (dictionary as? [String: String]) ?? dictionary.mapValues {
-            "\($0)"
-        }
+        let dictionary =
+            (dictionary as? [String: String])
+            ?? dictionary.mapValues {
+                "\($0)"
+            }
 
         self.init {
             PropertyForEach(dictionary, id: \.key) {

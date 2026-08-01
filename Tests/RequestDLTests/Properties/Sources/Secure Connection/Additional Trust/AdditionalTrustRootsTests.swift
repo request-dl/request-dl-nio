@@ -1,12 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
-struct AdditionalTrustsTests {
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+struct AdditionalTrustRootsTests {
 
     @Test
     func additional_whenCertificates_shouldBeValid() async throws {
@@ -17,22 +23,26 @@ struct AdditionalTrustsTests {
         let serverCertificate = try Array(Data(contentsOf: server.certificateURL))
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.AdditionalTrusts {
-                    RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificate(serverCertificate)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.AdditionalTrustRoots {
+                        RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
+                        RequestDL.Certificate(serverCertificate)
+                    }
                 }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init([.certificates([
-                    .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                    .init(serverCertificate, format: .pem)
+            resolved.session.configuration.secureConnection?.additionalTrustRoots
+                == .init([
+                    .certificates([
+                        .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+                        .init(serverCertificate, format: .pem),
+                    ])
                 ])
-            ])
         )
     }
 
@@ -56,17 +66,20 @@ struct AdditionalTrustsTests {
         try data.write(to: fileURL)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.AdditionalTrusts(fileURL.absolutePath(percentEncoded: false))
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.AdditionalTrustRoots(fileURL.absolutePath(percentEncoded: false))
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init(
-                [.file(fileURL.absolutePath(percentEncoded: false))]
-            )
+            resolved.session.configuration.secureConnection?.additionalTrustRoots
+                == .init(
+                    [.file(fileURL.absolutePath(percentEncoded: false))]
+                )
         )
     }
 
@@ -83,24 +96,27 @@ struct AdditionalTrustsTests {
         let bytes = Array(data)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.AdditionalTrusts(bytes)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.AdditionalTrustRoots(bytes)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.additionalTrustRoots == .init(
-                [.bytes(bytes)]
-            )
+            resolved.session.configuration.secureConnection?.additionalTrustRoots
+                == .init(
+                    [.bytes(bytes)]
+                )
         )
     }
 
     @Test
     func trusts_whenAccessBody_shouldBeNever() async throws {
         // Given
-        let sut = RequestDL.AdditionalTrusts {
+        let sut = RequestDL.AdditionalTrustRoots {
             RequestDL.Certificate([0, 1, 2])
         }
 

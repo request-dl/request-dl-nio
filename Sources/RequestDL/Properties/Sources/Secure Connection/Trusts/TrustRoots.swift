@@ -1,11 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import class FoundationEssentials.Bundle
+#else
+import class Foundation.Bundle
+#endif
 
-/// Configure the trusted certificates to validate the server using TLS.
-public struct Trusts<Content: Property>: Property {
+/// Configure the trusted roots certificates to validate the server using TLS.
+public struct TrustRoots<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -111,22 +115,26 @@ public struct Trusts<Content: Property>: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<Trusts<Content>>,
+        property: _GraphValue<TrustRoots<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
         switch property.source {
         case .file(let file):
-            return .leaf(SecureConnectionNode(
-                Node(source: .file(file)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .file(file)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .bytes(let bytes):
-            return .leaf(SecureConnectionNode(
-                Node(source: .bytes(bytes)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .bytes(bytes)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .trust
@@ -136,13 +144,18 @@ public struct Trusts<Content: Property>: Property {
                 inputs: inputs
             )
 
-            return .leaf(SecureConnectionNode(
-                Node(source: .nodes(outputs.node
-                    .search(for: SecureConnectionNode.self)
-                    .filter { $0.contains(CertificateNode.self) }
-                )),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(
+                        source: .nodes(
+                            outputs.node
+                                .search(for: SecureConnectionNode.self)
+                                .filter { $0.contains(CertificateNode.self) }
+                        )
+                    ),
+                    logger: inputs.environment.logger
+                )
+            )
         }
     }
 }

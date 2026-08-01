@@ -2,8 +2,6 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
-
 extension URLEncoder {
 
     /// Defines strategies for encoding key in a url encoded format
@@ -62,19 +60,21 @@ extension URLEncoder {
         private func encodeSnakeCased(_ key: String, in encoder: URLEncoder.Encoder) throws {
             var container = encoder.keyContainer()
 
-            try container.encode(key
-                .splitByUppercasedCharacters()
-                .joined(separator: "_")
-                .lowercased()
+            try container.encode(
+                key
+                    .splitByUppercasedCharacters()
+                    .joined(separator: "_")
+                    .lowercased()
             )
         }
 
         private func encodeKebabCased(_ key: String, in encoder: URLEncoder.Encoder) throws {
             var container = encoder.keyContainer()
-            try container.encode(key
-                .splitByUppercasedCharacters()
-                .joined(separator: "-")
-                .lowercased()
+            try container.encode(
+                key
+                    .splitByUppercasedCharacters()
+                    .joined(separator: "-")
+                    .lowercased()
             )
         }
 

@@ -9,7 +9,7 @@ let package = Package(
         .macOS(.v12),
         .iOS(.v15),
         .tvOS(.v15),
-        .watchOS(.v8)
+        .watchOS(.v8),
     ],
     products: [
         .library(
@@ -49,7 +49,7 @@ let package = Package(
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
             branch: "release-2.0"
-        )
+        ),
     ],
     targets: [
         .target(
@@ -66,7 +66,7 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "Logging", package: "swift-log"),
-                .product(name: "Collections", package: "swift-collections")
+                .product(name: "Collections", package: "swift-collections"),
             ]
         ),
 
@@ -74,6 +74,6 @@ let package = Package(
             name: "RequestDLTests",
             dependencies: ["RequestDL"],
             resources: [.process("Resources")]
-        )
+        ),
     ]
 )

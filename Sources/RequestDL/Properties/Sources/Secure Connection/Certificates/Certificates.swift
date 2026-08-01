@@ -1,15 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import class FoundationEssentials.Bundle
+#else
+import class Foundation.Bundle
+#endif
 
-/**
- A structure representing chain certificate for a property used inside
- for sending the public certificates.
-
- The receiver obtains the sender's certificates as Trust Roots.
- */
+/// A structure representing chain certificate for a property used inside
+/// for sending the public certificates.
+///
+/// The receiver obtains the sender's certificates as Trust Roots.
 public struct Certificates<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -123,15 +125,19 @@ public struct Certificates<Content: Property>: Property {
 
         switch property.source {
         case .file(let file):
-            return .leaf(SecureConnectionNode(
-                Node(source: .file(file)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .file(file)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .bytes(let bytes):
-            return .leaf(SecureConnectionNode(
-                Node(source: .bytes(bytes)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .bytes(bytes)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .chain
@@ -141,13 +147,18 @@ public struct Certificates<Content: Property>: Property {
                 inputs: inputs
             )
 
-            return .leaf(SecureConnectionNode(
-                Node(source: .nodes(outputs.node
-                    .search(for: SecureConnectionNode.self)
-                    .filter { $0.contains(CertificateNode.self) }
-                )),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(
+                        source: .nodes(
+                            outputs.node
+                                .search(for: SecureConnectionNode.self)
+                                .filter { $0.contains(CertificateNode.self) }
+                        )
+                    ),
+                    logger: inputs.environment.logger
+                )
+            )
         }
     }
 }

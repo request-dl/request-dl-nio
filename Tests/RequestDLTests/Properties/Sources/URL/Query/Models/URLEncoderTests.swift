@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct URLEncoderTests {
 
@@ -391,9 +397,12 @@ struct URLEncoderTests {
         let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
-        #expect(sut == value.map {
-            "\(key)=\($0)"
-        }.joined(separator: "&"))
+        #expect(
+            sut
+                == value.map {
+                    "\(key)=\($0)"
+                }.joined(separator: "&")
+        )
     }
 
     @Test
@@ -410,10 +419,13 @@ struct URLEncoderTests {
         let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
-        #expect(sut == value.enumerated().map {
-            let key = "\(key)[\($0)]".addingRFC3986PercentEncoding()
-            return "\(key)=\($1)"
-        }.joined(separator: "&"))
+        #expect(
+            sut
+                == value.enumerated().map {
+                    let key = "\(key)[\($0)]".addingRFC3986PercentEncoding()
+                    return "\(key)=\($1)"
+                }.joined(separator: "&")
+        )
     }
 
     @Test
@@ -430,9 +442,12 @@ struct URLEncoderTests {
         let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
-        #expect(sut == value.enumerated().map {
-            "\(key).\($0)=\($1)"
-        }.joined(separator: "&"))
+        #expect(
+            sut
+                == value.enumerated().map {
+                    "\(key).\($0)=\($1)"
+                }.joined(separator: "&")
+        )
     }
 
     @Test
@@ -452,10 +467,13 @@ struct URLEncoderTests {
         let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
-        #expect(sut == value.enumerated().map {
-            let key = "\(key)@\($0)".addingRFC3986PercentEncoding()
-            return "\(key)=\($1)"
-        }.joined(separator: "&"))
+        #expect(
+            sut
+                == value.enumerated().map {
+                    let key = "\(key)@\($0)".addingRFC3986PercentEncoding()
+                    return "\(key)=\($1)"
+                }.joined(separator: "&")
+        )
     }
 
     @Test
@@ -482,7 +500,7 @@ struct URLEncoderTests {
             "1",
             "hello",
             dateFormatter.string(from: date),
-            "1"
+            "1",
         ]
         .map { "foo=\($0.addingRFC3986PercentEncoding())" }
         .joined(separator: "&")
@@ -502,7 +520,7 @@ struct URLEncoderTests {
             "key1": "a",
             "key2": "ab",
             "key3": "abc",
-            "key4": "abcd"
+            "key4": "abcd",
         ]
 
         urlEncoder.dictionaryEncodingStrategy = .subscripted
@@ -513,10 +531,13 @@ struct URLEncoderTests {
         // Then
         #expect(sut.count == value.count)
 
-        #expect(sut.sorted() == value.map {
-            let key = "\(key)[\($0)]".addingRFC3986PercentEncoding()
-            return "\(key)=\($1)"
-        }.sorted())
+        #expect(
+            sut.sorted()
+                == value.map {
+                    let key = "\(key)[\($0)]".addingRFC3986PercentEncoding()
+                    return "\(key)=\($1)"
+                }.sorted()
+        )
     }
 
     @Test
@@ -529,7 +550,7 @@ struct URLEncoderTests {
             "key1": "a",
             "key2": "ab",
             "key3": "abc",
-            "key4": "abcd"
+            "key4": "abcd",
         ]
 
         urlEncoder.dictionaryEncodingStrategy = .accessMember
@@ -540,10 +561,13 @@ struct URLEncoderTests {
         // Then
         #expect(sut.count == value.count)
 
-        #expect(sut.sorted() == value.map {
-            let key = "\(key).\($0)".addingRFC3986PercentEncoding()
-            return "\(key)=\($1)"
-        }.sorted())
+        #expect(
+            sut.sorted()
+                == value.map {
+                    let key = "\(key).\($0)".addingRFC3986PercentEncoding()
+                    return "\(key)=\($1)"
+                }.sorted()
+        )
     }
 
     @Test
@@ -556,7 +580,7 @@ struct URLEncoderTests {
             "key1": "a",
             "key2": "ab",
             "key3": "abc",
-            "key4": "abcd"
+            "key4": "abcd",
         ]
 
         urlEncoder.dictionaryEncodingStrategy = .custom {
@@ -570,10 +594,13 @@ struct URLEncoderTests {
         // Then
         #expect(sut.count == value.count)
 
-        #expect(sut.sorted() == value.map {
-            let key = "\(key)@\($0)".addingRFC3986PercentEncoding()
-            return "\(key)=\($1)"
-        }.sorted())
+        #expect(
+            sut.sorted()
+                == value.map {
+                    let key = "\(key)@\($0)".addingRFC3986PercentEncoding()
+                    return "\(key)=\($1)"
+                }.sorted()
+        )
     }
 
     @Test
@@ -590,7 +617,7 @@ struct URLEncoderTests {
             "date": date,
             "flag": true,
             "optional": String?.none,
-            "array": array
+            "array": array,
         ]
 
         let dateFormatter = ISO8601DateFormatter()
@@ -612,15 +639,18 @@ struct URLEncoderTests {
             "flag": "1",
             "array.0": "1",
             "array.1": "2",
-            "array.2": "3"
+            "array.2": "3",
         ]
 
         #expect(sut.count == expectedValue.count)
 
-        #expect(sut.sorted() == expectedValue.map {
-            let key = "\(key).\($0)".addingRFC3986PercentEncoding()
-            return "\(key)=\($1.addingRFC3986PercentEncoding())"
-        }.sorted())
+        #expect(
+            sut.sorted()
+                == expectedValue.map {
+                    let key = "\(key).\($0)".addingRFC3986PercentEncoding()
+                    return "\(key)=\($1.addingRFC3986PercentEncoding())"
+                }.sorted()
+        )
     }
 
     // MARK: - Data
@@ -636,7 +666,8 @@ struct URLEncoderTests {
         let sut = try urlEncoder.encode(value, forKey: key)
 
         // Then
-        let expectedValue = value
+        let expectedValue =
+            value
             .base64EncodedString()
             .addingRFC3986PercentEncoding()
 
@@ -790,10 +821,11 @@ struct URLEncoderTests {
 
         urlEncoder.keyEncodingStrategy = .custom {
             var container = $1.keyContainer()
-            try container.encode($0
-                .splitByUppercasedCharacters()
-                .joined(separator: ".")
-                .lowercased()
+            try container.encode(
+                $0
+                    .splitByUppercasedCharacters()
+                    .joined(separator: ".")
+                    .lowercased()
             )
         }
 
@@ -861,9 +893,9 @@ struct URLEncoderTests {
     }
 }
 
-private extension URLEncoder {
+extension URLEncoder {
 
-    func encode<Value>(_ value: Value, forKey key: String) throws -> String {
+    fileprivate func encode<Value>(_ value: Value, forKey key: String) throws -> String {
         try self.encode(value, forKey: key)
             .map { $0.build() }
             .joined()

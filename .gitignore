@@ -12,3 +12,4 @@ DerivedData/
 *.xcscheme
 
 .swiftpm
+Package.resolved

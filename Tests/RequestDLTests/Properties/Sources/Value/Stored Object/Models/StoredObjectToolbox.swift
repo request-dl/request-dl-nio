@@ -1,7 +1,5 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 enum StoredObjectToolbox<Factory: IndexFactory> {}

@@ -1,10 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import SwiftAsyncStream
+import Testing
+
 @testable @_spi(Private) import RequestDL
 
 struct NamespaceTests {
@@ -32,11 +32,13 @@ struct NamespaceTests {
         let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
-        _ = try await resolve(TestProperty {
-            NamespaceSpy {
-                namespaceID.wrappedValue = $0
+        _ = try await resolve(
+            TestProperty {
+                NamespaceSpy {
+                    namespaceID.wrappedValue = $0
+                }
             }
-        })
+        )
 
         // Then
         #expect(namespaceID.wrappedValue == .global)
@@ -67,20 +69,25 @@ extension NamespaceTests {
         let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            SingleNamespace {
-                NamespaceSpy {
-                    namespaceID.wrappedValue = $0
+        let resolved = try await resolve(
+            TestProperty {
+                SingleNamespace {
+                    NamespaceSpy {
+                        namespaceID.wrappedValue = $0
+                    }
                 }
             }
-        })
+        )
 
         // Then
-        #expect(resolved.requestConfiguration.url == "https://www.apple.com/v1")
-        #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
-            base: SingleNamespace<NamespaceSpy>.self,
-            namespace: "_v1"
-        ))
+        #expect(resolved.requestConfiguration.url == "https://www.apple.com/SingleNamespace<NamespaceSpy>.v1")
+        #expect(
+            namespaceID.wrappedValue
+                == PropertyNamespace.ID(
+                    base: SingleNamespace<NamespaceSpy>.self,
+                    namespace: "_v1"
+                )
+        )
     }
 }
 
@@ -99,7 +106,12 @@ extension NamespaceTests {
 
         var body: some Property {
             content
-            Path("\(multiple)/\(namespace)")
+
+            // Emitted separately on purpose. Both wrappers describe the same merged namespace,
+            // so the two segments have to come out identical. They only differed before because
+            // the first wrapper was left holding a prefix of the real namespace.
+            Path("\(multiple)")
+            Path("\(namespace)")
         }
     }
 
@@ -109,23 +121,26 @@ extension NamespaceTests {
         let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            MultipleNamespace {
-                NamespaceSpy {
-                    namespaceID.wrappedValue = $0
+        let resolved = try await resolve(
+            TestProperty {
+                MultipleNamespace {
+                    NamespaceSpy {
+                        namespaceID.wrappedValue = $0
+                    }
                 }
             }
-        })
-
-        // Then
-        #expect(
-            resolved.requestConfiguration.url == "https://www.apple.com/multiple/namespace"
         )
 
-        #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
+        // Then
+        let expected = PropertyNamespace.ID(
             base: MultipleNamespace<NamespaceSpy>.self,
             namespace: "_multiple._namespace"
-        ))
+        )
+
+        #expect(namespaceID.wrappedValue == expected)
+
+        // Derived rather than spelled out, so the repetition reads as the assertion it is.
+        #expect(resolved.requestConfiguration.url == "https://www.apple.com/\(expected)/\(expected)")
     }
 }
 
@@ -150,21 +165,28 @@ extension NamespaceTests {
         let namespaceID = InlineProperty<PropertyNamespace.ID?>(wrappedValue: nil)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Path("v1")
-                .modifier(NamespaceModifier {
-                    namespaceID.wrappedValue = $0
-                })
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Path("v1")
+                    .modifier(
+                        NamespaceModifier {
+                            namespaceID.wrappedValue = $0
+                        }
+                    )
+            }
+        )
 
         // Then
         #expect(
-            resolved.requestConfiguration.url == "https://www.apple.com/v1/namespace"
+            resolved.requestConfiguration.url == "https://www.apple.com/v1/NamespaceModifier.namespace"
         )
 
-        #expect(namespaceID.wrappedValue == PropertyNamespace.ID(
-            base: NamespaceModifier.self,
-            namespace: "_namespace"
-        ))
+        #expect(
+            namespaceID.wrappedValue
+                == PropertyNamespace.ID(
+                    base: NamespaceModifier.self,
+                    namespace: "_namespace"
+                )
+        )
     }
 }

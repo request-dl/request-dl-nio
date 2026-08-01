@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Data
+#else
+import struct Foundation.Data
+#endif
 
 /// A representation of an Authorization header.
 public struct Authorization: Property {
@@ -72,8 +76,8 @@ public struct Authorization: Property {
         self.type = .basic
         self.token = {
             Data(String(username).utf8)
-            + Data(":".utf8)
-            + Data(String(password).utf8)
+                + Data(":".utf8)
+                + Data(String(password).utf8)
         }().base64EncodedString()
     }
 
@@ -85,9 +89,11 @@ public struct Authorization: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            type: property.type,
-            token: property.token
-        ))
+        return .leaf(
+            Node(
+                type: property.type,
+                token: property.token
+            )
+        )
     }
 }

@@ -1,30 +1,26 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A Property protocol conforming type that represents a query parameter in a URL request.
-
- ## Overview
-
- You can use it to build a request with query parameters.
-
- ```swift
- try await DataTask {
-     BaseURL("api.example.com")
-     Path("users")
-     Query(name: "email", value: "john@example.com")
-     Query(name: "age", value: 30)
- }
- .result()
- ```
-
- ## See Also
-
- - ``RequestDL/URLEncoder``
-*/
+/// A Property protocol conforming type that represents a query parameter in a URL request.
+///
+/// ## Overview
+///
+/// You can use it to build a request with query parameters.
+///
+/// ```swift
+/// try await DataTask {
+///     BaseURL("api.example.com")
+///     Path("users")
+///     Query(name: "email", value: "john@example.com")
+///     Query(name: "age", value: 30)
+/// }
+/// .result()
+/// ```
+///
+/// ## See Also
+///
+/// - ``RequestDL/URLEncoder``
 public struct Query<Value: Sendable>: Property {
 
     // MARK: - Public properties
@@ -61,10 +57,12 @@ public struct Query<Value: Sendable>: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(QueryNode(
-            name: property.name,
-            value: property.value,
-            urlEncoder: inputs.environment.urlEncoder
-        ))
+        return .leaf(
+            QueryNode(
+                name: property.name,
+                value: property.value,
+                urlEncoder: inputs.environment.urlEncoder
+            )
+        )
     }
 }

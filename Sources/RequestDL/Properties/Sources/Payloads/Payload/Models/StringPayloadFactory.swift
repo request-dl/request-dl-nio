@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct StringPayloadFactory: PayloadFactory {
 
@@ -25,7 +23,8 @@ struct StringPayloadFactory: PayloadFactory {
 
     func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
         try .init(
-            contentType: .init(String(contentType) + "; charset=\(input.charset)"),
+            // Only adds a charset when the caller has not written one.
+            contentType: contentType.appending(charset: input.charset),
             source: .buffer(Internals.DataBuffer(input.charset.encode(verbatim)))
         )
     }

@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 extension Internals.Override {
 
@@ -12,11 +16,18 @@ extension Internals.Override {
 
         @TaskLocal
         fileprivate static var closure: Closure = {
+            #if canImport(FoundationEssentials)
+            FoundationEssentials.raise($0)
+            #else
             Foundation.raise($0)
+            #endif
         }
 
         @discardableResult
-        static func replace<T: Sendable>(with closure: @escaping Closure, perform: @Sendable () async throws -> T) async rethrows -> T {
+        static func replace<T: Sendable>(
+            with closure: @escaping Closure,
+            perform: @Sendable () async throws -> T
+        ) async rethrows -> T {
             try await $closure.withValue(closure, operation: perform)
         }
     }

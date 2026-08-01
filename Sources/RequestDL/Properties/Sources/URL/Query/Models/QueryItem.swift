@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.CharacterSet
+#else
+import struct Foundation.CharacterSet
+#endif
 
 ///  A struct that represents a single query item in a URL request.
 public struct QueryItem: Sendable, Equatable, Hashable {

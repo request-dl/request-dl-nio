@@ -1,18 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A type that represents a task that has been modified by a ``RequestTaskModifier``.
-
- A ``ModifiedRequestTask`` is created by applying a ``RequestTask/modifier(_:)`` to a base
- ``RequestTask``.
-
- > Note: The `Element` associated type of the ``ModifiedRequestTask`` is determined by the `Output`
- associated type of the ``RequestTaskModifier``.
- */
+/// A type that represents a task that has been modified by a ``RequestTaskModifier``.
+///
+/// A ``ModifiedRequestTask`` is created by applying a ``RequestTask/modifier(_:)`` to a base
+/// ``RequestTask``.
+///
+/// > Note: The `Element` associated type of the ``ModifiedRequestTask`` is determined by the `Output`
+/// associated type of the ``RequestTaskModifier``.
 public struct ModifiedRequestTask<Modifier: RequestTaskModifier>: RequestTask {
 
     public typealias Element = Modifier.Output

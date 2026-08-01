@@ -1,30 +1,26 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A task that returns mocked data with a specific status code and headers.
-
- ```swift
- MockedTask(
-     statusCode: 200,
-     headers: ["Content-Type": "application/json"],
-     data: {
-         Data(
-             """
-             {
-                 "id": 1,
-                 "name": "John Doe",
-                 "email": "johndoe@example.com"
-             }
-             """.utf8
-         )
-     }
- )
- ```
-*/
+/// A task that returns mocked data with a specific status code and headers.
+///
+/// ```swift
+/// MockedTask(
+///     statusCode: 200,
+///     headers: ["Content-Type": "application/json"],
+///     data: {
+///         Data(
+///             """
+///             {
+///                 "id": 1,
+///                 "name": "John Doe",
+///                 "email": "johndoe@example.com"
+///             }
+///             """.utf8
+///         )
+///     }
+/// )
+/// ```
 public struct MockedTask<Element: Sendable>: RequestTask {
 
     // MARK: - Private properties

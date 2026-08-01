@@ -1,16 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- Sets the `Accept-Charset` header in the request.
-
- This is a specific feature that should be explored according to the needs of each endpoint. JSON in Swift, for
- example, uses `UTF-8`, `UTF-16`, and `UTF-32` during decoding and fails if other charsets are used.
- Therefore, always use this option only if it is truly necessary.
-*/
+/// Sets the `Accept-Charset` header in the request.
+///
+/// This is a specific feature that should be explored according to the needs of each endpoint. JSON in Swift, for
+/// example, uses `UTF-8`, `UTF-16`, and `UTF-32` during decoding and fails if other charsets are used.
+/// Therefore, always use this option only if it is truly necessary.
 public struct AcceptCharsetHeader: Property {
 
     // MARK: - Public properties
@@ -43,11 +39,13 @@ public struct AcceptCharsetHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "Accept-Charset",
-            value: property.charset.rawValue,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Accept-Charset",
+                value: property.charset.rawValue,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

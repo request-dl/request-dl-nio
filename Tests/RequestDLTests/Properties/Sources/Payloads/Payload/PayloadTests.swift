@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct PayloadTests {
 
@@ -14,16 +20,18 @@ struct PayloadTests {
         let json: [String: Any] = [
             "foo": "bar",
             "user": ["name": "olaf"],
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                json,
-                options: .sortedKeys
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    json,
+                    options: .sortedKeys
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
@@ -36,10 +44,13 @@ struct PayloadTests {
             resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
-        #expect(try data == JSONSerialization.data(
-            withJSONObject: json,
-            options: .sortedKeys
-        ))
+        #expect(
+            try data
+                == JSONSerialization.data(
+                    withJSONObject: json,
+                    options: .sortedKeys
+                )
+        )
     }
 
     @Test
@@ -48,16 +59,18 @@ struct PayloadTests {
         let json: [Any] = [
             ["foo", "bar"],
             ["user": ["name": "olaf"]],
-            [0, 1, 2]
+            [0, 1, 2],
         ]
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                json,
-                options: .sortedKeys
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    json,
+                    options: .sortedKeys
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
@@ -70,10 +83,13 @@ struct PayloadTests {
             resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
-        #expect(try data == JSONSerialization.data(
-            withJSONObject: json,
-            options: .sortedKeys
-        ))
+        #expect(
+            try data
+                == JSONSerialization.data(
+                    withJSONObject: json,
+                    options: .sortedKeys
+                )
+        )
     }
 
     @Test
@@ -83,13 +99,15 @@ struct PayloadTests {
         let customType = ContentType("application/json+request-dl")
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                json,
-                options: .sortedKeys,
-                contentType: customType
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    json,
+                    options: .sortedKeys,
+                    contentType: customType
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
@@ -102,10 +120,13 @@ struct PayloadTests {
             resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
         )
 
-        #expect(try data == JSONSerialization.data(
-            withJSONObject: json,
-            options: .sortedKeys
-        ))
+        #expect(
+            try data
+                == JSONSerialization.data(
+                    withJSONObject: json,
+                    options: .sortedKeys
+                )
+        )
     }
 
     @Test
@@ -123,12 +144,14 @@ struct PayloadTests {
         decoder.dateDecodingStrategy = .iso8601
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                mock,
-                encoder: encoder
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    mock,
+                    encoder: encoder
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
@@ -165,13 +188,15 @@ struct PayloadTests {
         let customType = ContentType("application/json+request-dl")
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                mock,
-                encoder: encoder,
-                contentType: customType
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    mock,
+                    encoder: encoder,
+                    contentType: customType
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
@@ -197,14 +222,18 @@ struct PayloadTests {
         let verbatim = "Hello world!"
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            Payload(verbatim: verbatim)
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                Payload(verbatim: verbatim)
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            Payload(verbatim: verbatim)
-                .charset(.utf16)
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                Payload(verbatim: verbatim)
+                    .charset(.utf16)
+            }
+        )
 
         let data1 = try await resolved1.requestConfiguration.body?.data()
         let data2 = try await resolved2.requestConfiguration.body?.data()
@@ -237,20 +266,24 @@ struct PayloadTests {
         let customType = ContentType("text/plain+request-dl")
 
         // When
-        let resolved1 = try await resolve(TestProperty {
-            Payload(
-                verbatim: verbatim,
-                contentType: customType
-            )
-        })
+        let resolved1 = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim: verbatim,
+                    contentType: customType
+                )
+            }
+        )
 
-        let resolved2 = try await resolve(TestProperty {
-            Payload(
-                verbatim: verbatim,
-                contentType: customType
-            )
-            .charset(.utf16)
-        })
+        let resolved2 = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim: verbatim,
+                    contentType: customType
+                )
+                .charset(.utf16)
+            }
+        )
 
         let data1 = try await resolved1.requestConfiguration.body?.data()
         let data2 = try await resolved2.requestConfiguration.body?.data()
@@ -282,9 +315,11 @@ struct PayloadTests {
         let data = Data.randomData(length: 1_024 * 1_024)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Payload(data: data)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(data: data)
+            }
+        )
 
         let builtData = try await resolved.requestConfiguration.body?.data()
 
@@ -307,12 +342,14 @@ struct PayloadTests {
         let contentType = ContentType("application/octet-stream+request-dl")
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                data: data,
-                contentType: contentType
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    data: data,
+                    contentType: contentType
+                )
+            }
+        )
 
         let builtData = try await resolved.requestConfiguration.body?.data()
 
@@ -343,12 +380,14 @@ struct PayloadTests {
         try data.write(to: url)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                url: url,
-                contentType: .octetStream
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    url: url,
+                    contentType: .octetStream
+                )
+            }
+        )
 
         let builtData = try await resolved.requestConfiguration.body?.data()
 
@@ -380,12 +419,14 @@ struct PayloadTests {
         try data.write(to: url)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                url: url,
-                contentType: contentType
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    url: url,
+                    contentType: contentType
+                )
+            }
+        )
 
         let builtData = try await resolved.requestConfiguration.body?.data()
 
@@ -421,17 +462,19 @@ extension PayloadTests {
         let json: [String: Any] = [
             "foo": "bar",
             "user": ["name": "olaf"],
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                json,
-                options: .fragmentsAllowed,
-                contentType: .formURLEncoded
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    json,
+                    options: .fragmentsAllowed,
+                    contentType: .formURLEncoded
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
@@ -441,11 +484,15 @@ extension PayloadTests {
         #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
 
         #expect(
-            try Set(resolved.requestConfiguration.queries) == Set(json.reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
-                    $0.build()
-                }
-            })
+            try Set(resolved.requestConfiguration.queries)
+                == Set(
+                    json.reduce([]) {
+                        try $0
+                            + URLEncoder().encode($1.value, forKey: $1.key).map {
+                                $0.build()
+                            }
+                    }
+                )
         )
     }
 
@@ -455,32 +502,37 @@ extension PayloadTests {
         let json: [String: Any] = [
             "foo": "bar",
             "user": ["name": "olaf"],
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            RequestMethod(.post)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestMethod(.post)
 
-            Payload(
-                json,
-                options: .fragmentsAllowed,
-                contentType: .formURLEncoded
-            )
-            .charset(.utf16)
-        })
+                Payload(
+                    json,
+                    options: .fragmentsAllowed,
+                    contentType: .formURLEncoded
+                )
+                .charset(.utf16)
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
-        let components = data.flatMap {
-            String(data: $0, encoding: .utf16)
-        }?.split(separator: "&") ?? []
+        let components =
+            data.flatMap {
+                String(data: $0, encoding: .utf16)
+            }?.split(separator: "&") ?? []
 
         // When
         #expect(resolved.requestConfiguration.queries.isEmpty)
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-www-form-urlencoded; charset=UTF-16"]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "application/x-www-form-urlencoded; charset=UTF-16"
+            ]
         )
 
         #expect(
@@ -488,12 +540,16 @@ extension PayloadTests {
         )
 
         #expect(
-            try Set(components) == Set(json.reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
-                    let query = $0.build()
-                    return "\(query.name)=\(query.value)"
-                }
-            })
+            try Set(components)
+                == Set(
+                    json.reduce([]) {
+                        try $0
+                            + URLEncoder().encode($1.value, forKey: $1.key).map {
+                                let query = $0.build()
+                                return "\(query.name)=\(query.value)"
+                            }
+                    }
+                )
         )
     }
 
@@ -508,20 +564,23 @@ extension PayloadTests {
         let encoder = JSONEncoder()
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            Payload(
-                mock,
-                encoder: encoder,
-                contentType: .formURLEncoded
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    mock,
+                    encoder: encoder,
+                    contentType: .formURLEncoded
+                )
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
-        let json = try JSONSerialization.jsonObject(
-            with: encoder.encode(mock),
-            options: .fragmentsAllowed
-        ) as? [String: Any]
+        let json =
+            try JSONSerialization.jsonObject(
+                with: encoder.encode(mock),
+                options: .fragmentsAllowed
+            ) as? [String: Any]
 
         // When
         #expect(json != nil)
@@ -530,11 +589,15 @@ extension PayloadTests {
         #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
 
         #expect(
-            try Set(resolved.requestConfiguration.queries) == Set(json?.reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
-                    $0.build()
-                }
-            } ?? [])
+            try Set(resolved.requestConfiguration.queries)
+                == Set(
+                    json?.reduce([]) {
+                        try $0
+                            + URLEncoder().encode($1.value, forKey: $1.key).map {
+                                $0.build()
+                            }
+                    } ?? []
+                )
         )
     }
 
@@ -549,27 +612,31 @@ extension PayloadTests {
         let encoder = JSONEncoder()
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            RequestMethod(.post)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestMethod(.post)
 
-            Payload(
-                mock,
-                encoder: encoder,
-                contentType: .formURLEncoded
-            )
-            .charset(.utf16)
-        })
+                Payload(
+                    mock,
+                    encoder: encoder,
+                    contentType: .formURLEncoded
+                )
+                .charset(.utf16)
+            }
+        )
 
         let data = try await resolved.requestConfiguration.body?.data()
 
-        let components = data.flatMap {
-            String(data: $0, encoding: .utf16)
-        }?.split(separator: "&") ?? []
+        let components =
+            data.flatMap {
+                String(data: $0, encoding: .utf16)
+            }?.split(separator: "&") ?? []
 
-        let json = try JSONSerialization.jsonObject(
-            with: encoder.encode(mock),
-            options: .fragmentsAllowed
-        ) as? [String: Any]
+        let json =
+            try JSONSerialization.jsonObject(
+                with: encoder.encode(mock),
+                options: .fragmentsAllowed
+            ) as? [String: Any]
 
         // When
         #expect(json != nil)
@@ -577,7 +644,9 @@ extension PayloadTests {
         #expect(resolved.requestConfiguration.queries.isEmpty)
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-www-form-urlencoded; charset=UTF-16"]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "application/x-www-form-urlencoded; charset=UTF-16"
+            ]
         )
 
         #expect(
@@ -585,12 +654,16 @@ extension PayloadTests {
         )
 
         #expect(
-            try Set(components) == Set(json?.reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: $1.key).map {
-                    let query = $0.build()
-                    return "\(query.name)=\(query.value)"
-                }
-            } ?? [])
+            try Set(components)
+                == Set(
+                    json?.reduce([]) {
+                        try $0
+                            + URLEncoder().encode($1.value, forKey: $1.key).map {
+                                let query = $0.build()
+                                return "\(query.name)=\(query.value)"
+                            }
+                    } ?? []
+                )
         )
     }
 
@@ -600,14 +673,16 @@ extension PayloadTests {
         let data = Data.randomData(length: 1_024)
 
         // Then
-        let resolved = try await resolve(TestProperty {
-            RequestMethod(.get)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestMethod(.get)
 
-            Payload(
-                data: data,
-                contentType: .formURLEncoded
-            )
-        })
+                Payload(
+                    data: data,
+                    contentType: .formURLEncoded
+                )
+            }
+        )
 
         let resolvedData = try await resolved.requestConfiguration.body?.data()
 
@@ -637,10 +712,12 @@ extension PayloadTests {
         let chunkSize = 1_024
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Payload(data: data)
-                .payloadChunkSize(chunkSize)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(data: data)
+                    .payloadChunkSize(chunkSize)
+            }
+        )
 
         let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
 
@@ -656,10 +733,11 @@ extension PayloadTests {
         let totalBytes = data.count
 
         #expect(
-            buffers.compactMap { $0.getData() } == stride(from: .zero, to: data.count, by: chunkSize).map {
-                let upperBound = $0 + chunkSize
-                return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
-            }
+            buffers.compactMap { $0.getData() }
+                == stride(from: .zero, to: data.count, by: chunkSize).map {
+                    let upperBound = $0 + chunkSize
+                    return data[$0..<(upperBound <= totalBytes ? upperBound : totalBytes)]
+                }
         )
     }
 
@@ -671,9 +749,11 @@ extension PayloadTests {
 
         // When
         do {
-            _ = try await resolve(TestProperty {
-                Payload(jsonObject)
-            })
+            _ = try await resolve(
+                TestProperty {
+                    Payload(jsonObject)
+                }
+            )
         } catch let error as EncodingPayloadError {
             encodingError = error
         }
@@ -688,9 +768,11 @@ extension PayloadTests {
         let data = Data()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Payload(data: data)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(data: data)
+            }
+        )
 
         let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
 
@@ -702,45 +784,5 @@ extension PayloadTests {
         #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
 
         #expect(buffers.resolveData().reduce(Data(), +) == data)
-    }
-}
-
-// MARK: - Deprecated
-
-extension PayloadTests {
-
-    @Test
-    func deprecated_whenInitDataWithPartLength() async throws {
-        // Given
-        let data = Data.randomData(length: 1_024 * 1_024)
-        let chunkSize = 1_024
-
-        // When
-        let resolved = try await resolve(TestProperty {
-            Payload(data: data)
-                .payloadPartLength(chunkSize)
-        })
-
-        let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
-
-        // Then
-        #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["application/octet-stream"]
-        )
-
-        #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [
-                String(data.count)
-            ]
-        )
-
-        let totalBytes = data.count
-
-        #expect(
-            buffers.compactMap { $0.getData() } == stride(from: .zero, to: data.count, by: chunkSize).map {
-                let upperBound = $0 + chunkSize
-                return data[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
-            }
-        )
     }
 }

@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct MockedTaskTests {
 
@@ -33,11 +39,14 @@ struct MockedTaskTests {
         #expect(result.payload == data)
 
         #expect(response.url?.absoluteString == "https://localhost")
-        #expect(response.headers == .init([
-            ("Accept", "application/json"),
-            ("Content-Type", "text/plain"),
-            ("Content-Length", String(data.count))
-        ]))
+        #expect(
+            response.headers
+                == .init([
+                    ("Accept", "application/json"),
+                    ("Content-Type", "text/plain"),
+                    ("Content-Length", String(data.count)),
+                ])
+        )
     }
 
     @Test
@@ -58,9 +67,12 @@ struct MockedTaskTests {
 
         #expect(head.status.code == 200)
         #expect(result.payload == data)
-        #expect(head.headers == .init([
-            ("Content-Type", "application/octet-stream"),
-            ("Content-Length", String(data.count))
-        ]))
+        #expect(
+            head.headers
+                == .init([
+                    ("Content-Type", "application/octet-stream"),
+                    ("Content-Length", String(data.count)),
+                ])
+        )
     }
 }

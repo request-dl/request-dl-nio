@@ -1,10 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import SwiftAsyncStream
+import Testing
+
 @testable import RequestDL
 
 struct InternalsDataStreamTests {
@@ -199,7 +199,7 @@ struct InternalsDataStreamTests {
         // Given
         let stream = Internals.AsyncStream<Int>()
 
-        let range = 0 ..< 100
+        let range = 0..<100
 
         let values = range.map { _ in
             InlineProperty(wrappedValue: [Result<Int, Error>]())
@@ -218,7 +218,7 @@ struct InternalsDataStreamTests {
             )
         }
 
-        for number in 0 ..< 10 {
+        for number in 0..<10 {
             stream.append(.success(number))
 
             if number > 7 {

@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct MultipartFormParser {
 
@@ -13,9 +19,10 @@ struct MultipartFormParser {
 
     init(_ requestConfiguration: RequestConfiguration) async throws {
         let contentTypeHeader = requestConfiguration.headers["Content-Type"] ?? []
-        let boundary = contentTypeHeader.first.flatMap {
-            MultipartFormParser.extractBoundary($0)
-        } ?? "nil"
+        let boundary =
+            contentTypeHeader.first.flatMap {
+                MultipartFormParser.extractBoundary($0)
+            } ?? "nil"
 
         let buffers = try await requestConfiguration.body?.buffers() ?? []
 

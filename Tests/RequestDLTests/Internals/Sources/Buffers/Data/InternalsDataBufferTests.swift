@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOCore
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsDataBufferTests {
 
@@ -594,7 +600,7 @@ struct InternalsDataBufferTests {
         dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        #expect(dataBuffer.getData() == data[64 ..< data.count])
+        #expect(dataBuffer.getData() == data[64..<data.count])
     }
 
     @Test
@@ -617,7 +623,7 @@ struct InternalsDataBufferTests {
         dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        #expect(dataBuffer.getBytes() == Array(data[64 ..< data.count]))
+        #expect(dataBuffer.getBytes() == Array(data[64..<data.count]))
     }
 
     @Test
@@ -631,7 +637,7 @@ struct InternalsDataBufferTests {
 
         // Then
 
-        #expect(dataBuffer.getBytes(at: 32, length: 64) == Array(data[32 ..< 96]))
+        #expect(dataBuffer.getBytes(at: 32, length: 64) == Array(data[32..<96]))
     }
 
     @Test
@@ -645,7 +651,7 @@ struct InternalsDataBufferTests {
 
         // Then
 
-        #expect(dataBuffer.getData(at: 32, length: 64) == data[32 ..< 96])
+        #expect(dataBuffer.getData(at: 32, length: 64) == data[32..<96])
     }
 
     @Test
@@ -695,9 +701,9 @@ struct InternalsDataBufferTests {
 
         // When
         let datas = await withTaskGroup(of: Data?.self) { group in
-            for index in 0 ..< 1_024 {
+            for index in 0..<1_024 {
                 group.addTask {
-                    return dataBuffer.getData(at: index, length: 1_024 - index)
+                    dataBuffer.getData(at: index, length: 1_024 - index)
                 }
             }
 

@@ -1,14 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A task that is intercepted by an ``RequestTaskInterceptor``.
-
- A ``InterceptedRequestTask`` is created by applying a ``RequestTask/interceptor(_:)`` to a base ``RequestTask``.
- */
+/// A task that is intercepted by an ``RequestTaskInterceptor``.
+///
+/// A ``InterceptedRequestTask`` is created by applying a ``RequestTask/interceptor(_:)`` to a base ``RequestTask``.
 public struct InterceptedRequestTask<Interceptor: RequestTaskInterceptor>: RequestTask {
 
     public typealias Element = Interceptor.Element

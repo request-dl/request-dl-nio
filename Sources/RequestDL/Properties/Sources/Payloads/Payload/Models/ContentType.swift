@@ -1,29 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The ContentType struct is used to define the media type of the data in the HTTP request.
-
- ```swift
- let contentType: ContentType = .json
- ```
-
- > Note: For a complete list of the available types, please see the corresponding static
- properties.
-
- > Important: If the media type is not included in the predefined static properties, use
- a string literal to initialize an instance of ContentType.
-
- The ContentType struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
- it to be initialized with a string literal.
-
- ```swift
- let customContentType: ContentType = "application/custom"
- ```
- */
+/// The ContentType struct is used to define the media type of the data in the HTTP request.
+///
+/// ```swift
+/// let contentType: ContentType = .json
+/// ```
+///
+/// > Note: For a complete list of the available types, please see the corresponding static
+/// properties.
+///
+/// > Important: If the media type is not included in the predefined static properties, use
+/// a string literal to initialize an instance of ContentType.
+///
+/// The ContentType struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
+/// it to be initialized with a string literal.
+///
+/// ```swift
+/// let customContentType: ContentType = "application/custom"
+/// ```
 public struct ContentType: Sendable, Hashable {
 
     // MARK: - Public static properties
@@ -121,5 +117,54 @@ extension ContentType: LosslessStringConvertible {
 
     public var description: String {
         rawValue
+    }
+}
+
+// MARK: - Parameters
+
+extension ContentType {
+
+    /// Whether this is `application/x-www-form-urlencoded`, parameters aside.
+    ///
+    /// Compares the media type rather than searching for a substring anywhere in the value,
+    /// which also matched things like `application/x-www-form-urlencoded-v2`. Lives here now
+    /// instead of in `EncodablePayloadFactory`, next to the type it describes.
+    var isFormURLEncoded: Bool {
+        mediaType == ContentType.formURLEncoded.rawValue.lowercased()
+    }
+
+    /// Returns this content type carrying a `charset`, unless it already declares one.
+    ///
+    /// Appending unconditionally produced headers with two `charset` parameters whenever the
+    /// caller had written one themselves.
+    ///
+    /// - Important: Only call this from a factory that actually encoded its bytes through that
+    /// charset. See ``PayloadFactory`` for the rule and for why declaring it elsewhere makes
+    /// the header describe an encoding the body does not have.
+    func appending(charset: Charset) -> ContentType {
+        guard !hasCharsetParameter else {
+            return self
+        }
+
+        return .init("\(rawValue); charset=\(charset)")
+    }
+
+    /// The media type, without parameters, normalised for comparison.
+    private var mediaType: String {
+        rawValue
+            .prefix { $0 != ";" }
+            .filter { $0 != " " }
+            .lowercased()
+    }
+
+    private var hasCharsetParameter: Bool {
+        rawValue
+            .split(separator: ";")
+            .dropFirst()
+            .contains {
+                $0.drop { $0 == " " }
+                    .lowercased()
+                    .hasPrefix("charset=")
+            }
     }
 }

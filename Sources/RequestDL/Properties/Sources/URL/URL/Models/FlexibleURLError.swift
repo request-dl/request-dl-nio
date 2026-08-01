@@ -1,14 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- An error type thrown by the `FlexibleURL` property when URL processing fails.
-
- This error provides context about the specific reason the url string could not be processed.
- */
+/// An error type thrown by the `FlexibleURL` property when URL processing fails.
+///
+/// This error provides context about the specific reason the url string could not be processed.
 public struct FlexibleURLError: Error {
 
     /**

@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOSSL
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsTrustRootsTests {
 
@@ -23,10 +29,10 @@ struct InternalsTrustRootsTests {
         let sut = try trusts.build()
 
         // Then
-        let expectedTrustRoots = try NIOSSLTrustRoots.certificates([
-            .init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-            .init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem)
-        ])
+        let expectedTrustRoots = try NIOSSLTrustRoots.certificates(
+            NIOSSLCertificate.fromPEMFile(client.certificateURL.absolutePath(percentEncoded: false))
+                + NIOSSLCertificate.fromPEMFile(server.certificateURL.absolutePath(percentEncoded: false))
+        )
         #expect(sut == expectedTrustRoots)
     }
 

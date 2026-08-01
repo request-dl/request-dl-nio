@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct PathTests {
 
@@ -15,10 +21,12 @@ struct PathTests {
         let host = "google.com"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL(host)
-            Path(path)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path(path)
+            }
+        )
 
         // Then
         #expect(
@@ -33,10 +41,12 @@ struct PathTests {
         let path = 123
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL(host)
-            Path(path)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path(path)
+            }
+        )
 
         // Then
         #expect(
@@ -51,10 +61,12 @@ struct PathTests {
         let host = "google.com"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL(host)
-            Path(path)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path(path)
+            }
+        )
 
         // Then
         #expect(
@@ -72,12 +84,14 @@ struct PathTests {
         let characterSetRule = CharacterSet(charactersIn: "/")
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL(host)
-            Path(path1)
-            Path(path2)
-            Path(path3)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path(path1)
+                Path(path2)
+                Path(path3)
+            }
+        )
 
         // Then
         let expectedPath2 = path2.trimmingCharacters(in: characterSetRule)
@@ -98,12 +112,14 @@ struct PathTests {
         let characterSetRule = CharacterSet(charactersIn: "/")
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL(host)
-            Path(path1)
-            Path(path2)
-            Path(path3)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path(path1)
+                Path(path2)
+                Path(path3)
+            }
+        )
 
         // Then
         let expectedPath1 = path1.trimmingCharacters(in: characterSetRule)

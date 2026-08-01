@@ -1,35 +1,37 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.CharacterSet
+#else
+import struct Foundation.CharacterSet
+#endif
 
-/**
- The `Path` is used to specify the URL path to reach the endpoint of the request.
-
- ## Overview
-
- You can specify as many paths as necessary and even mix different types such as Int, Double, or any other
- type that conforms to `LosslessStringConvertible`.
-
- Here's an example with a single specified path:
-
- ```swift
- // base-url/api/v1
- Path("api/v1")
- ```
-
- Here's an example with multiple specified paths, combined in the final URL:
-
- ```swift
- // base-url/api/v1/users/18900
- Path("api/v1")
- Path("users")
- Path(18900)
- ```
-
- By using the `Path` component, you can easily construct the desired URL path for your request in RequestDL.
- */
+/// The `Path` is used to specify the URL path to reach the endpoint of the request.
+///
+/// ## Overview
+///
+/// You can specify as many paths as necessary and even mix different types such as Int, Double, or any other
+/// type that conforms to `LosslessStringConvertible`.
+///
+/// Here's an example with a single specified path:
+///
+/// ```swift
+/// // base-url/api/v1
+/// Path("api/v1")
+/// ```
+///
+/// Here's an example with multiple specified paths, combined in the final URL:
+///
+/// ```swift
+/// // base-url/api/v1/users/18900
+/// Path("api/v1")
+/// Path("users")
+/// Path(18900)
+/// ```
+///
+/// By using the `Path` component, you can easily construct the desired URL path for your request in RequestDL.
 public struct Path: Property {
 
     private struct Node: PropertyNode {

@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Modifiers {
 
@@ -50,9 +48,11 @@ extension RequestTask {
         _ keyPath: WritableKeyPath<RequestEnvironmentValues, Value> & Sendable,
         _ value: Value
     ) -> ModifiedRequestTask<Modifiers.Environment<Element>> {
-        modifier(Modifiers.Environment {
-            $0[keyPath: keyPath] = value
-        })
+        modifier(
+            Modifiers.Environment {
+                $0[keyPath: keyPath] = value
+            }
+        )
     }
 }
 

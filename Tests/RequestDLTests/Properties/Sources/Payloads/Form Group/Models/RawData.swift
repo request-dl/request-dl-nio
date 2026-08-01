@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 struct RawData {
 
@@ -40,7 +44,7 @@ struct RawData {
     func hasSuffix<S: StringProtocol>(_ suffix: S) -> Bool {
         let endIndex = bytes.endIndex
         let index = bytes.index(endIndex, offsetBy: -suffix.utf8.count)
-        let bytes = bytes[index ..< endIndex]
+        let bytes = bytes[index..<endIndex]
 
         return Self.equal(bytes, to: suffix)
     }
@@ -69,7 +73,7 @@ struct RawData {
     }
 }
 
-extension Optional<RawData> {
+extension RawData? {
 
     static func == <S: StringProtocol>(_ lhs: Self, _ rhs: S) -> Bool {
         lhs.map {
@@ -97,7 +101,7 @@ extension RawData {
     }
 }
 
-extension Array<RawData> {
+extension [RawData] {
 
     func joined(by character: Character) -> RawData {
         guard let first = first else {

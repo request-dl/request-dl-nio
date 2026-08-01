@@ -1,22 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The ``RequestTask`` protocol defines an object that makes a request and returns a result asynchronously.
-
- For URLRequest-based requests, each request is considered as a URLSessionTask that allows the
- monitoring and cancellation of the request through it. For requests using a custom protocol,
- the concept of ``RequestTask`` is used to assemble the request and execute it when the
- ``RequestTask/result()``function is called.
-
- The associatedtype `Element` represents the type of the expected result of the task.
-
- > Note: The ``RequestTask`` protocol does not specify how the request is made or how the result is
- processed, it only provides a way to execute a request and receive its result asynchronously.
- */
+/// The ``RequestTask`` protocol defines an object that makes a request and returns a result asynchronously.
+///
+/// For URLRequest-based requests, each request is considered as a URLSessionTask that allows the
+/// monitoring and cancellation of the request through it. For requests using a custom protocol,
+/// the concept of ``RequestTask`` is used to assemble the request and execute it when the
+/// ``RequestTask/result()``function is called.
+///
+/// The associatedtype `Element` represents the type of the expected result of the task.
+///
+/// > Note: The ``RequestTask`` protocol does not specify how the request is made or how the result is
+/// processed, it only provides a way to execute a request and receive its result asynchronously.
 public protocol RequestTask<Element>: Sendable {
 
     associatedtype Element: Sendable

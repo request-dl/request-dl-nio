@@ -1,23 +1,19 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A type-erasing task that wraps another task.
-
- The ``AnyTask`` type forwards its operations to an underlying task object, hiding its specific underlying type.
-
- ```swift
- func makeRequest() -> AnyTask<TaskResult<Data>> {
-     DataTask {
-         BaseURL("google.com")
-     }
-     .eraseToAnyTask()
- }
- ```
- */
+/// A type-erasing task that wraps another task.
+///
+/// The ``AnyTask`` type forwards its operations to an underlying task object, hiding its specific underlying type.
+///
+/// ```swift
+/// func makeRequest() -> AnyTask<TaskResult<Data>> {
+///     DataTask {
+///         BaseURL("google.com")
+///     }
+///     .eraseToAnyTask()
+/// }
+/// ```
 public struct AnyTask<Element: Sendable>: RequestTask {
 
     // MARK: - Private properties

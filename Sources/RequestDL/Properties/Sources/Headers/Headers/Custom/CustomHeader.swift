@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A header property that accepts custom value for the given key.
 public struct CustomHeader: Property {
@@ -58,11 +56,13 @@ public struct CustomHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: property.key,
-            value: property.value,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: property.key,
+                value: property.value,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

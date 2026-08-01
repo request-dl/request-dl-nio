@@ -1,25 +1,27 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import class FoundationEssentials.ProcessInfo
+#else
+import class Foundation.ProcessInfo
+#endif
 
-/**
- Set the `User-Agent` header of the request.
-
- If the `User-Agent` field is required in the request, the ``RequestDL/UserAgentHeader`` provides two
- ways to configure the header.
-
- To use the default value of RequestDL, simply use the empty initializer ``RequestDL/UserAgentHeader/init()``.
- Alternatively, you can specify your own value using the initializer ``RequestDL/UserAgentHeader/init(_:)``.
-
- ```swift
- UserAgentHeader("CustomAgent")
- ```
-
- > Important: Multiple specifications of ``RequestDL/UserAgentHeader`` are internally resolved by combining
- the values in the pattern `%@ %@`.
- */
+/// Set the `User-Agent` header of the request.
+///
+/// If the `User-Agent` field is required in the request, the ``RequestDL/UserAgentHeader`` provides two
+/// ways to configure the header.
+///
+/// To use the default value of RequestDL, simply use the empty initializer ``RequestDL/UserAgentHeader/init()``.
+/// Alternatively, you can specify your own value using the initializer ``RequestDL/UserAgentHeader/init(_:)``.
+///
+/// ```swift
+/// UserAgentHeader("CustomAgent")
+/// ```
+///
+/// > Important: Multiple specifications of ``RequestDL/UserAgentHeader`` are internally resolved by combining
+/// the values in the pattern `%@ %@`.
 public struct UserAgentHeader: Property {
 
     // MARK: - Public properties
@@ -57,11 +59,13 @@ public struct UserAgentHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "User-Agent",
-            value: property.value.trimmingCharacters(in: .whitespaces),
-            strategy: inputs.environment.headerStrategy,
-            separator: " "
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "User-Agent",
+                value: property.value.trimmingCharacters(in: .whitespaces),
+                strategy: inputs.environment.headerStrategy,
+                separator: " "
+            )
+        )
     }
 }

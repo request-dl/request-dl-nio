@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct ReadingModeTests {
 
@@ -14,9 +20,11 @@ struct ReadingModeTests {
         let length = 1_024
 
         // When
-        let resolved = try await resolve(TestProperty {
-            ReadingMode(length: length)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                ReadingMode(length: length)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.readingMode == .length(length))
@@ -28,9 +36,11 @@ struct ReadingModeTests {
         let separator = Array(Data("\n".utf8))
 
         // When
-        let resolved = try await resolve(TestProperty {
-            ReadingMode(separator: separator)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                ReadingMode(separator: separator)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.readingMode == .separator(separator))

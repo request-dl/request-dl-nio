@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 #if canImport(Darwin)
 @preconcurrency import Combine
 import _Concurrency

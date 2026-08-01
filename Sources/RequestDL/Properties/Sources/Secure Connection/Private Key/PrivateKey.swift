@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOSSL
+
+#if canImport(FoundationEssentials)
+import class FoundationEssentials.Bundle
+#else
+import class Foundation.Bundle
+#endif
 
 /// A struct representing a private key for `SecureConnection` configuration.
 public struct PrivateKey: Property {
@@ -14,8 +19,6 @@ public struct PrivateKey: Property {
 
         func make(_ secureConnection: inout Internals.SecureConnection) {
             switch source {
-            case .file(let file):
-                secureConnection.privateKey = .file(file)
             case .privateKey(let privateKey):
                 secureConnection.privateKey = .privateKey(privateKey)
             }
@@ -23,7 +26,6 @@ public struct PrivateKey: Property {
     }
 
     fileprivate enum Source: Sendable {
-        case file(String)
         case privateKey(Internals.PrivateKey)
     }
 
@@ -46,12 +48,7 @@ public struct PrivateKey: Property {
     ///   - file: The path to the file containing the private key.
     ///   - format: The format of the private key file. Default is `.pem`.
     public init(_ file: String, format: Certificate.Format = .pem) {
-        switch format {
-        case .pem:
-            self.init(.file(file))
-        case .der:
-            self.init(.privateKey(.init(file, format: format())))
-        }
+        self.init(.privateKey(.init(file, format: format())))
     }
 
     /// Creates a private key from bytes with the specified format without password.
@@ -60,10 +57,14 @@ public struct PrivateKey: Property {
     ///   - bytes: The bytes representing the private key.
     ///   - format: The format of the private key bytes. Default is `.pem`.
     public init(_ bytes: [UInt8], format: Certificate.Format = .pem) {
-        self.init(.privateKey(.init(
-            bytes,
-            format: format()
-        )))
+        self.init(
+            .privateKey(
+                .init(
+                    bytes,
+                    format: format()
+                )
+            )
+        )
     }
 
     /// Creates a private key from a file in the specified bundle with the specified format without password.
@@ -95,11 +96,15 @@ public struct PrivateKey: Property {
         format: Certificate.Format = .pem,
         password: NIOSSLSecureBytes
     ) {
-        self.init(.privateKey(.init(
-            file,
-            format: format(),
-            password: password
-        )))
+        self.init(
+            .privateKey(
+                .init(
+                    file,
+                    format: format(),
+                    password: password
+                )
+            )
+        )
     }
 
     /// Creates a private key from bytes with the specified format, and allows for providing a
@@ -114,11 +119,15 @@ public struct PrivateKey: Property {
         format: Certificate.Format = .pem,
         password: NIOSSLSecureBytes
     ) {
-        self.init(.privateKey(.init(
-            bytes,
-            format: format(),
-            password: password
-        )))
+        self.init(
+            .privateKey(
+                .init(
+                    bytes,
+                    format: format(),
+                    password: password
+                )
+            )
+        )
     }
 
     /// Creates a private key from a file in the specified bundle with the specified format, and allows for
@@ -154,9 +163,11 @@ public struct PrivateKey: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(SecureConnectionNode(
-            Node(source: property.source),
-            logger: inputs.environment.logger
-        ))
+        return .leaf(
+            SecureConnectionNode(
+                Node(source: property.source),
+                logger: inputs.environment.logger
+            )
+        )
     }
 }

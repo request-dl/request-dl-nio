@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct ResponseHeadTests {
 
@@ -16,7 +22,7 @@ struct ResponseHeadTests {
             ("Accept", "application/json"),
             ("Accept", "text/plain"),
             ("Accept", "text/html"),
-            ("Accept-Language", "en-US")
+            ("Accept-Language", "en-US"),
         ])
 
         let responseHead = ResponseHead(
@@ -28,19 +34,20 @@ struct ResponseHeadTests {
         )
 
         // Then
-        #expect(responseHead.debugDescription == """
-            https://google.com/?q=search
-            200 Ok Status
+        #expect(
+            responseHead.debugDescription == """
+                https://google.com/?q=search
+                200 Ok Status
 
-            HTTP version range: 1 ... 3
-            Keep alive: false
+                HTTP version range: 1 ... 3
+                Keep alive: false
 
-            Content-Type: application/json
-            Accept: application/json
-            Accept: text/plain
-            Accept: text/html
-            Accept-Language: en-US
-            """
+                Content-Type: application/json
+                Accept: application/json
+                Accept: text/plain
+                Accept: text/html
+                Accept-Language: en-US
+                """
         )
     }
 }

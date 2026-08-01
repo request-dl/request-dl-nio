@@ -1,8 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(signal_h)
+import signal_h
 
 extension Interceptors {
 
@@ -55,3 +56,4 @@ extension RequestTask {
         interceptor(Interceptors.Breakpoint())
     }
 }
+#endif

@@ -1,29 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A property that groups together other properties for use in a ``RequestTask``.
-
- A ``PropertyGroup`` property is used to group together other properties that share common characteristics,
- such as a base URL or query parameters.
-
- In the example code below, a ``PropertyGroup`` property is used to group a ``Path`` property and a
- ``Query`` that specify the endpoint and a user ID for a request to the "api.example.com" server.
-
- ```swift
- DataTask {
-     BaseURL("api.example.com")
-
-     PropertyGroup {
-         Path("users")
-         Query(name: "id", value: user.id)
-     }
- }
- ```
- */
+/// A property that groups together other properties for use in a ``RequestTask``.
+///
+/// A ``PropertyGroup`` property is used to group together other properties that share common characteristics,
+/// such as a base URL or query parameters.
+///
+/// In the example code below, a ``PropertyGroup`` property is used to group a ``Path`` property and a
+/// ``Query`` that specify the endpoint and a user ID for a request to the "api.example.com" server.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("api.example.com")
+///
+///     PropertyGroup {
+///         Path("users")
+///         Query(name: "id", value: user.id)
+///     }
+/// }
+/// ```
 public struct PropertyGroup<Content: Property>: Property {
 
     // MARK: - Public properties

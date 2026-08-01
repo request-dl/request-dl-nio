@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
+
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Date
+#else
+import struct Foundation.Date
+#endif
 
 extension RequestTask {
 
@@ -25,7 +30,7 @@ extension RequestTask {
             return
         }
 
-        for index in 0 ..< times {
+        for index in 0..<times {
             logger?.debug("Pinging \(index + 1) started")
 
             let time = Date()
@@ -35,47 +40,9 @@ extension RequestTask {
             } else {
                 _ = try await result()
             }
-            
+
             let interval = Date().timeIntervalSince(time)
             logger?.debug("Pinging \(index + 1) succeeded in \(String(format: "%.3f", interval))s")
-        }
-    }
-
-    /**
-     A convenience method to send a simple ping request to the server and wait for the result.
-
-     - Parameters:
-        - times: Number of times the ping should be sent. Default value is 1.
-        - debug: A flag to indicate whether or not to print debug information. Default value is true.
-
-     - Throws: An error if the ping request fails.
-
-     - Returns: Nothing. This function only waits for the server to respond to the ping request.
-     */
-    @available(*, deprecated, renamed: "ping(_:logger:)")
-    @_disfavoredOverload
-    public func ping(_ times: Int = 1, debug: Bool = true) async throws {
-        if times <= 0 {
-            return
-        }
-
-        for index in 0 ..< times {
-            #if DEBUG
-            if debug {
-                print("Pinging \(index + 1) started")
-            }
-            #endif
-
-            let time = Date()
-            _ = try await result()
-
-            #if DEBUG
-            if debug {
-                let interval = Date().timeIntervalSince(time)
-
-                print("Pinging \(index + 1) success \(String(format: "%0.3f", interval))s")
-            }
-            #endif
         }
     }
 }

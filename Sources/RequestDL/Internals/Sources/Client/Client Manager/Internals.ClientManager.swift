@@ -1,10 +1,19 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 import SwiftAsyncStream
+
+#if canImport(Darwin)
+import var Foundation.NSEC_PER_SEC
+#endif
+
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Date
+#else
+import struct Foundation.Date
+#endif
 
 extension Internals {
 
@@ -48,7 +57,9 @@ extension Internals {
             return try await lock.withLock {
                 tableLock.lock()
                 if var items = _table[sessionProviderID] {
-                    if let (index, item) = items.enumerated().first(where: { $1.sessionConfiguration == sessionConfiguration }) {
+                    if let (index, item) = items.enumerated().first(where: {
+                        $1.sessionConfiguration == sessionConfiguration
+                    }) {
                         items[index] = item.updatingReadAt()
                         _table[sessionProviderID] = items
                         tableLock.unlock()
@@ -133,10 +144,12 @@ extension Internals {
 
             var items = _table[id] ?? []
 
-            items.append(.createNew(
-                sessionConfiguration: sessionConfiguration,
-                client: client
-            ))
+            items.append(
+                .createNew(
+                    sessionConfiguration: sessionConfiguration,
+                    client: client
+                )
+            )
 
             _table[id] = items
             return client

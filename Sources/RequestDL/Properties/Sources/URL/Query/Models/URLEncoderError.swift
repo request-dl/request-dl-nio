@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A structure representing an error that occurs during URL encoding.
 public struct URLEncoderError: Error {

@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 @Suite(.serialized)
 struct CachePropertiesTests {
@@ -18,10 +24,12 @@ struct CachePropertiesTests {
     func cache_whenCacheSharedWithoutCapacity() async throws {
         defer { resetCapacity() }
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cache()
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache()
+            }
+        )
 
         // Then
         #expect(resolved.dataCache == DataCache.shared)
@@ -35,13 +43,15 @@ struct CachePropertiesTests {
         let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cache(
-                    memoryCapacity: memoryCapacity,
-                    diskCapacity: diskCapacity
-                )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(
+                        memoryCapacity: memoryCapacity,
+                        diskCapacity: diskCapacity
+                    )
+            }
+        )
 
         // Then
         #expect(resolved.dataCache == DataCache.shared)
@@ -60,10 +70,12 @@ struct CachePropertiesTests {
         let suiteName = "hello_world"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cache(suiteName: suiteName)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(suiteName: suiteName)
+            }
+        )
 
         // Then
         #expect(resolved.dataCache == DataCache(suiteName: suiteName))
@@ -78,14 +90,16 @@ struct CachePropertiesTests {
         let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cache(
-                    memoryCapacity: memoryCapacity,
-                    diskCapacity: diskCapacity,
-                    suiteName: suiteName
-                )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(
+                        memoryCapacity: memoryCapacity,
+                        diskCapacity: diskCapacity,
+                        suiteName: suiteName
+                    )
+            }
+        )
 
         let dataCache = DataCache(suiteName: suiteName)
 
@@ -109,10 +123,12 @@ struct CachePropertiesTests {
         )[0].appendingPathComponent("cache_system")
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cache(url: url)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(url: url)
+            }
+        )
 
         // Then
         #expect(resolved.dataCache == DataCache(url: url))
@@ -131,14 +147,16 @@ struct CachePropertiesTests {
         let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cache(
-                    memoryCapacity: memoryCapacity,
-                    diskCapacity: diskCapacity,
-                    url: url
-                )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(
+                        memoryCapacity: memoryCapacity,
+                        diskCapacity: diskCapacity,
+                        url: url
+                    )
+            }
+        )
 
         let dataCache = DataCache(url: url)
 
@@ -159,10 +177,12 @@ struct CachePropertiesTests {
         let policy = DataCache.Policy.Set.memory
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cachePolicy(policy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cachePolicy(policy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cachePolicy == policy)
@@ -175,10 +195,12 @@ struct CachePropertiesTests {
         let policy = DataCache.Policy.Set.disk
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cachePolicy(policy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cachePolicy(policy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cachePolicy == policy)
@@ -191,10 +213,12 @@ struct CachePropertiesTests {
         let policy = DataCache.Policy.Set.all
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cachePolicy(policy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cachePolicy(policy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cachePolicy == policy)
@@ -207,10 +231,12 @@ struct CachePropertiesTests {
         let cacheStrategy = CacheStrategy.ignoreCachedData
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cacheStrategy(cacheStrategy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cacheStrategy(cacheStrategy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
@@ -223,10 +249,12 @@ struct CachePropertiesTests {
         let cacheStrategy = CacheStrategy.reloadAndValidateCachedData
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cacheStrategy(cacheStrategy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cacheStrategy(cacheStrategy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
@@ -239,10 +267,12 @@ struct CachePropertiesTests {
         let cacheStrategy = CacheStrategy.returnCachedDataElseLoad
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cacheStrategy(cacheStrategy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cacheStrategy(cacheStrategy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)
@@ -255,10 +285,12 @@ struct CachePropertiesTests {
         let cacheStrategy = CacheStrategy.useCachedDataOnly
 
         // When
-        let resolved = try await resolve(TestProperty {
-            EmptyProperty()
-                .cacheStrategy(cacheStrategy)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cacheStrategy(cacheStrategy)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.cacheStrategy == cacheStrategy)

@@ -1,12 +1,8 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A structure that represents an asynchronous response.
- */
+/// A structure that represents an asynchronous response.
 public struct AsyncResponse: Sendable, AsyncSequence {
 
     /**
@@ -25,17 +21,22 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         mutating public func next() async throws -> Element? {
             switch try await iterator.next() {
             case .upload(let step):
-                return .upload(UploadStep(
-                    chunkSize: step.chunkSize,
-                    totalSize: step.totalSize
-                ))
+                return .upload(
+                    UploadStep(
+                        chunkSize: step.chunkSize,
+                        totalSize: step.totalSize
+                    )
+                )
             case .download(let step):
-                return .download(DownloadStep(
-                    head: .init(step.head),
-                    bytes: AsyncBytes(
-                        seed: seed,
-                        bytes: step.bytes
-                    )))
+                return .download(
+                    DownloadStep(
+                        head: .init(step.head),
+                        bytes: AsyncBytes(
+                            seed: seed,
+                            bytes: step.bytes
+                        )
+                    )
+                )
             case .none:
                 return nil
             }

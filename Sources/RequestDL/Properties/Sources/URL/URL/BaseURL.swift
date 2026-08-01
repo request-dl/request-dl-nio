@@ -1,38 +1,34 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The `BaseURL` is the entry point as it specifies the scheme and host to be queried during the request.
-
- ## Overview
-
- To start using it, it is important to pay attention to some rules:
-
- - Scheme must be of type ``RequestDL/URLScheme``.
- - Host is a string without scheme.
-
- ```swift
- // Always HTTPS
- BaseURL("apple.com")
-
- // Specifying the scheme
- BaseURL(.http, host: "apple.com")
- ```
-
- > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
-
- > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
-
- ### Learn the fundamentals
-
- @Links(visualStyle: list) {
-     - <doc:Creating-requests-from-scratch>
-     - <doc:Cache-support>
- }
- */
+/// The `BaseURL` is the entry point as it specifies the scheme and host to be queried during the request.
+///
+/// ## Overview
+///
+/// To start using it, it is important to pay attention to some rules:
+///
+/// - Scheme must be of type ``RequestDL/URLScheme``.
+/// - Host is a string without scheme.
+///
+/// ```swift
+/// // Always HTTPS
+/// BaseURL("apple.com")
+///
+/// // Specifying the scheme
+/// BaseURL(.http, host: "apple.com")
+/// ```
+///
+/// > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
+///
+/// > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
+///
+/// ### Learn the fundamentals
+///
+/// @Links(visualStyle: list) {
+///     - <doc:Creating-requests-from-scratch>
+///     - <doc:Cache-support>
+/// }
 public struct BaseURL: Property {
 
     private struct Node: PropertyNode {

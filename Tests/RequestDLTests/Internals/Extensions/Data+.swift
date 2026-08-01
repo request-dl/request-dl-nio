@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 extension Data {
 
@@ -17,7 +22,7 @@ extension Data {
         let max = length > UInt8.max ? UInt8.max : UInt8(length)
         let chunk = Int(floor(Double(length) / Double(max)))
 
-        for byte in UInt8.min ... UInt8.max {
+        for byte in UInt8.min...UInt8.max {
             let availableBytes = length - buffer.writerIndex
             let length = availableBytes > Int(chunk) ? Int(chunk) : availableBytes
 

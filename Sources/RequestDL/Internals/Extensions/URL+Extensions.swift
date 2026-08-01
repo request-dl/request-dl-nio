@@ -1,8 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.URL
+import struct FoundationEssentials.URLComponents
+import class FoundationEssentials.FileManager
+#else
+import struct Foundation.URL
+import struct Foundation.URLComponents
+import class Foundation.FileManager
+#endif
 
 extension URL {
 
@@ -12,9 +20,11 @@ extension URL {
         }
 
         let path = components.path.removingPercentEncoding ?? components.path
-        components.path = percentEncoded ? {
-            (path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "")
-        }() : path
+        components.path =
+            percentEncoded
+            ? {
+                (path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "")
+            }() : path
         return components.path
     }
 

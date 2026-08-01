@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Data
+#else
+import struct Foundation.Data
+#endif
 
 /// Enumeration representing various character encodings (charsets) in Swift.
 public enum Charset: String, Sendable, LosslessStringConvertible {

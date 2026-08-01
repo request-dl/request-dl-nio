@@ -2,14 +2,10 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
-
-/**
- A property that reads data from a source property and provides it to a content closure.
- This type allows you to create a dependency between two properties, where the `source`
- property is resolved first, and its result is made available within the `content` closure
- via a `PropertyContext`.
- */
+/// A property that reads data from a source property and provides it to a content closure.
+/// This type allows you to create a dependency between two properties, where the `source`
+/// property is resolved first, and its result is made available within the `content` closure
+/// via a `PropertyContext`.
 public struct PropertyReader<Source: Property, Content: Property>: Property {
 
     // MARK: - Public properties

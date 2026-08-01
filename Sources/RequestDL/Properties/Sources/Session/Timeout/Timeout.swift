@@ -1,32 +1,28 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- `Timeout` is a struct that defines the request timeout for a connect and read.
-
- To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
-
- ```swift
- Timeout(.seconds(40), for: .connect)
- ```
-
- In the example below, a request is made to Google's website with the timeout for all types.
-
- ```swift
- DataTask {
-     BaseURL("google.com")
-     Timeout(.seconds(60), for: .all)
- }
-
- ```
-
- > Note: A request timeout is the amount of time a client will wait for a response from the server
- before terminating the connection. The timeout parameter is the duration of time before the timeout
- occurs, and the source parameter specifies the type of timeout to be applied
- */
+/// `Timeout` is a struct that defines the request timeout for a connect and read.
+///
+/// To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
+///
+/// ```swift
+/// Timeout(.seconds(40), for: .connect)
+/// ```
+///
+/// In the example below, a request is made to Google's website with the timeout for all types.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("google.com")
+///     Timeout(.seconds(60), for: .all)
+/// }
+///
+/// ```
+///
+/// > Note: A request timeout is the amount of time a client will wait for a response from the server
+/// before terminating the connection. The timeout parameter is the duration of time before the timeout
+/// occurs, and the source parameter specifies the type of timeout to be applied
 public struct Timeout: Property {
 
     private struct Node: PropertyNode {
@@ -84,9 +80,11 @@ public struct Timeout: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            timeout: property.timeout,
-            source: property.source
-        ))
+        return .leaf(
+            Node(
+                timeout: property.timeout,
+                source: property.source
+            )
+        )
     }
 }

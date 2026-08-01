@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct FormItem: Sendable {
 
@@ -41,11 +39,13 @@ struct FormItem: Sendable {
     // MARK: - Internal methods
 
     func callAsFunction() throws -> Output {
-        let output = try factory(.init(
-            method: nil,
-            charset: charset,
-            urlEncoder: urlEncoder
-        ))
+        let output = try factory(
+            .init(
+                method: nil,
+                charset: charset,
+                urlEncoder: urlEncoder
+            )
+        )
 
         switch output.source {
         case .buffer(let buffer):
@@ -74,7 +74,11 @@ struct FormItem: Sendable {
 
         headers.set(name: "Content-Disposition", value: contentDisposition())
         headers.set(name: "Content-Type", value: String(contentType))
-        headers.set(name: "Content-Length", value: String(buffer.estimatedBytes))
+        // `readableBytes`, not `estimatedBytes`. The estimate is the size of the whole backing
+        // store, while what goes on the wire is what the cursor can still read, so a partially
+        // read buffer declared a part longer than it sends. It is also arithmetic rather than a
+        // stat call, which for a file backed part used to happen once per part.
+        headers.set(name: "Content-Length", value: String(buffer.readableBytes))
 
         if let additionalHeaders {
             headers = headers.merging(additionalHeaders) { lhs, _ in lhs }

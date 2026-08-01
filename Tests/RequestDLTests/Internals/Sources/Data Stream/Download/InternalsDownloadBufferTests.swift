@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsDownloadBufferTests {
 
@@ -19,11 +25,13 @@ struct InternalsDownloadBufferTests {
         download.close()
 
         // Then
-        let bytes = try await Array(Internals.AsyncBytes(
-            logger: nil,
-            totalSize: data.count,
-            stream: download.stream
-        ))
+        let bytes = try await Array(
+            Internals.AsyncBytes(
+                logger: nil,
+                totalSize: data.count,
+                stream: download.stream
+            )
+        )
 
         #expect(bytes == [data])
     }

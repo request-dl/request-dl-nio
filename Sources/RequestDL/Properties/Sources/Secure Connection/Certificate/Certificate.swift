@@ -1,27 +1,30 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
 
-/**
- Set a certificate of type `PEM` or `DER`.
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
- It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
- with the server. There are several options to utilize the ``RequestDL/Certificate``.
-
- You can use it to configure the ``RequestDL/Trusts`` or ``RequestDL/AdditionalTrusts`` to
- validate if the server is trustworthy.
-
- Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication
- certificates to the server.
-
- ```swift
- let certData = Data(base64Encoded: "...")
- let cert = Certificate(certData!, format: .der)
- ```
- */
+/// Set a certificate of type `PEM` or `DER`.
+///
+/// It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
+/// with the server. There are several options to utilize the ``RequestDL/Certificate``.
+///
+/// You can use it to configure the ``RequestDL/TrustRoots`` or ``RequestDL/AdditionalTrustRoots`` to
+/// validate if the server is trustworthy.
+///
+/// Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication
+/// certificates to the server.
+///
+/// ```swift
+/// let certData = Data(base64Encoded: "...")
+/// let cert = Certificate(certData!, format: .der)
+/// ```
 public struct Certificate: Property {
 
     public enum Format: Sendable, Hashable {
@@ -133,13 +136,15 @@ public struct Certificate: Property {
             return .empty
         }
 
-        return .leaf(SecureConnectionNode(
-            CertificateNode(
-                source: property.source,
-                property: certificateProperty,
-                format: property.format()
-            ),
-            logger: inputs.environment.logger
-        ))
+        return .leaf(
+            SecureConnectionNode(
+                CertificateNode(
+                    source: property.source,
+                    property: certificateProperty,
+                    format: property.format()
+                ),
+                logger: inputs.environment.logger
+            )
+        )
     }
 }

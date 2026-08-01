@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct HeaderGroupTests {
@@ -17,12 +17,14 @@ struct HeaderGroupTests {
 
     @Test
     func headerGroupWithDictionary() async throws {
-        let property = TestProperty(HeaderGroup([
-            "Content-Type": "application/json",
-            "Accept": "text/html",
-            "Origin": "127.0.0.1:8080",
-            "xxx-api-key": "password"
-        ]))
+        let property = TestProperty(
+            HeaderGroup([
+                "Content-Type": "application/json",
+                "Accept": "text/html",
+                "Origin": "127.0.0.1:8080",
+                "xxx-api-key": "password",
+            ])
+        )
 
         let resolved = try await resolve(property)
 
@@ -45,13 +47,15 @@ struct HeaderGroupTests {
 
     @Test
     func headerGroupWithMultipleHeaders() async throws {
-        let property = TestProperty(HeaderGroup {
-            CacheHeader()
-                .public(true)
-            AcceptHeader(.json)
-            OriginHeader("127.0.0.1:8080")
-            CustomHeader(name: "xxx-api-key", value: "password")
-        })
+        let property = TestProperty(
+            HeaderGroup {
+                CacheHeader()
+                    .public(true)
+                AcceptHeader(.json)
+                OriginHeader("127.0.0.1:8080")
+                CustomHeader(name: "xxx-api-key", value: "password")
+            }
+        )
 
         let resolved = try await resolve(property)
 
@@ -79,18 +83,20 @@ struct HeaderGroupTests {
             .json,
             .pdf,
             .gif,
-            .html
+            .html,
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            HeaderGroup {
-                AcceptHeader(.json)
-                AcceptHeader(.pdf)
-                AcceptHeader(.gif)
-                AcceptHeader(.html)
+        let resolved = try await resolve(
+            TestProperty {
+                HeaderGroup {
+                    AcceptHeader(.json)
+                    AcceptHeader(.pdf)
+                    AcceptHeader(.gif)
+                    AcceptHeader(.html)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
@@ -105,19 +111,21 @@ struct HeaderGroupTests {
             .json,
             .pdf,
             .gif,
-            .html
+            .html,
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            HeaderGroup {
-                AcceptHeader(.json)
-                AcceptHeader(.pdf)
-                AcceptHeader(.gif)
-                AcceptHeader(.html)
+        let resolved = try await resolve(
+            TestProperty {
+                HeaderGroup {
+                    AcceptHeader(.json)
+                    AcceptHeader(.pdf)
+                    AcceptHeader(.gif)
+                    AcceptHeader(.html)
+                }
+                .headerStrategy(.setting)
             }
-            .headerStrategy(.setting)
-        })
+        )
 
         // Then
         #expect(

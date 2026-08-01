@@ -1,10 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import AsyncHTTPClient
 import Logging
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 extension Internals {
 
@@ -44,23 +49,32 @@ extension Internals {
                         return .task(cachedSessionTask)
                     }
                 } else if case .useCachedDataOnly = requestConfiguration.cacheStrategy {
-                    logger?.log(level: .warning, "No cached data available, but strategy is 'useCachedDataOnly' — returning error")
-                    return .task(SessionTask(Internals.AsyncResponse(
-                        logger: logger,
-                        uploadingBytes: .zero,
-                        upload: .empty(),
-                        head: .throwing(EmptyCachedDataError()),
-                        download: .empty()
-                    )))
+                    logger?.log(
+                        level: .warning,
+                        "No cached data available, but strategy is 'useCachedDataOnly' — returning error"
+                    )
+                    return .task(
+                        SessionTask(
+                            Internals.AsyncResponse(
+                                logger: logger,
+                                uploadingBytes: .zero,
+                                upload: .empty(),
+                                head: .throwing(EmptyCachedDataError()),
+                                download: .empty()
+                            )
+                        )
+                    )
                 }
             } else {
                 logger?.log(level: .info, "Cache ignored by strategy: ignoreCachedData")
             }
 
-            return .cache(try? await cacheIfNeeded(
-                dataCache: dataCache,
-                requestConfiguration: requestConfiguration
-            ))
+            return .cache(
+                try? await cacheIfNeeded(
+                    dataCache: dataCache,
+                    requestConfiguration: requestConfiguration
+                )
+            )
         }
 
         // MARK: - Private methods
@@ -84,24 +98,29 @@ extension Internals {
             case .ignoreCachedData:
                 return nil
             case .useCachedDataOnly:
-                return makeCachedSession(cachedData) ?? {
-                    SessionTask(AsyncResponse(
-                        logger: logger,
-                        uploadingBytes: .zero,
-                        upload: .empty(),
-                        head: .throwing(EmptyCachedDataError()),
-                        download: .empty()
-                    ))
-                }()
+                return makeCachedSession(cachedData)
+                    ?? {
+                        SessionTask(
+                            AsyncResponse(
+                                logger: logger,
+                                uploadingBytes: .zero,
+                                upload: .empty(),
+                                head: .throwing(EmptyCachedDataError()),
+                                download: .empty()
+                            )
+                        )
+                    }()
             case .returnCachedDataElseLoad:
                 return makeCachedSession(cachedData)
             case .reloadAndValidateCachedData:
-                guard let cachedData = await validateCachedData(
-                    client: client,
-                    dataCache: dataCache,
-                    cached: cachedData,
-                    requestConfiguration: requestConfiguration
-                ) else { return nil }
+                guard
+                    let cachedData = await validateCachedData(
+                        client: client,
+                        dataCache: dataCache,
+                        cached: cachedData,
+                        requestConfiguration: requestConfiguration
+                    )
+                else { return nil }
 
                 return makeCachedSession(cachedData)
             }
@@ -144,10 +163,12 @@ extension Internals {
             cached cachedData: CachedData,
             requestConfiguration: RequestConfiguration
         ) async -> CachedData? {
-            guard let headers = await getUpdatedHeadersForCache(
-                client: client,
-                cached: cachedData
-            ) else { return nil }
+            guard
+                let headers = await getUpdatedHeadersForCache(
+                    client: client,
+                    cached: cachedData
+                )
+            else { return nil }
 
             let modifiedHeaders = updateCacheHeaders(
                 cachedData.cachedResponse.response.headers,
@@ -198,10 +219,12 @@ extension Internals {
                 from: cachedData.response.headers["Last-Modified"]
             )
 
-            guard let response = try? await client.execute(
-                request: requestConfiguration.build(),
-                logger: logger
-            ).response() else { return nil }
+            guard
+                let response = try? await client.execute(
+                    request: requestConfiguration.build(),
+                    logger: logger
+                ).response()
+            else { return nil }
 
             if response.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified) — reusing cached data")
@@ -325,14 +348,16 @@ extension Internals {
                     // that its reader is gone.
                     defer { asyncBuffers.close() }
 
-                    guard var cacheBuffer = dataCache.allocateBuffer(
-                        key: requestConfiguration.url,
-                        cachedResponse: .init(
-                            response: head,
-                            policy: requestConfiguration.cachePolicy
-                        ),
-                        contentLength: UInt64(contentLength)
-                    ) else {
+                    guard
+                        var cacheBuffer = dataCache.allocateBuffer(
+                            key: requestConfiguration.url,
+                            cachedResponse: .init(
+                                response: head,
+                                policy: requestConfiguration.cachePolicy
+                            ),
+                            contentLength: UInt64(contentLength)
+                        )
+                    else {
                         logger?.log(
                             level: .warning,
                             "Could not allocate a cache buffer - response will not be cached"
@@ -344,9 +369,13 @@ extension Internals {
                         for try await buffer in asyncBuffers {
                             cacheBuffer.writeBuffer(buffer)
                         }
-                        logger?.log(level: .debug, "Cached response saved", additionalMetadata: [
-                            "size_bytes": .stringConvertible(cacheBuffer.readableBytes)
-                        ])
+                        logger?.log(
+                            level: .debug,
+                            "Cached response saved",
+                            additionalMetadata: [
+                                "size_bytes": .stringConvertible(cacheBuffer.readableBytes)
+                            ]
+                        )
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(error.localizedDescription)")
                         dataCache.remove(forKey: requestConfiguration.url)

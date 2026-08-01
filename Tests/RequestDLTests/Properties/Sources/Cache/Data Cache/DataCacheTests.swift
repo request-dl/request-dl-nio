@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import SwiftAsyncStream
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
@@ -248,7 +254,7 @@ struct DataCacheTests {
         // Given
         let dataCache = testState.dataCache
 
-        let cachedDatas = (0 ..< 3) .map {
+        let cachedDatas = (0..<3).map {
             mockCachedData(
                 url: "https://google.com/\($0)",
                 length: 1_024
@@ -278,7 +284,7 @@ struct DataCacheTests {
         // Given
         let dataCache = testState.dataCache
 
-        let cachedDatas = (0 ..< 3) .map {
+        let cachedDatas = (0..<3).map {
             mockCachedData(
                 url: "https://google.com/\($0)",
                 length: 1_024
@@ -332,7 +338,7 @@ extension DataCacheTests {
             version: .init(minor: 1, major: 2),
             headers: HTTPHeaders([
                 ("Expires", dateFormatter.string(from: expirationDate)),
-                ("ETag", "\(UUID())")
+                ("ETag", "\(UUID())"),
             ]),
             isKeepAlive: false
         )
@@ -354,7 +360,6 @@ extension DataCacheTests {
 
 extension DataCacheTests {
 
-
     @Test
     func accessingAllocateBufferMultipleTimes() async throws {
         let dataCache = DataCache(
@@ -365,7 +370,7 @@ extension DataCacheTests {
         let key = UUID().uuidString
         var locks = [AsyncSignal]()
 
-        for index in 0 ..< 1_000 {
+        for index in 0..<1_000 {
             let lock = AsyncSignal()
             locks.append(lock)
 

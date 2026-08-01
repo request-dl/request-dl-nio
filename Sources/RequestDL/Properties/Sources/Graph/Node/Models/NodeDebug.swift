@@ -1,10 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct NodeDebug {
+
+    // MARK: - Inner types
+
+    private enum Layout {
+        case object
+        case enumCase
+        case collection
+        case tuple
+    }
 
     // MARK: - Private properties
 
@@ -12,24 +19,32 @@ struct NodeDebug {
         [.class, .enum, .struct].contains(mirror.displayStyle)
     }
 
-    private func defaultDebugDescription() -> String {
-        String(describing: object)
-    }
-
-    private var children: [(label: String?, value: Any)] {
-        mirror.children.map {
-            ($0.label, $0.value)
+    private var layout: Layout {
+        switch mirror.displayStyle {
+        case .enum:
+            return .enumCase
+        case .collection, .set, .dictionary:
+            return .collection
+        case .tuple:
+            return .tuple
+        default:
+            return .object
         }
     }
 
     private let object: Any
     private let mirror: Mirror
+    private let children: [(label: String?, value: Any)]
 
     // MARK: - Inits
 
     init(_ object: Any) {
+        let mirror = Mirror(reflecting: object)
+
         self.object = object
-        self.mirror = .init(reflecting: object)
+        self.mirror = mirror
+        // Was a computed property remapping the mirror, read twice per `describe()`.
+        self.children = mirror.children.map { ($0.label, $0.value) }
     }
 
     // MARK: - Internal methods
@@ -40,44 +55,50 @@ struct NodeDebug {
         }
 
         guard !children.isEmpty else {
-            return "\(mirror.displayStyle == .enum ? "." : "")\(defaultDebugDescription())"
+            return "\(mirror.displayStyle == .enum ? "." : "")\(String(describing: object))"
         }
 
         let title = titleFormatted()
         let reducedChildren = reducedChildren()
-        let output = outputFormat()
 
-        if output.contains("\n") {
-            let value = reducedChildren
+        guard layout != .object else {
+            let value =
+                reducedChildren
                 .joined(separator: ",\n")
                 .debug_shiftLines()
 
-            return Self.format(output, title, value)
-        } else {
-            if reducedChildren.contains(where: { $0.contains("\n") }) && mirror.displayStyle != .enum {
-                let values = reducedChildren.joined(separator: ",\n")
-                return Self.format(output, title, "\n\(values.debug_shiftLines())\n")
-            } else {
-                return Self.format(output, title, reducedChildren.joined(separator: ", "))
-            }
+            return format(title, value)
         }
-    }
 
-    // MARK: - Private static methods
+        guard reducedChildren.contains(where: { $0.contains("\n") }), layout != .enumCase else {
+            return format(title, reducedChildren.joined(separator: ", "))
+        }
 
-    private static func format(_ output: String, _ title: String, _ value: String) -> String {
-        reverse(String(
-            format: reverse(output).replacingOccurrences(of: "@%", with: "%@"),
-            reverse(value),
-            reverse(title)
-        ))
-    }
-
-    private static func reverse(_ string: String) -> String {
-        String(string.reversed())
+        let values = reducedChildren.joined(separator: ",\n")
+        return format(title, "\n\(values.debug_shiftLines())\n")
     }
 
     // MARK: - Private methods
+
+    /// Assembles the description from its parts.
+    ///
+    /// This used to reverse the format string, the title and the value, run them through
+    /// `String(format:)`, then reverse the result, purely to get two `%@` in the opposite
+    /// order. Interpolation does that directly, and it drops a dependency on `%@` bridging,
+    /// which is the weakest part of `String(format:)` on the non Darwin platforms this package
+    /// supports.
+    private func format(_ title: String, _ value: String) -> String {
+        switch layout {
+        case .enumCase:
+            return "\(title).\(value)"
+        case .collection:
+            return "[\(value)]"
+        case .tuple:
+            return "(\(value))"
+        case .object:
+            return "\(title) {\n\(value)\n}"
+        }
+    }
 
     private func reducedChildren() -> [String] {
         children.map {
@@ -101,38 +122,23 @@ struct NodeDebug {
                 return "\(value)"
             case .dictionary:
                 return "\(label): \(value)"
-            case .none, .class, .struct, .optional:
-                return "\(label) = \(value)"
             default:
                 return "\(label) = \(value)"
             }
         }
     }
 
-    private func outputFormat() -> String {
-        switch mirror.displayStyle {
-        case .enum:
-            return "%@.%@"
-        case .collection, .set, .dictionary:
-            return "[%@]"
-        case .tuple:
-            return "(%@)"
-        default:
-            return "%@ {\n%@\n}"
-        }
-    }
-
     private func titleFormatted() -> String {
         let title = String(describing: type(of: object))
 
-        switch mirror.displayStyle {
-        case .collection, .set, .dictionary:
+        switch layout {
+        case .collection:
             return title.split(separator: "<")
                 .first
                 .map { "\($0)" } ?? title
         case .tuple:
             return "Tuple"
-        default:
+        case .enumCase, .object:
             return title
         }
     }

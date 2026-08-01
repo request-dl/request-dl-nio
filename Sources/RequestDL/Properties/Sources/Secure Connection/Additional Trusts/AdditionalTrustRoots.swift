@@ -1,13 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import class FoundationEssentials.Bundle
+#else
+import class Foundation.Bundle
+#endif
 
-/**
- A structure representing additional trusts as a property.
- */
-public struct AdditionalTrusts<Content: Property>: Property {
+/// A structure representing additional trust roots as a property.
+public struct AdditionalTrustRoots<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -118,22 +120,26 @@ public struct AdditionalTrusts<Content: Property>: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<AdditionalTrusts<Content>>,
+        property: _GraphValue<AdditionalTrustRoots<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
         switch property.source {
         case .file(let file):
-            return .leaf(SecureConnectionNode(
-                Node(source: .file(file)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .file(file)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .bytes(let bytes):
-            return .leaf(SecureConnectionNode(
-                Node(source: .bytes(bytes)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .bytes(bytes)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .additionalTrust
@@ -143,13 +149,18 @@ public struct AdditionalTrusts<Content: Property>: Property {
                 inputs: inputs
             )
 
-            return .leaf(SecureConnectionNode(
-                Node(source: .nodes(outputs.node
-                    .search(for: SecureConnectionNode.self)
-                    .filter { $0.contains(CertificateNode.self) }
-                )),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(
+                        source: .nodes(
+                            outputs.node
+                                .search(for: SecureConnectionNode.self)
+                                .filter { $0.contains(CertificateNode.self) }
+                        )
+                    ),
+                    logger: inputs.environment.logger
+                )
+            )
         }
     }
 }

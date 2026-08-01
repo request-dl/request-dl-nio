@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct ForEachTests {
@@ -20,12 +20,14 @@ struct ForEachTests {
         }
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            PropertyForEach(paths) { path in
-                Path(path.id)
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                PropertyForEach(paths) { path in
+                    Path(path.id)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
@@ -39,12 +41,14 @@ struct ForEachTests {
         let paths = ["api", "v1", "users"]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            PropertyForEach(paths, id: \.self) { path in
-                Path(path)
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                PropertyForEach(paths, id: \.self) { path in
+                    Path(path)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
@@ -55,15 +59,17 @@ struct ForEachTests {
     @Test
     func forEach_whenRange_shouldBeValid() async throws {
         // Given
-        let range = 0 ..< 3
+        let range = 0..<3
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            PropertyForEach(range) { index in
-                Path("\(index)")
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                PropertyForEach(range) { index in
+                    Path("\(index)")
+                }
             }
-        })
+        )
 
         // Then
         #expect(
@@ -74,15 +80,17 @@ struct ForEachTests {
     @Test
     func forEach_whenClosedRange_shouldBeValid() async throws {
         // Given
-        let range = 0 ... 3
+        let range = 0...3
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            PropertyForEach(range) { index in
-                Path("\(index)")
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                PropertyForEach(range) { index in
+                    Path("\(index)")
+                }
             }
-        })
+        )
 
         // Then
         #expect(

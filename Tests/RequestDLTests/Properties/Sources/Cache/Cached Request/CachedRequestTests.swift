@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 @Suite(.serialized)
 struct CachedRequestTests {
@@ -102,7 +108,7 @@ struct CachedRequestTests {
         // When
         do {
             _ = try await performCacheRequest(
-            testState: testState,
+                testState: testState,
                 headers: makeHeaders(),
                 cacheStrategy: .useCachedDataOnly
             )
@@ -155,7 +161,7 @@ struct CachedRequestTests {
 
         do {
             _ = try await performCacheRequest(
-            testState: testState,
+                testState: testState,
                 headers: makeHeaders(),
                 cacheStrategy: .useCachedDataOnly
             )
@@ -208,7 +214,7 @@ struct CachedRequestTests {
 
         do {
             _ = try await performCacheRequest(
-            testState: testState,
+                testState: testState,
                 headers: makeHeaders(),
                 cacheStrategy: .useCachedDataOnly
             )
@@ -356,9 +362,11 @@ extension CachedRequestTests {
                 url: URL(string: "https://localhost:8888"),
                 status: .init(code: 200, reason: "Ok"),
                 version: .init(minor: 1, major: 2),
-                headers: HTTPHeaders(headers + [
-                    ("Content-Length", String(data?.count ?? .zero))
-                ]),
+                headers: HTTPHeaders(
+                    headers + [
+                        ("Content-Length", String(data?.count ?? .zero))
+                    ]
+                ),
                 isKeepAlive: false
             ),
             policy: .all,
@@ -417,7 +425,7 @@ extension CachedRequestTests {
                 .cache(url: testState.dataCache.directoryURL)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(testState.certificate.certificateURL.absolutePath(percentEncoded: false))
                 }
             }

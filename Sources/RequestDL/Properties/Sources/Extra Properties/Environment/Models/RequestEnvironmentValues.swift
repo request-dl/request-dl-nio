@@ -1,15 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 import Logging
 
-/**
- ``RequestEnvironmentValues`` is a type that contains all of the environment values
- for a property hierarchy. It is accessible via a subscript on a property's ``PropertyEnvironment`` wrapper.
- */
+/// ``RequestEnvironmentValues`` is a type that contains all of the environment values
+/// for a property hierarchy. It is accessible via a subscript on a property's ``PropertyEnvironment`` wrapper.
 public struct RequestEnvironmentValues: Sendable {
 
     fileprivate struct Entry: Sendable, CustomDebugStringConvertible {
@@ -71,6 +67,3 @@ extension RequestEnvironmentValues: CustomDebugStringConvertible {
         return "\(type(of: self))(\n\t" + entryStrings.joined(separator: ",\n\t") + "\n)"
     }
 }
-
-@available(*, deprecated, renamed: "RequestEnvironmentValues")
-public typealias PropertyEnvironmentValues = RequestEnvironmentValues

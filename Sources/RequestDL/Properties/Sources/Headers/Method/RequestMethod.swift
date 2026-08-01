@@ -1,22 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- Defines the HTTP request method.
-
- Use `RequestMethod` to specify the HTTP request method when creating requests.
-
- ```swift
- DataTask {
-     BaseURL("ecommerce.com")
-     Path("products")
-     RequestMethod(.get)
- }
- ```
- */
+/// Defines the HTTP request method.
+///
+/// Use `RequestMethod` to specify the HTTP request method when creating requests.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("ecommerce.com")
+///     Path("products")
+///     RequestMethod(.get)
+/// }
+/// ```
 public struct RequestMethod: Property {
 
     private struct Node: PropertyNode {
@@ -66,8 +62,10 @@ public struct RequestMethod: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            httpMethod: property.httpMethod.rawValue
-        ))
+        return .leaf(
+            Node(
+                httpMethod: property.httpMethod.rawValue
+            )
+        )
     }
 }

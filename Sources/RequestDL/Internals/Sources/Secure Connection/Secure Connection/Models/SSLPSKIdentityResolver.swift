@@ -1,16 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOSSL
 
-/**
- A protocol for resolving pre-shared key client identities.
-
- ``SSLPSKIdentityResolver`` defines a function that can be used to resolve
- a pre-shared key client identity based on a given hint.
- */
+/// A protocol for resolving pre-shared key client identities.
+///
+/// ``SSLPSKIdentityResolver`` defines a function that can be used to resolve
+/// a pre-shared key client identity based on a given hint.
 public protocol SSLPSKIdentityResolver: Sendable, AnyObject {
 
     /**

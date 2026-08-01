@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 struct FlexibleURLNode: PropertyNode {
 
@@ -66,9 +70,9 @@ struct FlexibleURLNode: PropertyNode {
     }
 }
 
-private extension FlexibleURLNode {
+extension FlexibleURLNode {
 
-    func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
+    fileprivate func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
         guard !host.isEmpty else {
             throw FlexibleURLError(context: .invalidHost, url: url)
         }
@@ -82,7 +86,7 @@ private extension FlexibleURLNode {
         return "\(scheme)://\(fullHost)"
     }
 
-    func pathComponents(from components: URLComponents) -> [String] {
+    fileprivate func pathComponents(from components: URLComponents) -> [String] {
         var splitComponents = Array(
             components.path
                 .split(separator: "/")
@@ -102,8 +106,8 @@ private extension FlexibleURLNode {
         return splitComponents
     }
 
-    func queries(from components: URLComponents) -> [QueryItem] {
-        return components.queryItems?.compactMap { item in
+    fileprivate func queries(from components: URLComponents) -> [QueryItem] {
+        components.queryItems?.compactMap { item in
             QueryItem(name: item.name, value: item.value ?? "")
         } ?? []
     }

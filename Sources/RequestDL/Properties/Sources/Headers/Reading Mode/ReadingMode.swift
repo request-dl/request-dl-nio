@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Data
+#else
+import struct Foundation.Data
+#endif
 
 /// A struct representing the reading mode used for reading data.
 public struct ReadingMode: Property {

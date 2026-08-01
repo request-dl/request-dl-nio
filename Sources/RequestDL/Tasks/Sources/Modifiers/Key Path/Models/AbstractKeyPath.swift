@@ -1,16 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A type that enables dynamic member lookup of String values.
-
- AbstractKeyPath is a struct that conforms to the @dynamicMemberLookup, allowing
- dynamic member lookup of String values. It can be used as a base type for defining
- custom dynamic key paths in Swift.
- */
+/// A type that enables dynamic member lookup of String values.
+///
+/// AbstractKeyPath is a struct that conforms to the @dynamicMemberLookup, allowing
+/// dynamic member lookup of String values. It can be used as a base type for defining
+/// custom dynamic key paths in Swift.
 @dynamicMemberLookup
 public struct AbstractKeyPath {
 

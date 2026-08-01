@@ -1,26 +1,22 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A type that represents an asynchronous property specification.
-
- ```swift
- DataTask {
-     BaseURL("example.com")
-     Path("api/users")
-     RequestMethod(.get)
-
-     AsyncProperty {
-         if let id = try await getCurrentUserID() {
-             Path("\(id)")
-         }
-     }
- }
- ```
- */
+/// A type that represents an asynchronous property specification.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("example.com")
+///     Path("api/users")
+///     RequestMethod(.get)
+///
+///     AsyncProperty {
+///         if let id = try await getCurrentUserID() {
+///             Path("\(id)")
+///         }
+///     }
+/// }
+/// ```
 public struct AsyncProperty<Content: Property>: Property {
 
     // MARK: - Public properties

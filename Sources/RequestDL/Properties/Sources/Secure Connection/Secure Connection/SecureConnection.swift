@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 
 /// Represents a secure connection with various configuration options.
@@ -61,10 +60,12 @@ public struct SecureConnection<Content: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(Node(
-            secureConnection: property.secureConnection,
-            nodes: outputs.node.search(for: SecureConnectionNode.self)
-        ))
+        return .leaf(
+            Node(
+                secureConnection: property.secureConnection,
+                nodes: outputs.node.search(for: SecureConnectionNode.self)
+            )
+        )
     }
 
     // MARK: - Public methods

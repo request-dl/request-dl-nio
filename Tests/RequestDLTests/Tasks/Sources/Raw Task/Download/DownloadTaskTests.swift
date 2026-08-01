@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct DownloadTaskTests {
 
@@ -32,7 +38,7 @@ struct DownloadTaskTests {
             Path(uri)
 
             SecureConnection {
-                Trusts(certificate.certificateURL.absolutePath(percentEncoded: false))
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
         }
         .collectData()

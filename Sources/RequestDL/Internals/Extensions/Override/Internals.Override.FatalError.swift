@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Internals.Override {
 
@@ -16,7 +14,10 @@ extension Internals.Override {
             Swift.fatalError($0, file: $1, line: $2)
         }
 
-        static func replace<T: Sendable>(with closure: @escaping Closure, perform: @Sendable () async throws -> T) async rethrows -> T {
+        static func replace<T: Sendable>(
+            with closure: @escaping Closure,
+            perform: @Sendable () async throws -> T
+        ) async rethrows -> T {
             try await $closure.withValue(closure, operation: perform)
         }
 
@@ -43,14 +44,13 @@ extension Internals.Override {
     }
 }
 
-
 extension Internals {
 
     static func preconditionFailure(_ message: String, file: StaticString = #file, line: UInt = #line) -> Never {
         #if DEBUG
         Internals.Override.fatalError("🐞 RequestDL bug: \(message)", file: file, line: line)
         #else
-        Internals.Override.fatalError("RequestDL internal error", file: file, line: line)
+        Internals.Override.fatalError(message, file: file, line: line)
         #endif
     }
 }

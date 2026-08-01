@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct QueryGroupTests {
 
@@ -17,18 +23,20 @@ struct QueryGroupTests {
         }
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            property
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                property
+            }
+        )
 
         // Then
         #expect(
             resolved.requestConfiguration.url == """
-            https://127.0.0.1?\
-            number=123&\
-            page=1
-            """
+                https://127.0.0.1?\
+                number=123&\
+                page=1
+                """
         )
     }
 
@@ -42,18 +50,20 @@ struct QueryGroupTests {
         }
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            property
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                property
+            }
+        )
 
         // Then
         #expect(
             resolved.requestConfiguration.url == """
-            https://127.0.0.1?\
-            number=123&\
-            page=1
-            """
+                https://127.0.0.1?\
+                number=123&\
+                page=1
+                """
         )
 
         #expect(resolved.requestConfiguration.headers["api_key"] == nil)
@@ -64,16 +74,19 @@ struct QueryGroupTests {
         // Given
         let queries = [
             "number": 123,
-            "page": 1
+            "page": 1,
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            QueryGroup(queries)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                QueryGroup(queries)
+            }
+        )
 
-        let queryItems = URL(string: resolved.requestConfiguration.url)
+        let queryItems =
+            URL(string: resolved.requestConfiguration.url)
             .flatMap {
                 URLComponents(url: $0, resolvingAgainstBaseURL: true)
             }
@@ -81,18 +94,22 @@ struct QueryGroupTests {
 
         // Then
         #expect(queryItems.count == 2)
-        #expect(queryItems.contains(
-            URLQueryItem(
-                name: "number",
-                value: "123"
+        #expect(
+            queryItems.contains(
+                URLQueryItem(
+                    name: "number",
+                    value: "123"
+                )
             )
-        ))
-        #expect(queryItems.contains(
-            URLQueryItem(
-                name: "page",
-                value: "1"
+        )
+        #expect(
+            queryItems.contains(
+                URLQueryItem(
+                    name: "page",
+                    value: "1"
+                )
             )
-        ))
+        )
     }
 
     @Test

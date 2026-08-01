@@ -1,11 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 @testable import RequestDL
 
-extension Array<UInt8> {
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+extension [UInt8] {
 
     func split(by size: Int) -> [Data] {
         var buffer = Internals.DataBuffer(self)

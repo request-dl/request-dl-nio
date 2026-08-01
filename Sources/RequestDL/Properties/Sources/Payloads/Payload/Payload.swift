@@ -1,53 +1,55 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
-/**
- A representation of the HTTP body data in a request.
-
- A `Payload` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw
- `Data`.
-
- The body data is used in HTTP requests with the purpose of carrying information. When making a HTTP request,
- the request body is used to send information to the server. The server reads the information and acts upon it, for
- example, by returning a specific response or by modifying its behavior.
-
- To create a `Payload`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
-
- ```swift
- let bodyDict = ["name": "John", "age": 28]
-
- DataTask {
-     BaseURL("apple.com")
-     RequestMethod(.post)
-     Payload(bodyDict)
- }
- ```
-
- ## Topics
-
- ### Sending raw bytes
-
- - ``RequestDL/Payload/init(data:contentType:)``
-
- ### Sending verbatim texts
-
- - ``RequestDL/Payload/init(verbatim:contentType:)``
-
- ### Sending files
-
- - ``RequestDL/Payload/init(url:contentType:)``
-
- ### Sending Encodable
-
- - ``RequestDL/Payload/init(_:encoder:contentType:)``
-
- ### Sending JSON objects
-
- - ``RequestDL/Payload/init(_:options:contentType:)``
- */
+/// A representation of the HTTP body data in a request.
+///
+/// A `Payload` can be initialized with various types of data: a dictionary, an encodable value, a string, or a raw
+/// `Data`.
+///
+/// The body data is used in HTTP requests with the purpose of carrying information. When making a HTTP request,
+/// the request body is used to send information to the server. The server reads the information and acts upon it, for
+/// example, by returning a specific response or by modifying its behavior.
+///
+/// To create a `Payload`, initialize an instance with a dictionary, an encodable value, a string, or a raw `Data.
+///
+/// ```swift
+/// let bodyDict = ["name": "John", "age": 28]
+///
+/// DataTask {
+///     BaseURL("apple.com")
+///     RequestMethod(.post)
+///     Payload(bodyDict)
+/// }
+/// ```
+///
+/// ## Topics
+///
+/// ### Sending raw bytes
+///
+/// - ``RequestDL/Payload/init(data:contentType:)``
+///
+/// ### Sending verbatim texts
+///
+/// - ``RequestDL/Payload/init(verbatim:contentType:)``
+///
+/// ### Sending files
+///
+/// - ``RequestDL/Payload/init(url:contentType:)``
+///
+/// ### Sending Encodable
+///
+/// - ``RequestDL/Payload/init(_:encoder:contentType:)``
+///
+/// ### Sending JSON objects
+///
+/// - ``RequestDL/Payload/init(_:options:contentType:)``
 public struct Payload: Property {
 
     // MARK: - Public properties
@@ -163,11 +165,13 @@ public struct Payload: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        return .leaf(PayloadNode(
-            factory: property.factory,
-            charset: inputs.environment.charset,
-            urlEncoder: inputs.environment.urlEncoder,
-            chunkSize: inputs.environment.payloadChunkSize
-        ))
+        return .leaf(
+            PayloadNode(
+                factory: property.factory,
+                charset: inputs.environment.charset,
+                urlEncoder: inputs.environment.urlEncoder,
+                chunkSize: inputs.environment.payloadChunkSize
+            )
+        )
     }
 }

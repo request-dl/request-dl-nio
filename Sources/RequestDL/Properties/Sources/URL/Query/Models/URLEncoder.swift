@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import SwiftAsyncStream
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 /// A class that encodes values into query items for use in URL requests.
 public final class URLEncoder: @unchecked Sendable {
@@ -246,10 +251,12 @@ public final class URLEncoder: @unchecked Sendable {
         value: Date,
         in items: inout [QueryItem]
     ) throws {
-        guard let queryItem = try encodeToQuery(
-            key: encoder(key, for: _keyEncodingStrategy),
-            value: encoder(value, for: _dateEncodingStrategy)
-        ) else { return }
+        guard
+            let queryItem = try encodeToQuery(
+                key: encoder(key, for: _keyEncodingStrategy),
+                value: encoder(value, for: _dateEncodingStrategy)
+            )
+        else { return }
 
         items.append(queryItem)
     }
@@ -259,10 +266,12 @@ public final class URLEncoder: @unchecked Sendable {
         value: Bool,
         in items: inout [QueryItem]
     ) throws {
-        guard let queryItem = try encodeToQuery(
-            key: encoder(key, for: _keyEncodingStrategy),
-            value: encoder(value, for: _boolEncodingStrategy)
-        ) else { return }
+        guard
+            let queryItem = try encodeToQuery(
+                key: encoder(key, for: _keyEncodingStrategy),
+                value: encoder(value, for: _boolEncodingStrategy)
+            )
+        else { return }
 
         items.append(queryItem)
     }
@@ -272,10 +281,12 @@ public final class URLEncoder: @unchecked Sendable {
         value: Data,
         in items: inout [QueryItem]
     ) throws {
-        guard let queryItem = try encodeToQuery(
-            key: encoder(key, for: _keyEncodingStrategy),
-            value: encoder(value, for: _dataEncodingStrategy)
-        ) else { return }
+        guard
+            let queryItem = try encodeToQuery(
+                key: encoder(key, for: _keyEncodingStrategy),
+                value: encoder(value, for: _dataEncodingStrategy)
+            )
+        else { return }
 
         items.append(queryItem)
     }
@@ -289,10 +300,12 @@ public final class URLEncoder: @unchecked Sendable {
         case .some(let value):
             try items.append(contentsOf: _recursiveEncode(value, forKey: key))
         case .none:
-            guard let queryItem = try encodeToQuery(
-                key: encoder(key, for: _keyEncodingStrategy),
-                value: encoder(for: _optionalEncodingStrategy)
-            ) else { return }
+            guard
+                let queryItem = try encodeToQuery(
+                    key: encoder(key, for: _keyEncodingStrategy),
+                    value: encoder(for: _optionalEncodingStrategy)
+                )
+            else { return }
 
             items.append(queryItem)
         }
@@ -306,10 +319,12 @@ public final class URLEncoder: @unchecked Sendable {
         let keyEncoder = try encoder(key, for: _keyEncodingStrategy)
 
         if let key = try keyEncoder.getKey() {
-            items.append(.init(
-                name: key,
-                value: "\(value)"
-            ))
+            items.append(
+                .init(
+                    name: key,
+                    value: "\(value)"
+                )
+            )
         }
     }
 }

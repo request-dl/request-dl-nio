@@ -1,10 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import SwiftAsyncStream
+import Testing
+
 @testable import RequestDL
 
 struct InterceptedRequestTaskTests {
@@ -28,10 +28,12 @@ struct InterceptedRequestTaskTests {
         _ = try await MockedTask {
             BaseURL("localhost")
         }
-        .interceptor(Intercepted {
-            taskIntercepted.wrappedValue = true
-            expectation.signal()
-        })
+        .interceptor(
+            Intercepted {
+                taskIntercepted.wrappedValue = true
+                expectation.signal()
+            }
+        )
         .result()
 
         // Then

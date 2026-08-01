@@ -1,17 +1,23 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct GroupTaskTests {
 
     @Test
     func groupTask() async throws {
         // Given
-        let items = Array(0 ..< 10)
+        let items = Array(0..<10)
 
         // When
         let result = try await GroupTask(items) { index in
@@ -25,13 +31,15 @@ struct GroupTaskTests {
 
         // Then
         #expect(result.keys.count == items.count)
-        #expect(items.allSatisfy {
-            switch result[$0] {
-            case .failure, .none:
-                return false
-            case .success(let result):
-                return result.payload == Data("\($0)".utf8)
+        #expect(
+            items.allSatisfy {
+                switch result[$0] {
+                case .failure, .none:
+                    return false
+                case .success(let result):
+                    return result.payload == Data("\($0)".utf8)
+                }
             }
-        })
+        )
     }
 }

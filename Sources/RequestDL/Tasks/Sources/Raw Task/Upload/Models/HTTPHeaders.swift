@@ -2,9 +2,8 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
-import NIOHTTP1
 import Logging
+import NIOHTTP1
 
 /// Provides methods and properties for HTTP headers.
 public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByDictionaryLiteral {

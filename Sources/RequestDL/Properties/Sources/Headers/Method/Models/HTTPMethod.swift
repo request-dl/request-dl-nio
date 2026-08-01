@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// HTTP methods for making requests.
 public struct HTTPMethod: Sendable, Hashable {

@@ -1,12 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
+
 @testable import RequestDL
 
-extension Array<ByteBuffer> {
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+extension [ByteBuffer] {
 
     func resolveData() -> [Data] {
         compactMap {

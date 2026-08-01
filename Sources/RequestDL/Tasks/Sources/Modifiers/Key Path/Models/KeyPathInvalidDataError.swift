@@ -1,13 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import protocol FoundationEssentials.LocalizedError
+#else
+import protocol Foundation.LocalizedError
+#endif
 
-/**
- A error type representing a validation error due to a unexpected `RequestTask` result data.
- Conforms to the `TaskError` protocol.
- */
+/// A error type representing a validation error due to a unexpected `RequestTask` result data.
+/// Conforms to the `TaskError` protocol.
 public struct KeyPathInvalidDataError: TaskError, LocalizedError {
 
     public var errorDescription: String? {

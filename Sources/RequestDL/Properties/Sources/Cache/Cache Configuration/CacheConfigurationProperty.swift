@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.URL
+#else
+import struct Foundation.URL
+#endif
 
 private struct CacheConfigurationProperty: Property {
 
@@ -36,11 +40,13 @@ private struct CacheConfigurationProperty: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            memoryCapacity: property.memoryCapacity,
-            diskCapacity: property.diskCapacity,
-            directory: property.directory
-        ))
+        return .leaf(
+            Node(
+                memoryCapacity: property.memoryCapacity,
+                diskCapacity: property.diskCapacity,
+                directory: property.directory
+            )
+        )
     }
 }
 

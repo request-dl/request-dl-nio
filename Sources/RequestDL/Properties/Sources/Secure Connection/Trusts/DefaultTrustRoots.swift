@@ -1,13 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A structure that represents default trusts.
- */
-public struct DefaultTrusts: Property {
+/// A structure that represents default trust roots.
+public struct DefaultTrustRoots: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
@@ -35,7 +31,7 @@ public struct DefaultTrusts: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<DefaultTrusts>,
+        property: _GraphValue<DefaultTrustRoots>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()

@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import SwiftAsyncStream
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct ModifiersProgressTests {
 
@@ -115,7 +121,7 @@ struct ModifiersProgressTests {
             Payload(data: data)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -151,7 +157,7 @@ struct ModifiersProgressTests {
             Path(testState.uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -207,7 +213,7 @@ struct ModifiersProgressTests {
             Path(testState.uri)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -262,7 +268,7 @@ struct ModifiersProgressTests {
             ReadingMode(length: length)
 
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -283,11 +289,12 @@ struct ModifiersProgressTests {
         #expect(progressMonitor.download.totalSize == receivedData.count)
 
         #expect(
-            progressMonitor.upload.uploadedBytes == stride(
-                from: .zero,
-                to: data.count,
-                by: 64
-            ).map { _ in 64 }
+            progressMonitor.upload.uploadedBytes
+                == stride(
+                    from: .zero,
+                    to: data.count,
+                    by: 64
+                ).map { _ in 64 }
         )
 
         let completeParts = progressMonitor.download.receivedData.dropLast()

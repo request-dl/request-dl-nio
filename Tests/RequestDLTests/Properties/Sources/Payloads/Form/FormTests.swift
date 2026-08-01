@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct FormTests {
 
@@ -17,12 +23,14 @@ struct FormTests {
         let data = Data.randomData(length: 1_024)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                data: data
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -40,16 +48,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -60,13 +70,15 @@ struct FormTests {
         let data = Data.randomData(length: 1_024)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                data: data
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    data: data
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -84,16 +96,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -104,22 +118,24 @@ struct FormTests {
         let data = Data.randomData(length: 1_024)
         let headers = [
             ("Accept-Language", "en-US"),
-            ("Content-Encoding", "gzip")
+            ("Content-Encoding", "gzip"),
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                data: data,
-                headers: {
-                    PropertyForEach(headers, id: \.0) {
-                        CustomHeader(name: $0, value: $1)
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    data: data,
+                    headers: {
+                        PropertyForEach(headers, id: \.0) {
+                            CustomHeader(name: $0, value: $1)
+                        }
                     }
-                }
-            )
-        })
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -137,16 +153,20 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
-                ] + headers),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders(
+                        [
+                            ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                            ("Content-Type", "application/octet-stream"),
+                            ("Content-Length", String(data.count)),
+                        ] + headers
+                    ),
+                    contents: data
+                )
+            ]
+        )
     }
 
     // MARK: - Init with URL
@@ -167,13 +187,15 @@ struct FormTests {
         try data.write(to: url)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                contentType: .pdf,
-                url: url
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    contentType: .pdf,
+                    url: url
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -191,16 +213,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(url.lastPathComponent)\""),
-                    ("Content-Type", "application/pdf"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(url.lastPathComponent)\""),
+                        ("Content-Type", "application/pdf"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -220,39 +244,47 @@ struct FormTests {
         try data.write(to: url)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: .pdf,
-                url: url
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: .pdf,
+                    url: url
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(
-                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
-            )]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(
+                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                )
+            ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "application/pdf"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                        ("Content-Type", "application/pdf"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
 
     }
 
@@ -263,7 +295,7 @@ struct FormTests {
         let data = Data.randomData(length: 1_024)
         let headers = [
             ("Accept-Language", "en-US"),
-            ("Content-Encoding", "gzip")
+            ("Content-Encoding", "gzip"),
         ]
 
         let url = FileManager.default.temporaryDirectory
@@ -276,43 +308,56 @@ struct FormTests {
         try data.write(to: url)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                contentType: .pdf,
-                url: url,
-                headers: {
-                    PropertyForEach(headers, id: \.0) {
-                        CustomHeader(name: $0, value: $1)
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    contentType: .pdf,
+                    url: url,
+                    headers: {
+                        PropertyForEach(headers, id: \.0) {
+                            CustomHeader(name: $0, value: $1)
+                        }
                     }
-                }
-            )
-        })
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(
-                parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
-            )]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(
+                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                )
+            ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(url.lastPathComponent)\""),
-                    ("Content-Type", "application/pdf"),
-                    ("Content-Length", String(data.count))
-                ] + headers),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders(
+                        [
+                            (
+                                "Content-Disposition",
+                                "form-data; name=\"\(name)\"; filename=\"\(url.lastPathComponent)\""
+                            ),
+                            ("Content-Type", "application/pdf"),
+                            ("Content-Length", String(data.count)),
+                        ] + headers
+                    ),
+                    contents: data
+                )
+            ]
+        )
     }
 
     // MARK: - Init with String
@@ -324,19 +369,23 @@ struct FormTests {
         let verbatim = "Hello world!"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                verbatim: verbatim
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    verbatim: verbatim
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -345,16 +394,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "text/plain; charset=UTF-8"),
-                    ("Content-Length", String(verbatim.utf8.count))
-                ]),
-                contents: Data(verbatim.utf8)
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "text/plain; charset=UTF-8"),
+                        ("Content-Length", String(verbatim.utf8.count)),
+                    ]),
+                    contents: Data(verbatim.utf8)
+                )
+            ]
+        )
     }
 
     @Test
@@ -364,13 +415,15 @@ struct FormTests {
         let verbatim = "Hello world!"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                verbatim: verbatim
-            )
-            .charset(.utf16)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    verbatim: verbatim
+                )
+                .charset(.utf16)
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -381,23 +434,29 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "text/plain; charset=UTF-16"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "text/plain; charset=UTF-16"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -408,20 +467,24 @@ struct FormTests {
         let verbatim = "Hello world!"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                verbatim: verbatim
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    verbatim: verbatim
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -430,16 +493,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", "text/plain; charset=UTF-8"),
-                    ("Content-Length", String(verbatim.utf8.count))
-                ]),
-                contents: Data(verbatim.utf8)
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                        ("Content-Type", "text/plain; charset=UTF-8"),
+                        ("Content-Length", String(verbatim.utf8.count)),
+                    ]),
+                    contents: Data(verbatim.utf8)
+                )
+            ]
+        )
     }
 
     @Test
@@ -449,28 +514,32 @@ struct FormTests {
         let verbatim = "Hello world!"
         let headers = [
             ("Accept-Language", "en-US"),
-            ("Content-Encoding", "gzip")
+            ("Content-Encoding", "gzip"),
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                verbatim: verbatim,
-                headers: {
-                    PropertyForEach(headers, id: \.0) {
-                        CustomHeader(name: $0, value: $1)
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    verbatim: verbatim,
+                    headers: {
+                        PropertyForEach(headers, id: \.0) {
+                            CustomHeader(name: $0, value: $1)
+                        }
                     }
-                }
-            )
-        })
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -479,16 +548,20 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "text/plain; charset=UTF-8"),
-                    ("Content-Length", String(verbatim.utf8.count))
-                ] + headers),
-                contents: Data(verbatim.utf8)
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders(
+                        [
+                            ("Content-Disposition", "form-data; name=\"\(name)\""),
+                            ("Content-Type", "text/plain; charset=UTF-8"),
+                            ("Content-Length", String(verbatim.utf8.count)),
+                        ] + headers
+                    ),
+                    contents: Data(verbatim.utf8)
+                )
+            ]
+        )
     }
 
     // MARK: - Init with Encodable
@@ -509,13 +582,15 @@ struct FormTests {
         decoder.dateDecodingStrategy = .iso8601
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                value: mock,
-                encoder: encoder
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    value: mock,
+                    encoder: encoder
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -524,20 +599,26 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\""),
-                ("Content-Type", "application/json"),
-                ("Content-Length", String(data.count))
-            ])
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\""),
+                    ("Content-Type", "application/json"),
+                    ("Content-Length", String(data.count)),
+                ])
+            ]
+        )
 
         #expect(
             try parsed.items.map {
@@ -564,15 +645,17 @@ struct FormTests {
         decoder.dateDecodingStrategy = .iso8601
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: contentType,
-                value: mock,
-                encoder: encoder
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: contentType,
+                    value: mock,
+                    encoder: encoder
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -581,20 +664,26 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                ("Content-Type", String(contentType)),
-                ("Content-Length", String(data.count))
-            ])
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                    ("Content-Type", String(contentType)),
+                    ("Content-Length", String(data.count)),
+                ])
+            ]
+        )
 
         #expect(
             try parsed.items.map {
@@ -613,7 +702,7 @@ struct FormTests {
         )
         let headers = [
             ("Accept-Language", "en-US"),
-            ("Content-Encoding", "gzip")
+            ("Content-Encoding", "gzip"),
         ]
 
         let encoder = JSONEncoder()
@@ -623,18 +712,20 @@ struct FormTests {
         decoder.dateDecodingStrategy = .iso8601
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                value: mock,
-                encoder: encoder,
-                headers: {
-                    PropertyForEach(headers, id: \.0) {
-                        CustomHeader(name: $0, value: $1)
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    value: mock,
+                    encoder: encoder,
+                    headers: {
+                        PropertyForEach(headers, id: \.0) {
+                            CustomHeader(name: $0, value: $1)
+                        }
                     }
-                }
-            )
-        })
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -643,20 +734,28 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\""),
-                ("Content-Type", "application/json"),
-                ("Content-Length", String(data.count))
-            ] + headers)
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders(
+                    [
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/json"),
+                        ("Content-Length", String(data.count)),
+                    ] + headers
+                )
+            ]
+        )
 
         #expect(
             try parsed.items.map {
@@ -678,15 +777,17 @@ struct FormTests {
         let encoder = JSONEncoder()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: .formURLEncoded,
-                value: mock,
-                encoder: encoder
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: .formURLEncoded,
+                    value: mock,
+                    encoder: encoder
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -696,7 +797,8 @@ struct FormTests {
 
         let dictionary = try #require(json as? [AnyHashable: Any])
 
-        let queries = try dictionary
+        let queries =
+            try dictionary
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
             }
@@ -707,20 +809,26 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Length"] == [String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))]
+            resolved.requestConfiguration.headers["Content-Length"] == [
+                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+            ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
-                ("Content-Length", String(data.count))
-            ])
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
+                    ("Content-Length", String(data.count)),
+                ])
+            ]
+        )
 
         #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
@@ -740,16 +848,18 @@ struct FormTests {
         let encoder = JSONEncoder()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: .formURLEncoded,
-                value: mock,
-                encoder: encoder
-            )
-            .charset(.utf16)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: .formURLEncoded,
+                    value: mock,
+                    encoder: encoder
+                )
+                .charset(.utf16)
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -759,7 +869,8 @@ struct FormTests {
 
         let dictionary = try #require(json as? [AnyHashable: Any])
 
-        let queries = try dictionary
+        let queries =
+            try dictionary
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
             }
@@ -772,7 +883,9 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -781,13 +894,15 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
-                ("Content-Length", String(data.count))
-            ])
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
+                    ("Content-Length", String(data.count)),
+                ])
+            ]
+        )
 
         #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
@@ -802,17 +917,19 @@ struct FormTests {
         let name = "_name"
         let jsonObject: [AnyHashable: Any] = [
             "foo": "bar",
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                jsonObject: jsonObject,
-                options: .sortedKeys
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    jsonObject: jsonObject,
+                    options: .sortedKeys
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -824,7 +941,9 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -833,16 +952,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/json"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/json"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -853,19 +974,21 @@ struct FormTests {
         let contentType = ContentType("application/json+request-dl")
         let jsonObject: [AnyHashable: Any] = [
             "foo": "bar",
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: contentType,
-                jsonObject: jsonObject,
-                options: .sortedKeys
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: contentType,
+                    jsonObject: jsonObject,
+                    options: .sortedKeys
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -877,7 +1000,9 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -886,16 +1011,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                    ("Content-Type", String(contentType)),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                        ("Content-Type", String(contentType)),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -904,26 +1031,28 @@ struct FormTests {
         let name = "_name"
         let jsonObject: [AnyHashable: Any] = [
             "foo": "bar",
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
         let headers = [
             ("Accept-Language", "en-US"),
-            ("Content-Encoding", "gzip")
+            ("Content-Encoding", "gzip"),
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                jsonObject: jsonObject,
-                options: .sortedKeys,
-                headers: {
-                    PropertyForEach(headers, id: \.0) {
-                        CustomHeader(name: $0, value: $1)
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    jsonObject: jsonObject,
+                    options: .sortedKeys,
+                    headers: {
+                        PropertyForEach(headers, id: \.0) {
+                            CustomHeader(name: $0, value: $1)
+                        }
                     }
-                }
-            )
-        })
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -935,7 +1064,9 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -944,16 +1075,20 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/json"),
-                    ("Content-Length", String(data.count))
-                ] + headers),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders(
+                        [
+                            ("Content-Disposition", "form-data; name=\"\(name)\""),
+                            ("Content-Type", "application/json"),
+                            ("Content-Length", String(data.count)),
+                        ] + headers
+                    ),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -963,23 +1098,26 @@ struct FormTests {
         let filename = "foo.json"
         let jsonObject: [AnyHashable: Any] = [
             "foo": "bar",
-            "magic_numbers": [0, 1, 2]
+            "magic_numbers": [0, 1, 2],
         ]
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: .formURLEncoded,
-                jsonObject: jsonObject
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: .formURLEncoded,
+                    jsonObject: jsonObject
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
 
-        let queries = try jsonObject
+        let queries =
+            try jsonObject
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
             }
@@ -990,7 +1128,9 @@ struct FormTests {
 
         // Then
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -999,13 +1139,15 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
-                ("Content-Length", String(data.count))
-            ])
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"),
+                    ("Content-Length", String(data.count)),
+                ])
+            ]
+        )
 
         #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
@@ -1025,16 +1167,18 @@ struct FormTests {
         let encoder = JSONEncoder()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                filename: filename,
-                contentType: .formURLEncoded,
-                value: mock,
-                encoder: encoder
-            )
-            .charset(.utf16)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    contentType: .formURLEncoded,
+                    value: mock,
+                    encoder: encoder
+                )
+                .charset(.utf16)
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -1044,7 +1188,8 @@ struct FormTests {
 
         let dictionary = try #require(json as? [AnyHashable: Any])
 
-        let queries = try dictionary
+        let queries =
+            try dictionary
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
             }
@@ -1057,7 +1202,9 @@ struct FormTests {
         #expect(data.count != .zero)
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -1066,13 +1213,15 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items.map(\.headers) == [
-            HTTPHeaders([
-                ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
-                ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
-                ("Content-Length", String(data.count))
-            ])
-        ])
+        #expect(
+            parsed.items.map(\.headers) == [
+                HTTPHeaders([
+                    ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                    ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-16"),
+                    ("Content-Length", String(data.count)),
+                ])
+            ]
+        )
 
         #expect(
             parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
@@ -1089,13 +1238,15 @@ struct FormTests {
         let chunkSize = 64
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                data: data
-            )
-            .payloadChunkSize(chunkSize)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data
+                )
+                .payloadChunkSize(chunkSize)
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -1106,14 +1257,17 @@ struct FormTests {
 
         // Then
         #expect(
-            buffers.compactMap { $0.getData() } == stride(from: .zero, to: totalBytes, by: chunkSize).map {
-                let upperBound = $0 + chunkSize
-                return builtData[$0 ..< (upperBound <= totalBytes ? upperBound : totalBytes)]
-            }
+            buffers.compactMap { $0.getData() }
+                == stride(from: .zero, to: totalBytes, by: chunkSize).map {
+                    let upperBound = $0 + chunkSize
+                    return builtData[$0..<(upperBound <= totalBytes ? upperBound : totalBytes)]
+                }
         )
 
         #expect(
-            resolved.requestConfiguration.headers["Content-Type"] == ["multipart/form-data; boundary=\"\(parsed.boundary)\""]
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "multipart/form-data; boundary=\"\(parsed.boundary)\""
+            ]
         )
 
         #expect(
@@ -1122,16 +1276,18 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -1141,16 +1297,18 @@ struct FormTests {
         let data = Data.randomData(length: 64)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                data: data,
-                headers: {
-                    CustomHeader(name: "Accept-Language", value: "en-US")
-                    CustomHeader(name: "Accept-Language", value: "pt-BR")
-                }
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data,
+                    headers: {
+                        CustomHeader(name: "Accept-Language", value: "en-US")
+                        CustomHeader(name: "Accept-Language", value: "pt-BR")
+                    }
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -1168,18 +1326,20 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count)),
-                    ("Accept-Language", "en-US"),
-                    ("Accept-Language", "pt-BR")
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                        ("Accept-Language", "en-US"),
+                        ("Accept-Language", "pt-BR"),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -1189,17 +1349,19 @@ struct FormTests {
         let data = Data.randomData(length: 64)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                data: data,
-                headers: {
-                    CustomHeader(name: "Accept-Language", value: "en-US")
-                    CustomHeader(name: "Accept-Language", value: "pt-BR")
-                }
-            )
-            .headerStrategy(.setting)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data,
+                    headers: {
+                        CustomHeader(name: "Accept-Language", value: "en-US")
+                        CustomHeader(name: "Accept-Language", value: "pt-BR")
+                    }
+                )
+                .headerStrategy(.setting)
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -1217,17 +1379,19 @@ struct FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count)),
-                    ("Accept-Language", "pt-BR")
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                        ("Accept-Language", "pt-BR"),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 
     @Test
@@ -1252,12 +1416,14 @@ extension FormTests {
         let data = Data()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Form(
-                name: name,
-                data: data
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data
+                )
+            }
+        )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
         let parsed = try parser.parse()
@@ -1275,15 +1441,17 @@ extension FormTests {
             ]
         )
 
-        #expect(parsed.items == [
-            PartForm(
-                headers: HTTPHeaders([
-                    ("Content-Disposition", "form-data; name=\"\(name)\""),
-                    ("Content-Type", "application/octet-stream"),
-                    ("Content-Length", String(data.count))
-                ]),
-                contents: data
-            )
-        ])
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
     }
 }

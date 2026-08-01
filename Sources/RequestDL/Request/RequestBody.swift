@@ -2,15 +2,12 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
-import NIOCore
 import AsyncHTTPClient
+import NIOCore
 
-/**
- A structure representing the body of an HTTP request.
- This type encapsulates the data and settings for the request body,
- such as its size and chunking strategy.
- */
+/// A structure representing the body of an HTTP request.
+/// This type encapsulates the data and settings for the request body,
+/// such as its size and chunking strategy.
 public struct RequestBody: Sendable {
 
     // MARK: - Public properties

@@ -1,12 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
-/**
- A struct representing cached data with associated metadata.
- */
+/// A struct representing cached data with associated metadata.
 public struct CachedData: Sendable {
 
     // MARK: - Public properties

@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import Foundation
 #endif
 
 struct EncodablePayloadFactory: Sendable, PayloadFactory {
@@ -34,39 +34,39 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
     // MARK: - Internal methods
 
     func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
+        // Encoded once, with the encoder the caller configured, and reused on every path.
+        //
+        // The form-urlencoded path used to re-encode through a default `JSONEncoder`, which
+        // silently dropped the caller's settings. That matters more here than anywhere else:
+        // on this path the JSON keys become the form field names, so a caller who asked for
+        // `.convertToSnakeCase` was quietly sending camel case over the wire. The fallback
+        // branch then encoded a third time, with the right encoder, producing a body that did
+        // not match the object just inspected.
+        let data = try encode(encoder)
+
         guard contentType.isFormURLEncoded else {
-            return try .init(
+            return .init(
                 contentType: contentType,
-                source: .buffer(Internals.DataBuffer(encode(encoder)))
+                source: .buffer(Internals.DataBuffer(data))
             )
         }
 
-        let jsonData = try encode(.init())
-
-        switch try JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) {
+        switch try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {
         case let array as [Any]:
             return try input.jsonObject(array, contentType: contentType)
+
         case let dictionary as [AnyHashable: Any]:
             return try input.jsonObject(dictionary, contentType: contentType)
+
         default:
-            return try .init(
+            return .init(
                 contentType: contentType,
-                source: .buffer(Internals.DataBuffer(encode(encoder)))
+                source: .buffer(Internals.DataBuffer(data))
             )
         }
     }
 
-    func callAsFunction() throws -> Internals.AnyBuffer {
-        try Internals.DataBuffer(encode(encoder))
-    }
-}
-
-extension ContentType {
-
-    var isFormURLEncoded: Bool {
-        description.range(
-            of: ContentType.formURLEncoded.description,
-            options: .caseInsensitive
-        ) != nil
-    }
+    // The no argument `callAsFunction()` that used to live here is gone. `PayloadFactory`
+    // declares only the `PayloadInput` form, and both consumers hold the factory as an
+    // existential, so nothing could reach the overload even if it wanted to.
 }

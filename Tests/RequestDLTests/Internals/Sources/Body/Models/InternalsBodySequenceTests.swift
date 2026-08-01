@@ -1,11 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOCore
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsBodySequenceTests {
 
@@ -26,9 +32,12 @@ struct InternalsBodySequenceTests {
         // Given
         let data = Data("Hello World!".utf8)
 
-        let bodySequence = makeBodySequence(chunkSize: 1024, [
-            Internals.DataBuffer(data)
-        ])
+        let bodySequence = makeBodySequence(
+            chunkSize: 1024,
+            [
+                Internals.DataBuffer(data)
+            ]
+        )
 
         // When
         let sequence = Array(bodySequence).resolveData()
@@ -43,10 +52,13 @@ struct InternalsBodySequenceTests {
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
 
-        let bodySequence = makeBodySequence(chunkSize: 1024, [
-            Internals.DataBuffer(part1),
-            Internals.DataBuffer(part2)
-        ])
+        let bodySequence = makeBodySequence(
+            chunkSize: 1024,
+            [
+                Internals.DataBuffer(part1),
+                Internals.DataBuffer(part2),
+            ]
+        )
 
         // When
         let sequence = Array(bodySequence).resolveData()
@@ -62,10 +74,13 @@ struct InternalsBodySequenceTests {
         let part2 = Data("Earth is a small planet".utf8)
         let chunkSize = 2
 
-        let bodySequence = makeBodySequence(chunkSize: chunkSize, [
-            Internals.DataBuffer(part1),
-            Internals.DataBuffer(part2)
-        ])
+        let bodySequence = makeBodySequence(
+            chunkSize: chunkSize,
+            [
+                Internals.DataBuffer(part1),
+                Internals.DataBuffer(part2),
+            ]
+        )
 
         // When
         let sequence = Array(bodySequence).resolveData()
@@ -84,11 +99,14 @@ struct InternalsBodySequenceTests {
         let part3 = Data("Contents in the file".utf8)
         let chunkSize = 16
 
-        let bodySequence = makeBodySequence(chunkSize: chunkSize, [
-            Internals.DataBuffer(part1),
-            Internals.DataBuffer(part2),
-            Internals.FileBuffer(part3)
-        ])
+        let bodySequence = makeBodySequence(
+            chunkSize: chunkSize,
+            [
+                Internals.DataBuffer(part1),
+                Internals.DataBuffer(part2),
+                Internals.FileBuffer(part3),
+            ]
+        )
 
         // When
         let sequence = Array(bodySequence).resolveData()
@@ -132,7 +150,7 @@ extension InternalsBodySequenceTests {
         chunkSize: Int? = nil,
         _ buffers: [Internals.AnyBuffer]
     ) -> Internals.BodySequence {
-        return .init(
+        .init(
             chunkSize: chunkSize,
             buffers: buffers
         )

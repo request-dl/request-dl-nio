@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A set of HTTP status codes.
 public struct StatusCodeSet: Sendable, SetAlgebra {
@@ -13,12 +11,12 @@ public struct StatusCodeSet: Sendable, SetAlgebra {
 
     /// A set containing all HTTP status codes in the range of 200 to 299.
     public static let success: StatusCodeSet = {
-        StatusCodeSet((200 ..< 300).map(StatusCode.init(_:)))
+        StatusCodeSet((200..<300).map(StatusCode.init(_:)))
     }()
 
     /// A set containing all HTTP status codes in the range of 200 to 399.
     public static let successAndRedirect: StatusCodeSet = {
-        StatusCodeSet((200 ..< 400).map(StatusCode.init(_:)))
+        StatusCodeSet((200..<400).map(StatusCode.init(_:)))
     }()
 
     // MARK: - Public properties

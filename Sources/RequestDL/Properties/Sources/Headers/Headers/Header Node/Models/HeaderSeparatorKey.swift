@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 private struct HeaderSeparatorKey: RequestEnvironmentKey {
     static let defaultValue: String? = nil

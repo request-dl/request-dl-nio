@@ -1,22 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 // Documentation:
 
-/**
- An extension of `URLEncoder` that defines strategies for encoding non-optional values in a URL request.
-
- - `droppingKey`: Drops the key from the encoded string, leaving only the value.
-
- - `droppingValue`: Drops the value from the encoded string, leaving only the key.
-
- - `literal`:
-
- - `custom`:
- */
+/// An extension of `URLEncoder` that defines strategies for encoding non-optional values in a URL request.
+///
+/// - `droppingKey`: Drops the key from the encoded string, leaving only the value.
+///
+/// - `droppingValue`: Drops the value from the encoded string, leaving only the key.
+///
+/// - `literal`:
+///
+/// - `custom`:
 extension URLEncoder {
 
     /// Defines strategies for encoding none optional in a url encoded format

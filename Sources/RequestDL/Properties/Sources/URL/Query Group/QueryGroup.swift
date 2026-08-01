@@ -1,22 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
-A group of query parameters that can be used to compose a request.
-
-You can use this to group multiple query parameters together and pass them as a single argument to a request.
-
- ```swift
- QueryGroup {
-     Query(name: "name", value: "John")
-     Query(name: "surname", value: "Doe")
-     Query(name: "age", value: 30)
- }
- ```
- */
+/// A group of query parameters that can be used to compose a request.
+///
+/// You can use this to group multiple query parameters together and pass them as a single argument to a request.
+///
+///  ```swift
+///  QueryGroup {
+///      Query(name: "name", value: "John")
+///      Query(name: "surname", value: "Doe")
+///      Query(name: "age", value: 30)
+///  }
+///  ```
 public struct QueryGroup<Content: Property>: Property {
 
     struct Node: PropertyNode {

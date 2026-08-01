@@ -1,13 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
-A struct that represents the `AcceptHeader` header, used to specify the desired response
-content type for an HTTP request.
-*/
+/// A struct that represents the `AcceptHeader` header, used to specify the desired response
+/// content type for an HTTP request.
 public struct AcceptHeader: Property {
 
     // MARK: - Public properties
@@ -40,11 +36,13 @@ public struct AcceptHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "Accept",
-            value: property.type.rawValue,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Accept",
+                value: property.type.rawValue,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

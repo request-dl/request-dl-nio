@@ -1,29 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The ``RequestDL/Authorization/TokenType`` struct is used to define the authorization type of the request.
-
- ```swift
- let authorizationType: Authorization.TokenType = .bearer
- ```
-
- > Note: For a complete list of the available types, please see the corresponding static
- properties.
-
- > Important: If the authorization type is not included in the predefined static properties, use
- a string literal to initialize an instance of ``RequestDL/Authorization/TokenType``.
-
- The ``RequestDL/Authorization/TokenType`` struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
- it to be initialized with a string literal.
-
- ```swift
- let customAuthorizationType: Authorization.TokenType = "Private"
- ```
- */
+/// The ``RequestDL/Authorization/TokenType`` struct is used to define the authorization type of the request.
+///
+/// ```swift
+/// let authorizationType: Authorization.TokenType = .bearer
+/// ```
+///
+/// > Note: For a complete list of the available types, please see the corresponding static
+/// properties.
+///
+/// > Important: If the authorization type is not included in the predefined static properties, use
+/// a string literal to initialize an instance of ``RequestDL/Authorization/TokenType``.
+///
+/// The ``RequestDL/Authorization/TokenType`` struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
+/// it to be initialized with a string literal.
+///
+/// ```swift
+/// let customAuthorizationType: Authorization.TokenType = "Private"
+/// ```
 extension Authorization {
 
     public struct TokenType: Sendable, Hashable {

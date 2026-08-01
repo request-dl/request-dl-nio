@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Modifiers {
 
@@ -53,10 +51,12 @@ extension RequestTask where Element: TaskResultPrimitive {
         _ transform: @escaping @Sendable (Element) async throws -> Void,
         contains: @escaping @Sendable (StatusCode) -> Bool
     ) -> ModifiedRequestTask<Modifiers.OnStatusCode<Element>> {
-        modifier(Modifiers.OnStatusCode(
-            contains: contains,
-            transform: transform
-        ))
+        modifier(
+            Modifiers.OnStatusCode(
+                contains: contains,
+                transform: transform
+            )
+        )
     }
 
     /**

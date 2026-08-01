@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import Foundation
 #endif
 
 extension Modifiers {
@@ -57,10 +57,13 @@ extension Modifiers {
                 throw KeyPathNotFound(keyPath: keyPath)
             }
 
-            return try element(result, JSONSerialization.data(
-                withJSONObject: value,
-                options: .fragmentsAllowed
-            ))
+            return try element(
+                result,
+                JSONSerialization.data(
+                    withJSONObject: value,
+                    options: .fragmentsAllowed
+                )
+            )
         }
     }
 }
@@ -79,16 +82,18 @@ extension RequestTask<TaskResult<Data>> {
     public func keyPath(
         _ keyPath: KeyPath<AbstractKeyPath, String> & Sendable
     ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
-        modifier(Modifiers.KeyPath(
-            keyPath: { $0[keyPath: keyPath] },
-            data: \.payload,
-            element: {
-                TaskResult(
-                    head: $0.head,
-                    payload: $1
-                )
-            }
-        ))
+        modifier(
+            Modifiers.KeyPath(
+                keyPath: { $0[keyPath: keyPath] },
+                data: \.payload,
+                element: {
+                    TaskResult(
+                        head: $0.head,
+                        payload: $1
+                    )
+                }
+            )
+        )
     }
 }
 
@@ -104,10 +109,12 @@ extension RequestTask<Data> {
     public func keyPath(
         _ keyPath: KeyPath<AbstractKeyPath, String> & Sendable
     ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
-        modifier(Modifiers.KeyPath(
-            keyPath: { $0[keyPath: keyPath] },
-            data: { $0 },
-            element: { $1 }
-        ))
+        modifier(
+            Modifiers.KeyPath(
+                keyPath: { $0[keyPath: keyPath] },
+                data: { $0 },
+                element: { $1 }
+            )
+        )
     }
 }

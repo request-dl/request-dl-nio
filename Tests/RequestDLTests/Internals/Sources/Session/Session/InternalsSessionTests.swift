@@ -2,9 +2,15 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsSessionTests {
 
@@ -226,10 +232,11 @@ struct InternalsSessionTests {
         #expect(download != nil)
         #expect(download?.0.status.code == 200)
         #expect(
-            try (download?.1).map(HTTPResult<String>.init) == HTTPResult(
-                receivedBytes: length,
-                response: message
-            )
+            try (download?.1).map(HTTPResult<String>.init)
+                == HTTPResult(
+                    receivedBytes: length,
+                    response: message
+                )
         )
     }
 }

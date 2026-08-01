@@ -1,10 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import AsyncHTTPClient
+import Testing
+
 @testable import RequestDL
 
 struct InternalsDecompressionTests {
@@ -19,9 +19,10 @@ struct InternalsDecompressionTests {
 
         // Then
         #expect(
-            String(describing: sut) == String(
-                describing: HTTPClient.Decompression.disabled
-            )
+            String(describing: sut)
+                == String(
+                    describing: HTTPClient.Decompression.disabled
+                )
         )
     }
 
@@ -35,9 +36,10 @@ struct InternalsDecompressionTests {
 
         // Then
         #expect(
-            String(describing: sut) == String(
-                describing: HTTPClient.Decompression.enabled(limit: .ratio(1_024))
-            )
+            String(describing: sut)
+                == String(
+                    describing: HTTPClient.Decompression.enabled(limit: .ratio(1_024))
+                )
         )
     }
 

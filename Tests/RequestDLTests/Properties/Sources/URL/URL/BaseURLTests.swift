@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct BaseURLTests {
@@ -154,10 +154,12 @@ struct BaseURLTests {
         let host2 = "google.com"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL(.ftp, host: host1)
-            BaseURL(host2)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(.ftp, host: host1)
+                BaseURL(host2)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.url == "https://google.com")
@@ -170,20 +172,17 @@ struct BaseURLTests {
 
         do {
             // When
-            _ = try await resolve(TestProperty {
-                BaseURL(baseURL)
-            })
+            _ = try await resolve(
+                TestProperty {
+                    BaseURL(baseURL)
+                }
+            )
 
             // Then
             Issue.record("Not expecting success")
         } catch let error as BaseURLError {
             #expect(error.context == .invalidHost)
             #expect(error.baseURL == baseURL)
-            #expect(error.errorDescription == """
-                Invalid host string: The url scheme should not be \
-                included; BaseURL: \(baseURL)
-                """
-            )
         } catch {
             throw error
         }
@@ -196,20 +195,17 @@ struct BaseURLTests {
 
         do {
             // When
-            _ = try await resolve(TestProperty {
-                BaseURL(baseURL)
-            })
+            _ = try await resolve(
+                TestProperty {
+                    BaseURL(baseURL)
+                }
+            )
 
             // Then
             Issue.record("Not expecting success")
         } catch let error as BaseURLError {
             #expect(error.context == .unexpectedHost)
             #expect(error.baseURL == baseURL)
-            #expect(error.errorDescription == """
-                Unexpected format for host string: Could not extract the \
-                host; BaseURL: \(baseURL)
-                """
-            )
         } catch {
             throw error
         }

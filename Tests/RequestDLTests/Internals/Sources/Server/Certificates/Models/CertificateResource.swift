@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct CertificateResource: Hashable {
 
@@ -25,14 +30,16 @@ extension CertificateResource {
 
         let path = path.replacingOccurrences(of: "_", with: ".")
 
-        self.certificateURL = bundle.url(
-            forResource: "\(path).public",
-            withExtension: format.pathExtension
-        ).unsafelyUnwrapped
+        self.certificateURL =
+            bundle.url(
+                forResource: "\(path).public",
+                withExtension: format.pathExtension
+            ).unsafelyUnwrapped
 
-        self.privateKeyURL = bundle.url(
-            forResource: "\(path).private",
-            withExtension: format.pathExtension
-        ).unsafelyUnwrapped
+        self.privateKeyURL =
+            bundle.url(
+                forResource: "\(path).private",
+                withExtension: format.pathExtension
+            ).unsafelyUnwrapped
     }
 }

@@ -1,19 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- Represents the Cache Header property that can be set in a URLRequest.
-
- ```swift
- CacheHeader()
-     .maxAge(60)
-     .cached(true)
-     .stored(true)
- ```
- */
+/// Represents the Cache Header property that can be set in a URLRequest.
+///
+/// ```swift
+/// CacheHeader()
+///     .maxAge(60)
+///     .cached(true)
+///     .stored(true)
+/// ```
 public struct CacheHeader: Property {
 
     // MARK: - Public properties
@@ -77,12 +73,14 @@ public struct CacheHeader: Property {
             return .empty
         }
 
-        return .leaf(HeaderNode(
-            key: "Cache-Control",
-            value: value,
-            strategy: inputs.environment.headerStrategy,
-            separator: separator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Cache-Control",
+                value: value,
+                strategy: inputs.environment.headerStrategy,
+                separator: separator
+            )
+        )
     }
 
     // MARK: - Public methods
@@ -233,7 +231,6 @@ public struct CacheHeader: Property {
     }
 
     // MARK: - Private methods
-
 
     private func makeContents() -> [String] {
         var contents = [String]()

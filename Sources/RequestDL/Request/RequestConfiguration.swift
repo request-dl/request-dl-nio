@@ -1,27 +1,30 @@
 /*
  See LICENSE for this package's licensing information.
  */
-import Foundation
-import NIOCore
-import AsyncHTTPClient
 
-/**
- Configuration object used to define the parameters for an HTTP request.
- This structure holds details like the base URL, path components, query items,
- HTTP method, headers, body, and caching policies.
- */
+import AsyncHTTPClient
+import NIOCore
+
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.CharacterSet
+#else
+import struct Foundation.CharacterSet
+#endif
+
+/// Configuration object used to define the parameters for an HTTP request.
+/// This structure holds details like the base URL, path components, query items,
+/// HTTP method, headers, body, and caching policies.
 public struct RequestConfiguration: Sendable {
 
     // MARK: - Public properties
 
-    /**
-     The full URL string constructed from `baseURL`, `pathComponents`, and `queries`.
-
-     This computed property builds the URL by combining the configured components.
-     It automatically trims unnecessary slashes and handles query string formatting.
-     */
+    /// The full URL string constructed from `baseURL`, `pathComponents`, and `queries`.
+    ///
+    /// This computed property builds the URL by combining the configured components.
+    /// It automatically trims unnecessary slashes and handles query string formatting.
     public var url: String {
-        let baseURL = baseURL
+        let baseURL =
+            baseURL
             .trimmingCharacters(in: .urlHostAllowed.inverted)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
@@ -64,8 +67,7 @@ public struct RequestConfiguration: Sendable {
     // MARK: - Internal properties
 
     var isCacheEnabled: Bool {
-        body == nil && !cachePolicy.isEmpty &&
-        (method == nil || method == "GET")
+        body == nil && !cachePolicy.isEmpty && (method == nil || method == "GET")
     }
 
     var readingMode: Internals.DownloadStep.ReadingMode

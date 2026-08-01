@@ -1,37 +1,33 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A custom result builder for composing a request with properties.
-
- You use a property builder by adding multiple properties to a request, and returning them as
- a composed property within the closure.
-
- ```swift
- func myProperties<Content: Property>(
-     @PropertyBuilder content: () -> Content
- ) -> some Property {
-     content()
- }
- ```
-
- Which will behavior as:
-
- ```swift
- myProperties {
-     Query(name: "string", value: "abc")
-     Payload("some-content", using: .utf8)
-     Path("search")
-     PropertyGroup {
-         BaseURL("google.com")
-         Query(name: "page", value: 1)
-     }
- }
- ```
- */
+/// A custom result builder for composing a request with properties.
+///
+/// You use a property builder by adding multiple properties to a request, and returning them as
+/// a composed property within the closure.
+///
+/// ```swift
+/// func myProperties<Content: Property>(
+///     @PropertyBuilder content: () -> Content
+/// ) -> some Property {
+///     content()
+/// }
+/// ```
+///
+/// Which will behavior as:
+///
+/// ```swift
+/// myProperties {
+///     Query(name: "string", value: "abc")
+///     Payload("some-content", using: .utf8)
+///     Path("search")
+///     PropertyGroup {
+///         BaseURL("google.com")
+///         Query(name: "page", value: 1)
+///     }
+/// }
+/// ```
 @resultBuilder
 public struct PropertyBuilder: Sendable {
 

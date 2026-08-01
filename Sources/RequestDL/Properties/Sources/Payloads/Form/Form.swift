@@ -1,55 +1,57 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
-/**
- A structure representing a form with headers.
-
- A `Form` object is used to encapsulate form data for HTTP requests. It allows you to specify the name,
- filename, content type, and data or URL associated with a form field. It also supports adding custom headers
- to the form.
-
- ```swift
- Form(
-    name: "example",
-    filename: "example.txt",
-    contentType: .octetStream,
-    data: someData
- )
- ```
-
- > Note: The `Headers` generic parameter represents the type of custom headers associated with the
- form. If no custom headers are needed, the default would be `EmptyProperty`.
-
- ## Topics
-
- ### Sending raw bytes
-
- - ``RequestDL/Form/init(name:filename:contentType:data:)``
- - ``RequestDL/Form/init(name:filename:contentType:data:headers:)``
-
- ### Sending verbatim texts
-
- - ``RequestDL/Form/init(name:filename:contentType:verbatim:)``
- - ``RequestDL/Form/init(name:filename:contentType:verbatim:headers:)``
-
- ### Sending files
-
- - ``RequestDL/Form/init(name:filename:contentType:url:)``
- - ``RequestDL/Form/init(name:filename:contentType:url:headers:)``
-
- ### Sending Encodable
-
- - ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``
- - ``RequestDL/Form/init(name:filename:contentType:value:encoder:headers:)``
-
- ### Sending JSON objects
-
- - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``
- - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:headers:)``
- */
+/// A structure representing a form with headers.
+///
+/// A `Form` object is used to encapsulate form data for HTTP requests. It allows you to specify the name,
+/// filename, content type, and data or URL associated with a form field. It also supports adding custom headers
+/// to the form.
+///
+/// ```swift
+/// Form(
+///    name: "example",
+///    filename: "example.txt",
+///    contentType: .octetStream,
+///    data: someData
+/// )
+/// ```
+///
+/// > Note: The `Headers` generic parameter represents the type of custom headers associated with the
+/// form. If no custom headers are needed, the default would be `EmptyProperty`.
+///
+/// ## Topics
+///
+/// ### Sending raw bytes
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:data:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:data:headers:)``
+///
+/// ### Sending verbatim texts
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:verbatim:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:verbatim:headers:)``
+///
+/// ### Sending files
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:url:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:url:headers:)``
+///
+/// ### Sending Encodable
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:value:encoder:headers:)``
+///
+/// ### Sending JSON objects
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:headers:)``
 public struct Form<Headers: Property>: Property {
 
     // MARK: - Public properties
@@ -392,17 +394,19 @@ public struct Form<Headers: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(FormNode(
-            chunkSize: inputs.environment.payloadChunkSize,
-            item: FormItem(
-                name: property.name,
-                filename: property.filename,
-                additionalHeaders: additionalHeaders.isEmpty ? nil : additionalHeaders,
-                charset: inputs.environment.charset,
-                urlEncoder: inputs.environment.urlEncoder,
-                factory: property.factory
+        return .leaf(
+            FormNode(
+                chunkSize: inputs.environment.payloadChunkSize,
+                item: FormItem(
+                    name: property.name,
+                    filename: property.filename,
+                    additionalHeaders: additionalHeaders.isEmpty ? nil : additionalHeaders,
+                    charset: inputs.environment.charset,
+                    urlEncoder: inputs.environment.urlEncoder,
+                    factory: property.factory
+                )
             )
-        ))
+        )
     }
 
     // MARK: - Private static methods

@@ -1,10 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import NIOCore
 import AsyncHTTPClient
+import NIOCore
 import SwiftAsyncStream
 
 extension Internals {

@@ -1,14 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
 import SwiftAsyncStream
 
-/**
- A data cache that stores and retrieves data based on specified capacities and policies.
- */
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+/// A data cache that stores and retrieves data based on specified capacities and policies.
 public struct DataCache: Sendable, Equatable {
 
     private final class Manager: @unchecked Sendable {
@@ -212,7 +215,7 @@ public struct DataCache: Sendable, Equatable {
      - Parameters:
         - memoryCapacity: The maximum memory capacity in bytes for the data cache.
         - diskCapacity: The maximum disk capacity in bytes for the data cache.
-        - logger: The logger for cache usage.        
+        - logger: The logger for cache usage.
      */
     public init(
         memoryCapacity: UInt64 = .zero,
@@ -228,7 +231,8 @@ public struct DataCache: Sendable, Equatable {
     }
 
     init(url: URL, logger: Logger? = nil) {
-        let url = url
+        let url =
+            url
             .deletingLastPathComponent()
             .appendingPathComponent(url.lastPathComponent, isDirectory: true)
 
@@ -396,12 +400,14 @@ public struct DataCache: Sendable, Equatable {
 
         if cachedResponse.policy.contains(.memory) {
             memoryBuffer = storage.withMemoryStorage { memoryStorage -> Internals.AnyBuffer? in
-                guard let buffer = memoryStorage.allocateBuffer(
-                    key: key,
-                    cachedResponse: cachedResponse,
-                    contentLength: contentLength,
-                    maximumCapacity: memoryCapacity
-                ) else {
+                guard
+                    let buffer = memoryStorage.allocateBuffer(
+                        key: key,
+                        cachedResponse: cachedResponse,
+                        contentLength: contentLength,
+                        maximumCapacity: memoryCapacity
+                    )
+                else {
                     // The memory tier turned the new entry down, usually for size. Dropping
                     // whatever was there keeps `getCachedData` from serving it in front of a
                     // disk entry that is about to be updated.

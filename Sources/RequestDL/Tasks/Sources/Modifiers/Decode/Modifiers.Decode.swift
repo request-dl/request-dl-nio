@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import Foundation
 #endif
 
 extension Modifiers {
@@ -75,17 +75,19 @@ extension RequestTask {
         decoder: JSONDecoder = .init()
     ) -> ModifiedRequestTask<Modifiers.Decode<Element, T, TaskResult<T>>>
     where Element == TaskResult<Data> {
-        modifier(Modifiers.Decode(
-            type: type,
-            decoder: decoder,
-            data: \.payload,
-            output: {
-                TaskResult(
-                    head: $0.head,
-                    payload: $1
-                )
-            }
-        ))
+        modifier(
+            Modifiers.Decode(
+                type: type,
+                decoder: decoder,
+                data: \.payload,
+                output: {
+                    TaskResult(
+                        head: $0.head,
+                        payload: $1
+                    )
+                }
+            )
+        )
     }
 
     /**
@@ -102,11 +104,13 @@ extension RequestTask {
         decoder: JSONDecoder = .init()
     ) -> ModifiedRequestTask<Modifiers.Decode<Element, T, T>>
     where Element == Data {
-        modifier(Modifiers.Decode(
-            type: type,
-            decoder: decoder,
-            data: { $0 },
-            output: { $1 }
-        ))
+        modifier(
+            Modifiers.Decode(
+                type: type,
+                decoder: decoder,
+                data: { $0 },
+                output: { $1 }
+            )
+        )
     }
 }

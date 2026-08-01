@@ -1,51 +1,47 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The `@PropertyNamespace` property wrapper allows you to define a namespace identifier
- for `Property` objects.
-
- This creates a namespace ID for storing objects inside the `Property` declaration.
-
- ```swift
- struct ProjectDefaults: Property {
-
-    @PropertyNamespace var projectName
-    @StoredObject var pskResolver = PSKResolver()
-
-    var property: some Property {
-        SecureConnection {
-            PSKIdentity(pskResolver)
-        }
-    }
- }
- ```
-
- In this example, the `pskResolver` object will be stored internally and isolated by
- the `projectName` namespace ID. If you specify multiple namespaces, they will be
- merged into a single namespace declaration.
-
- Here is an example where the namespace ID is `_foo._bar`:
-
- ```swift
- struct ProjectDefaults: Property {
-
-    @PropertyNamespace var foo
-    @PropertyNamespace var bar
-
-    @StoredObject var pskResolver = PSKResolver()
-
-    var property: some Property {
-        SecureConnection {
-            PSKIdentity(pskResolver)
-        }
-    }
- }
- ```
- */
+/// The `@PropertyNamespace` property wrapper allows you to define a namespace identifier
+/// for `Property` objects.
+///
+/// This creates a namespace ID for storing objects inside the `Property` declaration.
+///
+/// ```swift
+/// struct ProjectDefaults: Property {
+///
+///    @PropertyNamespace var projectName
+///    @StoredObject var pskResolver = PSKResolver()
+///
+///    var property: some Property {
+///        SecureConnection {
+///            PSKIdentity(pskResolver)
+///        }
+///    }
+/// }
+/// ```
+///
+/// In this example, the `pskResolver` object will be stored internally and isolated by
+/// the `projectName` namespace ID. If you specify multiple namespaces, they will be
+/// merged into a single namespace declaration.
+///
+/// Here is an example where the namespace ID is `_foo._bar`:
+///
+/// ```swift
+/// struct ProjectDefaults: Property {
+///
+///    @PropertyNamespace var foo
+///    @PropertyNamespace var bar
+///
+///    @StoredObject var pskResolver = PSKResolver()
+///
+///    var property: some Property {
+///        SecureConnection {
+///            PSKIdentity(pskResolver)
+///        }
+///    }
+/// }
+/// ```
 @propertyWrapper
 public struct PropertyNamespace: DynamicValue {
 

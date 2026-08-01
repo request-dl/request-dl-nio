@@ -1,16 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A header that specifies the URL of a resource from which the requested resource was obtained.
-
- ```swift
- RefererHeader("https://www.example.com/")
- ```
- */
+/// A header that specifies the URL of a resource from which the requested resource was obtained.
+///
+/// ```swift
+/// RefererHeader("https://www.example.com/")
+/// ```
 public struct RefererHeader: Property {
 
     // MARK: - Public properties
@@ -44,11 +40,13 @@ public struct RefererHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "Referer",
-            value: property.value,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Referer",
+                value: property.value,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

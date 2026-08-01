@@ -2,11 +2,7 @@
  See LICENSE for this package's licensing information.
  */
 
-import Foundation
-
-/**
- A context object providing access to the request configuration within a property or scope.
- */
+/// A context object providing access to the request configuration within a property or scope.
 public struct PropertyContext: Sendable {
 
     /**

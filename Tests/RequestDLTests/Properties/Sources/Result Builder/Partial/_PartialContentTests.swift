@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct _PartialContentTests {
@@ -21,10 +21,13 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            BaseURL,
-            OriginHeader
-        >)
+        #expect(
+            result
+                is _PartialContent<
+                    BaseURL,
+                    OriginHeader
+                >
+        )
 
         #expect(resolved.requestConfiguration.url == "https://google.com")
         #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
@@ -45,13 +48,16 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            _PartialContent<
-                BaseURL,
-                OriginHeader
-            >,
-            CacheHeader
-        >)
+        #expect(
+            result
+                is _PartialContent<
+                    _PartialContent<
+                        BaseURL,
+                        OriginHeader
+                    >,
+                    CacheHeader
+                >
+        )
 
         #expect(resolved.requestConfiguration.url == "https://google.com")
         #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
@@ -74,16 +80,19 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            _PartialContent<
-                _PartialContent<
-                    BaseURL,
-                    OriginHeader
-                >,
-                CacheHeader
-            >,
-            Path
-        >)
+        #expect(
+            result
+                is _PartialContent<
+                    _PartialContent<
+                        _PartialContent<
+                            BaseURL,
+                            OriginHeader
+                        >,
+                        CacheHeader
+                    >,
+                    Path
+                >
+        )
 
         #expect(resolved.requestConfiguration.url == "https://google.com/search")
         #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
@@ -107,19 +116,22 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            _PartialContent<
-                _PartialContent<
+        #expect(
+            result
+                is _PartialContent<
                     _PartialContent<
-                        BaseURL,
-                        OriginHeader
+                        _PartialContent<
+                            _PartialContent<
+                                BaseURL,
+                                OriginHeader
+                            >,
+                            CacheHeader
+                        >,
+                        Path
                     >,
-                    CacheHeader
-                >,
-                Path
-            >,
-            Query<String>
-        >)
+                    Query<String>
+                >
+        )
 
         #expect(
             resolved.requestConfiguration.url == "https://google.com/search?q=request-dl"
@@ -147,22 +159,25 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            _PartialContent<
-                _PartialContent<
+        #expect(
+            result
+                is _PartialContent<
                     _PartialContent<
                         _PartialContent<
-                            BaseURL,
-                            OriginHeader
+                            _PartialContent<
+                                _PartialContent<
+                                    BaseURL,
+                                    OriginHeader
+                                >,
+                                CacheHeader
+                            >,
+                            Path
                         >,
-                        CacheHeader
+                        Query<String>
                     >,
-                    Path
-                >,
-                Query<String>
-            >,
-            Timeout
-        >)
+                    Timeout
+                >
+        )
 
         #expect(
             resolved.requestConfiguration.url == "https://google.com/search?q=request-dl"
@@ -194,25 +209,28 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            _PartialContent<
-                _PartialContent<
+        #expect(
+            result
+                is _PartialContent<
                     _PartialContent<
                         _PartialContent<
                             _PartialContent<
-                                BaseURL,
-                                OriginHeader
+                                _PartialContent<
+                                    _PartialContent<
+                                        BaseURL,
+                                        OriginHeader
+                                    >,
+                                    CacheHeader
+                                >,
+                                Path
                             >,
-                            CacheHeader
+                            Query<String>
                         >,
-                        Path
+                        Timeout
                     >,
-                    Query<String>
-                >,
-                Timeout
-            >,
-            Query<Int>
-        >)
+                    Query<Int>
+                >
+        )
 
         #expect(
             resolved.requestConfiguration.url == "https://google.com/search?q=request-dl&page=1"
@@ -245,28 +263,31 @@ struct _PartialContentTests {
         let resolved = try await resolve(result)
 
         // Then
-        #expect(result is _PartialContent<
-            _PartialContent<
-                _PartialContent<
+        #expect(
+            result
+                is _PartialContent<
                     _PartialContent<
                         _PartialContent<
                             _PartialContent<
                                 _PartialContent<
-                                    BaseURL,
-                                    OriginHeader
+                                    _PartialContent<
+                                        _PartialContent<
+                                            BaseURL,
+                                            OriginHeader
+                                        >,
+                                        CacheHeader
+                                    >,
+                                    Path
                                 >,
-                                CacheHeader
+                                Query<String>
                             >,
-                            Path
+                            Timeout
                         >,
-                        Query<String>
+                        Query<Int>
                     >,
-                    Timeout
-                >,
-                Query<Int>
-            >,
-            Path
-        >)
+                    Path
+                >
+        )
 
         #expect(
             resolved.requestConfiguration.url == "https://google.com/search/results?q=request-dl&page=1"

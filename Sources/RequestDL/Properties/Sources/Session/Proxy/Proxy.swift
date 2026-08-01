@@ -1,31 +1,27 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- `Proxy` is a struct that defines a proxy configuration for network requests.
-
- To create an instance of `Proxy`, initialize it with the host, port, connection protocol, and optionally, authorization credentials.
-
- ```swift
- Proxy(host: "myproxy.com", port: 8080, connection: .socks)
- ```
-
- In the example below, a request is made using a HTTP proxy with authentication.
-
- ```swift
- DataTask {
-     BaseURL("example.com")
-     Proxy(
-         host: "socks-proxy.com",
-         port: 1080,
-         authorization: .basic(username: "user", password: "pass")
-     )
- }
- ```
- */
+/// `Proxy` is a struct that defines a proxy configuration for network requests.
+///
+/// To create an instance of `Proxy`, initialize it with the host, port, connection protocol, and optionally, authorization credentials.
+///
+/// ```swift
+/// Proxy(host: "myproxy.com", port: 8080, connection: .socks)
+/// ```
+///
+/// In the example below, a request is made using a HTTP proxy with authentication.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("example.com")
+///     Proxy(
+///         host: "socks-proxy.com",
+///         port: 1080,
+///         authorization: .basic(username: "user", password: "pass")
+///     )
+/// }
+/// ```
 public struct Proxy: Property {
 
     private struct Node: PropertyNode {

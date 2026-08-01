@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
+
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
+import struct Foundation.UUID
+#endif
 
 extension Internals {
 
@@ -52,7 +57,7 @@ extension Internals {
                 metadata: [
                     "id": .string(id),
                     "base_url": .string(baseURL),
-                    "path_components": .array(pathComponents.map { .string($0) })
+                    "path_components": .array(pathComponents.map { .string($0) }),
                 ].merging(additionalMetadata() ?? [:]) { $1 },
                 file: file,
                 function: function,

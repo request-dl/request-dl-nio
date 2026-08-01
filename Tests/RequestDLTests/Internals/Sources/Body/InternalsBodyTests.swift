@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 struct InternalsBodyTests {
 
@@ -33,9 +39,12 @@ struct InternalsBodyTests {
         // Given
         let string = "Hello World"
 
-        let body = RequestBody(chunkSize: string.count, buffers: [
-            Internals.DataBuffer(string)
-        ])
+        let body = RequestBody(
+            chunkSize: string.count,
+            buffers: [
+                Internals.DataBuffer(string)
+            ]
+        )
 
         // When
         let buffers = try await body.buffers()

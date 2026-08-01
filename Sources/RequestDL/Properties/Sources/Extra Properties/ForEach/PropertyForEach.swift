@@ -1,28 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A property that iterates over a sequence of data and produces properties for each element.
-
- The ``PropertyForEach`` property is used to create a property for each element of a given `Data` sequence, identified
- by its `ID`. The property to be produced is determined by the `content` closure that takes each element
- of the sequence as input and produces a property.
-
- ```swift
- let paths = ["user", "search", "results"]
-
- DataTask {
-     BaseURL("ecommerce.com")
-     PropertyForEach(paths, id: \.self) {
-         Path($0)
-     }
- }
- ```
- */
-public struct PropertyForEach<Data, ID, Content>: Property where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
+/// A property that iterates over a sequence of data and produces properties for each element.
+///
+/// The ``PropertyForEach`` property is used to create a property for each element of a given `Data` sequence, identified
+/// by its `ID`. The property to be produced is determined by the `content` closure that takes each element
+/// of the sequence as input and produces a property.
+///
+/// ```swift
+/// let paths = ["user", "search", "results"]
+///
+/// DataTask {
+///     BaseURL("ecommerce.com")
+///     PropertyForEach(paths, id: \.self) {
+///         Path($0)
+///     }
+/// }
+/// ```
+public struct PropertyForEach<Data, ID, Content>: Property
+where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
 
     // MARK: - Public properties
 

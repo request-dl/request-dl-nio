@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct GraphNamespaceOperation<Content: Sendable>: GraphValueOperation {
 
@@ -19,26 +17,31 @@ struct GraphNamespaceOperation<Content: Sendable>: GraphValueOperation {
     // MARK: - Internal methods
 
     func callAsFunction(_ properties: inout GraphProperties) {
-        var labels = [String]()
-        var latestID: PropertyNamespace.ID?
-
-        for child in mirror() {
+        let namespaces = mirror().compactMap { child -> (label: String, value: PropertyNamespace)? in
             guard let namespace = child.value as? PropertyNamespace else {
-                continue
+                return nil
             }
 
-            labels.append(child.label ?? "nil")
-            let namespaceID = PropertyNamespace.ID(
-                base: Content.self,
-                namespace: labels.joined(separator: ".")
-            )
-
-            namespace.id = namespaceID
-            latestID = namespaceID
+            return (child.label ?? "nil", namespace)
         }
 
-        if let namespaceID = latestID {
-            properties.inputs.namespaceID = namespaceID
+        guard !namespaces.isEmpty else {
+            return
         }
+
+        // One merged namespace for every wrapper in the property, which is what the
+        // documentation promises. Building it progressively left each wrapper holding a prefix
+        // of the real namespace, so with `@PropertyNamespace var foo` followed by `var bar`,
+        // reading `foo` reported `_foo` while `_foo._bar` was the one actually in effect.
+        let namespaceID = PropertyNamespace.ID(
+            base: Content.self,
+            namespace: namespaces.map(\.label).joined(separator: ".")
+        )
+
+        for namespace in namespaces {
+            namespace.value.id = namespaceID
+        }
+
+        properties.inputs.namespaceID = namespaceID
     }
 }

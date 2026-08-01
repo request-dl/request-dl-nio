@@ -1,20 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A protocol that defines the properties and methods required for a primitive task result.
- */
+/// A protocol that defines the properties and methods required for a primitive task result.
 public protocol TaskResultPrimitive: Sendable {
 
     var head: ResponseHead { get }
 }
 
-/**
- A structure that represents the result of a task.
-*/
+/// A structure that represents the result of a task.
 public struct TaskResult<Element: Sendable>: TaskResultPrimitive {
 
     // MARK: - Public properties
