@@ -2,11 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
+#if canImport(Darwin)
 import Foundation
-#endif
 
 extension Modifiers {
 
@@ -16,11 +13,7 @@ extension Modifiers {
     /// The `KeyPath` modifier allows you to extract a sub-value from the data returned
     /// by the task using a key path.
     ///
-    /// ```swift
-    /// DataTask { ... }
-    ///     .keyPath(\.data)
-    /// ```
-    ///
+    @available(*, deprecated, message: "Use '.decode(_:decoder:)' with a Codable type instead. Dynamic key path extraction via JSONSerialization is deprecated and not supported on Linux/FoundationEssentials.")
     public struct KeyPath<Input: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties
@@ -75,10 +68,7 @@ extension RequestTask<TaskResult<Data>> {
     ///
     /// Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
     ///
-    /// - Parameter keyPath: The key path to extract the sub-value from the data.
-    ///
-    /// - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
-    ///
+    @available(*, deprecated, message: "Use '.decode(_:decoder:)' with a Codable type instead.")
     public func keyPath(
         _ keyPath: KeyPath<AbstractKeyPath, String> & Sendable
     ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
@@ -102,10 +92,7 @@ extension RequestTask<Data> {
     ///
     /// Returns a new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
     ///
-    /// - Parameter keyPath: The key path to extract the sub-value from the data.
-    ///
-    /// - Returns: A new `ModifiedTask` instance that applies the `KeyPath` modifier to the task.
-    ///
+    @available(*, deprecated, message: "Use '.decode(_:decoder:)' with a Codable type instead.")
     public func keyPath(
         _ keyPath: KeyPath<AbstractKeyPath, String> & Sendable
     ) -> ModifiedRequestTask<Modifiers.KeyPath<Element>> {
@@ -118,3 +105,4 @@ extension RequestTask<Data> {
         )
     }
 }
+#endif

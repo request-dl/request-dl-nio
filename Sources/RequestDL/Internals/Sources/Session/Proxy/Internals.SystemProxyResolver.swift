@@ -10,7 +10,7 @@ import struct Foundation.URL
 import class Foundation.NSNumber
 #endif
 
-#if canImport(Darwin)
+#if canImport(Darwin) && canImport(CFNetwork)
 import CFNetwork
 #endif
 
@@ -37,7 +37,7 @@ extension Internals {
     }
 }
 
-#if canImport(Darwin)
+#if canImport(Darwin) && canImport(CFNetwork)
 
 extension Internals.SystemProxyResolver {
 
