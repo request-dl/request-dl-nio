@@ -5,7 +5,7 @@
 import Logging
 
 #if canImport(FoundationEssentials)
-import struct FoundationEssentials.Date
+import FoundationEssentials
 #else
 import struct Foundation.Date
 #endif

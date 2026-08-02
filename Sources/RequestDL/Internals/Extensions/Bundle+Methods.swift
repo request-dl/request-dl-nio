@@ -3,8 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import class FoundationEssentials.Bundle
-import struct FoundationEssentials.URL
+import FoundationEssentials
 #else
 import class Foundation.Bundle
 import struct Foundation.URL

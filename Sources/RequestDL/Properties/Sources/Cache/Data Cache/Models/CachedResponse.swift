@@ -5,7 +5,7 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.Date
 #endif
 
 struct CachedResponse: Sendable, Codable, Hashable {

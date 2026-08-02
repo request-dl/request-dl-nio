@@ -10,8 +10,7 @@ import var Foundation.NSEC_PER_SEC
 #endif
 
 #if canImport(FoundationEssentials)
-import struct FoundationEssentials.Date
-import struct FoundationEssentials.DispatchTime
+import FoundationEssentials
 #else
 import struct Foundation.Date
 import struct Foundation.DispatchTime

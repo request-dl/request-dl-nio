@@ -59,8 +59,8 @@ struct TrustRootsTests {
             .appendingPathComponent("RequestDL.\(UUID())")
             .appendingPathComponent("merged.pem")
 
-        defer { try? fileURL.removeIfNeeded() }
-        try fileURL.createPathIfNeeded()
+        defer { Task { try? await fileURL.removeIfNeeded() } }
+        try await fileURL.createPathIfNeeded()
 
         try data.write(to: fileURL)
 

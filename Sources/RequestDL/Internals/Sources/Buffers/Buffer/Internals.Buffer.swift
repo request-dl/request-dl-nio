@@ -7,7 +7,9 @@ import SwiftAsyncStream
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.URL
+import struct Foundation.Data
+import protocol Foundation.DataProtocol
 #endif
 
 extension Internals {

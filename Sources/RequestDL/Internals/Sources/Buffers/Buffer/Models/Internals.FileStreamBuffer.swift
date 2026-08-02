@@ -5,7 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import class Foundation.FileHandle
+import protocol Foundation.DataProtocol
+import struct Foundation.Data
 #endif
 
 extension Internals {

@@ -3,8 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import struct FoundationEssentials.URL
-import class FoundationEssentials.NSNumber
+import FoundationEssentials
 #else
 import struct Foundation.URL
 import class Foundation.NSNumber

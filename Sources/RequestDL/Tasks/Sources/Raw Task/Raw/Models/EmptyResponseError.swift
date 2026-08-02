@@ -3,7 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import protocol FoundationEssentials.LocalizedError
+import FoundationEssentials
 #else
 import protocol Foundation.LocalizedError
 #endif

@@ -2,14 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Dispatch
-import SwiftAsyncStream
-
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import struct Foundation.DispatchTime
+import var Foundation.NSEC_PER_SEC
 #endif
+import SwiftAsyncStream
 
 extension Internals {
 

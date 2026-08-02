@@ -3,7 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import struct FoundationEssentials.URL
+import FoundationEssentials
 #else
 import struct Foundation.URL
 #endif

@@ -187,6 +187,7 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
+    #if canImport(Darwin)
     ///
     /// Creates a form with the given parameters.
     ///
@@ -217,6 +218,7 @@ public struct Form<Headers: Property>: Property {
             headers: EmptyProperty()
         )
     }
+    #endif
 
     ///
     /// Creates a form with the given parameters and custom headers.
@@ -337,6 +339,7 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
+    #if canImport(Darwin)
     ///
     /// Creates a form with the given parameters and custom headers.
     ///
@@ -367,6 +370,7 @@ public struct Form<Headers: Property>: Property {
             headers: headers()
         )
     }
+    #endif
 
     private init(
         name: String,

@@ -5,7 +5,7 @@
 import Logging
 
 #if canImport(FoundationEssentials)
-import struct FoundationEssentials.UUID
+import FoundationEssentials
 #else
 import struct Foundation.UUID
 #endif

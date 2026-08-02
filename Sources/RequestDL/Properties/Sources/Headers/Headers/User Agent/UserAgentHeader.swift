@@ -3,7 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import class FoundationEssentials.ProcessInfo
+import FoundationEssentials
 #else
 import class Foundation.ProcessInfo
 #endif

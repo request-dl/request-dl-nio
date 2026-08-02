@@ -3,7 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import struct FoundationEssentials.Data
+import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif

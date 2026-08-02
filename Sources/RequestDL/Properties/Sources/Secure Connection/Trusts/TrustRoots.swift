@@ -3,7 +3,7 @@
 //
 
 #if canImport(FoundationEssentials)
-import class FoundationEssentials.Bundle
+import FoundationEssentials
 #else
 import class Foundation.Bundle
 #endif

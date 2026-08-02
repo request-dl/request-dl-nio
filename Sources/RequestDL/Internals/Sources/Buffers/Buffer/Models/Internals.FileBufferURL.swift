@@ -5,7 +5,11 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.URL
+import struct Foundation.Date
+import struct Foundation.Data
+import struct Foundation.UUID
+import class Foundation.FileManager
 #endif
 
 extension Internals {
