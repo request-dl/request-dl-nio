@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct TrustRootsTests {
 
@@ -55,11 +50,12 @@ struct TrustRootsTests {
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
 
-        let fileURL = FileManager.default.temporaryDirectory
+        let fileURL =
+            temporaryDirectoryURL
             .appendingPathComponent("RequestDL.\(UUID())")
             .appendingPathComponent("merged.pem")
 
-        defer { Task { try? await fileURL.removeIfNeeded() } }
+        defer { fileURL.scheduleRemoval() }
         try await fileURL.createPathIfNeeded()
 
         try data.write(to: fileURL)

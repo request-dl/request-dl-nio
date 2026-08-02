@@ -42,7 +42,7 @@ extension RequestTask {
             }
 
             let interval = Date().timeIntervalSince(time)
-            logger?.debug("Pinging \(index + 1) succeeded in \(String(format: "%.3f", interval))s")
+            logger?.debug("Pinging \(index + 1) succeeded in \(interval.fixed(fractionDigits: 3))s")
         }
     }
 }

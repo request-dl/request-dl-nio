@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct MultipartFormParser {
 
@@ -37,8 +32,8 @@ struct MultipartFormParser {
 
 extension MultipartFormParser {
 
-    func parse() throws -> MultipartForm {
-        let rawData = try rawData()
+    func parse() async throws -> MultipartForm {
+        let rawData = try await rawData()
         let chunks = try breakIntoChunks(rawData)
         return MultipartForm(
             try chunks.reduce([PartForm]()) {
@@ -51,8 +46,8 @@ extension MultipartFormParser {
 
 extension MultipartFormParser {
 
-    func rawData() throws -> RawData {
-        .init(from: buffers.reduce(Data()) { $0 + ($1.getData() ?? Data()) })
+    func rawData() async throws -> RawData {
+        await .init(from: buffers.async.reduce(Data()) { await $0 + ($1.getData() ?? Data()) })
     }
 
     func breakIntoChunks(_ rawData: RawData) throws -> [[RawData]] {

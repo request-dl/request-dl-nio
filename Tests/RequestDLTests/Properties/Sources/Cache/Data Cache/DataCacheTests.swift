@@ -2,19 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
+import AsyncAlgorithms
+import Foundation
 import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
-
-private let globalMemoryCapacity: UInt64 = 8 * 1_024 * 1_024
-private let globalDiskCapacity: UInt64 = 64 * 1_024 * 1_024
+private let globalMemoryCapacity: Int64 = 8 * 1_024 * 1_024
+private let globalDiskCapacity: Int64 = 64 * 1_024 * 1_024
 private let globalDataCache = DataCache(suiteName: UUID().uuidString)
 
 @Suite(.serialized)
@@ -33,7 +29,9 @@ struct DataCacheTests {
         }
 
         deinit {
-            dataCache.removeAll()
+            let dataCache = self.dataCache
+            Task.detached { await dataCache.removeAll() }
+
             globalDataCache.memoryCapacity = .zero
             globalDataCache.diskCapacity = .zero
         }
@@ -55,8 +53,8 @@ struct DataCacheTests {
         let testState = TestState()
         defer { _ = testState }
         // Given
-        let memoryCapacity: UInt64 = 4 * 1_024 * 1_024
-        let diskCapacity: UInt64 = 16 * 1_024 * 1_024
+        let memoryCapacity: Int64 = 4 * 1_024 * 1_024
+        let diskCapacity: Int64 = 16 * 1_024 * 1_024
 
         // When
         let dataCache = DataCache(
@@ -76,8 +74,8 @@ struct DataCacheTests {
         // Given
         let dataCache = testState.dataCache
 
-        let memoryCapacity: UInt64 = 4 * 1_024 * 1_024
-        let diskCapacity: UInt64 = 16 * 1_024 * 1_024
+        let memoryCapacity: Int64 = 4 * 1_024 * 1_024
+        let diskCapacity: Int64 = 16 * 1_024 * 1_024
 
         // When
         dataCache.memoryCapacity = memoryCapacity
@@ -89,7 +87,7 @@ struct DataCacheTests {
     }
 
     @Test
-    func cache_whenSetCachedData() throws {
+    func cache_whenSetCachedData() async throws {
         let testState = TestState()
         defer { _ = testState }
         // Given
@@ -98,12 +96,12 @@ struct DataCacheTests {
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
 
-        let data1 = Data.randomData(length: 1_024)
-        let data2 = Data.randomData(length: 8 * 1_024)
+        let data1 = await Data.randomData(length: 1_024)
+        let data2 = await Data.randomData(length: 8 * 1_024)
 
         // When
         for (key, data) in [(key1, data1), (key2, data2)] {
-            dataCache.setCachedData(
+            await dataCache.setCachedData(
                 CachedData(
                     response: mockResponse(url: key),
                     policy: .all,
@@ -113,22 +111,22 @@ struct DataCacheTests {
             )
         }
 
-        let cachedMemory1 = dataCache.getCachedData(forKey: key1, policy: .memory)
-        let cachedDisk1 = dataCache.getCachedData(forKey: key1, policy: .disk)
+        let cachedMemory1 = await dataCache.getCachedData(forKey: key1, policy: .memory)
+        let cachedDisk1 = await dataCache.getCachedData(forKey: key1, policy: .disk)
 
-        let cachedMemory2 = dataCache.getCachedData(forKey: key2, policy: .memory)
-        let cachedDisk2 = dataCache.getCachedData(forKey: key2, policy: .disk)
+        let cachedMemory2 = await dataCache.getCachedData(forKey: key2, policy: .memory)
+        let cachedDisk2 = await dataCache.getCachedData(forKey: key2, policy: .disk)
 
         // Then
-        #expect(cachedMemory1?.data == data1)
-        #expect(cachedDisk1?.data == data1)
+        await #expect(cachedMemory1?.data == data1)
+        await #expect(cachedDisk1?.data == data1)
 
-        #expect(cachedMemory2?.data == data2)
-        #expect(cachedDisk2?.data == data2)
+        await #expect(cachedMemory2?.data == data2)
+        await #expect(cachedDisk2?.data == data2)
     }
 
     @Test
-    func cache_whenLowMemory() throws {
+    func cache_whenLowMemory() async throws {
         let testState = TestState()
         // Given
         let dataCache = testState.dataCache
@@ -138,33 +136,33 @@ struct DataCacheTests {
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
 
-        let cachedData1 = mockCachedData(
+        let cachedData1 = await mockCachedData(
             url: key1,
             length: 1_024 - 256,
             policy: .memory
         )
 
-        let cachedData2 = mockCachedData(
+        let cachedData2 = await mockCachedData(
             url: key2,
             length: 512,
             policy: .memory
         )
 
         // When
-        dataCache.setCachedData(cachedData1, forKey: key1)
-        dataCache.setCachedData(cachedData2, forKey: key2)
+        await dataCache.setCachedData(cachedData1, forKey: key1)
+        await dataCache.setCachedData(cachedData2, forKey: key2)
 
-        let cachedMemory1 = dataCache.getCachedData(forKey: key1, policy: .memory)
-        let cachedMemory2 = dataCache.getCachedData(forKey: key2, policy: .memory)
+        let cachedMemory1 = await dataCache.getCachedData(forKey: key1, policy: .memory)
+        let cachedMemory2 = await dataCache.getCachedData(forKey: key2, policy: .memory)
 
         // Then
         #expect(cachedMemory1 == nil)
 
-        #expect(cachedMemory2?.data == cachedData2.data)
+        await #expect(cachedMemory2?.data == cachedData2.data)
     }
 
     @Test
-    func cache_whenLowDisk() throws {
+    func cache_whenLowDisk() async throws {
         let testState = TestState()
         defer { _ = testState }
         // Given
@@ -172,36 +170,38 @@ struct DataCacheTests {
 
         dataCache.diskCapacity = 1_024
 
+        await dataCache.waitUntilIdle()
+
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
 
-        let cachedData1 = mockCachedData(
+        let cachedData1 = await mockCachedData(
             url: key1,
             length: 1_024 - 256,
             policy: .disk
         )
 
-        let cachedData2 = mockCachedData(
+        let cachedData2 = await mockCachedData(
             url: key2,
             length: 512,
             policy: .disk
         )
 
         // When
-        dataCache.setCachedData(cachedData1, forKey: key1)
-        dataCache.setCachedData(cachedData2, forKey: key2)
+        await dataCache.setCachedData(cachedData1, forKey: key1)
+        await dataCache.setCachedData(cachedData2, forKey: key2)
 
-        let cachedDisk1 = dataCache.getCachedData(forKey: key1, policy: .disk)
-        let cachedDisk2 = dataCache.getCachedData(forKey: key2, policy: .disk)
+        let cachedDisk1 = await dataCache.getCachedData(forKey: key1, policy: .disk)
+        let cachedDisk2 = await dataCache.getCachedData(forKey: key2, policy: .disk)
 
         // Then
         #expect(cachedDisk1 == nil)
 
-        #expect(cachedDisk2?.data == cachedData2.data)
+        await #expect(cachedDisk2?.data == cachedData2.data)
     }
 
     @Test
-    func cache_whenRemoveKey() throws {
+    func cache_whenRemoveKey() async throws {
         let testState = TestState()
         defer { _ = testState }
 
@@ -211,96 +211,104 @@ struct DataCacheTests {
         let key1 = "https://google.com"
         let key2 = "https://apple.com"
 
-        let cachedData1 = mockCachedData(
+        let cachedData1 = await mockCachedData(
             url: key1,
             length: 1_024 - 256
         )
 
-        let cachedData2 = mockCachedData(
+        let cachedData2 = await mockCachedData(
             url: key2,
             length: 512
         )
 
         // When
-        dataCache.setCachedData(cachedData1, forKey: key1)
-        dataCache.setCachedData(cachedData2, forKey: key2)
+        await dataCache.setCachedData(cachedData1, forKey: key1)
+        await dataCache.setCachedData(cachedData2, forKey: key2)
 
-        let memoryCached1 = dataCache.getCachedData(forKey: key1, policy: .memory)
-        let diskCached1 = dataCache.getCachedData(forKey: key1, policy: .disk)
-        let diskCached1Data = diskCached1?.data
+        let memoryCached1 = await dataCache.getCachedData(forKey: key1, policy: .memory)
+        let diskCached1 = await dataCache.getCachedData(forKey: key1, policy: .disk)
+        let diskCached1Data = await diskCached1?.data
 
-        dataCache.remove(forKey: key1)
+        await dataCache.remove(forKey: key1)
 
-        let memoryCached2 = dataCache.getCachedData(forKey: key2, policy: .memory)
-        let diskCached2 = dataCache.getCachedData(forKey: key2, policy: .disk)
+        let memoryCached2 = await dataCache.getCachedData(forKey: key2, policy: .memory)
+        let diskCached2 = await dataCache.getCachedData(forKey: key2, policy: .disk)
 
-        let memoryCached1_v2 = dataCache.getCachedData(forKey: key1, policy: .memory)
-        let diskCached1_v2 = dataCache.getCachedData(forKey: key1, policy: .disk)
+        let memoryCached1_v2 = await dataCache.getCachedData(forKey: key1, policy: .memory)
+        let diskCached1_v2 = await dataCache.getCachedData(forKey: key1, policy: .disk)
 
         // Then
-        #expect(memoryCached1?.data == cachedData1.data)
-        #expect(diskCached1Data == cachedData1.data)
+        await #expect(memoryCached1?.data == cachedData1.data)
+        await #expect(diskCached1Data == cachedData1.data)
 
-        #expect(memoryCached2?.data == cachedData2.data)
-        #expect(diskCached2?.data == cachedData2.data)
+        await #expect(memoryCached2?.data == cachedData2.data)
+        await #expect(diskCached2?.data == cachedData2.data)
 
         #expect(memoryCached1_v2 == nil)
         #expect(diskCached1_v2 == nil)
     }
 
     @Test
-    func cache_whenRemoveSince() throws {
+    func cache_whenRemoveSince() async throws {
         let testState = TestState()
         // Given
         let dataCache = testState.dataCache
 
-        let cachedDatas = (0..<3).map {
-            mockCachedData(
-                url: "https://google.com/\($0)",
-                length: 1_024
-            )
-        }
+        let cachedDatas = try await Array(
+            (0..<3).async.map {
+                await mockCachedData(
+                    url: "https://google.com/\($0)",
+                    length: 1_024
+                )
+            }
+        )
 
         // When
         for cacheData in cachedDatas {
-            dataCache.setCachedData(cacheData, forKey: cacheData.cachedResponse.response.url)
+            await dataCache.setCachedData(cacheData, forKey: cacheData.cachedResponse.response.url)
         }
 
-        dataCache.removeAll(since: cachedDatas[1].cachedResponse.date)
+        await dataCache.removeAll(since: cachedDatas[1].cachedResponse.date)
 
-        let storedDatas = [0, 1, 2].map {
-            dataCache.getCachedData(forKey: "https://google.com/\($0)", policy: .all)
-        }
+        let storedDatas = try await Array(
+            [0, 1, 2].async.map {
+                await dataCache.getCachedData(forKey: "https://google.com/\($0)", policy: .all)
+            }
+        )
 
         // Then
         #expect(storedDatas[0] == nil)
         #expect(storedDatas[1] == nil)
-        #expect(storedDatas[2]?.data == cachedDatas[2].data)
+        await #expect(storedDatas[2]?.data == cachedDatas[2].data)
     }
 
     @Test
-    func cache_whenRemoveAll() throws {
+    func cache_whenRemoveAll() async throws {
         let testState = TestState()
         // Given
         let dataCache = testState.dataCache
 
-        let cachedDatas = (0..<3).map {
-            mockCachedData(
-                url: "https://google.com/\($0)",
-                length: 1_024
-            )
-        }
+        let cachedDatas = try await Array(
+            (0..<3).async.map {
+                await mockCachedData(
+                    url: "https://google.com/\($0)",
+                    length: 1_024
+                )
+            }
+        )
 
         // When
         for cacheData in cachedDatas {
-            dataCache.setCachedData(cacheData, forKey: cacheData.cachedResponse.response.url)
+            await dataCache.setCachedData(cacheData, forKey: cacheData.cachedResponse.response.url)
         }
 
-        dataCache.removeAll()
+        await dataCache.removeAll()
 
-        let storedDatas = [0, 1, 2].map {
-            dataCache.getCachedData(forKey: "https://google.com/\($0)", policy: .all)
-        }
+        let storedDatas = try await Array(
+            [0, 1, 2].async.map {
+                await dataCache.getCachedData(forKey: "https://google.com/\($0)", policy: .all)
+            }
+        )
 
         // Then
         #expect(storedDatas[0] == nil)
@@ -349,8 +357,8 @@ extension DataCacheTests {
         length: Int,
         policy: DataCache.Policy.Set = .all,
         expiresAt expirationDate: Date = .distantFuture
-    ) -> CachedData {
-        CachedData(
+    ) async -> CachedData {
+        await CachedData(
             response: mockResponse(url: url, expiresAt: expirationDate),
             policy: policy,
             data: Data.randomData(length: length)
@@ -377,7 +385,7 @@ extension DataCacheTests {
             Task.detached(priority: .background) {
                 defer { lock.signal() }
 
-                _ = dataCache.allocateBuffer(
+                _ = await dataCache.allocateBuffer(
                     key: key + "\(index)",
                     cachedResponse: .init(
                         response: .init(

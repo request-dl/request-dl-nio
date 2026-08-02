@@ -5,7 +5,8 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.Data
+import class Foundation.JSONEncoder
 #endif
 
 struct EncodablePayloadFactory: Sendable, PayloadFactory {
@@ -33,7 +34,7 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
 
     // MARK: - Internal methods
 
-    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
+    func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
         // Encoded once, with the encoder the caller configured, and reused on every path.
         //
         // The form-urlencoded path used to re-encode through a default `JSONEncoder`, which
@@ -45,28 +46,36 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
         let data = try encode(encoder)
 
         guard contentType.isFormURLEncoded else {
-            return .init(
+            return await .init(
                 contentType: contentType,
                 source: .buffer(Internals.DataBuffer(data))
             )
         }
 
-        switch try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {
-        case let array as [Any]:
-            return try input.jsonObject(array, contentType: contentType)
+        // Parsed through `JSONDecoder` rather than `JSONSerialization`, which is not part of
+        // `FoundationEssentials`. `JSONPayloadFactory` is gated behind `canImport(Darwin)` for
+        // exactly that reason, and this file was reaching for the same type with no guard at
+        // all, so the form-urlencoded path could not build off Apple.
+        switch Internals.JSONValue.decoding(data) {
+        case .object(let object):
+            return try input.jsonObject(
+                object.mapValues(\.rawValue) as [AnyHashable: Any],
+                contentType: contentType
+            )
 
-        case let dictionary as [AnyHashable: Any]:
-            return try input.jsonObject(dictionary, contentType: contentType)
+        case .array(let array):
+            return try input.jsonObject(
+                array.map(\.rawValue),
+                contentType: contentType
+            )
 
         default:
-            return .init(
+            // A top level fragment, or something that did not parse. Sent as encoded, which is
+            // what the `default` branch of the previous version did.
+            return await .init(
                 contentType: contentType,
                 source: .buffer(Internals.DataBuffer(data))
             )
         }
     }
-
-    // The no argument `callAsFunction()` that used to live here is gone. `PayloadFactory`
-    // declares only the `PayloadInput` form, and both consumers hold the factory as an
-    // existential, so nothing could reach the overload even if it wanted to.
 }

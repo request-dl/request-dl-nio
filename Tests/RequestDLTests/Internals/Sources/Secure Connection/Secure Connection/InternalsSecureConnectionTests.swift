@@ -2,17 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import NIOCore
 import NIOSSL
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsSecureConnectionTests {
 

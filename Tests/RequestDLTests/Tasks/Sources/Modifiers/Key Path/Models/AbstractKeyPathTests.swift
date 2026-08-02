@@ -6,6 +6,7 @@ import Testing
 
 @testable import RequestDL
 
+#if canImport(Darwin)
 struct AbstractKeyPathTests {
 
     @Test
@@ -22,3 +23,4 @@ struct AbstractKeyPathTests {
         #expect(keyPath == "results")
     }
 }
+#endif

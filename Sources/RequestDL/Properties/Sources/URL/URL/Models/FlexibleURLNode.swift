@@ -5,7 +5,8 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.URL
+import struct Foundation.URLComponents
 #endif
 
 struct FlexibleURLNode: PropertyNode {
@@ -13,7 +14,9 @@ struct FlexibleURLNode: PropertyNode {
     let url: String
 
     func make(_ make: inout Make) async throws {
-        let normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        // `Character.isWhitespace` already covers newlines, so this is the whole of
+        // `.whitespacesAndNewlines` without needing `Foundation.CharacterSet`.
+        let normalized = url.trimming(where: \.isWhitespace)
 
         if normalized.contains("://") {
             guard let url = URL(string: normalized) else {

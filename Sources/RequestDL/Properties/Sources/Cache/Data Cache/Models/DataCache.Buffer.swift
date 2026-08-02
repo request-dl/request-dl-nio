@@ -27,13 +27,13 @@ extension DataCache {
 
         // MARK: - Internal methods
 
-        mutating func writeBuffer(_ buffer: Internals.AnyBuffer) {
-            guard let bytes = buffer.getBytes() else {
+        mutating func writeBuffer(_ buffer: Internals.AnyBuffer) async {
+            guard let bytes = await buffer.getBytes() else {
                 return
             }
 
-            memoryBuffer?.writeBytes(bytes)
-            diskBuffer?.writeBytes(bytes)
+            await memoryBuffer?.writeBytes(bytes)
+            await diskBuffer?.writeBytes(bytes)
         }
     }
 }

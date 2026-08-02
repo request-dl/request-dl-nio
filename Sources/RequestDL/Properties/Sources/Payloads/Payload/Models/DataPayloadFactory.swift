@@ -17,8 +17,8 @@ struct DataPayloadFactory: PayloadFactory {
 
     // MARK: - Internal methods
 
-    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
-        .init(
+    func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
+        await .init(
             contentType: contentType,
             source: .buffer(Internals.DataBuffer(data))
         )

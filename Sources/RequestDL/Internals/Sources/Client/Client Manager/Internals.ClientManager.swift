@@ -5,10 +5,6 @@
 import NIOCore
 import SwiftAsyncStream
 
-#if canImport(Darwin)
-import var Foundation.NSEC_PER_SEC
-#endif
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -22,13 +18,13 @@ extension Internals {
 
         // MARK: - Internal static properties
 
-        static let lifetime: UInt64 = 5 * 60 * NSEC_PER_SEC
+        static let lifetime = TimeAmount.seconds(5 * 60)
         static let shared = ClientManager(lifetime: lifetime)
 
         // MARK: - Private properties
 
         private let lock = AsyncLock()
-        private let lifetime: UInt64
+        private let lifetime: TimeAmount
 
         private let tableLock = Lock()
 
@@ -38,7 +34,7 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(lifetime: UInt64) {
+        init(lifetime: TimeAmount) {
             self.lifetime = lifetime
             scheduleCleanup()
         }
@@ -83,7 +79,7 @@ extension Internals {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
                 while true {
                     do {
-                        try await _Concurrency.Task.sleep(nanoseconds: lifetime)
+                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds))
                     } catch {
                         // Sleeping fails on cancellation and nothing else. Yielding and looping
                         // meant the next sleep failed immediately too, turning this into a
@@ -116,7 +112,7 @@ extension Internals {
                             continue
                         }
 
-                        guard now - item.readAt > lifetime else {
+                        guard now - item.readAt > lifetime.nanoseconds else {
                             surviving.append(item)
                             continue
                         }
@@ -151,7 +147,7 @@ extension Internals {
                 var items = _table[id],
                 let index = items.firstIndex(where: {
                     $0.sessionConfiguration == sessionConfiguration
-                        && now - $0.readAt <= lifetime
+                        && now - $0.readAt <= lifetime.nanoseconds
                 })
             else { return nil }
 

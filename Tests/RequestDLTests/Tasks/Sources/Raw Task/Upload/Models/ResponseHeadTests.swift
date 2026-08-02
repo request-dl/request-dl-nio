@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct ResponseHeadTests {
 
@@ -39,7 +34,7 @@ struct ResponseHeadTests {
                 https://google.com/?q=search
                 200 Ok Status
 
-                HTTP version range: 1 ... 3
+                HTTP/3.1
                 Keep alive: false
 
                 Content-Type: application/json

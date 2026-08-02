@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsSessionTests {
 
@@ -77,13 +72,13 @@ struct InternalsSessionTests {
         // Given
         let session = testState.session
         let length = 1_023
-        let data = Data.randomData(length: length)
+        let data = await Data.randomData(length: length)
 
         var requestConfiguration = RequestConfiguration()
         requestConfiguration.baseURL = "https://localhost:8888"
         requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         requestConfiguration.method = "POST"
-        requestConfiguration.body = RequestBody(buffers: [
+        requestConfiguration.body = await RequestBody(buffers: [
             Internals.DataBuffer(data)
         ])
 
@@ -168,11 +163,11 @@ struct InternalsSessionTests {
             .deletingLastPathComponent()
             .appendingPathComponent("UploadingFile.txt")
 
-        defer { try? url.removeIfNeeded() }
-        try url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+        try await url.createPathIfNeeded()
 
-        var fileBuffer = Internals.FileBuffer(url)
-        fileBuffer.writeData(Data.randomData(length: length))
+        var fileBuffer = await Internals.FileBuffer(url)
+        await fileBuffer.writeData(Data.randomData(length: length))
 
         let response = try LocalServer.ResponseConfiguration(
             jsonObject: message

@@ -178,7 +178,7 @@ extension Internals.SystemProxyResolver {
         return
             list
             .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .map { $0.trimming(where: \.isWhitespace).lowercased() }
             .contains { entry in
                 guard entry != "*" else {
                     return true

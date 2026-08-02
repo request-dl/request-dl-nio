@@ -2,23 +2,18 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct FormGroupTests {
 
     @Test
     func group_whenMultipleData() async throws {
         // Given
-        let parts = (0..<10).map { _ in
-            Data.randomData(length: (0...256).randomElement() ?? 256)
+        let parts = await Data.randomParts(10) { _ in
+            await Data.randomData(length: (0...256).randomElement() ?? 256)
         }
 
         // When
@@ -36,7 +31,7 @@ struct FormGroupTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -45,10 +40,10 @@ struct FormGroupTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
                 String(
-                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                    parser.buffers.async.map { await $0.estimatedBytes }.reduce(.zero, +)
                 )
             ]
         )
@@ -59,16 +54,16 @@ struct FormGroupTests {
     @Test
     func group_whenMultipleDataWithFormGroup() async throws {
         // Given
-        let parts1 = (0..<6).map { _ in
-            Data.randomData(length: (0...256).randomElement() ?? 256)
+        let parts1 = await Data.randomParts(6) { _ in
+            await Data.randomData(length: (0...256).randomElement() ?? 256)
         }
 
-        let parts2 = (0..<3).map { _ in
-            Data.randomData(length: (0...128).randomElement() ?? 128)
+        let parts2 = await Data.randomParts(3) { _ in
+            await Data.randomData(length: (0...128).randomElement() ?? 128)
         }
 
-        let parts3 = (0..<9).map { _ in
-            Data.randomData(length: (0...64).randomElement() ?? 64)
+        let parts3 = await Data.randomParts(9) { _ in
+            await Data.randomData(length: (0...64).randomElement() ?? 64)
         }
 
         // When
@@ -106,7 +101,7 @@ struct FormGroupTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -115,10 +110,10 @@ struct FormGroupTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
                 String(
-                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                    parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +)
                 )
             ]
         )
@@ -134,7 +129,7 @@ struct FormGroupTests {
     func group_whenChunkSize() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 256)
+        let data = await Data.randomData(length: 256)
         let chunkSize = 64
 
         // When
@@ -151,15 +146,16 @@ struct FormGroupTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
-        let builtData = buffers.compactMap { $0.getData() }.reduce(Data(), +)
+        let builtData = await buffers.async.compactMap { await $0.getData() }.reduce(Data(), +)
         let totalBytes = builtData.count
 
         // Then
+        let resolvedData = try await Array(buffers.async.compactMap { await $0.getData() })
         #expect(
-            buffers.compactMap { $0.getData() }
+            resolvedData
                 == stride(from: .zero, to: totalBytes, by: chunkSize).map {
                     let upperBound = $0 + chunkSize
                     return builtData[$0..<(upperBound <= totalBytes ? upperBound : totalBytes)]
@@ -172,10 +168,10 @@ struct FormGroupTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
                 String(
-                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                    parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +)
                 )
             ]
         )
@@ -198,10 +194,12 @@ struct FormGroupTests {
     func group_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = FormGroup {
-            Form(
-                name: "foo",
-                data: .randomData(length: 64)
-            )
+            AsyncProperty {
+                Form(
+                    name: "foo",
+                    data: await .randomData(length: 64)
+                )
+            }
         }
 
         // Then

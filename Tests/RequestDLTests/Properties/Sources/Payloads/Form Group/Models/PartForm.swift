@@ -2,13 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
 import Foundation
-#endif
+import RequestDL
 
 struct PartForm: Hashable {
 

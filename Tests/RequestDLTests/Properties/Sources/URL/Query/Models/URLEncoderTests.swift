@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct URLEncoderTests {
 
@@ -303,18 +298,19 @@ struct URLEncoderTests {
     @Test
     func encoder_whenDateWithMillisecondsSince1970() throws {
         let urlEncoder = URLEncoder()
-        // Given
 
+        // Given
         let key = "foo"
         let date = Date()
-
         urlEncoder.dateEncodingStrategy = .millisecondsSince1970
 
         // When
         let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
-        #expect(sut == "\(key)=\(Int64(date.timeIntervalSince1970) * 1_000)")
+        let expectedMilliseconds = Int64(date.timeIntervalSince1970 * 1000)
+
+        #expect(sut == "\(key)=\(expectedMilliseconds)")
     }
 
     @Test
@@ -338,23 +334,22 @@ struct URLEncoderTests {
     }
 
     @Test
-    func encoder_whenDateWithDateFormatter() throws {
+    func encoder_whenDateWithCustomStrategy() throws {
         let urlEncoder = URLEncoder()
-        // Given
 
+        // Given
         let key = "foo"
         let date = Date()
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "YYYY-MM-dd"
-
-        urlEncoder.dateEncodingStrategy = .formatter(dateFormatter)
+        urlEncoder.dateEncodingStrategy = .custom { date in
+            date.formatted(.iso8601)
+        }
 
         // When
         let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
-        let expectedDate = dateFormatter.string(from: date)
+        let expectedDate = date.formatted(.iso8601)
 
         #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
@@ -362,21 +357,27 @@ struct URLEncoderTests {
     @Test
     func encoder_whenDateWithCustom() throws {
         let urlEncoder = URLEncoder()
-        // Given
 
+        // Given
         let key = "foo"
         let date = Date()
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "YYYY-MM-dd"
-
-        urlEncoder.dateEncodingStrategy = .formatter(dateFormatter)
+        urlEncoder.dateEncodingStrategy = .custom { date in
+            // Como estamos no target de testes, podemos usar DateFormatter aqui.
+            // Dica: Use "yyyy" (ano do calendário) em vez de "YYYY" (ano da semana),
+            // que pode causar bugs estranhos na virada do ano.
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter.string(from: date)
+        }
 
         // When
         let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
-        let expectedDate = dateFormatter.string(from: date)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let expectedDate = formatter.string(from: date)
 
         #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
@@ -656,11 +657,11 @@ struct URLEncoderTests {
     // MARK: - Data
 
     @Test
-    func encoder_whenDataWithBase64() throws {
+    func encoder_whenDataWithBase64() async throws {
         let urlEncoder = URLEncoder()
         // Given
         let key = "foo"
-        let value = Data.randomData(length: 64)
+        let value = await Data.randomData(length: 64)
 
         // When
         let sut = try urlEncoder.encode(value, forKey: key)
@@ -675,12 +676,12 @@ struct URLEncoderTests {
     }
 
     @Test
-    func encoder_whenDataWithCustom() throws {
+    func encoder_whenDataWithCustom() async throws {
         let urlEncoder = URLEncoder()
         // Given
 
         let key = "foo"
-        let value = Data.randomData(length: 64)
+        let value = await Data.randomData(length: 64)
 
         urlEncoder.dataEncodingStrategy = .custom {
             var container = $1.valueContainer()
@@ -897,7 +898,6 @@ extension URLEncoder {
 
     fileprivate func encode<Value>(_ value: Value, forKey key: String) throws -> String {
         try self.encode(value, forKey: key)
-            .map { $0.build() }
             .joined()
     }
 }

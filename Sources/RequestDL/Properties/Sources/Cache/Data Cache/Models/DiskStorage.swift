@@ -2,96 +2,66 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+// `NIOFileSystem` is the public module; `_NIOFileSystem` is the underscored implementation
+// target it re-exports.
+import NIOFileSystem
+import SystemPackage
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.URL
+import struct Foundation.Date
+import struct Foundation.Data
+import struct Foundation.TimeInterval
+import class Foundation.JSONDecoder
+import class Foundation.JSONEncoder
 #endif
 
 struct DiskStorage: Sendable {
 
-    private struct Records: Sequence, Sendable {
-
-        struct Iterator: IteratorProtocol {
-
-            // MARK: - Internal properties
-
-            var urls: [URL]
-
-            // MARK: - Internal methods
-
-            mutating func next() -> Record? {
-                while let url = urls.first {
-                    urls.removeFirst()
-
-                    if let record = Record(url) {
-                        return record
-                    }
-                }
-
-                return nil
-            }
-        }
-
-        // MARK: - Internal properties
-
-        let directory: URL
-        let keys: [URLResourceKey]
-
-        // MARK: - Internal methods
-
-        func makeIterator() -> Iterator {
-            let urls = try? FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: keys
-            )
-
-            return .init(urls: urls ?? [])
-        }
-    }
-
     struct Record: Sendable {
 
         // MARK: - Internal static properties
-
         static let pathExtension = "cached"
-
-        // MARK: - Private static properties
-
         private static let responsePath = "response.record"
         private static let dataPath = "data.record"
 
         // MARK: - Internal properties
+        var size: Int64 {
+            get async {
+                let responsePath = responseURL.filePath
+                let dataPath = dataURL.filePath
 
-        var size: UInt64 {
-            do {
-                let cachedValues = try responseURL.resourceValues(forKeys: [.fileSizeKey])
-                let dataValues = try dataURL.resourceValues(forKeys: [.fileSizeKey])
+                let responseInfo = try? await FileSystem.shared.info(forFileAt: responsePath)
+                let dataInfo = try? await FileSystem.shared.info(forFileAt: dataPath)
 
-                let cachedSize = UInt64(cachedValues.fileSize ?? .zero)
-                let dataSize = UInt64(dataValues.fileSize ?? .zero)
-
-                return cachedSize + dataSize
-            } catch {
-                return .zero
+                return (responseInfo?.size ?? 0) + (dataInfo?.size ?? 0)
             }
         }
 
         let key: String
         let url: URL
         let date: Date
-
         let responseURL: URL
         let dataURL: URL
 
         // MARK: - Inits
 
-        init?(_ url: URL) {
-            guard
-                url.pathExtension == Self.pathExtension,
-                let (key, date) = Self.getKeyAndDate(url),
-                let (responseURL, dataURL) = Self.getResponseAndDataCachedURLs(url)
+        init?(_ url: URL) async {
+            guard url.pathExtension == Self.pathExtension,
+                let (key, date) = Self.getKeyAndDate(url)
             else { return nil }
+
+            let responseURL = url.appendingPathComponent(Self.responsePath)
+            let dataURL = url.appendingPathComponent(Self.dataPath)
+
+            // Both files have to be on disk for the record to be usable.
+            let responseExists = (try? await FileSystem.shared.info(forFileAt: responseURL.filePath)) != nil
+            let dataExists = (try? await FileSystem.shared.info(forFileAt: dataURL.filePath)) != nil
+
+            guard responseExists, dataExists else { return nil }
 
             self.date = date
             self.key = key
@@ -100,81 +70,45 @@ struct DiskStorage: Sendable {
             self.dataURL = dataURL
         }
 
-        init(
-            directory: URL,
-            key: String,
-            at date: Date
-        ) {
+        init(directory: URL, key: String, at date: Date) async {
             let timeUnit = Int(date.timeIntervalSinceReferenceDate)
-
             var directoryPathComponent = String(timeUnit, radix: 36)
-            directoryPathComponent += "."
-            directoryPathComponent += key
-            directoryPathComponent += "."
-            directoryPathComponent += DiskStorage.Record.pathExtension
+            directoryPathComponent += ".\(key).\(DiskStorage.Record.pathExtension)"
 
             let url = directory.appendingPathComponent(directoryPathComponent, isDirectory: true)
+            let responseURL = url.appendingPathComponent(DiskStorage.Record.responsePath)
+            let dataURL = url.appendingPathComponent(DiskStorage.Record.dataPath)
 
             self.url = url
             self.key = key
             self.date = date
-
-            let responseURL = url.appendingPathComponent(DiskStorage.Record.responsePath)
-            let dataURL = url.appendingPathComponent(DiskStorage.Record.dataPath)
-
             self.responseURL = responseURL
             self.dataURL = dataURL
 
             do {
-                try FileManager.default.createDirectory(
-                    at: url,
+                try await FileSystem.shared.createDirectory(
+                    at: url.filePath,
                     withIntermediateDirectories: true
                 )
-            } catch {}
+            } catch {
+                // Silent. Whoever writes through this record reports the failure with context.
+            }
         }
 
         // MARK: - Private static methods
 
         private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
-            var components =
-                url
-                .deletingPathExtension()
-                .lastPathComponent
-                .split(separator: ".")
-
-            guard let time = components.first.flatMap({ Int64($0, radix: 36) }) else {
-                return nil
-            }
-
+            var components = url.deletingPathExtension().lastPathComponent.split(separator: ".")
+            guard let time = components.first.flatMap({ Int64($0, radix: 36) }) else { return nil }
             components.removeFirst()
-
-            return (
-                components.joined(separator: "."),
-                Date(timeIntervalSinceReferenceDate: TimeInterval(time))
-            )
-        }
-
-        private static func getResponseAndDataCachedURLs(_ url: URL) -> (URL, URL)? {
-            guard
-                let contents = try? FileManager.default.contentsOfDirectory(
-                    at: url,
-                    includingPropertiesForKeys: [.fileSizeKey]
-                ),
-                contents.count == 2,
-                let responseURL = contents.first(where: { $0.lastPathComponent == Self.responsePath }),
-                let dataURL = contents.first(where: { $0.lastPathComponent == Self.dataPath })
-            else { return nil }
-
-            return (responseURL, dataURL)
+            return (components.joined(separator: "."), Date(timeIntervalSinceReferenceDate: TimeInterval(time)))
         }
     }
 
     // MARK: - Private properties
-
     private let directory: URL
 
     // MARK: - Inits
-
     init(directory: URL) {
         self.directory = directory
     }
@@ -182,138 +116,199 @@ struct DiskStorage: Sendable {
     // MARK: - Internal methods
 
     subscript(_ key: String) -> CachedData? {
-        guard
-            let record = record(key),
-            let responseData = try? Data(contentsOf: record.responseURL),
-            let cachedResponse = try? JSONDecoder().decode(CachedResponse.self, from: responseData)
-        else { return nil }
+        get async {
+            guard let record = await record(key) else { return nil }
 
-        return .init(
-            cachedResponse: cachedResponse,
-            buffer: Internals.FileBuffer(record.dataURL)
+            let responsePath = record.responseURL.filePath
+            guard
+                let handle = try? await FileSystem.shared.openFile(forReadingAt: responsePath),
+                let buffer = try? await handle.readToEnd(maximumSizeAllowed: .unlimited)
+            else { return nil }
+
+            let responseData =
+                buffer.getData(
+                    at: buffer.readerIndex,
+                    length: buffer.readableBytes
+                ) ?? Data()
+
+            guard
+                let cachedResponse = try? JSONDecoder().decode(
+                    CachedResponse.self,
+                    from: responseData
+                )
+            else { return nil }
+
+            return await .init(
+                cachedResponse: cachedResponse,
+                buffer: Internals.FileBuffer(record.dataURL)
+            )
+        }
+    }
+
+    func remove(_ key: String) async {
+        guard let record = await record(key) else { return }
+        _ = try? await FileSystem.shared.removeItem(
+            at: record.url.filePath
         )
     }
 
-    func remove(_ key: String) {
-        guard let record = record(key) else {
-            return
-        }
-
-        try? FileManager.default.removeItem(at: record.url)
+    func removeAll() async {
+        await freeSpace(.zero)
     }
 
-    func removeAll() {
-        freeSpace(.zero)
-    }
-
-    func removeAll(since date: Date) {
-        for record in records() where record.date <= date {
-            try? FileManager.default.removeItem(at: record.url)
+    func removeAll(since date: Date) async {
+        let recordsToCheck = await records()
+        for record in recordsToCheck where record.date <= date {
+            _ = try? await FileSystem.shared.removeItem(
+                at: record.url.filePath
+            )
         }
     }
 
     func updateCached(
         key: String,
         cachedResponse: CachedResponse,
-        maximumCapacity: UInt64
-    ) {
-        guard
-            let record = record(key),
+        maximumCapacity: Int64
+    ) async {
+        guard let record = await record(key),
             let response = try? JSONEncoder().encode(cachedResponse)
         else { return }
 
-        let responseLength = try? record.responseURL.resourceValues(forKeys: [.fileSizeKey]).fileSize
-        let spaceChange = response.count - (responseLength ?? .zero)
-        let spaceNeeded = UInt64(spaceChange < .zero ? .zero : spaceChange)
+        let responseInfo = try? await FileSystem.shared.info(forFileAt: record.responseURL.filePath)
+        let responseLength = responseInfo?.size ?? 0
+        let spaceChange = Int64(response.count) - Int64(responseLength)
+        let spaceNeeded = Int64(spaceChange < 0 ? 0 : spaceChange)
 
-        guard spaceNeeded <= maximumCapacity else {
-            return
-        }
+        guard spaceNeeded <= maximumCapacity else { return }
 
-        freeSpace(maximumCapacity - spaceNeeded)
+        await freeSpace(maximumCapacity - spaceNeeded)
 
-        guard
-            record.dataURL.isReachable,
-            let newRecord = self.record(key, createdAt: cachedResponse.date)
+        guard await record.dataURL.isReachable,
+            let newRecord = await self.record(key, createdAt: cachedResponse.date)
         else { return }
 
         do {
-            try FileManager.default.moveItem(
-                at: record.dataURL,
-                to: newRecord.dataURL
-            )
+            let oldDataPath = record.dataURL.filePath
+            let newDataPath = newRecord.dataURL.filePath
+            try await FileSystem.shared.moveItem(at: oldDataPath, to: newDataPath)
 
-            try response.write(to: newRecord.responseURL)
+            let newResponsePath = newRecord.responseURL.filePath
+            let handle = try await FileSystem.shared.openFile(
+                forWritingAt: newResponsePath,
+                options: .newFile(replaceExisting: true)
+            )
+            try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
+            try await handle.close()
         } catch {
-            try? FileManager.default.removeItem(at: newRecord.url)
+            _ = try? await FileSystem.shared.removeItem(
+                at: newRecord.url.filePath
+            )
         }
 
-        try? FileManager.default.removeItem(at: record.url)
+        _ = try? await FileSystem.shared.removeItem(
+            at: record.url.filePath
+        )
     }
 
     func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
-        contentLength: UInt64,
-        maximumCapacity: UInt64
-    ) -> Internals.AnyBuffer? {
-        guard let response = try? JSONEncoder().encode(cachedResponse) else {
+        contentLength: Int64,
+        maximumCapacity: Int64
+    ) async -> Internals.AnyBuffer? {
+        guard let response = try? JSONEncoder().encode(cachedResponse) else { return nil }
+
+        let writableBytes = Int64(response.count) + contentLength
+        guard writableBytes <= maximumCapacity else { return nil }
+
+        await freeSpace(maximumCapacity - writableBytes)
+
+        guard let record = await record(key, createdAt: cachedResponse.date) else { return nil }
+
+        do {
+            let responsePath = record.responseURL.filePath
+            let handle = try await FileSystem.shared.openFile(
+                forWritingAt: responsePath,
+                options: .newFile(replaceExisting: true)
+            )
+            try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
+            try await handle.close()
+        } catch {
             return nil
         }
 
-        let writableBytes = UInt64(response.count) + contentLength
-
-        guard writableBytes <= maximumCapacity else {
-            return nil
-        }
-
-        freeSpace(maximumCapacity - writableBytes)
-
-        guard let record = record(key, createdAt: cachedResponse.date) else {
-            return nil
-        }
-
-        try? response.write(to: record.responseURL)
-        return Internals.FileBuffer(record.dataURL)
+        return await Internals.FileBuffer(record.dataURL)
     }
 
-    func freeSpace(_ maximumCapacity: UInt64) {
-        let entries = records(including: [.fileSizeKey]).sorted {
-            $0.date > $1.date
+    func freeSpace(_ maximumCapacity: Int64) async {
+        var entries = await records()
+
+        if maximumCapacity == .zero {
+            for entry in entries {
+                _ = try? await FileSystem.shared.removeItem(at: entry.url.filePath)
+            }
+            return
         }
 
-        var accumulatedSize: UInt64 = 0
-        var deleteOnly = maximumCapacity == .zero
+        // Ordena do mais antigo para o mais novo (LRU: Least Recently Used)
+        entries.sort { $0.date < $1.date }
 
+        // Calcula o tamanho total atual
+        var totalSize: Int64 = 0
+        var entrySizes: [(Record, Int64)] = []
         for entry in entries {
-            if !deleteOnly {
-                accumulatedSize += entry.size
-            }
+            let size = await entry.size
+            totalSize += size
+            entrySizes.append((entry, size))
+        }
 
-            if deleteOnly || accumulatedSize > maximumCapacity {
-                deleteOnly = true
-                try? FileManager.default.removeItem(at: entry.url)
+        // Remove os mais antigos até que o tamanho total esteja dentro da capacidade
+        for (entry, size) in entrySizes {
+            if totalSize <= maximumCapacity {
+                break
             }
+            _ = try? await FileSystem.shared.removeItem(
+                at: entry.url.filePath
+            )
+            totalSize -= size
         }
     }
 
     // MARK: - Private methods
 
-    private func record(_ key: String, createdAt date: Date? = nil) -> Record? {
+    private func record(_ key: String, createdAt date: Date? = nil) async -> Record? {
         switch date {
         case .none:
-            return records().first {
-                $0.key == key
-            }
+            let allRecords = await records()
+            return allRecords.first { $0.key == key }
         case .some(let date):
-            return .init(directory: directory, key: key, at: date)
+            return await Record(directory: directory, key: key, at: date)
         }
     }
 
-    private func records(including keys: [URLResourceKey] = []) -> Records {
-        Records(
-            directory: directory,
-            keys: keys
-        )
+    private func records() async -> [Record] {
+        let dirPath = directory.filePath
+        var foundRecords: [Record] = []
+
+        do {
+            // 1. Abre um handle para o diretório
+            try await FileSystem.shared.withDirectoryHandle(atPath: dirPath) { dir in
+                // 2. Lista o conteúdo através do handle do diretório
+                for try await entry in dir.listContents() {
+                    // entry.name é um FilePath.Component, usamos .string para obter o texto
+                    if entry.name.string.hasSuffix(".\(Record.pathExtension)") {
+                        let entryURL = directory.appendingPathComponent(entry.name.string)
+
+                        if let record = await Record(entryURL) {
+                            foundRecords.append(record)
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Ignora erros de listagem (ex: diretório não existe ainda)
+        }
+
+        return foundRecords
     }
 }

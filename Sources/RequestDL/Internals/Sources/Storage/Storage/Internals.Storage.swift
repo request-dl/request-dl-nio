@@ -2,13 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+import SwiftAsyncStream
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.DispatchTime
-import var Foundation.NSEC_PER_SEC
 #endif
-import SwiftAsyncStream
 
 extension Internals {
 
@@ -26,7 +27,7 @@ extension Internals {
 
         // MARK: - Internal static properties
 
-        static let lifetime: UInt64 = 5 * 60 * NSEC_PER_SEC
+        static let lifetime = TimeAmount.seconds(5 * 60)
 
         /// A ceiling, not a working limit.
         ///
@@ -47,7 +48,7 @@ extension Internals {
         // MARK: - Private properties
 
         private let lock = Lock()
-        private let lifetime: UInt64
+        private let lifetime: TimeAmount
         private let maximumCount: Int
 
         // MARK: - Unsafe properties
@@ -56,7 +57,7 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(lifetime: UInt64, maximumCount: Int = Storage.maximumCount) {
+        init(lifetime: TimeAmount, maximumCount: Int = Storage.maximumCount) {
             precondition(maximumCount >= 1, "Storage needs room for at least one entry")
 
             self.lifetime = lifetime
@@ -88,7 +89,7 @@ extension Internals {
                 // one pass survived until the next and could be handed out at nearly twice its
                 // lifetime. That made the sweep interval a correctness parameter; it should
                 // only be a memory one.
-                guard DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime else {
+                guard DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime.nanoseconds else {
                     _table[key] = nil
                     return nil
                 }
@@ -136,7 +137,7 @@ extension Internals {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
                 while true {
                     do {
-                        try await _Concurrency.Task.sleep(nanoseconds: lifetime)
+                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds))
                     } catch {
                         // Sleeping fails on cancellation and nothing else. Yielding and looping
                         // meant the next sleep failed immediately too, turning this into a
@@ -158,7 +159,7 @@ extension Internals {
                 let now = DispatchTime.now().uptimeNanoseconds
 
                 _table = _table.filter {
-                    now - $1.readAt <= lifetime
+                    now - $1.readAt <= lifetime.nanoseconds
                 }
 
                 _evictIfNeeded()

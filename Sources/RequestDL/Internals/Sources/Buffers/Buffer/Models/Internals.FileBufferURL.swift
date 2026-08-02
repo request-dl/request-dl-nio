@@ -2,69 +2,82 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOFileSystem
+import SystemPackage
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.URL
 import struct Foundation.Date
-import struct Foundation.Data
 import struct Foundation.UUID
-import class Foundation.FileManager
+import class Foundation.ProcessInfo
 #endif
 
 extension Internals {
 
+    /// Addresses a file on disk.
+    ///
+    /// Metadata operations go through `NIOFileSystem`, which is async and offloads to an I/O
+    /// thread pool. The byte level reads and writes happen in ``Internals/FileStreamBuffer``.
+    ///
+    /// Creation, existence and removal delegate to the `URL` extensions rather than reimplement
+    /// them, so there is one description of what "this file exists" means.
     struct FileBufferURL: BufferURL {
 
         // MARK: - Internal static properties
 
+        /// A path inside the system temporary directory that nothing else holds.
+        ///
+        /// The file is not created here. Whoever writes first creates it, and the storage that
+        /// owns this URL removes it when it goes away.
         static var temporaryURL: Internals.FileBufferURL {
             let timestamp = Int(Date.timeIntervalSinceReferenceDate)
+            let pathComponent = "\(timestamp).\(UUID().uuidString).buffer"
+            let path = FilePath.temporaryDirectory.appending(pathComponent)
 
-            // No base64 here. The alphabet includes `/`, which `appendingPathComponent` reads
-            // as a separator, so the encoding could quietly turn one file name into a nested
-            // path. And it was encoding a string that is already safe: digits, a dot, and a
-            // UUID in hexadecimal with hyphens.
-            let pathComponent = "\(timestamp).\(UUID().uuidString)"
-
-            return .init(
-                url: FileManager.default.temporaryDirectory
-                    .appendingPathComponent(pathComponent)
-                    .appendingPathExtension("buffer"),
-                isTemporary: true
-            )
+            return .init(path: path, url: URL(fileURLWithPath: path.string), isTemporary: true)
         }
 
         // MARK: - Internal properties
 
+        /// The path the streams open against.
+        ///
+        /// Derived once, at init. The previous version rebuilt a `FilePath` from a `String` on
+        /// every call, including inside the open path of both streams.
+        let path: FilePath
+
         /// - Important: This is a stat call, not a stored value.
+        /// - Returns: Zero when the file is missing or unreadable, which is what an empty
+        /// buffer looks like to everything upstream.
         var writtenBytes: Int {
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: _path)
-                return attributes[.size] as? Int ?? .zero
-            } catch {
-                return .zero
+            get async {
+                do {
+                    guard let info = try await FileSystem.shared.info(forFileAt: path) else {
+                        return .zero
+                    }
+
+                    return Int(info.size)
+                } catch {
+                    return .zero
+                }
             }
         }
 
         // MARK: - Private properties
 
-        private let _path: String
         private let url: URL
-
-        // Only a URL this type minted itself is one it may delete. A caller supplied path
-        // belongs to the caller.
         private let isTemporary: Bool
 
         // MARK: - Inits
 
         init(_ url: URL) {
-            self.init(url: url, isTemporary: false)
+            self.init(path: url.filePath, url: url, isTemporary: false)
         }
 
-        private init(url: URL, isTemporary: Bool) {
+        private init(path: FilePath, url: URL, isTemporary: Bool) {
+            self.path = path
             self.url = url
-            self._path = url.absolutePath(percentEncoded: false)
             self.isTemporary = isTemporary
         }
 
@@ -76,58 +89,46 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func isResourceAvailable() -> Bool {
-            FileManager.default.fileExists(atPath: _path)
+        func isResourceAvailable() async -> Bool {
+            await url.isReachable
         }
 
-        func createResourceIfNeeded() {
-            guard !isResourceAvailable() else {
+        /// - Important: Failures are swallowed. The open that follows reports the same problem
+        /// with better context, and there is nothing useful to do here on the way past.
+        func createResourceIfNeeded() async {
+            try? await url.createPathIfNeeded()
+        }
+
+        /// Empties the file.
+        ///
+        /// - Warning: This is allowed to replace the file rather than shorten it in place, so
+        /// any descriptor already open against it may end up addressing an unlinked object.
+        /// Callers close their streams first.
+        func truncate() async {
+            guard await isResourceAvailable() else {
                 return
             }
 
-            let directoryURL = url.deletingLastPathComponent()
-
-            if !directoryURL.isReachable {
-                try? FileManager.default.createDirectory(
-                    at: directoryURL,
-                    withIntermediateDirectories: true
+            do {
+                let handle = try await FileSystem.shared.openFile(
+                    forWritingAt: path,
+                    options: .newFile(replaceExisting: true)
                 )
-            }
 
-            // `.withoutOverwriting` is `O_EXCL`, so the create is atomic. The check above is
-            // only a fast path: without the flag, two cursors reaching this at the same time
-            // both see the file missing and the second one truncates what the first just
-            // wrote.
-            try? Data().write(to: url, options: .withoutOverwriting)
+                try await handle.close()
+            } catch {}
         }
 
-        func truncate() {
-            guard isResourceAvailable() else {
-                return
-            }
-
-            try? Data().write(to: url)
-        }
-
-        func removeIfTemporary() {
+        func removeIfTemporary() async {
             guard isTemporary else {
                 return
             }
 
-            try? FileManager.default.removeItem(at: url)
+            try? await url.removeIfNeeded()
         }
 
         func absoluteURL() -> URL {
             url
         }
-    }
-}
-
-extension URL {
-
-    var isReachable: Bool {
-        FileManager.default.fileExists(
-            atPath: absolutePath(percentEncoded: false)
-        )
     }
 }

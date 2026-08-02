@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 @Suite(.serialized)
 struct CachedRequestTests {
@@ -30,13 +25,15 @@ struct CachedRequestTests {
             localServer = try await LocalServer(.standard)
             localServer.cleanup(at: uri)
 
-            dataCache.removeAll()
+            await dataCache.removeAll()
             dataCache.memoryCapacity = 8 * 1_024 * 1_024
             dataCache.diskCapacity = 64 * 1_024 * 1_024
         }
 
         deinit {
-            dataCache.removeAll()
+            let dataCache = self.dataCache
+            Task.detached { await dataCache.removeAll() }
+
             dataCache.memoryCapacity = .zero
             dataCache.diskCapacity = .zero
 
@@ -61,7 +58,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let cachedData = DataCache(url: testState.dataCache.directoryURL).getCachedData(
+        let cachedData = await DataCache(url: testState.dataCache.directoryURL).getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -75,11 +72,11 @@ struct CachedRequestTests {
     func cache_whenNoCacheOnIgnoresCachedDataStrategyWithPreviousCache() async throws {
         let testState = try await TestState()
         // Given
-        let cacheData = mockCachedData(makeHeaders(eTag: UUID()))
+        let cacheData = await mockCachedData(makeHeaders(eTag: UUID()))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         let response = try await performCacheRequest(
             testState: testState,
@@ -89,7 +86,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = DataCache(url: testState.dataCache.directoryURL).getCachedData(
+        let updatedCachedData = await DataCache(url: testState.dataCache.directoryURL).getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -123,11 +120,11 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
         let testState = try await TestState()
-        let cacheData = mockCachedData(makeHeaders())
+        let cacheData = await mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         let response = try await performCacheRequest(
             testState: testState,
@@ -137,7 +134,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = testState.dataCache.getCachedData(
+        let updatedCachedData = await testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -150,12 +147,12 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge() async throws {
         let testState = try await TestState()
-        let cacheData = mockCachedData(makeHeaders())
+        let cacheData = await mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888" + testState.uri
         var thrownError: Error?
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         try await waitCacheExpiration()
 
@@ -176,11 +173,11 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let testState = try await TestState()
-        let cacheData = mockCachedData(makeHeaders(maxAge: false))
+        let cacheData = await mockCachedData(makeHeaders(maxAge: false))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         let response = try await performCacheRequest(
             testState: testState,
@@ -190,7 +187,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = testState.dataCache.getCachedData(
+        let updatedCachedData = await testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -203,12 +200,12 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires() async throws {
         let testState = try await TestState()
-        let cacheData = mockCachedData(makeHeaders(maxAge: false))
+        let cacheData = await mockCachedData(makeHeaders(maxAge: false))
         let cacheKey = "https://localhost:8888" + testState.uri
         var thrownError: Error?
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         try await waitCacheExpiration()
 
@@ -229,11 +226,11 @@ struct CachedRequestTests {
     @Test
     func cache_whenReturnCachedDataElseLoadWithValidCache() async throws {
         let testState = try await TestState()
-        let cacheData = mockCachedData(makeHeaders())
+        let cacheData = await mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         let response = try await performCacheRequest(
             testState: testState,
@@ -243,7 +240,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = testState.dataCache.getCachedData(
+        let updatedCachedData = await testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -256,11 +253,11 @@ struct CachedRequestTests {
     @Test
     func cache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
         let testState = try await TestState()
-        let cacheData = mockCachedData(makeHeaders())
+        let cacheData = await mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         try await waitCacheExpiration()
 
@@ -272,7 +269,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = testState.dataCache.getCachedData(
+        let updatedCachedData = await testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -286,11 +283,11 @@ struct CachedRequestTests {
     func cache_whenReloadAndValidateCachedDataWithValidCache() async throws {
         let testState = try await TestState()
         let eTag = UUID()
-        let cacheData = mockCachedData(makeHeaders(eTag: eTag))
+        let cacheData = await mockCachedData(makeHeaders(eTag: eTag))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         let response = try await performCacheRequest(
             testState: testState,
@@ -300,7 +297,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = testState.dataCache.getCachedData(
+        let updatedCachedData = await testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -314,11 +311,11 @@ struct CachedRequestTests {
     func cache_whenReloadAndValidateCachedDataWithInvalidCache() async throws {
         let testState = try await TestState()
         let eTag = UUID()
-        let cacheData = mockCachedData(makeHeaders())
+        let cacheData = await mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
-        testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         try await waitCacheExpiration()
 
@@ -330,7 +327,7 @@ struct CachedRequestTests {
 
         await testState.dataCache.waitUntilIdle()
 
-        let updatedCachedData = testState.dataCache.getCachedData(
+        let updatedCachedData = await testState.dataCache.getCachedData(
             forKey: cacheKey,
             policy: .all
         )
@@ -352,12 +349,12 @@ extension CachedRequestTests {
         try await _Concurrency.Task.sleep(nanoseconds: 2 * NSEC_PER_SEC + 250 * NSEC_PER_MSEC)
     }
 
-    func mockCachedData(_ headers: [(String, String)] = []) -> CachedData {
+    func mockCachedData(_ headers: [(String, String)] = []) async -> CachedData {
         let data = try? JSONSerialization.data(withJSONObject: [
             "receivedBytes": "0"
         ])
 
-        return CachedData(
+        return await CachedData(
             response: ResponseHead(
                 url: URL(string: "https://localhost:8888"),
                 status: .init(code: 200, reason: "Ok"),

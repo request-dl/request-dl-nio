@@ -2,16 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import NIOCore
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsBodySequenceTests {
 
@@ -21,7 +16,7 @@ struct InternalsBodySequenceTests {
         let bodySequence = makeBodySequence([])
 
         // When
-        let sequence = Array(bodySequence).resolveData()
+        let sequence = try await Array(bodySequence).resolveData()
 
         // Then
         #expect(sequence == [])
@@ -32,7 +27,7 @@ struct InternalsBodySequenceTests {
         // Given
         let data = Data("Hello World!".utf8)
 
-        let bodySequence = makeBodySequence(
+        let bodySequence = await makeBodySequence(
             chunkSize: 1024,
             [
                 Internals.DataBuffer(data)
@@ -40,7 +35,7 @@ struct InternalsBodySequenceTests {
         )
 
         // When
-        let sequence = Array(bodySequence).resolveData()
+        let sequence = try await Array(bodySequence).resolveData()
 
         // Then
         #expect(sequence == [data])
@@ -52,7 +47,7 @@ struct InternalsBodySequenceTests {
         let part1 = Data("Hello World!".utf8)
         let part2 = Data("Earth is a small planet".utf8)
 
-        let bodySequence = makeBodySequence(
+        let bodySequence = await makeBodySequence(
             chunkSize: 1024,
             [
                 Internals.DataBuffer(part1),
@@ -61,7 +56,7 @@ struct InternalsBodySequenceTests {
         )
 
         // When
-        let sequence = Array(bodySequence).resolveData()
+        let sequence = try await Array(bodySequence).resolveData()
 
         // Then
         #expect(sequence == [part1 + part2])
@@ -74,7 +69,7 @@ struct InternalsBodySequenceTests {
         let part2 = Data("Earth is a small planet".utf8)
         let chunkSize = 2
 
-        let bodySequence = makeBodySequence(
+        let bodySequence = await makeBodySequence(
             chunkSize: chunkSize,
             [
                 Internals.DataBuffer(part1),
@@ -83,8 +78,8 @@ struct InternalsBodySequenceTests {
         )
 
         // When
-        let sequence = Array(bodySequence).resolveData()
-        let expecting = Array(part1 + part2).split(by: chunkSize)
+        let sequence = try await Array(bodySequence).resolveData()
+        let expecting = await Array(part1 + part2).split(by: chunkSize)
 
         // Then
         #expect(sequence == expecting)
@@ -99,7 +94,7 @@ struct InternalsBodySequenceTests {
         let part3 = Data("Contents in the file".utf8)
         let chunkSize = 16
 
-        let bodySequence = makeBodySequence(
+        let bodySequence = await makeBodySequence(
             chunkSize: chunkSize,
             [
                 Internals.DataBuffer(part1),
@@ -109,8 +104,8 @@ struct InternalsBodySequenceTests {
         )
 
         // When
-        let sequence = Array(bodySequence).resolveData()
-        let expecting = Array(part1 + part2 + part3).split(by: chunkSize)
+        let sequence = try await Array(bodySequence).resolveData()
+        let expecting = await Array(part1 + part2 + part3).split(by: chunkSize)
 
         // Then
         #expect(sequence == expecting)
@@ -120,19 +115,19 @@ struct InternalsBodySequenceTests {
     func bodySequence_whenBiggerDataWithNilSize_shouldFragmentByTheDefaultPolicy() async throws {
         // Given
         let length = 20_001
-        let data = Data.randomData(length: length)
+        let data = await Data.randomData(length: length)
 
-        let bodySequence = makeBodySequence([
+        let bodySequence = await makeBodySequence([
             Internals.DataBuffer(data)
         ])
 
         // When
-        let sequence = Array(bodySequence).resolveData()
+        let sequence = try await Array(bodySequence).resolveData()
 
         // Deriving the expectation from the sequence's own chunk size keeps this about the
         // contract, every byte in order and nothing over the limit, instead of restating the
         // sizing formula and breaking whenever it is tuned.
-        let expecting = Array(data).split(by: bodySequence.chunkSize)
+        let expecting = await Array(data).split(by: bodySequence.chunkSize)
 
         // Then
         #expect(sequence == expecting)

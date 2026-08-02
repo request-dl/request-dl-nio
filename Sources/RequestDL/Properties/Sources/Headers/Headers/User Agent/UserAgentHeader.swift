@@ -62,7 +62,7 @@ public struct UserAgentHeader: Property {
         return .leaf(
             HeaderNode(
                 key: "User-Agent",
-                value: property.value.trimmingCharacters(in: .whitespaces),
+                value: property.value.trimming(where: \.isWhitespace),
                 strategy: inputs.environment.headerStrategy,
                 separator: " "
             )

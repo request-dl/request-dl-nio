@@ -13,9 +13,7 @@ struct QueryNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        let queries = try urlEncoder.encode(value, forKey: name).map {
-            $0.build()
-        }
+        let queries = try urlEncoder.encode(value, forKey: name)
 
         make.requestConfiguration.queries.append(contentsOf: queries)
     }

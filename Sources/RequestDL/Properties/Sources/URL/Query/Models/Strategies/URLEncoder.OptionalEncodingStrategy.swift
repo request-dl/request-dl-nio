@@ -2,23 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Documentation:
-
-/// An extension of `URLEncoder` that defines strategies for encoding non-optional values in a URL request.
-///
-/// - `droppingKey`: Drops the key from the encoded string, leaving only the value.
-///
-/// - `droppingValue`: Drops the value from the encoded string, leaving only the key.
-///
-/// - `literal`:
-///
-/// - `custom`:
 extension URLEncoder {
 
-    /// Defines strategies for encoding none optional in a url encoded format
+    /// Defines strategies for encoding a `nil` in a url encoded format.
+    ///
+    /// Only reached for an optional that is actually empty. A `.some` is unwrapped and encoded
+    /// through whichever strategy fits the value inside it.
     public enum OptionalEncodingStrategy: URLEncodingStrategy {
 
-        /// Drops the key and value from the encoded string, leaving no trace of it.
+        /// Drops the key and the value, leaving no trace of the field.
+        ///
+        /// Dropping the value is what achieves this: a pair missing either half is not emitted.
         case droppingKey
 
         /// Drops the value from the encoded string, leaving only the key. e.g. `key=`
@@ -50,7 +44,9 @@ extension URLEncoder {
 
         private func encodeDroppingKey(in encoder: URLEncoder.Encoder) throws {
             var container = encoder.valueContainer()
-            try container.dropKey()
+            // Reads correctly now. It was `dropKey()`, which despite the name set the value,
+            // so the line said the opposite of what it did while behaving as intended.
+            try container.dropValue()
         }
 
         private func encodeDroppingValue(in encoder: URLEncoder.Encoder) throws {

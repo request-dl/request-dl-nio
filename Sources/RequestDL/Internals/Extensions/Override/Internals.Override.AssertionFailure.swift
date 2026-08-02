@@ -5,6 +5,10 @@
 extension Internals.Override {
 
     #if DEBUG
+    /// Swaps out `assertionFailure(_:file:line:)` for the duration of an operation.
+    ///
+    /// Task local, so a replacement is visible to the operation and to everything it awaits,
+    /// and to nothing running in parallel beside it.
     enum AssertionFailure {
 
         typealias Closure = @Sendable (String, StaticString, UInt) -> Void
@@ -27,6 +31,7 @@ extension Internals.Override {
     }
     #endif
 
+    /// Reports a recoverable programming error, or hands it to whatever a test substituted.
     static func assertionFailure(
         _ message: @Sendable @autoclosure () -> String = String(),
         file: StaticString = #file,
@@ -46,6 +51,10 @@ extension Internals.Override {
 
 extension Internals {
 
+    /// Reports a bug in this package, as opposed to a misuse of it by the caller.
+    ///
+    /// The marker in the message is the point: it tells whoever sees it in a console that the
+    /// issue belongs upstream and is worth filing.
     static func assertionFailure(_ message: String, file: StaticString = #file, line: UInt = #line) {
         #if DEBUG
         Internals.Override.assertionFailure("🐞 RequestDL bug: \(message)", file: file, line: line)

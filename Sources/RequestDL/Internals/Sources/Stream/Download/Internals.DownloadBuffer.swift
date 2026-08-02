@@ -43,8 +43,8 @@ extension Internals {
 
             // MARK: - Inits
 
-            init(readingMode: Internals.DownloadStep.ReadingMode) {
-                self._buffer = DataBuffer()
+            init(readingMode: Internals.DownloadStep.ReadingMode) async {
+                self._buffer = await DataBuffer()
                 self.readingMode = readingMode
 
                 // The body is buffered until somebody starts reading it, which covers both the
@@ -69,13 +69,13 @@ extension Internals {
 
             func append(_ incomeBytes: Internals.AnyBuffer) {
                 queue.addOperation {
-                    self._append(incomeBytes)
+                    await self._append(incomeBytes)
                 }
             }
 
             func close() {
                 queue.addOperation {
-                    self._close()
+                    await self._close()
                 }
             }
 
@@ -92,7 +92,7 @@ extension Internals {
 
             // MARK: - Unsafe methods
 
-            private func _append(_ incomeBytes: Internals.AnyBuffer) {
+            private func _append(_ incomeBytes: Internals.AnyBuffer) async {
                 guard var buffer = _buffer else {
                     return
                 }
@@ -103,9 +103,9 @@ extension Internals {
 
                 switch readingMode {
                 case .length(let length):
-                    _appendByLength(&incomeBytes, length: length, into: &buffer)
+                    await _appendByLength(&incomeBytes, length: length, into: &buffer)
                 case .separator(let separator):
-                    _appendBySeparator(&incomeBytes, separator: separator, into: &buffer)
+                    await _appendBySeparator(&incomeBytes, separator: separator, into: &buffer)
                 }
             }
 
@@ -113,7 +113,7 @@ extension Internals {
                 _ incomeBytes: inout Internals.AnyBuffer,
                 length: Int,
                 into buffer: inout DataBuffer
-            ) {
+            ) async {
                 while incomeBytes.readableBytes > .zero {
                     let receivedBytes = incomeBytes.readableBytes
                     let currentBytes = buffer.readableBytes
@@ -121,14 +121,14 @@ extension Internals {
                     let availableBytes = length - currentBytes
                     let readableBytes = receivedBytes > availableBytes ? availableBytes : receivedBytes
 
-                    if let data = incomeBytes.readData(readableBytes) {
-                        buffer.writeData(data)
+                    if let data = await incomeBytes.readData(readableBytes) {
+                        await buffer.writeData(data)
                     } else {
                         break
                     }
 
                     if buffer.readableBytes == length {
-                        _emit(&buffer)
+                        await _emit(&buffer)
                     }
                 }
             }
@@ -144,16 +144,16 @@ extension Internals {
                 _ incomeBytes: inout Internals.AnyBuffer,
                 separator: [UInt8],
                 into buffer: inout DataBuffer
-            ) {
+            ) async {
                 guard
                     incomeBytes.readableBytes > .zero,
-                    let incoming = incomeBytes.readBytes(incomeBytes.readableBytes)
+                    let incoming = await incomeBytes.readBytes(incomeBytes.readableBytes)
                 else { return }
 
                 guard !separator.isEmpty else {
                     // Degenerate configuration: there is nothing to split on, so everything is
                     // remainder. Matching an empty window would otherwise emit once per byte.
-                    buffer.writeBytes(incoming)
+                    await buffer.writeBytes(incoming)
                     return
                 }
 
@@ -170,22 +170,22 @@ extension Internals {
                         continue
                     }
 
-                    buffer.writeBytes(Array(incoming[start...index]))
+                    await buffer.writeBytes(Array(incoming[start...index]))
                     start = incoming.index(after: index)
 
-                    _emit(&buffer)
+                    await _emit(&buffer)
                     _window.removeAll(keepingCapacity: true)
                 }
 
                 if start < incoming.endIndex {
-                    buffer.writeBytes(Array(incoming[start...]))
+                    await buffer.writeBytes(Array(incoming[start...]))
                 }
             }
 
             /// Dispatches the accumulated bytes as one chunk and resets the buffer.
-            private func _emit(_ buffer: inout DataBuffer) {
-                var dataBuffer = DataBuffer()
-                dataBuffer.writeBuffer(&buffer)
+            private func _emit(_ buffer: inout DataBuffer) async {
+                var dataBuffer = await DataBuffer()
+                await dataBuffer.writeBuffer(&buffer)
 
                 _dispatch(.success(dataBuffer))
 
@@ -193,13 +193,13 @@ extension Internals {
                 buffer.moveWriterIndex(to: .zero)
             }
 
-            private func _close() {
+            private func _close() async {
                 guard var buffer = _buffer else {
                     return
                 }
 
-                if let data = buffer.readData(buffer.readableBytes) {
-                    _dispatch(.success(.init(data)))
+                if let data = await buffer.readData(buffer.readableBytes) {
+                    await _dispatch(.success(.init(data)))
                 }
 
                 self._buffer = nil
@@ -234,8 +234,8 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(readingMode: Internals.DownloadStep.ReadingMode) {
-            self.storage = .init(readingMode: readingMode)
+        init(readingMode: Internals.DownloadStep.ReadingMode) async {
+            self.storage = await .init(readingMode: readingMode)
         }
 
         // MARK: - Internal methods

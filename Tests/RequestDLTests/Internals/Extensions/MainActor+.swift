@@ -5,11 +5,7 @@
 //  Created by Brenno de Moura on 06/09/25.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
 import Foundation
-#endif
 
 @discardableResult
 func performOnMainThread<Value: Sendable>(_ block: @MainActor () throws -> Value) rethrows -> Value {

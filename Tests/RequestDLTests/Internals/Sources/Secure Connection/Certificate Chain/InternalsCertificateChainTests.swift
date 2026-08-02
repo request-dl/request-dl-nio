@@ -2,16 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import NIOSSL
+import SystemPackage
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsCertificateChainTests {
 
@@ -60,23 +56,18 @@ struct InternalsCertificateChainTests {
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
 
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RequestDL.\(UUID())")
-            .appendingPathComponent("merged.pem")
+        try await withTemporaryFileURL("merged.pem") { fileURL in
+            try data.write(to: fileURL)
 
-        defer { try? fileURL.removeIfNeeded() }
-        try fileURL.createPathIfNeeded()
+            // When
+            let sut = try Internals.CertificateChain.file(fileURL.absolutePath(percentEncoded: false)).build()
 
-        try data.write(to: fileURL)
-
-        // When
-        let sut = try Internals.CertificateChain.file(fileURL.absolutePath(percentEncoded: false)).build()
-
-        // Then
-        let expectedSources = try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
-            NIOSSLCertificateSource.certificate($0)
+            // Then
+            let expectedSources = try NIOSSLCertificate.fromPEMFile(fileURL.absolutePath(percentEncoded: false)).map {
+                NIOSSLCertificateSource.certificate($0)
+            }
+            #expect(sut == expectedSources)
         }
-        #expect(sut == expectedSources)
     }
 
     @Test

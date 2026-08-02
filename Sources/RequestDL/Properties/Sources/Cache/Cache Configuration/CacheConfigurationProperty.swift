@@ -12,8 +12,8 @@ private struct CacheConfigurationProperty: Property {
 
     private struct Node: PropertyNode {
 
-        let memoryCapacity: UInt64
-        let diskCapacity: UInt64
+        let memoryCapacity: Int64
+        let diskCapacity: Int64
         let directory: Internals.CacheConfiguration.Directory
 
         func make(_ make: inout Make) async throws {
@@ -29,8 +29,8 @@ private struct CacheConfigurationProperty: Property {
         bodyException()
     }
 
-    let memoryCapacity: UInt64
-    let diskCapacity: UInt64
+    let memoryCapacity: Int64
+    let diskCapacity: Int64
     let directory: Internals.CacheConfiguration.Directory
 
     // MARK: - Internal static methods
@@ -64,8 +64,8 @@ extension Property {
     ///
     @PropertyBuilder
     public func cache(
-        memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero
+        memoryCapacity: Int64 = .zero,
+        diskCapacity: Int64 = .zero
     ) -> some Property {
         self
         CacheConfigurationProperty(
@@ -86,8 +86,8 @@ extension Property {
     ///
     @PropertyBuilder
     public func cache(
-        memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero,
+        memoryCapacity: Int64 = .zero,
+        diskCapacity: Int64 = .zero,
         suiteName: String
     ) -> some Property {
         self
@@ -109,8 +109,8 @@ extension Property {
     ///
     @PropertyBuilder
     public func cache(
-        memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero,
+        memoryCapacity: Int64 = .zero,
+        diskCapacity: Int64 = .zero,
         url: URL
     ) -> some Property {
         self

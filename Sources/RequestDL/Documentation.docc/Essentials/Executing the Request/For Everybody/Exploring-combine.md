@@ -13,9 +13,7 @@ func userDetails() -> PublishedTask<User> {
     DataTask {
         // The request specifications
     }
-    .logInConsole(true)
     .extractPayload()
-    .keyPath(\.results)
     .decode(User.self)
     .publisher()
 }

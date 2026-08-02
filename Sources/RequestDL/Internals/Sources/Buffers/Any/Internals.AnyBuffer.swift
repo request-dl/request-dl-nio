@@ -4,5 +4,6 @@
 
 extension Internals {
 
+    /// Any buffer, whatever it is backed by.
     typealias AnyBuffer = any _BufferRepresentable
 }

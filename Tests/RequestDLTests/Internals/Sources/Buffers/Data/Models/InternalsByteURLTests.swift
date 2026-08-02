@@ -21,9 +21,9 @@ struct InternalsByteURLTests {
     }
 
     @Test
-    func byteURL_whenInitWithBuffer() {
+    func byteURL_whenInitWithBuffer() async {
         // Given
-        let buffer = ByteBuffer(data: .randomData(length: 64))
+        let buffer = await ByteBuffer(data: .randomData(length: 64))
 
         // When
         let url = Internals.ByteURL(buffer)
@@ -35,9 +35,9 @@ struct InternalsByteURLTests {
     }
 
     @Test
-    func byteURL_whenInitWithBufferSlice() {
+    func byteURL_whenInitWithBufferSlice() async {
         // Given
-        var buffer = ByteBuffer(data: .randomData(length: 128))
+        var buffer = await ByteBuffer(data: .randomData(length: 128))
 
         buffer.moveReaderIndex(to: 64)
 

@@ -3,15 +3,10 @@
 //
 
 import AsyncHTTPClient
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct UserAgentHeaderTests {
 

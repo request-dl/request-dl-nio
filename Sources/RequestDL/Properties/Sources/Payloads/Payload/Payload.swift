@@ -5,7 +5,12 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.Data
+import struct Foundation.URL
+import class Foundation.JSONEncoder
+#if canImport(Darwin)
+import class Foundation.JSONSerialization
+#endif
 #endif
 
 /// A representation of the HTTP body data in a request.
@@ -65,6 +70,7 @@ public struct Payload: Property {
 
     // MARK: - Inits
 
+    #if canImport(Darwin)
     ///
     /// Initializes a `Payload` with a JSON object.
     ///
@@ -84,6 +90,7 @@ public struct Payload: Property {
             contentType: contentType
         )
     }
+    #endif
 
     ///
     /// Initializes a `Payload` with an encodable value.

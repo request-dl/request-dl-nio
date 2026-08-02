@@ -33,7 +33,9 @@ public struct CachedData: Sendable {
     /// The actual data stored in the cache.
     ///
     public var data: Data {
-        buffer.getData() ?? Data()
+        get async {
+            await buffer.getData() ?? Data()
+        }
     }
 
     // MARK: - Internal properties
@@ -50,12 +52,12 @@ public struct CachedData: Sendable {
     ///    - policy: The cache policy associated with the cached data.
     ///    - data: The data to be cached.
     ///
-    public init<Data: DataProtocol>(
+    public init<Data: DataProtocol & Sendable>(
         response: ResponseHead,
         policy: DataCache.Policy.Set,
         data: Data
-    ) {
-        self.init(
+    ) async {
+        await self.init(
             cachedResponse: .init(
                 response: Self.internalResponse(response),
                 policy: policy
@@ -76,8 +78,8 @@ public struct CachedData: Sendable {
         response: ResponseHead,
         policy: DataCache.Policy.Set,
         url: URL
-    ) {
-        self.init(
+    ) async {
+        await self.init(
             cachedResponse: .init(
                 response: Self.internalResponse(response),
                 policy: policy

@@ -214,14 +214,16 @@ extension ResolveTests {
                                     value = some question,
                                     urlEncoder = URLEncoder {
                                         lock = Lock,
-                                        _dateEncodingStrategy = .iso8601,
-                                        _keyEncodingStrategy = .literal,
-                                        _dataEncodingStrategy = .base64,
-                                        _boolEncodingStrategy = .literal,
-                                        _optionalEncodingStrategy = .literal,
-                                        _arrayEncodingStrategy = .droppingIndex,
-                                        _dictionaryEncodingStrategy = .subscripted,
-                                        _whitespaceEncodingStrategy = .percentEscaping
+                                        _configuration = Configuration {
+                                            date = .iso8601,
+                                            key = .literal,
+                                            data = .base64,
+                                            bool = .literal,
+                                            optional = .literal,
+                                            array = .droppingIndex,
+                                            dictionary = .subscripted,
+                                            whitespace = .percentEscaping
+                                        }
                                     }
                                 }
                             }

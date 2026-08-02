@@ -7,7 +7,9 @@ import NIOSSL
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+#if canImport(Darwin)
 import class Foundation.Bundle
+#endif
 #endif
 
 /// A struct representing a private key for `SecureConnection` configuration.
@@ -67,6 +69,7 @@ public struct PrivateKey: Property {
         )
     }
 
+    #if canImport(Darwin)
     /// Creates a private key from a file in the specified bundle with the specified format without password.
     ///
     /// - Parameters:
@@ -83,6 +86,7 @@ public struct PrivateKey: Property {
             format: format
         )
     }
+    #endif
 
     /// Creates a private key from a file with the specified format, and allows for providing a
     /// `NIOSSLSecureBytes` password..
@@ -130,6 +134,7 @@ public struct PrivateKey: Property {
         )
     }
 
+    #if canImport(Darwin)
     /// Creates a private key from a file in the specified bundle with the specified format, and allows for
     /// providing a `NIOSSLSecureBytes` password.
     ///
@@ -150,6 +155,7 @@ public struct PrivateKey: Property {
             password: password
         )
     }
+    #endif
 
     private init(_ source: Source) {
         self.source = source

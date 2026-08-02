@@ -17,6 +17,6 @@ struct KeyPathNotFoundTests {
         let error = KeyPathNotFound(keyPath: keyPath)
 
         // Then
-        #expect(error.errorDescription == "Unable to resolve the KeyPath.\(keyPath) in the current Task result")
+        #expect(error.errorDescription == "Unable to resolve the KeyPath '\(keyPath)' in the current Task result")
     }
 }

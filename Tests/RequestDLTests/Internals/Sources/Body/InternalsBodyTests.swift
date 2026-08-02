@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsBodyTests {
 
@@ -18,7 +13,7 @@ struct InternalsBodyTests {
     func requestBody_whenSmallBody_shouldSendItInASingleChunk() async throws {
         // Given
         let string = "Hello World"
-        let body = RequestBody(buffers: [
+        let body = await RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -31,7 +26,7 @@ struct InternalsBodyTests {
         // Anything under the minimum chunk goes out whole. Eleven characters used to become
         // eleven writes, each with its own future and its own progress event.
         #expect(body.chunkSize == string.count)
-        #expect(buffers.resolveData() == Array(string.utf8).split(by: string.count))
+        await #expect(buffers.resolveData() == Array(string.utf8).split(by: string.count))
     }
 
     @Test
@@ -39,7 +34,7 @@ struct InternalsBodyTests {
         // Given
         let string = "Hello World"
 
-        let body = RequestBody(
+        let body = await RequestBody(
             chunkSize: string.count,
             buffers: [
                 Internals.DataBuffer(string)
@@ -53,7 +48,7 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == string.count)
         #expect(body.totalSize == string.count)
 
-        #expect(
+        await #expect(
             buffers.resolveData() == [Data(string.utf8)]
         )
     }
@@ -63,7 +58,7 @@ struct InternalsBodyTests {
         // Given
         let string = ""
 
-        let body = RequestBody(buffers: [
+        let body = await RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -74,7 +69,7 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == .zero)
         #expect(body.totalSize == string.count)
 
-        #expect(
+        await #expect(
             buffers.resolveData() == []
         )
     }
@@ -91,7 +86,7 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == .zero)
         #expect(body.totalSize == .zero)
 
-        #expect(
+        await #expect(
             buffers.resolveData() == []
         )
     }

@@ -8,8 +8,13 @@ import Logging
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.Date
 #endif
+
+// `TimeZone`, `Locale`, `Calendar` and `DateComponents` are gone from this file. None of them
+// are part of `FoundationEssentials`, and none were needed: HTTP dates are always proleptic
+// Gregorian and always UTC. Parsing lives in `Internals.GregorianCalendar` now, shared with the
+// ISO8601 formatting the URL encoder needs. `Locale` was imported and never used.
 
 extension Internals {
 
@@ -38,7 +43,7 @@ extension Internals {
             )
 
             if requestConfiguration.cacheStrategy != .ignoreCachedData {
-                if let cachedData = storedCachedData() {
+                if let cachedData = await storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
                         client: client,
                         cached: cachedData
@@ -53,17 +58,7 @@ extension Internals {
                         level: .warning,
                         "No cached data available, but strategy is 'useCachedDataOnly' — returning error"
                     )
-                    return .task(
-                        SessionTask(
-                            Internals.AsyncResponse(
-                                logger: logger,
-                                uploadingBytes: .zero,
-                                upload: .empty(),
-                                head: .throwing(EmptyCachedDataError()),
-                                download: .empty()
-                            )
-                        )
-                    )
+                    return .task(emptyCachedDataTask())
                 }
             } else {
                 logger?.log(level: .info, "Cache ignored by strategy: ignoreCachedData")
@@ -79,12 +74,27 @@ extension Internals {
 
         // MARK: - Private methods
 
-        private func storedCachedData() -> CachedData? {
+        /// The response handed back when the caller demanded cached data and there is none.
+        ///
+        /// - Note: Was written out twice, identically. Once is enough.
+        private func emptyCachedDataTask() -> SessionTask {
+            SessionTask(
+                Internals.AsyncResponse(
+                    logger: logger,
+                    uploadingBytes: .zero,
+                    upload: .empty(),
+                    head: .throwing(EmptyCachedDataError()),
+                    download: .empty()
+                )
+            )
+        }
+
+        private func storedCachedData() async -> CachedData? {
             guard requestConfiguration.isCacheEnabled else {
                 return nil
             }
 
-            return dataCache.getCachedData(
+            return await dataCache.getCachedData(
                 forKey: requestConfiguration.url,
                 policy: requestConfiguration.cachePolicy
             )
@@ -97,21 +107,13 @@ extension Internals {
             switch requestConfiguration.cacheStrategy {
             case .ignoreCachedData:
                 return nil
+
             case .useCachedDataOnly:
-                return makeCachedSession(cachedData)
-                    ?? {
-                        SessionTask(
-                            AsyncResponse(
-                                logger: logger,
-                                uploadingBytes: .zero,
-                                upload: .empty(),
-                                head: .throwing(EmptyCachedDataError()),
-                                download: .empty()
-                            )
-                        )
-                    }()
+                return await makeCachedSession(cachedData) ?? emptyCachedDataTask()
+
             case .returnCachedDataElseLoad:
-                return makeCachedSession(cachedData)
+                return await makeCachedSession(cachedData)
+
             case .reloadAndValidateCachedData:
                 guard
                     let cachedData = await validateCachedData(
@@ -122,17 +124,17 @@ extension Internals {
                     )
                 else { return nil }
 
-                return makeCachedSession(cachedData)
+                return await makeCachedSession(cachedData)
             }
         }
 
-        private func makeCachedSession(_ cachedData: CachedData) -> SessionTask? {
+        private func makeCachedSession(_ cachedData: CachedData) async -> SessionTask? {
             if !isCachedDataValid(cachedData) {
-                dataCache.remove(forKey: requestConfiguration.url)
+                await dataCache.remove(forKey: requestConfiguration.url)
                 return nil
             }
 
-            let download = Internals.DownloadBuffer(
+            let download = await Internals.DownloadBuffer(
                 readingMode: requestConfiguration.readingMode
             )
 
@@ -184,12 +186,12 @@ extension Internals {
                 with: modifiedHeaders
             )
 
-            dataCache.updateCached(
+            await dataCache.updateCached(
                 key: requestConfiguration.url,
                 cachedResponse: cachedResponse
             )
 
-            return dataCache.getCachedData(
+            return await dataCache.getCachedData(
                 forKey: requestConfiguration.url,
                 policy: requestConfiguration.cachePolicy
             )
@@ -231,17 +233,21 @@ extension Internals {
                 return cachedData.response.headers
             }
 
-            let lastModified = response.headers["Last-Modified"]
-            let eTag = response.headers["ETag"]
+            // Both sides defaulted before comparing. `response.headers[name]` is optional and
+            // the cached side had `?? []` applied, so a server that sends neither header
+            // compared `nil` against `[]`, which is not equal, and every such response
+            // invalidated a cache entry that was in fact unchanged.
+            for name in ["Last-Modified", "ETag"] {
+                let fresh = response.headers[name] ?? []
+                let cached = cachedData.response.headers[name] ?? []
 
-            if lastModified != cachedData.response.headers["Last-Modified"] ?? [] {
-                logger?.log(level: .info, "Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
-                return nil
-            }
-
-            if eTag != cachedData.response.headers["ETag"] ?? [] {
-                logger?.log(level: .info, "Cache invalidated (status: \(response.status.code)) — will fetch fresh data")
-                return nil
+                guard fresh == cached else {
+                    logger?.log(
+                        level: .info,
+                        "Cache invalidated (status: \(response.status.code)) — will fetch fresh data"
+                    )
+                    return nil
+                }
             }
 
             return .init(response.headers)
@@ -349,13 +355,13 @@ extension Internals {
                     defer { asyncBuffers.close() }
 
                     guard
-                        var cacheBuffer = dataCache.allocateBuffer(
+                        var cacheBuffer = await dataCache.allocateBuffer(
                             key: requestConfiguration.url,
                             cachedResponse: .init(
                                 response: head,
                                 policy: requestConfiguration.cachePolicy
                             ),
-                            contentLength: UInt64(contentLength)
+                            contentLength: Int64(contentLength)
                         )
                     else {
                         logger?.log(
@@ -367,8 +373,12 @@ extension Internals {
 
                     do {
                         for try await buffer in asyncBuffers {
-                            cacheBuffer.writeBuffer(buffer)
+                            // By value, not `inout`. This is `DataCache.Buffer.writeBuffer`,
+                            // which reads through `getBytes()` and leaves the argument's cursor
+                            // alone, not the draining `Internals.Buffer.writeBuffer(_:)`.
+                            await cacheBuffer.writeBuffer(buffer)
                         }
+
                         logger?.log(
                             level: .debug,
                             "Cached response saved",
@@ -378,7 +388,7 @@ extension Internals {
                         )
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(error.localizedDescription)")
-                        dataCache.remove(forKey: requestConfiguration.url)
+                        await dataCache.remove(forKey: requestConfiguration.url)
                     }
                 }
 
@@ -402,7 +412,8 @@ extension Internals {
             }
 
             if let maxAge = maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
-                if maxAge > .zero && cachedData.cachedResponse.date.advanced(by: TimeInterval(maxAge)) < Date() {
+                // `Double`, not `TimeInterval`. Same type, one fewer Foundation import.
+                if maxAge > .zero, cachedData.cachedResponse.date.advanced(by: Double(maxAge)) < Date() {
                     return false
                 }
             }
@@ -410,68 +421,82 @@ extension Internals {
             return true
         }
 
+        // MARK: - Private methods, header parsing
+
+        /// Whether the response forbids being served from, or written to, the cache.
+        ///
+        /// - Note: `no-store` is honoured as of 4.0. It was ignored, and it is the stronger of
+        /// the two: `no-cache` allows storing as long as the entry is revalidated before reuse,
+        /// while `no-store` forbids writing it down at all. A response carrying it was being
+        /// persisted to disk regardless, which for anything with an `Authorization` header or a
+        /// session cookie in the body is the exact case the directive exists to prevent.
+        ///
+        /// Compared lowercased, since cache directives are case insensitive.
         private func containsNoCache(headers: [String]) -> Bool {
-            flatAndCombineHeadersValues(headers)
-                .contains("no-cache")
+            for directive in directives(headers) {
+                // Prefix, not equality: `no-cache` may carry a field list, as in
+                // `no-cache="Set-Cookie"`, and that form is still a no-cache.
+                let directive = directive.lowercased()
+
+                if directive == "no-store" || directive == "no-cache" || directive.hasPrefix("no-cache=") {
+                    return true
+                }
+            }
+
+            return false
         }
 
         private func contentLength(headers: [String]) -> Int {
-            flatAndCombineHeadersValues(headers)
+            directives(headers)
                 .compactMap(Int.init)
                 .max() ?? .zero
         }
 
+        /// The latest `Expires` date across the given values.
+        ///
+        /// - Note: No longer run through ``directives(_:)``. An HTTP date contains a comma of
+        /// its own, right after the day name, so splitting the value on commas tore
+        /// `Sun, 06 Nov 1994 08:49:37 GMT` in half. The previous version tried to stitch the
+        /// pieces back together by remembering the last fragment that failed to parse and
+        /// prepending it to the next one. `Expires` is a single date, not a list, so the
+        /// splitting was never appropriate here.
         private func expiresDate(headers: [String]) -> Date? {
-            let dateFormatter = DateFormatter()
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-            dateFormatter.timeZone = TimeZone(identifier: "GMT")
-
-            var _weekday: String?
-            var dates: [Date] = []
-
-            for part in flatAndCombineHeadersValues(headers) {
-                if let weekday = _weekday {
-                    let literalDate = weekday + ", \(part)"
-
-                    if let date = dateFormatter.date(from: literalDate) {
-                        dates.append(date)
-                        _weekday = nil
-                    } else {
-                        _weekday = part
-                    }
-                } else {
-                    _weekday = part
-                }
-            }
-
-            return dates.max()
+            headers
+                .compactMap { Date(httpDate: $0.trimming(where: \.isWhitespace)) }
+                .max()
         }
 
+        /// The largest `max-age` across the given directives.
+        ///
+        /// - Note: Matches the directive name exactly. It used `range(of:options:)`, which is a
+        /// Foundation member this file has no import for, and which searches anywhere in the
+        /// string, so `s-maxage` and any vendor directive ending in `max-age` were read as one.
         private func maxAgeSeconds(headers: [String]) -> Int? {
-            flatAndCombineHeadersValues(headers)
-                .compactMap {
-                    let components = $0.split(separator: "=")
+            directives(headers)
+                .compactMap { directive -> Int? in
+                    let parts = directive.split(separator: "=", maxSplits: 1)
 
-                    if components.count <= 1 {
-                        return nil
-                    }
+                    guard
+                        parts.count == 2,
+                        parts[0].trimming(where: \.isWhitespace).lowercased() == "max-age"
+                    else { return nil }
 
-                    if components[0].range(of: "max-age", options: [.caseInsensitive]) == nil {
-                        return nil
-                    }
-
-                    return Int(components.dropFirst().joined(separator: "="))
+                    return Int(parts[1].trimming(where: \.isWhitespace))
                 }
                 .max()
         }
 
-        private func flatAndCombineHeadersValues(_ headers: [String]) -> some Sequence<String> {
+        /// Flattens header values into individual directives.
+        ///
+        /// - Note: Trimming goes through the package's own `trimming(where:)`. It was
+        /// `trimmingCharacters(in: .whitespaces)`, which needs `Foundation.CharacterSet`, the
+        /// type this refactor replaced.
+        private func directives(_ headers: [String]) -> some Sequence<String> {
             headers
                 .lazy
                 .flatMap { $0.split(separator: ";") }
                 .flatMap { $0.split(separator: ",") }
-                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .map { $0.trimming(where: \.isWhitespace) }
         }
     }
 }

@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct PayloadTests {
 
@@ -312,7 +307,7 @@ struct PayloadTests {
     @Test
     func payload_whenInitData() async throws {
         // Given
-        let data = Data.randomData(length: 1_024 * 1_024)
+        let data = await Data.randomData(length: 1_024 * 1_024)
 
         // When
         let resolved = try await resolve(
@@ -338,7 +333,7 @@ struct PayloadTests {
     @Test
     func payload_whenInitDataWithCustomType() async throws {
         // Given
-        let data = Data.randomData(length: 1_024 * 1_024)
+        let data = await Data.randomData(length: 1_024 * 1_024)
         let contentType = ContentType("application/octet-stream+request-dl")
 
         // When
@@ -368,14 +363,15 @@ struct PayloadTests {
     @Test
     func payload_whenInitURL() async throws {
         // Given
-        let data = Data.randomData(length: 1_024 * 1_024)
+        let data = await Data.randomData(length: 1_024 * 1_024)
 
-        let url = FileManager.default.temporaryDirectory
+        let url =
+            temporaryDirectoryURL
             .appendingPathComponent("payload.\(UUID())")
             .appendingPathExtension(".raw")
 
-        try url.createPathIfNeeded()
-        defer { try? url.removeIfNeeded() }
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
 
         try data.write(to: url)
 
@@ -406,15 +402,16 @@ struct PayloadTests {
     @Test
     func payload_whenInitURLWithCustomType() async throws {
         // Given
-        let data = Data.randomData(length: 1_024 * 1_024)
+        let data = await Data.randomData(length: 1_024 * 1_024)
         let contentType = ContentType("application/octet-stream+request-dl")
 
-        let url = FileManager.default.temporaryDirectory
+        let url =
+            temporaryDirectoryURL
             .appendingPathComponent("payload.\(UUID())")
             .appendingPathExtension(".raw")
 
-        try url.createPathIfNeeded()
-        defer { try? url.removeIfNeeded() }
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
 
         try data.write(to: url)
 
@@ -488,9 +485,7 @@ extension PayloadTests {
                 == Set(
                     json.reduce([]) {
                         try $0
-                            + URLEncoder().encode($1.value, forKey: $1.key).map {
-                                $0.build()
-                            }
+                            + URLEncoder().encode($1.value, forKey: $1.key)
                     }
                 )
         )
@@ -545,7 +540,7 @@ extension PayloadTests {
                     json.reduce([]) {
                         try $0
                             + URLEncoder().encode($1.value, forKey: $1.key).map {
-                                let query = $0.build()
+                                let query = $0
                                 return "\(query.name)=\(query.value)"
                             }
                     }
@@ -593,9 +588,7 @@ extension PayloadTests {
                 == Set(
                     json?.reduce([]) {
                         try $0
-                            + URLEncoder().encode($1.value, forKey: $1.key).map {
-                                $0.build()
-                            }
+                            + URLEncoder().encode($1.value, forKey: $1.key)
                     } ?? []
                 )
         )
@@ -659,7 +652,7 @@ extension PayloadTests {
                     json?.reduce([]) {
                         try $0
                             + URLEncoder().encode($1.value, forKey: $1.key).map {
-                                let query = $0.build()
+                                let query = $0
                                 return "\(query.name)=\(query.value)"
                             }
                     } ?? []
@@ -670,7 +663,7 @@ extension PayloadTests {
     @Test
     func payload_whenGETInitDataWithURLEncoded() async throws {
         // Given
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
 
         // Then
         let resolved = try await resolve(
@@ -708,7 +701,7 @@ extension PayloadTests {
     @Test
     func payload_whenInitDataWithChunkSize() async throws {
         // Given
-        let data = Data.randomData(length: 1_024 * 1_024)
+        let data = await Data.randomData(length: 1_024 * 1_024)
         let chunkSize = 1_024
 
         // When
@@ -731,9 +724,9 @@ extension PayloadTests {
         )
 
         let totalBytes = data.count
-
+        let resolvedData = try await Array(buffers.async.compactMap { await $0.getData() })
         #expect(
-            buffers.compactMap { $0.getData() }
+            resolvedData
                 == stride(from: .zero, to: data.count, by: chunkSize).map {
                     let upperBound = $0 + chunkSize
                     return data[$0..<(upperBound <= totalBytes ? upperBound : totalBytes)]
@@ -783,6 +776,6 @@ extension PayloadTests {
 
         #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
 
-        #expect(buffers.resolveData().reduce(Data(), +) == data)
+        await #expect(buffers.resolveData().reduce(Data(), +) == data)
     }
 }

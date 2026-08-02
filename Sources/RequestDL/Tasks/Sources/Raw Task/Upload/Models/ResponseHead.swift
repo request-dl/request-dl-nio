@@ -5,7 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+// Scoped. `URL` is all this file needs, and pulling the whole module in defeats the point of
+// the refactor for anyone reading the imports to work out the dependency surface.
+import struct Foundation.URL
 #endif
 
 /// A structure representing the head of an HTTP response.
@@ -64,8 +66,10 @@ public struct ResponseHead: Sendable, Hashable {
             debugDescription
         }
 
+        /// - Note: Was `String(minor) + " ... " + String(major)`, which printed the parts
+        /// backwards and separated them with an ellipsis, so HTTP/2.0 read as `0 ... 2`.
         public var debugDescription: String {
-            String(minor) + " ... " + String(major)
+            "HTTP/\(major).\(minor)"
         }
 
         /// The minor version number of the HTTP protocol used in the response.
@@ -162,7 +166,7 @@ extension ResponseHead: CustomDebugStringConvertible {
         \(url?.absoluteString ?? "URL(nil)")
         \(status.debugDescription) Status
 
-        HTTP version range: \(version)
+        \(version)
         Keep alive: \(isKeepAlive)
 
         \(headers.debugDescription)

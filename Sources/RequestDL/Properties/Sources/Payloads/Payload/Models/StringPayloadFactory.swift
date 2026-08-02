@@ -21,8 +21,8 @@ struct StringPayloadFactory: PayloadFactory {
 
     // MARK: - Internal methods
 
-    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
-        try .init(
+    func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
+        try await .init(
             // Only adds a charset when the caller has not written one.
             contentType: contentType.appending(charset: input.charset),
             source: .buffer(Internals.DataBuffer(input.charset.encode(verbatim)))

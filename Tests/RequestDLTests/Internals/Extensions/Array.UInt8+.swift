@@ -2,18 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
-@testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
 import Foundation
-#endif
+
+@testable import RequestDL
 
 extension [UInt8] {
 
-    func split(by size: Int) -> [Data] {
-        var buffer = Internals.DataBuffer(self)
+    func split(by size: Int) async -> [Data] {
+        var buffer = await Internals.DataBuffer(self)
         var items = [Data]()
         var readBytes = 0
 
@@ -25,7 +21,7 @@ extension [UInt8] {
             }
         }
 
-        while let data = buffer.readData(nextSize()) {
+        while let data = await buffer.readData(nextSize()) {
             readBytes += data.count
             items.append(data)
         }
@@ -33,9 +29,9 @@ extension [UInt8] {
         return items
     }
 
-    func split(separator: [UInt8]) -> [Data] {
-        var buffer = Internals.DataBuffer(self)
-        var chunk = Internals.DataBuffer()
+    func split(separator: [UInt8]) async -> [Data] {
+        var buffer = await Internals.DataBuffer(self)
+        var chunk = await Internals.DataBuffer()
         var items = [Data]()
 
         func nextSize() -> Int {
@@ -46,10 +42,10 @@ extension [UInt8] {
             }
         }
 
-        while let bytes = buffer.readBytes(nextSize()) {
+        while let bytes = await buffer.readBytes(nextSize()) {
             if bytes == separator {
-                chunk.writeBytes(bytes)
-                if let data = chunk.readData(chunk.readableBytes) {
+                await chunk.writeBytes(bytes)
+                if let data = await chunk.readData(chunk.readableBytes) {
                     items.append(data)
                     chunk.moveReaderIndex(to: .zero)
                     chunk.moveWriterIndex(to: .zero)
@@ -57,14 +53,14 @@ extension [UInt8] {
                     break
                 }
             } else {
-                chunk.writeBytes(Data(bytes)[0...0])
+                await chunk.writeBytes(Data(bytes)[0...0])
                 if buffer.readableBytes != .zero {
                     buffer.moveReaderIndex(to: (buffer.readerIndex + 1) - separator.count)
                 }
             }
         }
 
-        if let data = chunk.readData(chunk.readableBytes) {
+        if let data = await chunk.readData(chunk.readableBytes) {
             items.append(data)
         }
 

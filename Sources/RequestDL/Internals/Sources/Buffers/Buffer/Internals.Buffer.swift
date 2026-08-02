@@ -16,6 +16,8 @@ extension Internals {
 
     /// A cursor over a shared byte store.
     ///
+    /// ## Ownership model
+    ///
     /// The cursors are value semantics, one pair per copy of this struct. The bytes behind them
     /// are reference semantics, shared by every copy taken from the same source. That split is
     /// the whole design, and it is why this type carries no lock of its own: there is nothing
@@ -25,46 +27,73 @@ extension Internals {
     ///
     /// What is genuinely shared lives in ``Storage``, which is synchronized there, one whole
     /// operation at a time.
+    ///
+    /// ## Cursors can outlive the bytes they point at
+    ///
+    /// Because the store is shared and the cursors are not, one copy calling ``clear()`` leaves
+    /// every other copy holding indices past the end of an empty store. Reads in that state
+    /// answer `nil` rather than trapping, and writes land past the end, leaving a zero filled
+    /// gap behind them, which is what a file handle does when it seeks past EOF. Treat cursors
+    /// taken from a buffer somebody else may reset as advisory.
+    ///
+    /// ## Concurrency
+    ///
+    /// Every mutating member is `async`, so it needs exclusive access to `self` held across a
+    /// suspension. That is fine for a local `var` and illegal for a stored property of a class
+    /// or an actor: `await someActor.buffer.readData(8)` does not compile. Callers that keep a
+    /// buffer as a stored property have to move it into a local first and write it back after,
+    /// or hold it behind a type that owns the serialization itself.
     struct Buffer<Stream: StreamBuffer>: Sendable {
 
+        /// The shared byte store, plus the streams currently open over it.
+        ///
+        /// One instance is shared by every copy of the surrounding buffer, which is what makes
+        /// the bytes reference semantics. All access is serialized here, one whole logical
+        /// operation at a time, rather than one property at a time.
         private final class Storage: @unchecked Sendable {
 
             // MARK: - Internal properties
 
+            /// Bytes currently in the resource.
+            ///
             /// - Important: On a file system this is a stat call. It deliberately does not
             /// take the lock: `url` is immutable and reports either through its own
             /// synchronization or through the file system, so guarding it here would only
             /// queue size checks behind whatever read or write is in flight.
             var writtenBytes: Int {
-                url.writtenBytes
+                get async {
+                    await url.writtenBytes
+                }
             }
 
             // MARK: - Private properties
 
-            private let lock = Lock()
+            private let lock = AsyncLock()
             private let url: Stream.URL
 
             // MARK: - Unsafe properties
 
+            /// - Warning: Lockless. Only reachable from inside `lock`, or from `deinit`.
             private var _inputStream: Stream {
-                get throws {
+                get async throws {
                     if let stream = _storedInputStream {
                         return stream
                     }
 
-                    let stream = try Stream(readingFrom: url)
+                    let stream = try await Stream(readingFrom: url)
                     _storedInputStream = stream
                     return stream
                 }
             }
 
+            /// - Warning: Lockless. Only reachable from inside `lock`, or from `deinit`.
             private var _outputStream: Stream {
-                get throws {
+                get async throws {
                     if let stream = _storedOutputStream {
                         return stream
                     }
 
-                    let stream = try Stream(writingTo: url)
+                    let stream = try await Stream(writingTo: url)
                     _storedOutputStream = stream
                     return stream
                 }
@@ -72,6 +101,7 @@ extension Internals {
 
             private var _storedInputStream: Stream?
             private var _storedOutputStream: Stream?
+            private var _hasCreatedResource = false
 
             // MARK: - Inits
 
@@ -80,8 +110,21 @@ extension Internals {
             }
 
             deinit {
-                _close()
-                url.removeIfTemporary()
+                // `deinit` cannot suspend, so tear down is handed to a detached task. Every
+                // value it needs is copied out first: capturing `self` here would resurrect an
+                // object that is already being destroyed.
+                //
+                // The consequence is that a temporary file is removed asynchronously. A
+                // process that exits immediately after dropping its last buffer can leave the
+                // file behind. Call `close()` and `clear()` explicitly when that matters.
+                let streams = _detachStreams()
+                let url = self.url
+
+                Task.detached {
+                    try? await streams.input?.close()
+                    try? await streams.output?.close()
+                    await url.removeIfTemporary()
+                }
             }
 
             // MARK: - Internal methods
@@ -92,22 +135,48 @@ extension Internals {
             /// a second cursor over the same storage can move the stream in between. The caller
             /// then reads from wherever the other one left it.
             ///
-            /// - Returns: The data, and the offset the reader ended at.
-            func read(at index: UInt64, length: UInt64) -> (data: Data?, offset: UInt64) {
-                lock.withLock { () -> (data: Data?, offset: UInt64) in
-                    guard url.isResourceAvailable() else {
+            /// - Returns: The data, and the offset the reader ended at. A failed or refused
+            /// read reports `nil` and the offset it was handed, so the caller's cursor stays
+            /// where it was.
+            func read(at index: UInt64, length: UInt64) async -> (data: Data?, offset: UInt64) {
+                await lock.withLock { () async -> (data: Data?, offset: UInt64) in
+                    guard await url.isResourceAvailable() else {
                         return (nil, index)
                     }
 
                     do {
-                        let stream = try _inputStream
+                        let stream = try await _inputStream
 
-                        try stream.seek(to: index)
-                        let data = try stream.readData(length: length)
+                        try await stream.seek(to: index)
 
-                        return (data, stream.offset)
+                        let data = try await stream.readData(length: length)
+                        let offset = try await stream.offset
+
+                        return (data, offset)
                     } catch {
                         return (nil, index)
+                    }
+                }
+            }
+
+            /// Seeks and writes as one operation.
+            ///
+            /// - Returns: The offset the writer ended at, or `index` when the write failed.
+            /// Failure is silent by design, matching every other operation here, so a caller
+            /// that needs to know detects it by the offset not having moved.
+            func write<Bytes: DataProtocol & Sendable>(at index: UInt64, data: Bytes) async -> UInt64 {
+                await lock.withLock { () async -> UInt64 in
+                    await _createResourceIfNeeded()
+
+                    do {
+                        let stream = try await _outputStream
+
+                        try await stream.seek(to: index)
+                        try await stream.writeData(data)
+
+                        return try await stream.offset
+                    } catch {
+                        return index
                     }
                 }
             }
@@ -118,53 +187,84 @@ extension Internals {
             /// only a syscall away from correct. Caching costs a file descriptor for as long
             /// as anything holds this storage, which for a disk cache means one per entry the
             /// caller keeps alive.
-            func close() {
-                lock.withLock { _close() }
+            ///
+            /// Both streams are closed even when the first one fails, and the first error is
+            /// the one reported.
+            func close() async throws {
+                let streams = await lock.withLock { _detachStreams() }
+
+                var failure: Error?
+
+                do {
+                    try await streams.input?.close()
+                } catch {
+                    failure = error
+                }
+
+                do {
+                    try await streams.output?.close()
+                } catch {
+                    failure = failure ?? error
+                }
+
+                if let failure {
+                    throw failure
+                }
             }
 
             /// Drops every byte, letting the resource shrink back.
-            func clear() {
-                lock.withLock { url.truncate() }
-            }
+            ///
+            /// The cached streams are closed first. Truncating is allowed to replace the
+            /// backing resource rather than shorten it in place, and a descriptor opened
+            /// against the old one would keep reading and writing an object nobody else can
+            /// reach.
+            func clear() async {
+                await lock.withLock {
+                    let streams = _detachStreams()
 
-            /// Seeks and writes as one operation.
-            /// - Returns: The offset the writer ended at.
-            func write<Bytes: DataProtocol>(at index: UInt64, data: Bytes) -> UInt64 {
-                lock.withLock { () -> UInt64 in
-                    url.createResourceIfNeeded()
+                    try? await streams.input?.close()
+                    try? await streams.output?.close()
 
-                    do {
-                        let stream = try _outputStream
-
-                        try stream.seek(to: index)
-                        try stream.writeData(data)
-
-                        return stream.offset
-                    } catch {
-                        return index
-                    }
+                    await url.truncate()
+                    _hasCreatedResource = false
                 }
             }
 
             // MARK: - Unsafe methods
 
-            /// - Warning: Lockless, except from `deinit` where nothing else can reach this.
+            /// - Warning: Lockless. Only reachable from inside `lock`, or from `deinit`.
             ///
-            /// Closed independently, and never fatally. A temporary file can disappear
-            /// underneath us, and taking the process down from a deinit over that is not a
-            /// reasonable trade. Chaining them also meant a failure on the first one leaked
-            /// the second.
-            private func _close() {
-                try? _storedInputStream?.close()
-                try? _storedOutputStream?.close()
+            /// Hands the cached streams over to the caller and forgets them, so closing can
+            /// happen outside the critical section without another operation reaching a stream
+            /// that is halfway shut. Anything arriving afterwards opens its own.
+            private func _detachStreams() -> (input: Stream?, output: Stream?) {
+                defer {
+                    _storedInputStream = nil
+                    _storedOutputStream = nil
+                }
 
-                _storedInputStream = nil
-                _storedOutputStream = nil
+                return (_storedInputStream, _storedOutputStream)
+            }
+
+            /// - Warning: Lockless. Only reachable from inside `lock`.
+            ///
+            /// Creation is attempted once per storage rather than once per write, which took a
+            /// stat and sometimes an open and a close on every single call. A resource deleted
+            /// underneath a live storage is not recovered from, which is the same answer the
+            /// cached descriptors already give.
+            private func _createResourceIfNeeded() async {
+                guard !_hasCreatedResource else {
+                    return
+                }
+
+                await url.createResourceIfNeeded()
+                _hasCreatedResource = true
             }
         }
 
         // MARK: - Internal properties
 
+        /// Bytes between this cursor's reader and writer indices.
         var readableBytes: Int {
             _writerIndex - _readerIndex
         }
@@ -184,11 +284,18 @@ extension Internals {
         /// report, and the previous name `writableBytes` promised the opposite of what the
         /// number means to anyone arriving from `NIOCore.ByteBuffer`.
         var overwritableBytes: Int {
-            storage.writtenBytes - _writerIndex
+            get async {
+                await storage.writtenBytes - _writerIndex
+            }
         }
 
+        /// Bytes currently in the shared store, regardless of where this cursor sits.
+        ///
+        /// - Important: Reads through to the resource, so it is I/O on the file backed variant.
         var estimatedBytes: Int {
-            storage.writtenBytes
+            get async {
+                await storage.writtenBytes
+            }
         }
 
         // MARK: - Private properties
@@ -200,152 +307,216 @@ extension Internals {
 
         // MARK: - Inits
 
-        init(_ url: URL) {
+        /// Addresses a file system location.
+        ///
+        /// When `Stream` cannot address one, the bytes are read through a file backed buffer
+        /// and copied into this one, which means the whole file lands in memory.
+        init(_ url: URL) async {
             // Asking the storage type what it can address, instead of testing `Stream.self`
             // against a concrete type at runtime.
             if let url = Stream.URL.make(from: url) {
-                self.init(storage: .init(url))
+                await self.init(storage: .init(url))
                 return
             }
 
-            self.init(Internals.Buffer<Internals.FileStreamBuffer>(url))
+            await self.init(Internals.Buffer<Internals.FileStreamBuffer>(url))
         }
 
-        init(_ url: Internals.ByteURL) {
+        /// Addresses an in memory location.
+        ///
+        /// When `Stream` cannot address one, the bytes are copied in, as above.
+        init(_ url: Internals.ByteURL) async {
             if let url = Stream.URL.make(from: url) {
-                self.init(storage: .init(url))
+                await self.init(storage: .init(url))
                 return
             }
 
-            self.init(Internals.Buffer<Internals.ByteStreamBuffer>(url))
+            await self.init(Internals.Buffer<Internals.ByteStreamBuffer>(url))
         }
 
-        init<Bytes: DataProtocol>(_ data: Bytes) {
-            self.init()
-            writeData(data)
+        init<Bytes: DataProtocol & Sendable>(_ data: Bytes) async {
+            await self.init()
+            await writeData(data)
         }
 
-        init<Bytes: Sequence>(_ bytes: Bytes) where Bytes.Element == UInt8 {
-            self.init()
-            writeBytes(bytes)
+        init<Bytes: Sequence & Sendable>(_ bytes: Bytes) async where Bytes.Element == UInt8 {
+            await self.init()
+            await writeBytes(bytes)
         }
 
-        init(_ string: String) {
-            self.init(Data(string.utf8))
+        init(_ string: String) async {
+            await self.init(Data(string.utf8))
         }
 
-        init(_ staticString: StaticString) {
-            self.init(
-                UnsafeBufferPointer(
-                    start: staticString.utf8Start,
-                    count: staticString.utf8CodeUnitCount
-                )
-            )
+        init(_ staticString: StaticString) async {
+            // The bytes are copied out before the suspension. `UnsafeBufferPointer` is not
+            // `Sendable`, so it cannot be handed to an `async` initializer directly.
+            let data = staticString.withUTF8Buffer { Data($0) }
+            await self.init(data)
         }
 
-        init() {
-            self.init(storage: .init(.temporaryURL))
+        /// Opens an empty buffer over a fresh temporary resource.
+        init() async {
+            await self.init(storage: .init(.temporaryURL))
         }
 
-        init<OtherStream: StreamBuffer>(_ buffer: Buffer<OtherStream>) {
+        /// Copies `buffer`.
+        ///
+        /// Same stream type: the bytes are shared and only the cursors are copied, so this is
+        /// cheap and the two buffers stay linked. Different stream type: the bytes are carried
+        /// across into a new store, so the two are independent from then on.
+        init<OtherStream: StreamBuffer>(_ buffer: Buffer<OtherStream>) async {
             if let buffer = buffer as? Buffer<Stream> {
-                // Same stream type: share the bytes, copy the cursors.
-                self.init(storage: buffer.storage)
-                _writerIndex = buffer._writerIndex
+                await self.init(storage: buffer.storage)
                 _readerIndex = buffer._readerIndex
+                _writerIndex = buffer._writerIndex
                 return
             }
 
-            // Different stream type: the bytes have to be carried across. `source` is a copy,
-            // so rewinding it does not disturb the caller's cursors.
+            // `source` is a copy, so rewinding it does not disturb the caller's cursors.
             var source = buffer
-            let writerIndex = source._writerIndex
             let readerIndex = source._readerIndex
+            let writerIndex = source._writerIndex
 
             source.moveReaderIndex(to: .zero)
 
-            if let data = source.readData(source.readableBytes) {
-                self.init(data)
-            } else {
-                self.init()
+            let length = source.readableBytes
+
+            guard length > .zero, let data = await source.readData(length) else {
+                await self.init()
+                return
             }
 
-            moveWriterIndex(to: writerIndex)
-            moveReaderIndex(to: readerIndex)
+            await self.init(data)
+
+            // Clamped rather than restored outright. A short read leaves fewer bytes here than
+            // the source reported, and pointing the cursors at the original indices would put
+            // them past the end of what actually arrived.
+            moveWriterIndex(to: min(writerIndex, _writerIndex))
+            moveReaderIndex(to: min(readerIndex, _writerIndex))
         }
 
-        private init(storage: Storage) {
+        private init(storage: Storage) async {
+            self.init(storage: storage, writerIndex: await storage.writtenBytes)
+        }
+
+        private init(storage: Storage, writerIndex: Int) {
             self.storage = storage
-            self._writerIndex = storage.writtenBytes
+            self._writerIndex = writerIndex
         }
     }
+}
+
+// MARK: - Synchronous construction, in memory only
+
+extension Internals.Buffer where Stream == Internals.ByteStreamBuffer {
+
+    /// Opens a buffer over an in memory store, without suspending.
+    ///
+    /// ## Why this can be synchronous when the general initializer cannot
+    ///
+    /// The only asynchronous step in `init(_ url:)` is reading the initial writer index, and
+    /// following that call down for an in memory store gives:
+    ///
+    /// ```
+    /// Buffer.init(_:) async
+    ///   -> Storage.writtenBytes          get async
+    ///   -> ByteBufferURL.writtenBytes    get async   <- async purely to satisfy `BufferURL`
+    ///   -> ByteURL.writtenBytes                      <- a lock read, no suspension at all
+    /// ```
+    ///
+    /// `BufferURL.writtenBytes` is `async` because the file backed conformance has to stat.
+    /// The in memory one never suspends, so the `async` on this path is ceremony, and it was
+    /// blocking three call sites that genuinely cannot await: a NIO delegate callback, a
+    /// `didSet`, and the body of a synchronous lock.
+    ///
+    /// ## Overloading with the asynchronous initializer
+    ///
+    /// This shadows `init(_ url: Internals.ByteURL) async` by effect only. Swift resolves that
+    /// the way it resolves any `async` overload: an asynchronous context picks the `async` one,
+    /// so every existing `await Internals.DataBuffer(url)` still means what it always did, and
+    /// a synchronous context picks this one because it is the only candidate. Nothing has to
+    /// change at the call sites that already worked.
+    ///
+    /// Only the `ByteURL` initializer is mirrored. `init()` and the `DataProtocol` ones could
+    /// be too, but nothing needs them, and every added overload is one more place for
+    /// resolution to surprise somebody.
+    ///
+    /// - Important: In `Internals.ClientResponseReceiver` this is not merely convenient, it is
+    /// required. Response chunks are handed to a queue that preserves submission order, and
+    /// submission is synchronous. Building the buffer in a detached task instead would let two
+    /// chunks race to enqueue, and the body would be reassembled out of order.
+    init(_ url: Internals.ByteURL) {
+        self.init(
+            storage: .init(Internals.ByteBufferURL(url)),
+            writerIndex: url.writtenBytes
+        )
+    }
+
 }
 
 // MARK: - Reading
 
 extension Internals.Buffer {
 
+    /// - Precondition: `index` is within `0...writerIndex`. Moving a cursor to an index that
+    /// does not exist is a programming error, unlike querying one, which reports.
     mutating func moveReaderIndex(to index: Int) {
-        precondition(index <= _writerIndex)
-        precondition(index >= .zero)
+        precondition(index >= .zero, "Reader index \(index) is negative")
+        precondition(index <= _writerIndex, "Reader index \(index) is past the writer index \(_writerIndex)")
         _readerIndex = index
     }
 
-    mutating func readData(_ length: Int) -> Data? {
-        guard length >= .zero, _readerIndex + length <= _writerIndex else {
+    /// Reads forward from the reader index and advances it by however much arrived.
+    ///
+    /// - Returns: `nil` when the range is not readable, when the store no longer holds it, or
+    /// when the underlying resource failed. The reader index does not move in any of those
+    /// cases. A short read advances the cursor by the bytes actually delivered, not by
+    /// `length`.
+    mutating func readData(_ length: Int) async -> Data? {
+        // Subtracting rather than adding, so a large `length` cannot overflow past the check.
+        guard length >= .zero, length <= _writerIndex - _readerIndex else {
             return nil
         }
 
-        let result = storage.read(at: UInt64(_readerIndex), length: UInt64(length))
+        let result = await storage.read(at: UInt64(_readerIndex), length: UInt64(length))
         _readerIndex = Int(result.offset)
         return result.data
     }
 
-    mutating func readBytes(_ length: Int) -> [UInt8]? {
-        readData(length).map { [UInt8]($0) }
+    /// - Note: Same semantics as ``readData(_:)``.
+    mutating func readBytes(_ length: Int) async -> [UInt8]? {
+        await readData(length).map { [UInt8]($0) }
     }
 
     /// Reads the whole readable range without moving this cursor.
-    ///
-    /// The read still seeks the shared stream, so this is not free of effect on the store, only
-    /// free of effect on the caller. That is harmless because every storage operation positions
-    /// itself absolutely before reading, so nobody inherits the position this leaves behind.
-    func getData() -> Data? {
-        var mutableSelf = self
-        return mutableSelf.readData(mutableSelf.readableBytes)
+    func getData() async -> Data? {
+        await getData(at: _readerIndex, length: readableBytes)
     }
 
     /// Reads the whole readable range without moving this cursor.
-    func getBytes() -> [UInt8]? {
-        var mutableSelf = self
-        return mutableSelf.readBytes(mutableSelf.readableBytes)
+    func getBytes() async -> [UInt8]? {
+        await getBytes(at: _readerIndex, length: readableBytes)
     }
 
     /// Reads a range without moving this cursor.
     ///
-    /// Out of range reports rather than traps. Moving a cursor to a bad index is a programming
-    /// error and keeps its `precondition`, but asking a query for a range that is not there is
-    /// an ordinary answer of "nothing".
-    func getData(at index: Int, length: Int) -> Data? {
+    /// Goes straight to the store at an absolute index, so it neither reads nor writes this
+    /// cursor. Out of range reports rather than traps: moving a cursor to a bad index is a
+    /// programming error and keeps its `precondition`, but asking a query for a range that is
+    /// not there is an ordinary answer of "nothing".
+    func getData(at index: Int, length: Int) async -> Data? {
         guard isValidRange(at: index, length: length) else {
             return nil
         }
 
-        var mutableSelf = self
-        mutableSelf.moveReaderIndex(to: index)
-        return mutableSelf.readData(length)
+        return await storage.read(at: UInt64(index), length: UInt64(length)).data
     }
 
     /// Reads a range without moving this cursor.
     /// - Note: Same out of range behaviour as ``getData(at:length:)``.
-    func getBytes(at index: Int, length: Int) -> [UInt8]? {
-        guard isValidRange(at: index, length: length) else {
-            return nil
-        }
-
-        var mutableSelf = self
-        mutableSelf.moveReaderIndex(to: index)
-        return mutableSelf.readBytes(length)
+    func getBytes(at index: Int, length: Int) async -> [UInt8]? {
+        await getData(at: index, length: length).map { [UInt8]($0) }
     }
 
     /// - Note: Subtracts rather than adds, so a large `index` cannot overflow its way past the
@@ -362,18 +533,25 @@ extension Internals.Buffer {
 
 extension Internals.Buffer {
 
+    /// - Precondition: `index` is within `readerIndex...`. Rewinding the writer behind the
+    /// reader would make `readableBytes` negative.
     mutating func moveWriterIndex(to index: Int) {
-        precondition(_readerIndex <= index)
-        precondition(index >= .zero)
+        precondition(index >= .zero, "Writer index \(index) is negative")
+        precondition(index >= _readerIndex, "Writer index \(index) is behind the reader index \(_readerIndex)")
         _writerIndex = index
     }
 
-    mutating func writeData<Bytes: DataProtocol>(_ data: Bytes) {
-        _writerIndex = Int(storage.write(at: UInt64(_writerIndex), data: data))
+    /// Writes at the writer index and advances it.
+    ///
+    /// - Important: A failed write is silent, as it is everywhere else in this type. The writer
+    /// index stays put, so the bytes are lost rather than half applied.
+    mutating func writeData<Bytes: DataProtocol & Sendable>(_ data: Bytes) async {
+        _writerIndex = Int(await storage.write(at: UInt64(_writerIndex), data: data))
     }
 
-    mutating func writeBytes<Bytes: Sequence>(_ bytes: Bytes) where Bytes.Element == UInt8 {
-        writeData(Data(bytes))
+    /// - Note: Same semantics as ``writeData(_:)``.
+    mutating func writeBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes) async where Bytes.Element == UInt8 {
+        await writeData(Data(bytes))
     }
 
     /// Drains `buffer` into this one.
@@ -384,20 +562,25 @@ extension Internals.Buffer {
     /// deadlocked outright when the two were copies of each other, since copies share one lock
     /// object and the lock is not reentrant, and deadlocked between two threads calling it in
     /// opposite directions.
-    mutating func writeBuffer<OtherStream: StreamBuffer>(_ buffer: inout Internals.Buffer<OtherStream>) {
-        guard let data = buffer.readData(buffer.readableBytes) else {
+    mutating func writeBuffer<OtherStream: StreamBuffer>(_ buffer: inout Internals.Buffer<OtherStream>) async {
+        let length = buffer.readableBytes
+
+        guard length > .zero, let data = await buffer.readData(length) else {
             return
         }
 
-        writeData(data)
+        await writeData(data)
     }
 
     /// Drops every byte and rewinds both cursors.
     ///
     /// Moving the cursors alone leaves the store at whatever size it grew to, because the
     /// written count is a high water mark that only rises. This lets that memory go.
-    mutating func clear() {
-        storage.clear()
+    ///
+    /// - Warning: The store is shared. Other copies keep their own cursors, which now point
+    /// past the end of an empty resource.
+    mutating func clear() async {
+        await storage.clear()
         _readerIndex = .zero
         _writerIndex = .zero
     }
@@ -405,9 +588,10 @@ extension Internals.Buffer {
     /// Releases the open streams without discarding anything.
     ///
     /// Worth calling once a buffer has been read and is going to be kept around, since the
-    /// cached stream is a file descriptor on the disk backed variant.
-    func close() {
-        storage.close()
+    /// cached stream is a file descriptor on the disk backed variant. The next operation
+    /// reopens whatever it needs.
+    func close() async throws {
+        try await storage.close()
     }
 
     /// Overwrites bytes already in the buffer, leaving this cursor where it was.
@@ -418,17 +602,38 @@ extension Internals.Buffer {
     /// - Warning: Writing at or past the writer index puts the bytes outside this cursor's
     /// readable range, and the next `writeData` starts at that same index and overwrites them.
     /// Follow with ``moveWriterIndex(to:)`` when that is the intent.
-    func setData<Bytes: DataProtocol>(_ data: Bytes, at index: Int) {
-        var mutableSelf = self
-        mutableSelf.moveWriterIndex(to: index)
-        mutableSelf.writeData(data)
+    ///
+    /// - Throws: ``Internals/BufferIndexError`` when `index` is negative.
+    func setData<Bytes: DataProtocol & Sendable>(_ data: Bytes, at index: Int) async throws {
+        guard index >= .zero else {
+            throw Internals.BufferIndexError(index: index)
+        }
+
+        // Straight to the store rather than through a mutable copy of `self`. Routing it
+        // through `moveWriterIndex` tripped that method's precondition whenever `index` sat
+        // behind the reader, which is precisely the patching case this exists for.
+        _ = await storage.write(at: UInt64(index), data: data)
     }
 
     /// Overwrites bytes already in the buffer, leaving this cursor where it was.
     /// - Warning: Same caveat as ``setData(_:at:)``.
-    func setBytes<Bytes: Sequence>(_ bytes: Bytes, at index: Int) where Bytes.Element == UInt8 {
-        var mutableSelf = self
-        mutableSelf.moveWriterIndex(to: index)
-        mutableSelf.writeBytes(bytes)
+    /// - Precondition: `index` is not negative.
+    func setBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes, at index: Int) async where Bytes.Element == UInt8 {
+        precondition(index >= .zero, "Buffer index \(index) is negative")
+        _ = await storage.write(at: UInt64(index), data: Data(bytes))
+    }
+}
+
+// MARK: - Errors
+
+extension Internals {
+
+    struct BufferIndexError: Error, CustomStringConvertible {
+
+        let index: Int
+
+        var description: String {
+            "Attempted to address a buffer at the negative index \(index)"
+        }
     }
 }

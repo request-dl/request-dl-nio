@@ -5,7 +5,7 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.Data
 #endif
 
 extension Modifiers {

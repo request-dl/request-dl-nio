@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsAsyncResponseTests {
 
@@ -90,7 +85,7 @@ struct InternalsAsyncResponseTests {
         // Given
         let configuration = response()
 
-        let data = Data.randomData(length: 100_000_000)
+        let data = await Data.randomData(length: 100_000_000)
 
         let head = Internals.ResponseHead(
             url: "https://127.0.0.1",
@@ -102,7 +97,7 @@ struct InternalsAsyncResponseTests {
 
         // When
         configuration.head.append(.success(head))
-        configuration.download.append(.success(.init(data)))
+        await configuration.download.append(.success(.init(data)))
 
         configuration.upload.close()
         configuration.head.close()

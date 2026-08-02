@@ -14,6 +14,14 @@ import protocol Foundation.DataProtocol
 
 extension Internals {
 
+    /// A `FileHandle` shaped cursor over an ``Internals/ByteURL``.
+    ///
+    /// One handle is opened per direction, so there are always two of them over the same bytes.
+    /// The offset is per handle; the bytes are not. Everything that touches both the offset and
+    /// the store happens inside a single critical section, because the other handle is free to
+    /// move the store in between two separate ones.
+    ///
+    /// Synchronous throughout. There is no I/O here, only memory, so nothing to suspend for.
     final class ByteHandle: @unchecked Sendable {
 
         // MARK: - Private properties
@@ -42,6 +50,10 @@ extension Internals {
 
         // MARK: - Methods
 
+        /// Moves the offset the next operation will address.
+        ///
+        /// Seeking past the end is allowed, and matches a file handle: a write there fills the
+        /// gap with zeros first.
         func seek(toOffset offset: UInt64) throws {
             try lock.withLockVoid {
                 guard !_isClosed else {
@@ -62,6 +74,11 @@ extension Internals {
             }
         }
 
+        /// Reads up to `count` bytes from the current offset, advancing it by what arrived.
+        ///
+        /// - Returns: `nil` at or past the end of the store, otherwise the bytes available,
+        /// which may be fewer than `count`.
+        /// - Throws: ``InvalidModeError`` on a handle opened for writing.
         func read(upToCount count: Int) throws -> Data? {
             try lock.withLock { () throws -> Data? in
                 guard !_isClosed else {
@@ -89,22 +106,32 @@ extension Internals {
                     // Out of range is a possible outcome of a truncated or concurrently reset
                     // buffer, not a programming error, so it reports rather than traps. The
                     // previous `precondition` here turned every such race into a crash.
-                    guard index >= .zero, index + count <= writtenBytes else {
+                    guard index >= .zero, index < writtenBytes else {
                         return nil
                     }
+
+                    // Honouring "up to". Asking for more than is left used to answer nil, which
+                    // made a partial tail indistinguishable from EOF.
+                    let length = min(count, writtenBytes - index)
 
                     buffer.moveWriterIndex(to: writtenBytes)
                     buffer.moveReaderIndex(to: index)
 
-                    return buffer.readData(length: count)
+                    // `readSlice` and a view, not `readData`. The `Data` returning members of
+                    // `ByteBuffer` live in `NIOFoundationCompat`, which pulls in the whole of
+                    // `Foundation` and defeats the point of this refactor.
+                    return buffer.readSlice(length: length).map { Data($0.readableBytesView) }
                 }
 
-                _index = UInt64((data == nil ? .zero : count) + index)
+                _index = UInt64(index + (data?.count ?? .zero))
                 return data
             }
         }
 
-        func write<T: DataProtocol>(contentsOf data: T) throws {
+        /// Writes at the current offset, advancing it by the byte count.
+        ///
+        /// - Throws: ``InvalidModeError`` on a handle opened for reading.
+        func write<Bytes: DataProtocol>(contentsOf data: Bytes) throws {
             try lock.withLockVoid {
                 guard !_isClosed else {
                     throw ClosedError()
@@ -133,7 +160,12 @@ extension Internals {
                         buffer.moveWriterIndex(to: index)
                     }
 
-                    let written = buffer.writeData(data)
+                    // `writeBytes`, not `writeData`, for the `NIOFoundationCompat` reason
+                    // above. `DataProtocol` is a collection of `UInt8`, so it fits.
+                    let written = buffer.writeBytes(data)
+
+                    // A write in the middle rewinds the writer index, so the count has to be a
+                    // high water mark rather than the current position.
                     writtenBytes = max(writtenBytes, buffer.writerIndex)
 
                     return written

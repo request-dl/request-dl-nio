@@ -2,12 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import struct FoundationEssentials.CharacterSet
-#else
-import struct Foundation.CharacterSet
-#endif
-
 /// The `Path` is used to specify the URL path to reach the endpoint of the request.
 ///
 /// ## Overview
@@ -90,7 +84,7 @@ public struct Path: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let path = property.path.trimmingPrefix(in: CharacterSet(charactersIn: "/"))
+        let path = property.path.trimmingPrefix(where: { $0 == "/" })
 
         return .leaf(Node(path: path))
     }

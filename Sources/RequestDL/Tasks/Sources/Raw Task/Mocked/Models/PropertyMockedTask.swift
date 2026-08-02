@@ -72,7 +72,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             )
         )
 
-        let downloadBuffer = Internals.DownloadBuffer(
+        let downloadBuffer = await Internals.DownloadBuffer(
             readingMode: resolved.requestConfiguration.readingMode
         )
 
@@ -113,6 +113,11 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             body.stream(
                 .init {
                     if case .byteBuffer(let byteBuffer) = $0 {
+                        // Synchronous, like the real receiver in
+                        // `Internals.ClientResponseReceiver.didReceiveBodyPart`. The store is
+                        // already in memory, so nothing here suspends, and appending has to
+                        // stay ordered: the download queue preserves submission order and
+                        // submission is synchronous.
                         buffer.append(
                             Internals.DataBuffer(
                                 Internals.ByteURL(byteBuffer)
@@ -122,7 +127,15 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
                     return eventLoop.makeSucceededVoidFuture()
                 }
-            ).whenComplete { _ in
+            ).whenComplete { result in
+                // A failed stream is reported, not swallowed. `whenComplete { _ in }` closed the
+                // download as though it had ended normally, so a mock configured to fail
+                // mid-body looked to the caller like a short but successful response, which is
+                // the one thing a mock of a failure has to get right.
+                if case .failure(let error) = result {
+                    buffer.failed(error)
+                }
+
                 buffer.close()
             }
         }

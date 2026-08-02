@@ -4,11 +4,15 @@
 
 import Logging
 import SwiftAsyncStream
+import SystemPackage
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.URL
+import struct Foundation.Data
+import struct Foundation.Date
+import class Foundation.ProcessInfo
 #endif
 
 /// A data cache that stores and retrieves data based on specified capacities and policies.
@@ -56,14 +60,46 @@ public struct DataCache: Sendable, Equatable {
         /// Cache writes started and not yet finished.
         let pendingWrites = Internals.PendingTasks(priority: .background)
 
-        var memoryCapacity: UInt64 {
+        var memoryCapacity: Int64 {
             get { lock.withLock { _memoryCapacity } }
-            set { lock.withLock { _memoryCapacity = newValue } }
+            set {
+                // Store and trim in one critical section. Memory eviction is bookkeeping over a
+                // struct this lock already owns, so it belongs here.
+                lock.withLock {
+                    let didShrink = newValue < _memoryCapacity
+                    _memoryCapacity = newValue
+
+                    if didShrink {
+                        _memoryStorage.freeSpace(newValue)
+                    }
+                }
+            }
         }
 
-        var diskCapacity: UInt64 {
+        var diskCapacity: Int64 {
             get { lock.withLock { _diskCapacity } }
-            set { lock.withLock { _diskCapacity = newValue } }
+            set {
+                // Disk eviction is file system work and asynchronous, so it cannot happen where
+                // the memory one does. It ran from a `didSet`, which cannot await, and which
+                // fired from inside this lock anyway.
+                //
+                // The store stays under the lock; the trim is handed to the same tracker cache
+                // writes use, so `waitUntilIdle()` joins it and a test can wait for eviction
+                // instead of sleeping.
+                let diskStorage: DiskStorage? = lock.withLock {
+                    let didShrink = newValue < _diskCapacity
+                    _diskCapacity = newValue
+                    return didShrink ? _diskStorage : nil
+                }
+
+                guard let diskStorage else {
+                    return
+                }
+
+                pendingWrites.run {
+                    await diskStorage.freeSpace(newValue)
+                }
+            }
         }
 
         // MARK: - Private properties
@@ -74,21 +110,12 @@ public struct DataCache: Sendable, Equatable {
 
         // MARK: - Unsafe properties
 
-        private var _memoryCapacity: UInt64 {
-            didSet {
-                if _memoryCapacity < oldValue {
-                    _memoryStorage.freeSpace(_memoryCapacity)
-                }
-            }
-        }
-
-        private var _diskCapacity: UInt64 {
-            didSet {
-                if _diskCapacity < oldValue {
-                    _diskStorage.freeSpace(_diskCapacity)
-                }
-            }
-        }
+        // Plain storage. The eviction that used to hang off `didSet` moved into the setters
+        // above: one of the two is asynchronous, and an observer cannot await. Keeping the pair
+        // symmetrical, in the one place that assigns them, also makes it visible that shrinking
+        // is the only direction that evicts.
+        private var _memoryCapacity: Int64
+        private var _diskCapacity: Int64
 
         private var _memoryStorage: MemoryStorage
         private var _diskStorage: DiskStorage
@@ -128,7 +155,7 @@ public struct DataCache: Sendable, Equatable {
     ///
     /// The maximum memory capacity in bytes for the data cache.
     ///
-    public var memoryCapacity: UInt64 {
+    public var memoryCapacity: Int64 {
         get { storage.memoryCapacity }
         nonmutating set { storage.memoryCapacity = newValue }
     }
@@ -136,7 +163,7 @@ public struct DataCache: Sendable, Equatable {
     ///
     /// The maximum disk capacity in bytes for the data cache.
     ///
-    public var diskCapacity: UInt64 {
+    public var diskCapacity: Int64 {
         get { storage.diskCapacity }
         nonmutating set { storage.diskCapacity = newValue }
     }
@@ -164,8 +191,8 @@ public struct DataCache: Sendable, Equatable {
     ///    - logger: The logger for cache usage.
     ///
     public init(
-        memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero,
+        memoryCapacity: Int64 = .zero,
+        diskCapacity: Int64 = .zero,
         url: URL,
         logger: Logger? = nil
     ) {
@@ -196,8 +223,8 @@ public struct DataCache: Sendable, Equatable {
     ///    - logger: The logger for cache usage.
     ///
     public init(
-        memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero,
+        memoryCapacity: Int64 = .zero,
+        diskCapacity: Int64 = .zero,
         suiteName: String,
         logger: Logger? = nil
     ) {
@@ -218,8 +245,8 @@ public struct DataCache: Sendable, Equatable {
     ///    - logger: The logger for cache usage.
     ///
     public init(
-        memoryCapacity: UInt64 = .zero,
-        diskCapacity: UInt64 = .zero,
+        memoryCapacity: Int64 = .zero,
+        diskCapacity: Int64 = .zero,
         logger: Logger? = nil
     ) {
         self.init(
@@ -248,26 +275,54 @@ public struct DataCache: Sendable, Equatable {
 
     // MARK: - Internal static methods
 
+    /// The cache directory for a given suite.
+    ///
+    /// - Note: The temporary directory comes from ``SystemPackage/FilePath/temporaryDirectory``,
+    /// not from `FileManager`, which is not part of `FoundationEssentials`. On Darwin both
+    /// resolve to `TMPDIR`, so the location does not move.
+    ///
+    ///   `FileSystem.shared.temporaryDirectory` is the NIO one and would be the obvious choice,
+    ///   but it is `async throws` and this call chain cannot suspend: it is reached from
+    ///   `public init(...)` and, through those, from `public static let shared = DataCache()`.
+    ///   A stored property cannot be initialised from an asynchronous call.
     static func temporaryURL(suiteName: String) -> URL {
-        FileManager.default.temporaryDirectory
+        URL(fileURLWithPath: FilePath.temporaryDirectory.string, isDirectory: true)
             .appendingPathComponent(
                 "com.request-dl-nio.Swift.Cache",
                 isDirectory: true
             )
             .appendingPathComponent(
-                suiteName.replacingOccurrences(
-                    of: "[/:\\\\]",
-                    with: "_",
-                    options: .regularExpression
-                ),
+                sanitizedPathComponent(suiteName),
                 isDirectory: true
             )
     }
 
     static func mainTemporaryURL() -> URL {
-        temporaryURL(
-            suiteName: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+        temporaryURL(suiteName: ProcessInfo.processInfo.applicationIdentifier)
+    }
+
+    // MARK: - Private static methods
+
+    /// Replaces the characters that cannot appear in a single path component.
+    ///
+    /// - Note: A `map` rather than `replacingOccurrences(of:with:options: .regularExpression)`.
+    /// That overload is Foundation's regex path, which is not part of `FoundationEssentials`,
+    /// and reaching for a regular expression to rewrite three characters was never a good
+    /// trade. `.` is included now: a suite named `..` would otherwise resolve to the parent
+    /// directory and put the cache somewhere nobody asked for.
+    private static func sanitizedPathComponent(_ name: String) -> String {
+        let sanitized = String(
+            name.map { character in
+                switch character {
+                case "/", ":", "\\", ".":
+                    return "_"
+                default:
+                    return character
+                }
+            }
         )
+
+        return sanitized.isEmpty ? "_" : sanitized
     }
 
     // MARK: - Public methods
@@ -280,15 +335,15 @@ public struct DataCache: Sendable, Equatable {
     ///    - policy: The policy indicating the desired behavior for retrieving the cached data.
     /// - Returns: The cached data, if available based on the specified policy.
     ///
-    public func getCachedData(forKey key: String, policy: DataCache.Policy.Set) -> CachedData? {
+    public func getCachedData(forKey key: String, policy: DataCache.Policy.Set) async -> CachedData? {
         let key = base64EncodedKey(key)
 
-        if policy.contains(.memory), let cachedData = storage.memoryStorage[key] {
+        if policy.contains(.memory), let cachedData = await storage.memoryStorage[key] {
             return cachedData
         }
 
         if policy.contains(.disk) {
-            return storage.diskStorage[key]
+            return await storage.diskStorage[key]
         }
 
         return nil
@@ -305,14 +360,14 @@ public struct DataCache: Sendable, Equatable {
     ///    - cachedData: The cached data to be stored.
     ///    - key: The key associated with the cached data.
     ///
-    public func setCachedData(_ cachedData: CachedData, forKey key: String) {
-        var buffer = allocateBuffer(
+    public func setCachedData(_ cachedData: CachedData, forKey key: String) async {
+        var buffer = await allocateBuffer(
             key: key,
             cachedResponse: cachedData.cachedResponse,
-            contentLength: UInt64(cachedData.buffer.readableBytes)
+            contentLength: Int64(cachedData.buffer.readableBytes)
         )
 
-        buffer?.writeBuffer(cachedData.buffer)
+        await buffer?.writeBuffer(cachedData.buffer)
     }
 
     ///
@@ -320,19 +375,19 @@ public struct DataCache: Sendable, Equatable {
     ///
     /// - Parameter key: The key associated with the cached data to be removed.
     ///
-    public func remove(forKey key: String) {
+    public func remove(forKey key: String) async {
         let key = base64EncodedKey(key)
 
         storage.withMemoryStorage { $0.remove(key) }
-        storage.diskStorage.remove(key)
+        await storage.diskStorage.remove(key)
     }
 
     ///
     /// Removes all cached data from the cache.
     ///
-    public func removeAll() {
+    public func removeAll() async {
         storage.withMemoryStorage { $0.removeAll() }
-        storage.diskStorage.removeAll()
+        await storage.diskStorage.removeAll()
     }
 
     ///
@@ -340,9 +395,9 @@ public struct DataCache: Sendable, Equatable {
     ///
     /// - Parameter date: The date to filter cached data removal.
     ///
-    public func removeAll(since date: Date) {
+    public func removeAll(since date: Date) async {
         storage.withMemoryStorage { $0.removeAll(since: date) }
-        storage.diskStorage.removeAll(since: date)
+        await storage.diskStorage.removeAll(since: date)
     }
 
     // MARK: - Internal methods
@@ -350,7 +405,7 @@ public struct DataCache: Sendable, Equatable {
     func updateCached(
         key: String,
         cachedResponse: CachedResponse
-    ) {
+    ) async {
         guard !cachedResponse.policy.isEmpty else {
             return
         }
@@ -372,7 +427,7 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if cachedResponse.policy.contains(.disk) {
-            storage.diskStorage.updateCached(
+            await storage.diskStorage.updateCached(
                 key: key,
                 cachedResponse: cachedResponse,
                 maximumCapacity: diskCapacity
@@ -383,8 +438,8 @@ public struct DataCache: Sendable, Equatable {
     func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
-        contentLength: UInt64
-    ) -> Buffer? {
+        contentLength: Int64
+    ) async -> Buffer? {
         guard !cachedResponse.policy.isEmpty else {
             return nil
         }
@@ -399,9 +454,15 @@ public struct DataCache: Sendable, Equatable {
         var diskBuffer: Internals.AnyBuffer?
 
         if cachedResponse.policy.contains(.memory) {
-            memoryBuffer = storage.withMemoryStorage { memoryStorage -> Internals.AnyBuffer? in
+            // Two steps, and they have to be two.
+            //
+            // `withMemoryStorage` hands out an `inout` from inside a non reentrant lock, so its
+            // closure is synchronous and cannot await. The reservation below is pure
+            // bookkeeping and belongs there; opening a buffer over the result is asynchronous
+            // and belongs outside, which also keeps the lock from being held across it.
+            let dataURL = storage.withMemoryStorage { memoryStorage -> Internals.ByteURL? in
                 guard
-                    let buffer = memoryStorage.allocateBuffer(
+                    let dataURL = memoryStorage.allocateBuffer(
                         key: key,
                         cachedResponse: cachedResponse,
                         contentLength: contentLength,
@@ -415,12 +476,16 @@ public struct DataCache: Sendable, Equatable {
                     return nil
                 }
 
-                return buffer
+                return dataURL
+            }
+
+            if let dataURL {
+                memoryBuffer = await Internals.DataBuffer(dataURL)
             }
         }
 
         if cachedResponse.policy.contains(.disk) {
-            diskBuffer = storage.diskStorage.allocateBuffer(
+            diskBuffer = await storage.diskStorage.allocateBuffer(
                 key: key,
                 cachedResponse: cachedResponse,
                 contentLength: contentLength,

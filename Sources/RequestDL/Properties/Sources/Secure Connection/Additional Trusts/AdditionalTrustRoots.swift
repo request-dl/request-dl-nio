@@ -5,7 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+#if canImport(Darwin)
 import class Foundation.Bundle
+#endif
 #endif
 
 /// A structure representing additional trust roots as a property.
@@ -101,6 +103,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
         source = .bytes(bytes)
     }
 
+    #if canImport(Darwin)
     ///
     /// Initializes a new instance of the AdditionalTrustRoots struct with the specified file in the specified bundle
     /// in `PEM` format.
@@ -115,6 +118,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     ) where Content == Never {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
+    #endif
 
     // MARK: - Public static methods
 

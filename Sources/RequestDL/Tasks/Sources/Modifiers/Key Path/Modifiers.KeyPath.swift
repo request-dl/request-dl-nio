@@ -13,7 +13,15 @@ extension Modifiers {
     /// The `KeyPath` modifier allows you to extract a sub-value from the data returned
     /// by the task using a key path.
     ///
-    @available(*, deprecated, message: "Use '.decode(_:decoder:)' with a Codable type instead. Dynamic key path extraction via JSONSerialization is deprecated and not supported on Linux/FoundationEssentials.")
+    @available(
+        *,
+        deprecated,
+        message: """
+            Use '.decode(_:decoder:)' with a Codable type instead. Dynamic key path \
+            extraction via JSONSerialization is deprecated and not supported on \
+            Linux/FoundationEssentials.
+            """
+    )
     public struct KeyPath<Input: Sendable>: RequestTaskModifier {
 
         // MARK: - Internal properties

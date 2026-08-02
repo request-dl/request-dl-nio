@@ -2,13 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-@testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
 import Foundation
-#endif
+
+@testable import RequestDL
 
 struct CertificateResource: Hashable {
 

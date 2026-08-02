@@ -4,10 +4,9 @@
 
 import Logging
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
+#if canImport(Darwin)
+import class Foundation.Bundle
+import struct Foundation.URL
 #endif
 
 /// Set a certificate of type `PEM` or `DER`.
@@ -41,6 +40,7 @@ public struct Certificate: Property {
             }
         }
 
+        #if canImport(Darwin)
         func resolve(for path: String, in bundle: Bundle) -> String {
             let resourceName: String = {
                 let pathExtension = ".\(self().pathExtension)"
@@ -61,6 +61,7 @@ public struct Certificate: Property {
 
             return resourceURL.absolutePath(percentEncoded: false)
         }
+        #endif
     }
 
     // MARK: - Public properties
@@ -100,6 +101,7 @@ public struct Certificate: Property {
         self.format = format
     }
 
+    #if canImport(Darwin)
     /// Initializes with the specified file path within a bundle and format.
     ///
     /// - Parameters:
@@ -116,6 +118,7 @@ public struct Certificate: Property {
             format: format
         )
     }
+    #endif
 
     // MARK: - Public static methods
 

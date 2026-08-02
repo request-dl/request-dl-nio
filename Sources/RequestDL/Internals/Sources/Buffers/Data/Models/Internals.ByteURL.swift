@@ -14,6 +14,10 @@ import protocol Foundation.DataProtocol
 
 extension Internals {
 
+    /// An in memory location, standing where a file URL would otherwise stand.
+    ///
+    /// Identity is the reference itself, not the bytes, which is what makes it usable as a URL:
+    /// two handles opened against the same instance address the same store.
     final class ByteURL: @unchecked Sendable {
 
         // MARK: - Internal properties
@@ -27,6 +31,10 @@ extension Internals {
             lock.withLock { _buffer }
         }
 
+        /// High water mark of the writer index, which is the size of the store.
+        ///
+        /// Not the buffer's own `writerIndex`. A write in the middle rewinds that one, and the
+        /// bytes past it are still there.
         var writtenBytes: Int {
             lock.withLock { _writtenBytes }
         }
@@ -47,7 +55,8 @@ extension Internals {
 
         init() {}
 
-        /// This should only be used to wraps a ByteBuffer that will be managed exclusive by ByteURL.
+        /// - Important: Only for a `ByteBuffer` that this instance will own exclusively from
+        /// here on. The slice is taken, not copied.
         init(_ buffer: NIOCore.ByteBuffer) {
             let buffer = buffer.slice()
             self._buffer = buffer
@@ -85,7 +94,11 @@ extension Internals {
         func replace<Bytes: DataProtocol>(with data: Bytes) {
             withStorage { buffer, writtenBytes in
                 buffer.clear()
-                buffer.writeData(data)
+
+                // `writeBytes`, not `writeData`. The latter comes from `NIOFoundationCompat`,
+                // which imports the whole of `Foundation`.
+                _ = buffer.writeBytes(data)
+
                 writtenBytes = buffer.writerIndex
             }
         }
@@ -110,6 +123,9 @@ extension Internals.ByteURL: Hashable {
 extension Data {
 
     /// Replaces the whole content of `url` with this data.
+    ///
+    /// - Note: Declared `throws` to mirror `Data.write(to:)` for a file URL. It does not
+    /// currently fail.
     func write(to url: Internals.ByteURL) throws {
         url.replace(with: self)
     }

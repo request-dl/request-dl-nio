@@ -5,26 +5,74 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import class Foundation.ProcessInfo
+#endif
+
+#if canImport(Darwin)
+import class Foundation.Bundle
 #endif
 
 extension ProcessInfo {
 
+    /// A stable identifier for the running application.
+    ///
+    /// The bundle identifier where there is a bundle, the process name everywhere else. Used
+    /// for the `User-Agent` and to name the on-disk cache directory, so it wants to be the same
+    /// string across launches of the same program, not globally unique.
+    var applicationIdentifier: String {
+        #if canImport(Darwin)
+        return Bundle.main.bundleIdentifier ?? processName
+        #else
+        return processName
+        #endif
+    }
+
+    /// The application's marketing version, when the platform has a notion of one.
+    var applicationVersion: String? {
+        #if canImport(Darwin)
+        return Bundle.main.versionString
+        #else
+        return nil
+        #endif
+    }
+
+    /// A `User-Agent` in the `product/version` shape RFC 9110 describes.
     var userAgent: String {
-        let appName = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+        let version = operatingSystemVersion
 
-        let appVersion = Bundle.main.versionString ?? "1.0.0"
+        // Interpolation rather than `String(format:)`. The latter is not part of
+        // `FoundationEssentials`, so it would not have compiled off Apple, and it is the slower
+        // and less checkable of the two anyway.
+        let systemVersion = "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
 
-        let systemName = ProcessInfo.processInfo.hostName
-        let systemVersion = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(applicationIdentifier)/\(applicationVersion ?? "1.0.0") \(Self.systemName)/\(systemVersion)"
+    }
 
-        let systemVersionString = String(
-            format: "%d.%d.%d",
-            systemVersion.majorVersion,
-            systemVersion.minorVersion,
-            systemVersion.patchVersion
-        )
-
-        return "\(appName)/\(appVersion) \(systemName)/\(systemVersionString)"
+    /// The operating system, not the machine.
+    ///
+    /// - Important: This used to be `hostName`, which put the user's machine name into the
+    /// `User-Agent` of every outgoing request. On a laptop that is usually the owner's real
+    /// name. It is a privacy leak, and it also made the header useless for its actual purpose,
+    /// since a server cannot tell platforms apart from it.
+    private static var systemName: String {
+        #if os(macOS)
+        return "macOS"
+        #elseif os(iOS)
+        return "iOS"
+        #elseif os(tvOS)
+        return "tvOS"
+        #elseif os(watchOS)
+        return "watchOS"
+        #elseif os(visionOS)
+        return "visionOS"
+        #elseif os(Linux)
+        return "Linux"
+        #elseif os(Android)
+        return "Android"
+        #elseif os(Windows)
+        return "Windows"
+        #else
+        return "Unknown"
+        #endif
     }
 }

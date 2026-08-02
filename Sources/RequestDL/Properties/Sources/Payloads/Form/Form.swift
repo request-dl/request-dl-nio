@@ -5,7 +5,12 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import Foundation
+import struct Foundation.Data
+import struct Foundation.URL
+import class Foundation.JSONEncoder
+#if canImport(Darwin)
+import class Foundation.JSONSerialization
+#endif
 #endif
 
 /// A structure representing a form with headers.

@@ -5,7 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+#if canImport(Darwin)
 import class Foundation.Bundle
+#endif
 #endif
 
 /// Configure the trusted roots certificates to validate the server using TLS.
@@ -97,6 +99,7 @@ public struct TrustRoots<Content: Property>: Property {
         source = .bytes(bytes)
     }
 
+    #if canImport(Darwin)
     ///
     /// Initializes with the specified `PEM` file in some bundle.
     ///
@@ -110,6 +113,7 @@ public struct TrustRoots<Content: Property>: Property {
     ) where Content == Never {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
+    #endif
 
     // MARK: - Public static methods
 

@@ -32,7 +32,7 @@ extension Internals {
                     return nil
                 }
 
-                return dataBuffer.readData(dataBuffer.readableBytes)
+                return await dataBuffer.readData(dataBuffer.readableBytes)
             }
         }
 

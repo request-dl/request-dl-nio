@@ -52,7 +52,6 @@ Some interesting ideas for API-specific `Modifier`:
                     throw InternalServerError()
                 }
                 .refreshToken()
-                .keyPath(\.result)
                 .decode(objectType)
                 .extractPayload()
                 .result()

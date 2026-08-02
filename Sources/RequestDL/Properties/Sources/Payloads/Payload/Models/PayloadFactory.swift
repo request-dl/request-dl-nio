@@ -23,7 +23,7 @@
 /// A consequence worth knowing: `.charset(_:)` has no effect on JSON payloads, by design.
 protocol PayloadFactory: Sendable {
 
-    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput
+    func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput
 }
 
 struct PayloadInput {

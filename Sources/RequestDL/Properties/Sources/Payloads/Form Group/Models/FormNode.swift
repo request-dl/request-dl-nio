@@ -44,7 +44,7 @@ struct FormNode: PropertyNode {
             value: "multipart/form-data; boundary=\"\(constructor.boundary)\""
         )
 
-        let buffers = try constructor()
+        let buffers = try await constructor()
 
         let body = RequestBody(
             chunkSize: chunkSize,

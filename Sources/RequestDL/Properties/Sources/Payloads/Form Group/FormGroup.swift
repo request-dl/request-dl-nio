@@ -67,7 +67,10 @@ public struct FormGroup<Content: Property>: Property {
         return .leaf(
             FormNode(
                 chunkSize: inputs.environment.payloadChunkSize,
-                items: nodes.lazy.map(\.items).reduce([], +)
+                // `flatMap`, not `reduce([], +)`. The latter allocates a new array per node and
+                // copies everything accumulated so far into it, which is quadratic in the
+                // number of parts. Same fix already applied in `PayloadInput`.
+                items: nodes.flatMap(\.items)
             )
         )
     }

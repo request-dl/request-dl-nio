@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct FormTests {
 
@@ -20,7 +15,7 @@ struct FormTests {
     func form_whenInitData() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
 
         // When
         let resolved = try await resolve(
@@ -33,7 +28,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -42,9 +37,9 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +))
             ]
         )
 
@@ -67,7 +62,7 @@ struct FormTests {
         // Given
         let name = "foo"
         let filename = "bar.raw"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
 
         // When
         let resolved = try await resolve(
@@ -81,7 +76,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -90,9 +85,9 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +))
             ]
         )
 
@@ -115,7 +110,7 @@ struct FormTests {
         // Given
         let name = "foo"
         let filename = "bar.raw"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
         let headers = [
             ("Accept-Language", "en-US"),
             ("Content-Encoding", "gzip"),
@@ -138,7 +133,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -147,9 +142,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -175,14 +174,15 @@ struct FormTests {
     func form_whenInitURL() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
 
-        let url = FileManager.default.temporaryDirectory
+        let url =
+            temporaryDirectoryURL
             .appendingPathComponent("form.file.\(UUID())")
             .appendingPathExtension("raw")
 
-        try url.createPathIfNeeded()
-        defer { try? url.removeIfNeeded() }
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
 
         try data.write(to: url)
 
@@ -198,7 +198,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -207,9 +207,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -232,14 +236,15 @@ struct FormTests {
         // Given
         let name = "foo"
         let filename = "bar.raw"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
 
-        let url = FileManager.default.temporaryDirectory
+        let url =
+            temporaryDirectoryURL
             .appendingPathComponent("form.file.\(UUID())")
             .appendingPathExtension("raw")
 
-        try url.createPathIfNeeded()
-        defer { try? url.removeIfNeeded() }
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
 
         try data.write(to: url)
 
@@ -256,7 +261,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -265,10 +270,10 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
                 String(
-                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                    parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +)
                 )
             ]
         )
@@ -292,18 +297,19 @@ struct FormTests {
     func form_whenInitURLWithHeaders() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
         let headers = [
             ("Accept-Language", "en-US"),
             ("Content-Encoding", "gzip"),
         ]
 
-        let url = FileManager.default.temporaryDirectory
+        let url =
+            temporaryDirectoryURL
             .appendingPathComponent("form.file.\(UUID())")
             .appendingPathExtension("raw")
 
-        try url.createPathIfNeeded()
-        defer { try? url.removeIfNeeded() }
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
 
         try data.write(to: url)
 
@@ -324,7 +330,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -333,10 +339,10 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
                 String(
-                    parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +)
+                    parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +)
                 )
             ]
         )
@@ -379,7 +385,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -388,9 +394,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -426,7 +436,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = verbatim.data(using: .utf16) ?? Data()
 
@@ -439,9 +449,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -478,7 +492,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -487,9 +501,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -533,7 +551,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -542,9 +560,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -593,7 +615,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = try encoder.encode(mock)
 
@@ -604,9 +626,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -658,7 +684,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = try encoder.encode(mock)
 
@@ -669,9 +695,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -728,7 +758,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = try encoder.encode(mock)
 
@@ -739,9 +769,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -790,19 +824,26 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
         let json = try JSONSerialization.jsonObject(with: jsonData)
 
         let dictionary = try #require(json as? [AnyHashable: Any])
 
+        // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
+        //
+        // `Dictionary` iteration order is seeded per process, so the expectation used to depend
+        // on the order the test happened to walk the dictionary in. The product sorts now, and
+        // this has to sort the same way. It also makes the assertion deterministic, which it
+        // was not before.
         let queries =
             try dictionary
+            .map { (key: String(describing: $0.key), value: $0.value) }
+            .sorted { $0.key < $1.key }
             .reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
+                try $0 + URLEncoder().encode($1.value, forKey: $1.key)
             }
-            .map { $0.build() }
             .joined()
 
         let data = Data(queries.utf8)
@@ -814,9 +855,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -862,19 +907,26 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
         let json = try JSONSerialization.jsonObject(with: jsonData)
 
         let dictionary = try #require(json as? [AnyHashable: Any])
 
+        // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
+        //
+        // `Dictionary` iteration order is seeded per process, so the expectation used to depend
+        // on the order the test happened to walk the dictionary in. The product sorts now, and
+        // this has to sort the same way. It also makes the assertion deterministic, which it
+        // was not before.
         let queries =
             try dictionary
+            .map { (key: String(describing: $0.key), value: $0.value) }
+            .sorted { $0.key < $1.key }
             .reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
+                try $0 + URLEncoder().encode($1.value, forKey: $1.key)
             }
-            .map { $0.build() }
             .joined()
 
         let data = queries.data(using: .utf16) ?? Data()
@@ -888,9 +940,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -932,7 +988,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = try JSONSerialization.data(
             withJSONObject: jsonObject,
@@ -946,9 +1002,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -991,7 +1051,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = try JSONSerialization.data(
             withJSONObject: jsonObject,
@@ -1005,9 +1065,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -1055,7 +1119,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let data = try JSONSerialization.data(
             withJSONObject: jsonObject,
@@ -1069,9 +1133,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -1114,14 +1182,13 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let queries =
             try jsonObject
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
             }
-            .map { $0.build() }
             .joined()
 
         let data = Data(queries.utf8)
@@ -1133,9 +1200,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -1181,19 +1252,26 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
         let json = try JSONSerialization.jsonObject(with: jsonData)
 
         let dictionary = try #require(json as? [AnyHashable: Any])
 
+        // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
+        //
+        // `Dictionary` iteration order is seeded per process, so the expectation used to depend
+        // on the order the test happened to walk the dictionary in. The product sorts now, and
+        // this has to sort the same way. It also makes the assertion deterministic, which it
+        // was not before.
         let queries =
             try dictionary
+            .map { (key: String(describing: $0.key), value: $0.value) }
+            .sorted { $0.key < $1.key }
             .reduce([]) {
-                try $0 + URLEncoder().encode($1.value, forKey: String(describing: $1.key))
+                try $0 + URLEncoder().encode($1.value, forKey: $1.key)
             }
-            .map { $0.build() }
             .joined()
 
         let data = queries.data(using: .utf16) ?? Data()
@@ -1207,9 +1285,9 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +))
             ]
         )
 
@@ -1234,7 +1312,7 @@ struct FormTests {
     func form_whenInitDataChunkSize() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 1_024)
+        let data = await Data.randomData(length: 1_024)
         let chunkSize = 64
 
         // When
@@ -1249,15 +1327,16 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         let buffers = try await resolved.requestConfiguration.body?.buffers() ?? []
-        let builtData = buffers.compactMap { $0.getData() }.reduce(Data(), +)
+        let builtData = await buffers.async.compactMap { await $0.getData() }.reduce(Data(), +)
         let totalBytes = builtData.count
 
         // Then
+        let resolvedData = try await Array(buffers.async.compactMap { await $0.getData() })
         #expect(
-            buffers.compactMap { $0.getData() }
+            resolvedData
                 == stride(from: .zero, to: totalBytes, by: chunkSize).map {
                     let upperBound = $0 + chunkSize
                     return builtData[$0..<(upperBound <= totalBytes ? upperBound : totalBytes)]
@@ -1270,9 +1349,13 @@ struct FormTests {
             ]
         )
 
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
         #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(resolvedContentLength)
             ]
         )
 
@@ -1294,7 +1377,7 @@ struct FormTests {
     func form_whenHeadersWithAddingStrategy() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 64)
+        let data = await Data.randomData(length: 64)
 
         // When
         let resolved = try await resolve(
@@ -1311,7 +1394,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -1320,9 +1403,9 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +))
             ]
         )
 
@@ -1346,7 +1429,7 @@ struct FormTests {
     func form_whenHeadersWithSettingStrategy() async throws {
         // Given
         let name = "foo"
-        let data = Data.randomData(length: 64)
+        let data = await Data.randomData(length: 64)
 
         // When
         let resolved = try await resolve(
@@ -1364,7 +1447,7 @@ struct FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -1373,9 +1456,9 @@ struct FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +))
             ]
         )
 
@@ -1397,7 +1480,7 @@ struct FormTests {
     @Test
     func form_whenBodyCalled_shouldBeNever() async throws {
         // Given
-        let property = Form(
+        let property = await Form(
             name: "foo",
             data: .randomData(length: 64)
         )
@@ -1426,7 +1509,7 @@ extension FormTests {
         )
 
         let parser = try await MultipartFormParser(resolved.requestConfiguration)
-        let parsed = try parser.parse()
+        let parsed = try await parser.parse()
 
         // Then
         #expect(
@@ -1435,9 +1518,9 @@ extension FormTests {
             ]
         )
 
-        #expect(
+        await #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(parser.buffers.lazy.map(\.estimatedBytes).reduce(.zero, +))
+                String(parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +))
             ]
         )
 

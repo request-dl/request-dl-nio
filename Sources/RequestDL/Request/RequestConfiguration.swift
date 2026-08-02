@@ -5,12 +5,6 @@
 import AsyncHTTPClient
 import NIOCore
 
-#if canImport(FoundationEssentials)
-import struct FoundationEssentials.CharacterSet
-#else
-import struct Foundation.CharacterSet
-#endif
-
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,
 /// HTTP method, headers, body, and caching policies.
@@ -20,23 +14,19 @@ public struct RequestConfiguration: Sendable {
 
     /// The full URL string constructed from `baseURL`, `pathComponents`, and `queries`.
     ///
-    /// This computed property builds the URL by combining the configured components.
-    /// It automatically trims unnecessary slashes and handles query string formatting.
+    /// - Important: The query items are used as they are. Anything reaching ``queries`` is
+    /// expected to be percent encoded already, which is what ``URLEncoder`` produces. Encoding
+    /// again here would turn every `%20` into `%2520`.
     public var url: String {
-        let baseURL =
-            baseURL
-            .trimmingCharacters(in: .urlHostAllowed.inverted)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
+        let cleanBaseURL = baseURL.trimmingURLBoundaryCharacters()
         let pathComponents = pathComponents.joinedAsPath()
-
         let queries = queries.joined()
         let queriesPathComponent = queries.isEmpty ? "" : "?\(queries)"
 
         if pathComponents.isEmpty {
-            return baseURL + queriesPathComponent
+            return cleanBaseURL + queriesPathComponent
         } else {
-            return "\(baseURL)/\(pathComponents)\(queriesPathComponent)"
+            return "\(cleanBaseURL)/\(pathComponents)\(queriesPathComponent)"
         }
     }
 
@@ -47,6 +37,8 @@ public struct RequestConfiguration: Sendable {
     public internal(set) var pathComponents: [String]
 
     /// An array of query items to be added to the request URL. Defaults to an empty array.
+    ///
+    /// - Important: Percent encoded, see ``url``.
     public internal(set) var queries: [QueryItem]
 
     /// The HTTP method for the request (e.g., "GET", "POST"). Defaults to `nil`, which implies "GET".
@@ -66,8 +58,14 @@ public struct RequestConfiguration: Sendable {
 
     // MARK: - Internal properties
 
+    /// Only a bodyless GET is cacheable.
+    ///
+    /// - Note: Compares the method uppercased. It comes from the caller as a free string, and
+    /// `.method("get")` used to disable caching outright while behaving as a GET everywhere
+    /// else. Same normalisation as the query-versus-body decision in `PayloadNode`.
     var isCacheEnabled: Bool {
-        body == nil && !cachePolicy.isEmpty && (method == nil || method == "GET")
+        let method = method?.uppercased()
+        return body == nil && !cachePolicy.isEmpty && (method == nil || method == "GET")
     }
 
     var readingMode: Internals.DownloadStep.ReadingMode
@@ -95,5 +93,24 @@ public struct RequestConfiguration: Sendable {
             headers: headers.build(),
             body: body?.build()
         )
+    }
+}
+
+// MARK: - String extension
+
+extension String {
+
+    /// Trims the separators that would otherwise be doubled when this is joined with a path.
+    ///
+    /// Only whitespace and slashes, at both ends. `"https://example.com/"` loses its trailing
+    /// slash, and everything inside is left alone.
+    ///
+    /// - Note: Replaces a hand rolled stand-in for `.trimmingCharacters(in: .urlHostAllowed.inverted)`
+    /// that allowed only alphanumerics and `-._~`. That set is much narrower than
+    /// `urlHostAllowed`, which also carries `[` and `]`, so a base URL with an IPv6 literal was
+    /// mangled: `http://[::1]` came back as `http://[::1`. Naming what is actually being removed
+    /// is both correct and impossible to get wrong the same way again.
+    func trimmingURLBoundaryCharacters() -> String {
+        trimming { $0 == "/" || $0.isWhitespace }
     }
 }

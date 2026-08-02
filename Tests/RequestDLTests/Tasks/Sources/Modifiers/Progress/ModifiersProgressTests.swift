@@ -2,16 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct ModifiersProgressTests {
 
@@ -106,7 +101,7 @@ struct ModifiersProgressTests {
         let uploadMonitor = testState.uploadMonitor
 
         let resource = Certificates().server()
-        let data = Data.randomData(length: 1_024 * 64)
+        let data = await Data.randomData(length: 1_024 * 64)
 
         let response = LocalServer.ResponseConfiguration(
             data: data
@@ -250,7 +245,7 @@ struct ModifiersProgressTests {
         let progressMonitor = testState.progressMonitor
 
         let resource = Certificates().server()
-        let data = Data.randomData(length: 1_024 * 64)
+        let data = await Data.randomData(length: 1_024 * 64)
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
 
@@ -290,7 +285,8 @@ struct ModifiersProgressTests {
 
         #expect(
             progressMonitor.upload.uploadedBytes
-                == stride(
+                == [0]
+                + stride(
                     from: .zero,
                     to: data.count,
                     by: 64

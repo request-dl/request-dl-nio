@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
 import Testing
 
 @testable import RequestDL
@@ -25,7 +26,7 @@ struct InternalsStorageTests {
     @Test
     func storage_whenExpiredLifetime() async throws {
         // Given
-        let lifetime: UInt64 = 2_500_000_000
+        let lifetime = TimeAmount.seconds(2) + .milliseconds(500)
         let key = "key"
         let value = 1
 
@@ -36,7 +37,7 @@ struct InternalsStorageTests {
         // Then
         #expect(storage.getValue(Int.self, forKey: key) != nil)
 
-        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime * 3))
+        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds * 3))
 
         #expect(storage.getValue(Int.self, forKey: key) == nil)
     }

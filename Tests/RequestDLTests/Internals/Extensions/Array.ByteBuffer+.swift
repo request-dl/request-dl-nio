@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import NIOCore
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension [ByteBuffer] {
 
@@ -24,10 +19,20 @@ extension [ByteBuffer] {
 
 extension Array where Element: _BufferRepresentable {
 
-    func resolveData() -> [Data] {
-        compactMap {
-            var mutableBuffer = $0
-            return mutableBuffer.readData($0.writerIndex)
+    func resolveData() async -> [Data] {
+        var items = [Data]()
+        items.reserveCapacity(count)
+
+        for buffer in self {
+            var buffer = buffer
+
+            guard let data = await buffer.readData(buffer.writerIndex) else {
+                continue
+            }
+
+            items.append(data)
         }
+
+        return items
     }
 }

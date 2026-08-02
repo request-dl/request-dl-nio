@@ -130,6 +130,18 @@ extension Internals {
         }
 
         func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void> {
+            // Built before the lock, and synchronously.
+            //
+            // Wrapping a `ByteBuffer` costs nothing: the store is already in memory and the
+            // synchronous initializer exists precisely because that path never suspends. See
+            // `Internals.Buffer.init(_ url: Internals.ByteURL)`.
+            //
+            // It must not become a detached task instead. `download.append` enqueues on a queue
+            // that runs operations in submission order, and submission is synchronous, so
+            // reassembly depends on parts being submitted in the order the event loop delivered
+            // them. Two tasks racing to enqueue would corrupt the body.
+            let dataBuffer = Internals.DataBuffer(Internals.ByteURL(buffer))
+
             decide {
                 guard [.head, .downloading].contains(_state) && _phase == .download else {
                     _unexpectedStateOrPhase()
@@ -139,12 +151,9 @@ extension Internals {
                 _phase = .download
                 _reference = .download
 
-                let dataBuffer = Internals.DataBuffer(Internals.ByteURL(buffer))
-
-                return [
-                    { self.download.append(dataBuffer) },
-                    { self.head.close() },
-                ]
+                // `head` is closed by `didReceiveHead`, and closing is idempotent, so repeating
+                // it once per body part achieved nothing.
+                return [{ self.download.append(dataBuffer) }]
             }
 
             return task.eventLoop.makeSucceededVoidFuture()
@@ -200,7 +209,24 @@ extension Internals {
 
                     effects.append { self.download.failed(error) }
                 case .end, .failure:
-                    _unexpectedStateOrPhase(error: error)
+                    // Reported, not trapped.
+                    //
+                    // This used to call `_unexpectedStateOrPhase`, which is `Never` and ends the
+                    // process. Reaching it does not require a bug on this side: the delegate is
+                    // driven by the network stack, and an error arriving after `didFinishRequest`,
+                    // or a second error after the first, lands here. The cascade below can also
+                    // walk into it on its own, since `didFinishRequest` sets `_reference` to
+                    // `.lockout` and every `guard` in the chain then fails.
+                    //
+                    // Killing an app over the order two callbacks fired in is not a trade worth
+                    // making. Preconditions are for invariants this package controls.
+                    Internals.Log.unexpectedStateOrPhase(
+                        state: _state,
+                        phase: _phase,
+                        error: error
+                    ).log(level: .error, logger: logger?.logger)
+
+                    return []
                 }
 
                 _state = .failure

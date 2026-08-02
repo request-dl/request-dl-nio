@@ -6,52 +6,56 @@ import Logging
 import NIOHTTP1
 
 /// Provides methods and properties for HTTP headers.
+///
+/// Names are compared case insensitively, per RFC 9110. Values are not, and are stored in the
+/// order they were added.
 public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByDictionaryLiteral {
 
+    /// Walks every name-value pair, one value at a time.
+    ///
+    /// - Note: Rewritten around a pair of offsets. It used to hold a mutable copy of the whole
+    /// header set and delete each name as it finished with it, then call itself. That made
+    /// iteration quadratic, since every deletion is a linear search plus a shift, and it
+    /// recursed once per header name.
     public struct Iterator: IteratorProtocol {
 
         // MARK: - Private properties
 
-        fileprivate var headers: HTTPHeaders
+        private let headers: HTTPHeaders
 
-        private var name: Name?
-        private var values: [String]?
+        private var nameIndex: Int
+        private var valueIndex: Int
+
+        // MARK: - Inits
 
         init(_ headers: HTTPHeaders) {
-            let name = headers._first
-            let values = name.flatMap {
-                headers._values($0)
-            }
-
             self.headers = headers
-            self.name = name
-            self.values = values
+            self.nameIndex = headers._names.startIndex
+            self.valueIndex = .zero
         }
 
-        // MARK: - Internal methods
+        // MARK: - Public methods
 
         public mutating func next() -> Element? {
-            guard let name = name else {
-                return nil
+            // A loop rather than a recursive call, and it also copes with a name that somehow
+            // holds no values instead of stopping there.
+            while nameIndex < headers._names.endIndex {
+                let values = headers.values[nameIndex]
+
+                if valueIndex < values.endIndex {
+                    defer { valueIndex += 1 }
+                    return (headers._names[nameIndex].rawValue, values[valueIndex])
+                }
+
+                nameIndex += 1
+                valueIndex = .zero
             }
 
-            if var values, !values.isEmpty {
-                let value = values.removeFirst()
-                self.values = values
-                return (name.rawValue, value)
-            }
-
-            headers._remove(name)
-
-            self.name = headers._first
-            self.values = self.name.flatMap {
-                headers._values($0)
-            }
-
-            return next()
+            return nil
         }
     }
 
+    /// A header name, compared without regard to case.
     fileprivate struct Name: Sendable, Hashable, Codable, CustomDebugStringConvertible {
 
         // MARK: - Internal properties
@@ -64,13 +68,19 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
         // MARK: - Private properties
 
-        private let _hashValue: Int
+        /// What equality and hashing actually run on.
+        ///
+        /// - Note: This used to be a stored `hashValue`, and `==` compared nothing else. Two
+        /// unrelated names that happened to collide were therefore equal, which silently reads
+        /// one header as another. `hashValue` is also explicitly documented as unsuitable for
+        /// this: it is seeded per process and is not a substitute for comparing the values.
+        private let normalized: String
 
         // MARK: - Inits
 
         init(_ rawValue: String) {
             self.rawValue = rawValue
-            self._hashValue = rawValue.lowercased().hashValue
+            self.normalized = rawValue.lowercased()
         }
 
         init(from decoder: Decoder) throws {
@@ -82,14 +92,15 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         // MARK: - Internal static methods
 
         static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-            lhs._hashValue == rhs._hashValue
+            lhs.normalized == rhs.normalized
         }
 
         // MARK: - Internal methods
 
+        /// - Note: The wire format is unchanged, one `rawValue` key, so anything already
+        /// persisted still decodes. The unused `_hashValue` case is gone; nothing ever wrote it.
         enum CodingKeys: CodingKey {
             case rawValue
-            case _hashValue
         }
 
         func encode(to encoder: Encoder) throws {
@@ -99,7 +110,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         }
 
         func hash(into hasher: inout Hasher) {
-            _hashValue.hash(into: &hasher)
+            normalized.hash(into: &hasher)
         }
     }
 
@@ -108,7 +119,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     public typealias Element = (name: String, value: String)
 
-    // MARK: - Public methods
+    // MARK: - Public properties
 
     /// Indicates whether the instance is empty.
     public var isEmpty: Bool {
@@ -149,12 +160,10 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     // MARK: - Private properties
 
-    fileprivate var _first: Name? {
-        _names.first
-    }
-
-    private var values: [[String]]
-    private var _names: [Name]
+    // `fileprivate`, so the iterator and the collection conformance below can read them
+    // directly instead of going through a copy.
+    fileprivate var values: [[String]]
+    fileprivate var _names: [Name]
 
     // MARK: - Inits
 
@@ -190,7 +199,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     // MARK: - Public methods
 
     ///
-    /// Sets the value of the specified header field.
+    /// Sets the value of the specified header field, replacing anything already there.
     ///
     /// - Parameters:
     ///   - name: The name of the header field.
@@ -198,7 +207,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ///
     public mutating func set(name: String, value: String) {
         let name = self.name(name)
-        let value = trimmingCharacters(value)
+        let value = trimming(value)
 
         if let index = _names.firstIndex(of: name) {
             values[index] = [value]
@@ -209,7 +218,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     }
 
     ///
-    /// Adds a new value to the specified header field.
+    /// Adds a new value to the specified header field, keeping anything already there.
     ///
     /// - Parameters:
     ///    - name: The name of the header field.
@@ -217,7 +226,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ///
     public mutating func add(name: String, value: String) {
         let name = self.name(name)
-        let value = trimmingCharacters(value)
+        let value = trimming(value)
 
         if let index = _names.firstIndex(of: name) {
             values[index].append(value)
@@ -300,27 +309,72 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         Iterator(self)
     }
 
+    /// Folds `headers` into a copy of this one.
+    ///
+    /// A name carried only by `headers` is appended. A name present on both sides is resolved
+    /// by the closure, and whatever it returns is what ends up stored, trimmed but otherwise
+    /// untouched.
+    ///
+    /// - Parameters:
+    ///   - headers: The set to merge in.
+    ///   - groupingValues: Resolves a name present on both sides. **The receiver's values are
+    ///   passed first**, the incoming ones second, so `{ mine, _ in mine }` keeps this set and
+    ///   `{ _, theirs in theirs }` lets the argument win.
+    ///
+    /// - Note: No longer removes repeated values. It used to, on the both-present branch only,
+    /// which made the operation asymmetric and, worse, made it disagree with the closure: a
+    /// caller writing `{ mine, theirs in mine + theirs }` did not get back `mine + theirs`, and
+    /// `{ mine, _ in mine }` was not even an identity, since it could drop values `mine` had
+    /// legitimately carried twice. Deduplication is a policy, not an invariant, and it is wrong
+    /// for `Set-Cookie` and `Via`. It lives in ``uniquingValues()`` now, for callers that want
+    /// it. Trimming stays, because that one *is* an invariant of the storage.
     public func merging(
         _ headers: HTTPHeaders,
         by groupingValues: ([String], [String]) throws -> [String]
     ) rethrows -> HTTPHeaders {
         var mutableSelf = self
 
-        for _name in headers._names {
-            let name = _name.rawValue
-
-            guard let values = headers[name] else {
+        for name in headers._names {
+            guard let incoming = headers._values(name) else {
                 continue
             }
 
-            if let index = mutableSelf._names.firstIndex(of: _name) {
-                let values = try groupingValues(mutableSelf.values[index], values)
-                mutableSelf.values[index] = unique(values: values)
-            } else {
-                for value in values {
-                    mutableSelf.add(name: name, value: value)
-                }
+            guard let index = mutableSelf._names.firstIndex(of: name) else {
+                // Appended directly. Calling `add` per value repeated the name lookup once per
+                // value, for a name we already know is not there.
+                mutableSelf._names.append(name)
+                mutableSelf.values.append(incoming.map(trimming))
+                continue
             }
+
+            mutableSelf.values[index] = try groupingValues(mutableSelf.values[index], incoming)
+                .map(trimming)
+        }
+
+        return mutableSelf
+    }
+
+    /// Returns a copy with repeated values removed under each name, keeping the first of each
+    /// and the original order.
+    ///
+    /// - Warning: Not safe for every field, which is why it is opt-in rather than something
+    /// ``merging(_:by:)`` does on its own.
+    ///
+    ///   - `Set-Cookie` must never go through this. RFC 6265 defines it as one cookie per
+    ///   field line and forbids folding, so the lines are independent by design.
+    ///   - `Via` uses repetition for loop detection: the same proxy appearing twice is the
+    ///   signal, and collapsing it destroys the evidence.
+    ///   - Anything where order or multiplicity carries meaning, such as `WWW-Authenticate`
+    ///   challenges, is in the same category.
+    ///
+    ///   It is safe for the idempotent list fields, `Accept`, `Accept-Encoding`,
+    ///   `Cache-Control`, `Connection`, `Vary`, `Allow`, where a repeat says nothing new.
+    public func uniquingValues() -> HTTPHeaders {
+        var mutableSelf = self
+
+        for index in mutableSelf.values.indices {
+            var seen = Set<String>()
+            mutableSelf.values[index] = mutableSelf.values[index].filter { seen.insert($0).inserted }
         }
 
         return mutableSelf
@@ -351,39 +405,36 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         return values[index]
     }
 
-    private func unique(values: [String]) -> [String] {
-        var merged = [Name]()
-
-        return values.compactMap {
-            let value = name(trimmingCharacters($0))
-
-            if merged.contains(value) {
-                return nil
-            } else {
-                merged.append(value)
-                return value.rawValue
-            }
-        }
-    }
-
     private func name(_ name: String) -> Name {
         .init(name)
     }
 
-    private func trimmingCharacters(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespaces)
+    /// - Note: Uses the package's own trimming. It was `trimmingCharacters(in: .whitespaces)`,
+    /// which needs `Foundation.CharacterSet`, a type this file has no import for and that the
+    /// refactor is removing.
+    private func trimming(_ value: String) -> String {
+        value.trimming(where: \.isWhitespace)
     }
 }
 
-extension HTTPHeaders: RandomAccessCollection {
+// MARK: - BidirectionalCollection
+
+// Demoted from `RandomAccessCollection`. The storage is a jagged array of arrays, so moving an
+// index by *n* costs a walk over the names; claiming random access told generic algorithms they
+// could jump around for free, which is how an O(n) header lookup becomes O(n²) inside somebody
+// else's code.
+extension HTTPHeaders: BidirectionalCollection {
 
     public struct Index: Comparable {
 
         fileprivate let name: Int
         fileprivate let value: Int
 
+        /// - Note: Lexicographic. It was `lhs.name < rhs.name && lhs.value < rhs.value`, which
+        /// is not an ordering at all: `(0, 1)` and `(1, 0)` are neither less than, greater than,
+        /// nor equal to each other, so anything relying on `Comparable` behaved arbitrarily.
         public static func < (_ lhs: Self, _ rhs: Self) -> Bool {
-            lhs.name < rhs.name && lhs.value < rhs.value
+            (lhs.name, lhs.value) < (rhs.name, rhs.value)
         }
     }
 
@@ -402,34 +453,30 @@ extension HTTPHeaders: RandomAccessCollection {
         )
     }
 
-    public func index(before index: Index) -> Index {
-        guard index.value == .zero else {
-            return .init(
-                name: index.name,
-                value: values[index.name].index(before: index.value)
-            )
+    public func index(after index: Index) -> Index {
+        let values = self.values[index.name]
+        let next = index.value + 1
+
+        guard next < values.endIndex else {
+            // Past the last value of this name, so on to the next one. When that was the last
+            // name this lands exactly on `endIndex`.
+            return .init(name: index.name + 1, value: .zero)
         }
 
-        let name = _names.index(before: index.name)
-        return .init(
-            name: name,
-            value: values.startIndex >= name ? values[name].index(before: values[name].endIndex) : values.startIndex
-        )
+        return .init(name: index.name, value: next)
     }
 
-    public func index(after index: Index) -> Index {
-        guard values[index.name].endIndex == index.value + 1 else {
-            return .init(
-                name: index.name,
-                value: values[index.name].index(after: index.value)
-            )
+    /// - Note: The previous version tested `values.startIndex >= name`, which is only true for
+    /// the very first name, so stepping back into any other name landed on its first value
+    /// rather than its last. Iterating backwards repeated the same element and never terminated
+    /// where it should.
+    public func index(before index: Index) -> Index {
+        guard index.value == .zero else {
+            return .init(name: index.name, value: index.value - 1)
         }
 
-        let name = _names.index(after: index.name)
-        return .init(
-            name: name,
-            value: name < values.endIndex ? values[name].startIndex : .zero
-        )
+        let name = index.name - 1
+        return .init(name: name, value: values[name].endIndex - 1)
     }
 }
 
@@ -439,6 +486,7 @@ extension HTTPHeaders: CustomDebugStringConvertible {
 
     public var debugDescription: String {
         var lines: [String] = []
+
         for name in _names {
             for value in _values(name) ?? [] {
                 lines.append("\(name.rawValue): \(value)")

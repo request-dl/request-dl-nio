@@ -2,22 +2,27 @@
 // See LICENSE for this package's licensing information.
 //
 
-@testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
 import Foundation
-#endif
+
+@testable import RequestDL
 
 extension Data {
 
-    static func randomData(length: Int) -> Data {
+    static func randomParts(_ count: Int, producer: @Sendable (Int) async -> Data) async -> [Data] {
+        var items = [Data]()
+        items.reserveCapacity(count)
+        for index in 0..<count {
+            await items.append(producer(index))
+        }
+        return items
+    }
+
+    static func randomData(length: Int) async -> Data {
         guard length > .zero else {
             return Data()
         }
 
-        var buffer = Internals.DataBuffer()
+        var buffer = await Internals.DataBuffer()
 
         let max = length > UInt8.max ? UInt8.max : UInt8(length)
         let chunk = Int(floor(Double(length) / Double(max)))
@@ -27,16 +32,16 @@ extension Data {
             let length = availableBytes > Int(chunk) ? Int(chunk) : availableBytes
 
             let data = Data(repeating: byte, count: length)
-            buffer.writeData(data)
+            await buffer.writeData(data)
         }
 
         if buffer.readableBytes < length {
-            buffer.writeData(Data(repeating: .min, count: length - buffer.readableBytes))
+            await buffer.writeData(Data(repeating: .min, count: length - buffer.readableBytes))
         }
 
         precondition(buffer.readableBytes == length)
 
-        guard let data = buffer.readData(buffer.readableBytes) else {
+        guard let data = await buffer.readData(buffer.readableBytes) else {
             return Data()
         }
 

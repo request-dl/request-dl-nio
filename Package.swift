@@ -50,6 +50,10 @@ let package = Package(
             url: "https://github.com/o-nnerb/swift-async-stream",
             from: "2.0.0"
         ),
+        .package(
+            url: "https://github.com/apple/swift-async-algorithms",
+            from: "1.1.5"
+        ),
     ],
     targets: [
         .target(
@@ -73,7 +77,10 @@ let package = Package(
 
         .testTarget(
             name: "RequestDLTests",
-            dependencies: ["RequestDL"],
+            dependencies: [
+                "RequestDL",
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            ],
             resources: [.process("Resources")]
         ),
     ]

@@ -2,15 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 @Suite(.serialized)
 struct CachePropertiesTests {
@@ -39,8 +34,8 @@ struct CachePropertiesTests {
     func cache_whenCacheSharedWithCapacity() async throws {
         defer { resetCapacity() }
         // Given
-        let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
-        let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
+        let memoryCapacity: Int64 = 128 * 1_024 * 1_024
+        let diskCapacity: Int64 = 1_024 * 1_024 * 1_024
 
         // When
         let resolved = try await resolve(
@@ -86,8 +81,8 @@ struct CachePropertiesTests {
         defer { resetCapacity() }
         // Given
         let suiteName = "hello_world"
-        let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
-        let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
+        let memoryCapacity: Int64 = 128 * 1_024 * 1_024
+        let diskCapacity: Int64 = 1_024 * 1_024 * 1_024
 
         // When
         let resolved = try await resolve(
@@ -143,8 +138,8 @@ struct CachePropertiesTests {
             in: .userDomainMask
         )[0].appendingPathComponent("cache_system")
 
-        let memoryCapacity: UInt64 = 128 * 1_024 * 1_024
-        let diskCapacity: UInt64 = 1_024 * 1_024 * 1_024
+        let memoryCapacity: Int64 = 128 * 1_024 * 1_024
+        let diskCapacity: Int64 = 1_024 * 1_024 * 1_024
 
         // When
         let resolved = try await resolve(

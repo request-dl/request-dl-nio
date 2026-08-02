@@ -4,5 +4,6 @@
 
 extension Internals {
 
+    /// A buffer held in memory.
     typealias DataBuffer = Buffer<ByteStreamBuffer>
 }

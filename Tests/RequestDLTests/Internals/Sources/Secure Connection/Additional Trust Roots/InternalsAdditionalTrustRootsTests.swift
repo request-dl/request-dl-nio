@@ -2,16 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Foundation
 import NIOSSL
+import SystemPackage
 import Testing
 
 @testable import RequestDL
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 struct InternalsAdditionalTrustRootsTests {
 
@@ -46,20 +42,15 @@ struct InternalsAdditionalTrustRootsTests {
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
 
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RequestDL.\(UUID())")
-            .appendingPathComponent("merged.pem")
+        try await withTemporaryFileURL("merged.pem") { fileURL in
+            try data.write(to: fileURL)
 
-        defer { try? fileURL.removeIfNeeded() }
-        try fileURL.createPathIfNeeded()
+            // When
+            let sut = try Internals.AdditionalTrustRoots.file(fileURL.absolutePath(percentEncoded: false)).build()
 
-        try data.write(to: fileURL)
-
-        // When
-        let sut = try Internals.AdditionalTrustRoots.file(fileURL.absolutePath(percentEncoded: false)).build()
-
-        // Then
-        #expect(sut == .file(fileURL.absolutePath(percentEncoded: false)))
+            // Then
+            #expect(sut == .file(fileURL.absolutePath(percentEncoded: false)))
+        }
     }
 
     @Test

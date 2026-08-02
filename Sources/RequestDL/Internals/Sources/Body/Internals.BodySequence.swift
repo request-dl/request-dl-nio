@@ -3,13 +3,13 @@
 //
 
 import NIOCore
-import NIOFoundationCompat
 
 extension Internals {
 
-    struct BodySequence: Sendable, Sequence {
+    /// Cuts a list of buffers into fixed size chunks for the request body writer.
+    struct BodySequence: Sendable, AsyncSequence {
 
-        struct Iterator: Sendable, IteratorProtocol {
+        struct AsyncIterator: Sendable, AsyncIteratorProtocol {
 
             // MARK: - Internal properties
 
@@ -31,6 +31,8 @@ extension Internals {
                 self.chunkSize = chunkSize
                 self.totalSize = totalSize
                 self.buffers = buffers
+                // Allocated once at full size and then rewound, so the capacity is reused for
+                // every chunk instead of growing again per iteration.
                 self.bytes = .init(repeating: .zero, count: chunkSize)
                 bytes.moveReaderIndex(to: .zero)
                 bytes.moveWriterIndex(to: .zero)
@@ -43,7 +45,7 @@ extension Internals {
             /// Iterative on purpose. Recursing once per source buffer meant the stack depth
             /// tracked the number of buffers feeding a single chunk, which a body assembled
             /// from many small parts turns into an overflow.
-            mutating func next() -> NIOCore.ByteBuffer? {
+            mutating func next() async -> NIOCore.ByteBuffer? {
                 guard chunkSize > .zero else {
                     return nil
                 }
@@ -61,12 +63,16 @@ extension Internals {
                         continue
                     }
 
-                    guard let data = buffer.readData(length) else {
+                    guard let data = await buffer.readData(length) else {
                         // The buffer advertised readable bytes and then failed to produce
                         // them. Dropping it sends a body shorter than the declared length and
                         // leaves the peer waiting for the rest, so at least say so in debug
                         // rather than letting it pass unnoticed.
-                        assertionFailure(
+                        //
+                        // Through `Internals`, not `Swift`. The package has an override for
+                        // this precisely so a test can intercept it, and calling the standard
+                        // library directly walks straight past it.
+                        Internals.assertionFailure(
                             "Buffer reported \(buffer.readableBytes) readable bytes but returned none"
                         )
 
@@ -74,8 +80,12 @@ extension Internals {
                         continue
                     }
 
-                    bytes.writeData(data)
+                    bytes.writeBytes(data)
 
+                    // The cursor advanced on the local copy, so it has to be written back.
+                    // This is the one place the value semantics of `Internals.Buffer` are load
+                    // bearing in this file: the array element is a distinct copy until it is
+                    // reassigned.
                     if buffer.readableBytes == .zero {
                         buffers.removeFirst()
                     } else {
@@ -96,7 +106,7 @@ extension Internals {
             }
         }
 
-        // MARK: - Internal static properties
+        // MARK: - Private static properties
 
         /// How many chunks a body is aimed at, before the bounds below have their say.
         private static let targetChunkCount = 10_000
@@ -154,8 +164,8 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func makeIterator() -> Iterator {
-            Iterator(
+        func makeAsyncIterator() -> AsyncIterator {
+            AsyncIterator(
                 chunkSize: chunkSize,
                 totalSize: totalSize,
                 buffers: buffers

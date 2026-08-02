@@ -2,13 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Testing
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
 import Foundation
-#endif
+import Testing
 
 struct PayloadMock: Codable, Hashable {
 

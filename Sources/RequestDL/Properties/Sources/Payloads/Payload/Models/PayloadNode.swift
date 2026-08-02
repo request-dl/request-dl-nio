@@ -13,6 +13,7 @@ struct PayloadNode: PropertyNode {
 
     // MARK: - Internal methods
 
+    /// Runs the factory and installs the result, either as a query string or as a body.
     func make(_ make: inout Make) async throws {
         let input = PayloadInput(
             method: make.requestConfiguration.method,
@@ -20,7 +21,7 @@ struct PayloadNode: PropertyNode {
             urlEncoder: urlEncoder
         )
 
-        let output = try factory(input)
+        let output = try await factory(input)
 
         switch output.source {
         case .buffer(let buffer):
@@ -31,20 +32,13 @@ struct PayloadNode: PropertyNode {
             )
 
         case .urlEncoded(let queries):
-            let queries = queries.map { $0.build() }
-
-            // Uppercased before comparing. HTTP methods are conventionally uppercase but the
-            // value comes from the caller, and `.method("get")` used to fall through and send
-            // the fields as a body instead of as a query.
-            let method = make.requestConfiguration.method?.uppercased()
-
-            guard ![nil, "GET", "HEAD"].contains(method) else {
+            guard !sendsFieldsAsQuery(make.requestConfiguration.method) else {
                 removeAnySetHeaders(&make.requestConfiguration.headers)
                 make.requestConfiguration.queries.append(contentsOf: queries)
                 return
             }
 
-            let buffer = try Internals.DataBuffer(
+            let buffer = try await Internals.DataBuffer(
                 input.charset.encode(queries.joined())
             )
 
@@ -57,6 +51,21 @@ struct PayloadNode: PropertyNode {
     }
 
     // MARK: - Private methods
+
+    /// Whether the encoded fields belong in the URL rather than in a body.
+    ///
+    /// True with no method set, and for the two methods that carry no body.
+    ///
+    /// - Note: Compares uppercased. HTTP methods are conventionally uppercase but the value
+    /// comes from the caller, and `.method("get")` used to fall through and send the fields as
+    /// a body instead of as a query.
+    private func sendsFieldsAsQuery(_ method: String?) -> Bool {
+        guard let method = method?.uppercased() else {
+            return true
+        }
+
+        return method == "GET" || method == "HEAD"
+    }
 
     private func setBodyWithBuffer(
         buffer: Internals.AnyBuffer,

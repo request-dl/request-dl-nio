@@ -5,7 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+#if canImport(Darwin)
 import class Foundation.Bundle
+#endif
 #endif
 
 /// A structure representing chain certificate for a property used inside
@@ -99,6 +101,7 @@ public struct Certificates<Content: Property>: Property {
         source = .bytes(bytes)
     }
 
+    #if canImport(Darwin)
     ///
     /// Initializes a new instance of the Certificates struct with the specified file in the specified bundle
     /// in `PEM` format.
@@ -113,6 +116,7 @@ public struct Certificates<Content: Property>: Property {
     ) where Content == Never {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
+    #endif
 
     // MARK: - Public static methods
 
