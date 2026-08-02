@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            branch: "main"
+            from: "2.0.0"
         ),
     ],
     targets: [
