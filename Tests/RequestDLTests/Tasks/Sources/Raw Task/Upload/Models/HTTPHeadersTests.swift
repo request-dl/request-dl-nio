@@ -337,7 +337,7 @@ struct HTTPHeadersTests {
             headers.add(name: name, value: value)
         }
 
-        headers = headers.merging(otherHeaders, by: +)
+        headers = headers.merging(otherHeaders, by: +).uniquingValues()
 
         // Then
         #expect(headers.count == 6)
@@ -380,7 +380,7 @@ struct HTTPHeadersTests {
             headers.add(name: name, value: value)
         }
 
-        headers = headers.merging(otherHeaders, by: +)
+        headers = headers.merging(otherHeaders, by: +).uniquingValues()
 
         // Then
         #expect(headers.count == 6)

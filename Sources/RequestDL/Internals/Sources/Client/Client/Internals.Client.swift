@@ -17,6 +17,17 @@ extension Internals {
             manager.isRunning
         }
 
+        // MARK: - Internal properties
+
+        /// The group this client runs on.
+        ///
+        /// Exposed so a request body can be streamed from a loop this client already owns,
+        /// rather than from one derived by writing a zero length chunk down the wire just to
+        /// get hold of a future. See `RequestBody.connect(writer:body:eventLoop:)`.
+        var eventLoopGroup: EventLoopGroup {
+            _client.eventLoopGroup
+        }
+
         // MARK: - Private properties
 
         private let lock = AsyncLock()

@@ -107,7 +107,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         body: RequestBody
     ) {
         let eventLoop = eventLoopGroup.next()
-        let body = body.build()
+        let body = body.build(eventLoop: eventLoop)
 
         eventLoop.execute {
             body.stream(

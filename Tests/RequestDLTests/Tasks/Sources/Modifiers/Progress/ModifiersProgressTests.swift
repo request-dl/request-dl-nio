@@ -285,8 +285,7 @@ struct ModifiersProgressTests {
 
         #expect(
             progressMonitor.upload.uploadedBytes
-                == [0]
-                + stride(
+                == stride(
                     from: .zero,
                     to: data.count,
                     by: 64

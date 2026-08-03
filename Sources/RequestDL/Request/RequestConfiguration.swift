@@ -86,12 +86,14 @@ public struct RequestConfiguration: Sendable {
 
     // MARK: - Internal methods
 
-    func build() throws -> HTTPClient.Request {
+    /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
+    /// ``RequestBody/connect(writer:body:eventLoop:)``.
+    func build(eventLoop: EventLoop) throws -> HTTPClient.Request {
         try HTTPClient.Request(
             url: url,
             method: method.map { .init(rawValue: $0) } ?? .GET,
             headers: headers.build(),
-            body: body?.build()
+            body: body?.build(eventLoop: eventLoop)
         )
     }
 }

@@ -40,11 +40,13 @@ public struct RequestBody: Sendable {
 
     // MARK: - Internal methods
 
-    func build() -> HTTPClient.Body {
+    /// - Parameter eventLoop: Hosts the task that drives the body. See ``connect(writer:body:eventLoop:)``.
+    func build(eventLoop: EventLoop) -> HTTPClient.Body {
         .stream(length: _body.totalSize) {
             Self.connect(
                 writer: $0,
-                body: _body
+                body: _body,
+                eventLoop: eventLoop
             )
         }
     }
@@ -53,36 +55,39 @@ public struct RequestBody: Sendable {
 
     /// Drives the body into `writer`.
     ///
-    /// ## Why it opens with an empty write
+    /// ## Why the loop is passed in
     ///
     /// `HTTPClient.Body.stream` wants an `EventLoopFuture` back synchronously, and driving the
-    /// body needs a `Task`, which needs an `EventLoop` to be bridged back into a future.
-    /// Nothing here owns one: `StreamWriter` exposes only `write(_:)`, and `RequestBody` is
-    /// built long before any loop is picked. The future a write returns is the sole handle on
-    /// one, so the first write is what reaches it.
+    /// body needs a `Task`, which needs an `EventLoop` to be bridged into a future. Neither of
+    /// the two things in scope can supply one: `StreamWriter` exposes only `write(_:)`, and
+    /// `RequestBody` is built before any connection exists.
     ///
-    /// The previous version got there by pulling the first chunk instead, which made the whole
-    /// function `async` and left it uncallable from the synchronous closure above. That is also
-    /// why the empty-body case had its own branch: the pull could come back with nothing.
+    /// Two earlier shapes did not work.
     ///
-    /// - Important: The empty write is a no op on the wire. The body is always sent with a
-    /// known `length`, so `Content-Length` framing is used rather than chunked, where a zero
-    /// length write would instead be the terminator.
+    /// Pulling the first chunk to reach a loop through the future its write returns made the
+    /// whole function `async`, which the synchronous closure above cannot call.
+    ///
+    /// Opening with a zero length write to reach a loop the same way compiled, and was a no op
+    /// on the wire, but it was **not** invisible: `HTTPClientResponseDelegate` reports every
+    /// part that goes out, so every upload grew a leading progress event of zero bytes. A
+    /// 1023 byte body produced two `UploadStep`s instead of one.
+    ///
+    /// Both call sites already hold a group, so the loop is simply handed over.
+    ///
+    /// - Note: An empty body produces no iterations, so it needs no special case.
     private static func connect(
         writer: HTTPClient.Body.StreamWriter,
-        body: Internals.BodySequence
+        body: Internals.BodySequence,
+        eventLoop: EventLoop
     ) -> EventLoopFuture<Void> {
-        writer.write(.byteBuffer(.init())).flatMapWithEventLoop { _, eventLoop in
-            // An empty body simply produces no iterations, so it needs no special case.
-            eventLoop.makeFutureWithTask {
-                var iterator = Internals.StreamWriterSequence(
-                    writer: writer,
-                    body: body
-                ).makeAsyncIterator()
+        eventLoop.makeFutureWithTask {
+            var iterator = Internals.StreamWriterSequence(
+                writer: writer,
+                body: body
+            ).makeAsyncIterator()
 
-                while let next = await iterator.next() {
-                    try await next.get()
-                }
+            while let next = await iterator.next() {
+                try await next.get()
             }
         }
     }

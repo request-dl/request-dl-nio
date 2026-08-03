@@ -11,11 +11,6 @@ import FoundationEssentials
 import struct Foundation.Date
 #endif
 
-// `TimeZone`, `Locale`, `Calendar` and `DateComponents` are gone from this file. None of them
-// are part of `FoundationEssentials`, and none were needed: HTTP dates are always proleptic
-// Gregorian and always UTC. Parsing lives in `Internals.GregorianCalendar` now, shared with the
-// ISO8601 formatting the URL encoder needs. `Locale` was imported and never used.
-
 extension Internals {
 
     struct CacheControl: Sendable {
@@ -223,7 +218,7 @@ extension Internals {
 
             guard
                 let response = try? await client.execute(
-                    request: requestConfiguration.build(),
+                    request: requestConfiguration.build(eventLoop: client.eventLoopGroup.any()),
                     logger: logger
                 ).response()
             else { return nil }

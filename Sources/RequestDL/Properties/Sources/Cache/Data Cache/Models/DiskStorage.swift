@@ -3,8 +3,6 @@
 //
 
 import NIOCore
-// `NIOFileSystem` is the public module; `_NIOFileSystem` is the underscored implementation
-// target it re-exports.
 import NIOFileSystem
 import SystemPackage
 
@@ -119,17 +117,9 @@ struct DiskStorage: Sendable {
         get async {
             guard let record = await record(key) else { return nil }
 
-            let responsePath = record.responseURL.filePath
-            guard
-                let handle = try? await FileSystem.shared.openFile(forReadingAt: responsePath),
-                let buffer = try? await handle.readToEnd(maximumSizeAllowed: .unlimited)
-            else { return nil }
-
-            let responseData =
-                buffer.getData(
-                    at: buffer.readerIndex,
-                    length: buffer.readableBytes
-                ) ?? Data()
+            guard let responseData = await readResponseData(at: record.responseURL) else {
+                return nil
+            }
 
             guard
                 let cachedResponse = try? JSONDecoder().decode(
@@ -143,6 +133,41 @@ struct DiskStorage: Sendable {
                 buffer: Internals.FileBuffer(record.dataURL)
             )
         }
+    }
+
+    /// Reads a whole file into memory, closing the handle before returning on every path.
+    ///
+    /// - Note: `NIOFileSystem`'s handles are not closed by `deinit`. Dropping the last
+    /// reference to one that is still open is a fatal error, on purpose: a leaked descriptor is
+    /// a resource leak that would otherwise stay silent until the process runs out of them.
+    ///
+    /// `defer` cannot carry the fix here: its body cannot `await`, and the close is a NIO call
+    /// that has to be. So the read result is captured first, closed unconditionally right after,
+    /// and only then is the outcome inspected. That keeps a single `await handle.close()` on
+    /// the path regardless of whether the read succeeded, and closes before the function
+    /// returns rather than racing a detached task against it.
+    ///
+    /// The previous version had no close at all. A miss on `openFile` was harmless, since
+    /// nothing had opened yet, but a miss on `readToEnd` was not: `try?` swallowed the throw,
+    /// the `guard` chain failed, and the function returned `nil` with the handle still open and
+    /// now unreachable. That is exactly the trap this hit, on a cache entry whose response
+    /// record failed to read for any reason.
+    private func readResponseData(at url: URL) async -> Data? {
+        guard let handle = try? await FileSystem.shared.openFile(forReadingAt: url.filePath) else {
+            return nil
+        }
+
+        let buffer = try? await handle.readToEnd(maximumSizeAllowed: .unlimited)
+        try? await handle.close()
+
+        guard let buffer else {
+            return nil
+        }
+
+        return buffer.getData(
+            at: buffer.readerIndex,
+            length: buffer.readableBytes
+        ) ?? Data()
     }
 
     func remove(_ key: String) async {
@@ -192,13 +217,7 @@ struct DiskStorage: Sendable {
             let newDataPath = newRecord.dataURL.filePath
             try await FileSystem.shared.moveItem(at: oldDataPath, to: newDataPath)
 
-            let newResponsePath = newRecord.responseURL.filePath
-            let handle = try await FileSystem.shared.openFile(
-                forWritingAt: newResponsePath,
-                options: .newFile(replaceExisting: true)
-            )
-            try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
-            try await handle.close()
+            try await writeAndClose(response, to: newRecord.responseURL)
         } catch {
             _ = try? await FileSystem.shared.removeItem(
                 at: newRecord.url.filePath
@@ -226,13 +245,7 @@ struct DiskStorage: Sendable {
         guard let record = await record(key, createdAt: cachedResponse.date) else { return nil }
 
         do {
-            let responsePath = record.responseURL.filePath
-            let handle = try await FileSystem.shared.openFile(
-                forWritingAt: responsePath,
-                options: .newFile(replaceExisting: true)
-            )
-            try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
-            try await handle.close()
+            try await writeAndClose(response, to: record.responseURL)
         } catch {
             return nil
         }
@@ -250,10 +263,8 @@ struct DiskStorage: Sendable {
             return
         }
 
-        // Ordena do mais antigo para o mais novo (LRU: Least Recently Used)
         entries.sort { $0.date < $1.date }
 
-        // Calcula o tamanho total atual
         var totalSize: Int64 = 0
         var entrySizes: [(Record, Int64)] = []
         for entry in entries {
@@ -262,7 +273,6 @@ struct DiskStorage: Sendable {
             entrySizes.append((entry, size))
         }
 
-        // Remove os mais antigos até que o tamanho total esteja dentro da capacidade
         for (entry, size) in entrySizes {
             if totalSize <= maximumCapacity {
                 break
@@ -275,6 +285,51 @@ struct DiskStorage: Sendable {
     }
 
     // MARK: - Private methods
+
+    /// Writes `data` to `url`, replacing whatever was there, and closes the handle on every
+    /// path, including the one where the write itself throws.
+    ///
+    /// ## The bug this replaces
+    ///
+    /// `NIOFileSystem` handles are not closed by `deinit`. Dropping the last reference to one
+    /// that is still open is a fatal error, on purpose: a leaked descriptor is a resource leak
+    /// that would otherwise stay silent until the process runs out of them.
+    ///
+    ///   `SystemFileHandle.swift:131: Fatal error: Leaking file descriptor ...`
+    ///
+    /// Both call sites used to open, write, and close as three statements inside one `do`
+    /// block:
+    ///
+    /// ```swift
+    /// let handle = try await FileSystem.shared.openFile(...)
+    /// try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
+    /// try await handle.close()
+    /// ```
+    ///
+    /// A throw from `write` — a full disk, a permission error, anything — jumps straight to
+    /// `catch`, and `close()` never runs. The handle is still open, and it is also now
+    /// unreachable, which is exactly what NIO traps on. `readResponseData(at:)` a few lines up
+    /// already closed on every path for the read side; this is the same discipline for the
+    /// write side, which had not received it.
+    ///
+    /// - Throws: Whatever the open or the write threw. The close error is deliberately not
+    /// propagated: reporting a failure to close over a failure to write would point at the
+    /// wrong half of the problem, and the two call sites already have their own recovery for a
+    /// write that failed.
+    private func writeAndClose(_ data: Data, to url: URL) async throws {
+        let handle = try await FileSystem.shared.openFile(
+            forWritingAt: url.filePath,
+            options: .newFile(replaceExisting: true)
+        )
+
+        do {
+            try await handle.write(contentsOf: data, toAbsoluteOffset: .zero)
+            try await handle.close()
+        } catch {
+            try? await handle.close()
+            throw error
+        }
+    }
 
     private func record(_ key: String, createdAt date: Date? = nil) async -> Record? {
         switch date {
@@ -291,11 +346,8 @@ struct DiskStorage: Sendable {
         var foundRecords: [Record] = []
 
         do {
-            // 1. Abre um handle para o diretório
             try await FileSystem.shared.withDirectoryHandle(atPath: dirPath) { dir in
-                // 2. Lista o conteúdo através do handle do diretório
                 for try await entry in dir.listContents() {
-                    // entry.name é um FilePath.Component, usamos .string para obter o texto
                     if entry.name.string.hasSuffix(".\(Record.pathExtension)") {
                         let entryURL = directory.appendingPathComponent(entry.name.string)
 
@@ -305,9 +357,7 @@ struct DiskStorage: Sendable {
                     }
                 }
             }
-        } catch {
-            // Ignora erros de listagem (ex: diretório não existe ainda)
-        }
+        } catch {}
 
         return foundRecords
     }

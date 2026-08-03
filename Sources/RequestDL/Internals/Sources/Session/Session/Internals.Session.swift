@@ -90,7 +90,7 @@ extension Internals {
                 download: download.stream
             )
 
-            let request = try requestConfiguration.build()
+            let request = try requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
 
             let unsafeTask = client.execute(
                 request: request,

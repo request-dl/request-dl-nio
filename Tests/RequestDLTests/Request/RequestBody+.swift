@@ -23,32 +23,24 @@ extension RequestBody {
 
         let buffers = InlineProperty(wrappedValue: [Internals.DataBuffer]())
 
-        try await build().stream(
+        try await build(eventLoop: eventLoop).stream(
             .init(closure: { ioData in
                 switch ioData {
                 case .byteBuffer(let byteBuffer):
-                    // Empty writes carry no body bytes, so they are dropped.
-                    //
-                    // `RequestBody.connect` opens the stream with a zero length write. That is
-                    // the only way to reach an `EventLoop` from inside `HTTPClient.Body.stream`,
-                    // whose closure has to hand back a future synchronously and has nothing else
-                    // to build one from. On the wire it is a no op, since the body is framed by
-                    // `Content-Length` rather than chunked, and it has no business showing up
-                    // here as a phantom chunk either.
-                    guard byteBuffer.readableBytes > .zero else {
-                        break
-                    }
-
                     // Wrapped as a `ByteURL`, not read out through `readData(length:)`.
                     //
-                    // Two reasons. `ByteBuffer.readData` belongs to `NIOFoundationCompat`, which
-                    // this file does not import and which pulls in the whole of Foundation. And
-                    // wrapping reaches `Internals.Buffer.init(_ url: Internals.ByteURL)`, the
-                    // synchronous in-memory initializer, which is what lets this compile inside
-                    // a synchronous NIO closure at all: the `Data` initializer is `async`.
+                    // Two reasons, and both are why `.init(data)` cannot stay here. That spelling
+                    // resolves to `Internals.Buffer.init(_ data: some DataProtocol) async`, and
+                    // this closure is synchronous; wrapping reaches
+                    // `Internals.Buffer.init(_ url: Internals.ByteURL)`, the synchronous
+                    // in-memory initializer, which exists precisely because that path never
+                    // suspends.
                     //
-                    // Same shape as `Internals.ClientResponseReceiver.didReceiveBodyPart`, and
-                    // it copies nothing, since `ByteURL` takes a slice.
+                    // And `ByteBuffer.readData(length:)` belongs to `NIOFoundationCompat`, which
+                    // this file does not import and which pulls in the whole of Foundation.
+                    //
+                    // Same shape as `Internals.ClientResponseReceiver.didReceiveBodyPart`, and it
+                    // copies nothing, since `ByteURL` takes a slice.
                     buffers.wrappedValue += [
                         Internals.DataBuffer(Internals.ByteURL(byteBuffer))
                     ]
