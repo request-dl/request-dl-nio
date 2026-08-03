@@ -1202,8 +1202,9 @@ struct FormTests {
         )
     }
 
-    #endif
-
+    // `form_whenInitJSONURLEncoded` exercises `Form(name:filename:contentType:jsonObject:)`,
+    // the same Darwin-only `Any`-based initializer as the tests above — it belongs in this
+    // block for the same reason.
     @Test
     func form_whenInitJSONURLEncoded() async throws {
         // Given
@@ -1269,6 +1270,8 @@ struct FormTests {
             parsed.items.map { $0.contents.queries() } == [data.queries()]
         )
     }
+
+    #endif
 
     @Test
     func form_whenInitJSONWithURLEncodedUTF16() async throws {

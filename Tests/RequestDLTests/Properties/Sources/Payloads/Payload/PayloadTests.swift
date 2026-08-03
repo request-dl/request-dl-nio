@@ -475,6 +475,11 @@ struct PayloadTests {
 
 extension PayloadTests {
 
+    // `Payload(_:options:contentType:)` only exists on Darwin — same reason as the block at the
+    // top of this file: it is the one factory that takes `Any`, so it cannot avoid
+    // `JSONSerialization`, which is not part of `FoundationEssentials`.
+    #if canImport(Darwin)
+
     @Test
     func payload_whenGETInitJSONWithURLEncoded() async throws {
         // Given
@@ -569,6 +574,8 @@ extension PayloadTests {
                 )
         )
     }
+
+    #endif
 
     @Test
     func payload_whenGETInitEncodableWithURLEncoded() async throws {
@@ -757,6 +764,10 @@ extension PayloadTests {
         )
     }
 
+    // `Payload(_:options:contentType:)` only exists on Darwin — same reason as the other
+    // `Any`-based blocks in this file.
+    #if canImport(Darwin)
+
     @Test
     func payload_whenInvalidJSONObject() async throws {
         // Given
@@ -777,6 +788,8 @@ extension PayloadTests {
         // Then
         #expect(encodingError?.context == .invalidJSONObject)
     }
+
+    #endif
 
     @Test
     func payload_whenEmptyPayload() async throws {

@@ -187,7 +187,11 @@ struct DataCacheTests {
         // Then
         #expect(cachedMemory1 == nil)
 
-        await #expect(cachedMemory2?.data == cachedData2.data)
+        // Extracted first: comparing two `async` property accesses directly inside `#expect`
+        // fails to compile ("'async' property access in an autoclosure that does not support
+        // concurrency") even with `await` on the macro call itself.
+        let cachedData2Bytes = await cachedData2.data
+        await #expect(cachedMemory2?.data == cachedData2Bytes)
     }
 
     @Test
@@ -226,7 +230,8 @@ struct DataCacheTests {
         // Then
         #expect(cachedDisk1 == nil)
 
-        await #expect(cachedDisk2?.data == cachedData2.data)
+        let cachedData2Bytes = await cachedData2.data
+        await #expect(cachedDisk2?.data == cachedData2Bytes)
     }
 
     @Test
@@ -267,11 +272,14 @@ struct DataCacheTests {
         let diskCached1_v2 = await dataCache.getCachedData(forKey: key1, policy: .disk)
 
         // Then
-        await #expect(memoryCached1?.data == cachedData1.data)
-        await #expect(diskCached1Data == cachedData1.data)
+        let cachedData1Bytes = await cachedData1.data
+        let cachedData2Bytes = await cachedData2.data
 
-        await #expect(memoryCached2?.data == cachedData2.data)
-        await #expect(diskCached2?.data == cachedData2.data)
+        await #expect(memoryCached1?.data == cachedData1Bytes)
+        await #expect(diskCached1Data == cachedData1Bytes)
+
+        await #expect(memoryCached2?.data == cachedData2Bytes)
+        await #expect(diskCached2?.data == cachedData2Bytes)
 
         #expect(memoryCached1_v2 == nil)
         #expect(diskCached1_v2 == nil)
@@ -308,7 +316,9 @@ struct DataCacheTests {
         // Then
         #expect(storedDatas[0] == nil)
         #expect(storedDatas[1] == nil)
-        await #expect(storedDatas[2]?.data == cachedDatas[2].data)
+
+        let cachedData2Bytes = await cachedDatas[2].data
+        await #expect(storedDatas[2]?.data == cachedData2Bytes)
     }
 
     @Test

@@ -8,7 +8,6 @@
 import FoundationEssentials
 #else
 import struct Foundation.Data
-import func Foundation.floor
 #endif
 
 extension Data {
@@ -30,7 +29,9 @@ extension Data {
         var buffer = await Internals.DataBuffer()
 
         let max = length > UInt8.max ? UInt8.max : UInt8(length)
-        let chunk = Int(floor(Double(length) / Double(max)))
+        // `.rounded(.down)`, not the free function `floor(_:)` — that comes from `Glibc`/
+        // `Darwin`, neither of which this file imports under `FoundationEssentials`.
+        let chunk = Int((Double(length) / Double(max)).rounded(.down))
 
         for byte in UInt8.min...UInt8.max {
             let availableBytes = length - buffer.writerIndex

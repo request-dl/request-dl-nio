@@ -33,8 +33,16 @@ struct InternalsSessionTests {
             secureConnection.certificateVerification = .some(.none)
             configuration.secureConnection = secureConnection
 
+            // Same dedicated pool `Session.localServer` (see LocalServerSession.swift) gives the
+            // rest of this suite family, not `.shared`. `.shared` is `MultiThreadedEventLoopGroup
+            // .shared` — one thread, process-wide — and this file's own
+            // `session_whenUploadingFile_shouldBeValid` pushes 100MB through it in the same run
+            // as three tests that expect a prompt response; on that single thread, the upload
+            // starves the others until they hit `connectTimeout`.
+            configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 64
+
             session = Internals.Session(
-                provider: .shared,
+                provider: .identified("com.requestdl.tests.local-server", numberOfThreads: 2),
                 configuration: configuration
             )
         }

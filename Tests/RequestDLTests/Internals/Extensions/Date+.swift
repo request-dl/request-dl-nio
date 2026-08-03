@@ -6,12 +6,13 @@
 import FoundationEssentials
 #else
 import struct Foundation.Date
-import func Foundation.ceil
 #endif
 
 extension Date {
 
+    /// - Note: `.rounded(.up)`, not the free function `ceil(_:)` — that comes from `Glibc`/
+    /// `Darwin`, neither of which this file imports under `FoundationEssentials`.
     var seconds: Int {
-        Int(ceil(Double(timeIntervalSince1970)))
+        Int(Double(timeIntervalSince1970).rounded(.up))
     }
 }

@@ -23,6 +23,11 @@ import Musl
 import WinSDK
 #endif
 
+// `.breakpoint()` (`Interceptors.Breakpoint`) only exists where `signal_h` is importable —
+// effectively Darwin, whose SDK auto-modularizes system headers this way. Glibc exposes
+// `signal.h`'s declarations through the single `Glibc` umbrella module instead, so this test's
+// only subject does not exist to call on Linux.
+#if canImport(signal_h)
 #if DEBUG
 struct InterceptorsBreakpointTests {
 
@@ -47,4 +52,5 @@ struct InterceptorsBreakpointTests {
         }
     }
 }
+#endif
 #endif
