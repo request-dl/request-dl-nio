@@ -2,16 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.URL
 #endif
-import NIOCore
-import Testing
-
-@testable import RequestDL
 
 struct InternalsDataBufferTests {
 

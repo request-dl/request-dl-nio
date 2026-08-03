@@ -2,16 +2,18 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-#endif
 import NIO
 import NIOHTTP1
 import NIOSSL
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import class Foundation.JSONEncoder
+#endif
 
 extension LocalServer {
 
@@ -25,12 +27,15 @@ extension LocalServer {
             self.data = data
         }
 
-        init(headers: NIOHTTP1.HTTPHeaders = .init(), jsonObject: Any) throws {
+        /// - Note: `Value: Encodable`, not `Any` plus `JSONSerialization` — every call site
+        /// passes a `String`, and `JSONEncoder` handles a bare top-level value the same way
+        /// `JSONSerialization`'s `.fragmentsAllowed` used to, without needing `Foundation`.
+        init<Value: Encodable>(headers: NIOHTTP1.HTTPHeaders = .init(), jsonObject: Value) throws {
             self.headers = headers
-            self.data = try JSONSerialization.data(
-                withJSONObject: jsonObject,
-                options: [.sortedKeys, .fragmentsAllowed]
-            )
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            self.data = try encoder.encode(jsonObject)
         }
     }
 }

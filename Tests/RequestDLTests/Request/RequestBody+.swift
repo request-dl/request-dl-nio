@@ -3,16 +3,17 @@
 //
 
 import AsyncHTTPClient
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-#endif
 import NIOCore
 import NIOPosix
 import SwiftAsyncStream
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension RequestBody {
 

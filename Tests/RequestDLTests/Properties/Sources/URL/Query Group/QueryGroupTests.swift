@@ -2,12 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-import struct Foundation.URL
-#endif
 import Testing
 
 @testable import RequestDL
@@ -85,31 +79,16 @@ struct QueryGroupTests {
             }
         )
 
-        let queryItems =
-            URL(string: resolved.requestConfiguration.url)
-            .flatMap {
-                URLComponents(url: $0, resolvingAgainstBaseURL: true)
-            }
-            .flatMap(\.queryItems) ?? []
+        // `URLComponents`/`URLQueryItem` are not part of `FoundationEssentials`. A dictionary's
+        // iteration order is not guaranteed, so the query string built from it needs an
+        // order-independent comparison rather than the exact-string checks the other tests use.
+        let queryString = resolved.requestConfiguration.url.split(separator: "?", maxSplits: 1).last ?? ""
+        let queryItems = Set(queryString.split(separator: "&").map(String.init))
 
         // Then
         #expect(queryItems.count == 2)
-        #expect(
-            queryItems.contains(
-                URLQueryItem(
-                    name: "number",
-                    value: "123"
-                )
-            )
-        )
-        #expect(
-            queryItems.contains(
-                URLQueryItem(
-                    name: "page",
-                    value: "1"
-                )
-            )
-        )
+        #expect(queryItems.contains("number=123"))
+        #expect(queryItems.contains("page=1"))
     }
 
     @Test

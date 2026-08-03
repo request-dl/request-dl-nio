@@ -201,4 +201,38 @@ extension Date {
         "May": 5, "Jun": 6, "Jul": 7, "Aug": 8,
         "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
     ]
+
+    private static let httpMonthNames = [
+        1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec",
+    ]
+
+    private static let httpWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    /// This date as an HTTP date, the IMF-fixdate form of RFC 9110: `Sun, 06 Nov 1994 08:49:37 GMT`.
+    ///
+    /// The inverse of `init(httpDate:)` above. Nothing in this package's production paths needs
+    /// to format one — only to parse an incoming `Expires`/`Last-Modified` — but tests that
+    /// fabricate cache response headers need to build one without `DateFormatter`, which is not
+    /// part of `FoundationEssentials` any more than `Calendar` is.
+    func toHTTPDateString() -> String {
+        let timestamp = Int64(timeIntervalSince1970.rounded(.down))
+
+        let days = Internals.GregorianCalendar.floorDivide(timestamp, by: 86_400)
+        let secondsOfDay = timestamp - days * 86_400
+
+        let date = Internals.GregorianCalendar.civilFromDays(days)
+        let pad = Internals.GregorianCalendar.pad
+
+        // 1970-01-01, day zero, was a Thursday. `% 7` can come back negative for a day before
+        // the epoch, so the extra `+ 7` normalizes it before indexing.
+        let weekday = Self.httpWeekdays[Int(((days % 7) + 7 + 4) % 7)]
+        let month = Self.httpMonthNames[Int(date.month)] ?? ""
+
+        return "\(weekday), " + pad(date.day, 2) + " \(month) " + pad(date.year, 4)
+            + " " + pad(secondsOfDay / 3_600, 2)
+            + ":" + pad((secondsOfDay % 3_600) / 60, 2)
+            + ":" + pad(secondsOfDay % 60, 2)
+            + " GMT"
+    }
 }

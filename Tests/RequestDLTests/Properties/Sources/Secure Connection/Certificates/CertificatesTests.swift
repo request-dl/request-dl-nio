@@ -2,15 +2,20 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.UUID
 #endif
-import Testing
 
-@testable import RequestDL
+#if canImport(Darwin)
+import class Foundation.Bundle
+#endif
 
 struct CertificatesTests {
 
@@ -29,25 +34,39 @@ struct CertificatesTests {
                     RequestDL.Certificates {
                         RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
                         RequestDL.Certificate(serverCertificate)
+                        // `Certificate(_:in:format:)` only exists on Darwin — it is built on
+                        // `Bundle`, which is not part of `FoundationEssentials`.
+                        #if canImport(Darwin)
                         RequestDL.Certificate("client.public", in: .module)
+                        #endif
                     }
                 }
             }
         )
 
         // Then
+        // Built outside the `#expect` macro: `#if` inside a macro argument does not parse
+        // reliably, since the macro needs a single well formed expression before conditional
+        // compilation is resolved.
+        var expectedCertificates: [Internals.Certificate] = [
+            .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+            .init(serverCertificate, format: .pem),
+        ]
+
+        #if canImport(Darwin)
+        expectedCertificates.append(
+            .init(
+                Bundle.module
+                    .url(forResource: "client.public", withExtension: "pem")?
+                    .absolutePath(percentEncoded: false) ?? "",
+                format: .pem
+            )
+        )
+        #endif
+
         #expect(
             resolved.session.configuration.secureConnection?.certificateChain
-                == .certificates([
-                    .init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-                    .init(serverCertificate, format: .pem),
-                    .init(
-                        Bundle.module
-                            .url(forResource: "client.public", withExtension: "pem")?
-                            .absolutePath(percentEncoded: false) ?? "",
-                        format: .pem
-                    ),
-                ])
+                == .certificates(expectedCertificates)
         )
     }
 

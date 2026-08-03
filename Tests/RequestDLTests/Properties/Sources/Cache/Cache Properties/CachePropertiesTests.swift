@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#endif
 import Testing
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 
 @Suite(.serialized)
 struct CachePropertiesTests {
@@ -114,10 +115,11 @@ struct CachePropertiesTests {
     func cache_whenCacheURLWithoutCapacity() async throws {
         defer { resetCapacity() }
         // Given
-        let url = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0].appendingPathComponent("cache_system")
+        // Any distinct directory works: this only checks that a custom `url` is honored, not
+        // the real application support directory. `FileManager` is not part of
+        // `FoundationEssentials`; the system temporary directory is the portable stand-in
+        // already used elsewhere in the test suite.
+        let url = temporaryDirectoryURL.appendingPathComponent("cache_system")
 
         // When
         let resolved = try await resolve(
@@ -135,10 +137,11 @@ struct CachePropertiesTests {
     func cache_whenCacheURLWithCapacity() async throws {
         defer { resetCapacity() }
         // Given
-        let url = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0].appendingPathComponent("cache_system")
+        // Any distinct directory works: this only checks that a custom `url` is honored, not
+        // the real application support directory. `FileManager` is not part of
+        // `FoundationEssentials`; the system temporary directory is the portable stand-in
+        // already used elsewhere in the test suite.
+        let url = temporaryDirectoryURL.appendingPathComponent("cache_system")
 
         let memoryCapacity: Int64 = 128 * 1_024 * 1_024
         let diskCapacity: Int64 = 1_024 * 1_024 * 1_024

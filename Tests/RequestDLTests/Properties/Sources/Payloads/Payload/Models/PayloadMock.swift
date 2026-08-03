@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Date
 #endif
-import Testing
 
 struct PayloadMock: Codable, Hashable {
 
@@ -34,11 +35,10 @@ struct PayloadMock: Codable, Hashable {
 
     // MARK: - Private static methods
 
+    /// Floored to the nearest whole second, not truncated: a fractional timestamp of `-0.5`
+    /// belongs to the second before it, not to zero. Matches `Date.toISO8601String()`'s rounding,
+    /// which is the encoding this mock round-trips through.
     private static func zeroNanoseconds(_ date: Date) -> Date {
-        Calendar.current.date(
-            bySetting: .nanosecond,
-            value: .zero,
-            of: date
-        ) ?? date
+        Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down))
     }
 }

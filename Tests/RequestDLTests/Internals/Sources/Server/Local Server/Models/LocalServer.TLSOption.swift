@@ -2,16 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-#endif
 import NIO
 import NIOHTTP1
 import NIOSSL
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension LocalServer {
 

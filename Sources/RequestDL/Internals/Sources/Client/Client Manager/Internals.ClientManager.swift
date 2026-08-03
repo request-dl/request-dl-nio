@@ -166,13 +166,14 @@ extension Internals {
             guard
                 var items = _table[id],
                 let index = items.firstIndex(where: { item in
-                    item.sessionConfiguration == sessionConfiguration && {
-                        #if canImport(Darwin)
-                        now - item.readAt <= lifetime.nanoseconds
-                        #else
-                        item.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
-                        #endif
-                    }()
+                    item.sessionConfiguration == sessionConfiguration
+                        && {
+                            #if canImport(Darwin)
+                            now - item.readAt <= lifetime.nanoseconds
+                            #else
+                            item.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
+                            #endif
+                        }()
                 })
             else { return nil }
 

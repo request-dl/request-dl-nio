@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -11,9 +15,10 @@ import struct Foundation.Date
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 #endif
-import Testing
 
-@testable import RequestDL
+#if canImport(Darwin)
+import class Foundation.JSONSerialization
+#endif
 
 struct FormTests {
 
@@ -835,9 +840,14 @@ struct FormTests {
         let parsed = try await parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
-        let json = try JSONSerialization.jsonObject(with: jsonData)
 
-        let dictionary = try #require(json as? [AnyHashable: Any])
+        // `JSONValue` stands in for `JSONSerialization`'s `Any`, which is not part of
+        // `FoundationEssentials`.
+        guard case .object(let dictionary) = try JSONDecoder().decode(Internals.JSONValue.self, from: jsonData)
+        else {
+            Issue.record("Expected the mock to encode as a JSON object")
+            return
+        }
 
         // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
         //
@@ -846,7 +856,7 @@ struct FormTests {
         // has to sort the same way — that is also what keeps the assertion deterministic.
         let queries =
             try dictionary
-            .map { (key: String(describing: $0.key), value: $0.value) }
+            .map { (key: $0.key, value: $0.value.unwrapped) }
             .sorted { $0.key < $1.key }
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key)
@@ -883,7 +893,7 @@ struct FormTests {
         )
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries() } == [data.queries()]
         )
     }
 
@@ -917,9 +927,14 @@ struct FormTests {
         let parsed = try await parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
-        let json = try JSONSerialization.jsonObject(with: jsonData)
 
-        let dictionary = try #require(json as? [AnyHashable: Any])
+        // `JSONValue` stands in for `JSONSerialization`'s `Any`, which is not part of
+        // `FoundationEssentials`.
+        guard case .object(let dictionary) = try JSONDecoder().decode(Internals.JSONValue.self, from: jsonData)
+        else {
+            Issue.record("Expected the mock to encode as a JSON object")
+            return
+        }
 
         // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
         //
@@ -928,14 +943,17 @@ struct FormTests {
         // has to sort the same way — that is also what keeps the assertion deterministic.
         let queries =
             try dictionary
-            .map { (key: String(describing: $0.key), value: $0.value) }
+            .map { (key: $0.key, value: $0.value.unwrapped) }
             .sorted { $0.key < $1.key }
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key)
             }
             .joined()
 
-        let data = queries.data(using: .utf16) ?? Data()
+        // `String.data(using:)`/`String.Encoding` are not part of `FoundationEssentials`. The
+        // package's own `Charset` already encodes UTF-16 portably, with the same byte order
+        // mark behavior `.utf16` (no explicit endianness) carries.
+        let data = try Charset.utf16.encode(queries)
 
         // Then
         #expect(data.count != .zero)
@@ -967,11 +985,18 @@ struct FormTests {
         )
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries() } == [data.queries()]
         )
     }
 
     // MARK: - Init with JSON
+
+    // `Form(name:jsonObject:options:...)` only exists on Darwin — it is the one factory that
+    // takes `Any`, so it cannot avoid `JSONSerialization`, which is not part of
+    // `FoundationEssentials`. The three tests below exist to cover that initializer
+    // specifically, so unlike the rest of this file, they have no portable counterpart to fall
+    // back to.
+    #if canImport(Darwin)
 
     @Test
     func form_whenInitJSON() async throws {
@@ -1165,6 +1190,8 @@ struct FormTests {
         )
     }
 
+    #endif
+
     @Test
     func form_whenInitJSONURLEncoded() async throws {
         // Given
@@ -1227,7 +1254,7 @@ struct FormTests {
         )
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries() } == [data.queries()]
         )
     }
 
@@ -1261,9 +1288,14 @@ struct FormTests {
         let parsed = try await parser.parse()
 
         let jsonData = try JSONEncoder().encode(mock)
-        let json = try JSONSerialization.jsonObject(with: jsonData)
 
-        let dictionary = try #require(json as? [AnyHashable: Any])
+        // `JSONValue` stands in for `JSONSerialization`'s `Any`, which is not part of
+        // `FoundationEssentials`.
+        guard case .object(let dictionary) = try JSONDecoder().decode(Internals.JSONValue.self, from: jsonData)
+        else {
+            Issue.record("Expected the mock to encode as a JSON object")
+            return
+        }
 
         // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
         //
@@ -1272,14 +1304,17 @@ struct FormTests {
         // has to sort the same way — that is also what keeps the assertion deterministic.
         let queries =
             try dictionary
-            .map { (key: String(describing: $0.key), value: $0.value) }
+            .map { (key: $0.key, value: $0.value.unwrapped) }
             .sorted { $0.key < $1.key }
             .reduce([]) {
                 try $0 + URLEncoder().encode($1.value, forKey: $1.key)
             }
             .joined()
 
-        let data = queries.data(using: .utf16) ?? Data()
+        // `String.data(using:)`/`String.Encoding` are not part of `FoundationEssentials`. The
+        // package's own `Charset` already encodes UTF-16 portably, with the same byte order
+        // mark behavior `.utf16` (no explicit endianness) carries.
+        let data = try Charset.utf16.encode(queries)
 
         // Then
         #expect(data.count != .zero)
@@ -1307,7 +1342,7 @@ struct FormTests {
         )
 
         #expect(
-            parsed.items.map { $0.contents.queries(using: .utf8) } == [data.queries(using: .utf8)]
+            parsed.items.map { $0.contents.queries() } == [data.queries()]
         )
     }
 

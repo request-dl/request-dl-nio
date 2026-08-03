@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -11,11 +15,19 @@ import struct Foundation.UUID
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 #endif
-import Testing
 
-@testable import RequestDL
+#if canImport(Darwin)
+import class Foundation.JSONSerialization
+#endif
 
 struct PayloadTests {
+
+    // `Payload(_:options:contentType:)` only exists on Darwin — it is the one factory that
+    // takes `Any`, so it cannot avoid `JSONSerialization`, which is not part of
+    // `FoundationEssentials`. The three tests below exist to cover that initializer
+    // specifically, so unlike the rest of this file, they have no portable counterpart to fall
+    // back to.
+    #if canImport(Darwin)
 
     @Test
     func payload_whenInitJSON() async throws {
@@ -131,6 +143,8 @@ struct PayloadTests {
                 )
         )
     }
+
+    #endif
 
     @Test
     func payload_whenInitEncodable() async throws {
@@ -579,14 +593,15 @@ extension PayloadTests {
 
         let data = try await resolved.requestConfiguration.body?.data()
 
-        let json =
-            try JSONSerialization.jsonObject(
-                with: encoder.encode(mock),
-                options: .fragmentsAllowed
-            ) as? [String: Any]
+        // `JSONValue` stands in for `JSONSerialization`'s `Any`, which is not part of
+        // `FoundationEssentials`.
+        guard case .object(let json) = try JSONDecoder().decode(Internals.JSONValue.self, from: encoder.encode(mock))
+        else {
+            Issue.record("Expected the mock to encode as a JSON object")
+            return
+        }
 
         // When
-        #expect(json != nil)
         #expect(data == nil)
         #expect(resolved.requestConfiguration.headers["Content-Type"] == nil)
         #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
@@ -594,10 +609,10 @@ extension PayloadTests {
         #expect(
             try Set(resolved.requestConfiguration.queries)
                 == Set(
-                    json?.reduce([]) {
+                    json.reduce([]) {
                         try $0
-                            + URLEncoder().encode($1.value, forKey: $1.key)
-                    } ?? []
+                            + URLEncoder().encode($1.value.unwrapped, forKey: $1.key)
+                    }
                 )
         )
     }
@@ -630,18 +645,18 @@ extension PayloadTests {
 
         let components =
             data.flatMap {
-                String(data: $0, encoding: .utf16)
+                $0.decodedUTF16String()
             }?.split(separator: "&") ?? []
 
-        let json =
-            try JSONSerialization.jsonObject(
-                with: encoder.encode(mock),
-                options: .fragmentsAllowed
-            ) as? [String: Any]
+        // `JSONValue` stands in for `JSONSerialization`'s `Any`, which is not part of
+        // `FoundationEssentials`.
+        guard case .object(let json) = try JSONDecoder().decode(Internals.JSONValue.self, from: encoder.encode(mock))
+        else {
+            Issue.record("Expected the mock to encode as a JSON object")
+            return
+        }
 
         // When
-        #expect(json != nil)
-
         #expect(resolved.requestConfiguration.queries.isEmpty)
 
         #expect(
@@ -657,13 +672,13 @@ extension PayloadTests {
         #expect(
             try Set(components)
                 == Set(
-                    json?.reduce([]) {
+                    json.reduce([]) {
                         try $0
-                            + URLEncoder().encode($1.value, forKey: $1.key).map {
+                            + URLEncoder().encode($1.value.unwrapped, forKey: $1.key).map {
                                 let query = $0
                                 return "\(query.name)=\(query.value)"
                             }
-                    } ?? []
+                    }
                 )
         )
     }

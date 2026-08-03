@@ -3,14 +3,15 @@
 //
 
 import AsyncHTTPClient
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import class Foundation.ProcessInfo
 #endif
-import Testing
-
-@testable import RequestDL
 
 struct UserAgentHeaderTests {
 

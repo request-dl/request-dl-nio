@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -9,12 +14,8 @@ import struct Foundation.Data
 import struct Foundation.UUID
 import struct Foundation.URL
 import struct Foundation.Date
+import class Foundation.JSONEncoder
 #endif
-import Testing
-
-import NIOCore
-
-@testable import RequestDL
 
 @Suite(.serialized)
 struct CachedRequestTests {
@@ -182,7 +183,12 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let testState = try await TestState()
-        let cacheData = await mockCachedData(makeHeaders(maxAge: false))
+        // A wide `Expires` window, not the two seconds `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires`
+        // waits past. This test never sleeps, so its window only has to outlast the actual
+        // request/response round trip below — on a loaded CI simulator that alone can exceed a
+        // couple of seconds, which was flaking this test even though the cache itself was still
+        // perfectly valid.
+        let cacheData = await mockCachedData(makeHeaders(maxAge: false, expiresOffsetSeconds: 3_600))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
@@ -360,9 +366,7 @@ extension CachedRequestTests {
     }
 
     func mockCachedData(_ headers: [(String, String)] = []) async -> CachedData {
-        let data = try? JSONSerialization.data(withJSONObject: [
-            "receivedBytes": "0"
-        ])
+        let data = try? JSONEncoder().encode(["receivedBytes": "0"])
 
         return await CachedData(
             response: ResponseHead(
@@ -384,7 +388,8 @@ extension CachedRequestTests {
     private func makeHeaders(
         eTag: UUID? = nil,
         noCache: Bool = false,
-        maxAge: Bool = true
+        maxAge: Bool = true,
+        expiresOffsetSeconds: Double = 2
     ) -> [(String, String)] {
         if noCache {
             return [("Cache-Control", "no-cache")]
@@ -402,14 +407,15 @@ extension CachedRequestTests {
         if maxAge {
             headers.append(("Cache-Control", "public, max-age=\(maxAgeSeconds)"))
         } else {
-            let date = now.addingTimeInterval(Double(maxAgeSeconds))
+            // A separate offset from `maxAgeSeconds`: the "still valid" `Expires` tests need a
+            // window wide enough to outlast the actual request/response round trip (TLS
+            // handshake to the local server, cache lookup, and everything in between), not just
+            // the fixed two seconds `waitCacheExpiration()` sleeps past for the "already
+            // expired" ones.
+            let date = now.addingTimeInterval(expiresOffsetSeconds)
 
-            let dateFormatter = DateFormatter()
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-            dateFormatter.timeZone = TimeZone(identifier: "GMT")
             headers.append(("Cache-Control", "public"))
-            headers.append(("Expires", dateFormatter.string(from: date)))
+            headers.append(("Expires", date.toHTTPDateString()))
         }
 
         return headers
@@ -451,10 +457,7 @@ extension CachedRequestTests {
     ) throws -> LocalServer.ResponseConfiguration {
         LocalServer.ResponseConfiguration(
             headers: .init(headers),
-            data: try JSONSerialization.data(
-                withJSONObject: output,
-                options: [.fragmentsAllowed]
-            )
+            data: try JSONEncoder().encode(output)
         )
     }
 }

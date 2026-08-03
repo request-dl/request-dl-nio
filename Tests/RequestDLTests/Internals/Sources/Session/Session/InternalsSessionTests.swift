@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -9,9 +13,6 @@ import struct Foundation.Data
 import struct Foundation.UUID
 import struct Foundation.URL
 #endif
-import Testing
-
-@testable import RequestDL
 
 struct InternalsSessionTests {
 
@@ -215,10 +216,10 @@ struct InternalsSessionTests {
         for try await result in task() {
             switch result {
             case .upload(let step):
-                NSLog("Send %d bytes of %d (%d)", step.chunkSize, step.totalSize, uploadedBytes.count)
+                print("Send \(step.chunkSize) bytes of \(step.totalSize) (\(uploadedBytes.count))")
                 uploadedBytes.append(step.chunkSize)
             case .download(let step):
-                NSLog("Head %d %@", step.head.status.code, step.head.status.reason)
+                print("Head \(step.head.status.code) \(step.head.status.reason)")
                 download = (step.head, try await Data(Array(step.bytes).joined()))
             }
         }

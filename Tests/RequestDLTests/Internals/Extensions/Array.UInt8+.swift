@@ -2,13 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif
-
-@testable import RequestDL
 
 extension [UInt8] {
 

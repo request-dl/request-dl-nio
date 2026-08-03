@@ -15,8 +15,10 @@ enum MultipartFormParserError: Error {
     case invalidHeaders
 }
 
-extension MultipartFormParserError: LocalizedError {
+extension MultipartFormParserError {
 
+    /// `LocalizedError` is not part of `FoundationEssentials`, and nothing reads this through
+    /// that protocol — a plain member carries the same description.
     var errorDescription: String? {
         switch self {
         case .rawDataInvalid:

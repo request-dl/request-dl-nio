@@ -1,10 +1,11 @@
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#endif
 import Logging
 import NIOConcurrencyHelpers
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 
 final class TestLogHandler: LogHandler, @unchecked Sendable {
 

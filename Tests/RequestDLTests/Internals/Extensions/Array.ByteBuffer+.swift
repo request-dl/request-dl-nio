@@ -2,15 +2,16 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 import NIOFoundationEssentialsCompat
 #else
 import struct Foundation.Data
 #endif
-import NIOCore
-
-@testable import RequestDL
 
 extension [ByteBuffer] {
 

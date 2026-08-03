@@ -3,15 +3,16 @@
 //
 
 import AsyncHTTPClient
+import NIOCore
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.UUID
 #endif
-import NIOCore
-import Testing
-
-@testable import RequestDL
 
 struct InternalsSessionConfigurationTests {
 

@@ -3,6 +3,11 @@
 //
 
 import AsyncAlgorithms
+import SwiftAsyncStream
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -11,10 +16,6 @@ import struct Foundation.UUID
 import struct Foundation.Date
 import struct Foundation.URL
 #endif
-import SwiftAsyncStream
-import Testing
-
-@testable import RequestDL
 
 private let globalMemoryCapacity: Int64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: Int64 = 64 * 1_024 * 1_024
@@ -362,18 +363,12 @@ struct DataCacheTests {
 extension DataCacheTests {
 
     func mockResponse(url: String, expiresAt expirationDate: Date = .distantFuture) -> ResponseHead {
-        let dateFormatter = DateFormatter()
-
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        dateFormatter.timeZone = TimeZone(identifier: "GMT")
-
-        return ResponseHead(
+        ResponseHead(
             url: URL(string: url),
             status: .init(code: 200, reason: "Ok"),
             version: .init(minor: 1, major: 2),
             headers: HTTPHeaders([
-                ("Expires", dateFormatter.string(from: expirationDate)),
+                ("Expires", expirationDate.toHTTPDateString()),
                 ("ETag", "\(UUID())"),
             ]),
             isKeepAlive: false

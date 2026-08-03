@@ -2,15 +2,20 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOSSL
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif
-import NIOSSL
-import Testing
 
-@testable import RequestDL
+#if canImport(Darwin)
+import class Foundation.Bundle
+#endif
 
 struct PrivateKeyTests {
 
@@ -114,6 +119,10 @@ struct PrivateKeyTests {
         )
     }
 
+    // `PrivateKey(_:in:format:)` only exists on Darwin — it is built on `Bundle`, which is not
+    // part of `FoundationEssentials`. This test exists to cover that initializer specifically,
+    // so unlike the rest of this file, it has no portable counterpart to fall back to.
+    #if canImport(Darwin)
     @Test
     func privateKey_whenInitPEMFileNoPasswordInBundle_shouldBeValid() async throws {
         // Given
@@ -138,6 +147,7 @@ struct PrivateKeyTests {
                 }
         )
     }
+    #endif
 
     @Test
     func privateKey_whenInitPEMFileWithPasswordBytes() async throws {
@@ -269,6 +279,8 @@ struct PrivateKeyTests {
         )
     }
 
+    // Same reason as ``privateKey_whenInitPEMFileNoPasswordInBundle_shouldBeValid()`` above.
+    #if canImport(Darwin)
     @Test
     func privateKey_whenInitPEMFileWithPasswordBytesInBundle() async throws {
         // Given
@@ -305,6 +317,7 @@ struct PrivateKeyTests {
                 }
         )
     }
+    #endif
 
     @Test
     func certificate_whenAccessBody_shouldBeNever() async throws {

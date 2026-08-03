@@ -2,13 +2,26 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#endif
 import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
+
+// `SIGTRAP` is a libc signal constant, not a `Foundation` one — it comes from whichever of
+// these the platform provides, matching `Internals.Override.Raise`'s own imports.
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(WinSDK)
+import WinSDK
+#endif
 
 #if DEBUG
 struct InterceptorsBreakpointTests {

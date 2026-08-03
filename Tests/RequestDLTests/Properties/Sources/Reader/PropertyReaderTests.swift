@@ -2,15 +2,16 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.UUID
 #endif
-import SwiftAsyncStream
-import Testing
-
-@testable import RequestDL
 
 struct PropertyReaderTests {
 
@@ -44,7 +45,7 @@ struct PropertyReaderTests {
                 }
             )
 
-            try await Task.sleep(nanoseconds: 1 * NSEC_PER_SEC)
+            try await Task.sleep(nanoseconds: 1_000_000_000)
         }
 
         // Checks if the shared property (ReferenceMemoryProperty) also reflects the expected state

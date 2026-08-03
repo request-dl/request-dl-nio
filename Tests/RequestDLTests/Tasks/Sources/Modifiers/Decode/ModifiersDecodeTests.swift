@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -9,9 +13,6 @@ import struct Foundation.Date
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 #endif
-import Testing
-
-@testable import RequestDL
 
 struct ModifiersDecodeTests {
 

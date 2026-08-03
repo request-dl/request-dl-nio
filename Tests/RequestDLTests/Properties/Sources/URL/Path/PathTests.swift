@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#endif
 import Testing
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 
 struct PathTests {
 
@@ -78,7 +79,6 @@ struct PathTests {
         let path2 = "v1/"
         let path3 = "/users/10/detail"
         let host = "google.com"
-        let characterSetRule = CharacterSet(charactersIn: "/")
 
         // When
         let resolved = try await resolve(
@@ -91,8 +91,10 @@ struct PathTests {
         )
 
         // Then
-        let expectedPath2 = path2.trimmingCharacters(in: characterSetRule)
-        let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
+        // `CharacterSet`/`trimmingCharacters(in:)` are not part of `FoundationEssentials`; the
+        // package's own `trimming(where:)` trims the same "/" from both ends.
+        let expectedPath2 = path2.trimming { $0 == "/" }
+        let expectedPath3 = path3.trimming { $0 == "/" }
 
         #expect(
             resolved.requestConfiguration.url == "https://\(host)/\(path1)/\(expectedPath2)/\(expectedPath3)"
@@ -106,7 +108,6 @@ struct PathTests {
         let path2 = "/v1/"
         let path3 = "/users/10/detail/"
         let host = "google.com"
-        let characterSetRule = CharacterSet(charactersIn: "/")
 
         // When
         let resolved = try await resolve(
@@ -119,9 +120,9 @@ struct PathTests {
         )
 
         // Then
-        let expectedPath1 = path1.trimmingCharacters(in: characterSetRule)
-        let expectedPath2 = path2.trimmingCharacters(in: characterSetRule)
-        let expectedPath3 = path3.trimmingCharacters(in: characterSetRule)
+        let expectedPath1 = path1.trimming { $0 == "/" }
+        let expectedPath2 = path2.trimming { $0 == "/" }
+        let expectedPath3 = path3.trimming { $0 == "/" }
 
         #expect(
             resolved.requestConfiguration.url == "https://\(host)/\(expectedPath1)/\(expectedPath2)/\(expectedPath3)/"

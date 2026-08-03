@@ -10,6 +10,7 @@ import FoundationEssentials
 #else
 import struct Foundation.URL
 import struct Foundation.URLComponents
+import struct Foundation.Data
 #endif
 
 // MARK: - Paths
@@ -122,5 +123,43 @@ extension URL {
         }
 
         try await FileSystem.shared.removeItem(at: filePath)
+    }
+
+    /// Reads the whole file at this location into memory.
+    ///
+    /// - Note: There is no `Data(contentsOf:)` here — that reaches for platform file I/O that
+    /// `FoundationEssentials` does not provide. `NIOFileSystem` is the package's own portable
+    /// file layer, already used throughout `Internals`.
+    func readData() async throws -> Data {
+        let handle = try await FileSystem.shared.openFile(forReadingAt: filePath)
+
+        do {
+            let buffer = try await handle.readToEnd(maximumSizeAllowed: .unlimited)
+            try await handle.close()
+            return Data(buffer.readableBytesView)
+        } catch {
+            try? await handle.close()
+            throw error
+        }
+    }
+
+    /// Writes `data` to this location, replacing whatever was there.
+    ///
+    /// - Note: Closes on every path, including the one where the write itself throws — see
+    /// `DiskStorage.writeAndClose(_:to:)` for why that discipline matters with `NIOFileSystem`
+    /// handles.
+    func write(_ data: Data) async throws {
+        let handle = try await FileSystem.shared.openFile(
+            forWritingAt: filePath,
+            options: .newFile(replaceExisting: true)
+        )
+
+        do {
+            try await handle.write(contentsOf: data, toAbsoluteOffset: .zero)
+            try await handle.close()
+        } catch {
+            try? await handle.close()
+            throw error
+        }
     }
 }

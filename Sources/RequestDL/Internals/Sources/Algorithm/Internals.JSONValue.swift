@@ -21,7 +21,7 @@ extension Internals {
     /// `JSONSerialization` hands back `NSNumber`, which prints `1` for an integer and `1.5` for a
     /// fractional one. Decoding everything as `Double` would have turned every integer field into
     /// `1.0` on the wire, so the integer forms are tried first and kept as such.
-    enum JSONValue: Sendable, Decodable {
+    enum JSONValue: Sendable, Codable {
 
         case null
         case bool(Bool)
@@ -132,6 +132,31 @@ extension Internals {
         /// the `JSONSerialization` version did through its `default` branch.
         static func decoding(_ data: Data) -> JSONValue? {
             try? JSONDecoder().decode(JSONValue.self, from: data)
+        }
+
+        // MARK: - Internal methods
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+
+            switch self {
+            case .null:
+                try container.encodeNil()
+            case .bool(let value):
+                try container.encode(value)
+            case .integer(let value):
+                try container.encode(value)
+            case .unsignedInteger(let value):
+                try container.encode(value)
+            case .double(let value):
+                try container.encode(value)
+            case .string(let value):
+                try container.encode(value)
+            case .array(let value):
+                try container.encode(value)
+            case .object(let value):
+                try container.encode(value)
+            }
         }
     }
 

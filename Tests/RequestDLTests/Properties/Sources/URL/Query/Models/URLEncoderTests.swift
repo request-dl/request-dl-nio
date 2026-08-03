@@ -2,15 +2,16 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Testing
+
+@testable import RequestDL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.Date
 #endif
-import Testing
-
-@testable import RequestDL
 
 struct URLEncoderTests {
 
@@ -325,7 +326,6 @@ struct URLEncoderTests {
 
         let key = "foo"
         let date = Date()
-        let dateFormatter = ISO8601DateFormatter()
 
         urlEncoder.dateEncodingStrategy = .iso8601
 
@@ -333,7 +333,7 @@ struct URLEncoderTests {
         let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
-        let expectedDate = dateFormatter.string(from: date)
+        let expectedDate = date.formatted(.iso8601)
 
         #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
@@ -368,23 +368,30 @@ struct URLEncoderTests {
         let date = Date()
 
         urlEncoder.dateEncodingStrategy = .custom { date in
-            // Como estamos no target de testes, podemos usar DateFormatter aqui.
-            // Dica: Use "yyyy" (ano do calendário) em vez de "YYYY" (ano da semana),
-            // que pode causar bugs estranhos na virada do ano.
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            return formatter.string(from: date)
+            Self.yyyyMMdd(date)
         }
 
         // When
         let sut = try urlEncoder.encode(date, forKey: key)
 
         // Then
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let expectedDate = formatter.string(from: date)
+        let expectedDate = Self.yyyyMMdd(date)
 
         #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
+    }
+
+    /// `DateFormatter` with `dateFormat = "yyyy-MM-dd"` is not an option here — it is not part
+    /// of `FoundationEssentials`. Built on the same calendar arithmetic the package's own
+    /// `Date.toISO8601String()` uses, so it needs no locale (a calendar year, not a week year,
+    /// avoids the turn-of-year surprises a literal `"yyyy"` template is normally chosen to
+    /// dodge).
+    private static func yyyyMMdd(_ date: Date) -> String {
+        let timestamp = Int64(date.timeIntervalSince1970.rounded(.down))
+        let days = Internals.GregorianCalendar.floorDivide(timestamp, by: 86_400)
+        let civil = Internals.GregorianCalendar.civilFromDays(days)
+        let pad = Internals.GregorianCalendar.pad
+
+        return pad(civil.year, 4) + "-" + pad(civil.month, 2) + "-" + pad(civil.day, 2)
     }
 
     // MARK: - Array
@@ -491,8 +498,6 @@ struct URLEncoderTests {
         let date = Date()
         let value: [Any?] = [1, "hello", date, true, String?.none]
 
-        let dateFormatter = ISO8601DateFormatter()
-
         urlEncoder.dateEncodingStrategy = .iso8601
         urlEncoder.boolEncodingStrategy = .numeric
         urlEncoder.optionalEncodingStrategy = .droppingKey
@@ -505,7 +510,7 @@ struct URLEncoderTests {
         let expectedString = [
             "1",
             "hello",
-            dateFormatter.string(from: date),
+            date.formatted(.iso8601),
             "1",
         ]
         .map { "foo=\($0.addingRFC3986PercentEncoding())" }
@@ -626,8 +631,6 @@ struct URLEncoderTests {
             "array": array,
         ]
 
-        let dateFormatter = ISO8601DateFormatter()
-
         urlEncoder.dateEncodingStrategy = .iso8601
         urlEncoder.boolEncodingStrategy = .numeric
         urlEncoder.optionalEncodingStrategy = .droppingKey
@@ -641,7 +644,7 @@ struct URLEncoderTests {
         let expectedValue = [
             "numeric": "1",
             "string": "hello",
-            "date": dateFormatter.string(from: date),
+            "date": date.formatted(.iso8601),
             "flag": "1",
             "array.0": "1",
             "array.1": "2",
