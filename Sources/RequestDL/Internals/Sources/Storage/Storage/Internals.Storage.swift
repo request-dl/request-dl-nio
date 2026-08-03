@@ -92,7 +92,7 @@ extension Internals {
                     #if canImport(Darwin)
                     DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime.nanoseconds
                     #else
-                    register.readAt.duration(to: .now) <= .nanoseconds(lifetime)
+                    register.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
                     #endif
                 }()
                 // Age checked here, not only in the sweep. The sweep runs every `lifetime` and

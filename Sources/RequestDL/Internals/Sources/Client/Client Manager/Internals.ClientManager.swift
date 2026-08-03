@@ -118,7 +118,15 @@ extension Internals {
                             continue
                         }
 
-                        guard now - item.readAt > lifetime.nanoseconds else {
+                        let isExpired: Bool = {
+                            #if canImport(Darwin)
+                            now - item.readAt > lifetime.nanoseconds
+                            #else
+                            item.readAt.duration(to: .now) > .nanoseconds(lifetime.nanoseconds)
+                            #endif
+                        }()
+
+                        guard isExpired else {
                             surviving.append(item)
                             continue
                         }
@@ -157,9 +165,14 @@ extension Internals {
             // idle one does, which is the whole intent.
             guard
                 var items = _table[id],
-                let index = items.firstIndex(where: {
-                    $0.sessionConfiguration == sessionConfiguration
-                        && now - $0.readAt <= lifetime.nanoseconds
+                let index = items.firstIndex(where: { item in
+                    item.sessionConfiguration == sessionConfiguration && {
+                        #if canImport(Darwin)
+                        now - item.readAt <= lifetime.nanoseconds
+                        #else
+                        item.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
+                        #endif
+                    }()
                 })
             else { return nil }
 
