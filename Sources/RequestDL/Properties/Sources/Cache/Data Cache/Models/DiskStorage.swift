@@ -8,6 +8,7 @@ import SystemPackage
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
+import NIOFoundationEssentialsCompat
 #else
 import struct Foundation.URL
 import struct Foundation.Date

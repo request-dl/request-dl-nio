@@ -5,8 +5,6 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// Scoped. `URL` is all this file needs, and pulling the whole module in defeats the point of
-// the refactor for anyone reading the imports to work out the dependency surface.
 import struct Foundation.URL
 #endif
 

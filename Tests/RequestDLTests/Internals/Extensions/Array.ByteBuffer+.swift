@@ -2,7 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+import NIOFoundationEssentialsCompat
+#else
 import Foundation
+#endif
 import NIOCore
 
 @testable import RequestDL
