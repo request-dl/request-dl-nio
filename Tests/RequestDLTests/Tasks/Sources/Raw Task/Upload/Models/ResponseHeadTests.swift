@@ -2,7 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
 import Testing
 
 @testable import RequestDL

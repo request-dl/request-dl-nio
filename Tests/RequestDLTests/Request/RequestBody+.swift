@@ -3,7 +3,11 @@
 //
 
 import AsyncHTTPClient
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 import NIOCore
 import NIOPosix
 import SwiftAsyncStream

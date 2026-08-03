@@ -1,4 +1,6 @@
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 import Logging
 import NIOConcurrencyHelpers
 

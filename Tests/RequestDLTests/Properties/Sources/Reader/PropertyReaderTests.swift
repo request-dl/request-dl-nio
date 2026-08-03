@@ -2,7 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+#endif
 import SwiftAsyncStream
 import Testing
 

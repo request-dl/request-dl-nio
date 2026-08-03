@@ -3,7 +3,14 @@
 //
 
 import AsyncAlgorithms
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.UUID
+import struct Foundation.Date
+import struct Foundation.URL
+#endif
 import SwiftAsyncStream
 import Testing
 

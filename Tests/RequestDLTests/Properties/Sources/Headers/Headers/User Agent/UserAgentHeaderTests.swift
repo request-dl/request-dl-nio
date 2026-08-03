@@ -3,7 +3,11 @@
 //
 
 import AsyncHTTPClient
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import class Foundation.ProcessInfo
+#endif
 import Testing
 
 @testable import RequestDL

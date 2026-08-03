@@ -2,8 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.UUID
+import struct Foundation.URL
+import struct Foundation.Date
+#endif
 import Testing
+
+import NIOCore
 
 @testable import RequestDL
 
@@ -346,7 +355,8 @@ extension CachedRequestTests {
     /// sleeping exactly two seconds sits right on the boundary. The margin costs nothing and
     /// removes one more reason for these tests to flicker.
     func waitCacheExpiration() async throws {
-        try await _Concurrency.Task.sleep(nanoseconds: 2 * NSEC_PER_SEC + 250 * NSEC_PER_MSEC)
+        try await _Concurrency.Task
+            .sleep(nanoseconds: UInt64((TimeAmount.seconds(2) + .milliseconds(250)).nanoseconds))
     }
 
     func mockCachedData(_ headers: [(String, String)] = []) async -> CachedData {
@@ -392,7 +402,7 @@ extension CachedRequestTests {
         if maxAge {
             headers.append(("Cache-Control", "public, max-age=\(maxAgeSeconds)"))
         } else {
-            let date = now.addingTimeInterval(TimeInterval(maxAgeSeconds))
+            let date = now.addingTimeInterval(Double(maxAgeSeconds))
 
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")

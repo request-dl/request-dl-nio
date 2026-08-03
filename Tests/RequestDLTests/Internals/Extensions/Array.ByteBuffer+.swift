@@ -6,7 +6,7 @@
 import FoundationEssentials
 import NIOFoundationEssentialsCompat
 #else
-import Foundation
+import struct Foundation.Data
 #endif
 import NIOCore
 

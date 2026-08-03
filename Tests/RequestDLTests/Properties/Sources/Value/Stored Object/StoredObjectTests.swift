@@ -14,15 +14,11 @@ struct StoredObjectTests {
     func stored_whenPath_shouldIndexBeOneAndPathZero() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -42,7 +38,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 1)
+        #expect(Factory.producer.index == 1)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
     }
@@ -51,15 +47,11 @@ struct StoredObjectTests {
     func stored_whenPathDifferentPosition_shouldBeNotEqual() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -81,7 +73,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 1)
+        #expect(Factory.producer.index == 1)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.google.com/0")
         #expect(resolved2.requestConfiguration.url == "https://www.google.com/0")
@@ -91,15 +83,11 @@ struct StoredObjectTests {
     func stored_whenPathWithEqualNamespace() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -121,7 +109,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 1)
+        #expect(Factory.producer.index == 1)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
     }
@@ -130,15 +118,11 @@ struct StoredObjectTests {
     func stored_whenPathWithDifferentNamespace() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -160,7 +144,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 2)
+        #expect(Factory.producer.index == 2)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0")
         #expect(resolved2.requestConfiguration.url == "https://www.apple.com/1")
     }
@@ -169,15 +153,11 @@ struct StoredObjectTests {
     func stored_whenPathQuery_shouldURLContainsZeroAndOnes() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -199,7 +179,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 2)
+        #expect(Factory.producer.index == 2)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0?index=1")
     }
@@ -208,15 +188,11 @@ struct StoredObjectTests {
     func stored_whenPathQueryDifferentPosition_shouldBeNotEqual() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -238,7 +214,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 4)
+        #expect(Factory.producer.index == 4)
         #expect(resolved1.requestConfiguration.url != resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0?index=1")
         #expect(resolved2.requestConfiguration.url == "https://www.apple.com/3?index=2")
@@ -248,15 +224,11 @@ struct StoredObjectTests {
     func stored_whenMultiplePath_shouldIndexBeOneAndPathZero() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -276,7 +248,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 2)
+        #expect(Factory.producer.index == 2)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0/1")
     }
@@ -285,15 +257,11 @@ struct StoredObjectTests {
     func stored_whenCombined_shouldRestoreEachOne() async throws {
         // Given
         final class Factory: Index, IndexFactory, @unchecked Sendable {
-            @MainActor
+
             static let producer = IndexProducer()
 
             init() {
-                super.init(
-                    performOnMainThread {
-                        Self.producer
-                    }
-                )
+                super.init(Self.producer)
             }
         }
 
@@ -313,7 +281,7 @@ struct StoredObjectTests {
         )
 
         // Then
-        #expect(performOnMainThread { Factory.producer }.index == 3)
+        #expect(Factory.producer.index == 3)
         #expect(resolved1.requestConfiguration.url == resolved2.requestConfiguration.url)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/0/1.2")
     }

@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 import Testing
 
 @testable import RequestDL
