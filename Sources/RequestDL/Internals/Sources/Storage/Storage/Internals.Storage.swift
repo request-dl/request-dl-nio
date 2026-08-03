@@ -168,11 +168,11 @@ extension Internals {
         private func cleanupIfNeeded() {
             lock.withLockVoid {
                 let now = {
-                #if canImport(Darwin)
-                DispatchTime.now().uptimeNanoseconds
-                #else
-                ContinuousClock.now
-                #endif
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds
+                    #else
+                    ContinuousClock.now
+                    #endif
                 }()
 
                 _table = _table.filter {

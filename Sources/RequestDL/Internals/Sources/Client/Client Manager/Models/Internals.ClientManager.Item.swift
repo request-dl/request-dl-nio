@@ -51,11 +51,11 @@ extension Internals.ClientManager {
                 sessionConfiguration: sessionConfiguration,
                 client: client,
                 readAt: {
-                #if canImport(Darwin)
-                DispatchTime.now().uptimeNanoseconds
-                #else
-                ContinuousClock.now
-                #endif
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds
+                    #else
+                    ContinuousClock.now
+                    #endif
                 }()
             )
         }
