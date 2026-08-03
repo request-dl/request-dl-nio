@@ -2,15 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(Darwin)
 import Testing
 
 @testable import RequestDL
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-#endif
+import Foundation
 
 struct ModifiersKeyPathTests {
 
@@ -98,3 +95,4 @@ struct ModifiersKeyPathTests {
         #expect(keyPathNotFound)
     }
 }
+#endif

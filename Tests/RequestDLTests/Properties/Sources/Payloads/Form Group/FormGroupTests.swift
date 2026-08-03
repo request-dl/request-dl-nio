@@ -45,11 +45,13 @@ struct FormGroupTests {
             ]
         )
 
-        await #expect(
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
+        #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(
-                    parser.buffers.async.map { await $0.estimatedBytes }.reduce(.zero, +)
-                )
+                String(resolvedContentLength)
             ]
         )
 
@@ -115,11 +117,13 @@ struct FormGroupTests {
             ]
         )
 
-        await #expect(
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
+        #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(
-                    parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +)
-                )
+                String(resolvedContentLength)
             ]
         )
 
@@ -173,11 +177,13 @@ struct FormGroupTests {
             ]
         )
 
-        await #expect(
+        let resolvedContentLength = await parser.buffers.async.map {
+            await $0.estimatedBytes
+        }.reduce(.zero, +)
+
+        #expect(
             resolved.requestConfiguration.headers["Content-Length"] == [
-                String(
-                    parser.buffers.async.map({ await $0.estimatedBytes }).reduce(.zero, +)
-                )
+                String(resolvedContentLength)
             ]
         )
 
