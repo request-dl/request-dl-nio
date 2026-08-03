@@ -176,7 +176,11 @@ extension Internals {
                 }()
 
                 _table = _table.filter {
+                    #if canImport(Darwin)
                     now - $1.readAt <= lifetime.nanoseconds
+                    #else
+                    $1.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
+                    #endif
                 }
 
                 _evictIfNeeded()
