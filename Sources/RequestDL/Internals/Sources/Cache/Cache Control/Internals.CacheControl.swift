@@ -233,7 +233,7 @@ extension Internals {
             // compared `nil` against `[]`, which is not equal, and every such response
             // invalidated a cache entry that was in fact unchanged.
             for name in ["Last-Modified", "ETag"] {
-                let fresh = response.headers[name] ?? []
+                let fresh = response.headers[name]
                 let cached = cachedData.response.headers[name] ?? []
 
                 guard fresh == cached else {

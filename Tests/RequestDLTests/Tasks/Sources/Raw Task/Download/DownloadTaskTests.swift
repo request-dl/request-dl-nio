@@ -32,6 +32,8 @@ struct DownloadTaskTests {
             BaseURL(localServer.baseURL)
             Path(uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }

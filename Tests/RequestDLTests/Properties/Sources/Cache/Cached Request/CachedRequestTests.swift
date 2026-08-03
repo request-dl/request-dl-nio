@@ -416,7 +416,7 @@ extension CachedRequestTests {
         testState.localServer.insert(response, at: testState.uri)
 
         let output = try await DataTask {
-            Session()
+            Session.localServer
                 .cachePolicy(cachePolicy)
                 .cacheStrategy(cacheStrategy)
                 .cache(url: testState.dataCache.directoryURL)

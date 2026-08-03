@@ -115,6 +115,8 @@ struct ModifiersProgressTests {
             Path(testState.uri)
             Payload(data: data)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
@@ -150,6 +152,8 @@ struct ModifiersProgressTests {
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
             Path(testState.uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots {
@@ -207,6 +211,8 @@ struct ModifiersProgressTests {
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
@@ -261,6 +267,8 @@ struct ModifiersProgressTests {
             Path(testState.uri)
 
             ReadingMode(length: length)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots {

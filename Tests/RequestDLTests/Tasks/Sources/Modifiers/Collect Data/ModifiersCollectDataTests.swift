@@ -30,6 +30,8 @@ struct ModifiersCollectDataTests {
             BaseURL(localServer.baseURL)
             Path(uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
@@ -66,6 +68,8 @@ struct ModifiersCollectDataTests {
             BaseURL(localServer.baseURL)
             Path(uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
@@ -101,6 +105,8 @@ struct ModifiersCollectDataTests {
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots {

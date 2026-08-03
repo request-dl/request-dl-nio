@@ -32,6 +32,8 @@ struct DataTaskTests {
             BaseURL(localServer.baseURL)
             Path(uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
@@ -75,6 +77,8 @@ struct DataTaskTests {
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
@@ -146,6 +150,8 @@ extension DataTaskTests {
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 PSKIdentity(
