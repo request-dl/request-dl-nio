@@ -61,9 +61,9 @@ extension URLEncoder {
             try container.encode("\(Int64((date.timeIntervalSince1970 * 1000).rounded(.down)))")
         }
 
-        /// - Note: Formatting lives in ``Internals/GregorianCalendar``, shared with the HTTP
-        /// date parsing the cache layer needs. It used to be a private copy in this file that
-        /// counted years in a loop and was wrong for anything before 1970.
+        /// - Important: Formatting must go through ``Internals/GregorianCalendar``, shared with
+        /// the HTTP date parsing the cache layer needs, rather than a private copy in this file
+        /// — a year count done by looping is wrong for anything before 1970.
         private func encodeISO8601(_ date: Date, in encoder: URLEncoder.Encoder) throws {
             var container = encoder.valueContainer()
             try container.encode(date.toISO8601String())

@@ -60,9 +60,10 @@ public struct RequestConfiguration: Sendable {
 
     /// Only a bodyless GET is cacheable.
     ///
-    /// - Note: Compares the method uppercased. It comes from the caller as a free string, and
-    /// `.method("get")` used to disable caching outright while behaving as a GET everywhere
-    /// else. Same normalisation as the query-versus-body decision in `PayloadNode`.
+    /// - Important: Must compare the method uppercased. It comes from the caller as a free
+    /// string — without normalizing, `.method("get")` disables caching outright while still
+    /// behaving as a GET everywhere else. Same normalisation as the query-versus-body decision
+    /// in `PayloadNode`.
     var isCacheEnabled: Bool {
         let method = method?.uppercased()
         return body == nil && !cachePolicy.isEmpty && (method == nil || method == "GET")
@@ -107,11 +108,11 @@ extension String {
     /// Only whitespace and slashes, at both ends. `"https://example.com/"` loses its trailing
     /// slash, and everything inside is left alone.
     ///
-    /// - Note: Replaces a hand rolled stand-in for `.trimmingCharacters(in: .urlHostAllowed.inverted)`
-    /// that allowed only alphanumerics and `-._~`. That set is much narrower than
-    /// `urlHostAllowed`, which also carries `[` and `]`, so a base URL with an IPv6 literal was
-    /// mangled: `http://[::1]` came back as `http://[::1`. Naming what is actually being removed
-    /// is both correct and impossible to get wrong the same way again.
+    /// - Important: Must not narrow this down to `.trimmingCharacters(in: .urlHostAllowed.inverted)`
+    /// approximated by hand as "alphanumerics and `-._~`" — that set is much narrower than
+    /// `urlHostAllowed`, which also carries `[` and `]`, so a base URL with an IPv6 literal would
+    /// get mangled: `http://[::1]` coming back as `http://[::1`. Naming what is actually being
+    /// removed (whitespace and slashes) is both correct and impossible to get wrong the same way.
     func trimmingURLBoundaryCharacters() -> String {
         trimming { $0 == "/" || $0.isWhitespace }
     }

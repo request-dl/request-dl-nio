@@ -200,10 +200,10 @@ extension Internals {
             requestConfiguration.method = "HEAD"
 
             // Conditional request headers. Copying `ETag` and `Last-Modified` straight onto the
-            // request, which is what this used to do, tells the server nothing: those are
-            // response headers. A server only answers 304 when it is asked with `If-None-Match`
-            // or `If-Modified-Since`, so without these the 304 branch below was unreachable and
-            // every revalidation downloaded the whole body again.
+            // request tells the server nothing: those are response headers. A server only
+            // answers 304 when it is asked with `If-None-Match` or `If-Modified-Since` — without
+            // these the 304 branch below is unreachable and every revalidation downloads the
+            // whole body again.
             setConditionalHeader(
                 &requestConfiguration.headers,
                 named: "If-None-Match",
@@ -267,10 +267,10 @@ extension Internals {
 
         /// Folds the freshness directives the server just sent into the cached response.
         ///
-        /// The new value has to win. The previous version passed the new headers through the
-        /// `cachedHeaders` parameter of a helper that preferred whatever was already there, so
-        /// it could only ever add a directive that was missing and never refresh one that
-        /// existed. Picking up a fresher `max-age` is the entire point of revalidating.
+        /// - Important: The new value has to win. Must not pass the new headers through the
+        /// `cachedHeaders` parameter of a helper that prefers whatever was already there — that
+        /// could only ever add a directive that was missing and never refresh one that existed,
+        /// and picking up a fresher `max-age` is the entire point of revalidating.
         private func updateCacheHeaders(
             _ cachedHeaders: HTTPHeaders,
             with newHeaders: HTTPHeaders
@@ -449,12 +449,12 @@ extension Internals {
 
         /// The latest `Expires` date across the given values.
         ///
-        /// - Note: No longer run through ``directives(_:)``. An HTTP date contains a comma of
-        /// its own, right after the day name, so splitting the value on commas tore
-        /// `Sun, 06 Nov 1994 08:49:37 GMT` in half. The previous version tried to stitch the
-        /// pieces back together by remembering the last fragment that failed to parse and
-        /// prepending it to the next one. `Expires` is a single date, not a list, so the
-        /// splitting was never appropriate here.
+        /// - Important: Must not run through ``directives(_:)``. An HTTP date contains a comma
+        /// of its own, right after the day name, so splitting the value on commas tears
+        /// `Sun, 06 Nov 1994 08:49:37 GMT` in half — stitching the pieces back together by
+        /// remembering the last fragment that failed to parse and prepending it to the next one
+        /// is not a fix, since `Expires` is a single date, not a list, and splitting is never
+        /// appropriate here.
         private func expiresDate(headers: [String]) -> Date? {
             headers
                 .compactMap { Date(httpDate: $0.trimming(where: \.isWhitespace)) }
@@ -483,9 +483,9 @@ extension Internals {
 
         /// Flattens header values into individual directives.
         ///
-        /// - Note: Trimming goes through the package's own `trimming(where:)`. It was
-        /// `trimmingCharacters(in: .whitespaces)`, which needs `Foundation.CharacterSet`, the
-        /// type this refactor replaced.
+        /// - Note: Trimming goes through the package's own `trimming(where:)`, not
+        /// `trimmingCharacters(in: .whitespaces)` — that needs `Foundation.CharacterSet`, which
+        /// this file has no import for.
         private func directives(_ headers: [String]) -> some Sequence<String> {
             headers
                 .lazy

@@ -132,8 +132,8 @@ struct InternalsBodySequenceTests {
         // Then
         #expect(sequence == expecting)
 
-        // The sizing itself, asserted on purpose and separately: twenty kilobytes used to go out
-        // as ten thousand two byte chunks.
+        // Regression guard, asserted on purpose and separately from the contract above: twenty
+        // kilobytes must not go out as ten thousand two byte chunks.
         #expect(bodySequence.chunkSize == 16 * 1_024)
         #expect(sequence.count == 2)
     }

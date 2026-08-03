@@ -16,9 +16,10 @@ struct DynamicValueMirror<Content: Sendable>: Sendable {
     // MARK: - Inits
 
     init(_ content: Content) {
-        // Reflected once, at construction. This used to be a closure that rebuilt the `Mirror`
-        // on every call, and `GraphOperation` creates three operations that each ask for the
-        // children, so every property in the graph paid for three reflections instead of one.
+        // - Important: Reflected once, at construction, not lazily on every call. `GraphOperation`
+        // creates three operations that each ask for the children, so a closure that rebuilt the
+        // `Mirror` on every call would pay for three reflections instead of one per property in
+        // the graph.
         //
         // Holding the result rather than the `Mirror` is also what makes this `Sendable`
         // without an escape hatch: `DynamicValue` is `Sendable`, `Mirror` is not.

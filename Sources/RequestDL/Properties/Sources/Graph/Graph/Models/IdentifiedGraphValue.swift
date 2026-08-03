@@ -9,11 +9,11 @@ protocol IdentifiedGraphValue: Sendable {
 
     /// Identity of the position this value occupies in the graph.
     ///
-    /// Stored rather than derived. It used to walk the whole ancestor chain and hash the
-    /// resulting array on every read, and `GraphOperation` reads it once per property, so
-    /// resolving a graph cost O(properties x depth). Folding each id into the parent's value
-    /// at construction makes it O(1) per node and gives the same guarantee, since it is only
-    /// ever compared against other pathways inside the same process.
+    /// - Important: Must be stored, not derived by walking the whole ancestor chain and hashing
+    /// the resulting array on every read — `GraphOperation` reads this once per property, so
+    /// that walk would make resolving a graph cost O(properties x depth). Folding each id into
+    /// the parent's value at construction makes it O(1) per node and gives the same guarantee,
+    /// since it is only ever compared against other pathways inside the same process.
     var pathway: Int { get }
 
     var previousValue: IdentifiedGraphValue? { get }

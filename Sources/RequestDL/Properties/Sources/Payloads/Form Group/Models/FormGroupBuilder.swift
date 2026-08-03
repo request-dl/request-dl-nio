@@ -20,9 +20,9 @@ struct FormGroupBuilder: Sendable {
     /// The CRLF that separates multipart lines, per RFC 2046.
     ///
     /// A `String`, not a `Character`. CRLF really is a single extended grapheme cluster, so a
-    /// `Character` holds it, but `Character` has no `utf8` view to write it out through, and
-    /// the previous version reached for one in two places while interpolating into a `String`
-    /// in a third. A `String` serves all three spellings and needs no argument.
+    /// `Character` holds it, but `Character` has no `utf8` view to write it out through, which
+    /// a `Character` would need in some call sites while others interpolate into a `String`.
+    /// A `String` serves all those spellings and needs no argument.
     private let eol = "\r\n"
 
     // MARK: - Inits

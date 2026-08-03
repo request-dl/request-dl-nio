@@ -104,22 +104,23 @@ extension Internals {
                 // side happened to leave behind.
                 let data = url.withStorage { buffer, writtenBytes -> Data? in
                     // Out of range is a possible outcome of a truncated or concurrently reset
-                    // buffer, not a programming error, so it reports rather than traps. The
-                    // previous `precondition` here turned every such race into a crash.
+                    // buffer, not a programming error, so this reports rather than traps —
+                    // must not be a `precondition`, which would turn every such race into a
+                    // crash.
                     guard index >= .zero, index < writtenBytes else {
                         return nil
                     }
 
-                    // Honouring "up to". Asking for more than is left used to answer nil, which
-                    // made a partial tail indistinguishable from EOF.
+                    // Honouring "up to": asking for more than is left must not answer `nil`,
+                    // which would make a partial tail indistinguishable from EOF.
                     let length = min(count, writtenBytes - index)
 
                     buffer.moveWriterIndex(to: writtenBytes)
                     buffer.moveReaderIndex(to: index)
 
                     // `readSlice` and a view, not `readData`. The `Data` returning members of
-                    // `ByteBuffer` live in `NIOFoundationCompat`, which pulls in the whole of
-                    // `Foundation` and defeats the point of this refactor.
+                    // `ByteBuffer` live in `NIOFoundationCompat`, which pulls in all of
+                    // `Foundation` — exactly the dependency this type exists to avoid.
                     return buffer.readSlice(length: length).map { Data($0.readableBytesView) }
                 }
 
@@ -144,7 +145,7 @@ extension Internals {
                 let index = Int(_index)
 
                 // Same reasoning as `read`, plus the cost: mutating the buffer in place keeps
-                // its storage uniquely referenced, so appending no longer copies everything
+                // its storage uniquely referenced, so appending does not copy everything
                 // written so far on every call.
                 let written = url.withStorage { buffer, writtenBytes -> Int in
                     buffer.moveReaderIndex(to: .zero)

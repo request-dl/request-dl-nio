@@ -82,21 +82,21 @@ struct FormItem: Sendable {
         headers.set(name: "Content-Disposition", value: contentDisposition())
         headers.set(name: "Content-Type", value: String(contentType))
         // `readableBytes`, not `estimatedBytes`. The estimate is the size of the whole backing
-        // store, while what goes on the wire is what the cursor can still read, so a partially
-        // read buffer declared a part longer than it sends. It is also arithmetic rather than a
-        // stat call, which for a file backed part used to happen once per part.
+        // store, while what goes on the wire is what the cursor can still read — a partially
+        // read buffer would otherwise declare a part longer than it sends. It is also arithmetic
+        // rather than a stat call, which for a file backed part would cost one syscall per part.
         headers.set(name: "Content-Length", value: String(buffer.readableBytes))
 
         if let additionalHeaders {
             // The caller's headers win.
             //
-            // This was `{ lhs, _ in lhs }`, which keeps the receiver, and the receiver is the
-            // set generated just above. A caller who wrote a custom `Content-Type` on a part
-            // had it silently discarded, which leaves the `headers:` closure on `Form` with no
-            // way to override anything this method touches.
+            // - Important: Must not be `{ lhs, _ in lhs }`, which keeps the receiver — the
+            // receiver here is the set generated just above, so that closure would silently
+            // discard a caller's custom `Content-Type` on a part, leaving the `headers:` closure
+            // on `Form` with no way to override anything this method touches.
             //
-            // - Important: Assumes `HTTPHeaders.merging(_:uniquingKeysWith:)` passes the
-            // receiver's value first, as `Dictionary` does. Worth a glance at the declaration.
+            // Assumes `HTTPHeaders.merging(_:uniquingKeysWith:)` passes the receiver's value
+            // first, as `Dictionary` does. Worth a glance at the declaration.
             headers = headers.merging(additionalHeaders) { _, caller in caller }
         }
 

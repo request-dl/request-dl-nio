@@ -43,13 +43,12 @@ public struct StoredObject<Object: AnyObject & Sendable>: DynamicValue {
             return value
         }
 
-        // Reading, then building, then storing used to be three steps with nothing holding
-        // them together: two concurrent readers both missed, both ran the factory, and both
-        // stored, so each walked away with the instance it had built. That is the one promise
-        // this wrapper makes, and it was the one it could not keep.
-        //
-        // The insert resolves the race and reports the winner, so a loser's instance is
-        // discarded rather than returned.
+        // - Important: Reading, then building, then storing must not be three separate steps
+        // with nothing holding them together — two concurrent readers could both miss, both run
+        // the factory, and both store, so each would walk away with a different instance. This
+        // wrapper's one promise is a single shared instance, so the insert below must resolve
+        // the race and report the winner, discarding a loser's instance rather than returning
+        // it.
         return Internals.Storage.shared.setValueIfAbsent(thunk(), forKey: key)
     }
 

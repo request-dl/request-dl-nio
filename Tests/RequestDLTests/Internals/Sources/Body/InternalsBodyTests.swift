@@ -23,8 +23,8 @@ struct InternalsBodyTests {
         // Then
         #expect(body.totalSize == string.count)
 
-        // Anything under the minimum chunk goes out whole. Eleven characters used to become
-        // eleven writes, each with its own future and its own progress event.
+        // Regression guard: anything under the minimum chunk must go out whole, not as one
+        // write per character, each with its own future and its own progress event.
         #expect(body.chunkSize == string.count)
         await #expect(buffers.resolveData() == Array(string.utf8).split(by: string.count))
     }

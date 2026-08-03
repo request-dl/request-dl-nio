@@ -6,8 +6,8 @@ struct ChildrenNode: Node {
 
     // MARK: - Internal properties
 
-    // The traversal cursor that used to live here is gone. It was state about *reading* the
-    // node kept inside the node itself, which is what forced every walk to copy defensively.
+    // No traversal cursor here. State about *reading* the node kept inside the node itself
+    // would force every walk to copy defensively.
     private(set) var children: [Node] = []
 
     // MARK: - Inits

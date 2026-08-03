@@ -43,8 +43,8 @@ extension Internals {
 
         /// The path the streams open against.
         ///
-        /// Derived once, at init. The previous version rebuilt a `FilePath` from a `String` on
-        /// every call, including inside the open path of both streams.
+        /// - Important: Must be derived once, at init, not rebuilt from a `String` on every
+        /// call — including inside the open path of both streams.
         let path: FilePath
 
         /// - Important: This is a stat call, not a stored value.

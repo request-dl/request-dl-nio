@@ -50,10 +50,10 @@ extension ProcessInfo {
 
     /// The operating system, not the machine.
     ///
-    /// - Important: This used to be `hostName`, which put the user's machine name into the
-    /// `User-Agent` of every outgoing request. On a laptop that is usually the owner's real
-    /// name. It is a privacy leak, and it also made the header useless for its actual purpose,
-    /// since a server cannot tell platforms apart from it.
+    /// - Important: Must not be `hostName`. That puts the user's machine name into the
+    /// `User-Agent` of every outgoing request — on a laptop that is usually the owner's real
+    /// name, a privacy leak — and it is useless for the header's actual purpose anyway, since
+    /// a server cannot tell platforms apart from a machine name.
     private static var systemName: String {
         #if os(macOS)
         return "macOS"

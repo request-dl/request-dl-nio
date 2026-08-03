@@ -12,9 +12,9 @@ struct InternalsFileBufferTests {
 
     /// Owns a scratch file for the lifetime of one test.
     ///
-    /// - Note: Writes into the system temporary directory. It used to derive the path from
-    /// `#file`, which put test artefacts in the source tree, and combined with the fire and
-    /// forget teardown below that meant stray `.txt` files accumulating in the repository.
+    /// - Important: Must write into the system temporary directory, not a path derived from
+    /// `#file` — that puts test artefacts in the source tree, and combined with the fire and
+    /// forget teardown below leaves stray `.txt` files accumulating in the repository.
     final class FileURLManager: Sendable {
 
         let url: URL

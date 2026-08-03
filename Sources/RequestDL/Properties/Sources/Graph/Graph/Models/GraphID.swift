@@ -6,8 +6,8 @@ struct GraphID: Sendable, Hashable {
 
     private enum Source: Sendable, Hashable {
         case identified(ObjectIdentifier)
-        // Carries the type alongside the hash. Two custom ids of different types can no longer
-        // be conflated by a hash that happens to match.
+        // Carries the type alongside the hash, so two custom ids of different types cannot be
+        // conflated by a hash that happens to match.
         case constant(ObjectIdentifier, Int)
     }
 

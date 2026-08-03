@@ -34,8 +34,8 @@ extension URL {
 
     /// This URL as a `FilePath`, which is the currency the file system layer speaks.
     ///
-    /// The one place the conversion happens. Every call site used to spell out
-    /// `FilePath(absolutePath(percentEncoded: false))`, and forgetting the `false` there hands
+    /// The one place the conversion happens, rather than every call site spelling out
+    /// `FilePath(absolutePath(percentEncoded: false))` — forgetting the `false` there hands
     /// the file system a name containing literal escapes.
     var filePath: FilePath {
         FilePath(absolutePath(percentEncoded: false))
@@ -58,11 +58,10 @@ extension URL {
 
         // `URLComponents` already keeps both forms and hands over whichever is asked for.
         //
-        // The previous version encoded the path by hand and assigned the result back to
-        // `components.path`, which is the decoded property, and then read that same property.
-        // Assigning encoded text to the decoded side means the escapes are stored as literal
-        // content, so the value only looked right by accident, and any later read of
-        // `percentEncodedPath` would have come back double escaped.
+        // Read directly off `percentEncodedPath`/`path` rather than assigning encoded text back
+        // onto the decoded `components.path` property: that stores the escapes as literal
+        // content, so the value only looks right by accident, and any later read of
+        // `percentEncodedPath` comes back double escaped.
         return percentEncoded ? components.percentEncodedPath : components.path
     }
 }
@@ -82,12 +81,12 @@ extension URL {
     /// Creates an empty file here, and any missing directory above it.
     ///
     /// A no op when the file already exists, so the content of an existing file is never at
-    /// risk. The previous version passed `replaceExisting: true`, which was harmless only
-    /// because of the surrounding existence check, and read as the opposite of the intent.
+    /// risk. Must not pass `replaceExisting: true` here — that reads as the opposite of the
+    /// intent, and is only harmless because of the surrounding existence check.
     ///
-    /// - Throws: Whatever the file system reports. Unlike the previous version, a failure to
-    /// stat is propagated rather than read as "missing", so a permission problem no longer
-    /// turns into an attempt to create a file that is already there.
+    /// - Throws: Whatever the file system reports. A failure to stat is propagated rather than
+    /// read as "missing", so a permission problem does not turn into an attempt to create a
+    /// file that is already there.
     func createPathIfNeeded() async throws {
         let filePath = self.filePath
 

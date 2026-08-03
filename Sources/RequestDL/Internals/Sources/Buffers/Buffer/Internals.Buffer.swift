@@ -556,12 +556,11 @@ extension Internals.Buffer {
 
     /// Drains `buffer` into this one.
     ///
-    /// No longer takes a lock on either side. Both cursors are local to their own copy, and the
-    /// two storage operations are each atomic on their own, so there is nothing left to hold
-    /// across the pair. The previous version locked both buffers in argument order, which
-    /// deadlocked outright when the two were copies of each other, since copies share one lock
-    /// object and the lock is not reentrant, and deadlocked between two threads calling it in
-    /// opposite directions.
+    /// - Important: Must not take a lock on either side. Both cursors are local to their own
+    /// copy, and the two storage operations are each atomic on their own, so there is nothing
+    /// left to hold across the pair. Locking both buffers in argument order deadlocks outright
+    /// when the two are copies of each other — copies share one lock object, the lock is not
+    /// reentrant, and two threads calling this in opposite directions deadlock each other.
     mutating func writeBuffer<OtherStream: StreamBuffer>(_ buffer: inout Internals.Buffer<OtherStream>) async {
         let length = buffer.readableBytes
 

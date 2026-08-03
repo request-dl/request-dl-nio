@@ -15,7 +15,7 @@ on:
       - 'Sources/**'
       - 'Tests/**'
       - '.swift-format'
-      - '.github/workflows/swift-ci.yml'
+      - '.github/workflows/swift-ci.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -24,7 +24,7 @@ concurrency:
 jobs:
   ci:
     name: "Swift CI"
-    uses: request-dl/.github/.github/workflows/swift-ci.yml@ci-cleanup
+    uses: request-dl/.github/.github/workflows/swift-ci.yaml@ci-cleanup
     with:
       name: request-dl
       product-name: RequestDL

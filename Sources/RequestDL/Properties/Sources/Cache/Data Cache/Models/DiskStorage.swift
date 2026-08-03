@@ -148,11 +148,11 @@ struct DiskStorage: Sendable {
     /// the path regardless of whether the read succeeded, and closes before the function
     /// returns rather than racing a detached task against it.
     ///
-    /// The previous version had no close at all. A miss on `openFile` was harmless, since
-    /// nothing had opened yet, but a miss on `readToEnd` was not: `try?` swallowed the throw,
-    /// the `guard` chain failed, and the function returned `nil` with the handle still open and
-    /// now unreachable. That is exactly the trap this hit, on a cache entry whose response
-    /// record failed to read for any reason.
+    /// - Important: Must close on every path, not only when `readToEnd` succeeds. A miss on
+    /// `openFile` is harmless, since nothing has opened yet, but a miss on `readToEnd` is not: if
+    /// `try?` swallows the throw and the `guard` chain fails without closing first, the function
+    /// returns `nil` with the handle still open and now unreachable — exactly the trap NIO
+    /// traps on, for a cache entry whose response record failed to read for any reason.
     private func readResponseData(at url: URL) async -> Data? {
         guard let handle = try? await FileSystem.shared.openFile(forReadingAt: url.filePath) else {
             return nil
@@ -290,7 +290,7 @@ struct DiskStorage: Sendable {
     /// Writes `data` to `url`, replacing whatever was there, and closes the handle on every
     /// path, including the one where the write itself throws.
     ///
-    /// ## The bug this replaces
+    /// ## The bug this avoids
     ///
     /// `NIOFileSystem` handles are not closed by `deinit`. Dropping the last reference to one
     /// that is still open is a fatal error, on purpose: a leaked descriptor is a resource leak
@@ -298,8 +298,7 @@ struct DiskStorage: Sendable {
     ///
     ///   `SystemFileHandle.swift:131: Fatal error: Leaking file descriptor ...`
     ///
-    /// Both call sites used to open, write, and close as three statements inside one `do`
-    /// block:
+    /// - Important: Must not open, write, and close as three statements inside one `do` block:
     ///
     /// ```swift
     /// let handle = try await FileSystem.shared.openFile(...)
@@ -310,8 +309,8 @@ struct DiskStorage: Sendable {
     /// A throw from `write` — a full disk, a permission error, anything — jumps straight to
     /// `catch`, and `close()` never runs. The handle is still open, and it is also now
     /// unreachable, which is exactly what NIO traps on. `readResponseData(at:)` a few lines up
-    /// already closed on every path for the read side; this is the same discipline for the
-    /// write side, which had not received it.
+    /// closes on every path for the read side; this method gives the write side the same
+    /// discipline.
     ///
     /// - Throws: Whatever the open or the write threw. The close error is deliberately not
     /// propagated: reporting a failure to close over a failure to write would point at the

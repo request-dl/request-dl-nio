@@ -63,10 +63,9 @@ extension Internals {
 
         /// Opens for writing, creating the file when it does not exist.
         ///
-        /// - Important: Deliberately not truncating. The previous version passed `.truncate`,
-        /// which emptied the file every time the storage lazily opened its output stream, so
-        /// the first write to an existing file destroyed it and then left a zero filled gap
-        /// where the old content had been.
+        /// - Important: Must not pass `.truncate` — that would empty the file every time the
+        /// storage lazily opens its output stream, so the first write to an existing file would
+        /// destroy it and then leave a zero filled gap where the old content had been.
         init(writingTo url: URL) async throws {
             descriptor = try SystemPackage.FileDescriptor.open(
                 url.path,
@@ -122,8 +121,8 @@ extension Internals {
 
         /// Reads up to `length` bytes, looping over short reads until EOF.
         ///
-        /// The previous version issued one `read` and returned whatever came back, so a short
-        /// read silently delivered less than the caller asked for.
+        /// - Important: Must not issue a single `read` and return whatever comes back — a short
+        /// read would then silently deliver less than the caller asked for.
         ///
         /// - Returns: `nil` at EOF, otherwise the bytes actually read, which may be fewer than
         /// `length`. The offset advances by that same amount.

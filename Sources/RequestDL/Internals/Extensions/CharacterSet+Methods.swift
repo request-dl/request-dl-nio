@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Replaces `Foundation.CharacterSet`, which is not part of `FoundationEssentials`. The sets are
-// spelled out as ASCII ranges rather than looked up, which is also considerably faster than the
-// `CharacterSet` membership test it replaced.
+// Stands in for `Foundation.CharacterSet`, which is not part of `FoundationEssentials`. The sets
+// are spelled out as ASCII ranges rather than looked up, which is also considerably faster than
+// a `CharacterSet` membership test.
 //
 // - Note: Nothing in NIO covers this. Percent encoding exists inside `AsyncHTTPClient` but is
 // internal to it, so there is no public API to defer to.

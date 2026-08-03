@@ -833,10 +833,9 @@ struct FormTests {
 
         // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
         //
-        // `Dictionary` iteration order is seeded per process, so the expectation used to depend
-        // on the order the test happened to walk the dictionary in. The product sorts now, and
-        // this has to sort the same way. It also makes the assertion deterministic, which it
-        // was not before.
+        // `Dictionary` iteration order is seeded per process, so the expectation must not depend
+        // on the order the test happens to walk the dictionary in. The product sorts, so this
+        // has to sort the same way — that is also what keeps the assertion deterministic.
         let queries =
             try dictionary
             .map { (key: String(describing: $0.key), value: $0.value) }
@@ -916,10 +915,9 @@ struct FormTests {
 
         // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
         //
-        // `Dictionary` iteration order is seeded per process, so the expectation used to depend
-        // on the order the test happened to walk the dictionary in. The product sorts now, and
-        // this has to sort the same way. It also makes the assertion deterministic, which it
-        // was not before.
+        // `Dictionary` iteration order is seeded per process, so the expectation must not depend
+        // on the order the test happens to walk the dictionary in. The product sorts, so this
+        // has to sort the same way — that is also what keeps the assertion deterministic.
         let queries =
             try dictionary
             .map { (key: String(describing: $0.key), value: $0.value) }
@@ -1261,10 +1259,9 @@ struct FormTests {
 
         // Sorted by key, mirroring `PayloadInput.jsonObject(_:contentType:)`.
         //
-        // `Dictionary` iteration order is seeded per process, so the expectation used to depend
-        // on the order the test happened to walk the dictionary in. The product sorts now, and
-        // this has to sort the same way. It also makes the assertion deterministic, which it
-        // was not before.
+        // `Dictionary` iteration order is seeded per process, so the expectation must not depend
+        // on the order the test happens to walk the dictionary in. The product sorts, so this
+        // has to sort the same way — that is also what keeps the assertion deterministic.
         let queries =
             try dictionary
             .map { (key: String(describing: $0.key), value: $0.value) }

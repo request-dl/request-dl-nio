@@ -56,9 +56,9 @@ struct PayloadNode: PropertyNode {
     ///
     /// True with no method set, and for the two methods that carry no body.
     ///
-    /// - Note: Compares uppercased. HTTP methods are conventionally uppercase but the value
-    /// comes from the caller, and `.method("get")` used to fall through and send the fields as
-    /// a body instead of as a query.
+    /// - Important: Must compare uppercased. HTTP methods are conventionally uppercase but the
+    /// value comes from the caller — without normalizing, `.method("get")` falls through and
+    /// sends the fields as a body instead of as a query.
     private func sendsFieldsAsQuery(_ method: String?) -> Bool {
         guard let method = method?.uppercased() else {
             return true

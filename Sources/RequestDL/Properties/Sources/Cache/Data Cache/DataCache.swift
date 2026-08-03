@@ -110,10 +110,10 @@ public struct DataCache: Sendable, Equatable {
 
         // MARK: - Unsafe properties
 
-        // Plain storage. The eviction that used to hang off `didSet` moved into the setters
-        // above: one of the two is asynchronous, and an observer cannot await. Keeping the pair
-        // symmetrical, in the one place that assigns them, also makes it visible that shrinking
-        // is the only direction that evicts.
+        // Plain storage. Eviction cannot hang off `didSet` here: one of the two storages is
+        // asynchronous, and an observer cannot await. It lives in the setters above instead,
+        // in the one place that assigns these — which also keeps the pair symmetrical and makes
+        // it visible that shrinking is the only direction that evicts.
         private var _memoryCapacity: Int64
         private var _diskCapacity: Int64
 

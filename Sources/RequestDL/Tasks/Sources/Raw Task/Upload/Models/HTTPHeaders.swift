@@ -13,10 +13,9 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     /// Walks every name-value pair, one value at a time.
     ///
-    /// - Note: Rewritten around a pair of offsets. It used to hold a mutable copy of the whole
-    /// header set and delete each name as it finished with it, then call itself. That made
-    /// iteration quadratic, since every deletion is a linear search plus a shift, and it
-    /// recursed once per header name.
+    /// - Important: Must walk a pair of offsets, not hold a mutable copy of the whole header set
+    /// and delete each name as it finishes with it — that makes iteration quadratic, since every
+    /// deletion is a linear search plus a shift, once per header name.
     public struct Iterator: IteratorProtocol {
 
         // MARK: - Private properties
@@ -70,10 +69,10 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
         /// What equality and hashing actually run on.
         ///
-        /// - Note: This used to be a stored `hashValue`, and `==` compared nothing else. Two
-        /// unrelated names that happened to collide were therefore equal, which silently reads
-        /// one header as another. `hashValue` is also explicitly documented as unsuitable for
-        /// this: it is seeded per process and is not a substitute for comparing the values.
+        /// - Important: Must not be a stored `hashValue` compared with `==` and nothing else —
+        /// two unrelated names that happen to collide would then be equal, silently reading one
+        /// header as another. `hashValue` is also explicitly documented as unsuitable for this:
+        /// it is seeded per process and is not a substitute for comparing the values.
         private let normalized: String
 
         // MARK: - Inits
@@ -321,13 +320,13 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ///   passed first**, the incoming ones second, so `{ mine, _ in mine }` keeps this set and
     ///   `{ _, theirs in theirs }` lets the argument win.
     ///
-    /// - Note: No longer removes repeated values. It used to, on the both-present branch only,
-    /// which made the operation asymmetric and, worse, made it disagree with the closure: a
-    /// caller writing `{ mine, theirs in mine + theirs }` did not get back `mine + theirs`, and
-    /// `{ mine, _ in mine }` was not even an identity, since it could drop values `mine` had
+    /// - Important: Must not remove repeated values, not even on the both-present branch only —
+    /// that would make the operation asymmetric and, worse, disagree with the closure: a caller
+    /// writing `{ mine, theirs in mine + theirs }` would not get back `mine + theirs`, and
+    /// `{ mine, _ in mine }` would not even be an identity, since it could drop values `mine`
     /// legitimately carried twice. Deduplication is a policy, not an invariant, and it is wrong
-    /// for `Set-Cookie` and `Via`. It lives in ``uniquingValues()`` now, for callers that want
-    /// it. Trimming stays, because that one *is* an invariant of the storage.
+    /// for `Set-Cookie` and `Via`. It lives in ``uniquingValues()`` instead, for callers that
+    /// want it. Trimming stays here, because that one *is* an invariant of the storage.
     public func merging(
         _ headers: HTTPHeaders,
         by groupingValues: ([String], [String]) throws -> [String]
@@ -409,9 +408,8 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         .init(name)
     }
 
-    /// - Note: Uses the package's own trimming. It was `trimmingCharacters(in: .whitespaces)`,
-    /// which needs `Foundation.CharacterSet`, a type this file has no import for and that the
-    /// refactor is removing.
+    /// - Note: Uses the package's own trimming, not `trimmingCharacters(in: .whitespaces)` —
+    /// that needs `Foundation.CharacterSet`, a type this file has no import for.
     private func trimming(_ value: String) -> String {
         value.trimming(where: \.isWhitespace)
     }
@@ -466,10 +464,9 @@ extension HTTPHeaders: BidirectionalCollection {
         return .init(name: index.name, value: next)
     }
 
-    /// - Note: The previous version tested `values.startIndex >= name`, which is only true for
-    /// the very first name, so stepping back into any other name landed on its first value
-    /// rather than its last. Iterating backwards repeated the same element and never terminated
-    /// where it should.
+    /// - Important: Must not test `values.startIndex >= name` — that is only true for the very
+    /// first name, so stepping back into any other name would land on its first value rather
+    /// than its last, repeating the same element and never terminating where it should.
     public func index(before index: Index) -> Index {
         guard index.value == .zero else {
             return .init(name: index.name, value: index.value - 1)

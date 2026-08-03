@@ -8,15 +8,15 @@ extension Internals {
 
     /// Counts the requests a client currently has in flight.
     ///
-    /// This used to be a doubly linked list with a permanent root and a lock on every node.
-    /// Completing an operation touched its neighbours, so it held its own lock while taking
-    /// theirs, and two adjacent requests finishing at the same time deadlocked each other:
-    /// the first held A and wanted B, the second held B and wanted A. `Lock` is not reentrant,
-    /// so it was permanent, and it happened inside a cooperative pool thread while holding the
-    /// client's `AsyncLock`.
+    /// - Important: Must stay a plain counter, not a doubly linked list with a lock per node.
+    /// Completing an operation touches its neighbours, so a node holds its own lock while
+    /// taking theirs — two adjacent requests finishing at the same time deadlock each other:
+    /// the first holds A and wants B, the second holds B and wants A. `Lock` is not reentrant,
+    /// so that deadlock is permanent, and it would happen inside a cooperative pool thread
+    /// while holding the client's `AsyncLock`.
     ///
-    /// The list existed only to answer "is anything running", which a counter answers without
-    /// any of that.
+    /// The only question this needs to answer is "is anything running", which a counter answers
+    /// without any of that.
     final class ClientOperationQueue: @unchecked Sendable {
 
         // MARK: - Internal properties

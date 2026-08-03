@@ -82,11 +82,10 @@ struct NodeDebug {
 
     /// Assembles the description from its parts.
     ///
-    /// This used to reverse the format string, the title and the value, run them through
-    /// `String(format:)`, then reverse the result, purely to get two `%@` in the opposite
-    /// order. Interpolation does that directly, and it drops a dependency on `%@` bridging,
-    /// which is the weakest part of `String(format:)` on the non Darwin platforms this package
-    /// supports.
+    /// - Note: Plain interpolation, not `String(format:)` with the title and value reversed to
+    /// get two `%@` in the opposite order. Interpolation gets there directly, and it drops a
+    /// dependency on `%@` bridging, which is the weakest part of `String(format:)` on the non
+    /// Darwin platforms this package supports.
     private func format(_ title: String, _ value: String) -> String {
         switch layout {
         case .enumCase:

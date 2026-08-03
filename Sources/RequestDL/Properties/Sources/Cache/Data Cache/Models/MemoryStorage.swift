@@ -116,13 +116,11 @@ struct MemoryStorage: Sendable {
     /// - Returns: The store the caller should open a buffer over, or `nil` when the entry does
     /// not fit.
     ///
-    /// - Note: No longer `async`, and no longer returns the buffer itself. Only the last line
-    /// of the previous version was asynchronous, the `Internals.DataBuffer` initializer, and
-    /// that one suspension made the whole method `mutating async`. This type is only reachable
-    /// through `withMemoryStorage`, which hands out an `inout` from inside a non reentrant
-    /// lock, and a synchronous closure cannot await. The result was a method the only caller
-    /// could not call: `DataCache.allocateBuffer` had the compiler's error message pasted above
-    /// it as a comment.
+    /// - Important: Must not be `async`, and must not return the buffer itself. This type is
+    /// only reachable through `withMemoryStorage`, which hands out an `inout` from inside a non
+    /// reentrant lock, and a synchronous closure cannot await — so a method whose only
+    /// suspension point is building the `Internals.DataBuffer` itself would be a method its only
+    /// caller could not call.
     ///
     /// Returning the location instead lets the bookkeeping stay under the lock, where it
     /// belongs, and the buffer be built outside it. That also stops the lock being held across

@@ -29,7 +29,7 @@ import struct Foundation.Data
 /// Every strategy is settable at any time, so the whole set is read once, under the lock, at
 /// the top of ``encode(_:forKey:)``. Encoding then runs against that snapshot with no lock
 /// held. Two consequences worth knowing: a strategy replaced part way through one call does not
-/// take effect until the next, and encoding no longer serializes across threads.
+/// take effect until the next, and encoding does not serialize across threads.
 public final class URLEncoder: @unchecked Sendable {
 
     // MARK: - Public properties
@@ -110,9 +110,9 @@ public final class URLEncoder: @unchecked Sendable {
     ///
     /// - Throws: Whatever a strategy throws.
     public func encode(_ value: Any, forKey key: String) throws -> [QueryItem] {
-        // Snapshot, then release. The lock used to be held across the whole recursion, which
-        // meant it was held across calls into strategy code this type does not own. `Lock` is
-        // not reentrant, so a strategy reading any of the public properties above deadlocked
+        // Snapshot, then release. Must not hold the lock across the whole recursion — that
+        // would hold it across calls into strategy code this type does not own, and `Lock` is
+        // not reentrant, so a strategy reading any of the public properties above would deadlock
         // the calling thread outright.
         let configuration = lock.withLock { _configuration }
 

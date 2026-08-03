@@ -106,8 +106,7 @@ struct InternalsSessionTests {
         #expect(uploadSteps.allSatisfy { $0.totalSize == length })
         #expect(uploadSteps.map(\.chunkSize).reduce(.zero, +) == length)
 
-        // A body this small belongs in one chunk. This is the regression guard: it used to go
-        // out one byte at a time.
+        // Regression guard: a body this small must go out in one chunk, not one byte at a time.
         #expect(uploadSteps.count == 1)
 
         guard case .download? = result.last else {
