@@ -31,7 +31,9 @@ struct InternalsBodyTests {
         // Regression guard: anything under the minimum chunk must go out whole, not as one
         // write per character, each with its own future and its own progress event.
         #expect(body.chunkSize == string.count)
-        await #expect(buffers.resolveData() == Array(string.utf8).split(by: string.count))
+        let resolvedData = await buffers.resolveData()
+        let expectedChunks = await Array(string.utf8).split(by: string.count)
+        #expect(resolvedData == expectedChunks)
     }
 
     @Test
@@ -53,9 +55,8 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == string.count)
         #expect(body.totalSize == string.count)
 
-        await #expect(
-            buffers.resolveData() == [Data(string.utf8)]
-        )
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData == [Data(string.utf8)])
     }
 
     @Test
@@ -74,9 +75,8 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == .zero)
         #expect(body.totalSize == string.count)
 
-        await #expect(
-            buffers.resolveData() == []
-        )
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData == [])
     }
 
     @Test
@@ -91,8 +91,7 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == .zero)
         #expect(body.totalSize == .zero)
 
-        await #expect(
-            buffers.resolveData() == []
-        )
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData == [])
     }
 }

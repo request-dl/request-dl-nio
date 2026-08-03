@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(Darwin)
 import Testing
 
 @testable import RequestDL
@@ -20,3 +21,4 @@ struct KeyPathNotFoundTests {
         #expect(error.errorDescription == "Unable to resolve the KeyPath '\(keyPath)' in the current Task result")
     }
 }
+#endif

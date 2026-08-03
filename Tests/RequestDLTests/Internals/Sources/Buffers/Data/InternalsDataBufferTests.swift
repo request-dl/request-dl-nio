@@ -75,9 +75,11 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == data.count)
         #expect(dataBuffer.readerIndex == data.count)
         #expect(dataBuffer.readableBytes == .zero)
-        await #expect(dataBuffer.overwritableBytes == .zero)
+        let overwritableBytes = await dataBuffer.overwritableBytes
+        #expect(overwritableBytes == .zero)
         #expect(readData == data)
-        await #expect(dataBuffer.estimatedBytes == data.count)
+        let estimatedBytes = await dataBuffer.estimatedBytes
+        #expect(estimatedBytes == data.count)
     }
 
     @Test
@@ -99,7 +101,8 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == data.count)
         #expect(dataBuffer.readerIndex == index)
         #expect(dataBuffer.readableBytes == data.count - index)
-        await #expect(dataBuffer.overwritableBytes == .zero)
+        let overwritableBytes = await dataBuffer.overwritableBytes
+        #expect(overwritableBytes == .zero)
     }
 
     @Test
@@ -121,7 +124,8 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == index)
         #expect(dataBuffer.readerIndex == .zero)
         #expect(dataBuffer.readableBytes == index)
-        await #expect(dataBuffer.overwritableBytes == data.count - index)
+        let overwritableBytesAfterMove = await dataBuffer.overwritableBytes
+        #expect(overwritableBytesAfterMove == data.count - index)
     }
 
     @Test
@@ -143,7 +147,8 @@ struct InternalsDataBufferTests {
         #expect(readerIndex == sut1.readerIndex)
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == data.count)
-        await #expect(sut1.overwritableBytes == data.count)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == data.count)
         #expect(sut1.readableBytes == .zero)
     }
 
@@ -166,7 +171,8 @@ struct InternalsDataBufferTests {
         #expect(readerIndex == sut1.readerIndex)
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == data.count)
-        await #expect(sut1.overwritableBytes == data.count)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == data.count)
         #expect(sut1.readableBytes == .zero)
     }
 
@@ -186,7 +192,8 @@ struct InternalsDataBufferTests {
         // Then
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == data.count)
-        await #expect(sut1.overwritableBytes == data.count - writeSliceIndex)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == data.count - writeSliceIndex)
         #expect(sut1.readableBytes == writeSliceIndex)
     }
 
@@ -206,7 +213,8 @@ struct InternalsDataBufferTests {
         // Then
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == data.count)
-        await #expect(sut1.overwritableBytes == data.count - writeSliceIndex)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == data.count - writeSliceIndex)
         #expect(sut1.readableBytes == writeSliceIndex)
     }
 
@@ -232,7 +240,8 @@ struct InternalsDataBufferTests {
         #expect(readerIndex == .zero)
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == .zero)
-        await #expect(sut1.overwritableBytes == .zero)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == .zero)
         #expect(sut1.readableBytes == data.count)
     }
 
@@ -258,7 +267,8 @@ struct InternalsDataBufferTests {
         #expect(readerIndex == .zero)
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == .zero)
-        await #expect(sut1.overwritableBytes == .zero)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == .zero)
         #expect(sut1.readableBytes == data.count)
     }
 
@@ -281,12 +291,14 @@ struct InternalsDataBufferTests {
         #expect(readData1 == data[0..<readSliceIndex])
         #expect(sut1.writerIndex == data.count)
         #expect(sut1.readableBytes == data.count - readSliceIndex)
-        await #expect(sut1.overwritableBytes == .zero)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == .zero)
 
         #expect(readData2 == data)
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == .zero)
-        await #expect(sut2.overwritableBytes == .zero)
+        let sut2OverwritableBytes = await sut2.overwritableBytes
+        #expect(sut2OverwritableBytes == .zero)
     }
 
     @Test
@@ -308,12 +320,14 @@ struct InternalsDataBufferTests {
         #expect(readBytes1 == Array(data[0..<readSliceIndex]))
         #expect(sut1.writerIndex == data.count)
         #expect(sut1.readableBytes == data.count - readSliceIndex)
-        await #expect(sut1.overwritableBytes == .zero)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == .zero)
 
         #expect(readBytes2 == Array(data))
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readableBytes == .zero)
-        await #expect(sut2.overwritableBytes == .zero)
+        let sut2OverwritableBytes = await sut2.overwritableBytes
+        #expect(sut2OverwritableBytes == .zero)
     }
 
     @Test
@@ -343,12 +357,14 @@ struct InternalsDataBufferTests {
 
         #expect(sut1.writerIndex == overrideData.count)
         #expect(sut1.readerIndex == overrideData.count)
-        await #expect(sut1.overwritableBytes == data.count - overrideData.count)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == data.count - overrideData.count)
         #expect(sut1.readableBytes == .zero)
 
         #expect(sut2.writerIndex == data.count)
         #expect(sut2.readerIndex == data.count)
-        await #expect(sut2.overwritableBytes == .zero)
+        let sut2OverwritableBytes = await sut2.overwritableBytes
+        #expect(sut2OverwritableBytes == .zero)
         #expect(sut2.readableBytes == .zero)
     }
 
@@ -374,13 +390,16 @@ struct InternalsDataBufferTests {
         #expect(sut1.writerIndex == data.count + otherData.count)
         #expect(sut2.writerIndex == otherData.count)
 
-        await #expect(sut1.overwritableBytes == .zero)
-        await #expect(sut2.overwritableBytes == .zero)
+        let sut1OverwritableBytes = await sut1.overwritableBytes
+        #expect(sut1OverwritableBytes == .zero)
+        let sut2OverwritableBytes = await sut2.overwritableBytes
+        #expect(sut2OverwritableBytes == .zero)
 
         #expect(sut1.readerIndex == .zero)
         #expect(sut2.readerIndex == otherData.count)
 
-        await #expect(sut1.readData(sut1.readableBytes) == data + otherData)
+        let mergedData = await sut1.readData(sut1.readableBytes)
+        #expect(mergedData == data + otherData)
     }
 
     @Test
@@ -415,7 +434,8 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == data.count)
         #expect(dataBuffer.readerIndex == data.count)
         #expect(dataBuffer.readableBytes == .zero)
-        await #expect(dataBuffer.overwritableBytes == .zero)
+        let overwritableBytes = await dataBuffer.overwritableBytes
+        #expect(overwritableBytes == .zero)
     }
 
     @Test
@@ -432,7 +452,8 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == bytes.count)
         #expect(dataBuffer.readerIndex == bytes.count)
         #expect(dataBuffer.readableBytes == .zero)
-        await #expect(dataBuffer.overwritableBytes == .zero)
+        let overwritableBytes = await dataBuffer.overwritableBytes
+        #expect(overwritableBytes == .zero)
     }
 
     @Test
@@ -449,7 +470,8 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == string.count)
         #expect(dataBuffer.readerIndex == string.count)
         #expect(dataBuffer.readableBytes == .zero)
-        await #expect(dataBuffer.overwritableBytes == .zero)
+        let overwritableBytes = await dataBuffer.overwritableBytes
+        #expect(overwritableBytes == .zero)
     }
 
     @Test
@@ -466,7 +488,8 @@ struct InternalsDataBufferTests {
         #expect(dataBuffer.writerIndex == string.utf8CodeUnitCount)
         #expect(dataBuffer.readerIndex == string.utf8CodeUnitCount)
         #expect(dataBuffer.readableBytes == .zero)
-        await #expect(dataBuffer.overwritableBytes == .zero)
+        let overwritableBytes = await dataBuffer.overwritableBytes
+        #expect(overwritableBytes == .zero)
     }
 
     @Test
@@ -578,7 +601,8 @@ struct InternalsDataBufferTests {
 
         // Then
         #expect(dataBuffer.writerIndex == data.count)
-        await #expect(dataBuffer.readData(data.count) == data)
+        let readData = await dataBuffer.readData(data.count)
+        #expect(readData == data)
     }
 
     @Test
@@ -588,7 +612,8 @@ struct InternalsDataBufferTests {
         let dataBuffer = await Internals.DataBuffer(data)
 
         // Then
-        await #expect(dataBuffer.getData() == data)
+        let retrievedData = await dataBuffer.getData()
+        #expect(retrievedData == data)
     }
 
     @Test
@@ -601,7 +626,8 @@ struct InternalsDataBufferTests {
         dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        await #expect(dataBuffer.getData() == data[64..<data.count])
+        let retrievedData = await dataBuffer.getData()
+        #expect(retrievedData == data[64..<data.count])
     }
 
     @Test
@@ -611,7 +637,8 @@ struct InternalsDataBufferTests {
         let dataBuffer = await Internals.DataBuffer(data)
 
         // Then
-        await #expect(dataBuffer.getBytes() == Array(data))
+        let retrievedBytes = await dataBuffer.getBytes()
+        #expect(retrievedBytes == Array(data))
     }
 
     @Test
@@ -624,7 +651,8 @@ struct InternalsDataBufferTests {
         dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        await #expect(dataBuffer.getBytes() == Array(data[64..<data.count]))
+        let retrievedBytes = await dataBuffer.getBytes()
+        #expect(retrievedBytes == Array(data[64..<data.count]))
     }
 
     @Test
@@ -638,7 +666,8 @@ struct InternalsDataBufferTests {
 
         // Then
 
-        await #expect(dataBuffer.getBytes(at: 32, length: 64) == Array(data[32..<96]))
+        let retrievedBytes = await dataBuffer.getBytes(at: 32, length: 64)
+        #expect(retrievedBytes == Array(data[32..<96]))
     }
 
     @Test
@@ -651,7 +680,8 @@ struct InternalsDataBufferTests {
         dataBuffer.moveReaderIndex(to: 64)
 
         // Then
-        await #expect(dataBuffer.getData(at: 32, length: 64) == data[32..<96])
+        let retrievedData = await dataBuffer.getData(at: 32, length: 64)
+        #expect(retrievedData == data[32..<96])
     }
 
     @Test
@@ -666,12 +696,14 @@ struct InternalsDataBufferTests {
         try await dataBuffer.setData(writeData, at: data.count - 32)
 
         // Then
-        await #expect(dataBuffer.overwritableBytes == writeData.count - 32)
+        let overwritableBytesAfterWrite = await dataBuffer.overwritableBytes
+        #expect(overwritableBytesAfterWrite == writeData.count - 32)
 
         dataBuffer.moveReaderIndex(to: dataBuffer.writerIndex - 32)
         await dataBuffer.moveWriterIndex(to: dataBuffer.writerIndex + dataBuffer.overwritableBytes)
 
-        await #expect(dataBuffer.readData(writeData.count) == writeData)
+        let overwrittenData = await dataBuffer.readData(writeData.count)
+        #expect(overwrittenData == writeData)
     }
 
     @Test
@@ -686,12 +718,14 @@ struct InternalsDataBufferTests {
         await dataBuffer.setBytes(writeBytes, at: data.count - 32)
 
         // Then
-        await #expect(dataBuffer.overwritableBytes == writeBytes.count - 32)
+        let overwritableBytesAfterWrite = await dataBuffer.overwritableBytes
+        #expect(overwritableBytesAfterWrite == writeBytes.count - 32)
 
         dataBuffer.moveReaderIndex(to: dataBuffer.writerIndex - 32)
         await dataBuffer.moveWriterIndex(to: dataBuffer.writerIndex + dataBuffer.overwritableBytes)
 
-        await #expect(dataBuffer.readBytes(writeBytes.count) == writeBytes)
+        let overwrittenBytes = await dataBuffer.readBytes(writeBytes.count)
+        #expect(overwrittenBytes == writeBytes)
     }
 
     @Test

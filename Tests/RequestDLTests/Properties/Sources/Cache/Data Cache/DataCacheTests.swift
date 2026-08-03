@@ -147,11 +147,15 @@ struct DataCacheTests {
         let cachedDisk2 = await dataCache.getCachedData(forKey: key2, policy: .disk)
 
         // Then
-        await #expect(cachedMemory1?.data == data1)
-        await #expect(cachedDisk1?.data == data1)
+        let cachedMemory1Data = await cachedMemory1?.data
+        #expect(cachedMemory1Data == data1)
+        let cachedDisk1Data = await cachedDisk1?.data
+        #expect(cachedDisk1Data == data1)
 
-        await #expect(cachedMemory2?.data == data2)
-        await #expect(cachedDisk2?.data == data2)
+        let cachedMemory2Data = await cachedMemory2?.data
+        #expect(cachedMemory2Data == data2)
+        let cachedDisk2Data = await cachedDisk2?.data
+        #expect(cachedDisk2Data == data2)
     }
 
     @Test
@@ -191,7 +195,8 @@ struct DataCacheTests {
         // fails to compile ("'async' property access in an autoclosure that does not support
         // concurrency") even with `await` on the macro call itself.
         let cachedData2Bytes = await cachedData2.data
-        await #expect(cachedMemory2?.data == cachedData2Bytes)
+        let cachedMemory2Data = await cachedMemory2?.data
+        #expect(cachedMemory2Data == cachedData2Bytes)
     }
 
     @Test
@@ -231,7 +236,8 @@ struct DataCacheTests {
         #expect(cachedDisk1 == nil)
 
         let cachedData2Bytes = await cachedData2.data
-        await #expect(cachedDisk2?.data == cachedData2Bytes)
+        let cachedDisk2Data = await cachedDisk2?.data
+        #expect(cachedDisk2Data == cachedData2Bytes)
     }
 
     @Test
@@ -275,11 +281,14 @@ struct DataCacheTests {
         let cachedData1Bytes = await cachedData1.data
         let cachedData2Bytes = await cachedData2.data
 
-        await #expect(memoryCached1?.data == cachedData1Bytes)
-        await #expect(diskCached1Data == cachedData1Bytes)
+        let memoryCached1Data = await memoryCached1?.data
+        #expect(memoryCached1Data == cachedData1Bytes)
+        #expect(diskCached1Data == cachedData1Bytes)
 
-        await #expect(memoryCached2?.data == cachedData2Bytes)
-        await #expect(diskCached2?.data == cachedData2Bytes)
+        let memoryCached2Data = await memoryCached2?.data
+        #expect(memoryCached2Data == cachedData2Bytes)
+        let diskCached2Data = await diskCached2?.data
+        #expect(diskCached2Data == cachedData2Bytes)
 
         #expect(memoryCached1_v2 == nil)
         #expect(diskCached1_v2 == nil)
@@ -318,7 +327,8 @@ struct DataCacheTests {
         #expect(storedDatas[1] == nil)
 
         let cachedData2Bytes = await cachedDatas[2].data
-        await #expect(storedDatas[2]?.data == cachedData2Bytes)
+        let storedData2 = await storedDatas[2]?.data
+        #expect(storedData2 == cachedData2Bytes)
     }
 
     @Test

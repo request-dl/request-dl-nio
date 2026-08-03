@@ -812,6 +812,7 @@ extension PayloadTests {
 
         #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
 
-        await #expect(buffers.resolveData().reduce(Data(), +) == data)
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData.reduce(Data(), +) == data)
     }
 }
