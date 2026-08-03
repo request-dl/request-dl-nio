@@ -101,7 +101,13 @@ extension Internals {
                 // Monotonic, not wall clock. `Date` moves when the user or NTP moves the system
                 // clock: backwards and no client is ever recycled, forwards and every client is
                 // eligible at once, including one handed out a moment ago and about to be used.
-                let now = DispatchTime.now().uptimeNanoseconds
+                let now = {
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds
+                    #else
+                    ContinuousClock.now
+                    #endif
+                }()
 
                 for (key, items) in tableLock.withLock({ _table }) {
                     var surviving = [Item]()
@@ -136,7 +142,13 @@ extension Internals {
             id: String,
             sessionConfiguration: Internals.Session.Configuration
         ) -> Internals.Client? {
-            let now = DispatchTime.now().uptimeNanoseconds
+            let now = {
+                #if canImport(Darwin)
+                DispatchTime.now().uptimeNanoseconds
+                #else
+                ContinuousClock.now
+                #endif
+            }()
 
             // Age checked here, not only in the sweep. The sweep runs every `lifetime` and
             // retires what is older than `lifetime`, so a client that went idle just after one

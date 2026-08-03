@@ -20,26 +20,47 @@ struct DataCacheTests {
 
         let dataCache: DataCache
 
-        init() {
+        /// ## Cleaning up front instead of in `deinit`
+        ///
+        /// Every test in this suite points at `globalDataCache.directoryURL`, so they all read
+        /// and write the same directory. That makes teardown ordering load bearing, and `deinit`
+        /// cannot carry it: `removeAll()` is asynchronous, `deinit` cannot suspend, and a
+        /// detached task is not ordered against the end of the test. Zeroing the capacities had
+        /// the same problem from the other direction, since the disk setter hands its eviction
+        /// to the cache's pending-writes tracker rather than awaiting it.
+        ///
+        /// Both were therefore firing destructive work at the shared directory at some
+        /// unspecified later moment, which landed in the middle of whichever test ran next.
+        /// That is what made `cache_whenSetCachedData` fail on `cachedDisk1` sometimes and
+        /// `cachedDisk2` other times: the two keys are written and read in sequence, so a stray
+        /// wipe catches whichever one it happens to overlap.
+        ///
+        /// Cleaning at setup is awaited, always runs, and does not depend on the previous test
+        /// having torn itself down properly, which is the point: a test that crashes or is
+        /// cancelled never runs its teardown at all.
+        ///
+        /// The capacities need no resetting. Constructing over an existing storage raises the
+        /// capacity to the larger of the two, which
+        /// `cache_whenInitWithLowerCapacityPreviousSpecified` asserts on purpose, so building
+        /// with the globals is already the reset.
+        init() async {
             dataCache = .init(
                 memoryCapacity: globalMemoryCapacity,
                 diskCapacity: globalDiskCapacity,
                 url: globalDataCache.directoryURL
             )
-        }
 
-        deinit {
-            let dataCache = self.dataCache
-            Task.detached { await dataCache.removeAll() }
+            await dataCache.removeAll()
 
-            globalDataCache.memoryCapacity = .zero
-            globalDataCache.diskCapacity = .zero
+            // Joins any eviction the capacity setter queued, so the directory is known to be
+            // empty before the test writes its first entry.
+            await dataCache.waitUntilIdle()
         }
     }
 
     @Test
-    func cache_whenInit_shouldCapacityBeKnown() throws {
-        let testState = TestState()
+    func cache_whenInit_shouldCapacityBeKnown() async throws {
+        let testState = await TestState()
         // Given
         let dataCache = testState.dataCache
 
@@ -49,8 +70,8 @@ struct DataCacheTests {
     }
 
     @Test
-    func cache_whenInitWithLowerCapacityPreviousSpecified_shouldBeMax() {
-        let testState = TestState()
+    func cache_whenInitWithLowerCapacityPreviousSpecified_shouldBeMax() async {
+        let testState = await TestState()
         defer { _ = testState }
         // Given
         let memoryCapacity: Int64 = 4 * 1_024 * 1_024
@@ -69,8 +90,8 @@ struct DataCacheTests {
     }
 
     @Test
-    func cache_whenSetCapacityDirectly_shouldBeValid() throws {
-        let testState = TestState()
+    func cache_whenSetCapacityDirectly_shouldBeValid() async throws {
+        let testState = await TestState()
         // Given
         let dataCache = testState.dataCache
 
@@ -88,7 +109,7 @@ struct DataCacheTests {
 
     @Test
     func cache_whenSetCachedData() async throws {
-        let testState = TestState()
+        let testState = await TestState()
         defer { _ = testState }
         // Given
         let dataCache = testState.dataCache
@@ -127,7 +148,7 @@ struct DataCacheTests {
 
     @Test
     func cache_whenLowMemory() async throws {
-        let testState = TestState()
+        let testState = await TestState()
         // Given
         let dataCache = testState.dataCache
 
@@ -163,7 +184,7 @@ struct DataCacheTests {
 
     @Test
     func cache_whenLowDisk() async throws {
-        let testState = TestState()
+        let testState = await TestState()
         defer { _ = testState }
         // Given
         let dataCache = testState.dataCache
@@ -202,7 +223,7 @@ struct DataCacheTests {
 
     @Test
     func cache_whenRemoveKey() async throws {
-        let testState = TestState()
+        let testState = await TestState()
         defer { _ = testState }
 
         // Given
@@ -250,7 +271,7 @@ struct DataCacheTests {
 
     @Test
     func cache_whenRemoveSince() async throws {
-        let testState = TestState()
+        let testState = await TestState()
         // Given
         let dataCache = testState.dataCache
 
@@ -284,7 +305,7 @@ struct DataCacheTests {
 
     @Test
     func cache_whenRemoveAll() async throws {
-        let testState = TestState()
+        let testState = await TestState()
         // Given
         let dataCache = testState.dataCache
 

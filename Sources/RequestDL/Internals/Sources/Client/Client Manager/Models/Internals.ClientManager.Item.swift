@@ -17,9 +17,13 @@ extension Internals.ClientManager {
         let sessionConfiguration: Internals.Session.Configuration
         let client: Internals.Client
 
+        #if canImport(Darwin)
         /// Monotonic. See ``Internals/ClientManager/cleanupIfNeeded()`` for why this is not a
         /// `Date`.
         let readAt: UInt64
+        #else
+        let readAt: ContinuousClock.Instant
+        #endif
 
         // MARK: - Internal static methods
 
@@ -30,7 +34,13 @@ extension Internals.ClientManager {
             .init(
                 sessionConfiguration: sessionConfiguration,
                 client: client,
-                readAt: DispatchTime.now().uptimeNanoseconds
+                readAt: {
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds
+                    #else
+                    ContinuousClock.now
+                    #endif
+                }()
             )
         }
 
@@ -40,7 +50,13 @@ extension Internals.ClientManager {
             .init(
                 sessionConfiguration: sessionConfiguration,
                 client: client,
-                readAt: DispatchTime.now().uptimeNanoseconds
+                readAt: {
+                #if canImport(Darwin)
+                DispatchTime.now().uptimeNanoseconds
+                #else
+                ContinuousClock.now
+                #endif
+                }()
             )
         }
     }

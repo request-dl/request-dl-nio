@@ -17,11 +17,15 @@ extension Internals {
 
         private struct Register: Sendable {
 
+            #if canImport(Darwin)
             // Monotonic, not wall clock. `Date` moves when the user or NTP moves the system
             // clock: backwards and nothing ever expires, forwards and the whole table does at
             // once. The trade is that this does not advance while the device is suspended,
             // which for a cache lifetime is the harmless direction.
             let readAt = DispatchTime.now().uptimeNanoseconds
+            #else
+            let readAt = ContinuousClock.now
+            #endif
             let value: any Sendable
         }
 
@@ -84,12 +88,19 @@ extension Internals {
                     return nil
                 }
 
+                let isValid = {
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime.nanoseconds
+                    #else
+                    register.readAt.duration(to: .now) <= .nanoseconds(lifetime)
+                    #endif
+                }()
                 // Age checked here, not only in the sweep. The sweep runs every `lifetime` and
                 // removes what is older than `lifetime`, so an entry that went idle just after
                 // one pass survived until the next and could be handed out at nearly twice its
                 // lifetime. That made the sweep interval a correctness parameter; it should
                 // only be a memory one.
-                guard DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime.nanoseconds else {
+                guard isValid else {
                     _table[key] = nil
                     return nil
                 }
@@ -156,7 +167,13 @@ extension Internals {
 
         private func cleanupIfNeeded() {
             lock.withLockVoid {
-                let now = DispatchTime.now().uptimeNanoseconds
+                let now = {
+                #if canImport(Darwin)
+                DispatchTime.now().uptimeNanoseconds
+                #else
+                ContinuousClock.now
+                #endif
+                }()
 
                 _table = _table.filter {
                     now - $1.readAt <= lifetime.nanoseconds
