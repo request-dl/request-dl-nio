@@ -514,10 +514,21 @@ public struct DataCache: Sendable, Equatable {
 
     // MARK: - Private methods
 
+    /// - Note: A `compactMap` rather than `replacingOccurrences(of:with:)`, which is not part of
+    /// `FoundationEssentials`. Base64's alphabet makes each of these substitutions a single
+    /// character, so a character-by-character rewrite covers the same ground.
     private func base64EncodedKey(_ key: String) -> String {
-        Data(key.utf8).base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
+        let base64 = Data(key.utf8).base64EncodedString()
+
+        return String(
+            base64.compactMap { character -> Character? in
+                switch character {
+                case "+": return "-"
+                case "/": return "_"
+                case "=": return nil
+                default: return character
+                }
+            }
+        )
     }
 }

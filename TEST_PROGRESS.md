@@ -123,6 +123,17 @@
 
 ## 7. Last Session Summary
 
+- **Date:** 2026-08-04 (CI log triage, not a coverage batch)
+- **What was done:** Triaged two CI failure logs dropped in `inputs/` (`Linkage Test (FoundationEssentials).txt`, `Linux.txt`) and fixed all three root causes found:
+  1. `Internals.CacheControl.swift:385` used `error.localizedDescription`, not available on `any Error` under `FoundationEssentials` — switched to `String(describing: error)`, matching the pattern already used elsewhere in the same file/`Internals/Sources/Logger/`.
+  2. `DataCache.swift`'s `base64EncodedKey` used `String.replacingOccurrences(of:with:)`, also not part of `FoundationEssentials` — rewrote as a `compactMap` over `Character`, mirroring the existing `sanitizedPathComponent` pattern a few dozen lines above it in the same file.
+  3. **Found and fixed a real bug**, the actual cause of the Linux suite's one failing test (`DataCacheTests.cache_whenRemoveSince()`, `storedDatas[1]` unexpectedly non-nil): `DiskStorage.Record`'s directory-name encoding (`Sources/RequestDL/Properties/Sources/Cache/Data Cache/Models/DiskStorage.swift`) derived a nanosecond `Int64` via `date.timeIntervalSinceReferenceDate * 1_000_000_000`. By 2026 that product is well past `Double`'s 2^53 exact-integer range, so the multiply itself rounds, and reconstructing a `Date` from the rounded value can land a hair off the original — enough that a disk record's `date` no longer compares equal to the in-memory `Date` it was built from, so `record.date <= date` in `removeAll(since:)` silently disagreed with `MemoryStorage`'s exact (non-round-tripped) comparison and left the entry stranded on disk. This is a **follow-up** to the nanosecond-precision fix from 2026-08-03 (batch 2, see the Superseded entry below) — that fix solved same-second collisions but introduced this separate precision-loss bug via the `Double` scaling. Fix: encode/decode the raw IEEE-754 bit pattern (`Double.bitPattern` / `Double(bitPattern:)`) instead of a scaled-and-rounded nanosecond count — exact round-trip, no arithmetic to lose precision on either side, and still collision-proof per-key (arguably more so, since it no longer truncates to nanoseconds).
+  - Also removed the now-unused `import struct Foundation.TimeInterval` from `DiskStorage.swift`.
+- **Validation:** `swift build` clean; `swift test` full suite green (888 tests, same count as before — no tests added, this was a bug-fix session not a coverage session); `swift format format --in-place --recursive Sources Tests` produced no diffs beyond the three edited files.
+- **What was NOT finished:** The `FoundationEssentials` linkage and Linux logs only cover what actually ran in those two CI jobs on 2026-08-04; this session did not resume the coverage batch sequence (priority 3 `Tasks/Sources/Interceptors/`, priority 4 `Request/` from §2/§8 are still open from the previous session).
+
+### Superseded — 2026-08-04 (batch 3)
+
 - **Date:** 2026-08-04 (batch 3)
 - **What was done:**
   - Regenerated the coverage baseline (`./Scripts/coverage.sh`, full 882-test suite green) before scoping batch 3, per the plan left in the previous session's §8.
