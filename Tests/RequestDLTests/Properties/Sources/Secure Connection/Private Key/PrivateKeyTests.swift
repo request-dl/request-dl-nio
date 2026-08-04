@@ -10,11 +10,11 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
+import struct Foundation.Data
 #endif
 
 #if canImport(Darwin)
-// import class Foundation.Bundle
+import class Foundation.Bundle
 #endif
 
 struct PrivateKeyTests {

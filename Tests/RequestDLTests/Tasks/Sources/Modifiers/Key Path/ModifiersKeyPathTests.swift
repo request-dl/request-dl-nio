@@ -7,7 +7,7 @@ import Testing
 
 @testable import RequestDL
 
-// import Foundation
+import Foundation
 
 struct ModifiersKeyPathTests {
 

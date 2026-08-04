@@ -11,10 +11,10 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
-// import struct Foundation.UUID
-// import struct Foundation.Date
-// import struct Foundation.URL
+import struct Foundation.Data
+import struct Foundation.UUID
+import struct Foundation.Date
+import struct Foundation.URL
 #endif
 
 private let globalMemoryCapacity: Int64 = 8 * 1_024 * 1_024

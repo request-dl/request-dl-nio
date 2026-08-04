@@ -5,7 +5,7 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import protocol Foundation.LocalizedError
+import protocol Foundation.LocalizedError
 #endif
 
 /// An error type representing a request with no response.

@@ -7,8 +7,8 @@ import Testing
 @testable import RequestDL
 
 #if canImport(Darwin)
-// import class Foundation.Bundle
-// import struct Foundation.URL
+import class Foundation.Bundle
+import struct Foundation.URL
 
 struct BundleMethodsTests {
 

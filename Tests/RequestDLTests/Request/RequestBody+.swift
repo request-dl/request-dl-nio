@@ -12,7 +12,7 @@ import SwiftAsyncStream
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
+import struct Foundation.Data
 #endif
 
 extension RequestBody {
@@ -42,7 +42,7 @@ extension RequestBody {
                     // suspends.
                     //
                     // And `ByteBuffer.readData(length:)` belongs to `NIOFoundationCompat`, which
-                    // this file does not // import and which pulls in the whole of Foundation.
+                    // this file does not import and which pulls in the whole of Foundation.
                     //
                     // Same shape as `Internals.ClientResponseReceiver.didReceiveBodyPart`, and it
                     // copies nothing, since `ByteURL` takes a slice.

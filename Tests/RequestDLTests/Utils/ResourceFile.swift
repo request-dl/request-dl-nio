@@ -7,8 +7,8 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
-// import struct Foundation.URL
+import struct Foundation.Data
+import struct Foundation.URL
 #endif
 
 /// The checked-in `Resources` directory, located relative to this source file rather than

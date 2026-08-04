@@ -11,9 +11,9 @@ import NIOHTTP1
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
-// import class Foundation.JSONEncoder
-// import class Foundation.JSONDecoder
+import struct Foundation.Data
+import class Foundation.JSONEncoder
+import class Foundation.JSONDecoder
 #endif
 
 extension LocalServer {

@@ -11,7 +11,7 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.UUID
+import struct Foundation.UUID
 #endif
 
 struct InternalsSessionConfigurationTests {

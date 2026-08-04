@@ -11,8 +11,8 @@ import NIOSSL
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
-// import class Foundation.JSONEncoder
+import struct Foundation.Data
+import class Foundation.JSONEncoder
 #endif
 
 extension LocalServer {

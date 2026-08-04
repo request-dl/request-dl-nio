@@ -9,9 +9,9 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
-// import struct Foundation.UUID
-// import struct Foundation.URL
+import struct Foundation.Data
+import struct Foundation.UUID
+import struct Foundation.URL
 #endif
 
 // `session_whenUploadingFile_shouldBeValid` pushes 100MB through the same 2-thread event loop

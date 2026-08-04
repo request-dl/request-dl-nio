@@ -9,9 +9,9 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Date
-// import class Foundation.JSONEncoder
-// import class Foundation.JSONDecoder
+import struct Foundation.Date
+import class Foundation.JSONEncoder
+import class Foundation.JSONDecoder
 #endif
 
 struct ModifiersDecodeTests {

@@ -9,15 +9,15 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
-// import struct Foundation.Date
-// import struct Foundation.UUID
-// import class Foundation.JSONEncoder
-// import class Foundation.JSONDecoder
+import struct Foundation.Data
+import struct Foundation.Date
+import struct Foundation.UUID
+import class Foundation.JSONEncoder
+import class Foundation.JSONDecoder
 #endif
 
 #if canImport(Darwin)
-// import class Foundation.JSONSerialization
+import class Foundation.JSONSerialization
 #endif
 
 struct PayloadTests {

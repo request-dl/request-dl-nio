@@ -9,7 +9,7 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.URL
+import struct Foundation.URL
 #endif
 
 struct ResponseHeadTests {

@@ -12,7 +12,7 @@ import Testing
 import FoundationEssentials
 import NIOFoundationEssentialsCompat
 #else
-// import struct Foundation.Data
+import struct Foundation.Data
 #endif
 
 struct InternalsSecureConnectionTests {
