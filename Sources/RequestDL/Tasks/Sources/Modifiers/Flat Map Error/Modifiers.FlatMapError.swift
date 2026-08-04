@@ -52,7 +52,7 @@ extension RequestTask {
     /// ```swift
     /// DataTask { ... }
     ///     .flatMapError { error in
-    ///         print("Error encountered during task:", String(describing: error))
+    ///         print("Error encountered during task:", error.localizedDescription)
     ///     }
     /// ```
     ///
@@ -78,7 +78,7 @@ extension RequestTask {
     /// ```swift
     /// DataTask { ... }
     ///     .flatMapError(MyCustomError.self) { error in
-    ///         print("Custom error encountered during task:", String(describing: error))
+    ///         print("Custom error encountered during task:", error.localizedDescription)
     ///     }
     /// ```
     ///

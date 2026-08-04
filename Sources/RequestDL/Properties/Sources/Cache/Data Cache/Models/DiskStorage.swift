@@ -13,7 +13,6 @@ import NIOFoundationEssentialsCompat
 // import struct Foundation.URL
 // import struct Foundation.Date
 // import struct Foundation.Data
-// import struct Foundation.TimeInterval
 // import class Foundation.JSONDecoder
 // import class Foundation.JSONEncoder
 #endif
@@ -70,13 +69,19 @@ struct DiskStorage: Sendable {
         }
 
         init(directory: URL, key: String, at date: Date) async {
-            // Nanosecond precision, not whole seconds: `updateCached` creates a fresh record
-            // for the same key while revalidating an existing one, and two records for the same
-            // key landing in the same second would otherwise collide on this directory name.
-            // `moveItem` then throws on the collision, and the recovery path removes both the
-            // old and the new record, losing the entry outright.
-            let timeUnit = Int64((date.timeIntervalSinceReferenceDate * 1_000_000_000).rounded())
-            var directoryPathComponent = String(timeUnit, radix: 36)
+            // The raw bit pattern of the interval, not a nanosecond count. `updateCached`
+            // creates a fresh record for the same key while revalidating an existing one, and
+            // two records for the same key landing in the same directory name would otherwise
+            // collide; `moveItem` then throws, and the recovery path removes both the old and
+            // the new record, losing the entry outright. Scaling `timeIntervalSinceReferenceDate`
+            // by 1e9 does not avoid that: the interval is already well past `Double`'s 2^53
+            // exact-integer range by the time this runs in 2026, so the scaled product is itself
+            // rounded during the multiply, and reconstructing a `Date` from that rounded value
+            // can land a hair off from the original — enough for `record.date <= date` to
+            // disagree with the `Date` it was built from. The bit pattern round-trips exactly,
+            // with no arithmetic to lose precision on either side.
+            let bitPattern = date.timeIntervalSinceReferenceDate.bitPattern
+            var directoryPathComponent = String(bitPattern, radix: 36)
             directoryPathComponent += ".\(key).\(DiskStorage.Record.pathExtension)"
 
             let url = directory.appendingPathComponent(directoryPathComponent, isDirectory: true)
@@ -103,11 +108,11 @@ struct DiskStorage: Sendable {
 
         private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
             var components = url.deletingPathExtension().lastPathComponent.split(separator: ".")
-            guard let time = components.first.flatMap({ Int64($0, radix: 36) }) else { return nil }
+            guard let bitPattern = components.first.flatMap({ UInt64($0, radix: 36) }) else { return nil }
             components.removeFirst()
             return (
                 components.joined(separator: "."),
-                Date(timeIntervalSinceReferenceDate: TimeInterval(time) / 1_000_000_000)
+                Date(timeIntervalSinceReferenceDate: Double(bitPattern: bitPattern))
             )
         }
     }
