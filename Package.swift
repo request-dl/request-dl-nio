@@ -67,7 +67,7 @@ let package = Package(
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-//                .product(name: "NIOFoundationCompat", package: "swift-nio"),
+                .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
