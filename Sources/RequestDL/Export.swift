@@ -13,7 +13,7 @@
 @_exported import NIOTransportServices
 @_exported import NIOHTTP1
 @_exported import NIOPosix
-//@_exported import NIOHTTPCompression
+@_exported import NIOHTTPCompression
 @_exported import NIOFoundationEssentialsCompat
 @_exported import SystemPackage
 @_exported import Logging
