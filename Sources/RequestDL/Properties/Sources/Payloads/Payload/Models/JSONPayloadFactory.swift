@@ -2,14 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-import class Foundation.JSONSerialization
-#else
-import Foundation
-#endif
-
 #if canImport(Darwin)
+import struct Foundation.Data
+import class Foundation.JSONSerialization
+
 /// Serialises a loosely typed JSON object.
 ///
 /// - Important: Darwin only, and it has to be. This is the one factory that takes `Any` in, so
