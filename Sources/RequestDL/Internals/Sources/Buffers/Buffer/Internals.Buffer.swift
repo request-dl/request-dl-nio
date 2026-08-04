@@ -101,7 +101,10 @@ extension Internals {
 
             private var _storedInputStream: Stream?
             private var _storedOutputStream: Stream?
-            private var _hasCreatedResource = false
+
+            /// Whether this storage has already established that its resource exists, either
+            /// by creating it or by a prior stat succeeding.
+            private var _hasConfirmedResource = false
 
             // MARK: - Inits
 
@@ -226,7 +229,7 @@ extension Internals {
                     try? await streams.output?.close()
 
                     await url.truncate()
-                    _hasCreatedResource = false
+                    _hasConfirmedResource = false
                 }
             }
 
@@ -253,12 +256,12 @@ extension Internals {
             /// underneath a live storage is not recovered from, which is the same answer the
             /// cached descriptors already give.
             private func _createResourceIfNeeded() async {
-                guard !_hasCreatedResource else {
+                guard !_hasConfirmedResource else {
                     return
                 }
 
                 await url.createResourceIfNeeded()
-                _hasCreatedResource = true
+                _hasConfirmedResource = true
             }
 
             /// - Warning: Lockless. Only reachable from inside `lock`.
@@ -266,16 +269,30 @@ extension Internals {
             /// `url.isResourceAvailable()` is a file system stat, and under heavy concurrent
             /// reads on sandboxed Apple simulators it intermittently reports a file as missing
             /// in short, contiguous windows, with nothing thrown and no descriptor ever closed
-            /// underneath this storage (see `ci-triage/TASKS.md` T1/T2). A `read(at:length:)`
-            /// only reaches this check after the caller's own bookkeeping already trusts the
-            /// range is there, so a single "not available" answer here is treated as transient
-            /// and retried a few times, rather than as the resource having been removed.
+            /// underneath this storage. Retrying that stat a
+            /// handful of times narrows the window but does not close it: the same simulator
+            /// contention that produces one flaky answer can produce five in a row once enough
+            /// callers are stat-ing the same path at once, which is exactly what happens once
+            /// hundreds of reads land on one storage concurrently.
+            ///
+            /// The reliable fix is not a bigger retry budget, it is not re-asking a question
+            /// this storage already knows the answer to. Once this instance has itself created
+            /// the resource, or a stat has ever come back positive, nothing other than
+            /// ``clear()`` can make it disappear from underneath it — same invariant
+            /// `_createResourceIfNeeded()` already relies on. So the confirmation is cached and
+            /// every read after the first reachable one skips the stat entirely, which is also
+            /// what removes it from that concurrent contention going forward.
             private func _isResourceAvailable() async -> Bool {
+                guard !_hasConfirmedResource else {
+                    return true
+                }
+
                 let attempts = 5
                 let retryDelay: UInt64 = 2_000_000
 
                 for attempt in 0..<attempts {
                     if await url.isResourceAvailable() {
+                        _hasConfirmedResource = true
                         return true
                     }
 

@@ -25,6 +25,7 @@ import struct Foundation.UUID
 // verifying it requires the actual visionOS Simulator CI environment.
 struct LocalServerConcurrencyTests {
 
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
     @Test
     func manyConcurrentSessions_shareLocalServerWithoutCrossTalkOrHanging() async throws {
         let concurrency = 200

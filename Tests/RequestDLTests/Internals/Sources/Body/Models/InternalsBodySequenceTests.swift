@@ -157,7 +157,7 @@ struct InternalsBodySequenceTests {
         #expect(sequence.count == 2)
     }
 
-    /// Regression test for the fatal crash tracked as T1/T3 in `ci-triage/TASKS.md`.
+    /// Regression test for a fatal crash.
     ///
     /// The crash (`Internals.assertionFailure` at `Internals.BodySequence.swift:75`) never came
     /// from a `BodySequence` test run in isolation — it only ever surfaced when a file backed
