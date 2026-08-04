@@ -1,5 +1,5 @@
 {
-  "originHash" : "fa2547b0db80efbc5d98842b9daadbb4ea7b57895512cf7144cf7197dc9b2259",
+  "originHash" : "b4bb692e81bc69bd2336a4d136e878f4fe0b9742474280a194658577a300018d",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/o-nnerb/swift-async-stream",
       "state" : {
-        "revision" : "f1c7b5300b1cd63b5d9738fcf4f97c9b781aedde",
-        "version" : "2.0.1"
+        "revision" : "398d1ed9de8b1d22b96a96cd46a1228b3202d4a3",
+        "version" : "2.0.3"
       }
     },
     {

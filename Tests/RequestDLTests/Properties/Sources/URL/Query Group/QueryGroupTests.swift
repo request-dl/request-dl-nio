@@ -1,0 +1,102 @@
+//
+// See LICENSE for this package's licensing information.
+//
+
+import Testing
+
+@testable import RequestDL
+
+struct QueryGroupTests {
+
+    @Test
+    func groupOfQueries() async throws {
+        // Given
+        let property = QueryGroup {
+            Query(name: "number", value: 123)
+            Query(name: "page", value: 1)
+        }
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                property
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.url == """
+                https://127.0.0.1?\
+                number=123&\
+                page=1
+                """
+        )
+    }
+
+    @Test
+    func groupOfQueriesIgnoringOtherTypes() async throws {
+        // Given
+        let property = QueryGroup {
+            Query(name: "number", value: 123)
+            Query(name: "page", value: 1)
+            CustomHeader(name: "api_key", value: "password")
+        }
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                property
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.url == """
+                https://127.0.0.1?\
+                number=123&\
+                page=1
+                """
+        )
+
+        #expect(resolved.requestConfiguration.headers["api_key"] == nil)
+    }
+
+    @Test
+    func queries_whenInitWithDictionary_shouldBeValid() async throws {
+        // Given
+        let queries = [
+            "number": 123,
+            "page": 1,
+        ]
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                QueryGroup(queries)
+            }
+        )
+
+        // `URLComponents`/`URLQueryItem` are not part of `FoundationEssentials`. A dictionary's
+        // iteration order is not guaranteed, so the query string built from it needs an
+        // order-independent comparison rather than the exact-string checks the other tests use.
+        let queryString = resolved.requestConfiguration.url.split(separator: "?", maxSplits: 1).last ?? ""
+        let queryItems = Set(queryString.split(separator: "&").map(String.init))
+
+        // Then
+        #expect(queryItems.count == 2)
+        #expect(queryItems.contains("number=123"))
+        #expect(queryItems.contains("page=1"))
+    }
+
+    @Test
+    func neverBody() async throws {
+        // Given
+        let property = QueryGroup {}
+
+        // Then
+        try await assertNever(property.body)
+    }
+}

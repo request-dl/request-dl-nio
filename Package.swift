@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.1"
+            from: "2.0.3"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
@@ -78,6 +78,15 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
             ]
-        )
+        ),
+
+        .testTarget(
+            name: "RequestDLTests",
+            dependencies: [
+                "RequestDL",
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            ],
+            resources: [.process("Resources")]
+        ),
     ]
 )

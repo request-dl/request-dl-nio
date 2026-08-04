@@ -15,7 +15,7 @@ on:
       - 'Sources/**'
       - 'Tests/**'
       - '.swift-format'
-      - '.github/workflows/swift-ci.yml'
+      - '.github/workflows/swift-ci.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}

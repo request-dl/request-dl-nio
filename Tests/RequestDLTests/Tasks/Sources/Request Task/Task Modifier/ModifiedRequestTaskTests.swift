@@ -1,0 +1,41 @@
+//
+// See LICENSE for this package's licensing information.
+//
+
+import SwiftAsyncStream
+import Testing
+
+@testable import RequestDL
+
+struct ModifiedRequestTaskTests {
+
+    struct Modified<Input: Sendable>: RequestTaskModifier {
+
+        let callback: @Sendable () -> Void
+
+        func body(_ task: Content) async throws -> Input {
+            callback()
+            return try await task.result()
+        }
+    }
+
+    @Test
+    func modified() async throws {
+        // Given
+        let taskModified = InlineProperty(wrappedValue: false)
+
+        // When
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .modifier(
+            Modified {
+                taskModified.wrappedValue = true
+            }
+        )
+        .result()
+
+        // Then
+        #expect(taskModified.wrappedValue)
+    }
+}
