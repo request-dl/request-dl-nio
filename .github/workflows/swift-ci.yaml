@@ -66,7 +66,7 @@ jobs:
           EOF
 
           cat > Tests/LinkageTest/Sources/main.swift << 'EOF'
-          import SwiftAsyncStream
+          import RequestDL
 
           // This executable only imports the package
           // If the package uses Foundation (not FoundationEssentials),
