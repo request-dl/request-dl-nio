@@ -15,7 +15,7 @@
 //@_exported import NIOPosix
 //@_exported import NIOHTTPCompression
 //@_exported import NIOFoundationEssentialsCompat
-@_exported import SystemPackage
+import SystemPackage
 @_exported import Logging
 @_exported import Collections
 
