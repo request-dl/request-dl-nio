@@ -5,7 +5,7 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Data
+import struct Foundation.Data
 #endif
 
 /// Enumeration representing various character encodings (charsets) in Swift.
@@ -59,7 +59,7 @@ public enum Charset: String, Sendable, LosslessStringConvertible {
     ///
     /// Written out by hand rather than delegating to `String.data(using:)`. That method, and
     /// the `String.Encoding` it takes, belong to the full Foundation and are not part of
-    /// `FoundationEssentials`. This file only ever // imported `Foundation.Data`, so the previous
+    /// `FoundationEssentials`. This file only ever imported `Foundation.Data`, so the previous
     /// version did not compile off Apple either.
     ///
     /// The forms with an explicit endianness carry no byte order mark, because the name already

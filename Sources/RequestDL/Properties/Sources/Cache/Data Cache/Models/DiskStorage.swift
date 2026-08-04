@@ -10,11 +10,11 @@ import SystemPackage
 import FoundationEssentials
 import NIOFoundationEssentialsCompat
 #else
-// import struct Foundation.URL
-// import struct Foundation.Date
-// import struct Foundation.Data
-// import class Foundation.JSONDecoder
-// import class Foundation.JSONEncoder
+import struct Foundation.URL
+import struct Foundation.Date
+import struct Foundation.Data
+import class Foundation.JSONDecoder
+import class Foundation.JSONEncoder
 #endif
 
 struct DiskStorage: Sendable {

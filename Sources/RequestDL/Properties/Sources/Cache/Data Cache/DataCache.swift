@@ -9,10 +9,10 @@ import SystemPackage
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.URL
-// import struct Foundation.Data
-// import struct Foundation.Date
-// import class Foundation.ProcessInfo
+import struct Foundation.URL
+import struct Foundation.Data
+import struct Foundation.Date
+import class Foundation.ProcessInfo
 #endif
 
 /// A data cache that stores and retrieves data based on specified capacities and policies.

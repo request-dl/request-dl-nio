@@ -5,8 +5,8 @@
 import Logging
 
 #if canImport(Darwin)
-// import class Foundation.Bundle
-// import struct Foundation.URL
+import class Foundation.Bundle
+import struct Foundation.URL
 #endif
 
 /// Set a certificate of type `PEM` or `DER`.

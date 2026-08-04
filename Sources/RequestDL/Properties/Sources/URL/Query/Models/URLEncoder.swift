@@ -7,8 +7,8 @@ import SwiftAsyncStream
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Date
-// import struct Foundation.Data
+import struct Foundation.Date
+import struct Foundation.Data
 #endif
 
 /// Encodes values into query items for use in URL requests.
