@@ -2,6 +2,7 @@
  See LICENSE for this package's licensing information.
 */
 
+/*
 @_exported import AsyncHTTPClient
 @_exported import SwiftAsyncStream
 @_exported import NIOCore
@@ -17,5 +18,6 @@
 @_exported import SystemPackage
 @_exported import Logging
 @_exported import Collections
+*/
 
 enum Internals {}
