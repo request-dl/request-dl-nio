@@ -1,0 +1,170 @@
+//
+// See LICENSE for this package's licensing information.
+//
+
+/// The ContentType struct is used to define the media type of the data in the HTTP request.
+///
+/// ```swift
+/// let contentType: ContentType = .json
+/// ```
+///
+/// > Note: For a complete list of the available types, please see the corresponding static
+/// properties.
+///
+/// > Important: If the media type is not included in the predefined static properties, use
+/// a string literal to initialize an instance of ContentType.
+///
+/// The ContentType struct conforms to the `ExpressibleByStringLiteral` protocol, allowing
+/// it to be initialized with a string literal.
+///
+/// ```swift
+/// let customContentType: ContentType = "application/custom"
+/// ```
+public struct ContentType: Sendable, Hashable {
+
+    // MARK: - Public static properties
+
+    /// Content type for JSON data.
+    public static let json: ContentType = "application/json"
+
+    /// Content type for XML data.
+    public static let xml: ContentType = "application/xml"
+
+    /// Content type for form data with files.
+    public static let formData: ContentType = "form-data"
+
+    /// Content type for form data in the `x-www-form-urlencoded` format.
+    public static let formURLEncoded: ContentType = "application/x-www-form-urlencoded"
+
+    /// Content type for plain text data.
+    public static let text: ContentType = "text/plain"
+
+    /// Content type for HTML data.
+    public static let html: ContentType = "text/html"
+
+    /// Content type for CSS data.
+    public static let css: ContentType = "text/css"
+
+    /// Content type for JavaScript data.
+    public static let javascript: ContentType = "text/javascript"
+
+    /// Content type for GIF images.
+    public static let gif: ContentType = "image/gif"
+
+    /// Content type for PNG images.
+    public static let png: ContentType = "image/png"
+
+    /// Content type for JPEG images.
+    public static let jpeg: ContentType = "image/jpeg"
+
+    /// Content type for BMP images.
+    public static let bmp: ContentType = "image/bmp"
+
+    /// Content type for WebP images.
+    public static let webp: ContentType = "image/webp"
+
+    /// Content type for MIDI audio.
+    public static let midi: ContentType = "audio/midi"
+
+    /// Content type for MPEG audio.
+    public static let mpeg: ContentType = "audio/mpeg"
+
+    /// Content type for WAV audio.
+    public static let wav: ContentType = "audio/wav"
+
+    /// Content type for PDF files.
+    public static let pdf: ContentType = "application/pdf"
+
+    /// Content type for bytes data.
+    public static let octetStream: ContentType = "application/octet-stream"
+
+    // MARK: - Internal properties
+
+    let rawValue: String
+
+    // MARK: - Inits
+
+    ///
+    /// Initializes a `ContentType` instance with a given string value.
+    ///
+    /// - Parameter rawValue: The string value of the content type.
+    ///
+    public init<S: StringProtocol>(_ rawValue: S) {
+        self.rawValue = String(rawValue)
+    }
+}
+
+// MARK: - ExpressibleByStringLiteral
+
+extension ContentType: ExpressibleByStringLiteral {
+
+    ///
+    /// Initializes a `ContentType` instance using a string literal.
+    ///
+    /// - Parameter value: A string literal representing the media type.
+    /// - Returns: An instance of `ContentType` with the specified media type.
+    ///
+    /// > Note: Use this initializer to create a `ContentType` instance from a string literal.
+    ///
+    public init(stringLiteral value: StringLiteralType) {
+        self.rawValue = value
+    }
+}
+
+// MARK: - LosslessStringConvertible
+
+extension ContentType: LosslessStringConvertible {
+
+    public var description: String {
+        rawValue
+    }
+}
+
+// MARK: - Parameters
+
+extension ContentType {
+
+    /// Whether this is `application/x-www-form-urlencoded`, parameters aside.
+    ///
+    /// Compares the media type rather than searching for a substring anywhere in the value,
+    /// which also matched things like `application/x-www-form-urlencoded-v2`. Lives here now
+    /// instead of in `EncodablePayloadFactory`, next to the type it describes.
+    var isFormURLEncoded: Bool {
+        mediaType == ContentType.formURLEncoded.rawValue.lowercased()
+    }
+
+    /// Returns this content type carrying a `charset`, unless it already declares one.
+    ///
+    /// Appending unconditionally produced headers with two `charset` parameters whenever the
+    /// caller had written one themselves.
+    ///
+    /// - Important: Only call this from a factory that actually encoded its bytes through that
+    /// charset. See ``PayloadFactory`` for the rule and for why declaring it elsewhere makes
+    /// the header describe an encoding the body does not have.
+    func appending(charset: Charset) -> ContentType {
+        guard !hasCharsetParameter else {
+            return self
+        }
+
+        return .init("\(rawValue); charset=\(charset)")
+    }
+
+    /// The media type, without parameters, normalised for comparison.
+    private var mediaType: String {
+        rawValue
+            .prefix { $0 != ";" }
+            .filter { $0 != " " }
+            .lowercased()
+    }
+
+    private var hasCharsetParameter: Bool {
+        rawValue
+            .split(separator: ";")
+            .dropFirst()
+            .contains {
+                $0.drop { $0 == " " }
+                    .lowercased()
+                    .hasPrefix("charset=")
+            }
+    }
+}
