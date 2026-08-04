@@ -76,6 +76,42 @@ struct DiskStorageTests {
     }
 
     @Test
+    func diskStorage_whenDataRecordAppearsShortlyAfterResponseRecord_shouldStillFindRecord() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+
+            let key = "delayedrecord"
+            let date = Date()
+            let bitPattern = date.timeIntervalSinceReferenceDate.bitPattern
+            let recordDirectoryURL = directoryURL.appendingPathComponent(
+                "\(String(bitPattern, radix: 36)).\(key).cached",
+                isDirectory: true
+            )
+            let responseURL = recordDirectoryURL.appendingPathComponent("response.record")
+            let dataURL = recordDirectoryURL.appendingPathComponent("data.record")
+
+            let response = makeCachedResponse(key: key)
+            try await FileSystem.shared.createDirectory(
+                at: recordDirectoryURL.filePath,
+                withIntermediateDirectories: true
+            )
+            try await responseURL.write(Data(JSONEncoder().encode(response)))
+
+            // Given: "response.record" exists already, but "data.record" only shows up a few
+            // milliseconds into the lookup below — the same shape a transient
+            // `FileSystem.shared.info(forFileAt:)` miss leaves behind. `Record.init?` has to
+            // tolerate that instead of reporting the whole record missing outright.
+            async let lookup = storage[key]
+
+            try? await Task.sleep(nanoseconds: 4_000_000)
+            try await dataURL.createPathIfNeeded()
+
+            // Then
+            #expect(await lookup != nil)
+        }
+    }
+
+    @Test
     func diskStorage_whenResponseRecordCannotBeReadAsAFile_shouldReturnNil() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
             let storage = DiskStorage(directory: directoryURL)

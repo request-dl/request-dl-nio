@@ -56,8 +56,8 @@ struct DiskStorage: Sendable {
             let dataURL = url.appendingPathComponent(Self.dataPath)
 
             // Both files have to be on disk for the record to be usable.
-            let responseExists = (try? await FileSystem.shared.info(forFileAt: responseURL.filePath)) != nil
-            let dataExists = (try? await FileSystem.shared.info(forFileAt: dataURL.filePath)) != nil
+            let responseExists = await Self.isReachableWithRetry(responseURL)
+            let dataExists = await Self.isReachableWithRetry(dataURL)
 
             guard responseExists, dataExists else { return nil }
 
@@ -105,6 +105,32 @@ struct DiskStorage: Sendable {
         }
 
         // MARK: - Private static methods
+
+        /// Whether `url` exists, retrying past the transient miss `FileSystem.shared.info`
+        /// is already known to produce.
+        ///
+        /// This is the same flake `Internals.Buffer.Storage._isResourceAvailable()` retries
+        /// around: a stat can intermittently come back negative for a file that was just
+        /// written and closed, with nothing thrown and no descriptor left open. A record's own
+        /// `response.record`/`data.record` are written and closed synchronously right before
+        /// this runs, so a miss here is that stat flake, not a genuine absence — a single
+        /// unretried check turned a rare stat flake into a lost cache entry.
+        private static func isReachableWithRetry(_ url: URL) async -> Bool {
+            let attempts = 5
+            let retryDelay: UInt64 = 2_000_000
+
+            for attempt in 0..<attempts {
+                if await url.isReachable {
+                    return true
+                }
+
+                if attempt + 1 < attempts {
+                    try? await Task.sleep(nanoseconds: retryDelay)
+                }
+            }
+
+            return false
+        }
 
         private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
             var components = url.deletingPathExtension().lastPathComponent.split(separator: ".")
