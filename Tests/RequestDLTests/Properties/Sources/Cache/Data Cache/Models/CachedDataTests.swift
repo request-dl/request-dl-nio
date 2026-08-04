@@ -87,4 +87,26 @@ struct CachedDataTests {
         let cachedDataBytes = await cachedData.data
         #expect(cachedDataBytes == data)
     }
+
+    @Test
+    func cachedData_whenResponseHasNoURL_roundTripsAsNil() async throws {
+        // Given
+        let response = ResponseHead(
+            url: nil,
+            status: .init(code: 200, reason: "Ok"),
+            version: .init(minor: 1, major: 2),
+            headers: HTTPHeaders(),
+            isKeepAlive: false
+        )
+
+        // When
+        let cachedData = await CachedData(
+            response: response,
+            policy: .memory,
+            data: Data("no url".utf8)
+        )
+
+        // Then
+        #expect(cachedData.response.url == nil)
+    }
 }

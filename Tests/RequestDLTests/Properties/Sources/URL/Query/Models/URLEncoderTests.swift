@@ -1064,6 +1064,113 @@ struct URLEncoderTests {
             return error.errorType == .unset
         }
     }
+
+    // MARK: - Strategy getters
+
+    @Test
+    func encoder_strategyGetters_returnWhatWasSet() {
+        let urlEncoder = URLEncoder()
+
+        urlEncoder.dateEncodingStrategy = .millisecondsSince1970
+        urlEncoder.keyEncodingStrategy = .uppercased
+        urlEncoder.dataEncodingStrategy = .custom { _, _ in }
+        urlEncoder.boolEncodingStrategy = .numeric
+        urlEncoder.optionalEncodingStrategy = .droppingKey
+        urlEncoder.arrayEncodingStrategy = .accessMember
+        urlEncoder.dictionaryEncodingStrategy = .accessMember
+        urlEncoder.whitespaceEncodingStrategy = .plus
+
+        if case .millisecondsSince1970 = urlEncoder.dateEncodingStrategy {
+        } else {
+            Issue.record("Expected .millisecondsSince1970")
+        }
+
+        if case .uppercased = urlEncoder.keyEncodingStrategy {
+        } else {
+            Issue.record("Expected .uppercased")
+        }
+
+        if case .numeric = urlEncoder.boolEncodingStrategy {
+        } else {
+            Issue.record("Expected .numeric")
+        }
+
+        if case .droppingKey = urlEncoder.optionalEncodingStrategy {
+        } else {
+            Issue.record("Expected .droppingKey")
+        }
+
+        if case .accessMember = urlEncoder.arrayEncodingStrategy {
+        } else {
+            Issue.record("Expected .accessMember")
+        }
+
+        if case .accessMember = urlEncoder.dictionaryEncodingStrategy {
+        } else {
+            Issue.record("Expected .accessMember")
+        }
+
+        if case .plus = urlEncoder.whitespaceEncodingStrategy {
+        } else {
+            Issue.record("Expected .plus")
+        }
+    }
+
+    // MARK: - Dropped super keys
+
+    @Test
+    func encoder_whenDictionarySuperKeyDroppedWithCustom_producesNoQueryItems() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "root"
+        let value: [String: Any] = ["a": 1]
+
+        urlEncoder.keyEncodingStrategy = .custom { _, encoder in
+            var container = encoder.keyContainer()
+            try container.dropKey()
+        }
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        #expect(sut.isEmpty)
+    }
+
+    @Test
+    func encoder_whenArraySuperKeyDroppedWithCustom_producesNoQueryItems() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "root"
+        let value: [Any] = [1, 2]
+
+        urlEncoder.keyEncodingStrategy = .custom { _, encoder in
+            var container = encoder.keyContainer()
+            try container.dropKey()
+        }
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        #expect(sut.isEmpty)
+    }
+
+    // MARK: - Direct recursive encode
+
+    @Test
+    func recursiveEncode_calledDirectly_usesCurrentConfiguration() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        urlEncoder.keyEncodingStrategy = .uppercased
+
+        // When
+        let items = try urlEncoder._recursiveEncode(123, forKey: "foo")
+
+        // Then
+        #expect(items.map(\.name) == ["FOO"])
+        #expect(items.map(\.value) == ["123"])
+    }
 }
 
 extension URLEncoder {

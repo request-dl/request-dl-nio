@@ -19,10 +19,12 @@ extension LocalServer {
 
     struct ResponseConfiguration: Sendable {
 
+        let status: NIOHTTP1.HTTPResponseStatus
         let headers: NIOHTTP1.HTTPHeaders
         let data: Data
 
-        init(headers: NIOHTTP1.HTTPHeaders = .init(), data: Data) {
+        init(status: NIOHTTP1.HTTPResponseStatus = .ok, headers: NIOHTTP1.HTTPHeaders = .init(), data: Data) {
+            self.status = status
             self.headers = headers
             self.data = data
         }
@@ -30,7 +32,12 @@ extension LocalServer {
         /// - Note: `Value: Encodable`, not `Any` plus `JSONSerialization` — every call site
         /// passes a `String`, and `JSONEncoder` handles a bare top-level value the same way
         /// `JSONSerialization`'s `.fragmentsAllowed` used to, without needing `Foundation`.
-        init<Value: Encodable>(headers: NIOHTTP1.HTTPHeaders = .init(), jsonObject: Value) throws {
+        init<Value: Encodable>(
+            status: NIOHTTP1.HTTPResponseStatus = .ok,
+            headers: NIOHTTP1.HTTPHeaders = .init(),
+            jsonObject: Value
+        ) throws {
+            self.status = status
             self.headers = headers
 
             let encoder = JSONEncoder()

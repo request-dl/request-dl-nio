@@ -103,7 +103,7 @@ extension LocalServer {
 
             let head = HTTPResponseHead(
                 version: _version ?? .http1_1,
-                status: .ok,
+                status: _configuration?.status ?? .ok,
                 headers: headers
             )
 

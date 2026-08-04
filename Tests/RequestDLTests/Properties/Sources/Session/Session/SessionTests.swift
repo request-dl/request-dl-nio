@@ -189,6 +189,38 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenDecompressionLimitNone_shouldBeValid() async throws {
+        // Given
+        let decompressionLimit = Session.DecompressionLimit.none
+        let property = Session()
+            .decompressionLimit(decompressionLimit)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(
+            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+        )
+    }
+
+    @Test
+    func session_whenDecompressionLimitSize_shouldBeValid() async throws {
+        // Given
+        let decompressionLimit = Session.DecompressionLimit.size(1_024)
+        let property = Session()
+            .decompressionLimit(decompressionLimit)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(
+            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+        )
+    }
+
+    @Test
     func session_whenNeverBody_shouldBeNever() async throws {
         // Given
         let property = Session()

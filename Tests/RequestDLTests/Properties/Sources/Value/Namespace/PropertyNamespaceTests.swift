@@ -28,4 +28,9 @@ struct PropertyNamespaceTests {
         // Then
         #expect(namespace == .global)
     }
+
+    @Test
+    func namespaceID_whenGlobal_descriptionIsGlobal() {
+        #expect(PropertyNamespace.ID.global.description == "global")
+    }
 }
