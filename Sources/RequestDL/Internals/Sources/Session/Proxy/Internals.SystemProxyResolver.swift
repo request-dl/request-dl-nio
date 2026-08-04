@@ -5,15 +5,15 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.URL
-// import class Foundation.NSNumber
+import struct Foundation.URL
+import class Foundation.NSNumber
 #endif
 
 #if canImport(Darwin)
 #if canImport(CFNetwork)
 import CFNetwork
 #else
-// import Foundation
+import Foundation
 #endif
 #endif
 

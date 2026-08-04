@@ -8,7 +8,7 @@ import Logging
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.Date
+import struct Foundation.Date
 #endif
 
 extension Internals {

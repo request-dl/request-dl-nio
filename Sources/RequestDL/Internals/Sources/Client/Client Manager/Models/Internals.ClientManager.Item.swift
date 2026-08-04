@@ -5,7 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import struct Foundation.DispatchTime
+#if canImport(Darwin)
+import struct Foundation.DispatchTime
+#endif
 #endif
 
 extension Internals.ClientManager {

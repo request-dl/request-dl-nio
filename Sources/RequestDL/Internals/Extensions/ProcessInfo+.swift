@@ -5,11 +5,11 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-// import class Foundation.ProcessInfo
+import class Foundation.ProcessInfo
 #endif
 
 #if canImport(Darwin)
-// import class Foundation.Bundle
+import class Foundation.Bundle
 #endif
 
 extension ProcessInfo {
