@@ -24,7 +24,13 @@ struct LocalServer: Sendable {
         // MARK: - Private properties
 
         private let lock = AsyncLock()
-        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        // Shared process-wide across every suite that spins up a LocalServer (DataTaskTests,
+        // DownloadTaskTests, UploadTaskTests, InternalsSessionTests, ModifiersCollect*Tests,
+        // CachedRequestTests, ...). swift-testing runs suites concurrently by default, so 1
+        // thread here queues every concurrent suite's TLS handshakes behind each other —
+        // tolerable on lighter simulators, not on visionOS (see InternalsSessionTests'
+        // connectTimeout/tlsHandshakeTimeout failures in visionOS CI).
+        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 4)
 
         // MARK: - Unsafe properties
 
