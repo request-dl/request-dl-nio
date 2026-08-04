@@ -63,26 +63,27 @@ struct AsyncBytesCollectTests {
         // When
         _ = try await Logger.withTesting(
             level: .trace,
-            recorded: { recordBox.append($0) }
-        ) {
-            try await UploadTask {
-                BaseURL(localServer.baseURL)
-                Path(testState.uri)
+            recorded: { recordBox.append($0) },
+            perform: {
+                try await UploadTask {
+                    BaseURL(localServer.baseURL)
+                    Path(testState.uri)
 
-                Session.localServer
+                    Session.localServer
 
-                SecureConnection {
-                    TrustRoots {
-                        RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                    SecureConnection {
+                        TrustRoots {
+                            RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
+                        }
                     }
-                }
 
-                ReadingMode(length: length)
+                    ReadingMode(length: length)
+                }
+                .collectData()
+                .extractPayload()
+                .result()
             }
-            .collectData()
-            .extractPayload()
-            .result()
-        }
+        )
 
         // Then
         let receivedBytesRecords = recordBox.records.filter {
