@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Package.swift'
+      - 'Sources/**'
+      - 'Tests/**'
+      - '.swift-format'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Package.swift'
+      - 'Sources/**'
+      - 'Tests/**'
+      - '.swift-format'
+      - '.github/workflows/swift-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linkage-test:
+    name: "🔗 Linkage Test (FoundationEssentials)"
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v7.0.1
+
+      - name: ☑️ Swift Select
+        uses: SwiftyLab/setup-swift@v1.14.0
+        with:
+          swift-version: '6.2'
+
+      - name: 🔗 Setup Linkage Test Package
+        run: |
+          set -e
+          echo 'Setting up linkage test...'
+
+          # Create a temporary directory for the linkage test
+          mkdir -p Tests/LinkageTest/Sources
+
+          cat > Tests/LinkageTest/Package.swift << 'EOF'
+          // swift-tools-version: 6.2
+          import PackageDescription
+
+          let package = Package(
+              name: "linkageTest",
+              platforms: [.macOS(.v15)],
+              dependencies: [
+                  .package(name: "request-dl", path: "../.."),
+              ],
+              targets: [
+                  .executableTarget(
+                      name: "linkageTest",
+                      dependencies: [
+                          .product(name: "RequestDL", package: "request-dl"),
+                      ]
+                  ),
+              ]
+          )
+          EOF
+
+          cat > Tests/LinkageTest/Sources/main.swift << 'EOF'
+          import SwiftAsyncStream
+
+          // This executable only imports the package
+          // If the package uses Foundation (not FoundationEssentials),
+          // the binary will be linked against libFoundation.so
+          print("Linkage test executable")
+          EOF
+
+          echo 'Linkage test package created at Tests/LinkageTest/'
+          ls -la Tests/LinkageTest/
+
+      - name: ⚒️ Build Linkage Test
+        run: |
+          cd Tests/LinkageTest
+          swift build
+
+      - name: 🔍 Verify Linkage
+        run: |
+          set -e
+          cd Tests/LinkageTest
+
+          # Find the built binary
+          BINARY_PATH=$(find .build -name 'linkageTest' -type f -executable | head -n 1)
+
+          if [ -z "$BINARY_PATH" ]; then
+            echo '❌ Error: Could not find linkage test binary'
+            find .build -type f -executable 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "✅ Found binary: $BINARY_PATH"
+          echo ''
+          echo 'LDD output:'
+          ldd "$BINARY_PATH"
+          echo ''
+
+          # Check if the binary is linked against libFoundation.so
+          if ldd "$BINARY_PATH" | grep -q 'libFoundation.so'; then
+            echo '❌ FAILURE: Binary is linked against libFoundation.so'
+            echo 'This means the package uses Foundation instead of FoundationEssentials'
+            echo 'On Linux, this requires importing FoundationNetworking for URLSession APIs'
+            exit 1
+          else
+            echo '✅ SUCCESS: Binary is not linked against libFoundation.so - linkage test passed'
+            echo 'The package correctly uses FoundationEssentials'
+          fi
