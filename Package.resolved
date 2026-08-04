@@ -1,13 +1,13 @@
 {
-  "originHash" : "02d3e9a385bce4974341ff4446badd58259c43223cc193b61e45fda40489d909",
+  "originHash" : "84e9da4747766b3cc38708ef42abe85cdcc4a6143f9ab114555da22799728212",
   "pins" : [
     {
-      "identity" : "swift-async-stream",
+      "identity" : "swift-atomics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/o-nnerb/swift-async-stream",
+      "location" : "https://github.com/apple/swift-atomics.git",
       "state" : {
-        "revision" : "f1c7b5300b1cd63b5d9738fcf4f97c9b781aedde",
-        "version" : "2.0.1"
+        "revision" : "b601256eab081c0f92f059e12818ac1d4f178ff7",
+        "version" : "1.3.0"
       }
     },
     {
@@ -20,12 +20,21 @@
       }
     },
     {
-      "identity" : "swift-log",
+      "identity" : "swift-nio",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-log.git",
+      "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "a878e7f8f46cfc0e1125e565b5c08e7d5272dc9a",
-        "version" : "1.14.0"
+        "revision" : "0b18836bd8b0162e7e17a995a3fbee20ed8f3b2b",
+        "version" : "2.101.3"
+      }
+    },
+    {
+      "identity" : "swift-nio-transport-services",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-nio-transport-services.git",
+      "state" : {
+        "revision" : "60c3e187154421171721c1a38e800b390680fb5d",
+        "version" : "1.26.0"
       }
     },
     {
