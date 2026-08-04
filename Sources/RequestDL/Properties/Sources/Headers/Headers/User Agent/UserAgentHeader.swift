@@ -5,7 +5,7 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import class Foundation.ProcessInfo
+// import class Foundation.ProcessInfo
 #endif
 
 /// Set the `User-Agent` header of the request.

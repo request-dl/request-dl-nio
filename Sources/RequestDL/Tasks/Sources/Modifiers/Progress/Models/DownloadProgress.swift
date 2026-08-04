@@ -5,7 +5,7 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
+// import struct Foundation.Data
 #endif
 
 /// The ``RequestDL/DownloadProgress/download(_:totalSize:)`` is called when a certain number

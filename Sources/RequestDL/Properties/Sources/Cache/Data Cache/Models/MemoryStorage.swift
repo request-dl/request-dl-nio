@@ -7,8 +7,8 @@ import Collections
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Date
-import struct Foundation.URL
+// import struct Foundation.Date
+// import struct Foundation.URL
 #endif
 
 struct MemoryStorage: Sendable {

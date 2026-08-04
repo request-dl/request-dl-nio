@@ -5,8 +5,8 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
-import protocol Foundation.DataProtocol
+// import struct Foundation.Data
+// import protocol Foundation.DataProtocol
 #endif
 
 extension Internals {

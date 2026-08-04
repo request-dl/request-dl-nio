@@ -8,7 +8,7 @@ import NIOSSL
 import FoundationEssentials
 #else
 #if canImport(Darwin)
-import class Foundation.Bundle
+// import class Foundation.Bundle
 #endif
 #endif
 

@@ -8,7 +8,7 @@ import SwiftAsyncStream
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.DispatchTime
+// import struct Foundation.DispatchTime
 #endif
 
 extension Internals {

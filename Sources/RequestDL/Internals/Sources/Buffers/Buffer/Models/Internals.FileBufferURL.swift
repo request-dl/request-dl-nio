@@ -8,10 +8,10 @@ import SystemPackage
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.URL
-import struct Foundation.Date
-import struct Foundation.UUID
-import class Foundation.ProcessInfo
+// import struct Foundation.URL
+// import struct Foundation.Date
+// import struct Foundation.UUID
+// import class Foundation.ProcessInfo
 #endif
 
 extension Internals {

@@ -3,7 +3,7 @@
 //
 
 #if canImport(Darwin)
-import Foundation
+// import Foundation
 
 /// A error type representing a validation error due to a missing keyPath in `RequestTask` result data.
 /// Conforms to the `TaskError` protocol.

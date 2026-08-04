@@ -5,9 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.URL
-import struct Foundation.Data
-import protocol Foundation.DataProtocol
+// import struct Foundation.URL
+// import struct Foundation.Data
+// import protocol Foundation.DataProtocol
 #endif
 
 /// The shape of ``Internals/Buffer``, so callers can hold one without naming its stream type.

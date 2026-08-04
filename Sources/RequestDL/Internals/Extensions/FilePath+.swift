@@ -7,7 +7,7 @@ import SystemPackage
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import class Foundation.ProcessInfo
+// import class Foundation.ProcessInfo
 #endif
 
 extension FilePath {

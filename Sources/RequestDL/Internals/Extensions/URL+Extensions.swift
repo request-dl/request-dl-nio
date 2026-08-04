@@ -8,9 +8,9 @@ import SystemPackage
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.URL
-import struct Foundation.URLComponents
-import struct Foundation.Data
+// import struct Foundation.URL
+// import struct Foundation.URLComponents
+// import struct Foundation.Data
 #endif
 
 // MARK: - Paths

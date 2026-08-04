@@ -5,11 +5,11 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
-import struct Foundation.URL
-import class Foundation.JSONEncoder
+// import struct Foundation.Data
+// import struct Foundation.URL
+// import class Foundation.JSONEncoder
 #if canImport(Darwin)
-import class Foundation.JSONSerialization
+// import class Foundation.JSONSerialization
 #endif
 #endif
 

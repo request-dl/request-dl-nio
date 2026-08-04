@@ -5,8 +5,8 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
-import class Foundation.JSONDecoder
+// import struct Foundation.Data
+// import class Foundation.JSONDecoder
 #endif
 
 extension Internals {

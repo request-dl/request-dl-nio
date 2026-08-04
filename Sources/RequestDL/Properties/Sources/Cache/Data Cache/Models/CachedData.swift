@@ -5,9 +5,9 @@
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
-import struct Foundation.URL
-import protocol Foundation.DataProtocol
+// import struct Foundation.Data
+// import struct Foundation.URL
+// import protocol Foundation.DataProtocol
 #endif
 
 /// A struct representing cached data with associated metadata.

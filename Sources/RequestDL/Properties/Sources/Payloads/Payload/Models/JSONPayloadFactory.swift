@@ -4,9 +4,9 @@
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-import class Foundation.JSONSerialization
+// import class Foundation.JSONSerialization
 #else
-import Foundation
+// import Foundation
 #endif
 
 #if canImport(Darwin)
