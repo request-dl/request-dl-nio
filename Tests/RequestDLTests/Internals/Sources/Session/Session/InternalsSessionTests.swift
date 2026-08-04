@@ -14,6 +14,12 @@ import struct Foundation.UUID
 import struct Foundation.URL
 #endif
 
+// `session_whenUploadingFile_shouldBeValid` pushes 100MB through the same 2-thread event loop
+// group (`Session.provider`, see below) that the other three tests here use for a prompt
+// response; swift-testing runs `@Test`s in a suite concurrently by default, and the upload
+// starves the group's threads until the others hit `connectTimeout`. `.serialized` keeps this
+// suite's tests from overlapping, which the connection-pool tuning below alone didn't fix.
+@Suite(.serialized)
 struct InternalsSessionTests {
 
     final class TestState: Sendable {
