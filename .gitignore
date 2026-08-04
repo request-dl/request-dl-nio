@@ -14,3 +14,6 @@ DerivedData/
 .swiftpm
 Package.resolved
 /inputs
+
+CLAUDE.md
+.claude/
