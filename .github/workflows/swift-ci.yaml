@@ -17,8 +17,11 @@ on:
       - '.swift-format'
       - '.github/workflows/swift-ci.yaml'
 
+# Cancel any in-progress or queued run for the same repo + ref when a new
+# run is triggered (e.g. new push), so stale xcodebuild/swift test
+# processes don't keep running and don't sit blocking the queue.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
