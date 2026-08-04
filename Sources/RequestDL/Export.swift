@@ -15,8 +15,8 @@
 //@_exported import NIOPosix
 //@_exported import NIOHTTPCompression
 //@_exported import NIOFoundationEssentialsCompat
-//@_exported import SystemPackage
-//@_exported import Logging
-//@_exported import Collections
+@_exported import SystemPackage
+@_exported import Logging
+@_exported import Collections
 
 enum Internals {}

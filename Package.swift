@@ -18,10 +18,10 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(
-            url: "https://github.com/swift-server/async-http-client",
-            from: "1.30.2"
-        ),
+//        .package(
+//            url: "https://github.com/swift-server/async-http-client",
+//            from: "1.30.2"
+//        ),
 //        .package(
 //            url: "https://github.com/apple/swift-nio",
 //            from: "2.101.3"
@@ -38,14 +38,14 @@ let package = Package(
 //            url: "https://github.com/apple/swift-nio-transport-services",
 //            from: "1.26.0"
 //        ),
-//        .package(
-//            url: "https://github.com/apple/swift-log",
-//            from: "1.14.0"
-//        ),
-//        .package(
-//            url: "https://github.com/apple/swift-collections",
-//            from: "1.6.0"
-//        ),
+        .package(
+            url: "https://github.com/apple/swift-log",
+            from: "1.14.0"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-collections",
+            from: "1.6.0"
+        ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
             from: "2.0.1"
@@ -59,7 +59,7 @@ let package = Package(
         .target(
             name: "RequestDL",
             dependencies: [
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+//                .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
 //                .product(name: "NIO", package: "swift-nio"),
 //                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
@@ -70,8 +70,8 @@ let package = Package(
 //                .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
 //                .product(name: "NIOSSL", package: "swift-nio-ssl"),
 //                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
-//                .product(name: "Logging", package: "swift-log"),
-//                .product(name: "Collections", package: "swift-collections"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Collections", package: "swift-collections"),
             ]
         )
     ]
