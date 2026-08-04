@@ -57,6 +57,54 @@ struct ProxyTests {
     }
 
     @Test
+    func proxy_whenHTTPConnectionWithUsernamePasswordAuthorization() async throws {
+        // Given
+        let host = UUID().uuidString
+        let port = 1_090
+        let username = UUID().uuidString
+        let password = UUID().uuidString
+
+        // When
+        let resolved = try await resolve(
+            Proxy(
+                host: host,
+                port: port,
+                authorization: .basic(username: username, password: password)
+            )
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.host == host)
+        #expect(resolved.session.configuration.proxy?.port == port)
+        #expect(
+            resolved.session.configuration.proxy?.authorization
+                == .basic(username: username, password: password)
+        )
+    }
+
+    @Test
+    func proxy_whenHTTPConnectionWithBearerAuthorization() async throws {
+        // Given
+        let host = UUID().uuidString
+        let port = 1_090
+        let tokens = UUID().uuidString
+
+        // When
+        let resolved = try await resolve(
+            Proxy(
+                host: host,
+                port: port,
+                authorization: .bearer(tokens: tokens)
+            )
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.host == host)
+        #expect(resolved.session.configuration.proxy?.port == port)
+        #expect(resolved.session.configuration.proxy?.authorization == .bearer(tokens: tokens))
+    }
+
+    @Test
     func proxy_whenSOCKSConnectionWithoutAuthorization() async throws {
         // Given
         let host = UUID().uuidString

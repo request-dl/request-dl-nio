@@ -13,7 +13,7 @@ public struct RequestEnvironmentValues: Sendable {
         let keyStringLiteral: @Sendable () -> String
 
         var debugDescription: String {
-            "\(keyStringLiteral()): \(String(reflecting: self))"
+            "\(keyStringLiteral()): \(String(reflecting: value))"
         }
     }
 

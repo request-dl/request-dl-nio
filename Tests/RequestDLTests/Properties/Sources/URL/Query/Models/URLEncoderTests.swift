@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -899,6 +900,169 @@ struct URLEncoderTests {
 
         // Then
         #expect(sut == "foobar=onetwothree")
+    }
+
+    @Test
+    func encoder_whenWhitespaceCustomLeavesRepresentableUnset_throwsUnsetWhitespaceRepresentable() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "foo bar"
+        let value = "one two"
+
+        urlEncoder.whitespaceEncodingStrategy = .custom { _ in }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(value, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .unsetWhitespaceRepresentable
+                && error.description
+                    == "The whitespace strategy did not set a representation for the space character"
+        }
+    }
+
+    // MARK: - KeyContainer
+
+    @Test
+    func encoder_whenKeyDroppedWithCustom() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "secret"
+        let value = "shouldNotAppear"
+
+        urlEncoder.keyEncodingStrategy = .custom { _, encoder in
+            var container = encoder.keyContainer()
+            try container.dropKey()
+        }
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        #expect(sut.isEmpty)
+    }
+
+    @Test
+    func encoder_whenKeyReadBackWithUnkeyed() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "foo"
+        let value = "bar"
+        let readBack = InlineProperty<String?>(wrappedValue: nil)
+
+        urlEncoder.keyEncodingStrategy = .custom { key, encoder in
+            var container = encoder.keyContainer()
+            try container.encode(key.uppercased())
+            readBack.wrappedValue = try container.unkeyed()
+        }
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        #expect(readBack.wrappedValue == key.uppercased())
+        #expect(sut == "FOO=bar")
+    }
+
+    @Test
+    func encoder_whenKeyUnkeyedBeforeEncoding_throwsUnset() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "foo"
+        let value = "bar"
+
+        urlEncoder.keyEncodingStrategy = .custom { _, encoder in
+            let container = encoder.keyContainer()
+            _ = try container.unkeyed()
+        }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(value, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .unset
+                && error.description == "The URL encoding container was read before a value was written to it"
+        }
+    }
+
+    @Test
+    func encoder_whenKeyEncodedTwice_throwsAlreadySet() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "foo"
+        let value = "bar"
+
+        urlEncoder.keyEncodingStrategy = .custom { key, encoder in
+            var container = encoder.keyContainer()
+            try container.encode(key)
+            try container.encode(key)
+        }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(value, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .alreadySet
+                && error.description == "The URL encoding container was written to more than once"
+        }
+    }
+
+    // MARK: - ValueContainer
+
+    @Test
+    func encoder_whenValueReadBackWithUnkeyed() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "flag"
+        let readBack = InlineProperty<String?>(wrappedValue: nil)
+
+        urlEncoder.boolEncodingStrategy = .custom { flag, encoder in
+            var container = encoder.valueContainer()
+            try container.encode(flag ? "yes" : "no")
+            readBack.wrappedValue = try container.unkeyed()
+        }
+
+        // When
+        let sut = try urlEncoder.encode(true, forKey: key)
+
+        // Then
+        #expect(readBack.wrappedValue == "yes")
+        #expect(sut == "\(key)=yes")
+    }
+
+    @Test
+    func encoder_whenValueUnkeyedBeforeEncoding_throwsUnset() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "flag"
+
+        urlEncoder.boolEncodingStrategy = .custom { _, encoder in
+            let container = encoder.valueContainer()
+            _ = try container.unkeyed()
+        }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(true, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .unset
+        }
     }
 }
 

@@ -575,6 +575,92 @@ extension PayloadTests {
         )
     }
 
+    @Test
+    func payload_whenGETInitJSONArrayWithURLEncoded() async throws {
+        // Given
+        let json: [Any] = ["bar", "olaf", 42]
+
+        // Then
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    json,
+                    options: .fragmentsAllowed,
+                    contentType: .formURLEncoded
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // When
+        #expect(data == nil)
+        #expect(resolved.requestConfiguration.headers["Content-Type"] == nil)
+        #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
+
+        #expect(
+            try Set(resolved.requestConfiguration.queries)
+                == Set(
+                    json.enumerated().reduce([]) {
+                        try $0 + URLEncoder().encode($1.element, forKey: String($1.offset))
+                    }
+                )
+        )
+    }
+
+    @Test
+    func payload_whenPOSTInitJSONArrayWithURLEncodedCharsetUTF16() async throws {
+        // Given
+        let json: [Any] = ["bar", "olaf", 42]
+
+        // Then
+        let resolved = try await resolve(
+            TestProperty {
+                RequestMethod(.post)
+
+                Payload(
+                    json,
+                    options: .fragmentsAllowed,
+                    contentType: .formURLEncoded
+                )
+                .charset(.utf16)
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        let components =
+            data.flatMap {
+                String(data: $0, encoding: .utf16)
+            }?.split(separator: "&") ?? []
+
+        // When
+        #expect(resolved.requestConfiguration.queries.isEmpty)
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "application/x-www-form-urlencoded; charset=UTF-16"
+            ]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
+        )
+
+        #expect(
+            try Set(components)
+                == Set(
+                    json.enumerated().reduce([]) {
+                        try $0
+                            + URLEncoder().encode($1.element, forKey: String($1.offset)).map {
+                                let query = $0
+                                return "\(query.name)=\(query.value)"
+                            }
+                    }
+                )
+        )
+    }
+
     #endif
 
     @Test

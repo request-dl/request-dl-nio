@@ -45,4 +45,20 @@ struct ReadingModeTests {
         // Then
         #expect(resolved.requestConfiguration.readingMode == .separator(separator))
     }
+
+    @Test
+    func readingByStringSeparator() async throws {
+        // Given
+        let separator = "\r\n"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                ReadingMode(separator: separator)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.readingMode == .separator(Array(Data(separator.utf8))))
+    }
 }

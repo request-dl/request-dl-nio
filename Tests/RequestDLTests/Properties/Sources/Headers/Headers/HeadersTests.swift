@@ -138,6 +138,42 @@ struct HeadersTests {
     }
 
     @Test
+    func headers_whenSameHeaderWithDefaultHeaderSeparator() async throws {
+        // Given
+        let property = TestProperty {
+            CustomHeader(name: "xxx-api-key", value: "password")
+            CustomHeader(name: "xxx-api-key", value: "password123")
+        }
+        .headerSeparator()
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["xxx-api-key"] == ["password,password123"]
+        )
+    }
+
+    @Test
+    func headers_whenSameHeaderWithCustomHeaderSeparator() async throws {
+        // Given
+        let property = TestProperty {
+            CustomHeader(name: "xxx-api-key", value: "password")
+            CustomHeader(name: "xxx-api-key", value: "password123")
+        }
+        .headerSeparator(" | ")
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["xxx-api-key"] == ["password | password123"]
+        )
+    }
+
+    @Test
     func headers_whenCombinedHeadersWithGroup() async throws {
         let property = TestProperty {
             HostHeader("127.0.0.1", port: "8080")
