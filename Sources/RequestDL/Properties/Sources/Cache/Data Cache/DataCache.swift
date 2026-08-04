@@ -515,9 +515,17 @@ public struct DataCache: Sendable, Equatable {
     // MARK: - Private methods
 
     private func base64EncodedKey(_ key: String) -> String {
-        Data(key.utf8).base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
+        let base64 = Data(key.utf8).base64EncodedString()
+        
+        return String(
+            base64.compactMap { character -> Character? in
+                switch character {
+                case "+": return "-"
+                case "/": return "_"
+                case "=": return nil
+                default: return character
+                }
+            }
+        )
     }
 }

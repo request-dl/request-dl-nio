@@ -18,7 +18,7 @@
 ///         case .success(let string):
 ///             print("Intercepted task with string result: \(string)")
 ///         case .failure(let error):
-///             print("Intercepted task with error: \(error.localizedDescription)")
+///             print("Intercepted task with error: \(String(describing: error))")
 ///         }
 ///     }
 /// }
