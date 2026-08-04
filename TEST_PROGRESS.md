@@ -16,8 +16,8 @@
 
 | Priority | Module | Status | Coverage | Notes |
 |----------|--------|--------|----------|-------|
-| 1 | `Properties/Sources/` | 🔵 in progress | Batch 1 + 2 done (30 files) | Largest module, public API. Only 3 files left below 85%, all untestable without source changes (see §7). Batch 3 should move to priority 2. |
-| 2 | `Tasks/Sources/Modifiers/` | ⚪ not started | — | Test via `result()` + stubs |
+| 1 | `Properties/Sources/` | ✅ done | Batch 1 + 2 done (30 files) | Largest module, public API. Only 3 files left below 85%, all untestable without source changes (see §7). |
+| 2 | `Tasks/Sources/Modifiers/` | ✅ done | Batch 3 done (3 files fixed) | All files now ≥88% region / ≥93% line. `KeyPath.swift` (93.75% region/100% line) and `StatusCode.swift` (88.89% region/96% line) left as-is — both already above the 85% floor. |
 | 3 | `Tasks/Sources/Interceptors/` | ⚪ not started | — | Side-effect observers |
 | 4 | `Request/` | ⚪ not started | — | `RequestConfiguration`, `RequestBody` |
 | 5 | `Internals/` | ⛔ indirect only | — | Test via public API, never directly |
@@ -63,6 +63,14 @@
   - [x] `CachePolicyProperty.swift`, `CacheStrategyProperty.swift` — investigated, **skipped**: both are `private struct`s whose only uncovered line is `body: Never`; file-private access means no test file can construct an instance to call `.body` on without loosening the type's access level, which is a testability shortcut the project rule forbids
   - [x] `DataCache.Buffer.swift` — investigated, **skipped**: `readableBytes` is unused dead internal API (no call site anywhere in `Sources/`), and `writeBuffer`'s nil-guard only fires if the underlying `AnyBuffer.getBytes()` violates its own `isValidRange` invariant — not reachable without corrupting internal state
 
+### Batch 3 — `Tasks/Sources/Modifiers/` (priority 2)
+- **Status:** ✅ done
+- **Test file(s):** see Test Files Inventory (§4)
+- [x] `Modifiers.FlatMapError.swift` — the "transform closure succeeds, so the *original* error gets rethrown" path (`throw error` after a non-throwing `try await transform(error)`) was never exercised; both the untyped `flatMapError { }` and the typed `flatMapError(Type.self) { }` overloads had this gap
+- [x] `AsyncBytes+Collect.swift` — `log(receivedBytes:)`/`log(data:)` build their `additionalMetadata` via `@autoclosure` params, several layers deep (through `Internals.TaskLogger.log` down to swift-log's own `Logger.log`); the metadata-construction lines never executed because no test ever ran with a logger whose level allowed `.debug` messages through. Fixed by using the previously-unused `Logger.withTesting(level:recorded:perform:)` helper (`Tests/RequestDLTests/Utils/TestLogHandler.swift`) at `.trace` level and asserting on captured metadata keys.
+- [x] `AsyncResponse+Collect.swift` — same `@autoclosure`-metadata gap for `log(receivedStep:)`/`log(responseHead:)`, fixed the same way. Additionally, the `try Task.checkCancellation(); throw RequestFailureError()` fallback (reached when the async sequence completes without ever yielding a `.download` step) in both `collect()` and `collect(with:)` was unreachable through any real network round-trip (a completed HTTP exchange always yields a `.download` step). Covered by directly constructing an `Internals.AsyncResponse` with all three underlying streams (`upload`/`head`/`download`) closed empty via `.empty()`, wrapped in the public `AsyncResponse` via its internal init (`@testable import` — same pattern as `InternalsAsyncResponseTests.swift`'s existing `response_whenOnlyUploading_shouldReceiveParts` test, which already closes `head`/`download` without ever appending a head).
+- Full suite: 888 tests passing (up from 882 pre-batch-3).
+
 ## 4. Test Files Inventory
 
 | Test file | Mirrors source | Tests count | Last updated | Status |
@@ -89,6 +97,9 @@
 | `Tests/RequestDLTests/Properties/Sources/Reader/PropertyReaderTests.swift` | `.../Extra Properties/Reader/PropertyReader.swift` | 2 (+1) | 2026-08-03 | ✅ |
 | `Tests/RequestDLTests/Properties/Sources/Value/Dynamic Value/Model/SeedTests.swift` | `.../Value/Dynamic Value/Model/Seed.swift` | 2 (new file) | 2026-08-03 | ✅ |
 | `Tests/RequestDLTests/Properties/Sources/Payloads/Payload/PayloadTests.swift` | `.../Payloads/Payload/Models/EncodablePayloadFactory.swift`, `ContentType.swift` | 28 (+4, incl. batch 1's 2) | 2026-08-03 | ✅ |
+| `Tests/RequestDLTests/Tasks/Sources/Modifiers/Flat Map Error/ModifiersFlatMapErrorTests.swift` | `.../Flat Map Error/Modifiers.FlatMapError.swift` | 6 (+2) | 2026-08-04 | ✅ |
+| `Tests/RequestDLTests/Tasks/Sources/Modifiers/Progress/Extensions/AsyncBytesCollectTests.swift` | `.../Progress/Extensions/AsyncBytes+Collect.swift` | 1 (new file) | 2026-08-04 | ✅ |
+| `Tests/RequestDLTests/Tasks/Sources/Modifiers/Progress/Extensions/AsyncResponseCollectTests.swift` | `.../Progress/Extensions/AsyncResponse+Collect.swift` | 3 (new file) | 2026-08-04 | ✅ |
 
 ## 5. Key Decisions & Constraints
 
@@ -102,6 +113,8 @@
 - [x] **Before writing off a `body: Never { bodyException() }` getter as "unreachable dead code," check whether the *enclosing type* is constructible.** `extension Never: Property { var body: Never }` (in `Never+Property.swift`) is genuinely unreachable — `Never` has zero instances. But `SomeConstructibleType.body: Never` is not the same shape: any instance of `SomeConstructibleType` can have `.body` read on it, and `assertNever(property.body)` (see `Tests/RequestDLTests/Properties/Sources/Result Builder/Either/_EitherContentTests.swift`) reaches it safely via a fatalError-override shim. Batch 1 wrongly applied the `Never+Property.swift` reasoning to `_PropertyModifier_Content.swift`; batch 2 found the same missing-test gap (not dead code) in `ReadingMode.swift` and `PropertyReader.swift`. When in doubt, grep for the sibling pattern: does every other `Property` type in the same area have a `neverBody` test using `assertNever`? If yes and this one doesn't, it's a missing test, not dead code.
 - [x] A `private struct` (file-private) conforming to `Property` with an uncovered `body: Never` is a *different* case from the above and genuinely cannot be tested without loosening its access level — no test file can construct an instance to call `.body` on. This is a legitimate skip (`CachePolicyProperty.swift`, `CacheStrategyProperty.swift`), not a batch-1-style mistake. The distinguishing question: can a `Tests/` file construct an instance of the type at all?
 - [x] Prefer testing internal cache-tier types (`MemoryStorage`, `DiskStorage`) through the public/internal `DataCache` surface rather than constructing them directly — `DataCache`'s own internal methods (`updateCached`, `allocateBuffer`) are reachable via `@testable import` and already exercise the real locking/eviction path, so there was no need to touch `MemoryStorage`/`DiskStorage` init directly.
+- [x] When a `log(...)` call's metadata lines show 0 executions in `coverage-lines.txt` despite the enclosing function itself having a high execution count, check whether the metadata parameter is `@autoclosure` (it is, all the way down through `Internals.TaskLogger.log` to swift-log's own `Logger.log`) — if so, the closure only evaluates when the logger's level admits the message's level, and the fix is a test with an appropriately-leveled logger, not a "dead code" write-off. `Tests/RequestDLTests/Utils/TestLogHandler.swift`'s `Logger.withTesting(level:recorded:perform:)` helper existed unused in the repo for exactly this; batch 3 was its first use.
+- [x] For a fallback/defensive branch that real integration tests can't reach (e.g. `AsyncResponse+Collect.swift`'s `throw RequestFailureError()` when the async sequence ends without a `.download` step — never happens on a real completed HTTP round-trip), check whether the internal type can be constructed directly via `@testable import` and driven into the exact state needed, before writing it off as untestable. `Internals.AsyncStream<Element>.empty()` + `Internals.TaskSeed.withoutCancellation` made this straightforward for `AsyncResponse`/`AsyncBytes` (both only have internal inits) — same category as the `StoredObjectConfiguration`/`MemoryStorage`/`DiskStorage` direct-construction precedent from batches 1–2.
 - [ ] [ADD MORE AS DECIDED]
 
 ## 6. Blockers & Open Questions
@@ -110,7 +123,28 @@
 
 ## 7. Last Session Summary
 
-- **Date:** 2026-08-03 (batch 2, continuation of the same-day batch 1 session)
+- **Date:** 2026-08-04 (batch 3)
+- **What was done:**
+  - Regenerated the coverage baseline (`./Scripts/coverage.sh`, full 882-test suite green) before scoping batch 3, per the plan left in the previous session's §8.
+  - Cross-referenced `coverage-report.txt` against every file under `Sources/RequestDL/Tasks/Sources/Modifiers/` and found 2 files genuinely below 85% line coverage — `Progress/Extensions/AsyncBytes+Collect.swift` (83.02%) and `Progress/Extensions/AsyncResponse+Collect.swift` (73.44%, the lowest in the whole directory) — plus one borderline file, `Flat Map Error/Modifiers.FlatMapError.swift` (86.96% line / 70% region), worth a quick look since the region number was unusually low for something already passing the line-coverage floor.
+  - Fixed all three to 100% line/region/function coverage. Full suite: 888 tests passing (up from 882). See §3 batch-3 entry for the specific gaps and the fixes; see §5 for the two new general decisions this session established (the `@autoclosure` metadata-logging gap, and direct-constructing `Internals.AsyncResponse`/`AsyncBytes` via `@testable import` for a fallback branch unreachable through any real network round-trip).
+  - Incidentally, `On Status Code/Modifiers.OnStatusCode.swift` also moved from 91.67%/97.62% to 100%/100% between the pre- and post-batch coverage runs, with no test targeting it directly — likely a side effect of the new tests exercising more of the shared `RequestTask`/`AsyncResponse` plumbing. Not investigated further since it wasn't a target and is a coverage improvement, not a regression.
+  - `Tasks/Sources/Modifiers/` is now effectively done: every file is ≥88% region / ≥93% line. Two files remain just above the 85% floor without being chased to 100% — `Key Path/Modifiers.KeyPath.swift` (93.75% region/100% line, 1 region miss) and `On Status Code/Models/StatusCode.swift` (88.89% region/96% line, 1 line miss at line 250, a `return nil` branch) — left alone per the established "only chase files below 85%" discipline from batches 1–2, not investigated in detail.
+- **What was NOT finished:** Priority 3 (`Tasks/Sources/Interceptors/`), priority 4 (`Request/`) still not started — batch 4 should move there per §2/§8. `Internals/` (priority 5) stays indirect-only.
+- **Coverage delta (line %, before → after):**
+  | File | Before | After |
+  |---|---|---|
+  | `Modifiers.FlatMapError.swift` | 86.96% | 100% |
+  | `AsyncBytes+Collect.swift` | 83.02% | 100% |
+  | `AsyncResponse+Collect.swift` | 73.44% | 100% |
+- **Commands that work:**
+  - `swift test` — full suite, 888 tests passing as of this session. Saw one flaky single-test failure on one run that vanished on immediate re-run with no code changes in between (consistent with this branch's known event-loop-thread-starvation flakiness, see `6af08ba` in git log) — re-run `swift test` once if you see an isolated failure before assuming a regression.
+  - `swift test --filter RequestDLTests.<SuiteName>` or `.../<SuiteName>/<testName>`
+  - `./Scripts/coverage.sh` — same as before, ran 3 times this session (baseline, after the three fixes, after the follow-up `FlatMapError` typed-overload fix).
+  - `swift format format --in-place --recursive Tests/RequestDLTests/Tasks/Sources/Modifiers/` — no diffs beyond the new/edited files.
+  - `Logger.withTesting(level:metadata:recorded:perform:)` (`Tests/RequestDLTests/Utils/TestLogHandler.swift`) — previously-unused test helper, now proven out; reach for it whenever a test needs to assert on what gets logged (sets `RequestEnvironmentValues.current.logger` via the task-local for the duration of the `perform` closure, so call `.result()` inside it).
+
+### Superseded — 2026-08-03 (batch 2, continuation of the same-day batch 1 session)
 - **What was done:**
   - Worked through all 10 batch-2 target files from §8 (previous session's plan) plus a further sweep of every other `Properties/Sources/` file still below 85%, bringing the module to 27/30 files at or near 100% (3 legitimately unreachable without source changes — see below).
   - **Found and fixed a real bug** in `DiskStorage.updateCached` (`Sources/RequestDL/Properties/Sources/Cache/Data Cache/Models/DiskStorage.swift`): cache-entry directory names were derived from `Int(date.timeIntervalSinceReferenceDate)` — whole-second precision. Two records for the same key created within the same second (e.g. an initial cache write immediately followed by a revalidation, which is exactly what `Internals.CacheControl`'s 304 revalidation path does) collide on the same directory name. `moveItem` then throws on the collision, the catch block removes the (colliding) new directory, and the unconditional cleanup that follows removes the old one too — **the cache entry is silently lost, both old and new**. Reproduced directly (test failed without a delay between writes, passed with a 1.1s `Task.sleep` inserted as a diagnostic — that sleep was removed once the real fix landed). Fix: switched the directory-naming timestamp from second to nanosecond precision (`Sources/RequestDL/Properties/Sources/Cache/Data Cache/Models/DiskStorage.swift:72-79,99-104`). User approved fixing it before it was touched (via `AskUserQuestion`, choosing "fix it now" over "sleep workaround" or "skip the test").
@@ -148,11 +182,13 @@
 
 ## 8. Next Steps
 
-1. [ ] `coverage-report.txt`/`coverage-lines.txt` at repo root reflect the end-of-batch-2 state (regenerated after all fixes below landed, full suite green). Re-run `./Scripts/coverage.sh` at the start of batch 3 only if uncommitted changes have landed since, or just to be safe — it's cheap insurance against a stale baseline.
-2. [ ] `Properties/Sources/` is effectively done. The only 3 files left below 85% are documented skips (see §3/§7) — don't re-investigate them without a new angle (e.g. a source-level API change that makes the private types testable, which is out of scope for a coverage-only pass).
-3. [ ] **Batch 3: move to priority 2, `Tasks/Sources/Modifiers/`** (per §2). Test via `.result()` + stubs, per the existing convention in `Tests/RequestDLTests/Tasks/Sources/Modifiers/`. Then priority 3 (`Tasks/Sources/Interceptors/`), then priority 4 (`Request/`). `Internals/` (priority 5) stays indirect-only per the existing rule.
-4. [ ] Before writing tests for a `Tasks/` file, check `coverage-report.txt` for its current line/region coverage and cross-reference `coverage-lines.txt` for exact uncovered lines — same workflow as batches 1–2.
-5. [ ] Apply the corrected `Never.body` rule from §5 up front this time: for every `Property`/`RequestTaskModifier`/`RequestTaskInterceptor` type with a `body: Never` (or equivalent placeholder) getter, check whether the type is constructible before assuming it's dead code.
-6. [ ] After batch 3: `swift test`, `swift format format --in-place --recursive Tests`, re-run `./Scripts/coverage.sh`, diff against this session's numbers, update this file again.
-7. [ ] Do not commit/push new tests without going through `/commit-push` and explicit user confirmation. The `DiskStorage.swift` bug fix from this session is a `Sources/` change mixed in with the test changes — call that out specifically when proposing the commit split/message, since it's not "just tests."
+1. [ ] `coverage-report.txt`/`coverage-lines.txt` at repo root reflect the end-of-batch-3 state (regenerated after all fixes landed, full 888-test suite green). Re-run `./Scripts/coverage.sh` at the start of batch 4 only if uncommitted changes have landed since, or just to be safe.
+2. [ ] `Properties/Sources/` and `Tasks/Sources/Modifiers/` are both effectively done (see §2). Don't re-investigate their documented skips/left-alone files without a new angle.
+3. [ ] **Batch 4: move to priority 3, `Tasks/Sources/Interceptors/`** (per §2). Side-effect observers (`RequestTaskInterceptor.output(_ result: Result<Element, Error>)`) — test via `.result()` + stubs, same convention as Modifiers. Then priority 4 (`Request/`: `RequestConfiguration`, `RequestBody`). `Internals/` (priority 5) stays indirect-only per the existing rule.
+4. [ ] Before writing tests for an `Interceptors/` file, check `coverage-report.txt` for its current line/region coverage and cross-reference `coverage-lines.txt` for exact uncovered lines — same workflow as batches 1–3.
+5. [ ] Apply the corrected `Never.body`/constructibility rule from §5 up front: for every `Property`/`RequestTaskModifier`/`RequestTaskInterceptor` type with a `body: Never` (or equivalent placeholder) getter, check whether the type is constructible before assuming it's dead code.
+6. [ ] New this session, apply going forward: if a `log(...)` call's metadata-building lines show 0 executions despite the function itself executing, check for `@autoclosure` params before assuming dead code — see §5. And for defensive/fallback branches unreachable through real integration flows, check whether `@testable import` direct construction of the internal type can reach it (per the new §5 entries) before writing it off.
+7. [ ] After batch 4: `swift test`, `swift format format --in-place --recursive Tests`, re-run `./Scripts/coverage.sh`, diff against this session's numbers, update this file again.
+8. [ ] Do not commit/push new tests without going through `/commit-push` and explicit user confirmation.
+9. [ ] `coverage-report.txt`, `coverage-lines.txt`, and (new as of this session) `job-logs.txt` are still untracked and not in `.gitignore` as of batch 3 — still unresolved after being flagged at the end of batch 2 too. Flag to the user again at the next commit.
 8. [ ] `coverage-report.txt` and `coverage-lines.txt` are still untracked and not in `.gitignore` as of this session — still unresolved, flag to the user again at the next commit.
