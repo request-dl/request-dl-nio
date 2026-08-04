@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -154,6 +155,51 @@ struct InternalsBodySequenceTests {
         // kilobytes must not go out as ten thousand two byte chunks.
         #expect(bodySequence.chunkSize == 16 * 1_024)
         #expect(sequence.count == 2)
+    }
+
+    /// Regression test for the fatal crash tracked as T1/T3 in `ci-triage/TASKS.md`.
+    ///
+    /// The crash (`Internals.assertionFailure` at `Internals.BodySequence.swift:75`) never came
+    /// from a `BodySequence` test run in isolation — it only ever surfaced when a file backed
+    /// `Internals.Buffer` was under heavy concurrent I/O from elsewhere in the process at the
+    /// same time a `BodySequence` was draining it, which `Internals.Buffer.Storage.
+    /// _isResourceAvailable()` now retries instead of trusting a single "unavailable" answer.
+    /// This pairs `BodySequence` consumption with the same 1,024-way concurrent pressure
+    /// `fileBuffer_whenRacingImmutable` applies, both against the one shared file, so the fatal
+    /// path has direct coverage instead of only showing up as flakiness across the whole suite.
+    @Test
+    func bodySequence_whenReadingFileBufferUnderConcurrentPressure_shouldNotReportBug() async throws {
+        // Given
+        let data = await Data.randomData(length: 128 * 1_024)
+        let fileBuffer = await Internals.FileBuffer(data)
+
+        let bodySequence = makeBodySequence(
+            chunkSize: 4_096,
+            [fileBuffer]
+        )
+
+        let capturedAssertions = InlineProperty<[String]>(wrappedValue: [])
+
+        // When
+        let chunks = try await Internals.Override.AssertionFailure.replace { message, _, _ in
+            capturedAssertions.withValue { $0.append(message) }
+        } perform: {
+            async let pressure: Void = withTaskGroup(of: Void.self) { group in
+                for index in 0..<1_024 {
+                    group.addTask {
+                        _ = await fileBuffer.getData(at: index, length: data.count - index)
+                    }
+                }
+            }
+
+            let chunks = try await Array(bodySequence)
+            await pressure
+            return chunks
+        }
+
+        // Then
+        #expect(capturedAssertions.wrappedValue.isEmpty)
+        #expect(chunks.resolveData().reduce(Data(), +) == data)
     }
 }
 

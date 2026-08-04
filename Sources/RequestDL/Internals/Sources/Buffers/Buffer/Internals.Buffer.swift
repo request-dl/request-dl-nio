@@ -140,7 +140,7 @@ extension Internals {
             /// where it was.
             func read(at index: UInt64, length: UInt64) async -> (data: Data?, offset: UInt64) {
                 await lock.withLock { () async -> (data: Data?, offset: UInt64) in
-                    guard await url.isResourceAvailable() else {
+                    guard await _isResourceAvailable() else {
                         return (nil, index)
                     }
 
@@ -259,6 +259,32 @@ extension Internals {
 
                 await url.createResourceIfNeeded()
                 _hasCreatedResource = true
+            }
+
+            /// - Warning: Lockless. Only reachable from inside `lock`.
+            ///
+            /// `url.isResourceAvailable()` is a file system stat, and under heavy concurrent
+            /// reads on sandboxed Apple simulators it intermittently reports a file as missing
+            /// in short, contiguous windows, with nothing thrown and no descriptor ever closed
+            /// underneath this storage (see `ci-triage/TASKS.md` T1/T2). A `read(at:length:)`
+            /// only reaches this check after the caller's own bookkeeping already trusts the
+            /// range is there, so a single "not available" answer here is treated as transient
+            /// and retried a few times, rather than as the resource having been removed.
+            private func _isResourceAvailable() async -> Bool {
+                let attempts = 5
+                let retryDelay: UInt64 = 2_000_000
+
+                for attempt in 0..<attempts {
+                    if await url.isResourceAvailable() {
+                        return true
+                    }
+
+                    if attempt + 1 < attempts {
+                        try? await Task.sleep(nanoseconds: retryDelay)
+                    }
+                }
+
+                return false
             }
         }
 
