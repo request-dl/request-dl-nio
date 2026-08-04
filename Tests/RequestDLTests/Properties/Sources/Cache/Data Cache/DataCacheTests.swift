@@ -366,6 +366,129 @@ struct DataCacheTests {
     }
 
     @Test
+    func cache_whenEntryExceedsMemoryAndDiskCapacity_shouldNotBeCached() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        dataCache.memoryCapacity = 512
+        dataCache.diskCapacity = 512
+        await dataCache.waitUntilIdle()
+
+        let key = "https://oversized.example.com"
+
+        let cachedData = await mockCachedData(
+            url: key,
+            length: 1_024,
+            policy: .all
+        )
+
+        // When
+        await dataCache.setCachedData(cachedData, forKey: key)
+        await dataCache.waitUntilIdle()
+
+        // Then
+        let cached = await dataCache.getCachedData(forKey: key, policy: .all)
+        #expect(cached == nil)
+    }
+
+    @Test
+    func cache_whenUpdateCachedForExistingKey_shouldReplaceMetadataAndKeepBuffer() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        let key = "https://updatable.example.com"
+        let cachedData = await mockCachedData(url: key, length: 128, policy: .memory)
+
+        await dataCache.setCachedData(cachedData, forKey: key)
+
+        let newCachedResponse = await mockCachedData(
+            url: key,
+            length: 32,
+            policy: .memory
+        ).cachedResponse
+
+        // When
+        await dataCache.updateCached(key: key, cachedResponse: newCachedResponse)
+
+        // Then
+        let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
+        #expect(cachedMemory != nil)
+        #expect(await cachedMemory?.data == cachedData.data)
+    }
+
+    @Test
+    func cache_whenUpdateCachedOnDiskForExistingKey_shouldReplaceMetadataAndKeepBuffer() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        let key = "https://updatable-disk.example.com"
+        let cachedData = await mockCachedData(url: key, length: 128, policy: .disk)
+
+        await dataCache.setCachedData(cachedData, forKey: key)
+
+        let newCachedResponse = await mockCachedData(
+            url: key,
+            length: 32,
+            policy: .disk
+        ).cachedResponse
+
+        // When
+        await dataCache.updateCached(key: key, cachedResponse: newCachedResponse)
+
+        // Then
+        let cachedDisk = await dataCache.getCachedData(forKey: key, policy: .disk)
+        #expect(cachedDisk != nil)
+        #expect(await cachedDisk?.data == cachedData.data)
+    }
+
+    @Test
+    func cache_whenUpdateCachedOnDiskForMissingKey_shouldDoNothing() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        let key = "https://never-allocated-disk.example.com"
+
+        let cachedResponse = await mockCachedData(
+            url: key,
+            length: 32,
+            policy: .disk
+        ).cachedResponse
+
+        // When
+        await dataCache.updateCached(key: key, cachedResponse: cachedResponse)
+
+        // Then
+        let cachedDisk = await dataCache.getCachedData(forKey: key, policy: .disk)
+        #expect(cachedDisk == nil)
+    }
+
+    @Test
+    func cache_whenUpdateCachedForMissingKey_shouldDoNothing() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        let key = "https://never-allocated.example.com"
+
+        let cachedResponse = await mockCachedData(
+            url: key,
+            length: 32,
+            policy: .memory
+        ).cachedResponse
+
+        // When
+        await dataCache.updateCached(key: key, cachedResponse: cachedResponse)
+
+        // Then
+        let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
+        #expect(cachedMemory == nil)
+    }
+
+    @Test
     func cache_whenInitWithSuiteName() {
         // Given
         let suiteName = "shared_other_lib"

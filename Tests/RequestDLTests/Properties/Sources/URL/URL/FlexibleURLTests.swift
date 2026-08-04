@@ -254,4 +254,66 @@ struct FlexibleURLTests {
         // Then
         try await assertNever(property.body)
     }
+
+    @Test func completeURLWithUnparseableHostThrowsInvalidURL() async throws {
+        // Given
+        let unparseableURL = "http://a b.com/x"
+        var thrownError: FlexibleURLError?
+
+        // When
+        do {
+            _ = try await resolve(FlexibleURL(unparseableURL))
+        } catch let error as FlexibleURLError {
+            thrownError = error
+        }
+
+        // Then
+        if case .invalidURL = thrownError?.context {
+            // Expected.
+        } else {
+            Issue.record("Expected .invalidURL, got \(String(describing: thrownError?.context))")
+        }
+        #expect(thrownError?.url == unparseableURL)
+    }
+
+    @Test func completeURLWithEmptyHostThrowsInvalidHost() async throws {
+        // Given
+        let emptyHostURL = "https:///path"
+        var thrownError: FlexibleURLError?
+
+        // When
+        do {
+            _ = try await resolve(FlexibleURL(emptyHostURL))
+        } catch let error as FlexibleURLError {
+            thrownError = error
+        }
+
+        // Then
+        if case .invalidHost = thrownError?.context {
+            // Expected.
+        } else {
+            Issue.record("Expected .invalidHost, got \(String(describing: thrownError?.context))")
+        }
+        #expect(thrownError?.url == emptyHostURL)
+    }
+
+    @Test func rootPathResolvesWithoutTrailingSlash() async throws {
+        // Given
+        let rootPath = "/"
+        // A path made only of slashes is trimmed away entirely by `joinedAsPath()`, so the
+        // final URL carries no path suffix even though `FlexibleURLNode` internally records a
+        // single "/" path component for it.
+        let expectedUrl = "https://api.service.com"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.service.com")
+                FlexibleURL(rootPath)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == expectedUrl)
+    }
 }

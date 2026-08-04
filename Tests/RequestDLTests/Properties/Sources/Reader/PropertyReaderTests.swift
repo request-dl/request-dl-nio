@@ -56,6 +56,14 @@ struct PropertyReaderTests {
         // This verifies the initial state captured by the first execution of ReferenceMemoryProperty
         #expect(resolved.requestConfiguration.url.contains("counter=0"))
     }
+
+    @Test func neverBody() async throws {
+        // Given
+        let property = PropertyReader(EmptyProperty()) { _ in EmptyProperty() }
+
+        // Then
+        try await assertNever(property.body)
+    }
 }
 
 private struct ReferenceMemoryProperty: Property {

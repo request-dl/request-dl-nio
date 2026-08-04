@@ -26,4 +26,12 @@ struct DefaultTrustRootsTests {
         #expect(resolved.session.configuration.secureConnection?.trustRoots == nil)
         #expect(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? false)
     }
+
+    @Test func neverBody() async throws {
+        // Given
+        let property = DefaultTrustRoots()
+
+        // Then
+        try await assertNever(property.body)
+    }
 }

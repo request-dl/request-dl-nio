@@ -61,4 +61,12 @@ struct ReadingModeTests {
         // Then
         #expect(resolved.requestConfiguration.readingMode == .separator(Array(Data(separator.utf8))))
     }
+
+    @Test func neverBody() async throws {
+        // Given
+        let property = ReadingMode(length: 1_024)
+
+        // Then
+        try await assertNever(property.body)
+    }
 }

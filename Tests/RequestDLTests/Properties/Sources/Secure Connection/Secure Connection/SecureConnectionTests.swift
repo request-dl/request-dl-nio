@@ -152,6 +152,44 @@ struct SecureConnectionTests {
     }
 
     @Test
+    func secure_whenUpdatesRenegotiationSupportToNone_shouldBeValid() async throws {
+        // Given
+        let renegotiationSupport: NIORenegotiationSupport = .none
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .renegotiationSupport(.none)
+            }
+        )
+
+        let sut = resolved.session.configuration.secureConnection
+
+        // Then
+        #expect(sut?.renegotiationSupport == renegotiationSupport)
+    }
+
+    @Test
+    func secure_whenUpdatesRenegotiationSupportToOnce_shouldBeValid() async throws {
+        // Given
+        let renegotiationSupport: NIORenegotiationSupport = .once
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .renegotiationSupport(.once)
+            }
+        )
+
+        let sut = resolved.session.configuration.secureConnection
+
+        // Then
+        #expect(sut?.renegotiationSupport == renegotiationSupport)
+    }
+
+    @Test
     func secure_whenUpdatesShutdownTimeout_shouldBeValid() async throws {
         // Given
         let timeout = UnitTime.seconds(60)

@@ -55,4 +55,12 @@ struct AcceptCharsetHeaderTests {
         // Then
         #expect(resolved.requestConfiguration.headers["Accept-Charset"] == [charset.rawValue])
     }
+
+    @Test func neverBody() async throws {
+        // Given
+        let property = AcceptCharsetHeader(.utf8)
+
+        // Then
+        try await assertNever(property.body)
+    }
 }

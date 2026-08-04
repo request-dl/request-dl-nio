@@ -327,6 +327,31 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenInitStringWithContentTypeAlreadyDeclaringCharset() async throws {
+        // Given
+        // `appending(charset:)` must not append a second `charset` parameter when the content
+        // type the caller passed already declares one.
+        let verbatim = "Hello world!"
+        let customType = ContentType("text/plain; charset=ISO-8859-1")
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim: verbatim,
+                    contentType: customType
+                )
+                .charset(.utf16)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["text/plain; charset=ISO-8859-1"]
+        )
+    }
+
+    @Test
     func payload_whenInitData() async throws {
         // Given
         let data = await Data.randomData(length: 1_024 * 1_024)
@@ -708,6 +733,66 @@ extension PayloadTests {
                     }
                 )
         )
+    }
+
+    @Test
+    func payload_whenGETInitEncodableArrayWithURLEncoded() async throws {
+        // Given
+        let values = ["bar", "olaf", "42"]
+
+        // Then
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    values,
+                    contentType: .formURLEncoded
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // When
+        #expect(data == nil)
+        #expect(resolved.requestConfiguration.headers["Content-Type"] == nil)
+        #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
+
+        #expect(
+            try Set(resolved.requestConfiguration.queries)
+                == Set(
+                    values.enumerated().reduce([]) {
+                        try $0 + URLEncoder().encode($1.element, forKey: String($1.offset))
+                    }
+                )
+        )
+    }
+
+    @Test
+    func payload_whenGETInitEncodableFragmentWithURLEncoded() async throws {
+        // Given
+        // A top-level fragment (neither a JSON object nor a JSON array) cannot be exploded
+        // into query items, so it is sent as an already-encoded body instead — the same
+        // fallback a non-form-urlencoded content type takes.
+        let value = "just-a-string"
+
+        // Then
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    value,
+                    contentType: .formURLEncoded
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+        let expectedData = try JSONEncoder().encode(value)
+
+        // When
+        #expect(resolved.requestConfiguration.queries.isEmpty)
+        #expect(data == expectedData)
+        #expect(resolved.requestConfiguration.headers["Content-Type"] == [String(ContentType.formURLEncoded)])
+        #expect(resolved.requestConfiguration.headers["Content-Length"] == [String(expectedData.count)])
     }
 
     @Test

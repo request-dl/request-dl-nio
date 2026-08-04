@@ -70,7 +70,12 @@ struct DiskStorage: Sendable {
         }
 
         init(directory: URL, key: String, at date: Date) async {
-            let timeUnit = Int(date.timeIntervalSinceReferenceDate)
+            // Nanosecond precision, not whole seconds: `updateCached` creates a fresh record
+            // for the same key while revalidating an existing one, and two records for the same
+            // key landing in the same second would otherwise collide on this directory name.
+            // `moveItem` then throws on the collision, and the recovery path removes both the
+            // old and the new record, losing the entry outright.
+            let timeUnit = Int64((date.timeIntervalSinceReferenceDate * 1_000_000_000).rounded())
             var directoryPathComponent = String(timeUnit, radix: 36)
             directoryPathComponent += ".\(key).\(DiskStorage.Record.pathExtension)"
 
@@ -100,7 +105,10 @@ struct DiskStorage: Sendable {
             var components = url.deletingPathExtension().lastPathComponent.split(separator: ".")
             guard let time = components.first.flatMap({ Int64($0, radix: 36) }) else { return nil }
             components.removeFirst()
-            return (components.joined(separator: "."), Date(timeIntervalSinceReferenceDate: TimeInterval(time)))
+            return (
+                components.joined(separator: "."),
+                Date(timeIntervalSinceReferenceDate: TimeInterval(time) / 1_000_000_000)
+            )
         }
     }
 
