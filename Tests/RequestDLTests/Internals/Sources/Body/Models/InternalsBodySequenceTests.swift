@@ -28,6 +28,19 @@ struct InternalsBodySequenceTests {
     }
 
     @Test
+    func bodySequence_isEmptyReflectsWhetherBuffersWerePassed() async throws {
+        // Given
+        let emptyBodySequence = makeBodySequence([])
+        let nonEmptyBodySequence = await makeBodySequence([
+            Internals.DataBuffer(Data("a".utf8))
+        ])
+
+        // Then
+        #expect(emptyBodySequence.isEmpty)
+        #expect(!nonEmptyBodySequence.isEmpty)
+    }
+
+    @Test
     func bodySequence_whenContainsDataLessThenSize_shouldBeEqualData() async throws {
         // Given
         let data = Data("Hello World!".utf8)

@@ -240,6 +240,75 @@ struct InternalsDataStreamTests {
             #expect(value.wrappedValue.count == 10)
         }
     }
+
+    @Test
+    func stream_whenUntilFirstIterationConsumedTwice_shouldReportAlreadyConsumed() async throws {
+        // Given
+        // `.untilFirstIteration` hands the whole buffer to the first iterator and keeps
+        // nothing of its own, so a second iterator has nothing left to replay.
+        let stream = Internals.AsyncStream<Int>(bufferingPolicy: .untilFirstIteration)
+        stream.append(.success(1))
+        stream.close()
+
+        var first = stream.makeAsyncIterator()
+        let value = try await first.next()
+
+        // When
+        var second = stream.makeAsyncIterator()
+
+        // Then
+        #expect(value == 1)
+        await #expect(throws: AlreadyConsumedError.self) {
+            _ = try await second.next()
+        }
+    }
+
+    @Test
+    func stream_whenIteratingPastDone_shouldKeepReturningNilWithoutCrashing() async throws {
+        // Given
+        let stream = Internals.AsyncStream<Int>.constant(1)
+        var iterator = stream.makeAsyncIterator()
+
+        // When
+        let first = try await iterator.next()
+        let second = try await iterator.next()
+        // The iterator's own state is already `.done` by this third call — not just the
+        // underlying subject — exercising that branch directly rather than falling through it.
+        let third = try await iterator.next()
+
+        // Then
+        #expect(first == 1)
+        #expect(second == nil)
+        #expect(third == nil)
+    }
+
+    @Test
+    func stream_equalityAndHashAreIdentityBased() {
+        // Given
+        let first = Internals.AsyncStream<Int>()
+        let second = Internals.AsyncStream<Int>()
+
+        // Then
+        #expect(first == first)
+        #expect(first != second)
+
+        let set: Set<Internals.AsyncStream<Int>> = [first, first, second]
+        #expect(set.count == 2)
+    }
+}
+
+struct AlreadyConsumedErrorTests {
+
+    @Test
+    func descriptionExplainsSingleUseSemantics() {
+        #expect(
+            AlreadyConsumedError().description
+                == """
+                This response body has already been consumed. Read it once and keep the result, or \
+                issue the request again.
+                """
+        )
+    }
 }
 
 extension InternalsDataStreamTests {

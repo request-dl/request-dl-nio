@@ -751,4 +751,25 @@ struct InternalsDataBufferTests {
         // Then
         #expect(Set(datas.compactMap { $0 }).count == 1_024)
     }
+
+    @Test
+    func dataBuffer_whenInitRealFileURL_shouldReadContentsThroughFileStreamBuffer() async throws {
+        // Given
+        // `Internals.ByteURL.make(from:)` cannot address a real file `URL` — only an
+        // in-memory one — so `init(_ url: URL)` falls back to reading it through a
+        // `FileStreamBuffer`-backed `Buffer` and copying the bytes into this one.
+        let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        let data = Data("Hello world".utf8)
+        try data.write(to: fileURL)
+
+        // When
+        var dataBuffer = await Internals.DataBuffer(fileURL)
+        let readData = await dataBuffer.readData(dataBuffer.readableBytes)
+
+        // Then
+        #expect(readData == data)
+    }
 }

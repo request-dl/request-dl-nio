@@ -807,4 +807,72 @@ struct InternalsFileBufferTests {
         // Then
         #expect(Set(datas.compactMap { $0 }).count == 1_024)
     }
+
+    @Test
+    func fileBuffer_whenCleared_shouldResetIndicesAndStorage() async throws {
+        // Given
+        let fileURLManager = try await FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        var fileBuffer = await Internals.FileBuffer(fileURL)
+        await fileBuffer.writeData(Data("Hello world".utf8))
+
+        // When
+        await fileBuffer.clear()
+
+        // Then
+        #expect(fileBuffer.writerIndex == .zero)
+        #expect(fileBuffer.readerIndex == .zero)
+        #expect(fileBuffer.readableBytes == .zero)
+        let estimatedBytes = await fileBuffer.estimatedBytes
+        #expect(estimatedBytes == .zero)
+    }
+
+    @Test
+    func fileBuffer_whenClosed_shouldReopenTransparentlyOnNextRead() async throws {
+        // Given
+        let fileURLManager = try await FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        let data = Data("Hello world".utf8)
+        var fileBuffer = await Internals.FileBuffer(fileURL)
+        await fileBuffer.writeData(data)
+
+        // When
+        try await fileBuffer.close()
+        fileBuffer.moveReaderIndex(to: .zero)
+        let readData = await fileBuffer.readData(data.count)
+
+        // Then
+        #expect(readData == data)
+    }
+
+    @Test
+    func fileBuffer_whenGetDataRangeExtendsPastWriterIndex_shouldBeNil() async throws {
+        // Given
+        let data = await Data.randomData(length: 64)
+        let fileBuffer = await Internals.FileBuffer(data)
+
+        // Then
+        let result = await fileBuffer.getData(at: 32, length: 64)
+        #expect(result == nil)
+    }
+
+    @Test
+    func fileBuffer_whenSetDataWithNegativeIndex_shouldThrowBufferIndexError() async throws {
+        // Given
+        let fileBuffer = await Internals.FileBuffer()
+
+        // When / Then
+        do {
+            try await fileBuffer.setData(Data("x".utf8), at: -1)
+            Issue.record("Expected setData(_:at:) to throw")
+        } catch let error as Internals.BufferIndexError {
+            #expect(error.description == "Attempted to address a buffer at the negative index -1")
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
 }
