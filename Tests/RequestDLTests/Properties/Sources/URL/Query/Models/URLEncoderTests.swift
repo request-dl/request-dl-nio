@@ -1019,6 +1019,32 @@ struct URLEncoderTests {
         }
     }
 
+    @Test
+    func encoder_whenKeyNeverEncodedNorDropped_throwsUnset() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "foo"
+        let value = "bar"
+
+        // A custom strategy that never touches its key container at all — distinct from
+        // `encoder_whenKeyUnkeyedBeforeEncoding_throwsUnset` above, which reads the container's
+        // own local state back before writing to it. This instead reaches
+        // `URLEncoder.Encoder.getKey()`'s own `.none` case, since nothing ever calls
+        // `encoder.setKey(_:)`.
+        urlEncoder.keyEncodingStrategy = .custom { _, _ in }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(value, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .unset
+        }
+    }
+
     // MARK: - ValueContainer
 
     @Test
@@ -1062,6 +1088,53 @@ struct URLEncoderTests {
             }
 
             return error.errorType == .unset
+        }
+    }
+
+    @Test
+    func encoder_whenValueNeverEncodedNorDropped_throwsUnset() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "flag"
+
+        // Same distinction as `encoder_whenKeyNeverEncodedNorDropped_throwsUnset`: this never
+        // touches the value container, reaching `URLEncoder.Encoder.getValue()`'s own `.none`
+        // case rather than the container's own unwritten-local-state check.
+        urlEncoder.boolEncodingStrategy = .custom { _, _ in }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(true, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .unset
+        }
+    }
+
+    @Test
+    func encoder_whenValueEncodedTwice_throwsAlreadySet() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "flag"
+
+        urlEncoder.boolEncodingStrategy = .custom { flag, encoder in
+            var container = encoder.valueContainer()
+            try container.encode(flag ? "yes" : "no")
+            try container.encode(flag ? "yes" : "no")
+        }
+
+        // Then
+        #expect {
+            try urlEncoder.encode(true, forKey: key)
+        } throws: {
+            guard let error = $0 as? URLEncoderError else {
+                return false
+            }
+
+            return error.errorType == .alreadySet
         }
     }
 

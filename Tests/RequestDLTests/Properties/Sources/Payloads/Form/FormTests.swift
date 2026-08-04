@@ -189,6 +189,44 @@ struct FormTests {
         )
     }
 
+    @Test
+    func form_whenCustomHeaderOverridesAGeneratedHeader_shouldKeepTheCallersValue() async throws {
+        // Given
+        let name = "foo"
+        let data = await Data.randomData(length: 64)
+        let overriddenContentType = "application/vnd.custom+octet-stream"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data,
+                    headers: {
+                        CustomHeader(name: "Content-Type", value: overriddenContentType)
+                    }
+                )
+            }
+        )
+
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
+        let parsed = try await parser.parse()
+
+        // Then
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", overriddenContentType),
+                        ("Content-Length", String(data.count)),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
+    }
+
     // MARK: - Init with URL
 
     @Test

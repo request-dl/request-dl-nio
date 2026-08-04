@@ -134,6 +134,21 @@ struct HeaderGroupTests {
     }
 
     @Test
+    func headerGroupWithNonStringDictionaryValuesStringifiesThem() async throws {
+        let property = TestProperty(
+            HeaderGroup([
+                "X-Retry-Count": 3,
+                "X-Debug": true,
+            ])
+        )
+
+        let resolved = try await resolve(property)
+
+        #expect(resolved.requestConfiguration.headers["X-Retry-Count"] == ["3"])
+        #expect(resolved.requestConfiguration.headers["X-Debug"] == ["true"])
+    }
+
+    @Test
     func neverBody() async throws {
         // Given
         let property = HeaderGroup([:])
