@@ -54,6 +54,10 @@ let package = Package(
             url: "https://github.com/apple/swift-async-algorithms",
             from: "1.1.5"
         ),
+        .package(
+            url: "https://github.com/apple/swift-system",
+            from: "1.6.3"
+        ),
     ],
     targets: [
         .target(
@@ -63,13 +67,14 @@ let package = Package(
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-                .product(name: "NIOFoundationCompat", package: "swift-nio"),
+                .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
             ]
