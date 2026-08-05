@@ -17,12 +17,14 @@ import struct Foundation.UUID
 // ModifiersCollect*Tests, CachedRequestTests, ...), and swift-testing runs suites concurrently by
 // default — so many independent sessions hit the same server/`ResponseQueue` at once in practice.
 // This exercises that path directly: many concurrent sessions, each with its own uri/response slot,
-// must not see each other's responses or hang. It does NOT reproduce the visionOS CI timeout itself
-// (HTTPClientError.connectTimeout/.tlsHandshakeTimeout in InternalsSessionTests) — on this machine
-// even a single server thread clears 200 concurrent connections in well under a second, so the
-// elapsed-time assertion below is only a "didn't hang" sanity check, not a guard against that
-// specific regression. The real fix for that bug is the thread count bump in LocalServer.swift;
-// verifying it requires the actual visionOS Simulator CI environment.
+// must not see each other's responses or hang. On a visionOS CI run under heavy shared-runner
+// contention, this test's own 200 concurrently-connecting sessions have themselves hit
+// `HTTPClientError.connectTimeout` at this shared group, in addition to the InternalsSessionTests
+// timeout described below — on this machine even a single server thread clears 200 concurrent
+// connections in well under a second, so the elapsed-time assertion below is only a "didn't hang"
+// sanity check, not a guard against either regression. The real mitigation for both is the thread
+// count on `LocalServer.ServerManager.shared` (bumped 1→4, then 4→8 — see LocalServer.swift);
+// verifying either bump actually holds requires the real visionOS Simulator CI environment.
 struct LocalServerConcurrencyTests {
 
     @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
