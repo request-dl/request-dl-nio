@@ -116,20 +116,7 @@ struct DiskStorage: Sendable {
         /// this runs, so a miss here is that stat flake, not a genuine absence — a single
         /// unretried check turned a rare stat flake into a lost cache entry.
         private static func isReachableWithRetry(_ url: URL) async -> Bool {
-            let attempts = 5
-            let retryDelay: UInt64 = 2_000_000
-
-            for attempt in 0..<attempts {
-                if await url.isReachable {
-                    return true
-                }
-
-                if attempt + 1 < attempts {
-                    try? await Task.sleep(nanoseconds: retryDelay)
-                }
-            }
-
-            return false
+            await DiskStorage.retryingUntilSuccess { await url.isReachable ? true : nil } ?? false
         }
 
         private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
@@ -192,8 +179,18 @@ struct DiskStorage: Sendable {
     /// `try?` swallows the throw and the `guard` chain fails without closing first, the function
     /// returns `nil` with the handle still open and now unreachable — exactly the trap NIO
     /// traps on, for a cache entry whose response record failed to read for any reason.
+    ///
+    /// - Note: `openFile` is retried (`retryingUntilSuccess`) rather than attempted once: `url`
+    /// only gets here after `Record.init?` already confirmed it reachable, so an `openFile` miss
+    /// right after is the same transient stat/open flake `isReachableWithRetry` retries around,
+    /// not a genuine absence. Before this retry, that flake surfaced as this whole method — and
+    /// therefore `subscript(_:)` — returning `nil` for an entry that was just written.
     private func readResponseData(at url: URL) async -> Data? {
-        guard let handle = try? await FileSystem.shared.openFile(forReadingAt: url.filePath) else {
+        guard
+            let handle = await Self.retryingUntilSuccess({
+                try? await FileSystem.shared.openFile(forReadingAt: url.filePath)
+            })
+        else {
             return nil
         }
 
@@ -208,6 +205,33 @@ struct DiskStorage: Sendable {
             at: buffer.readerIndex,
             length: buffer.readableBytes
         ) ?? Data()
+    }
+
+    // MARK: - Private static methods
+
+    /// Retries `operation` past the transient stat/open miss `FileSystem.shared` is already
+    /// known to produce under heavy concurrent disk access on sandboxed Apple simulators: a
+    /// check or open can intermittently fail for a file that was just written/confirmed, with
+    /// nothing thrown and no descriptor left open. Shared by `Record.isReachableWithRetry` and
+    /// `readResponseData`, the two places here that read a `.cached` entry right after its own
+    /// existence was (or is about to be) confirmed, where a fresh miss is that flake, not a
+    /// genuine absence.
+    private static func retryingUntilSuccess<T>(
+        attempts: Int = 5,
+        retryDelay: UInt64 = 2_000_000,
+        _ operation: () async -> T?
+    ) async -> T? {
+        for attempt in 0..<attempts {
+            if let result = await operation() {
+                return result
+            }
+
+            if attempt + 1 < attempts {
+                try? await Task.sleep(nanoseconds: retryDelay)
+            }
+        }
+
+        return nil
     }
 
     func remove(_ key: String) async {
