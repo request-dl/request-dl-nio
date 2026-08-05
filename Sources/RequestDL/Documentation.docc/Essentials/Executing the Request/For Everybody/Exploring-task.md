@@ -90,6 +90,58 @@ Then, for each item in the sequence, you will have access to its individual resu
 
 > Warning: The element must conform to the `Hashable` protocol.
 
+```swift
+func makeMultipleRequest() async throws -> GroupResult<Int, TaskResult<Data>> {
+    try await GroupTask([0, 1, 2, 3]) { page in
+        DataTask {
+            BaseURL("apple.com")
+            Path("results")
+            Query(name: "page", value: page)
+        }
+    }
+    .result()
+}
+
+let results = try await makeMultipleRequest()
+
+for (page, result) in results {
+    switch result {
+    case .success(let taskResult):
+        print(page, taskResult.payload)
+    case .failure(let error):
+        print(page, error)
+    }
+}
+```
+
+### MockedTask
+
+``RequestDL/MockedTask`` lets you fabricate a response without performing any real network call, which is useful for tests and previews where you want deterministic data and no dependency on a live server.
+
+You specify the response head — `version`, `status`, and `isKeepAlive` — along with a ``RequestDL/Property`` block describing the mocked body, exactly as you would for a real request.
+
+```swift
+let result = try await MockedTask(
+    status: .init(code: 200, reason: "Ok")
+) {
+    Payload(
+        verbatim: """
+        {
+            "id": 1,
+            "name": "John Doe"
+        }
+        """,
+        contentType: .json
+    )
+}
+.collectData()
+.result()
+
+print(result.payload)
+```
+
+> Tip: ``RequestDL/MockedTask`` returns an ``RequestDL/AsyncResponse``, just like ``RequestDL/UploadTask``. Use ``RequestDL/RequestTask/collectData()`` to collapse it into a ``RequestDL/TaskResult`` the same way ``RequestDL/DataTask`` does.
+
 ## Topics
 
 ### The basics

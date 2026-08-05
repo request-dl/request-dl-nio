@@ -10,12 +10,11 @@ A network layer written in Swift based on the declarative programming paradigm.
 
     @PageColor(blue)
 
-    @Available(macOS, introduced: "10.15")
-    @Available(iOS, introduced: "13.0")
-    @Available(tvOS, introduced: "13.0")
-    @Available(watchOS, introduced: "6.0")
-    @Available(visionOS, introduced: "1.0")
-    @Available("Swift", introduced: "6.1")
+    @Available(macOS, introduced: "12.0")
+    @Available(iOS, introduced: "15.0")
+    @Available(tvOS, introduced: "15.0")
+    @Available(watchOS, introduced: "8.0")
+    @Available("Swift", introduced: "6.2")
 
     @SupportedLanguage(swift)
 }
@@ -25,6 +24,16 @@ A network layer written in Swift based on the declarative programming paradigm.
 RequestDL aims to provide a comprehensive API for developing applications that consume network services. At its core, RequestDL is built on Apple's **AsyncHTTPClient**, which in turn is based on **SwiftNIO**.
 
 With these foundations and leveraging modern networking techniques, along with extensive integration provided by Apple through these two modules, RequestDL can accomplish a great deal. All of this is achieved using a simplified and concise syntax.
+
+### Installation
+
+RequestDL can be installed using Swift Package Manager. To include it in your project, add the following dependency to your `Package.swift` file:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/request-dl/request-dl-nio.git", from: "4.0.0")
+]
+```
 
 ### Where to start?
 
@@ -67,7 +76,7 @@ try await DataTask {
 - [x] [Modifiers & Interceptors](<doc:Modifiers-and-Interceptors>);
 - [x] [Upload & Download progress](<doc:Upload-and-download-progress>);
 - [x] [Swift Concurrency](<doc:Swift-concurrency>);
-- [x] [Combine support](<doc:Exploring-combine>);
+- [x] [Combine support](<doc:Exploring-combine>) (Apple platforms only);
 
 We are excited to expand this list with many other features. Start by making your contribution in [Discussions](https://github.com/orgs/request-dl/discussions) or by opening a PR (Pull Request).
 

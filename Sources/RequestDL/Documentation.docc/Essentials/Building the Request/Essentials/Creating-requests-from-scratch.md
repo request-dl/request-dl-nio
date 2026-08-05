@@ -46,7 +46,7 @@ The URL of a request consists of four main parts: scheme, host, paths, and query
     Adds query parameters to the URL. These parameters are used to convey additional information in the request.
 
     ```swift
-    Query(name: "create_at", value: Date())
+    Query(name: "created_at", value: Date())
     ```
 
 > Tip: Explore the ``RequestDL/URLEncoder`` to use other ways of inserting parameters in the URL.
