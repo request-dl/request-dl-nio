@@ -2,7 +2,6 @@
  See LICENSE for this package's licensing information.
 */
 
-import Foundation
 import AsyncHTTPClient
 
 /// SPKI-based certificate pinning configuration for secure connections.

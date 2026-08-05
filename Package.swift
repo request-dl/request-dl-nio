@@ -19,8 +19,8 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/o-nnerb/async-http-client",
-            from: "1.33.1-alpha.1"
+            url: "https://github.com/request-dl/async-http-client",
+            from: "1.37.0-beta.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",

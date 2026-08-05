@@ -5,7 +5,12 @@
 //  Created by Brenno de Moura on 02/02/26.
 //
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 import AsyncHTTPClient
 import Crypto
 

@@ -2,7 +2,13 @@
  See LICENSE for this package's licensing information.
 */
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.URL
+#endif
+
 import Testing
 import NIOSSL
 import Crypto
