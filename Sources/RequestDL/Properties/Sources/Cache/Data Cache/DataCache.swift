@@ -277,16 +277,19 @@ public struct DataCache: Sendable, Equatable {
 
     /// The cache directory for a given suite.
     ///
-    /// - Note: The temporary directory comes from ``SystemPackage/FilePath/temporaryDirectory``,
-    /// not from `FileManager`, which is not part of `FoundationEssentials`. On Darwin both
-    /// resolve to `TMPDIR`, so the location does not move.
+    /// - Note: Resolved through ``SystemPackage/FilePath/cachesDirectory``, not
+    /// `FilePath.temporaryDirectory``. Cache entries are meant to survive between requests, and
+    /// the temporary directory offers no such guarantee: the system can purge it at any moment,
+    /// even while the app is running. `cachesDirectory` lands in `Library/Caches` on Darwin,
+    /// which is only cleared between launches, and falls back to the temporary directory on
+    /// platforms with no equivalent standard location.
     ///
-    ///   `FileSystem.shared.temporaryDirectory` is the NIO one and would be the obvious choice,
-    ///   but it is `async throws` and this call chain cannot suspend: it is reached from
+    ///   `FileSystem.shared.temporaryDirectory` is the NIO one and would otherwise be the obvious
+    ///   choice, but it is `async throws` and this call chain cannot suspend: it is reached from
     ///   `public init(...)` and, through those, from `public static let shared = DataCache()`.
     ///   A stored property cannot be initialised from an asynchronous call.
     static func temporaryURL(suiteName: String) -> URL {
-        URL(fileURLWithPath: FilePath.temporaryDirectory.string, isDirectory: true)
+        URL(fileURLWithPath: FilePath.cachesDirectory.string, isDirectory: true)
             .appendingPathComponent(
                 "com.request-dl-nio.Swift.Cache",
                 isDirectory: true

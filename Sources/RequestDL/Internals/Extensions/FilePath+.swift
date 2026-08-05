@@ -10,6 +10,10 @@ import FoundationEssentials
 import class Foundation.ProcessInfo
 #endif
 
+#if canImport(Darwin)
+import class Foundation.FileManager
+#endif
+
 extension FilePath {
 
     /// The system temporary directory.
@@ -51,5 +55,27 @@ extension FilePath {
         #else
         return FilePath("/private/tmp")
         #endif
+    }
+
+    /// The directory appropriate for data that should persist between launches but can be
+    /// regenerated, such as the on-disk cache.
+    ///
+    /// Apple's guidance is explicit about this split: the temporary directory can be purged by
+    /// the system at any moment, including while the app is still running, so anything that
+    /// needs to survive past the current request does not belong there. `Library/Caches` is
+    /// still purgeable under disk pressure, but only between launches, which is what a cache
+    /// actually wants.
+    ///
+    /// `FileManager` is not part of `FoundationEssentials`, so this only resolves through it on
+    /// Darwin, where the full `Foundation` is available. Everywhere else there is no equivalent
+    /// standard location, so this falls back to ``temporaryDirectory``.
+    static var cachesDirectory: FilePath {
+        #if canImport(Darwin)
+        if let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            return FilePath(url.path)
+        }
+        #endif
+
+        return temporaryDirectory
     }
 }
