@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+#endif
 
 struct ModifiersCollectDataTests {
 
@@ -28,6 +34,8 @@ struct ModifiersCollectDataTests {
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots {
@@ -65,6 +73,8 @@ struct ModifiersCollectDataTests {
             BaseURL(localServer.baseURL)
             Path(uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
@@ -100,6 +110,8 @@ struct ModifiersCollectDataTests {
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots {

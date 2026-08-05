@@ -1,9 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 import Testing
+
 @testable import RequestDL
 
 struct InterceptorsDetachTests {

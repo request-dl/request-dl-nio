@@ -1,8 +1,8 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 
 extension Internals {
 
@@ -28,7 +28,7 @@ extension Internals {
             _buckets.count
         }
 
-        private var _buckets: [Array<Element>?]
+        private var _buckets: [[Element]?]
         // MARK: - Inits
 
         init(capacity: Int = 16) {
@@ -121,7 +121,7 @@ extension Internals {
         }
 
         private func _index(forKey key: Key) -> Int {
-            return abs(key.hashValue) % _capacity
+            abs(key.hashValue) % _capacity
         }
     }
 }

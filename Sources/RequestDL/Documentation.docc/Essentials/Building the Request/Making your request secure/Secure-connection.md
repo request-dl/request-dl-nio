@@ -8,16 +8,16 @@ Having and maintaining a secure connection is extremely critical in any applicat
 
 As supported by SwiftNIO, we have the following definitions:
 
-1. **Trust**  
+1. **Trust**
    Validated after receiving the server's certificate to determine whether it is trustworthy.
 
-2. **Client Authorization**  
+2. **Client Authorization**
    A local certificate is sent to the server to establish client trust.
 
-3. **PSK**  
+3. **PSK**
    Authentication using a pre-shared symmetric key between client and server.
 
-4. **SPKI Pinning**  
+4. **SPKI Pinning**
    Cryptographic pinning of the server's public key structure for explicit trust validation.
 
 > Warning: Any TLS configuration must be performed within ``RequestDL/SecureConnection``. Otherwise, RequestDL will not recognize the declarations.
@@ -86,7 +86,7 @@ TrustRoots {
 
 After defining the base certificates, you need to specify additional certificates to be used as alternative server validation. It is optional and can be explored depending on the server's specifications.
 
-> Tip: In applications where security is not the highest priority, combine ``RequestDL/DefaultTrustRoots`` with ``RequestDL/AdditionalTrustRoots`` to include both system certificates and custom trust anchors.
+> Tip: In an application where security is not a priority, you can combine ``RequestDL/DefaultTrustRoots`` with ``RequestDL/AdditionalTrustRoots`` to include both system certificates and the ones you want to trust.
 
 ### Client Authorization
 
@@ -111,7 +111,7 @@ PrivateKey(privateFile1)
 ### PSK
 
 Pre-Shared Key (PSK) authentication uses symmetric keys shared between client and server. Configure using ``SSLPSKIdentityResolver``, secured via ``StoredObject`` for efficiency:
-```swift 
+```swift
 struct GithubAPI: Property {
     @StoredObject var psk = GithubPSKResolver()
 
@@ -136,13 +136,11 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 ### Certificate fundamentals
 - ``RequestDL/Certificate``
 
-### Server trust configuration
+### Configuring the server trust
+
 - ``RequestDL/DefaultTrustRoots``
 - ``RequestDL/TrustRoots``
 - ``RequestDL/AdditionalTrustRoots``
-- ``RequestDL/DefaultTrusts``
-- ``RequestDL/Trusts``
-- ``RequestDL/AdditionalTrusts``
 
 ### SPKI Pinning
 - ``RequestDL/SPKIPinning``

@@ -1,10 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 
 struct NodeTests {
 
@@ -23,73 +27,65 @@ struct NodeTests {
         let leaf = LeafNode(Node(value: value))
 
         // Then
+        // O acesso a `value` funciona graças ao @dynamicMemberLookup no LeafNode
         #expect(leaf.value == 1)
     }
 
     @Test
-    func node_whenLeafNextIsCalled_shouldBeNil() async {
+    func node_whenLeafChildrenIsCalled_shouldBeEmpty() async {
         // Given
         let node = Node(value: true)
 
         // When
-        var leaf = LeafNode(node)
-
-        let next1 = leaf.next()
-        let next2 = leaf.next()
+        let leaf = LeafNode(node)
+        let children = leaf.children
 
         // Then
-        #expect(next1 == nil)
-        #expect(next2 == nil)
+        #expect(children.isEmpty)
     }
 
     @Test
-    func node_whenEmptyLeafNextIsCalled_shouldBeNil() async {
+    func node_whenEmptyLeafChildrenIsCalled_shouldBeEmpty() async {
         // Given
-        var empty = EmptyLeafNode()
+        let empty = EmptyLeafNode()
 
         // When
-        let next1 = empty.next()
-        let next2 = empty.next()
+        let children = empty.children
 
         // Then
-        #expect(next1 == nil)
-        #expect(next2 == nil)
+        #expect(children.isEmpty)
     }
 
     @Test
-    func node_whenChildrenNextIsCalledWithEmptyNodes_shouldBeNil() async {
+    func node_whenChildrenChildrenIsCalledWithEmptyNodes_shouldBeEmpty() async {
         // Given
-        var children = ChildrenNode()
+        let childrenNode = ChildrenNode()
 
         // When
-        let next1 = children.next()
-        let next2 = children.next()
+        let children = childrenNode.children
 
         // Then
-        #expect(next1 == nil)
-        #expect(next2 == nil)
+        #expect(children.isEmpty)
     }
 
     @Test
-    func node_whenChildrenAppendNodesAndCallNext_shouldBeEqualNodes() async {
+    func node_whenChildrenAppendNodesAndCheckChildren_shouldBeEqualNodes() async {
         // Given
         let node1 = LeafNode(Node(value: 1))
         let node2 = LeafNode(Node(value: true))
 
-        var children = ChildrenNode()
+        var childrenNode = ChildrenNode()
 
-        children.append(node1)
-        children.append(node2)
+        childrenNode.append(node1)
+        childrenNode.append(node2)
 
         // When
-        let next1 = children.next()
-        let next2 = children.next()
-        let next3 = children.next()
+        let children = childrenNode.children
 
         // Then
-        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
-        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
-        #expect(next3 == nil)
+        #expect(children.count == 2)
+        #expect((children[0] as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((children[1] as? LeafNode<Node<Bool>>)?.value == true)
     }
 
     @Test
@@ -109,20 +105,13 @@ struct NodeTests {
         children1.append(children2)
 
         // When
-        let next1 = children1.next()
-        let next2 = children1.next()
-        let next3 = children1.next()
-        let next4 = children1.next()
+        let children = children1.children
 
         // Then
-        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
-        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
-        #expect(next3 != nil)
-        #expect(next4 == nil)
-
-        if let next3 {
-            #expect(next3 is ChildrenNode)
-        }
+        #expect(children.count == 3)
+        #expect((children[0] as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((children[1] as? LeafNode<Node<Bool>>)?.value == true)
+        #expect(children[2] is ChildrenNode)
     }
 
     @Test
@@ -142,18 +131,14 @@ struct NodeTests {
         children1.append(children2, grouping: true)
 
         // When
-        let next1 = children1.next()
-        let next2 = children1.next()
-        let next3 = children1.next()
-        let next4 = children1.next()
-        let next5 = children1.next()
+        let children = children1.children
 
         // Then
-        #expect((next1 as? LeafNode<Node<Int>>)?.value == 1)
-        #expect((next2 as? LeafNode<Node<Bool>>)?.value == true)
-        #expect((next3 as? LeafNode<Node<Int>>)?.value == 1)
-        #expect((next4 as? LeafNode<Node<Bool>>)?.value == true)
-        #expect(next5 == nil)
+        #expect(children.count == 4)
+        #expect((children[0] as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((children[1] as? LeafNode<Node<Bool>>)?.value == true)
+        #expect((children[2] as? LeafNode<Node<Int>>)?.value == 1)
+        #expect((children[3] as? LeafNode<Node<Bool>>)?.value == true)
     }
 
     @Test
@@ -205,8 +190,8 @@ struct NodeTests {
         children.append(node2)
         children.append(node3)
 
-        children.append(children) // 2 -> 4
-        children.append(children) // 4 -> 8
+        children.append(children)  // 2 -> 4
+        children.append(children)  // 4 -> 8
 
         // When
         let nodes = children.search(for: Node<Int>.self)

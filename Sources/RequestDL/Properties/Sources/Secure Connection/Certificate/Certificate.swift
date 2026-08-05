@@ -1,27 +1,29 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
 
-/**
- Set a certificate of type `PEM` or `DER`.
+#if canImport(Darwin)
+import class Foundation.Bundle
+import struct Foundation.URL
+#endif
 
- It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
- with the server. There are several options to utilize the ``RequestDL/Certificate``.
-
- You can use it to configure the ``RequestDL/TrustRoots`` or ``RequestDL/AdditionalTrustRoots`` to
- validate if the server is trustworthy.
-
- Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication
- certificates to the server.
-
- ```swift
- let certData = Data(base64Encoded: "...")
- let cert = Certificate(certData!, format: .der)
- ```
- */
+/// Set a certificate of type `PEM` or `DER`.
+///
+/// It should be used to configure the ``RequestDL/SecureConnection`` and make the connection secure
+/// with the server. There are several options to utilize the ``RequestDL/Certificate``.
+///
+/// You can use it to configure the ``RequestDL/TrustRoots`` or ``RequestDL/AdditionalTrustRoots`` to
+/// validate if the server is trustworthy.
+///
+/// Another valid option is to use it with ``RequestDL/Certificates`` and send client authentication
+/// certificates to the server.
+///
+/// ```swift
+/// let certData = Data(base64Encoded: "...")
+/// let cert = Certificate(certData!, format: .der)
+/// ```
 public struct Certificate: Property {
 
     public enum Format: Sendable, Hashable {
@@ -38,6 +40,7 @@ public struct Certificate: Property {
             }
         }
 
+        #if canImport(Darwin)
         func resolve(for path: String, in bundle: Bundle) -> String {
             let resourceName: String = {
                 let pathExtension = ".\(self().pathExtension)"
@@ -58,6 +61,7 @@ public struct Certificate: Property {
 
             return resourceURL.absolutePath(percentEncoded: false)
         }
+        #endif
     }
 
     // MARK: - Public properties
@@ -97,6 +101,7 @@ public struct Certificate: Property {
         self.format = format
     }
 
+    #if canImport(Darwin)
     /// Initializes with the specified file path within a bundle and format.
     ///
     /// - Parameters:
@@ -113,6 +118,7 @@ public struct Certificate: Property {
             format: format
         )
     }
+    #endif
 
     // MARK: - Public static methods
 
@@ -133,13 +139,15 @@ public struct Certificate: Property {
             return .empty
         }
 
-        return .leaf(SecureConnectionNode(
-            CertificateNode(
-                source: property.source,
-                property: certificateProperty,
-                format: property.format()
-            ),
-            logger: inputs.environment.logger
-        ))
+        return .leaf(
+            SecureConnectionNode(
+                CertificateNode(
+                    source: property.source,
+                    property: certificateProperty,
+                    format: property.format()
+                ),
+                logger: inputs.environment.logger
+            )
+        )
     }
 }

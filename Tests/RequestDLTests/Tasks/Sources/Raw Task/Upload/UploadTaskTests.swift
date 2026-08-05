@@ -1,10 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+import struct Foundation.Data
+#endif
 
 struct UploadTaskTests {
 
@@ -19,7 +26,7 @@ struct UploadTaskTests {
 
         let certificate = Certificates().server()
         let output = "Hello World"
-        let upload = Data.randomData(length: 1_024)
+        let upload = await Data.randomData(length: 1_024)
 
         let response = try LocalServer.ResponseConfiguration(
             jsonObject: output
@@ -31,6 +38,8 @@ struct UploadTaskTests {
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))

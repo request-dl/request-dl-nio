@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import AsyncHTTPClient
 import NIOPosix
+import Testing
+
 @testable import RequestDL
 
 struct SessionTests {
@@ -99,7 +99,8 @@ struct SessionTests {
 
         // Then
         #expect(
-            resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit == maximumConnections
+            resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
+                == maximumConnections
         )
     }
 
@@ -142,10 +143,11 @@ struct SessionTests {
         }
 
         #expect(
-            redirectConfiguration == .follow(
-                max: max,
-                allowCycles: cycles
-            )
+            redirectConfiguration
+                == .follow(
+                    max: max,
+                    allowCycles: cycles
+                )
         )
     }
 
@@ -162,9 +164,10 @@ struct SessionTests {
         #expect(
             String(
                 describing: resolved.session.configuration.decompression
-            ) == String(
-                describing: HTTPClient.Decompression.disabled
             )
+                == String(
+                    describing: HTTPClient.Decompression.disabled
+                )
         )
     }
 
@@ -185,20 +188,34 @@ struct SessionTests {
     }
 
     @Test
-    func session_whenDNSOverride_shouldBeValid() async throws {
+    func session_whenDecompressionLimitNone_shouldBeValid() async throws {
         // Given
-        let origin = "google.com"
-        let destination = "apple.com"
-
+        let decompressionLimit = Session.DecompressionLimit.none
         let property = Session()
-            .overrideDNS(destination, from: origin)
+            .decompressionLimit(decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            try resolved.session.configuration.build().dnsOverride == [origin: destination]
+            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+        )
+    }
+
+    @Test
+    func session_whenDecompressionLimitSize_shouldBeValid() async throws {
+        // Given
+        let decompressionLimit = Session.DecompressionLimit.size(1_024)
+        let property = Session()
+            .decompressionLimit(decompressionLimit)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(
+            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
         )
     }
 

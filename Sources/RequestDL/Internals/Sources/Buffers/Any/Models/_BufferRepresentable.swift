@@ -1,9 +1,23 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+import struct Foundation.Data
+import protocol Foundation.DataProtocol
+#endif
 
+/// The shape of ``Internals/Buffer``, so callers can hold one without naming its stream type.
+///
+/// ## Concurrency
+///
+/// Every mutating requirement is `async`, which means exclusive access to `self` held across a
+/// suspension. That is legal for a local `var` and rejected for a stored property of a class or
+/// an actor. Anything keeping a buffer as a property has to move it into a local, operate, and
+/// write it back, or wrap it in a type that owns the serialization.
 protocol _BufferRepresentable<Stream>: Sendable {
 
     associatedtype Stream: StreamBuffer
@@ -14,55 +28,79 @@ protocol _BufferRepresentable<Stream>: Sendable {
 
     var writerIndex: Int { get }
 
-    var writableBytes: Int { get }
+    /// Bytes already in the store that sit past the writer index.
+    ///
+    /// Renamed from `writableBytes`, which read as remaining capacity. These buffers grow on
+    /// demand, so there is no capacity to report, and the number actually says how much the
+    /// next write would overwrite.
+    var overwritableBytes: Int { get async }
 
-    var estimatedBytes: Int { get }
+    /// Bytes in the shared store, regardless of where this cursor sits.
+    var estimatedBytes: Int { get async }
 
-    init(_ url: Foundation.URL)
+    init(_ url: URL) async
 
-    init(_ url: Internals.ByteURL)
+    init(_ url: Internals.ByteURL) async
 
-    init<Data: DataProtocol>(_ data: Data)
+    init<Bytes: DataProtocol & Sendable>(_ data: Bytes) async
 
-    init<Bytes: Sequence>(_ bytes: Bytes) where Bytes.Element == UInt8
+    init<Bytes: Sequence & Sendable>(_ bytes: Bytes) async where Bytes.Element == UInt8
 
-    init(_ string: String)
+    init(_ string: String) async
 
-    init(_ staticString: StaticString)
+    init(_ staticString: StaticString) async
 
-    init()
+    init() async
 
-    init<OtherStream: StreamBuffer>(_ buffer: Internals.Buffer<OtherStream>)
+    init<OtherStream: StreamBuffer>(_ buffer: Internals.Buffer<OtherStream>) async
 
     mutating func moveReaderIndex(to index: Int)
 
-    mutating func readData(_ length: Int) -> Data?
+    /// Reads forward from the reader index and advances it by however much arrived.
+    mutating func readData(_ length: Int) async -> Data?
 
-    mutating func readBytes(_ length: Int) -> [UInt8]?
+    /// - Note: Same semantics as ``readData(_:)``.
+    mutating func readBytes(_ length: Int) async -> [UInt8]?
 
-    func getData() -> Data?
+    /// Reads the whole readable range without moving the cursor.
+    func getData() async -> Data?
 
-    func getBytes() -> [UInt8]?
+    /// Reads the whole readable range without moving the cursor.
+    func getBytes() async -> [UInt8]?
 
-    func getData(at index: Int, length: Int) -> Data?
+    /// Reads an absolute range without moving the cursor. Out of range answers `nil`.
+    func getData(at index: Int, length: Int) async -> Data?
 
-    func getBytes(at index: Int, length: Int) -> [UInt8]?
+    /// Reads an absolute range without moving the cursor. Out of range answers `nil`.
+    func getBytes(at index: Int, length: Int) async -> [UInt8]?
 
     mutating func moveWriterIndex(to index: Int)
 
-    mutating func writeData<Data: DataProtocol>(_ data: Data)
+    /// Writes at the writer index and advances it. Failure is silent.
+    mutating func writeData<Bytes: DataProtocol & Sendable>(_ data: Bytes) async
 
-    mutating func writeBytes<Bytes: Sequence>(_ bytes: Bytes) where Bytes.Element == UInt8
+    /// - Note: Same semantics as ``writeData(_:)``.
+    mutating func writeBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes) async where Bytes.Element == UInt8
 
-    mutating func writeBuffer<OtherStream: StreamBuffer>(_ buffer: inout Internals.Buffer<OtherStream>)
+    /// Drains `buffer` into this one.
+    mutating func writeBuffer<OtherStream: StreamBuffer>(_ buffer: inout Internals.Buffer<OtherStream>) async
 
-    func setData<Data: DataProtocol>(_ data: Data)
+    // The index-less `setData(_:)` and `setBytes(_:)` are gone. They wrote at the current
+    // writer index without moving it, which put the bytes outside the readable range with no
+    // way to reach them, and left the next write pointed at the same index to overwrite them.
+    // There was no call that both compiled and did something useful.
 
-    func setBytes<Bytes: Sequence>(_ bytes: Bytes) where Bytes.Element == UInt8
+    /// Overwrites bytes already in the store, leaving the cursor where it was.
+    func setData<Bytes: DataProtocol & Sendable>(_ data: Bytes, at index: Int) async throws
 
-    func setData<Data: DataProtocol>(_ data: Data, at index: Int)
+    /// Overwrites bytes already in the store, leaving the cursor where it was.
+    func setBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes, at index: Int) async where Bytes.Element == UInt8
 
-    func setBytes<Bytes: Sequence>(_ bytes: Bytes, at index: Int) where Bytes.Element == UInt8
+    /// Drops every byte and rewinds both cursors, letting the store shrink back.
+    mutating func clear() async
+
+    /// Releases the open streams without discarding anything.
+    func close() async throws
 }
 
 extension Internals.Buffer: _BufferRepresentable {}

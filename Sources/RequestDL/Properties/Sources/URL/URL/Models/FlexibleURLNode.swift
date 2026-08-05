@@ -1,15 +1,22 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+import struct Foundation.URLComponents
+#endif
 
 struct FlexibleURLNode: PropertyNode {
 
     let url: String
 
     func make(_ make: inout Make) async throws {
-        let normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        // `Character.isWhitespace` already covers newlines, so this is the whole of
+        // `.whitespacesAndNewlines` without needing `Foundation.CharacterSet`.
+        let normalized = url.trimming(where: \.isWhitespace)
 
         if normalized.contains("://") {
             guard let url = URL(string: normalized) else {
@@ -66,9 +73,9 @@ struct FlexibleURLNode: PropertyNode {
     }
 }
 
-private extension FlexibleURLNode {
+extension FlexibleURLNode {
 
-    func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
+    fileprivate func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
         guard !host.isEmpty else {
             throw FlexibleURLError(context: .invalidHost, url: url)
         }
@@ -82,7 +89,7 @@ private extension FlexibleURLNode {
         return "\(scheme)://\(fullHost)"
     }
 
-    func pathComponents(from components: URLComponents) -> [String] {
+    fileprivate func pathComponents(from components: URLComponents) -> [String] {
         var splitComponents = Array(
             components.path
                 .split(separator: "/")
@@ -102,8 +109,8 @@ private extension FlexibleURLNode {
         return splitComponents
     }
 
-    func queries(from components: URLComponents) -> [QueryItem] {
-        return components.queryItems?.compactMap { item in
+    fileprivate func queries(from components: URLComponents) -> [QueryItem] {
+        components.queryItems?.compactMap { item in
             QueryItem(name: item.name, value: item.value ?? "")
         } ?? []
     }

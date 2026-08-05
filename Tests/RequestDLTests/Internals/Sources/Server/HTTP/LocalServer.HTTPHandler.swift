@@ -1,11 +1,20 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIO
 import NIOConcurrencyHelpers
 import NIOHTTP1
+
+@testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import class Foundation.JSONEncoder
+import class Foundation.JSONDecoder
+#endif
 
 extension LocalServer {
 
@@ -94,7 +103,7 @@ extension LocalServer {
 
             let head = HTTPResponseHead(
                 version: _version ?? .http1_1,
-                status: .ok,
+                status: _configuration?.status ?? .ok,
                 headers: headers
             )
 
@@ -123,25 +132,23 @@ extension LocalServer {
                 receivedBytes += _incomeBuffer.readableBytes
             }
 
-            let response = _configuration.map {
-                try? JSONSerialization.jsonObject(
-                    with: $0.data,
-                    options: [.fragmentsAllowed]
-                )
+            // `JSONValue` stands in for `JSONSerialization`'s `Any`, which is not part of
+            // `FoundationEssentials`.
+            let response = _configuration.flatMap {
+                try? JSONDecoder().decode(Internals.JSONValue.self, from: $0.data)
             }
 
-            var jsonObject = [String: Any]()
-
-            jsonObject["receivedBytes"] = receivedBytes
+            var jsonObject: [String: Internals.JSONValue] = [
+                "receivedBytes": .integer(Int64(receivedBytes))
+            ]
 
             if let response {
                 jsonObject["response"] = response
             }
 
-            return try? JSONSerialization.data(
-                withJSONObject: jsonObject,
-                options: [.sortedKeys]
-            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            return try? encoder.encode(jsonObject)
         }
 
         private func cleanup() {

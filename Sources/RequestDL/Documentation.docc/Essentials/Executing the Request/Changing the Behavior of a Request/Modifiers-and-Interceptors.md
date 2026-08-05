@@ -22,8 +22,9 @@ Some interesting ideas for API-specific `Modifier`:
     struct TokenRefreshModifier: RequestTaskModifier {
 
         typealias Input = TaskResult<Data>
+        typealias Output = TaskResult<Data>
 
-        func body(_ task: Content) async throws -> Input {
+        func body(_ task: Content) async throws -> Output {
             let result = try await task.result()
         
             guard result.head.status.code == 401 else {
@@ -42,8 +43,6 @@ Some interesting ideas for API-specific `Modifier`:
     ```swift
     struct DefaultsModifier<Object: Decodable>: RequestTaskModifier {
 
-        typelias Input = TaskResult<Data>
-
         let objectType: Object.Type
 
         func body(_ task: Content) async throws -> Object {
@@ -52,7 +51,6 @@ Some interesting ideas for API-specific `Modifier`:
                     throw InternalServerError()
                 }
                 .refreshToken()
-                .keyPath(\.result)
                 .decode(objectType)
                 .extractPayload()
                 .result()

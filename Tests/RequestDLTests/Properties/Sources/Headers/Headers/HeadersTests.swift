@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct HeadersTests {
@@ -134,6 +134,42 @@ struct HeadersTests {
 
         #expect(
             resolved.requestConfiguration.headers["xxx-api-key"] == ["password", "password123"]
+        )
+    }
+
+    @Test
+    func headers_whenSameHeaderWithDefaultHeaderSeparator() async throws {
+        // Given
+        let property = TestProperty {
+            CustomHeader(name: "xxx-api-key", value: "password")
+            CustomHeader(name: "xxx-api-key", value: "password123")
+        }
+        .headerSeparator()
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["xxx-api-key"] == ["password,password123"]
+        )
+    }
+
+    @Test
+    func headers_whenSameHeaderWithCustomHeaderSeparator() async throws {
+        // Given
+        let property = TestProperty {
+            CustomHeader(name: "xxx-api-key", value: "password")
+            CustomHeader(name: "xxx-api-key", value: "password123")
+        }
+        .headerSeparator(" | ")
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["xxx-api-key"] == ["password | password123"]
         )
     }
 

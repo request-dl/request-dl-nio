@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 
 /// Represents a secure connection with various configuration options.
@@ -61,10 +60,12 @@ public struct SecureConnection<Content: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(Node(
-            secureConnection: property.secureConnection,
-            nodes: outputs.node.search(for: SecureConnectionNode.self)
-        ))
+        return .leaf(
+            Node(
+                secureConnection: property.secureConnection,
+                nodes: outputs.node.search(for: SecureConnectionNode.self)
+            )
+        )
     }
 
     // MARK: - Public methods
@@ -196,7 +197,9 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter suites: The cipher suites to use as string representations.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
     public func cipherSuites(_ suites: String...) -> Self {
-        suites.forEach { precondition(!$0.contains(":")) }
+        for suite in suites {
+            precondition(!suite.contains(":"))
+        }
         return edit { $0.secureConnection.cipherSuites = suites.joined(separator: ":") }
     }
 

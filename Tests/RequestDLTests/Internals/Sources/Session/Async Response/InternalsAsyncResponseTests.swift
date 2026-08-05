@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 struct InternalsAsyncResponseTests {
 
@@ -12,7 +18,7 @@ struct InternalsAsyncResponseTests {
     func response_whenOnlyUploading_shouldReceiveParts() async throws {
         // Given
         let uploadingBytes = 16
-        let parts = 0 ..< uploadingBytes
+        let parts = 0..<uploadingBytes
         let configuration = response(uploadingBytes: uploadingBytes)
 
         // When
@@ -27,12 +33,17 @@ struct InternalsAsyncResponseTests {
         let received = try await Array(configuration.response)
 
         // Then
-        #expect(received == parts.map {
-            .upload(.init(
-                chunkSize: $0,
-                totalSize: uploadingBytes
-            ))
-        })
+        #expect(
+            received
+                == parts.map {
+                    .upload(
+                        .init(
+                            chunkSize: $0,
+                            totalSize: uploadingBytes
+                        )
+                    )
+                }
+        )
     }
 
     @Test
@@ -58,14 +69,20 @@ struct InternalsAsyncResponseTests {
         let received = try await Array(configuration.response)
 
         // Then
-        #expect(received == [.download(.init(
-            head: head,
-            bytes: .init(
-                logger: nil,
-                totalSize: .zero,
-                stream: configuration.download
-            )
-        ))])
+        #expect(
+            received == [
+                .download(
+                    .init(
+                        head: head,
+                        bytes: .init(
+                            logger: nil,
+                            totalSize: .zero,
+                            stream: configuration.download
+                        )
+                    )
+                )
+            ]
+        )
     }
 
     @Test
@@ -73,7 +90,7 @@ struct InternalsAsyncResponseTests {
         // Given
         let configuration = response()
 
-        let data = Data.randomData(length: 100_000_000)
+        let data = await Data.randomData(length: 100_000_000)
 
         let head = Internals.ResponseHead(
             url: "https://127.0.0.1",
@@ -85,7 +102,7 @@ struct InternalsAsyncResponseTests {
 
         // When
         configuration.head.append(.success(head))
-        configuration.download.append(.success(.init(data)))
+        await configuration.download.append(.success(.init(data)))
 
         configuration.upload.close()
         configuration.head.close()
@@ -94,14 +111,20 @@ struct InternalsAsyncResponseTests {
         let received = try await Array(configuration.response)
 
         // Then
-        #expect(received == [.download(.init(
-            head: head,
-            bytes: .init(
-                logger: nil,
-                totalSize: data.count,
-                stream: configuration.download
-            )
-        ))])
+        #expect(
+            received == [
+                .download(
+                    .init(
+                        head: head,
+                        bytes: .init(
+                            logger: nil,
+                            totalSize: data.count,
+                            stream: configuration.download
+                        )
+                    )
+                )
+            ]
+        )
     }
 }
 

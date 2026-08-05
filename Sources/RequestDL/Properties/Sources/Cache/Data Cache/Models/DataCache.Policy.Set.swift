@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension DataCache.Policy {
 
@@ -30,11 +28,11 @@ extension DataCache.Policy {
             self.rawValue = rawValue
         }
 
-        /**
-         Initializes a cache policy set with the specified cache policy.
-
-         - Parameter policy: The cache policy to initialize the set with.
-         */
+        ///
+        /// Initializes a cache policy set with the specified cache policy.
+        ///
+        /// - Parameter policy: The cache policy to initialize the set with.
+        ///
         public init(_ policy: DataCache.Policy) {
             self.init(rawValue: 1 << policy.rawValue)
         }

@@ -1,13 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
+import NIOPosix
+
 #if canImport(Darwin)
 import NIOTransportServices
 #endif
-import NIOPosix
 
 extension Internals {
 

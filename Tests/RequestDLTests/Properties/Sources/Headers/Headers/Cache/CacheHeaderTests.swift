@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct CacheHeaderTests {
@@ -58,12 +58,13 @@ struct CacheHeaderTests {
         // Given
         let cache = CacheHeader()
 
-        let modifiedCache = cache
+        let modifiedCache =
+            cache
             .cached(false)
             .stored(false)
             .transformed(false)
             .onlyIfCached(true)
-            .public(false) // nil
+            .public(false)  // nil
             .maxAge(1_000)
             .sharedMaxAge(16_000)
             .maxStale(300)

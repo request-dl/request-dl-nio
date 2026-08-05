@@ -1,11 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOSSL
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+import struct Foundation.Data
+#endif
 
 struct DataTaskTests {
 
@@ -30,6 +37,8 @@ struct DataTaskTests {
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
@@ -75,6 +84,8 @@ struct DataTaskTests {
             BaseURL(localServer.baseURL)
             Path(uri)
 
+            Session.localServer
+
             SecureConnection {
                 TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
                 RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
@@ -110,7 +121,7 @@ extension DataTaskTests {
             bytes.append(":\(identity)".utf8)
             bytes.append(":\(identity)".utf8)
             bytes.append(":pskHint".utf8)
-            return.init(key: bytes, identity: identity)
+            return .init(key: bytes, identity: identity)
         }
     }
 
@@ -122,10 +133,10 @@ extension DataTaskTests {
 
         let identity = "client"
         let key = """
-        ff135dfc9c802f584fd8b7bb3284fae0e1c404e4f8ac9217ff1b1bdecb\
-        d4cfa5651253143700a94c89227f5db03ed2de86a2914b4da0259901a4\
-        bbaf8a1dee0f
-        """
+            ff135dfc9c802f584fd8b7bb3284fae0e1c404e4f8ac9217ff1b1bdecb\
+            d4cfa5651253143700a94c89227f5db03ed2de86a2914b4da0259901a4\
+            bbaf8a1dee0f
+            """
 
         let localServer = try await LocalServer(
             LocalServer.Configuration(
@@ -145,6 +156,8 @@ extension DataTaskTests {
         let data = try await DataTask {
             BaseURL(localServer.baseURL)
             Path(uri)
+
+            Session.localServer
 
             SecureConnection {
                 PSKIdentity(

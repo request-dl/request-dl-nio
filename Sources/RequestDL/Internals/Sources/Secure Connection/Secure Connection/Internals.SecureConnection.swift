@@ -1,11 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import NIOSSL
 import AsyncHTTPClient
 import NIOCore
+import NIOSSL
 
 extension Internals {
 
@@ -174,28 +173,29 @@ extension Internals {
 extension Internals.SecureConnection: Equatable {
 
     static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-        let isSecurityPropertiesEqual = lhs.certificateChain == rhs.certificateChain
-        && lhs.privateKey == rhs.privateKey
-        && lhs.keyLogger === rhs.keyLogger
-        && lhs.cipherSuites == rhs.cipherSuites
+        let isSecurityPropertiesEqual =
+            lhs.certificateChain == rhs.certificateChain
+            && lhs.privateKey == rhs.privateKey
+            && lhs.keyLogger === rhs.keyLogger
+            && lhs.cipherSuites == rhs.cipherSuites
 
         return isSecurityPropertiesEqual
-        && lhs.certificateVerification == rhs.certificateVerification
-        && lhs.trustRoots == rhs.trustRoots
-        && lhs.additionalTrustRoots == rhs.additionalTrustRoots
-        && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms
-        && lhs.verifySignatureAlgorithms == rhs.verifySignatureAlgorithms
-        && lhs.sendCANameList == rhs.sendCANameList
-        && lhs.renegotiationSupport == rhs.renegotiationSupport
-        && lhs.shutdownTimeout == rhs.shutdownTimeout
-        && lhs.pskHint == rhs.pskHint
-        && lhs.applicationProtocols == rhs.applicationProtocols
-        && lhs.pskIdentityResolver === rhs.pskIdentityResolver
-        && lhs.minimumTLSVersion == rhs.minimumTLSVersion
-        && lhs.maximumTLSVersion == rhs.maximumTLSVersion
-        && lhs.cipherSuiteValues == rhs.cipherSuiteValues
-        && lhs.tlsPins == rhs.tlsPins
-        && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
+            && lhs.certificateVerification == rhs.certificateVerification
+            && lhs.trustRoots == rhs.trustRoots
+            && lhs.additionalTrustRoots == rhs.additionalTrustRoots
+            && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms
+            && lhs.verifySignatureAlgorithms == rhs.verifySignatureAlgorithms
+            && lhs.sendCANameList == rhs.sendCANameList
+            && lhs.renegotiationSupport == rhs.renegotiationSupport
+            && lhs.shutdownTimeout == rhs.shutdownTimeout
+            && lhs.pskHint == rhs.pskHint
+            && lhs.applicationProtocols == rhs.applicationProtocols
+            && lhs.pskIdentityResolver === rhs.pskIdentityResolver
+            && lhs.minimumTLSVersion == rhs.minimumTLSVersion
+            && lhs.maximumTLSVersion == rhs.maximumTLSVersion
+            && lhs.cipherSuiteValues == rhs.cipherSuiteValues
+            && lhs.tlsPins == rhs.tlsPins
+            && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
     }
 }
 

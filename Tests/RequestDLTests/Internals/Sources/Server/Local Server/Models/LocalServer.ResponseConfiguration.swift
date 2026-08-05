@@ -1,35 +1,48 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
-#else
-@preconcurrency import Foundation
-#endif
 import NIO
-import NIOSSL
 import NIOHTTP1
+import NIOSSL
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import class Foundation.JSONEncoder
+#endif
 
 extension LocalServer {
 
     struct ResponseConfiguration: Sendable {
 
+        let status: NIOHTTP1.HTTPResponseStatus
         let headers: NIOHTTP1.HTTPHeaders
         let data: Data
 
-        init(headers: NIOHTTP1.HTTPHeaders = .init(), data: Data) {
+        init(status: NIOHTTP1.HTTPResponseStatus = .ok, headers: NIOHTTP1.HTTPHeaders = .init(), data: Data) {
+            self.status = status
             self.headers = headers
             self.data = data
         }
 
-        init(headers: NIOHTTP1.HTTPHeaders = .init(), jsonObject: Any) throws {
+        /// - Note: `Value: Encodable`, not `Any` plus `JSONSerialization` — every call site
+        /// passes a `String`, and `JSONEncoder` handles a bare top-level value the same way
+        /// `JSONSerialization`'s `.fragmentsAllowed` used to, without needing `Foundation`.
+        init<Value: Encodable>(
+            status: NIOHTTP1.HTTPResponseStatus = .ok,
+            headers: NIOHTTP1.HTTPHeaders = .init(),
+            jsonObject: Value
+        ) throws {
+            self.status = status
             self.headers = headers
-            self.data = try JSONSerialization.data(
-                withJSONObject: jsonObject,
-                options: [.sortedKeys, .fragmentsAllowed]
-            )
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            self.data = try encoder.encode(jsonObject)
         }
     }
 }

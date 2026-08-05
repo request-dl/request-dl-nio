@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A property that represents the host of a network request.
 public struct HostHeader: Property {
@@ -20,13 +18,13 @@ public struct HostHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `Host` property with the given `host` and `port`.
-
-     - Parameters:
-        - host: A `StringProtocol` representing the host.
-        - port: A `StringProtocol` representing the port.
-     */
+    ///
+    /// Initializes a `Host` property with the given `host` and `port`.
+    ///
+    /// - Parameters:
+    ///    - host: A `StringProtocol` representing the host.
+    ///    - port: A `StringProtocol` representing the port.
+    ///
     public init<Host, Port>(
         _ host: Host,
         port: Port
@@ -34,11 +32,11 @@ public struct HostHeader: Property {
         self.value = "\(host):\(port)"
     }
 
-    /**
-     Initializes a `Host` property with the given `host`.
-
-     - Parameter host: A `StringProtocol` representing the host.
-     */
+    ///
+    /// Initializes a `Host` property with the given `host`.
+    ///
+    /// - Parameter host: A `StringProtocol` representing the host.
+    ///
     public init<S: StringProtocol>(_ host: S) {
         self.value = String(host)
     }
@@ -51,11 +49,13 @@ public struct HostHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "Host",
-            value: property.value,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Host",
+                value: property.value,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

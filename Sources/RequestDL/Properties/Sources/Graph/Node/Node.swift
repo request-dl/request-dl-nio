@@ -1,30 +1,31 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
+/// A node in the resolved property graph.
+///
+/// Exposes its children rather than iterating itself. The previous shape, `mutating func
+/// next()`, put traversal state inside the data: every walk had to copy the node first to
+/// avoid consuming it, and correctness rested on every conformance being a value type, which
+/// a protocol cannot require. A single `final class` conformance would have made the first
+/// traversal eat the graph, and the second one find an empty tree with no error anywhere.
 protocol Node: Sendable, NodeStringConvertible {
 
-    mutating func next() -> Node?
+    var children: [Node] { get }
 }
 
 extension Node {
 
     var nodeDescription: String {
         let title = String(describing: type(of: self))
-        var mutableSelf = self
-        var children = [String]()
+        let descriptions = children.map(\.nodeDescription)
 
-        while let node = mutableSelf.next() {
-            children.append(node.nodeDescription)
-        }
-
-        if children.isEmpty {
+        guard !descriptions.isEmpty else {
             return title
         }
 
-        let childrenDescription = children
+        let childrenDescription =
+            descriptions
             .joined(separator: ",\n")
             .debug_shiftLines()
 
@@ -41,10 +42,8 @@ extension Node {
             return leaf
         }
 
-        var mutableSelf = self
-
-        while let node = mutableSelf.next() {
-            if let property = node.first(of: propertyNode) {
+        for child in children {
+            if let property = child.first(of: propertyNode) {
                 return property
             }
         }
@@ -59,13 +58,8 @@ extension Node {
             return [leaf]
         }
 
-        var mutableSelf = self
-        var items = [LeafNode<Property>]()
-
-        while let node = mutableSelf.next() {
-            items.append(contentsOf: node.search(for: propertyNode))
+        return children.flatMap {
+            $0.search(for: propertyNode)
         }
-
-        return items
     }
 }

@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 private struct HeaderStrategyKey: RequestEnvironmentKey {
     static let defaultValue: HeaderStrategy = .adding
@@ -18,12 +16,12 @@ extension RequestEnvironmentValues {
 
 extension Property {
 
-    /**
-     Sets the header strategy for the property.
-
-     - Parameter headerStrategy: The header strategy to be set.
-     - Returns: A modified version of the property with the updated header strategy.
-     */
+    ///
+    /// Sets the header strategy for the property.
+    ///
+    /// - Parameter headerStrategy: The header strategy to be set.
+    /// - Returns: A modified version of the property with the updated header strategy.
+    ///
     public func headerStrategy(_ headerStrategy: HeaderStrategy) -> some Property {
         environment(\.headerStrategy, headerStrategy)
     }

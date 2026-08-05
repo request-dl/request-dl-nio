@@ -1,177 +1,128 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
+
+/// Thrown when a response body is read a second time.
+///
+/// The bytes of a response are buffered until somebody starts reading them, and released to
+/// that reader as it advances. There is nothing left for a second reader, so this is raised
+/// instead of handing back whatever survived, which would be a partial result that changes
+/// with how far the first reader got.
+public struct AlreadyConsumedError: Error, CustomStringConvertible {
+
+    public var description: String {
+        """
+        This response body has already been consumed. Read it once and keep the result, or \
+        issue the request again.
+        """
+    }
+
+    init() {}
+}
 
 extension Internals {
 
+    /// A replaying broadcast stream of values, terminated by completion or by an error.
+    ///
+    /// Backed by `ReplaySubject`. Replay is load bearing rather than incidental: `constant(_:)`,
+    /// `throwing(_:)` and `empty()` produce and finish during construction, and on the live path
+    /// the download iterator is only created when the caller reaches for the bytes, long after
+    /// they start arriving.
+    ///
+    /// Streams that are only ever read once should be built with `.untilFirstIteration`, which
+    /// keeps that guarantee while dropping the retained bytes to the gap between producer and
+    /// reader once reading starts.
     struct AsyncStream<Element: Sendable>: Sendable, Hashable, AsyncSequence {
+
+        // MARK: - Inner types
+
+        /// What travels through the subject.
+        ///
+        /// `Result<Element, Error>` cannot be carried directly because `any Error` is not
+        /// `Sendable`. Marking this payload unchecked states the assumption in one visible
+        /// place, instead of burying it under an unchecked conformance on a whole storage
+        /// class the way the previous implementation did.
+        fileprivate enum Value: @unchecked Sendable {
+            case success(Element)
+            case failure(any Error)
+        }
+
+        /// Anchor for `Hashable`.
+        ///
+        /// The subject is a value type, so equality needs something that copies of this stream
+        /// share and separately created streams do not.
+        fileprivate final class Identity: Sendable {}
 
         struct AsyncIterator: Sendable, AsyncIteratorProtocol {
 
+            // MARK: - Inner types
+
+            fileprivate enum State: @unchecked Sendable {
+                case iterating(SubjectAsyncIterator<Value>)
+                /// Raised on the first `next()`. `makeAsyncIterator()` cannot throw, so a
+                /// stream with nothing left to give hands back an iterator that explains
+                /// itself the moment somebody reads from it.
+                case failed(any Error)
+                case done
+            }
+
             // MARK: - Private properties
 
-            fileprivate var node: @Sendable () async -> Node?
+            fileprivate var state: State
 
             // MARK: - Internal methods
 
             mutating func next() async throws -> Element? {
-                guard let node = await node() else {
+                switch state {
+                case .done:
                     return nil
-                }
 
-                self.node = { await node.next() }
-
-                switch node.value {
-                case .success(let value):
-                    return value
-                case .failure(let error):
+                case .failed(let error):
+                    state = .done
                     throw error
-                }
-            }
-        }
 
-        private final class Storage: @unchecked Sendable {
-
-            // MARK: - Private properties
-
-            private let lock = AsyncLock()
-            private let rootSignal = AsyncSignal()
-
-            // MARK: - Unsafe properties
-
-            private var _root: Node?
-            private weak var _last: Node?
-
-            private var _isClosed = false
-
-            // MARK: - Inits
-            init() {}
-
-            func append(_ value: Result<Element, Error>) async {
-                await lock.withLock {
-                    guard !_isClosed else {
-                        return
+                case .iterating(var iterator):
+                    guard let value = await iterator.next() else {
+                        state = .done
+                        return nil
                     }
 
-                    let next = Node(value)
+                    state = .iterating(iterator)
 
-                    if let node = _last ?? _root {
-                        await node.append(next)
-                        _last = next
-                    } else {
-                        _root = next
-                        _last = next
-                        rootSignal.signal()
+                    switch value {
+                    case .success(let element):
+                        return element
+
+                    case .failure(let error):
+                        state = .done
+                        throw error
                     }
-
-                    if case .failure = value {
-                        await _close()
-                    }
-                }
-            }
-
-            func close() async {
-                await lock.withLock {
-                    await _close()
-                }
-            }
-
-            func root() async -> Node? {
-                await rootSignal.wait()
-
-                return await lock.withLock {
-                    _root
-                }
-            }
-
-            // MARK: - Unsafe methods
-
-            private func _close() async {
-                guard !_isClosed else {
-                    return
-                }
-
-                _isClosed = true
-                await (_last ?? _root)?.close()
-
-                if _root == nil {
-                    rootSignal.signal()
-                }
-            }
-        }
-
-        fileprivate final class Node: @unchecked Sendable {
-
-            // MARK: - Internal properties
-
-            let value: Result<Element, Error>
-
-            // MARK: - Private properties
-
-            private let lock = AsyncLock()
-            private let nextSignal = AsyncSignal()
-
-            // MARK: - Unsafe properties
-
-            private var _next: Node?
-            private var _isClosed: Bool = false
-
-            // MARK: - Inits
-
-            init(_ value: Result<Element, Error>) {
-                self.value = value
-                self._next = nil
-            }
-
-            // MARK: - Internal methods
-
-            func next() async -> Node? {
-                await nextSignal.wait()
-
-                return await lock.withLock {
-                    _next
-                }
-            }
-
-            func append(_ node: Node) async {
-                await lock.withLock {
-                    guard _next == nil else {
-                        fatalError()
-                    }
-
-                    _next = node
-                    _isClosed = true
-                    nextSignal.signal()
-                }
-            }
-
-            func close() async {
-                await lock.withLock {
-                    guard !_isClosed else {
-                        return
-                    }
-
-                    _isClosed = true
-                    nextSignal.signal()
                 }
             }
         }
 
         // MARK: - Private properties
 
-        private let storage = Storage()
-        private let queue = AsyncQueue()
+        private let subject: ReplaySubject<Value>
+        private let identity: Identity
 
         // MARK: - Inits
 
-        init() {}
+        /// Creates a new stream.
+        /// - Parameter bufferingPolicy: `.unbounded` keeps everything for every reader.
+        /// `.untilFirstIteration` keeps everything until somebody starts reading and then
+        /// releases it to that reader, which makes the stream single use.
+        init(bufferingPolicy: SubjectBufferingPolicy = .unbounded) {
+            subject = .init(bufferingPolicy: bufferingPolicy)
+            identity = .init()
+        }
 
         // MARK: - Internal static methods
 
         static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-            lhs.storage === rhs.storage
+            lhs.identity === rhs.identity
         }
 
         static func empty() -> AsyncStream<Element> {
@@ -197,23 +148,32 @@ extension Internals {
         // MARK: - Internal methods
 
         func append(_ value: Result<Element, Error>) {
-            queue.addOperation {
-                await storage.append(value)
+            switch value {
+            case .success(let element):
+                subject.send(.success(element))
+
+            case .failure(let error):
+                // A failure ends the stream, matching the previous behaviour where appending
+                // one triggered a close.
+                subject.send(.failure(error))
+                subject.completed()
             }
         }
 
         func close() {
-            queue.addOperation {
-                await storage.close()
-            }
+            subject.completed()
         }
 
         func makeAsyncIterator() -> AsyncIterator {
-            .init(node: { await storage.root() })
+            guard let iterator = subject.makeIteratorIfAvailable() else {
+                return .init(state: .failed(AlreadyConsumedError()))
+            }
+
+            return .init(state: .iterating(iterator))
         }
 
         func hash(into hasher: inout Hasher) {
-            hasher.combine(ObjectIdentifier(storage))
+            hasher.combine(ObjectIdentifier(identity))
         }
     }
 }

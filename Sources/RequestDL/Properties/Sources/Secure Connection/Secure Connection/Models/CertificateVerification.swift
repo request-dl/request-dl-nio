@@ -1,15 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOSSL
 
-/**
- An enumeration that represents different modes of certificate verification.
-
- `CertificateVerification` provides options to specify how certificates should be verified in Swift.
- */
+/// An enumeration that represents different modes of certificate verification.
+///
+/// `CertificateVerification` provides options to specify how certificates should be verified in Swift.
 public enum CertificateVerification: Sendable, Hashable {
 
     /// Indicates that all certificate verification is disabled.

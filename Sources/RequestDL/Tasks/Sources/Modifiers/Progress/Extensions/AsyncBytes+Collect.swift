@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension AsyncBytes {
 
@@ -35,15 +40,23 @@ extension AsyncBytes {
     }
 
     private func log(receivedBytes: Data) {
-        logger?.log(level: .debug, "Downloaded \(receivedBytes.count) bytes", additionalMetadata: [
-            "raw_bytes": .stringConvertible(receivedBytes),
-            "total_size": .stringConvertible(totalSize)
-        ])
+        logger?.log(
+            level: .debug,
+            "Downloaded \(receivedBytes.count) bytes",
+            additionalMetadata: [
+                "raw_bytes": .stringConvertible(receivedBytes),
+                "total_size": .stringConvertible(totalSize),
+            ]
+        )
     }
 
     private func log(data: Data) {
-        logger?.log(level: .debug, "Data fetched: \(data.count) bytes", additionalMetadata: [
-            "raw_bytes": .string(data.safeLogDescription())
-        ])
+        logger?.log(
+            level: .debug,
+            "Data fetched: \(data.count) bytes",
+            additionalMetadata: [
+                "raw_bytes": .string(data.safeLogDescription())
+            ]
+        )
     }
 }

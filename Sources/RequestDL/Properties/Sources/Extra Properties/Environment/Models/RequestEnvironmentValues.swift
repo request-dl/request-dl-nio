@@ -1,15 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 import Logging
 
-/**
- ``RequestEnvironmentValues`` is a type that contains all of the environment values
- for a property hierarchy. It is accessible via a subscript on a property's ``PropertyEnvironment`` wrapper.
- */
+/// ``RequestEnvironmentValues`` is a type that contains all of the environment values
+/// for a property hierarchy. It is accessible via a subscript on a property's ``PropertyEnvironment`` wrapper.
 public struct RequestEnvironmentValues: Sendable {
 
     fileprivate struct Entry: Sendable, CustomDebugStringConvertible {
@@ -17,7 +13,7 @@ public struct RequestEnvironmentValues: Sendable {
         let keyStringLiteral: @Sendable () -> String
 
         var debugDescription: String {
-            "\(keyStringLiteral()): \(String(reflecting: self))"
+            "\(keyStringLiteral()): \(String(reflecting: value))"
         }
     }
 
@@ -34,12 +30,12 @@ public struct RequestEnvironmentValues: Sendable {
 
     // MARK: - Public methods
 
-    /**
-     Subscript for retrieving an `Value` for a given ``RequestEnvironmentKey`` type.
-
-     - Parameter key: The ``RequestEnvironmentKey`` type to retrieve the `Value` for.
-     - Returns: The `Value` in the environment for the given `Key`.
-     */
+    ///
+    /// Subscript for retrieving an `Value` for a given ``RequestEnvironmentKey`` type.
+    ///
+    /// - Parameter key: The ``RequestEnvironmentKey`` type to retrieve the `Value` for.
+    /// - Returns: The `Value` in the environment for the given `Key`.
+    ///
     public subscript<Key: RequestEnvironmentKey>(key: Key.Type) -> Key.Value {
         get {
             guard
@@ -71,6 +67,3 @@ extension RequestEnvironmentValues: CustomDebugStringConvertible {
         return "\(type(of: self))(\n\t" + entryStrings.joined(separator: ",\n\t") + "\n)"
     }
 }
-
-@available(*, deprecated, renamed: "RequestEnvironmentValues")
-public typealias PropertyEnvironmentValues = RequestEnvironmentValues

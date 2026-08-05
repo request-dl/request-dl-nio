@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
 
 extension AsyncResponse {
@@ -42,17 +41,25 @@ extension AsyncResponse {
     }
 
     func log(receivedStep step: UploadStep) {
-        logger?.log(level: .debug, "Uploaded \(step.chunkSize) bytes", additionalMetadata: [
-            "chunk_size": .stringConvertible(step.chunkSize),
-            "total_size": .stringConvertible(step.totalSize),
-        ])
+        logger?.log(
+            level: .debug,
+            "Uploaded \(step.chunkSize) bytes",
+            additionalMetadata: [
+                "chunk_size": .stringConvertible(step.chunkSize),
+                "total_size": .stringConvertible(step.totalSize),
+            ]
+        )
     }
 
     func log(responseHead: ResponseHead) {
-        logger?.log(level: .debug, "Received response", additionalMetadata: [
-            "status": .stringConvertible(responseHead.status),
-            "version": .stringConvertible(responseHead.version),
-            "keep_alive": .stringConvertible(responseHead.isKeepAlive)
-        ])
+        logger?.log(
+            level: .debug,
+            "Received response",
+            additionalMetadata: [
+                "status": .stringConvertible(responseHead.status),
+                "version": .stringConvertible(responseHead.version),
+                "keep_alive": .stringConvertible(responseHead.isKeepAlive),
+            ]
+        )
     }
 }

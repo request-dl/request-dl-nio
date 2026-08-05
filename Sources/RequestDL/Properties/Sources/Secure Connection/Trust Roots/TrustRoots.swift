@@ -1,12 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/// Configure the trusted certificates to validate the server using TLS.
-@available(*, deprecated, renamed: "TrustRoots")
-public typealias Trusts<Content: Property> = TrustRoots<Content>
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+#if canImport(Darwin)
+import class Foundation.Bundle
+#endif
+#endif
 
 /// Configure the trusted roots certificates to validate the server using TLS.
 public struct TrustRoots<Content: Property>: Property {
@@ -58,58 +60,60 @@ public struct TrustRoots<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Instantiate using a group of ``RequestDL/Certificates`` that forms a hierarchy of trusted certificates.
-
-     ```swift
-     DataTask {
-        SecureConnection {
-            TrustRoots {
-                Certificate(rootPath, format: .der)
-                Certificate(secondPath, format: .pem)
-            }
-        }
-        .verification(.fullVerification)
-     }
-     ```
-
-     - Parameter content: A closure that returns the content of ``RequestDL/Certificate``.
-     */
+    ///
+    /// Instantiate using a group of ``RequestDL/Certificates`` that forms a hierarchy of trusted certificates.
+    ///
+    /// ```swift
+    /// DataTask {
+    ///    SecureConnection {
+    ///        TrustRoots {
+    ///            Certificate(rootPath, format: .der)
+    ///            Certificate(secondPath, format: .pem)
+    ///        }
+    ///    }
+    ///    .verification(.fullVerification)
+    /// }
+    /// ```
+    ///
+    /// - Parameter content: A closure that returns the content of ``RequestDL/Certificate``.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
-    /**
-     Initializes with the specified `PEM` file.
-
-     - Parameter file: The path to the file.
-     */
+    ///
+    /// Initializes with the specified `PEM` file.
+    ///
+    /// - Parameter file: The path to the file.
+    ///
     public init(_ file: String) where Content == Never {
         source = .file(file)
     }
 
-    /**
-     Initializes with the specified bytes in `PEM` format.
-
-     - Parameter bytes: An array of bytes.
-     */
+    ///
+    /// Initializes with the specified bytes in `PEM` format.
+    ///
+    /// - Parameter bytes: An array of bytes.
+    ///
     public init(_ bytes: [UInt8]) where Content == Never {
         source = .bytes(bytes)
     }
 
-    /**
-     Initializes with the specified `PEM` file in some bundle.
-
-     - Parameters:
-        - file: The path to the file.
-        - bundle: The bundle containing the file.
-     */
+    #if canImport(Darwin)
+    ///
+    /// Initializes with the specified `PEM` file in some bundle.
+    ///
+    /// - Parameters:
+    ///    - file: The path to the file.
+    ///    - bundle: The bundle containing the file.
+    ///
     public init(
         _ file: String,
         in bundle: Bundle
     ) where Content == Never {
         self.init(Certificate.Format.pem.resolve(for: file, in: bundle))
     }
+    #endif
 
     // MARK: - Public static methods
 
@@ -122,15 +126,19 @@ public struct TrustRoots<Content: Property>: Property {
 
         switch property.source {
         case .file(let file):
-            return .leaf(SecureConnectionNode(
-                Node(source: .file(file)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .file(file)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .bytes(let bytes):
-            return .leaf(SecureConnectionNode(
-                Node(source: .bytes(bytes)),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(source: .bytes(bytes)),
+                    logger: inputs.environment.logger
+                )
+            )
         case .content(let content):
             var inputs = inputs
             inputs.environment.certificateProperty = .trust
@@ -140,13 +148,18 @@ public struct TrustRoots<Content: Property>: Property {
                 inputs: inputs
             )
 
-            return .leaf(SecureConnectionNode(
-                Node(source: .nodes(outputs.node
-                    .search(for: SecureConnectionNode.self)
-                    .filter { $0.contains(CertificateNode.self) }
-                )),
-                logger: inputs.environment.logger
-            ))
+            return .leaf(
+                SecureConnectionNode(
+                    Node(
+                        source: .nodes(
+                            outputs.node
+                                .search(for: SecureConnectionNode.self)
+                                .filter { $0.contains(CertificateNode.self) }
+                        )
+                    ),
+                    logger: inputs.environment.logger
+                )
+            )
         }
     }
 }

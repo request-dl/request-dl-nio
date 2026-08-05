@@ -1,11 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import struct Foundation.Data
+import class Foundation.JSONEncoder
 #endif
 
 struct EncodablePayloadFactory: Sendable, PayloadFactory {
@@ -33,40 +34,47 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
 
     // MARK: - Internal methods
 
-    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
+    func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
+        // Encoded once, with the encoder the caller configured, and reused on every path.
+        //
+        // - Important: The form-urlencoded path must not re-encode through a default
+        // `JSONEncoder` — that would silently drop the caller's settings. That matters more
+        // here than anywhere else: on this path the JSON keys become the form field names, so a
+        // caller who asked for `.convertToSnakeCase` would quietly send camel case over the
+        // wire, and a fallback branch encoding a third time with the right encoder would produce
+        // a body that does not match the object just inspected.
+        let data = try encode(encoder)
+
         guard contentType.isFormURLEncoded else {
-            return try .init(
+            return await .init(
                 contentType: contentType,
-                source: .buffer(Internals.DataBuffer(encode(encoder)))
+                source: .buffer(Internals.DataBuffer(data))
             )
         }
 
-        let jsonData = try encode(.init())
+        // Parsed through `JSONDecoder` rather than `JSONSerialization`, which is not part of
+        // `FoundationEssentials`. `JSONPayloadFactory` is gated behind `canImport(Darwin)` for
+        // exactly that reason, and this file was reaching for the same type with no guard at
+        // all, so the form-urlencoded path could not build off Apple.
+        switch Internals.JSONValue.decoding(data) {
+        case .object(let object):
+            return try input.jsonObject(
+                object.mapValues(\.rawValue) as [AnyHashable: Any],
+                contentType: contentType
+            )
 
-        switch try JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) {
-        case let array as [Any]:
-            return try input.jsonObject(array, contentType: contentType)
-        case let dictionary as [AnyHashable: Any]:
-            return try input.jsonObject(dictionary, contentType: contentType)
+        case .array(let array):
+            return try input.jsonObject(
+                array.map(\.rawValue),
+                contentType: contentType
+            )
+
         default:
-            return try .init(
+            // A top level fragment, or something that did not parse. Sent as already encoded.
+            return await .init(
                 contentType: contentType,
-                source: .buffer(Internals.DataBuffer(encode(encoder)))
+                source: .buffer(Internals.DataBuffer(data))
             )
         }
-    }
-
-    func callAsFunction() throws -> Internals.AnyBuffer {
-        try Internals.DataBuffer(encode(encoder))
-    }
-}
-
-extension ContentType {
-
-    var isFormURLEncoded: Bool {
-        description.range(
-            of: ContentType.formURLEncoded.description,
-            options: .caseInsensitive
-        ) != nil
     }
 }

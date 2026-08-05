@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct ResolveTests {
@@ -46,7 +46,7 @@ struct ResolveTests {
                 CacheHeader()
                     .public(true)
 
-                Timeout(60) // should be eliminated
+                Timeout(60)  // should be eliminated
             }
 
             QueryGroup {
@@ -213,19 +213,17 @@ extension ResolveTests {
                                     name = q,
                                     value = some question,
                                     urlEncoder = URLEncoder {
-                                        lock = Lock {
-                                            _lock = NIOLock {
-                                                _storage = NIOConcurrencyHelpers.LockStorage<()>
-                                            }
-                                        },
-                                        _dateEncodingStrategy = .iso8601,
-                                        _keyEncodingStrategy = .literal,
-                                        _dataEncodingStrategy = .base64,
-                                        _boolEncodingStrategy = .literal,
-                                        _optionalEncodingStrategy = .literal,
-                                        _arrayEncodingStrategy = .droppingIndex,
-                                        _dictionaryEncodingStrategy = .subscripted,
-                                        _whitespaceEncodingStrategy = .percentEscaping
+                                        lock = Lock,
+                                        _configuration = Configuration {
+                                            date = .iso8601,
+                                            key = .literal,
+                                            data = .base64,
+                                            bool = .literal,
+                                            optional = .literal,
+                                            array = .droppingIndex,
+                                            dictionary = .subscripted,
+                                            whitespace = .percentEscaping
+                                        }
                                     }
                                 }
                             }

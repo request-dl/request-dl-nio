@@ -1,15 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIO
-import NIOSSL
 import NIOHTTP1
+import NIOSSL
+import SwiftAsyncStream
+
+@testable import RequestDL
+
 #if canImport(Darwin)
 import NIOTransportServices
 #endif
-@testable import RequestDL
 
 struct LocalServer: Sendable {
 
@@ -22,7 +24,22 @@ struct LocalServer: Sendable {
         // MARK: - Private properties
 
         private let lock = AsyncLock()
-        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        // Shared process-wide across every suite that spins up a LocalServer (DataTaskTests,
+        // DownloadTaskTests, UploadTaskTests, InternalsSessionTests, ModifiersCollect*Tests,
+        // CachedRequestTests, ...). swift-testing runs suites concurrently by default, so too few
+        // threads here queues every concurrent suite's TLS handshakes behind each other —
+        // tolerable on lighter simulators, not on visionOS (see InternalsSessionTests'
+        // connectTimeout/tlsHandshakeTimeout failures in visionOS CI).
+        //
+        // Bumped from 1 to 4 threads previously (see git history), which held up until a CI run
+        // with unusually heavy shared-runner contention (ci-triage/TASKS.md T4) reproduced the
+        // same connectTimeout on both `InternalsSessionTests.session_whenPerformingGet_shouldBeValid`
+        // and, independently, `LocalServerConcurrencyTests.manyConcurrentSessions_
+        // shareLocalServerWithoutCrossTalkOrHanging` itself — the latter alone drives 200
+        // concurrently-connecting client sessions at this same group. Bumped again to 8; still a
+        // fixed headroom guess rather than a guarantee against arbitrarily bad contention, so a
+        // recurrence here should widen this further rather than be treated as a new bug.
+        private let group = MultiThreadedEventLoopGroup(numberOfThreads: 8)
 
         // MARK: - Unsafe properties
 
@@ -43,8 +60,7 @@ struct LocalServer: Sendable {
 
                 guard
                     !_channels.keys.contains(where: {
-                        $0.host == serverConfiguration.host &&
-                        $0.port == serverConfiguration.port
+                        $0.host == serverConfiguration.host && $0.port == serverConfiguration.port
                     })
                 else { fatalError() }
 
@@ -59,7 +75,7 @@ struct LocalServer: Sendable {
                         channel.pipeline
                             .addHandlers([
                                 BackPressureHandler(),
-                                NIOSSLServerHandler(context: sslContext)
+                                NIOSSLServerHandler(context: sslContext),
                             ])
                             .flatMap {
                                 channel.pipeline.configureHTTPServerPipeline()

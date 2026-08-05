@@ -1,24 +1,20 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A custom error type representing base URL-related errors.
-
- ```swift
- throw BaseURLError(
-    context: .invalidHost,
-    baseURL: "http://example.com"
- )
- ```
- */
+/// A custom error type representing base URL-related errors.
+///
+/// ```swift
+/// throw BaseURLError(
+///    context: .invalidHost,
+///    baseURL: "http://example.com"
+/// )
+/// ```
 public struct BaseURLError: Error {
 
-    /**
-     The possible contexts for the base URL error.
-     */
+    ///
+    /// The possible contexts for the base URL error.
+    ///
     public enum Context: Sendable {
         /// The host string provided is invalid, as it should not include the protocol.
         case invalidHost
@@ -37,37 +33,18 @@ public struct BaseURLError: Error {
 
     // MARK: - Initializer
 
-    /**
-     Initializes a `BaseURLError` instance.
-
-     - Parameters:
-        - context: The context of the error.
-        - baseURL: The base URL associated with the error.
-     */
+    ///
+    /// Initializes a `BaseURLError` instance.
+    ///
+    /// - Parameters:
+    ///    - context: The context of the error.
+    ///    - baseURL: The base URL associated with the error.
+    ///
     public init(
         context: Context,
         baseURL: String
     ) {
         self.context = context
         self.baseURL = baseURL
-    }
-}
-
-@available(*, deprecated)
-extension BaseURLError: LocalizedError {
-
-    public var errorDescription: String? {
-        switch context {
-        case .invalidHost:
-            return """
-                Invalid host string: The url scheme should not be \
-                included; BaseURL: \(baseURL)
-                """
-        case .unexpectedHost:
-            return """
-                Unexpected format for host string: Could not extract the \
-                host; BaseURL: \(baseURL)
-                """
-        }
     }
 }

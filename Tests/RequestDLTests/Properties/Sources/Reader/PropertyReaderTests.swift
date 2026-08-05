@@ -1,33 +1,42 @@
-/*
- See LICENSE for this package's licensing information.
- */
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+#endif
 
 struct PropertyReaderTests {
 
     @Test
     func propertyReaderModifiesBasedOnResolvedConfiguration() async throws {
-        for _ in 1 ... 5 {
+        for _ in 1...5 {
             let content = PropertyGroup {
                 BaseURL(.https, host: "apple.com:1090")
                 CustomHeader(name: "Authorization", value: UUID().uuidString)
                 ReferenceMemoryProperty()
             }
 
-            let resolved = try await resolve(TestProperty {
-                PropertyReader(content) { context in
-                    if context.requestConfiguration.url.contains("apple.com:1090") {
-                        BaseURL(.http, host: "google.com")
-                    }
+            let resolved = try await resolve(
+                TestProperty {
+                    PropertyReader(content) { context in
+                        if context.requestConfiguration.url.contains("apple.com:1090") {
+                            BaseURL(.http, host: "google.com")
+                        }
 
-                    if context.requestConfiguration.headers.contains(name: "Authorization") {
-                        Authorization(.bearer, token: UUID().uuidString)
+                        if context.requestConfiguration.headers.contains(name: "Authorization") {
+                            Authorization(.bearer, token: UUID().uuidString)
+                        }
                     }
                 }
-            })
+            )
 
             #expect(resolved.requestConfiguration.url == "http://google.com?counter=0")
             #expect(
@@ -36,7 +45,7 @@ struct PropertyReaderTests {
                 }
             )
 
-            try await Task.sleep(nanoseconds: 1 * NSEC_PER_SEC)
+            try await Task.sleep(nanoseconds: 1_000_000_000)
         }
 
         // Checks if the shared property (ReferenceMemoryProperty) also reflects the expected state
@@ -46,6 +55,14 @@ struct PropertyReaderTests {
         // Expects the counter parameter to be present with its initial value '0'
         // This verifies the initial state captured by the first execution of ReferenceMemoryProperty
         #expect(resolved.requestConfiguration.url.contains("counter=0"))
+    }
+
+    @Test func neverBody() async throws {
+        // Given
+        let property = PropertyReader(EmptyProperty()) { _ in EmptyProperty() }
+
+        // Then
+        try await assertNever(property.body)
     }
 }
 

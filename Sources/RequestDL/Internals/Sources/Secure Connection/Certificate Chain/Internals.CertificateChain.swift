@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOSSL
 
 extension Internals {
@@ -38,9 +37,11 @@ extension Internals {
             switch self {
             case .certificates(let certificates):
                 return try certificates.reduce(into: []) {
-                    try $0.append(contentsOf: $1.build().map {
-                        .certificate($0)
-                    })
+                    try $0.append(
+                        contentsOf: $1.build().map {
+                            .certificate($0)
+                        }
+                    )
                 }
             case .bytes(let bytes):
                 return try NIOSSLCertificate.fromPEMBytes(bytes).map {

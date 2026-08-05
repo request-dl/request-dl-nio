@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Array {
 
@@ -32,7 +30,7 @@ extension Array where Element: Equatable {
 
         let lowerBound = index(endIndex, offsetBy: -suffix.endIndex)
 
-        return Array(self[lowerBound ..< endIndex]) == suffix
+        return Array(self[lowerBound..<endIndex]) == suffix
     }
 
     private func _components<S: Sequence>(

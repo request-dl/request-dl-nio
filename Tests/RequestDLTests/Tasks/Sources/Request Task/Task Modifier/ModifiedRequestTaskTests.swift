@@ -1,9 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 import Testing
+
 @testable import RequestDL
 
 struct ModifiedRequestTaskTests {
@@ -27,9 +28,11 @@ struct ModifiedRequestTaskTests {
         _ = try await MockedTask {
             BaseURL("localhost")
         }
-        .modifier(Modified {
-            taskModified.wrappedValue = true
-        })
+        .modifier(
+            Modified {
+                taskModified.wrappedValue = true
+            }
+        )
         .result()
 
         // Then

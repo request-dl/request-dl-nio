@@ -1,11 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+#if canImport(Darwin)
+import struct Foundation.DispatchTime
+#endif
 #endif
 
 extension Internals.ClientManager {
@@ -16,7 +18,14 @@ extension Internals.ClientManager {
 
         let sessionConfiguration: Internals.Session.Configuration
         let client: Internals.Client
-        let readAt: Date
+
+        #if canImport(Darwin)
+        /// Monotonic. See ``Internals/ClientManager/cleanupIfNeeded()`` for why this is not a
+        /// `Date`.
+        let readAt: UInt64
+        #else
+        let readAt: ContinuousClock.Instant
+        #endif
 
         // MARK: - Internal static methods
 
@@ -27,7 +36,13 @@ extension Internals.ClientManager {
             .init(
                 sessionConfiguration: sessionConfiguration,
                 client: client,
-                readAt: .init()
+                readAt: {
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds
+                    #else
+                    ContinuousClock.now
+                    #endif
+                }()
             )
         }
 
@@ -37,7 +52,13 @@ extension Internals.ClientManager {
             .init(
                 sessionConfiguration: sessionConfiguration,
                 client: client,
-                readAt: .init()
+                readAt: {
+                    #if canImport(Darwin)
+                    DispatchTime.now().uptimeNanoseconds
+                    #else
+                    ContinuousClock.now
+                    #endif
+                }()
             )
         }
     }

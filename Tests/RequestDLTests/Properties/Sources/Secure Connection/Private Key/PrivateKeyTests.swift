@@ -1,11 +1,21 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOSSL
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
+#if canImport(Darwin)
+import class Foundation.Bundle
+#endif
 
 struct PrivateKeyTests {
 
@@ -15,17 +25,20 @@ struct PrivateKeyTests {
         let resource = Certificates(.pem).client()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .file(
-                resource.privateKeyURL.absolutePath(percentEncoded: false)
-            )
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    .init(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+                )
         )
     }
 
@@ -35,18 +48,23 @@ struct PrivateKeyTests {
         let resource = Certificates(.der).client()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .der)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(resource.privateKeyURL.absolutePath(percentEncoded: false), format: .der)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(Internals.PrivateKey(
-                resource.privateKeyURL.absolutePath(percentEncoded: false),
-                format: .der
-            ))
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(
+                        resource.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: .der
+                    )
+                )
         )
     }
 
@@ -57,17 +75,20 @@ struct PrivateKeyTests {
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(bytes, format: .pem)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(bytes, format: .pem)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
-                Internals.PrivateKey(bytes, format: .pem)
-            )
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(bytes, format: .pem)
+                )
         )
     }
 
@@ -78,21 +99,30 @@ struct PrivateKeyTests {
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(bytes, format: .der)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(bytes, format: .der)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(Internals.PrivateKey(
-                bytes,
-                format: .der
-            ))
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(
+                        bytes,
+                        format: .der
+                    )
+                )
         )
     }
 
+    // `PrivateKey(_:in:format:)` only exists on Darwin — it is built on `Bundle`, which is not
+    // part of `FoundationEssentials`. This test exists to cover that initializer specifically,
+    // so unlike the rest of this file, it has no portable counterpart to fall back to.
+    #if canImport(Darwin)
     @Test
     func privateKey_whenInitPEMFileNoPasswordInBundle_shouldBeValid() async throws {
         // Given
@@ -101,19 +131,23 @@ struct PrivateKeyTests {
         let file = resource.privateKeyURL.lastPathComponent
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(file, in: .module, format: .pem)
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(file, in: .module, format: .pem)
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == Bundle.module.resolveURL(forResourceName: file).map {
-                .file($0.absolutePath(percentEncoded: false))
-            }
+            resolved.session.configuration.secureConnection?.privateKey
+                == Bundle.module.resolveURL(forResourceName: file).map {
+                    .privateKey(.init($0.absolutePath(percentEncoded: false), format: .pem))
+                }
         )
     }
+    #endif
 
     @Test
     func privateKey_whenInitPEMFileWithPasswordBytes() async throws {
@@ -122,25 +156,28 @@ struct PrivateKeyTests {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(
-                    resource.privateKeyURL.absolutePath(percentEncoded: false),
-                    format: .pem,
-                    password: password
-                )
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(
+                        resource.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: .pem,
+                        password: password
+                    )
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
-                Internals.PrivateKey(
-                    resource.privateKeyURL.absolutePath(percentEncoded: false),
-                    format: .pem,
-                    password: .init(password)
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(
+                        resource.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: .pem,
+                        password: .init(password)
+                    )
                 )
-            )
         )
     }
 
@@ -151,25 +188,28 @@ struct PrivateKeyTests {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(
-                    resource.privateKeyURL.absolutePath(percentEncoded: false),
-                    format: .der,
-                    password: password
-                )
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(
+                        resource.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: .der,
+                        password: password
+                    )
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
-                Internals.PrivateKey(
-                    resource.privateKeyURL.absolutePath(percentEncoded: false),
-                    format: .der,
-                    password: .init(password)
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(
+                        resource.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: .der,
+                        password: .init(password)
+                    )
                 )
-            )
         )
     }
 
@@ -181,25 +221,28 @@ struct PrivateKeyTests {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(
-                    bytes,
-                    format: .pem,
-                    password: password
-                )
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(
+                        bytes,
+                        format: .pem,
+                        password: password
+                    )
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
-                Internals.PrivateKey(
-                    bytes,
-                    format: .pem,
-                    password: .init(password)
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(
+                        bytes,
+                        format: .pem,
+                        password: .init(password)
+                    )
                 )
-            )
         )
     }
 
@@ -211,28 +254,33 @@ struct PrivateKeyTests {
         let password = NIOSSLSecureBytes("password".utf8)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(
-                    bytes,
-                    format: .der,
-                    password: password
-                )
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(
+                        bytes,
+                        format: .der,
+                        password: password
+                    )
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == .privateKey(
-                Internals.PrivateKey(
-                    bytes,
-                    format: .der,
-                    password: .init(password)
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(
+                        bytes,
+                        format: .der,
+                        password: .init(password)
+                    )
                 )
-            )
         )
     }
 
+    // Same reason as ``privateKey_whenInitPEMFileNoPasswordInBundle_shouldBeValid()`` above.
+    #if canImport(Darwin)
     @Test
     func privateKey_whenInitPEMFileWithPasswordBytesInBundle() async throws {
         // Given
@@ -242,30 +290,34 @@ struct PrivateKeyTests {
         let file = resource.privateKeyURL.lastPathComponent
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PrivateKey(
-                    file,
-                    in: .module,
-                    format: .pem,
-                    password: password
-                )
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PrivateKey(
+                        file,
+                        in: .module,
+                        format: .pem,
+                        password: password
+                    )
+                }
             }
-        })
+        )
 
         // Then
         #expect(
-            resolved.session.configuration.secureConnection?.privateKey == Bundle.module.resolveURL(forResourceName: file).map {
-                .privateKey(
-                    Internals.PrivateKey(
-                        $0.absolutePath(percentEncoded: false),
-                        format: .pem,
-                        password: .init(password)
+            resolved.session.configuration.secureConnection?.privateKey
+                == Bundle.module.resolveURL(forResourceName: file).map {
+                    .privateKey(
+                        Internals.PrivateKey(
+                            $0.absolutePath(percentEncoded: false),
+                            format: .pem,
+                            password: .init(password)
+                        )
                     )
-                )
-            }
+                }
         )
     }
+    #endif
 
     @Test
     func certificate_whenAccessBody_shouldBeNever() async throws {

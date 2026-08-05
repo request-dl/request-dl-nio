@@ -1,12 +1,19 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
-import NIOSSL
 import NIOCore
+import NIOSSL
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+import NIOFoundationEssentialsCompat
+#else
+import struct Foundation.Data
+#endif
 
 struct InternalsSecureConnectionTests {
 
@@ -65,23 +72,6 @@ struct InternalsSecureConnectionTests {
     }
 
     @Test
-    func secureConnection_whenPrivateKey_shouldBeValid() async throws {
-        // Given
-        var secureConnection = Internals.SecureConnection()
-
-        let server = Certificates().server()
-        let privateKeyPath = server.privateKeyURL.absolutePath(percentEncoded: false)
-
-        // When
-        secureConnection.privateKey = .file(privateKeyPath)
-
-        let sut = try secureConnection.build()
-
-        // Then
-        #expect(sut.tlsConfiguration.privateKey == .file(privateKeyPath))
-    }
-
-    @Test
     func secureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
@@ -103,7 +93,7 @@ struct InternalsSecureConnectionTests {
 
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
-            .ecdsaSecp384R1Sha384
+            .ecdsaSecp384R1Sha384,
         ]
 
         // When
@@ -122,7 +112,7 @@ struct InternalsSecureConnectionTests {
 
         let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
-            .ecdsaSecp384R1Sha384
+            .ecdsaSecp384R1Sha384,
         ]
 
         // When
@@ -235,12 +225,12 @@ struct InternalsSecureConnectionTests {
 
         let cipherSuitesValues: [NIOTLSCipher] = [
             .TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-            .TLS_RSA_WITH_AES_256_GCM_SHA384
+            .TLS_RSA_WITH_AES_256_GCM_SHA384,
         ]
 
         let cipherSuites = [
             "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
-            "TLS_RSA_WITH_AES_256_GCM_SHA384"
+            "TLS_RSA_WITH_AES_256_GCM_SHA384",
         ].joined(separator: ":")
 
         // When

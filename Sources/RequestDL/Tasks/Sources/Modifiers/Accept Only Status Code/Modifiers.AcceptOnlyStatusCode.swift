@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Modifiers {
 
@@ -15,14 +13,14 @@ extension Modifiers {
 
         // MARK: - Public methods
 
-        /**
-         Modifies a task to accept only the specified status codes.
-
-         - Parameter task: The task to modify.
-         - Returns: The modified task that accepts only the specified status codes.
-         - Throws: An `InvalidStatusCodeError` if the status code of the result is not
-         included in the set of accepted status codes.
-         */
+        ///
+        /// Modifies a task to accept only the specified status codes.
+        ///
+        /// - Parameter task: The task to modify.
+        /// - Returns: The modified task that accepts only the specified status codes.
+        /// - Throws: An `InvalidStatusCodeError` if the status code of the result is not
+        /// included in the set of accepted status codes.
+        ///
         public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
@@ -41,12 +39,12 @@ extension Modifiers {
 
 extension RequestTask where Element: TaskResultPrimitive {
 
-    /**
-     Returns a modified task that accepts only the specified status codes.
-
-     - Parameter statusCodes: The set of status codes to accept.
-     - Returns: A modified task that accepts only the specified status codes.
-     */
+    ///
+    /// Returns a modified task that accepts only the specified status codes.
+    ///
+    /// - Parameter statusCodes: The set of status codes to accept.
+    /// - Returns: A modified task that accepts only the specified status codes.
+    ///
     public func acceptOnlyStatusCode(
         _ statusCodes: StatusCodeSet
     ) -> ModifiedRequestTask<Modifiers.AcceptOnlyStatusCode<Element>> {

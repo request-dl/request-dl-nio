@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 
 extension Internals {
@@ -16,10 +15,11 @@ extension Internals {
             let logger: Internals.TaskLogger?
             let uploadingBytes: Int
             let upload: AsyncStream<Int>.AsyncIterator?
-            let download: (
-                head: Internals.AsyncStream<Internals.ResponseHead>,
-                bytes: Internals.AsyncStream<Internals.DataBuffer>
-            )?
+            let download:
+                (
+                    head: Internals.AsyncStream<Internals.ResponseHead>,
+                    bytes: Internals.AsyncStream<Internals.DataBuffer>
+                )?
 
             // MARK: - Internal methods
 
@@ -32,10 +32,12 @@ extension Internals {
                         download: download
                     )
 
-                    return .upload(.init(
-                        chunkSize: chunkSize,
-                        totalSize: uploadingBytes
-                    ))
+                    return .upload(
+                        .init(
+                            chunkSize: chunkSize,
+                            totalSize: uploadingBytes
+                        )
+                    )
                 }
 
                 guard let (heads, data) = download else {
@@ -61,14 +63,16 @@ extension Internals {
                         .compactMap(Int.init)
                         .max()
 
-                    return .download(DownloadStep(
-                        head: head,
-                        bytes: AsyncBytes(
-                            logger: logger,
-                            totalSize: totalSize ?? .zero,
-                            stream: data
+                    return .download(
+                        DownloadStep(
+                            head: head,
+                            bytes: AsyncBytes(
+                                logger: logger,
+                                totalSize: totalSize ?? .zero,
+                                stream: data
+                            )
                         )
-                    ))
+                    )
                 }
             }
         }

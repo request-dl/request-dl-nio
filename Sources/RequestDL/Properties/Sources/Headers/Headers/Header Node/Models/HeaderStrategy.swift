@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// Enum defining the strategy for handling headers.
 public enum HeaderStrategy: Sendable {

@@ -1,18 +1,20 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct GraphOperation<Content: Sendable>: Sendable {
 
     // MARK: - Internal properties
 
+    /// - Important: Ordered, not arbitrary. `GraphNamespaceOperation` writes
+    /// `inputs.namespaceID`, and `GraphStoredObjectOperation` reads it to key the objects it
+    /// registers. Reordering these silently files every stored object under the wrong
+    /// namespace.
     var operations: [GraphValueOperation] {
         [
             GraphNamespaceOperation(mirror),
             GraphEnvironmentOperation(mirror),
-            GraphStoredObjectOperation(mirror)
+            GraphStoredObjectOperation(mirror),
         ]
     }
 

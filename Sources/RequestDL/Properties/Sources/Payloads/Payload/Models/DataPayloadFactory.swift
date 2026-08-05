@@ -1,11 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-#if canImport(Darwin)
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
 #else
-@preconcurrency import Foundation
+import struct Foundation.Data
 #endif
 
 struct DataPayloadFactory: PayloadFactory {
@@ -17,8 +17,8 @@ struct DataPayloadFactory: PayloadFactory {
 
     // MARK: - Internal methods
 
-    func callAsFunction(_ input: PayloadInput) throws -> PayloadOutput {
-        .init(
+    func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
+        await .init(
             contentType: contentType,
             source: .buffer(Internals.DataBuffer(data))
         )

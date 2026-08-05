@@ -1,12 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
-
-/// A structure that represents default trusts.
-@available(*, deprecated, renamed: "DefaultTrustRoots")
-public typealias DefaultTrusts = DefaultTrustRoots
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A structure that represents default trust roots.
 public struct DefaultTrustRoots: Property {
@@ -28,9 +22,9 @@ public struct DefaultTrustRoots: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of the DefaultTrustRoots structure.
-     */
+    ///
+    /// Initializes a new instance of the DefaultTrustRoots structure.
+    ///
     public init() {}
 
     // MARK: - Public static methods

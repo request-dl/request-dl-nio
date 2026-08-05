@@ -1,9 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 import Testing
+
 @testable import RequestDL
 
 struct ModifiersFlatMapErrorTests {
@@ -43,6 +44,60 @@ struct ModifiersFlatMapErrorTests {
             throw error
         }
         .result()
+    }
+
+    @Test
+    func flatMapErrorRethrowsOriginalErrorWhenTransformSucceeds() async throws {
+        // Given
+        let error = FlatMapError()
+        let mapError = InlineProperty(wrappedValue: false)
+
+        // When
+        do {
+            _ = try await MockedTask {
+                BaseURL("localhost")
+            }
+            .flatMap { _ in throw error }
+            .flatMapError { _ in
+                mapError.wrappedValue = true
+            }
+            .result()
+
+            Issue.record("Expected the original error to be rethrown")
+        } catch is FlatMapError {
+        } catch {
+            throw error
+        }
+
+        // Then
+        #expect(mapError.wrappedValue)
+    }
+
+    @Test
+    func flatMapErrorTypedRethrowsOriginalErrorWhenTransformSucceeds() async throws {
+        // Given
+        let error = FlatMapError()
+        let mapError = InlineProperty(wrappedValue: false)
+
+        // When
+        do {
+            _ = try await MockedTask {
+                BaseURL("localhost")
+            }
+            .flatMap { _ in throw error }
+            .flatMapError(FlatMapError.self) { _ in
+                mapError.wrappedValue = true
+            }
+            .result()
+
+            Issue.record("Expected the original error to be rethrown")
+        } catch is FlatMapError {
+        } catch {
+            throw error
+        }
+
+        // Then
+        #expect(mapError.wrappedValue)
     }
 
     @Test

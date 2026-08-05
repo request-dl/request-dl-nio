@@ -1,10 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import Logging
+import SwiftAsyncStream
+import Testing
+
 @testable import RequestDL
 
 struct ModifiersLoggerTests {
@@ -40,7 +41,7 @@ struct ModifiersLoggerTests {
         .result()
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
 
         #expect(logger.wrappedValue?.label == nil)
     }
@@ -63,7 +64,7 @@ struct ModifiersLoggerTests {
         .result()
 
         // Then
-        await expectation.wait()
+        try await expectation.wait()
 
         #expect(logger.wrappedValue?.label == customLogger.label)
     }

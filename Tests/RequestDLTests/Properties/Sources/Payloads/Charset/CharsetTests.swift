@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 struct CharsetTests {
 
@@ -18,7 +24,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf8))
+        #expect(sut == Data(verbatim.utf8))
     }
 
     @Test
@@ -31,7 +37,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .isoLatin1))
+        #expect(sut == Data(verbatim.unicodeScalars.map { UInt8($0.value) }))
     }
 
     @Test
@@ -44,7 +50,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf16))
+        #expect(sut == referenceUTF16(verbatim, bigEndian: !Self.isLittleEndian, byteOrderMark: true))
     }
 
     @Test
@@ -57,7 +63,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf16BigEndian))
+        #expect(sut == referenceUTF16(verbatim, bigEndian: true, byteOrderMark: false))
     }
 
     @Test
@@ -70,7 +76,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf16LittleEndian))
+        #expect(sut == referenceUTF16(verbatim, bigEndian: false, byteOrderMark: false))
     }
 
     @Test
@@ -83,7 +89,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf32))
+        #expect(sut == referenceUTF32(verbatim, bigEndian: !Self.isLittleEndian, byteOrderMark: true))
     }
 
     @Test
@@ -96,7 +102,7 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf32BigEndian))
+        #expect(sut == referenceUTF32(verbatim, bigEndian: true, byteOrderMark: false))
     }
 
     @Test
@@ -109,6 +115,67 @@ struct CharsetTests {
         let sut = try charset.encode(verbatim)
 
         // Then
-        #expect(sut == verbatim.data(using: .utf32LittleEndian))
+        #expect(sut == referenceUTF32(verbatim, bigEndian: false, byteOrderMark: false))
+    }
+}
+
+extension CharsetTests {
+
+    /// `littleEndian` is the identity on a little endian machine and a byte swap on a big endian
+    /// one, matching `Charset`'s own check.
+    fileprivate static var isLittleEndian: Bool {
+        UInt16(1).littleEndian == 1
+    }
+
+    /// A from-scratch reference encoder, deliberately independent of `Charset`'s own
+    /// `withUnsafeBytes(of:)`-based implementation — plain bit shifting instead — so this test
+    /// can catch a mistake in either without checking one against a copy of itself.
+    ///
+    /// `String(data:encoding:)`/`String.Encoding` are not part of `FoundationEssentials`, so
+    /// they cannot serve as the reference here the way they once did.
+    fileprivate func referenceUTF16(_ string: String, bigEndian: Bool, byteOrderMark: Bool) -> Data {
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity((string.utf16.count + (byteOrderMark ? 1 : 0)) * 2)
+
+        if byteOrderMark {
+            bytes += splitBigEndianFirst(0xFEFF as UInt16, bigEndian: bigEndian)
+        }
+
+        for unit in string.utf16 {
+            bytes += splitBigEndianFirst(unit, bigEndian: bigEndian)
+        }
+
+        return Data(bytes)
+    }
+
+    fileprivate func referenceUTF32(_ string: String, bigEndian: Bool, byteOrderMark: Bool) -> Data {
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity((string.unicodeScalars.count + (byteOrderMark ? 1 : 0)) * 4)
+
+        if byteOrderMark {
+            bytes += splitBigEndianFirst(0x0000_FEFF as UInt32, bigEndian: bigEndian)
+        }
+
+        for scalar in string.unicodeScalars {
+            bytes += splitBigEndianFirst(scalar.value, bigEndian: bigEndian)
+        }
+
+        return Data(bytes)
+    }
+
+    fileprivate func splitBigEndianFirst(_ value: UInt16, bigEndian: Bool) -> [UInt8] {
+        let high = UInt8(value >> 8)
+        let low = UInt8(value & 0xFF)
+        return bigEndian ? [high, low] : [low, high]
+    }
+
+    fileprivate func splitBigEndianFirst(_ value: UInt32, bigEndian: Bool) -> [UInt8] {
+        let bytes = [
+            UInt8((value >> 24) & 0xFF),
+            UInt8((value >> 16) & 0xFF),
+            UInt8((value >> 8) & 0xFF),
+            UInt8(value & 0xFF),
+        ]
+        return bigEndian ? bytes : bytes.reversed()
     }
 }

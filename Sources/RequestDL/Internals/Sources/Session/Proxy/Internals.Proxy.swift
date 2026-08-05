@@ -1,13 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import AsyncHTTPClient
 
 extension Internals {
 
-    struct Proxy: Sendable, Equatable {
+    struct Proxy: Sendable, Hashable {
 
         enum Authorization: Sendable, Hashable {
 
