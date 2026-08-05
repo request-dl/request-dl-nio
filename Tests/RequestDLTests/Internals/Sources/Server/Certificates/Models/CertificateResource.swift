@@ -1,9 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
 
 struct CertificateResource: Hashable {
 
@@ -16,23 +21,24 @@ struct CertificateResource: Hashable {
 
 extension CertificateResource {
 
+    /// - Parameter path: The fixture's subdirectory under `Resources`, e.g. `"client_password"`,
+    /// which also names the file stem once its underscores are dotted:
+    /// `client_password/client.password.public.pem`.
     init(
         _ path: String,
-        in bundle: Bundle,
         format: Internals.Certificate.Format
     ) {
         self.format = format
 
-        let path = path.replacingOccurrences(of: "_", with: ".")
+        let dottedPath = path.replacingOccurrences(of: "_", with: ".")
+        let directory = testResourcesDirectory.appendingPathComponent(path, isDirectory: true)
 
-        self.certificateURL = bundle.url(
-            forResource: "\(path).public",
-            withExtension: format.pathExtension
-        ).unsafelyUnwrapped
+        self.certificateURL = directory.appendingPathComponent(
+            "\(dottedPath).public.\(format.pathExtension)"
+        )
 
-        self.privateKeyURL = bundle.url(
-            forResource: "\(path).private",
-            withExtension: format.pathExtension
-        ).unsafelyUnwrapped
+        self.privateKeyURL = directory.appendingPathComponent(
+            "\(dottedPath).private.\(format.pathExtension)"
+        )
     }
 }

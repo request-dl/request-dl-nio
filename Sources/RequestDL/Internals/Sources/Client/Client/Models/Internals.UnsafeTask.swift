@@ -1,17 +1,36 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import NIOCore
 import AsyncHTTPClient
+import NIOCore
+import SwiftAsyncStream
 
 extension Internals {
 
     struct UnsafeTask<Element: Sendable>: Sendable, Hashable {
 
-        fileprivate final class RunningState: @unchecked Sendable {
-            var isRunning = true
+        /// Orders the ending against the request itself.
+        ///
+        /// `TaskSeed` already guarantees that cancelling and releasing cannot both fire, so
+        /// what is left to arbitrate is those against `whenComplete`, which runs on the event
+        /// loop. Both sides claim through here, on that loop, so exactly one wins.
+        private final class State: @unchecked Sendable {
+
+            private let lock = Lock()
+            private var _isRunning = true
+
+            /// - Returns: `true` for the first caller, `false` for everyone after.
+            func finish() -> Bool {
+                lock.withLock {
+                    guard _isRunning else {
+                        return false
+                    }
+
+                    _isRunning = false
+                    return true
+                }
+            }
         }
 
         // MARK: - Private properties
@@ -25,30 +44,48 @@ extension Internals {
             _ task: HTTPClient.Task<Element>,
             completion: @Sendable @escaping () -> Void
         ) {
-            let lock = Lock()
-            let runningState = RunningState()
+            let state = State()
 
-            seed = TaskSeed {
-                lock.withLock {
-                    guard runningState.isRunning else {
+            seed = TaskSeed(
+                cancel: {
+                    guard state.finish() else {
                         return
                     }
 
-                    runningState.isRunning = false
                     task.cancel()
                     completion()
+                },
+                release: {
+                    // Dropping the response still cancels, which is what stops a `break` out of
+                    // a body stream from downloading the rest of it for nobody, and what keeps
+                    // an endless stream from holding its connection open forever.
+                    //
+                    // Hopped onto the request's own event loop, though, because that is where
+                    // `whenComplete` below runs. Ordering the two there means `finish` decides
+                    // between them deterministically: a request that already completed has
+                    // claimed the transition, and this becomes a no op instead of cancelling
+                    // something that just succeeded.
+                    //
+                    // A shut down loop drops the closure rather than running it. That releases
+                    // `completion`, and with it the operation, whose own `deinit` releases the
+                    // slot, so nothing is left counted as busy.
+                    task.eventLoop.execute {
+                        guard state.finish() else {
+                            return
+                        }
+
+                        task.cancel()
+                        completion()
+                    }
                 }
-            }
+            )
 
             task.futureResult.whenComplete { _ in
-                lock.withLock {
-                    guard runningState.isRunning else {
-                        return
-                    }
-
-                    runningState.isRunning = false
-                    completion()
+                guard state.finish() else {
+                    return
                 }
+
+                completion()
             }
 
             self.task = task

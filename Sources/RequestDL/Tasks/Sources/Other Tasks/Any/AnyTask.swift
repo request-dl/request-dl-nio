@@ -1,23 +1,19 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A type-erasing task that wraps another task.
-
- The ``AnyTask`` type forwards its operations to an underlying task object, hiding its specific underlying type.
-
- ```swift
- func makeRequest() -> AnyTask<TaskResult<Data>> {
-     DataTask {
-         BaseURL("google.com")
-     }
-     .eraseToAnyTask()
- }
- ```
- */
+/// A type-erasing task that wraps another task.
+///
+/// The ``AnyTask`` type forwards its operations to an underlying task object, hiding its specific underlying type.
+///
+/// ```swift
+/// func makeRequest() -> AnyTask<TaskResult<Data>> {
+///     DataTask {
+///         BaseURL("google.com")
+///     }
+///     .eraseToAnyTask()
+/// }
+/// ```
 public struct AnyTask<Element: Sendable>: RequestTask {
 
     // MARK: - Private properties
@@ -32,13 +28,13 @@ public struct AnyTask<Element: Sendable>: RequestTask {
 
     // MARK: - Public methods
 
-    /**
-     Returns the result of the wrapped task.
-
-     - Returns: The result of the wrapped task.
-
-     - Throws: If the wrapped task throws an error.
-     */
+    ///
+    /// Returns the result of the wrapped task.
+    ///
+    /// - Returns: The result of the wrapped task.
+    ///
+    /// - Throws: If the wrapped task throws an error.
+    ///
     public func result() async throws -> Element {
         try await task.result()
     }
@@ -48,11 +44,11 @@ public struct AnyTask<Element: Sendable>: RequestTask {
 
 extension RequestTask {
 
-    /**
-     Returns an ``AnyTask`` instance that wraps the current ``RequestTask``.
-
-     - Returns: An ``AnyTask`` instance.
-     */
+    ///
+    /// Returns an ``AnyTask`` instance that wraps the current ``RequestTask``.
+    ///
+    /// - Returns: An ``AnyTask`` instance.
+    ///
     public func eraseToAnyTask() -> AnyTask<Element> {
         .init(self)
     }

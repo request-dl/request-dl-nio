@@ -1,32 +1,39 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOSSL
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.UUID
+#endif
 
 struct InternalsTrustRootsTests {
 
     @Test
-    func trusts_whenCertificates_shouldBeValid() async throws {
+    func trustRoots_whenCertificates_shouldBeValid() async throws {
         // Given
         let server = Certificates().server()
         let client = Certificates().client()
 
-        var trusts = Internals.TrustRoots()
-        trusts.append(.init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem))
-        trusts.append(.init(server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
+        var trustRoots = Internals.TrustRoots()
+        trustRoots.append(.init(client.certificateURL.absolutePath(percentEncoded: false), format: .pem))
+        trustRoots.append(.init(server.certificateURL.absolutePath(percentEncoded: false), format: .pem))
 
         // When
-        let sut = try trusts.build()
+        let sut = try trustRoots.build()
 
         // Then
-        let expectedTrustRoots = try NIOSSLTrustRoots.certificates([
-            .init(file: client.certificateURL.absolutePath(percentEncoded: false), format: .pem),
-            .init(file: server.certificateURL.absolutePath(percentEncoded: false), format: .pem)
-        ])
+        let expectedTrustRoots = try NIOSSLTrustRoots.certificates(
+            NIOSSLCertificate.fromPEMFile(client.certificateURL.absolutePath(percentEncoded: false))
+                + NIOSSLCertificate.fromPEMFile(server.certificateURL.absolutePath(percentEncoded: false))
+        )
         #expect(sut == expectedTrustRoots)
     }
 
@@ -40,12 +47,13 @@ struct InternalsTrustRootsTests {
             .map { try Data(contentsOf: $0.certificateURL) }
             .reduce(Data(), +)
 
-        let fileURL = FileManager.default.temporaryDirectory
+        let fileURL =
+            temporaryDirectoryURL
             .appendingPathComponent("RequestDL.\(UUID())")
             .appendingPathComponent("merged.pem")
 
-        defer { try? fileURL.removeIfNeeded() }
-        try fileURL.createPathIfNeeded()
+        defer { fileURL.scheduleRemoval() }
+        try await fileURL.createPathIfNeeded()
 
         try data.write(to: fileURL)
 

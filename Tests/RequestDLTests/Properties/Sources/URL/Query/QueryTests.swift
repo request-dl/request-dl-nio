@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct QueryTests {
@@ -14,10 +14,12 @@ struct QueryTests {
         let property = Query(name: "number", value: 123)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            property
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                property
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.url == "https://127.0.0.1?number=123")
@@ -40,13 +42,13 @@ struct QueryTests {
         // Then
         #expect(
             resolved.requestConfiguration.url == """
-            https://127.0.0.1?\
-            number=123&\
-            page=1&\
-            api_key=password&\
-            array=9&\
-            array=nine
-            """
+                https://127.0.0.1?\
+                number=123&\
+                page=1&\
+                api_key=password&\
+                array=9&\
+                array=nine
+                """
         )
     }
 
@@ -72,11 +74,11 @@ struct QueryTests {
         // Then
         #expect(
             resolved.requestConfiguration.url == """
-            https://127.0.0.1?\
-            flag=1&\
-            array.0=9&\
-            array.1=nine
-            """
+                https://127.0.0.1?\
+                flag=1&\
+                array.0=9&\
+                array.1=nine
+                """
         )
     }
 

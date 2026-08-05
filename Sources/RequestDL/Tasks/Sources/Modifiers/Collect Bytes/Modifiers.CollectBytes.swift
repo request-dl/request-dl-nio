@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Modifiers {
 
@@ -17,13 +15,13 @@ extension Modifiers {
 
         // MARK: - Public methods
 
-        /**
-         Combines individual steps into `AsyncBytes` object.
-
-         - Parameter task: The request task to modify.
-         - Returns: The task result.
-         - Throws: An error if the modification fails.
-         */
+        ///
+        /// Combines individual steps into `AsyncBytes` object.
+        ///
+        /// - Parameter task: The request task to modify.
+        /// - Returns: The task result.
+        /// - Throws: An error if the modification fails.
+        ///
         public func body(_ task: Content) async throws -> TaskResult<AsyncBytes> {
             try await task.result().collect()
         }

@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct PropertyModifierTests {
@@ -34,10 +34,12 @@ struct PropertyModifierTests {
         let modifier = CustomModifier(includesContent: true)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("apple.com")
-                .modifier(modifier)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("apple.com")
+                    .modifier(modifier)
+            }
+        )
 
         // Then
         #expect(
@@ -51,10 +53,12 @@ struct PropertyModifierTests {
         let modifier = CustomModifier(includesContent: false)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("apple.com")
-                .modifier(modifier)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("apple.com")
+                    .modifier(modifier)
+            }
+        )
 
         // Then
         #expect(
@@ -65,7 +69,7 @@ struct PropertyModifierTests {
 
 extension PropertyModifierTests {
 
-    struct AdditionalTrustsFaker: PropertyModifier {
+    struct AdditionalTrustRootsFaker: PropertyModifier {
 
         func body(content: Content) -> some Property {
             content
@@ -80,19 +84,23 @@ extension PropertyModifierTests {
         let certificatePath = resource.certificateURL.absolutePath(percentEncoded: false)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            SecureConnection {
-                Certificate(certificatePath)
-                    .modifier(AdditionalTrustsFaker())
+        let resolved = try await resolve(
+            TestProperty {
+                SecureConnection {
+                    Certificate(certificatePath)
+                        .modifier(AdditionalTrustRootsFaker())
+                }
             }
-        })
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.additionalTrustRoots == [
-            .certificates([.init(certificatePath, format: .pem)])
-        ])
+        #expect(
+            sut?.additionalTrustRoots == [
+                .certificates([.init(certificatePath, format: .pem)])
+            ]
+        )
     }
 }
 
@@ -122,11 +130,13 @@ extension PropertyModifierTests {
         let modifier = PathModifier()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("www.google.com")
-                .modifier(modifier)
-                .environment(\.path, additionalPath)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("www.google.com")
+                    .modifier(modifier)
+                    .environment(\.path, additionalPath)
+            }
+        )
 
         // Then
         #expect(
@@ -140,10 +150,12 @@ extension PropertyModifierTests {
         let modifier = PathModifier()
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("www.google.com")
-                .modifier(modifier)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("www.google.com")
+                    .modifier(modifier)
+            }
+        )
 
         // Then
         #expect(

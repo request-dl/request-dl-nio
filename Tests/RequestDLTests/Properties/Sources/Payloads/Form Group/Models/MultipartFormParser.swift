@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 struct MultipartFormParser {
 
@@ -13,9 +19,10 @@ struct MultipartFormParser {
 
     init(_ requestConfiguration: RequestConfiguration) async throws {
         let contentTypeHeader = requestConfiguration.headers["Content-Type"] ?? []
-        let boundary = contentTypeHeader.first.flatMap {
-            MultipartFormParser.extractBoundary($0)
-        } ?? "nil"
+        let boundary =
+            contentTypeHeader.first.flatMap {
+                MultipartFormParser.extractBoundary($0)
+            } ?? "nil"
 
         let buffers = try await requestConfiguration.body?.buffers() ?? []
 
@@ -30,8 +37,8 @@ struct MultipartFormParser {
 
 extension MultipartFormParser {
 
-    func parse() throws -> MultipartForm {
-        let rawData = try rawData()
+    func parse() async throws -> MultipartForm {
+        let rawData = try await rawData()
         let chunks = try breakIntoChunks(rawData)
         return MultipartForm(
             try chunks.reduce([PartForm]()) {
@@ -44,8 +51,8 @@ extension MultipartFormParser {
 
 extension MultipartFormParser {
 
-    func rawData() throws -> RawData {
-        .init(from: buffers.reduce(Data()) { $0 + ($1.getData() ?? Data()) })
+    func rawData() async throws -> RawData {
+        await .init(from: buffers.async.reduce(Data()) { await $0 + ($1.getData() ?? Data()) })
     }
 
     func breakIntoChunks(_ rawData: RawData) throws -> [[RawData]] {

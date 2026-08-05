@@ -1,19 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 
 struct SeedFactory: Sendable {
 
     private final class Storage: @unchecked Sendable {
-
-        // MARK: - Internal properties
-
-        var seeds: [PropertyNamespace.ID: Seed] {
-            get { lock.withLock { _seeds } }
-            set { lock.withLock { _seeds = newValue } }
-        }
 
         // MARK: - Private properties
 
@@ -22,6 +15,24 @@ struct SeedFactory: Sendable {
         // MARK: - Unsafe properties
 
         private var _seeds = [PropertyNamespace.ID: Seed]()
+
+        // MARK: - Internal methods
+
+        /// Hands out the next seed for `id`.
+        ///
+        /// Reading, incrementing and writing happen in one critical section. Reaching the
+        /// dictionary through a computed property with a lock on each accessor made this three
+        /// separate acquisitions, so two callers asking at the same time both read the same
+        /// value and both walked away with the same seed. Since the seed keys stored object
+        /// identity, that means two distinct properties pointing at the same state, which is
+        /// the one outcome a seed factory exists to prevent.
+        func next(_ id: PropertyNamespace.ID) -> Seed {
+            lock.withLock {
+                let seed = _seeds[id]?.next() ?? .zero
+                _seeds[id] = seed
+                return seed
+            }
+        }
     }
 
     // MARK: - Private properties
@@ -35,9 +46,6 @@ struct SeedFactory: Sendable {
     // MARK: - Internal methods
 
     func callAsFunction(_ id: PropertyNamespace.ID) -> Seed {
-        let currentSeed = storage.seeds[id] ?? .init(-1)
-        let seed = currentSeed.next()
-        storage.seeds[id] = seed
-        return seed
+        storage.next(id)
     }
 }

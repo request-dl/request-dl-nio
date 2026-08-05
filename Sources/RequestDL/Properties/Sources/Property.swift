@@ -1,37 +1,33 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The `Property` protocol is the foundation of all other objects in the RequestDL library.
-
- The protocol provides a `body` property, which returns an opaque `some Property` type.
- By combining multiple request objects, we can use the `body` property to configure
- multiple request properties at once.
-
- ```swift
- struct DefaultHeaders: Property {
-
-    let cache: Bool
-
-    var body: some Property {
-        Headers.ContentType(.json)
-        AcceptHeader(.json)
-
-        if cache {
-            CacheHeader()
-                .cached(true)
-        }
-    }
- }
- ```
-
- This `DefaultHeaders` struct conforms to the Property protocol and sets default
- headers for all requests. We can use many different objects to configure requests in
- order to meet specific application requirements.
- */
+/// The `Property` protocol is the foundation of all other objects in the RequestDL library.
+///
+/// The protocol provides a `body` property, which returns an opaque `some Property` type.
+/// By combining multiple request objects, we can use the `body` property to configure
+/// multiple request properties at once.
+///
+/// ```swift
+/// struct DefaultHeaders: Property {
+///
+///    let cache: Bool
+///
+///    var body: some Property {
+///        Headers.ContentType(.json)
+///        AcceptHeader(.json)
+///
+///        if cache {
+///            CacheHeader()
+///                .cached(true)
+///        }
+///    }
+/// }
+/// ```
+///
+/// This `DefaultHeaders` struct conforms to the Property protocol and sets default
+/// headers for all requests. We can use many different objects to configure requests in
+/// order to meet specific application requirements.
 public protocol Property: Sendable {
 
     associatedtype Body: Property

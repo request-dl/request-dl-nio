@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 /// A structure representing an error that occurs during encoding payload.
 public struct EncodingPayloadError: Sendable, Error {
@@ -20,11 +18,11 @@ public struct EncodingPayloadError: Sendable, Error {
     /// The context of the error.
     public let context: Context
 
-    /**
-    Initializes a new instance of `EncodingPayloadError`.
-
-    - Parameter context: The context of the error.
-    */
+    ///
+    /// Initializes a new instance of `EncodingPayloadError`.
+    ///
+    /// - Parameter context: The context of the error.
+    ///
     public init(_ context: Context) {
         self.context = context
     }

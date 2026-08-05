@@ -1,10 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOSSL
+import Testing
+
 @testable import RequestDL
 
 struct PSKIdentityTests {
@@ -20,19 +20,21 @@ struct PSKIdentityTests {
         let key = NIOSSLSecureBytes([0, 1, 2])
 
         // When
-        let resolved = try await resolve(TestProperty {
-            RequestDL.SecureConnection {
-                RequestDL.PSKIdentity(
-                    ClientResolver(
-                        key: key,
-                        identity: identity,
-                        received: {
-                            #expect($0 == context)
-                        }
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.PSKIdentity(
+                        ClientResolver(
+                            key: key,
+                            identity: identity,
+                            received: {
+                                #expect($0 == context)
+                            }
+                        )
                     )
-                )
+                }
             }
-        })
+        )
 
         let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(context)
 

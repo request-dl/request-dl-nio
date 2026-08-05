@@ -1,11 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 @dynamicMemberLookup
 struct LeafNode<Property: PropertyNode>: Node {
+
+    // MARK: - Internal properties
+
+    var children: [Node] { [] }
 
     // MARK: - Private properties
 
@@ -22,16 +24,16 @@ struct LeafNode<Property: PropertyNode>: Node {
     subscript<Value>(dynamicMember keyPath: KeyPath<Property, Value>) -> Value {
         property[keyPath: keyPath]
     }
-
-    mutating func next() -> Node? {
-        nil
-    }
 }
 
 // MARK: - PropertyNode
 
 extension LeafNode: PropertyNode {
 
+    // Declared here on purpose. `LeafNode` conforms to both `Node` and `PropertyNode`, and both
+    // supply a default `nodeDescription`. Removing this one does not fail to compile: it
+    // silently falls back to the `Node` default, which lists children, finds none, and prints
+    // the bare title.
     var nodeDescription: String {
         let title = String(describing: type(of: self))
         let values = propertyDescription.debug_shiftLines()

@@ -1,32 +1,28 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A type representing an HTTP form with a list of content.
-
- Use `FormGroup` to represent an HTTP form with a list of content, which can be used in an HTTP request.
- This type conforms to `Property`, allowing it to be composed with other `Property` objects.
-
- The content of the form is specified using a property builder syntax, allowing you to create a list of
- properties objects.
-
- ```swift
- FormGroup {
-     Form(
-         name: "name",
-         verbatim: "John"
-     )
-
-     Form(
-         name: "age",
-         verbatim: "25"
-     )
- }
- ```
- */
+/// A type representing an HTTP form with a list of content.
+///
+/// Use `FormGroup` to represent an HTTP form with a list of content, which can be used in an HTTP request.
+/// This type conforms to `Property`, allowing it to be composed with other `Property` objects.
+///
+/// The content of the form is specified using a property builder syntax, allowing you to create a list of
+/// properties objects.
+///
+/// ```swift
+/// FormGroup {
+///     Form(
+///         name: "name",
+///         verbatim: "John"
+///     )
+///
+///     Form(
+///         name: "age",
+///         verbatim: "25"
+///     )
+/// }
+/// ```
 public struct FormGroup<Content: Property>: Property {
 
     // MARK: - Public properties
@@ -42,12 +38,12 @@ public struct FormGroup<Content: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `Form` with the specified list of properties.
-
-     - Parameters:
-        - content: A property builder closure that creates a list of `Property` objects.
-     */
+    ///
+    /// Initializes a new instance of `Form` with the specified list of properties.
+    ///
+    /// - Parameters:
+    ///    - content: A property builder closure that creates a list of `Property` objects.
+    ///
     public init(@PropertyBuilder content: () -> Content) {
         self.content = content()
     }
@@ -68,9 +64,14 @@ public struct FormGroup<Content: Property>: Property {
 
         let nodes = outputs.node.search(for: FormNode.self)
 
-        return .leaf(FormNode(
-            chunkSize: inputs.environment.payloadChunkSize,
-            items: nodes.lazy.map(\.items).reduce([], +)
-        ))
+        return .leaf(
+            FormNode(
+                chunkSize: inputs.environment.payloadChunkSize,
+                // `flatMap`, not `reduce([], +)`. The latter allocates a new array per node and
+                // copies everything accumulated so far into it, which is quadratic in the
+                // number of parts. Same fix already applied in `PayloadInput`.
+                items: nodes.flatMap(\.items)
+            )
+        )
     }
 }

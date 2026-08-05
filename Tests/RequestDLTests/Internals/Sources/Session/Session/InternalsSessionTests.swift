@@ -1,11 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.UUID
+import struct Foundation.URL
+#endif
+
+// `session_whenUploadingFile_shouldBeValid` pushes 100MB through the same 2-thread event loop
+// group (`Session.provider`, see below) that the other three tests here use for a prompt
+// response; swift-testing runs `@Test`s in a suite concurrently by default, and the upload
+// starves the group's threads until the others hit `connectTimeout`. `.serialized` keeps this
+// suite's tests from overlapping, which the connection-pool tuning below alone didn't fix.
+@Suite(.serialized)
 struct InternalsSessionTests {
 
     final class TestState: Sendable {
@@ -25,8 +39,16 @@ struct InternalsSessionTests {
             secureConnection.certificateVerification = .some(.none)
             configuration.secureConnection = secureConnection
 
+            // Same dedicated pool `Session.localServer` (see LocalServerSession.swift) gives the
+            // rest of this suite family, not `.shared`. `.shared` is `MultiThreadedEventLoopGroup
+            // .shared` — one thread, process-wide — and this file's own
+            // `session_whenUploadingFile_shouldBeValid` pushes 100MB through it in the same run
+            // as three tests that expect a prompt response; on that single thread, the upload
+            // starves the others until they hit `connectTimeout`.
+            configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 64
+
             session = Internals.Session(
-                provider: .shared,
+                provider: .identified("com.requestdl.tests.local-server", numberOfThreads: 2),
                 configuration: configuration
             )
         }
@@ -67,17 +89,17 @@ struct InternalsSessionTests {
     @Test
     func session_whenPerformingPostUploadingData_shouldBeValid() async throws {
         let testState = try await TestState()
+
         // Given
         let session = testState.session
-
         let length = 1_023
-        let data = Data.randomData(length: length)
+        let data = await Data.randomData(length: length)
 
         var requestConfiguration = RequestConfiguration()
         requestConfiguration.baseURL = "https://localhost:8888"
         requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         requestConfiguration.method = "POST"
-        requestConfiguration.body = RequestBody(buffers: [
+        requestConfiguration.body = await RequestBody(buffers: [
             Internals.DataBuffer(data)
         ])
 
@@ -87,13 +109,26 @@ struct InternalsSessionTests {
             dataCache: .init(),
             logger: nil
         )
+
         let result = try await Array(task())
 
         // Then
-        #expect(result.count == length + 1)
-        #expect(
-            Array(result[0..<length]) == (0..<length).map { _ in .upload(.init(chunkSize: 1, totalSize: length)) }
-        )
+        let uploadSteps = result.compactMap { step -> UploadStep? in
+            guard case .upload(let step) = step else {
+                return nil
+            }
+
+            return step
+        }
+
+        // Whatever the chunking policy is, every part has to report the same total and the
+        // parts have to add up to the body. Asserting a step count instead pinned the policy.
+        #expect(uploadSteps.count == result.count - 1)
+        #expect(uploadSteps.allSatisfy { $0.totalSize == length })
+        #expect(uploadSteps.map(\.chunkSize).reduce(.zero, +) == length)
+
+        // Regression guard: a body this small must go out in one chunk, not one byte at a time.
+        #expect(uploadSteps.count == 1)
 
         guard case .download? = result.last else {
             Issue.record("The obtained result is different from the expected result")
@@ -148,11 +183,11 @@ struct InternalsSessionTests {
             .deletingLastPathComponent()
             .appendingPathComponent("UploadingFile.txt")
 
-        defer { try? url.removeIfNeeded() }
-        try url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+        try await url.createPathIfNeeded()
 
-        var fileBuffer = Internals.FileBuffer(url)
-        fileBuffer.writeData(Data.randomData(length: length))
+        var fileBuffer = await Internals.FileBuffer(url)
+        await fileBuffer.writeData(Data.randomData(length: length))
 
         let response = try LocalServer.ResponseConfiguration(
             jsonObject: message
@@ -195,24 +230,28 @@ struct InternalsSessionTests {
         for try await result in task() {
             switch result {
             case .upload(let step):
-                NSLog("Send %d bytes of %d (%d)", step.chunkSize, step.totalSize, uploadedBytes.count)
+                print("Send \(step.chunkSize) bytes of \(step.totalSize) (\(uploadedBytes.count))")
                 uploadedBytes.append(step.chunkSize)
             case .download(let step):
-                NSLog("Head %d %@", step.head.status.code, step.head.status.reason)
+                print("Head \(step.head.status.code) \(step.head.status.reason)")
                 download = (step.head, try await Data(Array(step.bytes).joined()))
             }
         }
 
         // Then
-        #expect(uploadedBytes.reduce(.zero, +) == fileBuffer.writerIndex)
+        let uploadedTotal = uploadedBytes.reduce(.zero, +)
+
         #expect(fileBuffer.writerIndex == length)
+        #expect(uploadedTotal == length)
+        #expect(uploadedBytes.allSatisfy { $0 <= fragment })
         #expect(download != nil)
         #expect(download?.0.status.code == 200)
         #expect(
-            try (download?.1).map(HTTPResult<String>.init) == HTTPResult(
-                receivedBytes: length,
-                response: message
-            )
+            try (download?.1).map(HTTPResult<String>.init)
+                == HTTPResult(
+                    receivedBytes: length,
+                    response: message
+                )
         )
     }
 }

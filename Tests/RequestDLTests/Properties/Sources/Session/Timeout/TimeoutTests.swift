@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct TimeoutTests {
@@ -15,9 +15,11 @@ struct TimeoutTests {
         let timeout = UnitTime.seconds(75)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            Timeout(timeout, for: requestTimeout)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                Timeout(timeout, for: requestTimeout)
+            }
+        )
 
         // Then
         #expect(resolved.session.configuration.timeout.connect == timeout)

@@ -1,9 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import NIOCore
 import Testing
+
 @testable import RequestDL
 
 struct InternalsClientManagerTests {
@@ -59,7 +60,7 @@ struct InternalsClientManagerTests {
     @Test
     func manager_expiringClients() async throws {
         // Given
-        let lifetime: UInt64 = 2_500_000_000
+        let lifetime = TimeAmount.seconds(2) + .milliseconds(500)
         let manager = Internals.ClientManager(lifetime: lifetime)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
@@ -70,7 +71,7 @@ struct InternalsClientManagerTests {
             sessionConfiguration: sessionConfiguration
         )
 
-        try await _Concurrency.Task.sleep(nanoseconds: lifetime * 3)
+        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds) * 3)
 
         let sut2 = try await manager.client(
             provider: provider,

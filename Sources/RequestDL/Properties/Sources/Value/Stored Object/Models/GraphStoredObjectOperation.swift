@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct GraphStoredObjectOperation<Content: Sendable>: GraphValueOperation {
 
@@ -23,12 +21,14 @@ struct GraphStoredObjectOperation<Content: Sendable>: GraphValueOperation {
         let id = properties.inputs.namespaceID
 
         for stored in deepSearch(DynamicStoredObject.self) {
-            stored.value.update(.init(
-                id: id,
-                label: stored.label,
-                seed: properties.inputs.seedFactory(id),
-                base: Content.self
-            ))
+            stored.value.update(
+                .init(
+                    id: id,
+                    label: stored.label,
+                    seed: properties.inputs.seedFactory(id),
+                    base: Content.self
+                )
+            )
         }
     }
 }

@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOSSL
 
 /// A struct representing a pre-shared key (PSK).
@@ -49,13 +48,15 @@ public struct PSKIdentity: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(SecureConnectionNode(
-            Node(
-                resolver: property.resolver,
-                hint: property.hint
-            ),
-            logger: inputs.environment.logger
-        ))
+        return .leaf(
+            SecureConnectionNode(
+                Node(
+                    resolver: property.resolver,
+                    hint: property.hint
+                ),
+                logger: inputs.environment.logger
+            )
+        )
     }
 
     // MARK: - Public methods

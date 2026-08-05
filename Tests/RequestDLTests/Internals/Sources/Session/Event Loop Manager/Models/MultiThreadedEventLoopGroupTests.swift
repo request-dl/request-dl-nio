@@ -1,10 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
 import NIOPosix
+import Testing
+
 @testable import RequestDL
 
 struct MultiThreadedEventLoopGroupTests {

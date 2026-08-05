@@ -1,10 +1,16 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+#endif
 
 struct DNSOverrideTests {
 
@@ -20,9 +26,11 @@ struct DNSOverrideTests {
         )
 
         // Then
-        #expect(resolved.session.configuration.dnsOverride == [
-            origin: destination
-        ])
+        #expect(
+            resolved.session.configuration.dnsOverride == [
+                origin: destination
+            ]
+        )
     }
 
     @Test

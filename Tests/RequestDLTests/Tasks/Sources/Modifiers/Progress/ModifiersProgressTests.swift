@@ -1,10 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.UUID
+#endif
 
 struct ModifiersProgressTests {
 
@@ -99,7 +107,7 @@ struct ModifiersProgressTests {
         let uploadMonitor = testState.uploadMonitor
 
         let resource = Certificates().server()
-        let data = Data.randomData(length: 1_024 * 64)
+        let data = await Data.randomData(length: 1_024 * 64)
 
         let response = LocalServer.ResponseConfiguration(
             data: data
@@ -113,8 +121,10 @@ struct ModifiersProgressTests {
             Path(testState.uri)
             Payload(data: data)
 
+            Session.localServer
+
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -149,8 +159,10 @@ struct ModifiersProgressTests {
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
+            Session.localServer
+
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -205,8 +217,10 @@ struct ModifiersProgressTests {
             BaseURL(localServer.baseURL)
             Path(testState.uri)
 
+            Session.localServer
+
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -243,7 +257,7 @@ struct ModifiersProgressTests {
         let progressMonitor = testState.progressMonitor
 
         let resource = Certificates().server()
-        let data = Data.randomData(length: 1_024 * 64)
+        let data = await Data.randomData(length: 1_024 * 64)
         let message = String(repeating: "c", count: 1_024 * 64)
         let length = 1_024
 
@@ -260,8 +274,10 @@ struct ModifiersProgressTests {
 
             ReadingMode(length: length)
 
+            Session.localServer
+
             SecureConnection {
-                Trusts {
+                TrustRoots {
                     RequestDL.Certificate(resource.certificateURL.absolutePath(percentEncoded: false))
                 }
             }
@@ -282,11 +298,12 @@ struct ModifiersProgressTests {
         #expect(progressMonitor.download.totalSize == receivedData.count)
 
         #expect(
-            progressMonitor.upload.uploadedBytes == stride(
-                from: .zero,
-                to: data.count,
-                by: 64
-            ).map { _ in 64 }
+            progressMonitor.upload.uploadedBytes
+                == stride(
+                    from: .zero,
+                    to: data.count,
+                    by: 64
+                ).map { _ in 64 }
         )
 
         let completeParts = progressMonitor.download.receivedData.dropLast()

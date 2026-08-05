@@ -1,38 +1,34 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- The `BaseURL` is the entry point as it specifies the scheme and host to be queried during the request.
-
- ## Overview
-
- To start using it, it is important to pay attention to some rules:
-
- - Scheme must be of type ``RequestDL/URLScheme``.
- - Host is a string without scheme.
-
- ```swift
- // Always HTTPS
- BaseURL("apple.com")
-
- // Specifying the scheme
- BaseURL(.http, host: "apple.com")
- ```
-
- > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
-
- > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
-
- ### Learn the fundamentals
-
- @Links(visualStyle: list) {
-     - <doc:Creating-requests-from-scratch>
-     - <doc:Cache-support>
- }
- */
+/// The `BaseURL` is the entry point as it specifies the scheme and host to be queried during the request.
+///
+/// ## Overview
+///
+/// To start using it, it is important to pay attention to some rules:
+///
+/// - Scheme must be of type ``RequestDL/URLScheme``.
+/// - Host is a string without scheme.
+///
+/// ```swift
+/// // Always HTTPS
+/// BaseURL("apple.com")
+///
+/// // Specifying the scheme
+/// BaseURL(.http, host: "apple.com")
+/// ```
+///
+/// > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
+///
+/// > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
+///
+/// ### Learn the fundamentals
+///
+/// @Links(visualStyle: list) {
+///     - <doc:Creating-requests-from-scratch>
+///     - <doc:Cache-support>
+/// }
 public struct BaseURL: Property {
 
     private struct Node: PropertyNode {
@@ -73,46 +69,46 @@ public struct BaseURL: Property {
 
     // MARK: - Init
 
-    /**
-     Creates a BaseURL by combining the url scheme and the string host.
-
-     ```swift
-     import RequestDL
-
-     struct AppleDeveloperBaseURL: Property {
-
-         var body: some Property {
-             BaseURL(.https, host: "developer.apple.com")
-         }
-     }
-     ```
-
-     - Parameters:
-        - scheme: The url scheme chosen.
-        - host: The string host only.
-     */
+    ///
+    /// Creates a BaseURL by combining the url scheme and the string host.
+    ///
+    /// ```swift
+    /// import RequestDL
+    ///
+    /// struct AppleDeveloperBaseURL: Property {
+    ///
+    ///     var body: some Property {
+    ///         BaseURL(.https, host: "developer.apple.com")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///    - scheme: The url scheme chosen.
+    ///    - host: The string host only.
+    ///
     public init(_ scheme: URLScheme, host: String) {
         self.scheme = scheme
         self.host = host
     }
 
-    /**
-     Defines the base URL from the host with the default HTTPS scheme.
-
-     ```swift
-     import RequestDL
-
-     struct AppleDeveloperBaseURL: Property {
-
-         var body: some Property {
-             BaseURL("developer.apple.com")
-         }
-     }
-     ```
-
-     - Parameters:
-        - host: The string host only.
-     */
+    ///
+    /// Defines the base URL from the host with the default HTTPS scheme.
+    ///
+    /// ```swift
+    /// import RequestDL
+    ///
+    /// struct AppleDeveloperBaseURL: Property {
+    ///
+    ///     var body: some Property {
+    ///         BaseURL("developer.apple.com")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///    - host: The string host only.
+    ///
     public init(_ host: String) {
         self.init(.https, host: host)
     }

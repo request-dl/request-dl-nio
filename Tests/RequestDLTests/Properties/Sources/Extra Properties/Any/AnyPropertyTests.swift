@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct AnyPropertyTests {
@@ -14,10 +14,12 @@ struct AnyPropertyTests {
         let property = Query(name: "number", value: 123)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            BaseURL("127.0.0.1")
-            AnyProperty(property)
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                AnyProperty(property)
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.url == "https://127.0.0.1?number=123")
@@ -30,20 +32,24 @@ struct AnyPropertyTests {
         let path = certificate.certificateURL.absolutePath(percentEncoded: false)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            SecureConnection {
-                AdditionalTrusts {
-                    AnyProperty(Certificate(path))
+        let resolved = try await resolve(
+            TestProperty {
+                SecureConnection {
+                    AdditionalTrustRoots {
+                        AnyProperty(Certificate(path))
+                    }
                 }
             }
-        })
+        )
 
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.additionalTrustRoots == [
-            .certificates([.init(path, format: .pem)])
-        ])
+        #expect(
+            sut?.additionalTrustRoots == [
+                .certificates([.init(path, format: .pem)])
+            ]
+        )
     }
 
     @Test

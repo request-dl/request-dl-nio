@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct Resolve<Root: Property>: Sendable {
 
@@ -28,7 +26,7 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
-            configuration: make.sessionConfiguration
+            configuration: sessionConfiguration(for: make)
         )
 
         return Resolved(
@@ -61,13 +59,36 @@ struct Resolve<Root: Property>: Sendable {
             .debug_shiftLines()
 
         return """
-        \(title) {
-        \(nodesDescription)
-        }
-        """
+            \(title) {
+            \(nodesDescription)
+            }
+            """
     }
 
     // MARK: - Private methods
+
+    /// Folds a resolved system proxy into the session configuration.
+    ///
+    /// Done here rather than inside `SystemProxy`'s node because the system's answer depends on
+    /// the URL, and the URL is only complete once every property has contributed to it. A node
+    /// declared before `BaseURL` would otherwise resolve against an empty address.
+    ///
+    /// The resolved proxy lands in the configuration, so the client cache partitions by it the
+    /// same way it does for an explicit one.
+    private func sessionConfiguration(for make: Make) -> Internals.Session.Configuration {
+        guard make.resolvesSystemProxy, make.sessionConfiguration.proxy == nil else {
+            // An explicit `Proxy` wins. Declaring both leaves the explicit one in effect.
+            return make.sessionConfiguration
+        }
+
+        var configuration = make.sessionConfiguration
+
+        configuration.proxy = Internals.SystemProxyResolver.proxy(
+            forURL: make.requestConfiguration.url
+        )
+
+        return configuration
+    }
 
     private func inputs() -> _PropertyInputs {
         .init(
@@ -101,9 +122,8 @@ extension Node {
             try await property.make(&make)
         }
 
-        var mutableSelf = self
-        while let next = mutableSelf.next() {
-            try await next._make(&make)
+        for child in children {
+            try await child._make(&make)
         }
     }
 }

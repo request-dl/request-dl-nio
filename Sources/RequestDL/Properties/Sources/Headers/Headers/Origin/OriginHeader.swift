@@ -1,21 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A representation of the `OriginHeader` header field in an HTTP message.
-
- The `OriginHeader` header field indicates the origin of the request in terms of scheme,
- host, and port number. This header is mainly used in the context of CORS (Cross-Origin
- Resource Sharing) requests to ensure that a web application can only access resources
- from a different origin if the server explicitly allows it.
-
- ```swift
- OriginHeader("https://example.com")
- ```
- */
+/// A representation of the `OriginHeader` header field in an HTTP message.
+///
+/// The `OriginHeader` header field indicates the origin of the request in terms of scheme,
+/// host, and port number. This header is mainly used in the context of CORS (Cross-Origin
+/// Resource Sharing) requests to ensure that a web application can only access resources
+/// from a different origin if the server explicitly allows it.
+///
+/// ```swift
+/// OriginHeader("https://example.com")
+/// ```
 public struct OriginHeader: Property {
 
     // MARK: - Public properties
@@ -31,13 +27,13 @@ public struct OriginHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a `OriginHeader` property with the given `host` and `port`.
-
-     - Parameters:
-     - host: A `StringProtocol` representing the host.
-     - port: A `StringProtocol` representing the port.
-     */
+    ///
+    /// Initializes a `OriginHeader` property with the given `host` and `port`.
+    ///
+    /// - Parameters:
+    /// - host: A `StringProtocol` representing the host.
+    /// - port: A `StringProtocol` representing the port.
+    ///
     public init<Host, Port>(
         _ host: Host,
         port: Port
@@ -45,11 +41,11 @@ public struct OriginHeader: Property {
         self.value = "\(host):\(port)"
     }
 
-    /**
-     Initializes an `OriginHeader` header field with the given origin value.
-
-     - Parameter origin: A `StringProtocol` representing the host.
-     */
+    ///
+    /// Initializes an `OriginHeader` header field with the given origin value.
+    ///
+    /// - Parameter origin: A `StringProtocol` representing the host.
+    ///
     public init<S: StringProtocol>(_ origin: S) {
         self.value = String(origin)
     }
@@ -62,11 +58,13 @@ public struct OriginHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "Origin",
-            value: property.value,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Origin",
+                value: property.value,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

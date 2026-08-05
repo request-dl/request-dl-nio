@@ -1,14 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-#if canImport(Darwin)
-import Foundation
-#else
-@preconcurrency import Foundation
-#endif
+//
+// See LICENSE for this package's licensing information.
+//
 
 import Logging
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
 
 extension Internals {
 
@@ -20,10 +20,15 @@ extension Internals {
             case main
         }
 
+        // MARK: - Internal static properties
+
+        /// Floor applied when the caller asked for nothing, or for zero.
+        private static let minimumCapacity: Int64 = 1_024 * 1_024 * 2
+
         // MARK: - Internal properties
 
-        var memoryCapacity: UInt64?
-        var diskCapacity: UInt64?
+        var memoryCapacity: Int64?
+        var diskCapacity: Int64?
         var directory: Directory?
 
         // MARK: - Inits
@@ -32,11 +37,17 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// Builds the cache this configuration describes.
+        ///
+        /// - Important: Must not build one `DataCache`, raise its capacities to the floor below,
+        /// then discard it and return a second one constructed with `memoryCapacity ?? .zero` —
+        /// that leaves the floor as dead code, and the common path, with both capacities unset,
+        /// would produce a cache with zero of each: caching off by default with nothing to say
+        /// so.
         func build(logger: Logger?) -> DataCache {
-            let directory = directory ?? .main
             let directoryURL: URL
 
-            switch directory {
+            switch directory ?? .main {
             case .main:
                 directoryURL = DataCache.mainTemporaryURL()
             case .custom(let suiteName):
@@ -45,22 +56,23 @@ extension Internals {
                 directoryURL = url
             }
 
-            let lazyDataCache = DataCache(url: directoryURL, logger: logger)
+            let dataCache = DataCache(url: directoryURL, logger: logger)
 
-            if memoryCapacity == nil || memoryCapacity == .zero {
-                lazyDataCache.memoryCapacity = max(lazyDataCache.memoryCapacity, 1_024 * 1_024 * 2)
+            dataCache.memoryCapacity = Self.resolve(memoryCapacity, default: dataCache.memoryCapacity)
+            dataCache.diskCapacity = Self.resolve(diskCapacity, default: dataCache.diskCapacity)
+
+            return dataCache
+        }
+
+        // MARK: - Private static methods
+
+        /// A requested capacity, or the type's own default raised to the floor.
+        private static func resolve(_ requested: Int64?, default defaultValue: Int64) -> Int64 {
+            guard let requested, requested > .zero else {
+                return max(defaultValue, minimumCapacity)
             }
 
-            if diskCapacity == nil || diskCapacity == .zero {
-                lazyDataCache.diskCapacity = max(lazyDataCache.diskCapacity, 1_024 * 1_024 * 2)
-            }
-
-            return .init(
-                memoryCapacity: memoryCapacity ?? .zero,
-                diskCapacity: diskCapacity  ?? .zero,
-                url: directoryURL,
-                logger: logger
-            )
+            return requested
         }
     }
 }

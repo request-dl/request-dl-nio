@@ -1,28 +1,25 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOCore
 
-/**
- The Session object is used to set various properties related to the request context.
-
- By using this object, we can centralize the creation of a single type of session to be used
- in all requests.
-
- ```swift
- struct MyAppConfiguration: Property {
-
-     var body: some Property {
-         Session()
-             .waitsForConnectivity(true)
-
-         Timeout(10)
-     }
- }
- ```
- */
+/// The Session object is used to set various properties related to the request context.
+///
+/// By using this object, we can centralize the creation of a single type of session to be used
+/// in all requests.
+///
+/// ```swift
+/// struct MyAppConfiguration: Property {
+///
+///     var body: some Property {
+///         Session()
+///             .waitsForConnectivity(true)
+///
+///         Timeout(10)
+///     }
+/// }
+/// ```
 public struct Session: Property {
 
     private struct Node: PropertyNode {
@@ -55,13 +52,13 @@ public struct Session: Property {
         provider = .shared
     }
 
-    /**
-     Initializes a new Session object with a custom identifier and number of threads.
-
-     - Parameters:
-        - identifier: A custom identifier for the session.
-        - numberOfThreads: The number of threads to use for the session. Defaults to 1.
-     */
+    ///
+    /// Initializes a new Session object with a custom identifier and number of threads.
+    ///
+    /// - Parameters:
+    ///    - identifier: A custom identifier for the session.
+    ///    - numberOfThreads: The number of threads to use for the session. Defaults to 1.
+    ///
     public init(
         _ identifier: String,
         numberOfThreads: Int = 1
@@ -81,107 +78,87 @@ public struct Session: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node(
-            configuration: property.configuration,
-            provider: property.provider
-        ))
+        return .leaf(
+            Node(
+                configuration: property.configuration,
+                provider: property.provider
+            )
+        )
     }
 
     // MARK: - Public methods
 
-    /**
-     Set whether the session should wait for connectivity before making a request.
-
-     - Parameter flag: `true` to wait for connectivity or `false` to not wait for it.
-     - Returns: The modified `Session` instance with the waiting for connectivity flag configured.
-     */
+    ///
+    /// Set whether the session should wait for connectivity before making a request.
+    ///
+    /// - Parameter flag: `true` to wait for connectivity or `false` to not wait for it.
+    /// - Returns: The modified `Session` instance with the waiting for connectivity flag configured.
+    ///
     public func waitsForConnectivity(_ flag: Bool) -> Self {
         edit { $0.networkFrameworkWaitForConnectivity = flag }
     }
 
-    /**
-     Enable the usage of Network framework on Apple Platforms when compatible.
-
-     Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
-     or specific secure connection settings.
-
-     - Parameter enabled: The flag to enable the Network framework
-     - Returns: A modified property with Network framework enabled.
-     */
+    ///
+    /// Enable the usage of Network framework on Apple Platforms when compatible.
+    ///
+    /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
+    /// or specific secure connection settings.
+    ///
+    /// - Parameter enabled: The flag to enable the Network framework
+    /// - Returns: A modified property with Network framework enabled.
+    ///
     public func enableNetworkFramework(_ enabled: Bool = true) -> some Property {
         edit { $0.enableNetworkFramework = enabled }
     }
 
-    /**
-     Configures the maximum number of connections per host for the session.
-
-     - Parameter maximum: The maximum number of connections per host.
-     - Returns: The modified `Session` instance with the maximum connections per host configured.
-     */
+    ///
+    /// Configures the maximum number of connections per host for the session.
+    ///
+    /// - Parameter maximum: The maximum number of connections per host.
+    /// - Returns: The modified `Session` instance with the maximum connections per host configured.
+    ///
     public func maximumConnectionsPerHost(_ maximum: Int) -> Self {
         edit { $0.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = maximum }
     }
 
-    /**
-     Disables redirect for the session.
-
-     - Returns: The modified `Session` instance with redirect disabled.
-     */
+    ///
+    /// Disables redirect for the session.
+    ///
+    /// - Returns: The modified `Session` instance with redirect disabled.
+    ///
     public func disableRedirect() -> Self {
         edit { $0.redirectConfiguration = .disallow }
     }
 
-    /**
-     Enables redirect follow for the session.
-
-     - Parameters:
-     - max: The maximum number of redirects to follow.
-     - allowCycles: Whether to allow redirect cycles or not.
-     - Returns: The modified `Session` instance with redirect follow enabled.
-     */
+    ///
+    /// Enables redirect follow for the session.
+    ///
+    /// - Parameters:
+    /// - max: The maximum number of redirects to follow.
+    /// - allowCycles: Whether to allow redirect cycles or not.
+    /// - Returns: The modified `Session` instance with redirect follow enabled.
+    ///
     public func enableRedirectFollow(max: Int, allowCycles: Bool) -> Self {
         edit { $0.redirectConfiguration = .follow(max: max, allowCycles: allowCycles) }
     }
 
-    /**
-     Ignores unclean SSL shutdown for the session.
-
-     - Returns: The modified `Session` instance with unclean SSL shutdown ignored.
-     */
-    public func ignoreUncleanSSLShutdown() -> Self {
-        edit { $0.ignoreUncleanSSLShutdown = true }
-    }
-
-    /**
-     Disables decompression for the session.
-
-     - Returns: The modified `Session` instance with decompression disabled.
-     */
+    ///
+    /// Disables decompression for the session.
+    ///
+    /// - Returns: The modified `Session` instance with decompression disabled.
+    ///
     public func disableDecompression() -> Self {
         edit { $0.decompression = .disabled }
     }
 
-    /**
-     Configures the decompression limit for the session.
-
-     - Parameter decompressionLimit: The decompression limit to set.
-     - Returns: The modified `Session` instance with the decompression limit configured.
-     */
+    ///
+    /// Configures the decompression limit for the session.
+    ///
+    /// - Parameter decompressionLimit: The decompression limit to set.
+    /// - Returns: The modified `Session` instance with the decompression limit configured.
+    ///
     public func decompressionLimit(_ decompressionLimit: DecompressionLimit) -> Self {
         edit { $0.decompression = .enabled(decompressionLimit.build()) }
-    }
-
-    /**
-     Overrides DNS settings for a specific destination with a custom origin.
-
-     - Parameters:
-     - destination: The destination for which DNS settings are to be overridden.
-     - origin: The custom origin to use for DNS resolution.
-     - Returns: The modified `Session` instance with the DNS override configured.
-     */
-    @available(*, deprecated, message: "Use the new 'DNSOverride' property instead of this method.")
-    public func overrideDNS(_ destination: String, from origin: String) -> Self {
-        edit { $0.dnsOverride[origin] = destination }
     }
 
     // MARK: - Private properties

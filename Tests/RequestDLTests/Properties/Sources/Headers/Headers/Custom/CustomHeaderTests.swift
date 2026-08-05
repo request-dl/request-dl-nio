@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct CustomHeaderTests {
@@ -15,12 +15,14 @@ struct CustomHeaderTests {
         let value = "password"
 
         // When
-        let resolved = try await resolve(TestProperty {
-            CustomHeader(
-                name: name,
-                value: value
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                CustomHeader(
+                    name: name,
+                    value: value
+                )
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.headers[name] == [value])
@@ -33,12 +35,14 @@ struct CustomHeaderTests {
         let value = 123
 
         // When
-        let resolved = try await resolve(TestProperty {
-            CustomHeader(
-                name: name,
-                value: value
-            )
-        })
+        let resolved = try await resolve(
+            TestProperty {
+                CustomHeader(
+                    name: name,
+                    value: value
+                )
+            }
+        )
 
         // Then
         #expect(resolved.requestConfiguration.headers[name] == ["\(value)"])

@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct HTTPHeadersTests {
@@ -22,16 +22,18 @@ struct HTTPHeadersTests {
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
             ("Accept", "audio/mp3"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ])
 
         // Then
         #expect(headers.count == 5)
         #expect(!headers.isEmpty)
 
-        #expect(headers.names == [
-            "Content-Type", "Accept", "Authorization"
-        ])
+        #expect(
+            headers.names == [
+                "Content-Type", "Accept", "Authorization",
+            ]
+        )
 
         #expect(headers.first?.name == "Content-Type")
         #expect(headers.first?.value == "application/json")
@@ -45,7 +47,7 @@ struct HTTPHeadersTests {
         // Given
         let headers: HTTPHeaders = [
             "Content-Type": "text/html",
-            "Accept": "audio/mp3"
+            "Accept": "audio/mp3",
         ]
 
         // Then
@@ -66,7 +68,7 @@ struct HTTPHeadersTests {
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
             ("Accept", "audio/mp3"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         // When
@@ -82,9 +84,11 @@ struct HTTPHeadersTests {
 
         #expect(headers.count == 3)
 
-        #expect(headers.names == [
-            "Content-Type", "Accept", "Authorization"
-        ])
+        #expect(
+            headers.names == [
+                "Content-Type", "Accept", "Authorization",
+            ]
+        )
 
         #expect(
             headersSequence.map(\.0) == expectingSequence.map(\.0)
@@ -105,7 +109,7 @@ struct HTTPHeadersTests {
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
             ("Accept", "audio/mp3"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         // When
@@ -121,9 +125,11 @@ struct HTTPHeadersTests {
 
         #expect(headers.count == 5)
 
-        #expect(headers.names == [
-            "Content-Type", "Accept", "Authorization"
-        ])
+        #expect(
+            headers.names == [
+                "Content-Type", "Accept", "Authorization",
+            ]
+        )
 
         #expect(headersSequence.map(\.0) == expectingSequence.map(\.0))
 
@@ -140,7 +146,7 @@ struct HTTPHeadersTests {
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
             ("Accept", "audio/mp3"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         // When
@@ -153,13 +159,17 @@ struct HTTPHeadersTests {
         // Then
         #expect(headers.count == 2)
 
-        #expect(headers.names == [
-            "Accept", "Authorization"
-        ])
+        #expect(
+            headers.names == [
+                "Accept", "Authorization",
+            ]
+        )
 
-        #expect(headers.map(\.value) == [
-            "audio/mp3", "Bearer 123"
-        ])
+        #expect(
+            headers.map(\.value) == [
+                "audio/mp3", "Bearer 123",
+            ]
+        )
     }
 
     @Test
@@ -172,7 +182,7 @@ struct HTTPHeadersTests {
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
             ("Accept", "audio/mp3"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         // When
@@ -200,7 +210,7 @@ struct HTTPHeadersTests {
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
             ("Accept", "audio/mp3"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         // When
@@ -226,7 +236,7 @@ struct HTTPHeadersTests {
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
-            ("Content-Type", "text/html")
+            ("Content-Type", "text/html"),
         ]
 
         // When
@@ -237,14 +247,16 @@ struct HTTPHeadersTests {
         // Then
         let key = "content-type"
 
-        #expect((0 ..< key.count).allSatisfy {
-            let index = key.index(key.startIndex, offsetBy: $0)
+        #expect(
+            (0..<key.count).allSatisfy {
+                let index = key.index(key.startIndex, offsetBy: $0)
 
-            let uppercased = key[key.startIndex...index]
-            let lowercased = key[key.index(after: index)..<key.endIndex]
+                let uppercased = key[key.startIndex...index]
+                let lowercased = key[key.index(after: index)..<key.endIndex]
 
-            return headers.contains(name: "\(uppercased.uppercased())\(lowercased.lowercased())")
-        })
+                return headers.contains(name: "\(uppercased.uppercased())\(lowercased.lowercased())")
+            }
+        )
 
         #expect(!headers.contains(name: "Accept"))
     }
@@ -257,7 +269,7 @@ struct HTTPHeadersTests {
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
-            ("Content-Type", "text/html")
+            ("Content-Type", "text/html"),
         ]
 
         // When
@@ -266,13 +278,17 @@ struct HTTPHeadersTests {
         }
 
         // Then
-        #expect(headers.contains(name: "content-type") {
-            $0 == "text/html"
-        })
+        #expect(
+            headers.contains(name: "content-type") {
+                $0 == "text/html"
+            }
+        )
 
-        #expect(!headers.contains(name: "content-type") {
-            $0 == "audio/mp3"
-        })
+        #expect(
+            !headers.contains(name: "content-type") {
+                $0 == "audio/mp3"
+            }
+        )
     }
 
     @Test
@@ -283,7 +299,7 @@ struct HTTPHeadersTests {
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
-            ("Content-Type", "text/html")
+            ("Content-Type", "text/html"),
         ]
 
         // When
@@ -306,12 +322,12 @@ struct HTTPHeadersTests {
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
-            ("Accept", "audio/mp3")
+            ("Accept", "audio/mp3"),
         ]
 
         let exclusiveValues = [
             ("Accept", "application/xml"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         let otherHeaders = HTTPHeaders(sharedValues + exclusiveValues)
@@ -321,19 +337,23 @@ struct HTTPHeadersTests {
             headers.add(name: name, value: value)
         }
 
-        headers = headers.merging(otherHeaders, by: +)
+        headers = headers.merging(otherHeaders, by: +).uniquingValues()
 
         // Then
         #expect(headers.count == 6)
 
-        #expect(headers.names == [
-            "Content-Type", "Accept", "Authorization"
-        ])
+        #expect(
+            headers.names == [
+                "Content-Type", "Accept", "Authorization",
+            ]
+        )
 
-        #expect(headers.map(\.value) == [
-            "application/json", "application/javascript", "text/html",
-            "audio/mp3", "application/xml", "Bearer 123"
-        ])
+        #expect(
+            headers.map(\.value) == [
+                "application/json", "application/javascript", "text/html",
+                "audio/mp3", "application/xml", "Bearer 123",
+            ]
+        )
     }
 
     @Test
@@ -345,12 +365,12 @@ struct HTTPHeadersTests {
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
             ("Content-Type", "text/html"),
-            ("Accept", "audio/mp3")
+            ("Accept", "audio/mp3"),
         ]
 
         let exclusiveValues = [
             ("Accept", "application/xml"),
-            ("Authorization", "Bearer 123")
+            ("Authorization", "Bearer 123"),
         ]
 
         let otherHeaders = HTTPHeaders(sharedValues)
@@ -360,19 +380,23 @@ struct HTTPHeadersTests {
             headers.add(name: name, value: value)
         }
 
-        headers = headers.merging(otherHeaders, by: +)
+        headers = headers.merging(otherHeaders, by: +).uniquingValues()
 
         // Then
         #expect(headers.count == 6)
 
-        #expect(headers.names == [
-            "Content-Type", "Accept", "Authorization"
-        ])
+        #expect(
+            headers.names == [
+                "Content-Type", "Accept", "Authorization",
+            ]
+        )
 
-        #expect(headers.map(\.value) == [
-            "application/json", "application/javascript", "text/html",
-            "audio/mp3", "application/xml", "Bearer 123"
-        ])
+        #expect(
+            headers.map(\.value) == [
+                "application/json", "application/javascript", "text/html",
+                "audio/mp3", "application/xml", "Bearer 123",
+            ]
+        )
     }
 
     @Test
@@ -383,7 +407,7 @@ struct HTTPHeadersTests {
         let values = [
             ("Content-Type", "application/json"),
             ("Content-type", "application/javascript"),
-            ("Content-Type", "text/html")
+            ("Content-Type", "text/html"),
         ]
 
         // When

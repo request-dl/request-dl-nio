@@ -1,55 +1,62 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.URL
+import class Foundation.JSONEncoder
+#if canImport(Darwin)
+import class Foundation.JSONSerialization
+#endif
+#endif
 
-/**
- A structure representing a form with headers.
-
- A `Form` object is used to encapsulate form data for HTTP requests. It allows you to specify the name,
- filename, content type, and data or URL associated with a form field. It also supports adding custom headers
- to the form.
-
- ```swift
- Form(
-    name: "example",
-    filename: "example.txt",
-    contentType: .octetStream,
-    data: someData
- )
- ```
-
- > Note: The `Headers` generic parameter represents the type of custom headers associated with the
- form. If no custom headers are needed, the default would be `EmptyProperty`.
-
- ## Topics
-
- ### Sending raw bytes
-
- - ``RequestDL/Form/init(name:filename:contentType:data:)``
- - ``RequestDL/Form/init(name:filename:contentType:data:headers:)``
-
- ### Sending verbatim texts
-
- - ``RequestDL/Form/init(name:filename:contentType:verbatim:)``
- - ``RequestDL/Form/init(name:filename:contentType:verbatim:headers:)``
-
- ### Sending files
-
- - ``RequestDL/Form/init(name:filename:contentType:url:)``
- - ``RequestDL/Form/init(name:filename:contentType:url:headers:)``
-
- ### Sending Encodable
-
- - ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``
- - ``RequestDL/Form/init(name:filename:contentType:value:encoder:headers:)``
-
- ### Sending JSON objects
-
- - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``
- - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:headers:)``
- */
+/// A structure representing a form with headers.
+///
+/// A `Form` object is used to encapsulate form data for HTTP requests. It allows you to specify the name,
+/// filename, content type, and data or URL associated with a form field. It also supports adding custom headers
+/// to the form.
+///
+/// ```swift
+/// Form(
+///    name: "example",
+///    filename: "example.txt",
+///    contentType: .octetStream,
+///    data: someData
+/// )
+/// ```
+///
+/// > Note: The `Headers` generic parameter represents the type of custom headers associated with the
+/// form. If no custom headers are needed, the default would be `EmptyProperty`.
+///
+/// ## Topics
+///
+/// ### Sending raw bytes
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:data:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:data:headers:)``
+///
+/// ### Sending verbatim texts
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:verbatim:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:verbatim:headers:)``
+///
+/// ### Sending files
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:url:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:url:headers:)``
+///
+/// ### Sending Encodable
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:value:encoder:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:value:encoder:headers:)``
+///
+/// ### Sending JSON objects
+///
+/// - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:)``
+/// - ``RequestDL/Form/init(name:filename:contentType:jsonObject:options:headers:)``
 public struct Form<Headers: Property>: Property {
 
     // MARK: - Public properties
@@ -68,17 +75,17 @@ public struct Form<Headers: Property>: Property {
 
     // MARK: - Inits
 
-    /**
-     Creates a form with the given parameters.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - data: The data associated with the form field.
-
-     > Note: This initializer is available when `Headers` is `EmptyProperty`.
-     */
+    ///
+    /// Creates a form with the given parameters.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - data: The data associated with the form field.
+    ///
+    /// > Note: This initializer is available when `Headers` is `EmptyProperty`.
+    ///
     public init(
         name: String,
         filename: String? = nil,
@@ -96,17 +103,17 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - url: The URL associated with the form field.
-
-     > Note: This initializer is available when `Headers` is `EmptyProperty`.
-     */
+    ///
+    /// Creates a form with the given parameters.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - url: The URL associated with the form field.
+    ///
+    /// > Note: This initializer is available when `Headers` is `EmptyProperty`.
+    ///
     public init(
         name: String,
         filename: String? = nil,
@@ -124,18 +131,18 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - verbatim: The verbatim data associated with the form field.
-
-     > Note: This initializer is available when `Headers` is `EmptyProperty` and `Verbatim`
-     conforms to `StringProtocol`.
-     */
+    ///
+    /// Creates a form with the given parameters.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - verbatim: The verbatim data associated with the form field.
+    ///
+    /// > Note: This initializer is available when `Headers` is `EmptyProperty` and `Verbatim`
+    /// conforms to `StringProtocol`.
+    ///
     public init<Verbatim: StringProtocol>(
         name: String,
         filename: String? = nil,
@@ -153,19 +160,19 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - value: The value to be encoded and associated with the form field.
-        - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
-
-     > Note: This initializer is available when `Headers` is `EmptyProperty` and `Value`
-     conforms to `Encodable`.
-     */
+    ///
+    /// Creates a form with the given parameters.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - value: The value to be encoded and associated with the form field.
+    ///    - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
+    ///
+    /// > Note: This initializer is available when `Headers` is `EmptyProperty` and `Value`
+    /// conforms to `Encodable`.
+    ///
     public init<Value: Encodable & Sendable>(
         name: String,
         filename: String? = nil,
@@ -185,18 +192,19 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - jsonObject: The JSON object to be associated with the form field.
-        - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
-
-     > Note: This initializer is available when `Headers` is `EmptyProperty`.
-     */
+    #if canImport(Darwin)
+    ///
+    /// Creates a form with the given parameters.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - jsonObject: The JSON object to be associated with the form field.
+    ///    - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
+    ///
+    /// > Note: This initializer is available when `Headers` is `EmptyProperty`.
+    ///
     public init(
         name: String,
         filename: String? = nil,
@@ -215,17 +223,18 @@ public struct Form<Headers: Property>: Property {
             headers: EmptyProperty()
         )
     }
+    #endif
 
-    /**
-     Creates a form with the given parameters and custom headers.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - data: The data associated with the form field.
-        - headers: A closure that returns custom headers for the form.
-     */
+    ///
+    /// Creates a form with the given parameters and custom headers.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - data: The data associated with the form field.
+    ///    - headers: A closure that returns custom headers for the form.
+    ///
     public init(
         name: String,
         filename: String? = nil,
@@ -244,16 +253,16 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters and custom headers.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - url: The URL associated with the form field.
-        - headers: A closure that returns custom headers for the form.
-     */
+    ///
+    /// Creates a form with the given parameters and custom headers.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - url: The URL associated with the form field.
+    ///    - headers: A closure that returns custom headers for the form.
+    ///
     public init(
         name: String,
         filename: String? = nil,
@@ -272,18 +281,18 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters and custom headers.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - verbatim: The verbatim data associated with the form field.
-        - headers: A closure that returns custom headers for the form.
-
-     > Note: This initializer is available when `Verbatim` conforms to `StringProtocol`.
-     */
+    ///
+    /// Creates a form with the given parameters and custom headers.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - verbatim: The verbatim data associated with the form field.
+    ///    - headers: A closure that returns custom headers for the form.
+    ///
+    /// > Note: This initializer is available when `Verbatim` conforms to `StringProtocol`.
+    ///
     public init<Verbatim: StringProtocol>(
         name: String,
         filename: String? = nil,
@@ -302,19 +311,19 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters and custom headers.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - value: The value to be encoded and associated with the form field.
-        - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
-        - headers: A closure that returns custom headers for the form.
-
-     > Note: This initializer is available when `Value` conforms to `Encodable`.
-     */
+    ///
+    /// Creates a form with the given parameters and custom headers.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - value: The value to be encoded and associated with the form field.
+    ///    - encoder: The JSON encoder to use for encoding the value. Default is `JSONEncoder()`.
+    ///    - headers: A closure that returns custom headers for the form.
+    ///
+    /// > Note: This initializer is available when `Value` conforms to `Encodable`.
+    ///
     public init<Value: Encodable & Sendable>(
         name: String,
         filename: String? = nil,
@@ -335,17 +344,18 @@ public struct Form<Headers: Property>: Property {
         )
     }
 
-    /**
-     Creates a form with the given parameters and custom headers.
-
-     - Parameters:
-        - name: The name of the form field.
-        - filename: The filename associated with the form field, if applicable.
-        - contentType: The content type of the form field.
-        - jsonObject: The JSON object to be associated with the form field.
-        - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
-        - headers: A closure that returns custom headers for the form.
-     */
+    #if canImport(Darwin)
+    ///
+    /// Creates a form with the given parameters and custom headers.
+    ///
+    /// - Parameters:
+    ///    - name: The name of the form field.
+    ///    - filename: The filename associated with the form field, if applicable.
+    ///    - contentType: The content type of the form field.
+    ///    - jsonObject: The JSON object to be associated with the form field.
+    ///    - options: The JSON writing options to use for serializing the JSON object. Default is `[]`.
+    ///    - headers: A closure that returns custom headers for the form.
+    ///
     public init(
         name: String,
         filename: String? = nil,
@@ -365,6 +375,7 @@ public struct Form<Headers: Property>: Property {
             headers: headers()
         )
     }
+    #endif
 
     private init(
         name: String,
@@ -392,17 +403,19 @@ public struct Form<Headers: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(FormNode(
-            chunkSize: inputs.environment.payloadChunkSize,
-            item: FormItem(
-                name: property.name,
-                filename: property.filename,
-                additionalHeaders: additionalHeaders.isEmpty ? nil : additionalHeaders,
-                charset: inputs.environment.charset,
-                urlEncoder: inputs.environment.urlEncoder,
-                factory: property.factory
+        return .leaf(
+            FormNode(
+                chunkSize: inputs.environment.payloadChunkSize,
+                item: FormItem(
+                    name: property.name,
+                    filename: property.filename,
+                    additionalHeaders: additionalHeaders.isEmpty ? nil : additionalHeaders,
+                    charset: inputs.environment.charset,
+                    urlEncoder: inputs.environment.urlEncoder,
+                    factory: property.factory
+                )
             )
-        ))
+        )
     }
 
     // MARK: - Private static methods

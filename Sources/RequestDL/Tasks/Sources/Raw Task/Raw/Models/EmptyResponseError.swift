@@ -1,8 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import protocol Foundation.LocalizedError
+#endif
 
 /// An error type representing a request with no response.
 public struct RequestFailureError: LocalizedError {

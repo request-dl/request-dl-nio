@@ -1,9 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(Darwin)
 import Testing
+
 @testable import RequestDL
 
 struct KeyPathInvalidDataErrorTests {
@@ -14,9 +15,11 @@ struct KeyPathInvalidDataErrorTests {
         let error = KeyPathInvalidDataError()
 
         // Then
-        #expect(error.errorDescription == """
-            Unable to read the current data result on Task.keyPath() in key-value format
-            """
+        #expect(
+            error.errorDescription == """
+                Unable to read the current data result on Task.keyPath() in key-value format
+                """
         )
     }
 }
+#endif

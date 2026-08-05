@@ -1,9 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
 import NIOCore
+
+//
+// See LICENSE for this package's licensing information.
+//
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension Internals {
 
@@ -28,7 +32,7 @@ extension Internals {
                     return nil
                 }
 
-                return dataBuffer.readData(dataBuffer.readableBytes)
+                return await dataBuffer.readData(dataBuffer.readableBytes)
             }
         }
 

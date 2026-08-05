@@ -1,14 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-#if canImport(Darwin)
-import Foundation
-#else
-@preconcurrency import Foundation
-#endif
+//
+// See LICENSE for this package's licensing information.
+//
 
 import Collections
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Date
+import struct Foundation.URL
+#endif
 
 struct MemoryStorage: Sendable {
 
@@ -16,8 +17,8 @@ struct MemoryStorage: Sendable {
 
         // MARK: - Internal properties
 
-        var size: UInt64 {
-            UInt64(dataURL.writtenBytes)
+        var size: Int64 {
+            Int64(dataURL.writtenBytes)
         }
 
         let key: String
@@ -54,14 +55,16 @@ struct MemoryStorage: Sendable {
     // MARK: - Internal methods
 
     subscript(_ key: String) -> CachedData? {
-        guard let record = records[key] else {
-            return nil
-        }
+        get async {
+            guard let record = records[key] else {
+                return nil
+            }
 
-        return .init(
-            cachedResponse: record.cachedResponse,
-            buffer: Internals.DataBuffer(record.dataURL)
-        )
+            return await .init(
+                cachedResponse: record.cachedResponse,
+                buffer: Internals.DataBuffer(record.dataURL)
+            )
+        }
     }
 
     mutating func remove(_ key: String) {
@@ -76,8 +79,12 @@ struct MemoryStorage: Sendable {
 
     mutating func removeAll(since date: Date) {
         for key in identifiers {
+            // Mirrors `freeSpace`'s handling of the same `identifiers`/`records` pairing: treat a
+            // missing record as already evicted rather than trapping, so both methods agree on
+            // what to do with a stale identifier.
             guard let entry = records[key] else {
-                fatalError()
+                identifiers.remove(key)
+                continue
             }
 
             if entry.date <= date {
@@ -90,7 +97,7 @@ struct MemoryStorage: Sendable {
     mutating func updateCached(
         key: String,
         cachedResponse: CachedResponse,
-        maximumCapacity: UInt64
+        maximumCapacity: Int64
     ) {
         guard let record = records[key] else {
             return
@@ -108,12 +115,26 @@ struct MemoryStorage: Sendable {
         identifiers.append(key)
     }
 
+    /// Reserves a slot and hands back the location its bytes go to.
+    ///
+    /// - Returns: The store the caller should open a buffer over, or `nil` when the entry does
+    /// not fit.
+    ///
+    /// - Important: Must not be `async`, and must not return the buffer itself. This type is
+    /// only reachable through `withMemoryStorage`, which hands out an `inout` from inside a non
+    /// reentrant lock, and a synchronous closure cannot await — so a method whose only
+    /// suspension point is building the `Internals.DataBuffer` itself would be a method its only
+    /// caller could not call.
+    ///
+    /// Returning the location instead lets the bookkeeping stay under the lock, where it
+    /// belongs, and the buffer be built outside it. That also stops the lock being held across
+    /// buffer construction.
     mutating func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
-        contentLength: UInt64,
-        maximumCapacity: UInt64
-    ) -> Internals.AnyBuffer? {
+        contentLength: Int64,
+        maximumCapacity: Int64
+    ) -> Internals.ByteURL? {
         guard contentLength <= maximumCapacity else {
             return nil
         }
@@ -130,11 +151,11 @@ struct MemoryStorage: Sendable {
 
         records[key] = record
 
-        return Internals.DataBuffer(record.dataURL)
+        return record.dataURL
     }
 
-    mutating func freeSpace(_ maximumCapacity: UInt64) {
-        var accumulatedSize: UInt64 = 0
+    mutating func freeSpace(_ maximumCapacity: Int64) {
+        var accumulatedSize: Int64 = 0
         var deleteOnly = maximumCapacity == .zero
 
         for key in identifiers.reversed() {

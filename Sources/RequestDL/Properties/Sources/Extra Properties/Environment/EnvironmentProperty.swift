@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 private struct EnvironmentProperty<Content: Property>: Property {
 
@@ -37,15 +35,15 @@ private struct EnvironmentProperty<Content: Property>: Property {
 
 extension Property {
 
-    /**
-     Sets an `Value` for a given `keyPath`.
-
-     - Parameters:
-       - keyPath: The `WritableKeyPath` of the ``RequestEnvironmentValues`` to set the `value` for.
-       - value: The `Value` to set for the ``PropertyEnvironment``.
-
-     - Returns: A modified `Property` with the new ``RequestEnvironmentValues`` set.
-     */
+    ///
+    /// Sets an `Value` for a given `keyPath`.
+    ///
+    /// - Parameters:
+    ///   - keyPath: The `WritableKeyPath` of the ``RequestEnvironmentValues`` to set the `value` for.
+    ///   - value: The `Value` to set for the ``PropertyEnvironment``.
+    ///
+    /// - Returns: A modified `Property` with the new ``RequestEnvironmentValues`` set.
+    ///
     public func environment<Value: Sendable>(
         _ keyPath: WritableKeyPath<RequestEnvironmentValues, Value> & Sendable,
         _ value: Value

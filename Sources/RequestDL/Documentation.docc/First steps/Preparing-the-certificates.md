@@ -38,7 +38,7 @@ One crucial point is to download the entire certificate hierarchy because when c
 
 6. Drag the certificates into the **Resources** folder of your project or module.
 
-In this example, we downloaded the entire certificate hierarchy from the server. However, we have the option to use ``RequestDL/DefaultTrusts`` together with ``RequestDL/AdditionalTrusts`` to achieve a similar result.
+In this example, we downloaded the entire certificate hierarchy from the server. However, we have the option to use ``RequestDL/DefaultTrustRoots`` together with ``RequestDL/AdditionalTrustRoots`` to achieve a similar result.
 
 > Note: It is recommended to always convert the certificates to PEM format, as it allows you to combine them into a single file for use anywhere.
 
@@ -81,7 +81,7 @@ struct GithubAPI: Property {
     var body: some Property {
         // Previous code
         SecureConnection {
-            Trusts {
+            TrustRoots {
                 Certificate("DigiCert Global...", format: .der)
                 Certificate("DigiCert TLS...", format: .der)
                 Certificate("*.github.com", format: .der)
@@ -101,7 +101,7 @@ struct GithubAPI: Property {
     var body: some Property {
         // Previous code
         SecureConnection {
-            Trusts {
+            TrustRoots {
                 Certificate("*.github.com", format: .pem)
             }
         }

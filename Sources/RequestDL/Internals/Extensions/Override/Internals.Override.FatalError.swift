@@ -1,12 +1,17 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension Internals.Override {
 
     #if DEBUG
+    /// Swaps out `fatalError(_:file:line:)` for the duration of an operation.
+    ///
+    /// Task local, so a replacement is visible to the operation and to everything it awaits,
+    /// and to nothing running in parallel beside it.
+    ///
+    /// - Important: The closure returns `Never`. A substitute that returns normally is not an
+    /// option, so a test replacing this one throws, or traps in its own way.
     enum FatalError {
 
         typealias Closure = @Sendable (String, StaticString, UInt) -> Never
@@ -16,7 +21,10 @@ extension Internals.Override {
             Swift.fatalError($0, file: $1, line: $2)
         }
 
-        static func replace<T: Sendable>(with closure: @escaping Closure, perform: @Sendable () async throws -> T) async rethrows -> T {
+        static func replace<T: Sendable>(
+            with closure: @escaping Closure,
+            perform: @Sendable () async throws -> T
+        ) async rethrows -> T {
             try await $closure.withValue(closure, operation: perform)
         }
 
@@ -26,6 +34,7 @@ extension Internals.Override {
     }
     #endif
 
+    /// Stops the process, or hands the message to whatever a test substituted.
     static func fatalError(
         _ message: @Sendable @autoclosure () -> String = String(),
         file: StaticString = #file,
@@ -43,14 +52,14 @@ extension Internals.Override {
     }
 }
 
-
 extension Internals {
 
+    /// Stops the process over a bug in this package, as opposed to a misuse of it by the caller.
     static func preconditionFailure(_ message: String, file: StaticString = #file, line: UInt = #line) -> Never {
         #if DEBUG
         Internals.Override.fatalError("🐞 RequestDL bug: \(message)", file: file, line: line)
         #else
-        Internals.Override.fatalError("RequestDL internal error", file: file, line: line)
+        Internals.Override.fatalError(message, file: file, line: line)
         #endif
     }
 }

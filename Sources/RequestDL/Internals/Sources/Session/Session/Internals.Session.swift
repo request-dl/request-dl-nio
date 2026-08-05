@@ -1,12 +1,11 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import AsyncHTTPClient
+import Logging
 import NIOCore
 import NIOPosix
-import Logging
 
 extension Internals {
 
@@ -70,7 +69,9 @@ extension Internals {
         ) async throws -> SessionTask {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
-            let download = Internals.DownloadBuffer(readingMode: requestConfiguration.readingMode)
+            let download = await Internals.DownloadBuffer(
+                readingMode: requestConfiguration.readingMode
+            )
 
             let delegate = Internals.ClientResponseReceiver(
                 url: requestConfiguration.url,
@@ -89,7 +90,7 @@ extension Internals {
                 download: download.stream
             )
 
-            let request = try requestConfiguration.build()
+            let request = try requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
 
             let unsafeTask = client.execute(
                 request: request,

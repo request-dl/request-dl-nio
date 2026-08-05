@@ -1,15 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
- */
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import NIOSSL
 
-/**
- An enumeration that represents different versions of the Transport Layer Security (TLS) protocol.
-
- `TLSVersion` provides options to specify different versions of the TLS protocol in Swift.
- */
+/// An enumeration that represents different versions of the Transport Layer Security (TLS) protocol.
+///
+/// `TLSVersion` provides options to specify different versions of the TLS protocol in Swift.
 public enum TLSVersion: Int {
 
     /// The TLS 1.0 version.

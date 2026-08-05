@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import RequestDL
 
 extension StoredObjectToolbox {
@@ -19,10 +18,10 @@ extension StoredObjectToolbox {
     }
 }
 
-private extension StoredObjectToolbox {
+extension StoredObjectToolbox {
 
     @propertyWrapper
-    struct CombinedProperty: DynamicValue {
+    fileprivate struct CombinedProperty: DynamicValue {
 
         @OneProperty var one
         @TwoProperty var two
@@ -33,7 +32,7 @@ private extension StoredObjectToolbox {
     }
 
     @propertyWrapper
-    struct OneProperty: DynamicValue {
+    fileprivate struct OneProperty: DynamicValue {
 
         @StoredObject var factory = Factory()
 
@@ -43,7 +42,7 @@ private extension StoredObjectToolbox {
     }
 
     @propertyWrapper
-    struct TwoProperty: DynamicValue {
+    fileprivate struct TwoProperty: DynamicValue {
 
         @StoredObject var factory1 = Factory()
         @StoredObject var factory2 = Factory()

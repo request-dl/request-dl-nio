@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct AsyncPropertyTests {
@@ -18,13 +18,15 @@ struct AsyncPropertyTests {
         }
 
         // When
-        let resolved = try await resolve(TestProperty {
-            AsyncProperty {
-                if let apiKey = await apiKey {
-                    Authorization(.bearer, token: apiKey)
+        let resolved = try await resolve(
+            TestProperty {
+                AsyncProperty {
+                    if let apiKey = await apiKey {
+                        Authorization(.bearer, token: apiKey)
+                    }
                 }
             }
-        })
+        )
 
         // Then
         #expect(

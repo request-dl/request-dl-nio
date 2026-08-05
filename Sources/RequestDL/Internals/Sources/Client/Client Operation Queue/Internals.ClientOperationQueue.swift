@@ -1,68 +1,47 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 
 extension Internals {
 
+    /// Counts the requests a client currently has in flight.
+    ///
+    /// - Important: Must stay a plain counter, not a doubly linked list with a lock per node.
+    /// Completing an operation touches its neighbours, so a node holds its own lock while
+    /// taking theirs — two adjacent requests finishing at the same time deadlock each other:
+    /// the first holds A and wants B, the second holds B and wants A. `Lock` is not reentrant,
+    /// so that deadlock is permanent, and it would happen inside a cooperative pool thread
+    /// while holding the client's `AsyncLock`.
+    ///
+    /// The only question this needs to answer is "is anything running", which a counter answers
+    /// without any of that.
     final class ClientOperationQueue: @unchecked Sendable {
-
-        private final class Root: Internals.ClientOperation, @unchecked Sendable {
-
-            override func complete() {
-                /*
-                 * This function intentionally has no implementation and is
-                 * meant to be used as a permanent root for a
-                 * `ClientOperationQueue`. By not implementing the function, we
-                 * can ensure that the root operation is always present in
-                 * memory and is held by the queue.
-                 *
-                 * The default implementation updates the next and previous
-                 * references that point to this operation, but since the root
-                 * is intended to exist indefinitely, we do not want to modify
-                 * these references.
-                 */
-            }
-        }
 
         // MARK: - Internal properties
 
         var isRunning: Bool {
-            lock.withLock {
-                _last == nil || _last !== root
-            }
+            lock.withLock { _count > .zero }
         }
 
         // MARK: - Private properties
 
         private let lock = Lock()
 
-        private let root: Root
-
         // MARK: - Unsafe properties
 
-        private weak var _last: ClientOperation?
+        private var _count = 0
 
         // MARK: - Inits
 
-        init() {
-            let root = Root(delegate: nil)
-
-            self.root = root
-            self._last = root
-        }
+        init() {}
 
         // MARK: - Internals methods
 
         func operation() -> ClientOperation {
-            lock.withLock {
-                let last = _last ?? root
-                let operation = ClientOperation(delegate: self)
-                operation.connect(to: last)
-                self._last = operation
-                return operation
-            }
+            lock.withLock { _count += 1 }
+            return ClientOperation(delegate: self)
         }
     }
 }
@@ -72,10 +51,6 @@ extension Internals {
 extension Internals.ClientOperationQueue: QueueClientOperationDelegate {
 
     func operationDidComplete(_ operation: Internals.ClientOperation) {
-        lock.withLock {
-            if operation === _last {
-                _last = _last?.previous ?? root
-            }
-        }
+        lock.withLock { _count -= 1 }
     }
 }

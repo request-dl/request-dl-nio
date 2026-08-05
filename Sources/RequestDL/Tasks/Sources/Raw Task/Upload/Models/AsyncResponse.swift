@@ -1,41 +1,42 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
- A structure that represents an asynchronous response.
- */
+/// A structure that represents an asynchronous response.
 public struct AsyncResponse: Sendable, AsyncSequence {
 
-    /**
-     A structure that defines an async iterator for the asynchronous response.
-     */
+    ///
+    /// A structure that defines an async iterator for the asynchronous response.
+    ///
     public struct Iterator: Sendable, AsyncIteratorProtocol {
 
         fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncResponse.Iterator
 
-        /**
-         Returns the next element in the sequence, or nil if there are no more elements.
-
-         - Returns: The next element in the sequence.
-         */
+        ///
+        /// Returns the next element in the sequence, or nil if there are no more elements.
+        ///
+        /// - Returns: The next element in the sequence.
+        ///
         mutating public func next() async throws -> Element? {
             switch try await iterator.next() {
             case .upload(let step):
-                return .upload(UploadStep(
-                    chunkSize: step.chunkSize,
-                    totalSize: step.totalSize
-                ))
+                return .upload(
+                    UploadStep(
+                        chunkSize: step.chunkSize,
+                        totalSize: step.totalSize
+                    )
+                )
             case .download(let step):
-                return .download(DownloadStep(
-                    head: .init(step.head),
-                    bytes: AsyncBytes(
-                        seed: seed,
-                        bytes: step.bytes
-                    )))
+                return .download(
+                    DownloadStep(
+                        head: .init(step.head),
+                        bytes: AsyncBytes(
+                            seed: seed,
+                            bytes: step.bytes
+                        )
+                    )
+                )
             case .none:
                 return nil
             }
@@ -67,11 +68,11 @@ public struct AsyncResponse: Sendable, AsyncSequence {
 
     // MARK: - Public methods
 
-    /**
-     Returns an async iterator over the elements of the sequence.
-
-     - Returns: An async iterator for the asynchronous response.
-     */
+    ///
+    /// Returns an async iterator over the elements of the sequence.
+    ///
+    /// - Returns: An async iterator for the asynchronous response.
+    ///
     public func makeAsyncIterator() -> Iterator {
         Iterator(
             seed: seed,

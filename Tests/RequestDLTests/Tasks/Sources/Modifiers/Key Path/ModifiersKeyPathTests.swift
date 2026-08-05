@@ -1,10 +1,13 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
+
+#if canImport(Darwin)
+import Testing
+
+@testable import RequestDL
 
 import Foundation
-import Testing
-@testable import RequestDL
 
 struct ModifiersKeyPathTests {
 
@@ -92,3 +95,4 @@ struct ModifiersKeyPathTests {
         #expect(keyPathNotFound)
     }
 }
+#endif

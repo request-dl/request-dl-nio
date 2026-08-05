@@ -1,19 +1,24 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 struct InternalsBodyTests {
 
     @Test
-    func requestBody_whenFragmentByOne_shouldContainsAllCharacters() async throws {
+    func requestBody_whenSmallBody_shouldSendItInASingleChunk() async throws {
         // Given
         let string = "Hello World"
-
-        let body = RequestBody(buffers: [
+        let body = await RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -21,12 +26,14 @@ struct InternalsBodyTests {
         let buffers = try await body.buffers()
 
         // Then
-        #expect(body.chunkSize == 1)
         #expect(body.totalSize == string.count)
 
-        #expect(
-            buffers.resolveData() == Array(string.utf8).split(by: 1)
-        )
+        // Regression guard: anything under the minimum chunk must go out whole, not as one
+        // write per character, each with its own future and its own progress event.
+        #expect(body.chunkSize == string.count)
+        let resolvedData = await buffers.resolveData()
+        let expectedChunks = await Array(string.utf8).split(by: string.count)
+        #expect(resolvedData == expectedChunks)
     }
 
     @Test
@@ -34,9 +41,12 @@ struct InternalsBodyTests {
         // Given
         let string = "Hello World"
 
-        let body = RequestBody(chunkSize: string.count, buffers: [
-            Internals.DataBuffer(string)
-        ])
+        let body = await RequestBody(
+            chunkSize: string.count,
+            buffers: [
+                Internals.DataBuffer(string)
+            ]
+        )
 
         // When
         let buffers = try await body.buffers()
@@ -45,9 +55,8 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == string.count)
         #expect(body.totalSize == string.count)
 
-        #expect(
-            buffers.resolveData() == [Data(string.utf8)]
-        )
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData == [Data(string.utf8)])
     }
 
     @Test
@@ -55,7 +64,7 @@ struct InternalsBodyTests {
         // Given
         let string = ""
 
-        let body = RequestBody(buffers: [
+        let body = await RequestBody(buffers: [
             Internals.DataBuffer(string)
         ])
 
@@ -66,9 +75,8 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == .zero)
         #expect(body.totalSize == string.count)
 
-        #expect(
-            buffers.resolveData() == []
-        )
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData == [])
     }
 
     @Test
@@ -83,8 +91,7 @@ struct InternalsBodyTests {
         #expect(body.chunkSize == .zero)
         #expect(body.totalSize == .zero)
 
-        #expect(
-            buffers.resolveData() == []
-        )
+        let resolvedData = await buffers.resolveData()
+        #expect(resolvedData == [])
     }
 }

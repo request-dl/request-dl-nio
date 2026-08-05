@@ -1,13 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-
-/**
-A struct that represents the `AcceptHeader` header, used to specify the desired response
-content type for an HTTP request.
-*/
+/// A struct that represents the `AcceptHeader` header, used to specify the desired response
+/// content type for an HTTP request.
 public struct AcceptHeader: Property {
 
     // MARK: - Public properties
@@ -23,11 +19,11 @@ public struct AcceptHeader: Property {
 
     // MARK: - Inits
 
-    /**
-     Initializes a new instance of `Accept` header for the given `ContentType`.
-
-     - Parameter contentType: The content type to be accepted.
-     */
+    ///
+    /// Initializes a new instance of `Accept` header for the given `ContentType`.
+    ///
+    /// - Parameter contentType: The content type to be accepted.
+    ///
     public init(_ contentType: RequestDL.ContentType) {
         self.type = contentType
     }
@@ -40,11 +36,13 @@ public struct AcceptHeader: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(HeaderNode(
-            key: "Accept",
-            value: property.type.rawValue,
-            strategy: inputs.environment.headerStrategy,
-            separator: inputs.environment.headerSeparator
-        ))
+        return .leaf(
+            HeaderNode(
+                key: "Accept",
+                value: property.type.rawValue,
+                strategy: inputs.environment.headerStrategy,
+                separator: inputs.environment.headerSeparator
+            )
+        )
     }
 }

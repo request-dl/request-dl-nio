@@ -16,7 +16,7 @@ You can start by specifying a ``RequestDL/RequestEnvironmentKey`` as follows:
 
 ```swift
 struct PayloadKey: RequestEnvironmentKey {
-    public static let defaultValue: Data?
+    public static let defaultValue: Data? = nil
 }
 
 extension RequestEnvironmentValues {
@@ -93,8 +93,6 @@ For each `@PropertyNamespace` defined, RequestDL combines the values to form a u
 - ``RequestDL/RequestEnvironmentValues``
 - ``RequestDL/PropertyEnvironment``
 - ``RequestDL/Property/environment(_:_:)``
-- ``RequestDL/PropertyEnvironmentKey``
-- ``RequestDL/PropertyEnvironmentValues``
 
 ### Keep objects in memory
 

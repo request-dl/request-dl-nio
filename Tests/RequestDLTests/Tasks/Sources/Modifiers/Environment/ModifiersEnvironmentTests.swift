@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct ModifiersEnvironmentTests {
@@ -36,7 +36,8 @@ struct ModifiersEnvironmentTests {
         let numberTask = NumberTask()
 
         // When
-        let value = try await numberTask
+        let value =
+            try await numberTask
             .environment(\.number, number)
             .result()
 

@@ -1,9 +1,9 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Testing
+
 @testable import RequestDL
 
 struct TLSVersionTests {
@@ -84,5 +84,25 @@ struct TLSVersionTests {
 
         // Then
         #expect(lhs > rhs)
+    }
+
+    @Test
+    func version_whenDowngradeV1_shouldStayV1() async throws {
+        #expect(TLSVersion.v1.downgrade == .v1)
+    }
+
+    @Test
+    func version_whenDowngradeV11_shouldBeV1() async throws {
+        #expect(TLSVersion.v1_1.downgrade == .v1)
+    }
+
+    @Test
+    func version_whenDowngradeV12_shouldBeV11() async throws {
+        #expect(TLSVersion.v1_2.downgrade == .v1_1)
+    }
+
+    @Test
+    func version_whenDowngradeV13_shouldBeV12() async throws {
+        #expect(TLSVersion.v1_3.downgrade == .v1_2)
     }
 }

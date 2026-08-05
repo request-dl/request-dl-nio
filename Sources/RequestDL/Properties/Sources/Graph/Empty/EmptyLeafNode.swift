@@ -1,12 +1,8 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct EmptyLeafNode: Node {
 
-    mutating func next() -> Node? {
-        nil
-    }
+    var children: [Node] { [] }
 }

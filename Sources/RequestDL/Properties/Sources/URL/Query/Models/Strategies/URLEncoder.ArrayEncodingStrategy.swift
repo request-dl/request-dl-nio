@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension URLEncoder {
 
@@ -40,18 +38,18 @@ extension URLEncoder {
         // MARK: - Private methods
 
         private func encodeDroppingIndex(_ index: Int, in encoder: URLEncoder.Encoder) throws {
-           var container = encoder.keyContainer()
-           try container.encode("")
-       }
+            var container = encoder.keyContainer()
+            try container.encode("")
+        }
 
         private func encodeSubscripted(_ index: Int, in encoder: URLEncoder.Encoder) throws {
-           var container = encoder.keyContainer()
-           try container.encode("[\(index)]")
-       }
+            var container = encoder.keyContainer()
+            try container.encode("[\(index)]")
+        }
 
         private func encodeAccessMember(_ index: Int, in encoder: URLEncoder.Encoder) throws {
-           var container = encoder.keyContainer()
-           try container.encode(".\(index)")
-       }
+            var container = encoder.keyContainer()
+            try container.encode(".\(index)")
+        }
     }
 }

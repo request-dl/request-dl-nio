@@ -1,12 +1,18 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
-import Testing
-import NIOCore
 import AsyncHTTPClient
+import NIOCore
+import Testing
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+#endif
 
 struct InternalsSessionConfigurationTests {
 
@@ -40,9 +46,10 @@ struct InternalsSessionConfigurationTests {
         #expect(
             String(
                 describing: builtConfiguration.redirectConfiguration
-            ) == String(
-                describing: redirectConfiguration.build()
             )
+                == String(
+                    describing: redirectConfiguration.build()
+                )
         )
     }
 
@@ -198,9 +205,10 @@ struct InternalsSessionConfigurationTests {
         #expect(
             String(
                 describing: builtConfiguration.decompression
-            ) == String(
-                describing: decompression.build()
             )
+                == String(
+                    describing: decompression.build()
+                )
         )
     }
 
@@ -246,9 +254,10 @@ struct InternalsSessionConfigurationTests {
         #expect(
             String(
                 describing: builtConfiguration.redirectConfiguration
-            ) == String(
-                describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 5, allowCycles: false)
             )
+                == String(
+                    describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 5, allowCycles: false)
+                )
         )
         #expect(builtConfiguration.timeout.connect == nil)
         #expect(builtConfiguration.timeout.read == nil)
@@ -256,9 +265,10 @@ struct InternalsSessionConfigurationTests {
         #expect(
             String(
                 describing: builtConfiguration.decompression
-            ) == String(
-                describing: HTTPClient.Decompression.disabled
             )
+                == String(
+                    describing: HTTPClient.Decompression.disabled
+                )
         )
         #expect(builtConfiguration.httpVersion == .automatic)
         #expect(builtConfiguration.networkFrameworkWaitForConnectivity)

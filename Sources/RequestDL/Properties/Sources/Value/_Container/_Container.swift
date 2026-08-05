@@ -1,8 +1,8 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 
 @propertyWrapper
 struct _Container<Value>: DynamicValue {
@@ -12,7 +12,8 @@ struct _Container<Value>: DynamicValue {
     var wrappedValue: Value {
         get { storage.value }
         nonmutating
-        set { storage.value = newValue }
+            set
+        { storage.value = newValue }
     }
 
     // MARK: - Private properties

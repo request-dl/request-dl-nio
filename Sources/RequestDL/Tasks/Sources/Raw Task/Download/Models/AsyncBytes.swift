@@ -1,27 +1,29 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
-/**
- A structure that represents asynchronous bytes.
- */
+/// A structure that represents asynchronous bytes.
 public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
-    /**
-     A structure that defines an async iterator for the asynchronous bytes.
-     */
+    ///
+    /// A structure that defines an async iterator for the asynchronous bytes.
+    ///
     public struct AsyncIterator: AsyncIteratorProtocol {
 
         fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncBytes.AsyncIterator
 
-        /**
-         Returns the next element in the sequence, or nil if there are no more elements.
-
-         - Returns: The next element in the sequence.
-         */
+        ///
+        /// Returns the next element in the sequence, or nil if there are no more elements.
+        ///
+        /// - Returns: The next element in the sequence.
+        ///
         public mutating func next() async throws -> Data? {
             try await iterator.next()
         }
@@ -31,12 +33,12 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
     // MARK: - Public properties
 
-    /**
-     The total size of the response body.
-
-     Internally, the value is known when the client receives the response head which contains the
-     `Content-Length` header.
-     */
+    ///
+    /// The total size of the response body.
+    ///
+    /// Internally, the value is known when the client receives the response head which contains the
+    /// `Content-Length` header.
+    ///
     public var totalSize: Int {
         bytes.totalSize
     }
@@ -64,11 +66,11 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
     // MARK: - Public methods
 
-    /**
-     Returns an async iterator over the elements of the sequence.
-
-     - Returns: An async iterator for the asynchronous bytes.
-     */
+    ///
+    /// Returns an async iterator over the elements of the sequence.
+    ///
+    /// - Returns: An async iterator for the asynchronous bytes.
+    ///
     public func makeAsyncIterator() -> AsyncIterator {
         .init(
             seed: seed,

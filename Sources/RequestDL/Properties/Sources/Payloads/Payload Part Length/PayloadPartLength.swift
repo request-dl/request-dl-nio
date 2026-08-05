@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 private struct PayloadChunkSizeKey: RequestEnvironmentKey {
     static var defaultValue: Int? { nil }
@@ -24,14 +22,5 @@ extension Property {
     /// - Returns: A new instance of Property with the chunk size set.
     public func payloadChunkSize(_ chunkSize: Int) -> some Property {
         environment(\.payloadChunkSize, chunkSize)
-    }
-
-    /// Sets the length of payload parts to be used during the upload process.
-    ///
-    /// - Parameter length: The desired length of each payload part.
-    /// - Returns: A new instance of Property with the payload part length set.
-    @available(*, deprecated, renamed: "payloadChunkSize")
-    public func payloadPartLength(_ length: Int) -> some Property {
-        payloadChunkSize(length)
     }
 }

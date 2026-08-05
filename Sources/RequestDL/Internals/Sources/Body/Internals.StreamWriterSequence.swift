@@ -1,16 +1,15 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import AsyncHTTPClient
 import NIOCore
-@preconcurrency import AsyncHTTPClient
 
 extension Internals {
 
-    struct StreamWriterSequence: Sendable, Sequence {
+    struct StreamWriterSequence: Sendable, AsyncSequence {
 
-        struct Iterator: Sendable, IteratorProtocol {
+        struct AsyncIterator: Sendable, AsyncIteratorProtocol {
 
             // MARK: - Private properties
 
@@ -18,13 +17,13 @@ extension Internals {
 
             // MARK: - Unsafe properties
 
-            private var _iterator: Internals.BodySequence.Iterator
+            private var _iterator: Internals.BodySequence.AsyncIterator
 
             // MARK: - Inits
 
             init(
                 writer: HTTPClient.Body.StreamWriter,
-                iterator: Internals.BodySequence.Iterator
+                iterator: Internals.BodySequence.AsyncIterator
             ) {
                 self.writer = writer
                 self._iterator = iterator
@@ -32,8 +31,8 @@ extension Internals {
 
             // MARK: - Methods
 
-            mutating func next() -> Element? {
-                guard let item = _iterator.next() else {
+            mutating func next() async -> Element? {
+                guard let item = await _iterator.next() else {
                     return nil
                 }
 
@@ -50,10 +49,10 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func makeIterator() -> Iterator {
-            Iterator(
+        func makeAsyncIterator() -> AsyncIterator {
+            AsyncIterator(
                 writer: writer,
-                iterator: body.makeIterator()
+                iterator: body.makeAsyncIterator()
             )
         }
     }

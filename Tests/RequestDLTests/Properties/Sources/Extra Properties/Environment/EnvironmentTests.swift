@@ -1,9 +1,10 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+import SwiftAsyncStream
 import Testing
+
 @testable import RequestDL
 
 struct EnvironmentTests {
@@ -36,11 +37,13 @@ struct EnvironmentTests {
         }
 
         // When
-        _ = try await resolve(TestProperty {
-            receiver
-        })
+        _ = try await resolve(
+            TestProperty {
+                receiver
+            }
+        )
 
-        await expectation.wait()
+        try await expectation.wait()
 
         // Then
         #expect(value.wrappedValue == IntegerEnvironmentKey.defaultValue)
@@ -61,12 +64,14 @@ struct EnvironmentTests {
         let value = 2
 
         // When
-        _ = try await resolve(TestProperty {
-            receiver
-                .environment(\.integer, value)
-        })
+        _ = try await resolve(
+            TestProperty {
+                receiver
+                    .environment(\.integer, value)
+            }
+        )
 
-        await expectation.wait()
+        try await expectation.wait()
 
         // Then
         #expect(receivedValue.wrappedValue == value)

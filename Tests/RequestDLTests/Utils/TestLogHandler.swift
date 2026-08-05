@@ -1,18 +1,22 @@
-import Foundation
+import Logging
 import NIOConcurrencyHelpers
-@preconcurrency import Logging
+
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#endif
 
 final class TestLogHandler: LogHandler, @unchecked Sendable {
 
-    var logLevel: Logger.Level  {
-        get { lock.withLock { _logLevel }}
-        set { lock.withLock { _logLevel = newValue }}
+    var logLevel: Logger.Level {
+        get { lock.withLock { _logLevel } }
+        set { lock.withLock { _logLevel = newValue } }
     }
 
     var metadata: Logger.Metadata {
-        get { lock.withLock { _metadata }}
-        set { lock.withLock { _metadata = newValue }}
+        get { lock.withLock { _metadata } }
+        set { lock.withLock { _metadata = newValue } }
     }
 
     private let onLogRecord: @Sendable (LogRecord) -> Void
@@ -56,7 +60,7 @@ final class TestLogHandler: LogHandler, @unchecked Sendable {
 
     subscript(metadataKey key: String) -> Logger.Metadata.Value? {
         get { lock.withLock { _metadata[key] } }
-        set { lock.withLock { _metadata[key] = newValue }}
+        set { lock.withLock { _metadata[key] = newValue } }
     }
 
     // MARK: - Supporting Types
@@ -81,8 +85,8 @@ final class TestLogHandler: LogHandler, @unchecked Sendable {
     }
 }
 
-private extension String {
-    var lastPathComponent: String {
+extension String {
+    fileprivate var lastPathComponent: String {
         split(separator: "/").last.map(String.init) ?? self
     }
 }
@@ -105,7 +109,8 @@ extension Logger {
                     metadata: metadata,
                     onLogRecord: recorded
                 )
-        })
+            }
+        )
 
         return try await RequestEnvironmentValues.$current.withValue(environment, operation: operation)
     }

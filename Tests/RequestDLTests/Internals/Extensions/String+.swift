@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 extension String {
 
@@ -14,15 +12,16 @@ extension String {
         let characters = [
             lowercaseCharacters,
             uppercaseCharacters,
-            decimalCharacters
+            decimalCharacters,
         ].joined()
 
         var string = ""
 
-        for _ in 0 ..< length {
-            string += characters.randomElement().map {
-                String($0)
-            } ?? "a"
+        for _ in 0..<length {
+            string +=
+                characters.randomElement().map {
+                    String($0)
+                } ?? "a"
         }
 
         return string

@@ -1,8 +1,7 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
 import Logging
 
 extension Internals {
@@ -12,7 +11,10 @@ extension Internals {
         let message: @Sendable () -> Logger.Message
         let metadata: (@Sendable () -> Logger.Metadata)?
 
-        init(_ message: @autoclosure @escaping @Sendable () -> Logger.Message, metadata: @autoclosure @escaping @Sendable () -> Logger.Metadata) {
+        init(
+            _ message: @autoclosure @escaping @Sendable () -> Logger.Message,
+            metadata: @autoclosure @escaping @Sendable () -> Logger.Metadata
+        ) {
             self.message = message
             self.metadata = metadata
         }
@@ -42,10 +44,15 @@ extension Internals.Log {
             """,
             metadata: [
                 String(describing: type(of: state)): .string(String(describing: state)),
-                String(describing: type(of: phase)): .string(String(describing: phase))
-            ].merging(error.map {[
-                String(describing: type(of: $0)): .string(String(describing: $0))
-            ]} ?? [:], uniquingKeysWith: { lhs, _ in lhs })
+                String(describing: type(of: phase)): .string(String(describing: phase)),
+            ].merging(
+                error.map {
+                    [
+                        String(describing: type(of: $0)): .string(String(describing: $0))
+                    ]
+                } ?? [:],
+                uniquingKeysWith: { lhs, _ in lhs }
+            )
         )
     }
 }
@@ -59,7 +66,7 @@ extension Internals.Log {
             It seems that you are attempting to create a Certificate \
             property outside of the allowed context.
 
-            Please note that Certificates, Trusts, and AdditionalTrusts \
+            Please note that Certificates, TrustRoots, and AdditionalTrustRoots \
             are the only valid contexts in which you can create a \
             Certificate property.
 
@@ -79,7 +86,7 @@ extension Internals.Log {
             """,
             metadata: [
                 String(describing: type(of: resource)): .string(.init(describing: resource)),
-                String(describing: type(of: bundle)): .string(.init(describing: bundle))
+                String(describing: type(of: bundle)): .string(.init(describing: bundle)),
             ]
         )
     }
@@ -113,23 +120,6 @@ extension Internals.Log {
             """
         )
     }
-
-    static func environmentNilValue<KeyPath: Sendable>(_ keyPath: KeyPath) -> Internals.Log {
-        Internals.Log(
-            """
-            This can occur if the property wrapper's key path does not \
-            exist in the current environment, or if the environment has \
-            not been properly set up.
-
-            Please ensure that the environment is correctly configured \
-            and that the key path provided to the property wrapper is \
-            valid.
-            """,
-            metadata: [
-                String(describing: type(of: keyPath)): .string(.init(describing: keyPath))
-            ]
-        )
-    }
 }
 
 // MARK: - Cache
@@ -149,13 +139,31 @@ extension Internals.Log {
             """,
             metadata: [
                 "memoryCapacity": .string(.init(describing: memoryCapacity)),
-                "diskCapacity": .string(.init(describing: diskCapacity))
+                "diskCapacity": .string(.init(describing: diskCapacity)),
             ]
         )
     }
 }
 
 extension Internals.Log {
+
+    func assertionFailure(
+        file: StaticString = #fileID,
+        function: String = #function,
+        line: UInt = #line,
+        logger: Logger? = nil
+    ) {
+        logMetadata(
+            level: .error,
+            logger: logger ?? RequestEnvironmentValues.current.logger
+        )
+
+        Internals.assertionFailure(
+            message().description,
+            file: file,
+            line: line
+        )
+    }
 
     func preconditionFailure(
         file: StaticString = #fileID,
@@ -232,9 +240,9 @@ extension Internals.Log {
             print(
                 """
                 Crash Metadata Information
-                
+
                 \(metadata().description)
-                
+
                 -> \(file):\(line)
                 """
             )

@@ -1,35 +1,41 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
 
-import Foundation
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.URL
+import protocol Foundation.DataProtocol
+#endif
 
-/**
- A struct representing cached data with associated metadata.
- */
+/// A struct representing cached data with associated metadata.
 public struct CachedData: Sendable {
 
     // MARK: - Public properties
 
-    /**
-     The response head associated with the cached data.
-     */
+    ///
+    /// The response head associated with the cached data.
+    ///
     public var response: ResponseHead {
         .init(cachedResponse.response)
     }
 
-    /**
-     The cache policy associated with the cached data.
-     */
+    ///
+    /// The cache policy associated with the cached data.
+    ///
     public var policy: DataCache.Policy.Set {
         cachedResponse.policy
     }
 
-    /**
-     The actual data stored in the cache.
-     */
+    ///
+    /// The actual data stored in the cache.
+    ///
     public var data: Data {
-        buffer.getData() ?? Data()
+        get async {
+            await buffer.getData() ?? Data()
+        }
     }
 
     // MARK: - Internal properties
@@ -38,20 +44,20 @@ public struct CachedData: Sendable {
 
     let buffer: Internals.AnyBuffer
 
-    /**
-     Initializes with the provided response head, cache policy, and data.
-
-     - Parameters:
-        - response: The response head associated with the cached data.
-        - policy: The cache policy associated with the cached data.
-        - data: The data to be cached.
-     */
-    public init<Data: DataProtocol>(
+    ///
+    /// Initializes with the provided response head, cache policy, and data.
+    ///
+    /// - Parameters:
+    ///    - response: The response head associated with the cached data.
+    ///    - policy: The cache policy associated with the cached data.
+    ///    - data: The data to be cached.
+    ///
+    public init<Data: DataProtocol & Sendable>(
         response: ResponseHead,
         policy: DataCache.Policy.Set,
         data: Data
-    ) {
-        self.init(
+    ) async {
+        await self.init(
             cachedResponse: .init(
                 response: Self.internalResponse(response),
                 policy: policy
@@ -60,20 +66,20 @@ public struct CachedData: Sendable {
         )
     }
 
-    /**
-     Initializes with the provided response head, cache policy, and file URL.
-
-     - Parameters:
-        - response: The response head associated with the cached data.
-        - policy: The cache policy associated with the cached data.
-        - url: The file URL representing the location of the cached data.
-     */
+    ///
+    /// Initializes with the provided response head, cache policy, and file URL.
+    ///
+    /// - Parameters:
+    ///    - response: The response head associated with the cached data.
+    ///    - policy: The cache policy associated with the cached data.
+    ///    - url: The file URL representing the location of the cached data.
+    ///
     public init(
         response: ResponseHead,
         policy: DataCache.Policy.Set,
         url: URL
-    ) {
-        self.init(
+    ) async {
+        await self.init(
             cachedResponse: .init(
                 response: Self.internalResponse(response),
                 policy: policy

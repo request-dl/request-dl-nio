@@ -1,8 +1,6 @@
-/*
- See LICENSE for this package's licensing information.
-*/
-
-import Foundation
+//
+// See LICENSE for this package's licensing information.
+//
 
 struct HeaderNode: PropertyNode {
 
@@ -64,11 +62,14 @@ struct HeaderNode: PropertyNode {
 extension HeaderNode: CustomReflectable {
 
     var customMirror: Mirror {
-        Mirror(self, children: [
-            (label: "key", value: key),
-            (label: "value", value: value),
-            (label: "strategy", value: strategy),
-            (label: "separator", value: separator as Any)
-        ])
+        Mirror(
+            self,
+            children: [
+                (label: "key", value: key),
+                (label: "value", value: value),
+                (label: "strategy", value: strategy),
+                (label: "separator", value: separator as Any),
+            ]
+        )
     }
 }
