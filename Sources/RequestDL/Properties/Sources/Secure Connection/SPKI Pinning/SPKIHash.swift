@@ -1,13 +1,14 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
+
+import Crypto
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif
-import Crypto
 
 /// An SPKI (SubjectPublicKeyInfo) hash for certificate pinning.
 ///
@@ -56,7 +57,7 @@ public struct SPKIHash<Algorithm: HashFunction>: Property {
     /// Creates an SPKI hash from raw SHA-256 digest bytes.
     ///
     /// - Parameter data: Raw 32-byte SHA-256 digest.
-    public init(_  data: Data) where Algorithm == SHA256 {
+    public init(_ data: Data) where Algorithm == SHA256 {
         self.source = .rawData(data)
     }
 

@@ -5,14 +5,14 @@
 //  Created by Brenno de Moura on 02/02/26.
 //
 
+import AsyncHTTPClient
+import Crypto
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif
-
-import AsyncHTTPClient
-import Crypto
 
 extension Internals {
 
@@ -34,7 +34,7 @@ extension Internals {
             }
         }
 
-        static func ==(lhs: Self, rhs: Self) -> Bool {
+        static func == (lhs: Self, rhs: Self) -> Bool {
             lhs.source == rhs.source
                 && lhs.algorithmID == rhs.algorithmID
         }
@@ -59,9 +59,9 @@ extension Internals {
     }
 }
 
-private extension AsyncHTTPClient.SPKIHash {
+extension AsyncHTTPClient.SPKIHash {
 
-    init<Algorithm: HashFunction>(
+    fileprivate init<Algorithm: HashFunction>(
         algorithm: Algorithm.Type,
         source: Internals.SPKIHashSource
     ) throws {

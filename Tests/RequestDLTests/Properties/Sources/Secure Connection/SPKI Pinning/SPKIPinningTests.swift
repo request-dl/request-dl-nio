@@ -1,6 +1,12 @@
-/*
- See LICENSE for this package's licensing information.
-*/
+//
+// See LICENSE for this package's licensing information.
+//
+
+import Crypto
+import NIOSSL
+import Testing
+
+@testable import RequestDL
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -8,11 +14,6 @@ import FoundationEssentials
 import struct Foundation.Data
 import struct Foundation.URL
 #endif
-
-import Testing
-import NIOSSL
-import Crypto
-@testable import RequestDL
 
 struct SPKIPinningTests {
 
@@ -26,26 +27,31 @@ struct SPKIPinningTests {
         let clientPin = try hashSPKI(from: client.certificateURL)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            SecureConnection {
-                SPKIPinning {
-                    PropertyForEach(serverPin, id: \.self) {
-                        SPKIHash($0)
-                    }
+        let resolved = try await resolve(
+            TestProperty {
+                SecureConnection {
+                    SPKIPinning {
+                        PropertyForEach(serverPin, id: \.self) {
+                            SPKIHash($0)
+                        }
 
-                    PropertyForEach(clientPin, id: \.self) {
-                        SPKIHash($0)
+                        PropertyForEach(clientPin, id: \.self) {
+                            SPKIHash($0)
+                        }
                     }
                 }
             }
-        })
+        )
 
         // Then
         let secureConnection = try #require(resolved.session.configuration.secureConnection)
         #expect(secureConnection.tlsPinningPolicy == .strict)
-        #expect(secureConnection.tlsPins == (serverPin + clientPin).map {
-            .init(source: .rawData($0), algorithm: SHA256.self)
-        })
+        #expect(
+            secureConnection.tlsPins
+                == (serverPin + clientPin).map {
+                    .init(source: .rawData($0), algorithm: SHA256.self)
+                }
+        )
     }
 
     @Test
@@ -58,26 +64,31 @@ struct SPKIPinningTests {
         let clientPin = try hashSPKI(from: client.certificateURL)
 
         // When
-        let resolved = try await resolve(TestProperty {
-            SecureConnection {
-                SPKIPinning(policy: .audit) {
-                    PropertyForEach(serverPin, id: \.self) {
-                        SPKIHash($0)
-                    }
+        let resolved = try await resolve(
+            TestProperty {
+                SecureConnection {
+                    SPKIPinning(policy: .audit) {
+                        PropertyForEach(serverPin, id: \.self) {
+                            SPKIHash($0)
+                        }
 
-                    PropertyForEach(clientPin, id: \.self) {
-                        SPKIHash($0)
+                        PropertyForEach(clientPin, id: \.self) {
+                            SPKIHash($0)
+                        }
                     }
                 }
             }
-        })
+        )
 
         // Then
         let secureConnection = try #require(resolved.session.configuration.secureConnection)
         #expect(secureConnection.tlsPinningPolicy == .audit)
-        #expect(secureConnection.tlsPins == (serverPin + clientPin).map {
-            .init(source: .rawData($0), algorithm: SHA256.self)
-        })
+        #expect(
+            secureConnection.tlsPins
+                == (serverPin + clientPin).map {
+                    .init(source: .rawData($0), algorithm: SHA256.self)
+                }
+        )
     }
 }
 
