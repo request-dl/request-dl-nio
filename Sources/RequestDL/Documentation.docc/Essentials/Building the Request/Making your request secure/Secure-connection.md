@@ -39,17 +39,16 @@ SPKI (SubjectPublicKeyInfo) pinning provides defense-in-depth security beyond st
   - `.strict`: Terminate connections on pin mismatch (production)
   - `.audit`: Allow connections but log warnings (staging/debugging)
 
+Both active and backup pins are declared as ``RequestDL/SPKIHash`` values inside the same
+``RequestDL/SPKIPinning`` builder — there is no separate wrapper to distinguish them.
+
 #### Example implementation
 ```swift
 SecureConnection {
     SPKIPinning(policy: .strict) {
-        SPKIActivePins {
-            SPKIHash("base64-active-pin-1")
-            SPKIHash("base64-active-pin-2")
-        }
-        SPKIBackupPins {
-            SPKIHash("base64-backup-pin")
-        }
+        SPKIHash("base64-active-pin-1")
+        SPKIHash("base64-active-pin-2")
+        SPKIHash("base64-backup-pin")
     }
 }
 ```
@@ -144,8 +143,6 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 
 ### SPKI Pinning
 - ``RequestDL/SPKIPinning``
-- ``RequestDL/SPKIActivePins``
-- ``RequestDL/SPKIBackupPins``
 - ``RequestDL/SPKIHash``
 
 ### Client authorization

@@ -13,12 +13,8 @@ import AsyncHTTPClient
 /// ```swift
 /// SecureConnection {
 ///     SPKIPinning(policy: .strict) {
-///         SPKIActivePins {
-///             SPKIHash("base64-encoded-active-pin")
-///         }
-///         SPKIBackupPins {
-///             SPKIHash("base64-encoded-backup-pin")
-///         }
+///         SPKIHash("base64-encoded-active-pin")
+///         SPKIHash("base64-encoded-backup-pin")
 ///     }
 /// }
 /// ```
@@ -54,7 +50,7 @@ public struct SPKIPinning<Content: Property>: Property {
     ///
     /// - Parameters:
     ///   - policy: Failure behavior on pin mismatch (`.strict` for production, `.audit` for debugging).
-    ///   - content: Property builder containing `SPKIActivePins` and `SPKIBackupPins` declarations.
+    ///   - content: Property builder containing `SPKIHash` declarations, including any backup pins.
     public init(
         policy: SPKIPinningPolicy = .strict,
         @PropertyBuilder content: () -> Content
