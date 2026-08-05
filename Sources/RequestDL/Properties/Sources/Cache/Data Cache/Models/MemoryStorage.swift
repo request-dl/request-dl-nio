@@ -79,8 +79,12 @@ struct MemoryStorage: Sendable {
 
     mutating func removeAll(since date: Date) {
         for key in identifiers {
+            // Mirrors `freeSpace`'s handling of the same `identifiers`/`records` pairing: treat a
+            // missing record as already evicted rather than trapping, so both methods agree on
+            // what to do with a stale identifier.
             guard let entry = records[key] else {
-                fatalError()
+                identifiers.remove(key)
+                continue
             }
 
             if entry.date <= date {
