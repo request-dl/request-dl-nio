@@ -31,7 +31,7 @@ concurrency:
 jobs:
   ci:
     name: "Swift CI"
-    uses: request-dl/.github/.github/workflows/swift-ci.yaml@update-swift-ci-workflow
+    uses: request-dl/.github/.github/workflows/swift-ci.yaml@ci/apple-coverage-xcresulttool-export-fallback
     with:
       name: request-dl
       product-name: RequestDL
