@@ -21,6 +21,12 @@ struct LocalServer: Sendable {
 
         static let shared = ServerManager()
 
+        // Separate instance (own `group` and `_channels`) for LocalServerConcurrencyTests'
+        // 200-connection burst, paired with `Configuration.stress` (see
+        // LocalServer.Configuration.swift) so that deliberate stress test no longer competes
+        // with every other LocalServer-backed suite for `.shared`'s threads.
+        static let stress = ServerManager()
+
         // MARK: - Private properties
 
         private let lock = AsyncLock()
@@ -39,6 +45,11 @@ struct LocalServer: Sendable {
         // concurrently-connecting client sessions at this same group. Bumped again to 8; still a
         // fixed headroom guess rather than a guarantee against arbitrarily bad contention, so a
         // recurrence here should widen this further rather than be treated as a new bug.
+        //
+        // LocalServerConcurrencyTests has since moved its 200-connection burst to `.stress`
+        // (its own instance, own group, `Configuration.stress`/port 8889) instead of driving
+        // that load at this shared group — this group's remaining exposure is the aggregate of
+        // every *other* LocalServer-backed suite's normal (light) traffic.
         private let group = MultiThreadedEventLoopGroup(numberOfThreads: 8)
 
         // MARK: - Unsafe properties
@@ -145,8 +156,8 @@ struct LocalServer: Sendable {
 
     // MARK: - Inits
 
-    init(_ serverConfiguration: Configuration) async throws {
-        let (channel, responseQueue) = try await ServerManager.shared.channel(serverConfiguration)
+    init(_ serverConfiguration: Configuration, manager: ServerManager = .shared) async throws {
+        let (channel, responseQueue) = try await manager.channel(serverConfiguration)
 
         self.serverConfiguration = serverConfiguration
         self.channel = channel
