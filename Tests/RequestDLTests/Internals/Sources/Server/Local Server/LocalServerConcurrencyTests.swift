@@ -87,7 +87,10 @@ struct LocalServerConcurrencyTests {
         #expect(resultCounts.allSatisfy { $0 == 1 })
 
         // Sanity check only (see suite-level comment): this must not hang, but on a fast machine
-        // it clears in well under a second regardless of server thread count.
-        #expect(elapsed < .seconds(30))
+        // it clears in well under a second regardless of server thread count. 30s was too tight
+        // for heavily-loaded shared CI runners (observed up to ~60s on visionOS with all 200
+        // sessions still resolving correctly); 180s keeps this a hang-canary without being a
+        // performance assertion.
+        #expect(elapsed < .seconds(180))
     }
 }
