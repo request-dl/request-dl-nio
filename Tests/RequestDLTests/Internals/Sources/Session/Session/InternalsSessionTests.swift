@@ -47,6 +47,13 @@ struct InternalsSessionTests {
             // starves the others until they hit `connectTimeout`.
             configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 64
 
+            // `LocalServer.ServerManager.shared`'s server-side group (LocalServer.swift) is also
+            // process-wide, shared with every other LocalServer-backed suite; AsyncHTTPClient's
+            // 10s default connect timeout can be too tight for this suite's requests when heavy
+            // CI contention queues its TLS handshake behind other suites' traffic (ci-triage/
+            // TASKS.md T1b).
+            configuration.timeout.connect = .seconds(60)
+
             session = Internals.Session(
                 provider: .identified("com.requestdl.tests.local-server", numberOfThreads: 2),
                 configuration: configuration
