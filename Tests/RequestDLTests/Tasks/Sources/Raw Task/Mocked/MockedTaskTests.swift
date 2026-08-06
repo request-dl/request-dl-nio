@@ -24,8 +24,11 @@ struct MockedTaskTests {
         let data = Data("Hello World".utf8)
 
         // When
+        // `AcceptHeader` only shapes the resolved request (used for the cache key/url); it does
+        // not leak into the mocked response headers. `headers` is the channel for that.
         let result = try await MockedTask(
             status: .init(code: statusCode, reason: "Ok"),
+            headers: ["X-Mock-Only": "true"],
             content: {
                 BaseURL("localhost")
                 AcceptHeader(.json)
@@ -45,11 +48,35 @@ struct MockedTaskTests {
         #expect(
             response.headers
                 == .init([
-                    ("Accept", "application/json"),
                     ("Content-Type", "text/plain"),
                     ("Content-Length", String(data.count)),
+                    ("X-Mock-Only", "true"),
                 ])
         )
+        #expect(response.headers["Accept"] == nil)
+    }
+
+    @Test
+    func mock_whenHeadersOverridesBodyDerivedContentType() async throws {
+        // Given
+        let data = Data("Hello World".utf8)
+
+        // When
+        // `headers` takes precedence over the `Content-Type`/`Content-Length` that `Payload`
+        // derives automatically from the mocked body.
+        let result = try await MockedTask(
+            headers: ["Content-Type": "application/json"],
+            content: {
+                BaseURL("localhost")
+                Payload(data: data, contentType: .text)
+            }
+        )
+        .collectData()
+        .result()
+
+        // Then
+        #expect(result.head.headers.first(name: "Content-Type") == "application/json")
+        #expect(result.head.headers.first(name: "Content-Length") == String(data.count))
     }
 
     @Test

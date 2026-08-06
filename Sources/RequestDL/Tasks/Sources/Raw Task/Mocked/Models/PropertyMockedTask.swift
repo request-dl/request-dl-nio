@@ -4,12 +4,20 @@
 
 import NIOCore
 
+/// Header names `Payload` sets on the resolved request to describe the body it produced — the one
+/// piece of the request-shaping property graph that is actually about the mocked response, so it
+/// carries over by default. Everything else declared in `content` (`Headers`, `AcceptHeader`,
+/// `Authorization`, ...) stays request-only; `PropertyMockedTask.headers` is the channel for adding
+/// response headers explicitly.
+private let bodyDerivedHeaderNames = ["Content-Type", "Content-Length"]
+
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     // MARK: - Internal properties
 
     let version: ResponseHead.Version
     let status: ResponseHead.Status
+    let headers: HTTPHeaders
     let isKeepAlive: Bool
     let content: Content
 
@@ -142,17 +150,25 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     }
 
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {
-        var headers = resolved.requestConfiguration.headers
+        var responseHeaders = HTTPHeaders()
+
+        for name in bodyDerivedHeaderNames {
+            if let value = resolved.requestConfiguration.headers.first(name: name) {
+                responseHeaders.set(name: name, value: value)
+            }
+        }
+
+        responseHeaders = responseHeaders.merging(headers) { _, theirs in theirs }
 
         if let method = resolved.requestConfiguration.method {
-            headers.set(name: "rdl-request-method", value: method)
+            responseHeaders.set(name: "rdl-request-method", value: method)
         }
 
         return .init(
             url: resolved.requestConfiguration.url,
             status: .init(code: status.code, reason: status.reason),
             version: .init(minor: version.minor, major: version.major),
-            headers: headers,
+            headers: responseHeaders,
             isKeepAlive: isKeepAlive
         )
     }
