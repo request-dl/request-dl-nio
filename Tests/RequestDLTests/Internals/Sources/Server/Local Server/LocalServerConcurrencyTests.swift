@@ -12,32 +12,32 @@ import FoundationEssentials
 import struct Foundation.UUID
 #endif
 
-// `LocalServer.ServerManager.shared`'s server-side event loop group is a process-wide singleton
-// shared by every LocalServer-backed suite (DataTaskTests, UploadTaskTests, InternalsSessionTests,
-// ModifiersCollect*Tests, CachedRequestTests, ...), and swift-testing runs suites concurrently by
-// default — so many independent sessions hit the same server/`ResponseQueue` at once in practice.
-// This exercises that path directly: many concurrent sessions, each with its own uri/response slot,
-// must not see each other's responses or hang. On a visionOS CI run under heavy shared-runner
-// contention, this test's own 200 concurrently-connecting sessions have themselves hit
-// `HTTPClientError.connectTimeout` at this shared group, in addition to the InternalsSessionTests
-// timeout described below — on this machine even a single server thread clears 200 concurrent
-// connections in well under a second, so the elapsed-time assertion below is only a "didn't hang"
-// sanity check, not a guard against either regression. The real mitigation for both is the thread
-// count on `LocalServer.ServerManager.shared` (bumped 1→4, then 4→8 — see LocalServer.swift);
-// verifying either bump actually holds requires the real visionOS Simulator CI environment.
+// This exercises many concurrent sessions, each with its own uri/response slot, and asserts they
+// must not see each other's responses or hang. It deliberately drives 200 concurrently-connecting
+// client sessions at once, so it runs against its own dedicated server/event loop group
+// (`Configuration.stress` / `ServerManager.stress`, see LocalServer.swift and
+// LocalServer.Configuration.swift) instead of `.standard`, which every other LocalServer-backed
+// suite (DataTaskTests, UploadTaskTests, InternalsSessionTests, ModifiersCollect*Tests,
+// CachedRequestTests, ...) shares — swift-testing runs suites concurrently by default, and this
+// test's own burst previously starved those suites (and itself) into `HTTPClientError
+// .connectTimeout` when it shared their group (ci-triage/TASKS.md T1b). `configuration.timeout
+// .connect` below is also widened past AsyncHTTPClient's 10s default for the same reason: even on
+// its own dedicated group, 200 simultaneous TLS handshakes under heavy CI contention can
+// legitimately take longer than that.
 struct LocalServerConcurrencyTests {
 
     @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
     @Test
     func manyConcurrentSessions_shareLocalServerWithoutCrossTalkOrHanging() async throws {
         let concurrency = 200
-        let localServer = try await LocalServer(.standard)
+        let localServer = try await LocalServer(.stress, manager: .stress)
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.certificateVerification = .some(.none)
 
         var mutableConfiguration = Internals.Session.Configuration()
         mutableConfiguration.secureConnection = secureConnection
+        mutableConfiguration.timeout.connect = .seconds(60)
         let configuration = mutableConfiguration
 
         let clock = ContinuousClock()
