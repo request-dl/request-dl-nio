@@ -2,23 +2,25 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// A task that returns mocked data with a specific status code and headers, without performing any
-/// real network call.
+/// A task that mirrors a resolved request back as its own response, without performing any real
+/// network call.
 ///
-/// The `content` block describes the mocked response body the same way a real request describes its
-/// outgoing one: a ``RequestDL/MockedBody`` there becomes the bytes streamed back as the response,
-/// and its `Content-Type`/`Content-Length` are carried over automatically. Anything else declared in
-/// `content` — ``RequestDL/Headers``, ``RequestDL/AcceptHeader``, ``RequestDL/Authorization``, etc. —
-/// only shapes the resolved request used to compute the cache key and the response `url`; it is
-/// **not** echoed into the mocked response headers. Use the `headers` parameter for that.
+/// The `content` block is a request description just like any other task's — ``RequestDL/BaseURL``,
+/// ``RequestDL/Headers``, ``RequestDL/AcceptHeader``, ``RequestDL/Authorization``,
+/// ``RequestDL/Payload``, and so on. Resolving it produces the mocked response: every header the
+/// request would carry (including `Content-Type`/`Content-Length` from ``RequestDL/Payload``) is
+/// copied onto the response, and ``RequestDL/Payload``'s bytes become the response body. That makes
+/// `MockedTask` a way to inspect exactly what a request would look like — URL, headers, encoded body
+/// — by running it through the same result-processing pipeline (``RequestDL/RequestTask/collectData()``,
+/// modifiers, `.decode(_:)`, ...) a real task would use, without a live server.
 ///
 /// ```swift
 /// MockedTask(
 ///     status: .init(code: 200, reason: "Ok"),
-///     headers: ["Content-Type": "application/json"],
 ///     content: {
 ///         BaseURL("localhost")
-///         MockedBody(
+///         AcceptHeader(.json)
+///         Payload(
 ///             data: Data(
 ///                 """
 ///                 {
@@ -33,9 +35,11 @@
 /// )
 /// ```
 ///
-/// Use `delay` to simulate network latency, and the ``MockedTask/init(throwing:delay:)`` initializer
-/// to simulate a transport-level failure (a thrown error) instead of a response, for exercising a
-/// consumer's error-handling paths without a live server.
+/// Use `headers` to overlay something that isn't part of the request itself — a synthetic
+/// response-only header, for instance. Use `delay` to simulate network latency, and the
+/// ``MockedTask/init(throwing:delay:)`` initializer to simulate a transport-level failure (a thrown
+/// error) instead of a response, for exercising a consumer's error-handling paths without a live
+/// server.
 ///
 /// > Note: If `content` configures a data cache and a matching entry already exists for the
 /// resolved URL, that cached response is returned instead of the mocked one —
@@ -58,9 +62,9 @@ public struct MockedTask: RequestTask {
     /// - Parameters:
     ///    - version: The HTTP version of the response. Default is `.init(minor: 0, major: 2)`.
     ///    - status: The status of the response. Default is `.init(code: 200, reason: "Ok")`.
-    ///    - headers: Headers to attach to the mocked response, on top of the `Content-Type`/
-    ///      `Content-Length` derived from the ``RequestDL/MockedBody`` declared in `content`. Takes
-    ///      precedence when a name collides with one of those two.
+    ///    - headers: Headers to overlay on top of the mocked response, which by default mirrors
+    ///      every header the resolved request would carry. Takes precedence when a name collides
+    ///      with one already on the resolved request.
     ///    - isKeepAlive: A Boolean value indicating whether the connection should be kept alive. Default is `false`.
     ///    - delay: How long to wait before delivering the mocked response. Default is `.zero`.
     ///    - content: A closure that returns the content of the response.

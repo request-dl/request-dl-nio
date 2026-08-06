@@ -24,15 +24,13 @@ struct MockedTaskTests {
         let data = Data("Hello World".utf8)
 
         // When
-        // `AcceptHeader` only shapes the resolved request (used for the cache key/url); it does
-        // not leak into the mocked response headers. `headers` is the channel for that.
+        // The mocked response mirrors every header the resolved request would carry.
         let result = try await MockedTask(
             status: .init(code: statusCode, reason: "Ok"),
-            headers: ["X-Mock-Only": "true"],
             content: {
                 BaseURL("localhost")
                 AcceptHeader(.json)
-                MockedBody(data: data, contentType: .text)
+                Payload(data: data, contentType: .text)
             }
         )
         .collectData()
@@ -48,35 +46,41 @@ struct MockedTaskTests {
         #expect(
             response.headers
                 == .init([
+                    ("Accept", "application/json"),
                     ("Content-Type", "text/plain"),
                     ("Content-Length", String(data.count)),
-                    ("X-Mock-Only", "true"),
                 ])
         )
-        #expect(response.headers["Accept"] == nil)
     }
 
     @Test
-    func mock_whenHeadersOverridesBodyDerivedContentType() async throws {
+    func mock_whenHeadersOverlaysOnTopOfMirroredRequest() async throws {
         // Given
         let data = Data("Hello World".utf8)
 
         // When
-        // `headers` takes precedence over the `Content-Type`/`Content-Length` that `MockedBody`
-        // derives automatically from the mocked body.
+        // `headers` overlays on top of the mirrored request headers: it overrides a name already
+        // there (`Content-Type`) and adds one that is not part of the request at all.
         let result = try await MockedTask(
-            headers: ["Content-Type": "application/json"],
+            headers: [
+                "Content-Type": "application/json",
+                "X-Mock-Only": "true",
+            ],
             content: {
                 BaseURL("localhost")
-                MockedBody(data: data, contentType: .text)
+                AcceptHeader(.json)
+                Payload(data: data, contentType: .text)
             }
         )
         .collectData()
         .result()
 
         // Then
-        #expect(result.head.headers.first(name: "Content-Type") == "application/json")
-        #expect(result.head.headers.first(name: "Content-Length") == String(data.count))
+        let response = result.head
+        #expect(response.headers.first(name: "Content-Type") == "application/json")
+        #expect(response.headers.first(name: "Content-Length") == String(data.count))
+        #expect(response.headers.first(name: "Accept") == "application/json")
+        #expect(response.headers.first(name: "X-Mock-Only") == "true")
     }
 
     @Test
@@ -87,7 +91,7 @@ struct MockedTaskTests {
         // When
         let result = try await MockedTask {
             BaseURL("localhost")
-            MockedBody(data: data)
+            Payload(data: data)
         }
         .collectData()
         .result()
@@ -120,7 +124,7 @@ struct MockedTaskTests {
             BaseURL("localhost")
             Path(UUID().uuidString)
             Session.localServer.cacheStrategy(.useCachedDataOnly)
-            MockedBody(data: data)
+            Payload(data: data)
         }
         .collectData()
         .result()
@@ -165,9 +169,9 @@ struct MockedTaskTests {
         await dataCache.setCachedData(cachedData, forKey: cacheKey)
 
         // When
-        // Deliberately no `MockedBody` here: `RequestConfiguration.isCacheEnabled` requires a
-        // `nil` body, and `MockedBody`/`Payload` feed the mocked *response* through the same
-        // mechanism a real request would use for its upload body — so declaring one would
+        // Deliberately no `Payload` here: `RequestConfiguration.isCacheEnabled` requires a
+        // `nil` body, and a mocked task mirrors `Payload` into the response body through the
+        // same mechanism a real request would use for its upload body — so setting one would
         // disable caching altogether and never reach `CacheControl`'s cache-hit path.
         let result = try await MockedTask {
             BaseURL("localhost")
@@ -202,7 +206,7 @@ struct MockedTaskTests {
         let cacheKey = "https://localhost/\(path)"
 
         // When
-        // No `MockedBody` here either — see the comment in the cache-hit test above; the mocked
+        // No `Payload` here either — see the comment in the cache-hit test above; the mocked
         // response body ends up empty (`mockRequest`'s `else { downloadBuffer.close() }`
         // branch), but that is enough to prove the write side (`cacheStream`) ran, which is
         // what this test targets.
@@ -232,7 +236,7 @@ struct MockedTaskTests {
         let result = try await MockedTask {
             BaseURL("localhost")
             RequestMethod(.post)
-            MockedBody(data: data)
+            Payload(data: data)
         }
         .collectData()
         .result()
