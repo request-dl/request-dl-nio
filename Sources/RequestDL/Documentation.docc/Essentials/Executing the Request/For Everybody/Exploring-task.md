@@ -118,13 +118,13 @@ for (page, result) in results {
 
 ``RequestDL/MockedTask`` lets you fabricate a response without performing any real network call, which is useful for tests and previews where you want deterministic data and no dependency on a live server.
 
-You specify the response head — `version`, `status`, and `isKeepAlive` — along with a ``RequestDL/Property`` block describing the mocked body, exactly as you would for a real request.
+You specify the response head — `version`, `status`, and `isKeepAlive` — along with a ``RequestDL/Property`` block describing the mocked body with ``RequestDL/MockedBody``, exactly as you would declare an outgoing body with ``RequestDL/Payload`` for a real request.
 
 ```swift
 let result = try await MockedTask(
     status: .init(code: 200, reason: "Ok")
 ) {
-    Payload(
+    MockedBody(
         verbatim: """
         {
             "id": 1,
@@ -141,6 +141,14 @@ print(result.payload)
 ```
 
 > Tip: ``RequestDL/MockedTask`` returns an ``RequestDL/AsyncResponse``, just like ``RequestDL/UploadTask``. Use ``RequestDL/RequestTask/collectData()`` to collapse it into a ``RequestDL/TaskResult`` the same way ``RequestDL/DataTask`` does.
+
+Use the `headers` parameter to set headers on the mocked response — headers declared inside the block (`Headers`, `AcceptHeader`, `Authorization`, ...) only shape the resolved request used for the cache key and response `url`, they are not echoed into the response. Use `delay` to simulate network latency, and ``RequestDL/MockedTask/init(throwing:delay:)`` to simulate a transport-level failure instead of a response:
+
+```swift
+struct OfflineError: Error {}
+
+let task = MockedTask(throwing: OfflineError(), delay: .seconds(1))
+```
 
 ## Topics
 
@@ -186,3 +194,4 @@ print(result.payload)
 ### Testing and debugging
 
 - ``RequestDL/MockedTask``
+- ``RequestDL/MockedBody``

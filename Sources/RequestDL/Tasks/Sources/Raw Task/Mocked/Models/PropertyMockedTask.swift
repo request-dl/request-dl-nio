@@ -4,11 +4,11 @@
 
 import NIOCore
 
-/// Header names `Payload` sets on the resolved request to describe the body it produced — the one
-/// piece of the request-shaping property graph that is actually about the mocked response, so it
-/// carries over by default. Everything else declared in `content` (`Headers`, `AcceptHeader`,
-/// `Authorization`, ...) stays request-only; `PropertyMockedTask.headers` is the channel for adding
-/// response headers explicitly.
+/// Header names `MockedBody`/`Payload` set on the resolved request to describe the body they
+/// produced — the one piece of the request-shaping property graph that is actually about the
+/// mocked response, so it carries over by default. Everything else declared in `content`
+/// (`Headers`, `AcceptHeader`, `Authorization`, ...) stays request-only; `PropertyMockedTask.headers`
+/// is the channel for adding response headers explicitly.
 private let bodyDerivedHeaderNames = ["Content-Type", "Content-Length"]
 
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
@@ -19,11 +19,16 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     let status: ResponseHead.Status
     let headers: HTTPHeaders
     let isKeepAlive: Bool
+    let delay: UnitTime
     let content: Content
 
     // MARK: - Internal methods
 
     func result(_ environment: RequestEnvironmentValues) async throws -> AsyncResponse {
+        if delay > .zero {
+            try await Task.sleep(nanoseconds: UInt64(delay.nanoseconds))
+        }
+
         let resolved = try await Resolve(
             root: content,
             environment: environment

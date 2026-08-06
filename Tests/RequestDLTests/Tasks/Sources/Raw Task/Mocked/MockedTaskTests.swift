@@ -32,7 +32,7 @@ struct MockedTaskTests {
             content: {
                 BaseURL("localhost")
                 AcceptHeader(.json)
-                Payload(data: data, contentType: .text)
+                MockedBody(data: data, contentType: .text)
             }
         )
         .collectData()
@@ -62,13 +62,13 @@ struct MockedTaskTests {
         let data = Data("Hello World".utf8)
 
         // When
-        // `headers` takes precedence over the `Content-Type`/`Content-Length` that `Payload`
+        // `headers` takes precedence over the `Content-Type`/`Content-Length` that `MockedBody`
         // derives automatically from the mocked body.
         let result = try await MockedTask(
             headers: ["Content-Type": "application/json"],
             content: {
                 BaseURL("localhost")
-                Payload(data: data, contentType: .text)
+                MockedBody(data: data, contentType: .text)
             }
         )
         .collectData()
@@ -87,7 +87,7 @@ struct MockedTaskTests {
         // When
         let result = try await MockedTask {
             BaseURL("localhost")
-            Payload(data: data)
+            MockedBody(data: data)
         }
         .collectData()
         .result()
@@ -120,7 +120,7 @@ struct MockedTaskTests {
             BaseURL("localhost")
             Path(UUID().uuidString)
             Session.localServer.cacheStrategy(.useCachedDataOnly)
-            Payload(data: data)
+            MockedBody(data: data)
         }
         .collectData()
         .result()
@@ -165,10 +165,10 @@ struct MockedTaskTests {
         await dataCache.setCachedData(cachedData, forKey: cacheKey)
 
         // When
-        // Deliberately no `Payload` here: `RequestConfiguration.isCacheEnabled` requires a
-        // `nil` body, and a mocked task repurposes `Payload` to feed the mocked *response*
-        // through the same mechanism a real request would use for its upload body — so setting
-        // one would disable caching altogether and never reach `CacheControl`'s cache-hit path.
+        // Deliberately no `MockedBody` here: `RequestConfiguration.isCacheEnabled` requires a
+        // `nil` body, and `MockedBody`/`Payload` feed the mocked *response* through the same
+        // mechanism a real request would use for its upload body — so declaring one would
+        // disable caching altogether and never reach `CacheControl`'s cache-hit path.
         let result = try await MockedTask {
             BaseURL("localhost")
             Path(path)
@@ -202,7 +202,7 @@ struct MockedTaskTests {
         let cacheKey = "https://localhost/\(path)"
 
         // When
-        // No `Payload` here either — see the comment in the cache-hit test above; the mocked
+        // No `MockedBody` here either — see the comment in the cache-hit test above; the mocked
         // response body ends up empty (`mockRequest`'s `else { downloadBuffer.close() }`
         // branch), but that is enough to prove the write side (`cacheStream`) ran, which is
         // what this test targets.
@@ -232,12 +232,70 @@ struct MockedTaskTests {
         let result = try await MockedTask {
             BaseURL("localhost")
             RequestMethod(.post)
-            Payload(data: data)
+            MockedBody(data: data)
         }
         .collectData()
         .result()
 
         // Then
         #expect(result.head.headers.first(name: "rdl-request-method") == "POST")
+    }
+
+    @Test
+    func mock_whenThrowing_throwsErrorInsteadOfReturningResponse() async throws {
+        // Given
+        struct SimulatedTransportError: Error, Equatable {}
+
+        // When
+        do {
+            _ = try await MockedTask(throwing: SimulatedTransportError())
+                .collectData()
+                .result()
+            Issue.record("Expected MockedTask(throwing:) to throw")
+        } catch let error as SimulatedTransportError {
+            // Then
+            #expect(error == SimulatedTransportError())
+        }
+    }
+
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func mock_whenDelay_waitsBeforeDeliveringResponse() async throws {
+        // Given
+        let clock = ContinuousClock()
+        let delay = UnitTime.milliseconds(200)
+
+        // When
+        let start = clock.now
+        _ = try await MockedTask(delay: delay) {
+            BaseURL("localhost")
+        }
+        .collectData()
+        .result()
+        let elapsed = clock.now - start
+
+        // Then
+        #expect(elapsed >= .nanoseconds(delay.nanoseconds))
+    }
+
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func mock_whenThrowingWithDelay_waitsBeforeThrowing() async throws {
+        // Given
+        struct SimulatedTransportError: Error {}
+        let clock = ContinuousClock()
+        let delay = UnitTime.milliseconds(200)
+
+        // When
+        let start = clock.now
+        await #expect(throws: SimulatedTransportError.self) {
+            try await MockedTask(throwing: SimulatedTransportError(), delay: delay)
+                .collectData()
+                .result()
+        }
+        let elapsed = clock.now - start
+
+        // Then
+        #expect(elapsed >= .nanoseconds(delay.nanoseconds))
     }
 }

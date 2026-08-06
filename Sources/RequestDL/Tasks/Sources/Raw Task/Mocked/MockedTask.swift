@@ -6,8 +6,8 @@
 /// real network call.
 ///
 /// The `content` block describes the mocked response body the same way a real request describes its
-/// outgoing one: a ``RequestDL/Payload`` there becomes the bytes streamed back as the response, and
-/// its `Content-Type`/`Content-Length` are carried over automatically. Anything else declared in
+/// outgoing one: a ``RequestDL/MockedBody`` there becomes the bytes streamed back as the response,
+/// and its `Content-Type`/`Content-Length` are carried over automatically. Anything else declared in
 /// `content` — ``RequestDL/Headers``, ``RequestDL/AcceptHeader``, ``RequestDL/Authorization``, etc. —
 /// only shapes the resolved request used to compute the cache key and the response `url`; it is
 /// **not** echoed into the mocked response headers. Use the `headers` parameter for that.
@@ -18,7 +18,7 @@
 ///     headers: ["Content-Type": "application/json"],
 ///     content: {
 ///         BaseURL("localhost")
-///         Payload(
+///         MockedBody(
 ///             data: Data(
 ///                 """
 ///                 {
@@ -32,6 +32,10 @@
 ///     }
 /// )
 /// ```
+///
+/// Use `delay` to simulate network latency, and the ``MockedTask/init(throwing:delay:)`` initializer
+/// to simulate a transport-level failure (a thrown error) instead of a response, for exercising a
+/// consumer's error-handling paths without a live server.
 ///
 /// > Note: If `content` configures a data cache and a matching entry already exists for the
 /// resolved URL, that cached response is returned instead of the mocked one —
@@ -55,9 +59,10 @@ public struct MockedTask: RequestTask {
     ///    - version: The HTTP version of the response. Default is `.init(minor: 0, major: 2)`.
     ///    - status: The status of the response. Default is `.init(code: 200, reason: "Ok")`.
     ///    - headers: Headers to attach to the mocked response, on top of the `Content-Type`/
-    ///      `Content-Length` derived from the ``RequestDL/Payload`` declared in `content`. Takes
+    ///      `Content-Length` derived from the ``RequestDL/MockedBody`` declared in `content`. Takes
     ///      precedence when a name collides with one of those two.
     ///    - isKeepAlive: A Boolean value indicating whether the connection should be kept alive. Default is `false`.
+    ///    - delay: How long to wait before delivering the mocked response. Default is `.zero`.
     ///    - content: A closure that returns the content of the response.
     ///
     public init<Content: Property>(
@@ -65,6 +70,7 @@ public struct MockedTask: RequestTask {
         status: ResponseHead.Status = .init(code: 200, reason: "Ok"),
         headers: HTTPHeaders = [:],
         isKeepAlive: Bool = false,
+        delay: UnitTime = .zero,
         @PropertyBuilder content: () -> Content
     ) {
         self.payload = PropertyMockedTask(
@@ -72,7 +78,26 @@ public struct MockedTask: RequestTask {
             status: status,
             headers: headers,
             isKeepAlive: isKeepAlive,
+            delay: delay,
             content: content()
+        )
+    }
+
+    ///
+    /// Initializes a mocked task that throws the given error instead of returning a response,
+    /// simulating a transport-level failure (no connection, DNS failure, TLS error, ...).
+    ///
+    /// - Parameters:
+    ///    - error: The error thrown by ``result()``.
+    ///    - delay: How long to wait before throwing. Default is `.zero`.
+    ///
+    public init(
+        throwing error: Error,
+        delay: UnitTime = .zero
+    ) {
+        self.payload = ErrorMockedTask(
+            error: error,
+            delay: delay
         )
     }
 
