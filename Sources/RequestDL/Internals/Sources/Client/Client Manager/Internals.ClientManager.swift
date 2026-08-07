@@ -54,6 +54,12 @@ extension Internals {
             let sessionProviderID = provider.uniqueIdentifier(with: options)
 
             return try await lock.withLock {
+                // `AsyncLock` never aborts acquisition, so a task cancelled while queued behind
+                // a cleanup sweep would otherwise still pay for (or trigger) client creation and
+                // go on to fire a request nobody wants anymore. Checked first, before touching
+                // the table, so a cancelled caller does no work at all here.
+                try Task.checkCancellation()
+
                 // `withLock` rather than a manual lock and unlock pair with a return in the
                 // middle of it, which balances today and stops balancing on the next edit.
                 if let client = tableLock.withLock({

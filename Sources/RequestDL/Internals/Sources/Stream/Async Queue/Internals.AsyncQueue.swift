@@ -62,9 +62,16 @@ extension Internals {
         ///
         /// Loops rather than awaiting once: an operation submitted while the queue is going
         /// idle opens a new epoch, and the caller has to wait for that one too.
+        ///
+        /// - Note: Returns early, without joining the current epoch, when the calling task is
+        /// cancelled. `AsyncSignal.wait()` resolves near instantly once a task is already
+        /// cancelled rather than genuinely suspending, so looping past that with `try?` would
+        /// spin hot instead of idling until the real signal.
         func waitUntilIdle() async {
             while let signal = lock.withLock({ _idleSignal }) {
-                try? await signal.wait()
+                guard (try? await signal.wait()) != nil else {
+                    return
+                }
             }
         }
 
