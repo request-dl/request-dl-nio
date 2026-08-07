@@ -215,9 +215,16 @@ struct DiskStorage: Sendable {
     /// `readResponseData`, the two places here that read a `.cached` entry right after its own
     /// existence was (or is about to be) confirmed, where a fresh miss is that flake, not a
     /// genuine absence.
+    ///
+    /// - Note: 50 attempts, 10ms apart — a 500ms budget. The previous 5×2ms (10ms total) was
+    /// sized for a quiet machine; under the parallel test load this runs under in CI, the
+    /// transient window this retries past can outlast that easily, which is what turned
+    /// `diskStorage_whenFreeingSpaceBelowTotalUsage_shouldEvictOnlyTheOldestEntries` flaky. The
+    /// happy path still returns on the first attempt; this only changes how long a genuinely
+    /// slow stat gets before being treated as a real miss.
     private static func retryingUntilSuccess<T>(
-        attempts: Int = 5,
-        retryDelay: UInt64 = 2_000_000,
+        attempts: Int = 50,
+        retryDelay: UInt64 = 10_000_000,
         _ operation: () async -> T?
     ) async -> T? {
         for attempt in 0..<attempts {
