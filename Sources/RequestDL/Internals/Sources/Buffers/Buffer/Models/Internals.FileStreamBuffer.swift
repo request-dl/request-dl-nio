@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+import NIOFileSystem
 import SwiftAsyncStream
 import SystemPackage
 
@@ -14,26 +16,37 @@ import protocol Foundation.DataProtocol
 
 extension Internals {
 
-    /// A stream over a file, backed by a single descriptor.
+    /// A stream over a file, backed by a single `NIOFileSystem` handle.
     ///
     /// ## Positioning
     ///
-    /// Every syscall here addresses an absolute offset, `pread` and `pwrite` rather than
-    /// `lseek` plus `read`. The offset this type reports is bookkeeping for the protocol, not
-    /// state the kernel shares, so nothing else can move the file position underneath an
-    /// operation in flight. That also drops the `Darwin` and `Glibc` imports the previous
-    /// version needed for `lseek` and `errno`, which is the point of the exercise.
+    /// Every call here addresses an absolute offset, `readChunk(fromAbsoluteOffset:)` and
+    /// `write(toAbsoluteOffset:)` rather than a stream position plus `read`/`write`. The offset
+    /// this type reports is bookkeeping for the protocol, not state the kernel shares, so
+    /// nothing else can move the file position underneath an operation in flight.
     ///
     /// ## Blocking
     ///
-    /// `SystemPackage.FileDescriptor` is synchronous. These methods are `async` to satisfy
-    /// ``StreamBuffer``, but the syscall runs on whichever cooperative thread called it. That
-    /// is acceptable for the small, local reads this package performs and is not acceptable for
-    /// large files. See the review notes for the `NIOFileSystem` handle alternative, which
-    /// offloads to an I/O thread pool.
+    /// `NIOFileSystem` runs the underlying syscall on its own `NIOThreadPool`, not on whichever
+    /// Swift Concurrency cooperative thread called in here. A prior revision called
+    /// `SystemPackage.FileDescriptor` directly, which ran the syscall in place on that
+    /// cooperative thread — harmless for one caller, but under `swift-testing`'s parallel test
+    /// execution enough concurrent callers saturate the fixed-size cooperative pool, and a
+    /// critical section merely waiting for a worker thread looks identical to one genuinely
+    /// stuck to `AsyncLock.Watchdog`, which measures wall time, not CPU time. `DiskStorage`
+    /// already made this move for its metadata files; this brings the byte level stream in line.
     final class FileStreamBuffer: @unchecked Sendable, StreamBuffer {
 
         typealias URL = Internals.FileBufferURL
+
+        // MARK: - Private types
+
+        /// A file is opened for reading or for writing, never both, matching the two inits
+        /// below. `NIOFileSystem` hands back a different concrete handle type per direction.
+        private enum Handle: Sendable {
+            case read(ReadFileHandle)
+            case write(WriteFileHandle)
+        }
 
         // MARK: - Internal properties
 
@@ -58,7 +71,7 @@ extension Internals {
         // MARK: - Private properties
 
         private let lock = AsyncLock(watchdog: watchdog)
-        private let descriptor: SystemPackage.FileDescriptor
+        private let handle: Handle
 
         // MARK: - Unsafe properties
 
@@ -67,23 +80,25 @@ extension Internals {
 
         // MARK: - Inits
 
-        /// - Throws: `Errno.noSuchFileOrDirectory` when the file is not there. Callers are
+        /// - Throws: Whatever `NIOFileSystem` throws when the file is not there. Callers are
         /// expected to check availability first and treat the throw as an empty read.
         init(readingFrom url: URL) async throws {
-            descriptor = try SystemPackage.FileDescriptor.open(url.path, .readOnly)
+            handle = .read(try await FileSystem.shared.openFile(forReadingAt: url.path))
         }
 
         /// Opens for writing, creating the file when it does not exist.
         ///
-        /// - Important: Must not pass `.truncate` — that would empty the file every time the
-        /// storage lazily opens its output stream, so the first write to an existing file would
-        /// destroy it and then leave a zero filled gap where the old content had been.
+        /// - Important: Must not pass `.newFile(replaceExisting: true)` — that would empty the
+        /// file every time the storage lazily opens its output stream, so the first write to an
+        /// existing file would destroy it and then leave a zero filled gap where the old content
+        /// had been. `.modifyFile` opens an existing file untouched and only creates one that is
+        /// missing.
         init(writingTo url: URL) async throws {
-            descriptor = try SystemPackage.FileDescriptor.open(
-                url.path,
-                .writeOnly,
-                options: [.create],
-                permissions: .ownerReadWrite
+            handle = .write(
+                try await FileSystem.shared.openFile(
+                    forWritingAt: url.path,
+                    options: .modifyFile(createIfNecessary: true, permissions: .ownerReadWrite)
+                )
             )
         }
 
@@ -105,22 +120,22 @@ extension Internals {
                 return
             }
 
+            guard case .write(let writeHandle) = handle else {
+                return
+            }
+
             try await lock.withLock {
                 var written = 0
 
                 while written < bytes.count {
                     // Checked once per short-write retry rather than only on entry, so a large
-                    // write cancelled partway through does not pay for every remaining syscall.
+                    // write cancelled partway through does not pay for every remaining chunk.
                     try Task.checkCancellation()
 
-                    let count = try bytes.withUnsafeBytes { pointer -> Int in
-                        let remaining = UnsafeRawBufferPointer(rebasing: pointer[written...])
-
-                        return try descriptor.write(
-                            toAbsoluteOffset: Int64(_offset) + Int64(written),
-                            remaining
-                        )
-                    }
+                    let count = try await writeHandle.write(
+                        contentsOf: bytes[written...],
+                        toAbsoluteOffset: Int64(_offset) + Int64(written)
+                    )
 
                     // A zero length write with a non empty buffer is not progress, and looping
                     // on it spins forever.
@@ -128,7 +143,7 @@ extension Internals {
                         throw Errno.ioError
                     }
 
-                    written += count
+                    written += Int(count)
                 }
 
                 _offset += UInt64(written)
@@ -137,7 +152,7 @@ extension Internals {
 
         /// Reads up to `length` bytes, looping over short reads until EOF.
         ///
-        /// - Important: Must not issue a single `read` and return whatever comes back — a short
+        /// - Important: Must not issue a single read and return whatever comes back — a short
         /// read would then silently deliver less than the caller asked for.
         ///
         /// - Returns: `nil` at EOF, otherwise the bytes actually read, which may be fewer than
@@ -147,28 +162,29 @@ extension Internals {
                 return nil
             }
 
-            return try await lock.withLock { () throws -> Data? in
-                var bytes = [UInt8](repeating: .zero, count: Int(length))
+            guard case .read(let readHandle) = handle else {
+                return nil
+            }
+
+            return try await lock.withLock { () async throws -> Data? in
+                var data = Data()
                 var read = 0
 
-                while read < bytes.count {
+                while read < Int(length) {
                     // Same reasoning as `writeData`: checked per retry, not only on entry.
                     try Task.checkCancellation()
 
-                    let count = try bytes.withUnsafeMutableBytes { pointer -> Int in
-                        let remaining = UnsafeMutableRawBufferPointer(rebasing: pointer[read...])
+                    let chunk = try await readHandle.readChunk(
+                        fromAbsoluteOffset: Int64(_offset) + Int64(read),
+                        length: .bytes(Int64(length) - Int64(read))
+                    )
 
-                        return try descriptor.read(
-                            fromAbsoluteOffset: Int64(_offset) + Int64(read),
-                            into: remaining
-                        )
-                    }
-
-                    guard count > .zero else {
+                    guard chunk.readableBytes > .zero else {
                         break
                     }
 
-                    read += count
+                    data.append(contentsOf: chunk.readableBytesView)
+                    read += chunk.readableBytes
                 }
 
                 guard read > .zero else {
@@ -176,13 +192,13 @@ extension Internals {
                 }
 
                 _offset += UInt64(read)
-                return Data(bytes.prefix(read))
+                return data
             }
         }
 
         /// - Note: Closing twice is a no op rather than an error. The storage detaches its
-        /// streams before closing them, so this should not happen, and taking a descriptor
-        /// number that has since been reused is a far worse outcome than a redundant call.
+        /// streams before closing them, so this should not happen, and closing a handle that
+        /// has already been closed is a far worse outcome than a redundant call.
         func close() async throws {
             try await lock.withLock {
                 guard !_isClosed else {
@@ -190,7 +206,13 @@ extension Internals {
                 }
 
                 _isClosed = true
-                try descriptor.close()
+
+                switch handle {
+                case .read(let readHandle):
+                    try await readHandle.close()
+                case .write(let writeHandle):
+                    try await writeHandle.close()
+                }
             }
         }
     }
