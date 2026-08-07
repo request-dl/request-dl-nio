@@ -74,7 +74,7 @@ extension URL {
     /// Whether something exists at this location.
     var isReachable: Bool {
         get async {
-            let info = try? await FileSystem.shared.info(forFileAt: filePath)
+            let info = try? await Internals.fileSystem.info(forFileAt: filePath)
             return info != nil
         }
     }
@@ -91,7 +91,7 @@ extension URL {
     func createPathIfNeeded() async throws {
         let filePath = self.filePath
 
-        guard try await FileSystem.shared.info(forFileAt: filePath) == nil else {
+        guard try await Internals.fileSystem.info(forFileAt: filePath) == nil else {
             return
         }
 
@@ -99,14 +99,14 @@ extension URL {
 
         // `withIntermediateDirectories` covers the parents, not the leaf, so an existing
         // directory still has to be checked for.
-        if try await FileSystem.shared.info(forFileAt: directoryPath) == nil {
-            try await FileSystem.shared.createDirectory(
+        if try await Internals.fileSystem.info(forFileAt: directoryPath) == nil {
+            try await Internals.fileSystem.createDirectory(
                 at: directoryPath,
                 withIntermediateDirectories: true
             )
         }
 
-        let handle = try await FileSystem.shared.openFile(
+        let handle = try await Internals.fileSystem.openFile(
             forWritingAt: filePath,
             options: .newFile(replaceExisting: false)
         )
@@ -118,11 +118,11 @@ extension URL {
     func removeIfNeeded() async throws {
         let filePath = self.filePath
 
-        guard try await FileSystem.shared.info(forFileAt: filePath) != nil else {
+        guard try await Internals.fileSystem.info(forFileAt: filePath) != nil else {
             return
         }
 
-        try await FileSystem.shared.removeItem(at: filePath)
+        try await Internals.fileSystem.removeItem(at: filePath)
     }
 
     /// Reads the whole file at this location into memory.
@@ -131,7 +131,7 @@ extension URL {
     /// `FoundationEssentials` does not provide. `NIOFileSystem` is the package's own portable
     /// file layer, already used throughout `Internals`.
     func readData() async throws -> Data {
-        let handle = try await FileSystem.shared.openFile(forReadingAt: filePath)
+        let handle = try await Internals.fileSystem.openFile(forReadingAt: filePath)
 
         do {
             let buffer = try await handle.readToEnd(maximumSizeAllowed: .unlimited)
@@ -149,7 +149,7 @@ extension URL {
     /// `DiskStorage.writeAndClose(_:to:)` for why that discipline matters with `NIOFileSystem`
     /// handles.
     func write(_ data: Data) async throws {
-        let handle = try await FileSystem.shared.openFile(
+        let handle = try await Internals.fileSystem.openFile(
             forWritingAt: filePath,
             options: .newFile(replaceExisting: true)
         )

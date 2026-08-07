@@ -31,8 +31,8 @@ struct DiskStorage: Sendable {
                 let responsePath = responseURL.filePath
                 let dataPath = dataURL.filePath
 
-                let responseInfo = try? await FileSystem.shared.info(forFileAt: responsePath)
-                let dataInfo = try? await FileSystem.shared.info(forFileAt: dataPath)
+                let responseInfo = try? await Internals.fileSystem.info(forFileAt: responsePath)
+                let dataInfo = try? await Internals.fileSystem.info(forFileAt: dataPath)
 
                 return (responseInfo?.size ?? 0) + (dataInfo?.size ?? 0)
             }
@@ -94,7 +94,7 @@ struct DiskStorage: Sendable {
             self.dataURL = dataURL
 
             do {
-                try await FileSystem.shared.createDirectory(
+                try await Internals.fileSystem.createDirectory(
                     at: url.filePath,
                     withIntermediateDirectories: true
                 )
@@ -105,7 +105,7 @@ struct DiskStorage: Sendable {
 
         // MARK: - Private static methods
 
-        /// Whether `url` exists, retrying past the transient miss `FileSystem.shared.info`
+        /// Whether `url` exists, retrying past the transient miss `Internals.fileSystem.info`
         /// is already known to produce.
         ///
         /// This is the same flake `Internals.Buffer.Storage._isResourceAvailable()` retries
@@ -187,7 +187,7 @@ struct DiskStorage: Sendable {
     private func readResponseData(at url: URL) async -> Data? {
         guard
             let handle = await Self.retryingUntilSuccess({
-                try? await FileSystem.shared.openFile(forReadingAt: url.filePath)
+                try? await Internals.fileSystem.openFile(forReadingAt: url.filePath)
             })
         else {
             return nil
@@ -208,7 +208,7 @@ struct DiskStorage: Sendable {
 
     // MARK: - Private static methods
 
-    /// Retries `operation` past the transient stat/open miss `FileSystem.shared` is already
+    /// Retries `operation` past the transient stat/open miss `Internals.fileSystem` is already
     /// known to produce under heavy concurrent disk access on sandboxed Apple simulators: a
     /// check or open can intermittently fail for a file that was just written/confirmed, with
     /// nothing thrown and no descriptor left open. Shared by `Record.isReachableWithRetry` and
@@ -235,7 +235,7 @@ struct DiskStorage: Sendable {
 
     func remove(_ key: String) async {
         guard let record = await record(key) else { return }
-        _ = try? await FileSystem.shared.removeItem(
+        _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
     }
@@ -247,7 +247,7 @@ struct DiskStorage: Sendable {
     func removeAll(since date: Date) async {
         let recordsToCheck = await records()
         for record in recordsToCheck where record.date <= date {
-            _ = try? await FileSystem.shared.removeItem(
+            _ = try? await Internals.fileSystem.removeItem(
                 at: record.url.filePath
             )
         }
@@ -262,7 +262,7 @@ struct DiskStorage: Sendable {
             let response = try? JSONEncoder().encode(cachedResponse)
         else { return }
 
-        let responseInfo = try? await FileSystem.shared.info(forFileAt: record.responseURL.filePath)
+        let responseInfo = try? await Internals.fileSystem.info(forFileAt: record.responseURL.filePath)
         let responseLength = responseInfo?.size ?? 0
         let spaceChange = Int64(response.count) - Int64(responseLength)
         let spaceNeeded = Int64(spaceChange < 0 ? 0 : spaceChange)
@@ -278,16 +278,16 @@ struct DiskStorage: Sendable {
         do {
             let oldDataPath = record.dataURL.filePath
             let newDataPath = newRecord.dataURL.filePath
-            try await FileSystem.shared.moveItem(at: oldDataPath, to: newDataPath)
+            try await Internals.fileSystem.moveItem(at: oldDataPath, to: newDataPath)
 
             try await writeAndClose(response, to: newRecord.responseURL)
         } catch {
-            _ = try? await FileSystem.shared.removeItem(
+            _ = try? await Internals.fileSystem.removeItem(
                 at: newRecord.url.filePath
             )
         }
 
-        _ = try? await FileSystem.shared.removeItem(
+        _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
     }
@@ -321,7 +321,7 @@ struct DiskStorage: Sendable {
 
         if maximumCapacity == .zero {
             for entry in entries {
-                _ = try? await FileSystem.shared.removeItem(at: entry.url.filePath)
+                _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
             return
         }
@@ -340,7 +340,7 @@ struct DiskStorage: Sendable {
             if totalSize <= maximumCapacity {
                 break
             }
-            _ = try? await FileSystem.shared.removeItem(
+            _ = try? await Internals.fileSystem.removeItem(
                 at: entry.url.filePath
             )
             totalSize -= size
@@ -363,7 +363,7 @@ struct DiskStorage: Sendable {
     /// - Important: Must not open, write, and close as three statements inside one `do` block:
     ///
     /// ```swift
-    /// let handle = try await FileSystem.shared.openFile(...)
+    /// let handle = try await Internals.fileSystem.openFile(...)
     /// try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
     /// try await handle.close()
     /// ```
@@ -379,7 +379,7 @@ struct DiskStorage: Sendable {
     /// wrong half of the problem, and the two call sites already have their own recovery for a
     /// write that failed.
     private func writeAndClose(_ data: Data, to url: URL) async throws {
-        let handle = try await FileSystem.shared.openFile(
+        let handle = try await Internals.fileSystem.openFile(
             forWritingAt: url.filePath,
             options: .newFile(replaceExisting: true)
         )
@@ -408,7 +408,7 @@ struct DiskStorage: Sendable {
         var foundRecords: [Record] = []
 
         do {
-            try await FileSystem.shared.withDirectoryHandle(atPath: dirPath) { dir in
+            try await Internals.fileSystem.withDirectoryHandle(atPath: dirPath) { dir in
                 for try await entry in dir.listContents() {
                     if entry.name.string.hasSuffix(".\(Record.pathExtension)") {
                         let entryURL = directory.appendingPathComponent(entry.name.string)

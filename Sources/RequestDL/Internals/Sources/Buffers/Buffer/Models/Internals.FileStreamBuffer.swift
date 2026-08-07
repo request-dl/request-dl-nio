@@ -83,7 +83,7 @@ extension Internals {
         /// - Throws: Whatever `NIOFileSystem` throws when the file is not there. Callers are
         /// expected to check availability first and treat the throw as an empty read.
         init(readingFrom url: URL) async throws {
-            handle = .read(try await FileSystem.shared.openFile(forReadingAt: url.path))
+            handle = .read(try await Internals.fileSystem.openFile(forReadingAt: url.path))
         }
 
         /// Opens for writing, creating the file when it does not exist.
@@ -95,7 +95,7 @@ extension Internals {
         /// missing.
         init(writingTo url: URL) async throws {
             handle = .write(
-                try await FileSystem.shared.openFile(
+                try await Internals.fileSystem.openFile(
                     forWritingAt: url.path,
                     options: .modifyFile(createIfNecessary: true, permissions: .ownerReadWrite)
                 )

@@ -53,7 +53,7 @@ extension Internals {
         var writtenBytes: Int {
             get async {
                 do {
-                    guard let info = try await FileSystem.shared.info(forFileAt: path) else {
+                    guard let info = try await Internals.fileSystem.info(forFileAt: path) else {
                         return .zero
                     }
 
@@ -110,7 +110,7 @@ extension Internals {
             }
 
             do {
-                let handle = try await FileSystem.shared.openFile(
+                let handle = try await Internals.fileSystem.openFile(
                     forWritingAt: path,
                     options: .newFile(replaceExisting: true)
                 )
