@@ -4,7 +4,6 @@
 
 import NIOCore
 import NIOFileSystem
-import SystemPackage
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

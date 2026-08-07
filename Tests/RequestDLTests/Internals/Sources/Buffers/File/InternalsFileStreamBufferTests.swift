@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import SystemPackage
 import Testing
 
 @testable import RequestDL
