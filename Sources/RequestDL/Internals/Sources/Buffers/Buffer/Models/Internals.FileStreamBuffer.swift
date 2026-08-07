@@ -97,6 +97,10 @@ extension Internals {
                 var written = 0
 
                 while written < bytes.count {
+                    // Checked once per short-write retry rather than only on entry, so a large
+                    // write cancelled partway through does not pay for every remaining syscall.
+                    try Task.checkCancellation()
+
                     let count = try bytes.withUnsafeBytes { pointer -> Int in
                         let remaining = UnsafeRawBufferPointer(rebasing: pointer[written...])
 
@@ -136,6 +140,9 @@ extension Internals {
                 var read = 0
 
                 while read < bytes.count {
+                    // Same reasoning as `writeData`: checked per retry, not only on entry.
+                    try Task.checkCancellation()
+
                     let count = try bytes.withUnsafeMutableBytes { pointer -> Int in
                         let remaining = UnsafeMutableRawBufferPointer(rebasing: pointer[read...])
 
