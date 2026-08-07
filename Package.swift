@@ -77,7 +77,8 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
-            ]
+            ],
+            swiftSettings: [.defaultIsolation(nil)],
         ),
 
         .testTarget(
