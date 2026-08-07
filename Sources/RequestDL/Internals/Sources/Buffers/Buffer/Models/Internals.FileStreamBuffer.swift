@@ -43,9 +43,21 @@ extension Internals {
             }
         }
 
+        // MARK: - Private static properties
+
+        /// Flags a seek/read/write/close that is still running after 5s. Development builds
+        /// only — see `AsyncLock.Watchdog`.
+        #if DEBUG
+        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 5) {
+            Internals.assertionFailure($0)
+        }
+        #else
+        private static let watchdog: AsyncLock.Watchdog? = nil
+        #endif
+
         // MARK: - Private properties
 
-        private let lock = AsyncLock()
+        private let lock = AsyncLock(watchdog: watchdog)
         private let descriptor: SystemPackage.FileDescriptor
 
         // MARK: - Unsafe properties

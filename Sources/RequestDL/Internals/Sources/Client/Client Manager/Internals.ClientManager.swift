@@ -23,9 +23,25 @@ extension Internals {
         static let lifetime = TimeAmount.seconds(5 * 60)
         static let shared = ClientManager(lifetime: lifetime)
 
+        // MARK: - Private static properties
+
+        /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
+        /// running after 30s. Set higher than the other `AsyncLock`s in `Internals`:
+        /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients
+        /// serially in one sweep, each a real network drain, so a wide margin is needed to avoid
+        /// flagging a legitimately busy sweep. Development builds only — see
+        /// `AsyncLock.Watchdog`.
+        #if DEBUG
+        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 30) {
+            Internals.assertionFailure($0)
+        }
+        #else
+        private static let watchdog: AsyncLock.Watchdog? = nil
+        #endif
+
         // MARK: - Private properties
 
-        private let lock = AsyncLock()
+        private let lock = AsyncLock(watchdog: watchdog)
         private let lifetime: TimeAmount
 
         private let tableLock = Lock()

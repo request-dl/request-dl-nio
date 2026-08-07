@@ -50,17 +50,26 @@ Findings from a review of every `AsyncLock` and `AsyncSignal` (from
   `InternalsFileStreamBufferTests.writeData_whenCallingTaskIsCancelledBeforeItRuns_shouldThrowCancellationError`,
   `InternalsFileStreamBufferTests.readData_whenCallingTaskIsCancelledBeforeItRuns_shouldThrowCancellationError`.
 
-## Open — worth doing, not urgent
-
-- [ ] **No `AsyncLock` in the project uses `Watchdog`.** All five instances
-  (`Internals.Buffer.swift:71`, `Internals.FileStreamBuffer.swift:48`,
-  `Internals.Client.swift:33`, `Internals.ClientManager.swift:28`,
-  `Internals.EventLoopGroupManager.swift:19`) are created with the plain `AsyncLock()`
-  initializer. `Watchdog` is opt-in and free when `nil`, so this isn't a bug — but it means a
-  critical section that starts hanging (deadlock, future bug) would surface only as "requests
-  stop making progress," with no log or signal pointing at the lock. Worth wiring up at least on
-  `Internals.Client` and `Internals.ClientManager` — both sit on every request's path — in debug
-  or test builds via `Issue.record`.
+- [x] **No `AsyncLock` in the project used `Watchdog`.** All five instances
+  (`Internals.Buffer.swift`, `Internals.FileStreamBuffer.swift`, `Internals.Client.swift`,
+  `Internals.ClientManager.swift`, `Internals.EventLoopGroupManager.swift`) were created with the
+  plain `AsyncLock()` initializer, so a critical section that started hanging (deadlock, future
+  bug) would have surfaced only as "requests stop making progress," with no log or signal
+  pointing at the lock.
+  Fixed by giving each a `private static let watchdog: AsyncLock.Watchdog?` (a computed
+  `static var` in `Internals.Buffer.swift`, since `Storage` is nested in the generic
+  `Buffer<Stream>` and Swift disallows stored static properties there), gated on `#if DEBUG` so
+  it costs nothing in release, reporting through `Internals.assertionFailure(_:)` — the
+  codebase's existing, test-overridable seam for "recoverable programming error." Thresholds
+  reflect what each critical section normally does: 5s for `Buffer`/`FileStreamBuffer`
+  (in-process reads/writes) and `EventLoopGroupManager` (create-or-cache a group), 10s for
+  `Client` (`shutdown()` drains real connections), 30s for `ClientManager` (`cleanupIfNeeded()`
+  can shut down several expired clients serially under the same lock, each its own network
+  drain). No dedicated regression test added — exercising a real trip means holding a lock past
+  its threshold, which would make the suite multiple seconds slower per site for coverage of
+  logic that already has its own tests in swift-async-stream; verified instead by confirming the
+  full suite still passes with watchdogs enabled (no false positives at these thresholds) and
+  that a release build compiles with the `#else nil` branch.
 
 ## Not audited
 
