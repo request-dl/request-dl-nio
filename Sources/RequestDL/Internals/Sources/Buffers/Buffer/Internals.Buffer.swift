@@ -66,9 +66,25 @@ extension Internals {
                 }
             }
 
+            // MARK: - Private static properties
+
+            /// Flags a read/write/close/clear that is still running after 5s. Development
+            /// builds only — see `AsyncLock.Watchdog`.
+            ///
+            /// - Note: Computed rather than a stored `static let` — `Storage` is nested inside
+            /// the generic `Buffer<Stream>`, and Swift does not allow stored static properties
+            /// in a generic type.
+            private static var watchdog: AsyncLock.Watchdog? {
+                #if DEBUG
+                .init(seconds: 5) { Internals.assertionFailure($0) }
+                #else
+                nil
+                #endif
+            }
+
             // MARK: - Private properties
 
-            private let lock = AsyncLock()
+            private let lock = AsyncLock(watchdog: watchdog)
             private let url: Stream.URL
 
             // MARK: - Unsafe properties

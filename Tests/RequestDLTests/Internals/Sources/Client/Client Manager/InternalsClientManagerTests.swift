@@ -81,4 +81,28 @@ struct InternalsClientManagerTests {
         // Then
         #expect(sut1 !== sut2)
     }
+
+    @Test
+    func manager_whenCallingTaskIsCancelledBeforeItRuns_shouldThrowCancellationError() async throws {
+        // Given
+        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let provider = Internals.SharedSessionProvider()
+        let sessionConfiguration = Internals.Session.Configuration()
+
+        // When
+        // `AsyncLock` never aborts acquisition, so this only fails if `client(provider:
+        // sessionConfiguration:)` checks cancellation itself once inside the lock.
+        let task = _Concurrency.Task<Internals.Client, Error> {
+            try await manager.client(
+                provider: provider,
+                sessionConfiguration: sessionConfiguration
+            )
+        }
+        task.cancel()
+
+        // Then
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+    }
 }

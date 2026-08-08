@@ -21,67 +21,67 @@ private final class Box<Value: Sendable>: @unchecked Sendable {
     }
 }
 
-struct InternalsAsyncQueueTests {
+struct InternalsPendingTasksTests {
 
     @Test
-    func asyncQueue_whenOperationsAreSubmitted_shouldRunThemInSubmissionOrder() async {
+    func pendingTasks_whenOperationsAreRunning_shouldWaitForAllOfThem() async {
         // Given
-        let queue = Internals.AsyncQueue()
-        let order = Box<[Int]>([])
+        let pendingTasks = Internals.PendingTasks()
+        let count = Box(0)
 
         // When
-        for index in 0..<5 {
-            queue.addOperation {
-                order.withLock { $0.append(index) }
+        for _ in 0..<5 {
+            pendingTasks.run {
+                count.withLock { $0 += 1 }
             }
         }
 
-        await queue.waitUntilIdle()
+        await pendingTasks.waitUntilIdle()
 
         // Then
-        #expect(order.withLock { $0 } == Array(0..<5))
+        #expect(count.withLock { $0 } == 5)
     }
 
     @Test
-    func asyncQueue_whenIdle_shouldReturnImmediately() async {
+    func pendingTasks_whenIdle_shouldReturnImmediately() async {
         // Given
-        let queue = Internals.AsyncQueue()
+        let pendingTasks = Internals.PendingTasks()
 
         // Then
-        await queue.waitUntilIdle()
+        await pendingTasks.waitUntilIdle()
     }
 
     @Test
-    func asyncQueue_whenSubmittedAgainDuringADrain_shouldWaitForTheNewEpochToo() async {
+    func pendingTasks_whenStartedAgainDuringADrain_shouldWaitForTheNewEpochToo() async {
         // Given
-        let queue = Internals.AsyncQueue()
+        let pendingTasks = Internals.PendingTasks()
         let secondRan = Box(false)
 
         // When
-        queue.addOperation {
-            queue.addOperation {
+        pendingTasks.run {
+            pendingTasks.run {
                 secondRan.withLock { $0 = true }
             }
         }
 
-        await queue.waitUntilIdle()
+        await pendingTasks.waitUntilIdle()
 
         // Then
         #expect(secondRan.withLock { $0 })
     }
 
     @Test
-    func asyncQueue_whenCallingTaskIsCancelled_shouldReturnWithoutJoiningCurrentEpoch() async throws {
+    func pendingTasks_whenCallingTaskIsCancelled_shouldReturnWithoutJoiningCurrentEpoch() async throws {
         // Given
-        let queue = Internals.AsyncQueue()
+        let pendingTasks = Internals.PendingTasks()
         let started = AsyncSignal()
         let release = AsyncSignal()
         let finished = Box(false)
 
-        // A queue that stays busy until the test explicitly lets it finish, so `waitUntilIdle`
-        // has a real epoch to join (and, before the fix, to spin against) instead of returning
-        // immediately because the queue was already idle.
-        queue.addOperation {
+        // Work that stays in flight until the test explicitly lets it finish, so
+        // `waitUntilIdle` has a real epoch to join (and, before the fix, to spin against)
+        // instead of returning immediately because nothing was running.
+        pendingTasks.run {
             started.signal()
             try? await release.wait()
         }
@@ -89,7 +89,7 @@ struct InternalsAsyncQueueTests {
         try await started.wait()
 
         let waiter = _Concurrency.Task {
-            await queue.waitUntilIdle()
+            await pendingTasks.waitUntilIdle()
         }
         waiter.cancel()
 
@@ -115,9 +115,10 @@ struct InternalsAsyncQueueTests {
 
         #expect(returnedPromptly)
 
-        // Cleanup: let the blocked operation finish and drain the queue for real, and give the
-        // stray `waiter` (still spinning above if the assertion just failed) a chance to settle.
+        // Cleanup: let the blocked operation finish and drain the tracker for real, and give
+        // the stray `waiter` (still spinning above if the assertion just failed) a chance to
+        // settle.
         release.signal()
-        await queue.waitUntilIdle()
+        await pendingTasks.waitUntilIdle()
     }
 }
