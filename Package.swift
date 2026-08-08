@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.4"
+            from: "2.0.5"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
