@@ -28,9 +28,22 @@ extension Internals {
             _client.eventLoopGroup
         }
 
+        // MARK: - Private static properties
+
+        /// Flags a `shutdown()` that is still running after 10s — draining real, in-flight
+        /// connections can legitimately take a few seconds under load, longer than the other
+        /// `AsyncLock`s in `Internals`. Development builds only — see `AsyncLock.Watchdog`.
+        #if DEBUG
+        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 10) {
+            Internals.assertionFailure($0)
+        }
+        #else
+        private static let watchdog: AsyncLock.Watchdog? = nil
+        #endif
+
         // MARK: - Private properties
 
-        private let lock = AsyncLock()
+        private let lock = AsyncLock(watchdog: watchdog)
 
         private let manager = Internals.ClientOperationQueue()
         private let _client: HTTPClient

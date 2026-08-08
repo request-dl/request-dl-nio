@@ -3,7 +3,6 @@
 //
 
 import NIOSSL
-import SystemPackage
 import Testing
 
 @testable import RequestDL

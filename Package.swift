@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.4"
+            from: "2.0.5"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
@@ -77,7 +77,8 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
-            ]
+            ],
+            swiftSettings: [.defaultIsolation(nil)],
         ),
 
         .testTarget(
