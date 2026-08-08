@@ -6,12 +6,12 @@ import Logging
 
 protocol SecureConnectionCollectorPropertyNode: Sendable {
 
-    func make(_ collector: inout SecureConnectionNode.Collector)
+    func make(_ collector: inout SecureConnectionNode.Collector) throws
 }
 
 protocol SecureConnectionPropertyNode: Sendable {
 
-    func make(_ secureConnection: inout Internals.SecureConnection)
+    func make(_ secureConnection: inout Internals.SecureConnection) throws
 }
 
 struct SecureConnectionNode: PropertyNode {
@@ -106,12 +106,12 @@ struct SecureConnectionNode: PropertyNode {
 
         // MARK: - Internal methods
 
-        func callAsFunction(_ collector: inout Collector) {
+        func callAsFunction(_ collector: inout Collector) throws {
             switch source {
             case .node(let node):
-                node.make(&collector.secureConnection)
+                try node.make(&collector.secureConnection)
             case .collectorNode(let node):
-                node.make(&collector)
+                try node.make(&collector)
             }
         }
     }
@@ -162,7 +162,7 @@ struct SecureConnectionNode: PropertyNode {
         }
 
         var collector = secureConnection.collector()
-        passthrough(&collector)
+        try passthrough(&collector)
         make.sessionConfiguration.secureConnection = collector(\.self)
     }
 }

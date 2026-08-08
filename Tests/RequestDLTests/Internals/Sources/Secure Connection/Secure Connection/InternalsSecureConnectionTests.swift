@@ -51,7 +51,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.trustRoots == .file(certificatePath))
+        #expect(sut.tlsConfiguration.trustRoots == .file(certificatePath))
     }
 
     @Test
@@ -68,7 +68,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.additionalTrustRoots == [.file(certificatePath)])
+        #expect(sut.tlsConfiguration.additionalTrustRoots == [.file(certificatePath)])
     }
 
     @Test
@@ -83,7 +83,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.certificateVerification == certificateVerification)
+        #expect(sut.tlsConfiguration.certificateVerification == certificateVerification)
     }
 
     @Test
@@ -102,7 +102,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.signingSignatureAlgorithms == signatureAlgorithms)
+        #expect(sut.tlsConfiguration.signingSignatureAlgorithms == signatureAlgorithms)
     }
 
     @Test
@@ -121,7 +121,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.verifySignatureAlgorithms == signatureAlgorithms)
+        #expect(sut.tlsConfiguration.verifySignatureAlgorithms == signatureAlgorithms)
     }
 
     @Test
@@ -136,7 +136,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.sendCANameList == sendCANameList)
+        #expect(sut.tlsConfiguration.sendCANameList == sendCANameList)
     }
 
     @Test
@@ -151,7 +151,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.renegotiationSupport == renegotiationSupport)
+        #expect(sut.tlsConfiguration.renegotiationSupport == renegotiationSupport)
     }
 
     @Test
@@ -166,7 +166,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.shutdownTimeout == timeout)
+        #expect(sut.tlsConfiguration.shutdownTimeout == timeout)
     }
 
     @Test
@@ -181,7 +181,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.pskHint == pskHint)
+        #expect(sut.tlsConfiguration.pskHint == pskHint)
     }
 
     @Test
@@ -196,7 +196,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.applicationProtocols == applicationProtocolos)
+        #expect(sut.tlsConfiguration.applicationProtocols == applicationProtocolos)
     }
 
     @Test
@@ -214,8 +214,8 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.minimumTLSVersion == minimumVersion)
-        #expect(sut.maximumTLSVersion == maximumVersion)
+        #expect(sut.tlsConfiguration.minimumTLSVersion == minimumVersion)
+        #expect(sut.tlsConfiguration.maximumTLSVersion == maximumVersion)
     }
 
     @Test
@@ -240,8 +240,8 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.cipherSuites == cipherSuites)
-        #expect(sut.cipherSuiteValues == cipherSuitesValues)
+        #expect(sut.tlsConfiguration.cipherSuites == cipherSuites)
+        #expect(sut.tlsConfiguration.cipherSuiteValues == cipherSuitesValues)
     }
 
     @Test
@@ -254,25 +254,25 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.certificateChain == configuration.certificateChain)
-        #expect(sut.certificateVerification == configuration.certificateVerification)
-        #expect(sut.trustRoots == configuration.trustRoots)
-        #expect(sut.additionalTrustRoots == configuration.additionalTrustRoots)
-        #expect(sut.privateKey == configuration.privateKey)
-        #expect(sut.signingSignatureAlgorithms == configuration.signingSignatureAlgorithms)
-        #expect(sut.verifySignatureAlgorithms == configuration.verifySignatureAlgorithms)
-        #expect(sut.sendCANameList == configuration.sendCANameList)
-        #expect(sut.renegotiationSupport == configuration.renegotiationSupport)
-        #expect(sut.shutdownTimeout == configuration.shutdownTimeout)
-        #expect(sut.pskHint == configuration.pskHint)
-        #expect(sut.applicationProtocols == configuration.applicationProtocols)
-        #expect(sut.keyLogCallback == nil)
-        #expect(sut.pskClientCallback == nil)
-        #expect(sut.pskServerCallback == nil)
-        #expect(sut.minimumTLSVersion == configuration.minimumTLSVersion)
-        #expect(sut.maximumTLSVersion == configuration.maximumTLSVersion)
-        #expect(sut.cipherSuites == configuration.cipherSuites)
-        #expect(sut.cipherSuiteValues == configuration.cipherSuiteValues)
+        #expect(sut.tlsConfiguration.certificateChain == configuration.certificateChain)
+        #expect(sut.tlsConfiguration.certificateVerification == configuration.certificateVerification)
+        #expect(sut.tlsConfiguration.trustRoots == configuration.trustRoots)
+        #expect(sut.tlsConfiguration.additionalTrustRoots == configuration.additionalTrustRoots)
+        #expect(sut.tlsConfiguration.privateKey == configuration.privateKey)
+        #expect(sut.tlsConfiguration.signingSignatureAlgorithms == configuration.signingSignatureAlgorithms)
+        #expect(sut.tlsConfiguration.verifySignatureAlgorithms == configuration.verifySignatureAlgorithms)
+        #expect(sut.tlsConfiguration.sendCANameList == configuration.sendCANameList)
+        #expect(sut.tlsConfiguration.renegotiationSupport == configuration.renegotiationSupport)
+        #expect(sut.tlsConfiguration.shutdownTimeout == configuration.shutdownTimeout)
+        #expect(sut.tlsConfiguration.pskHint == configuration.pskHint)
+        #expect(sut.tlsConfiguration.applicationProtocols == configuration.applicationProtocols)
+        #expect(sut.tlsConfiguration.keyLogCallback == nil)
+        #expect(sut.tlsConfiguration.pskClientCallback == nil)
+        #expect(sut.tlsConfiguration.pskServerCallback == nil)
+        #expect(sut.tlsConfiguration.minimumTLSVersion == configuration.minimumTLSVersion)
+        #expect(sut.tlsConfiguration.maximumTLSVersion == configuration.maximumTLSVersion)
+        #expect(sut.tlsConfiguration.cipherSuites == configuration.cipherSuites)
+        #expect(sut.tlsConfiguration.cipherSuiteValues == configuration.cipherSuiteValues)
     }
 
     @Test
@@ -329,7 +329,7 @@ extension InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        sut.keyLogCallback?(.init(data: data))
+        sut.tlsConfiguration.keyLogCallback?(.init(data: data))
     }
 }
 
@@ -357,7 +357,9 @@ extension InternalsSecureConnectionTests {
         secureConnection.pskIdentityResolver = resolver
 
         let sut = try secureConnection.build()
-        let result = try sut.pskClientProvider.map { try $0(.init(hint: identity, maxPSKLength: 1_000)) }
+        let result = try sut.tlsConfiguration.pskClientProvider.map {
+            try $0(.init(hint: identity, maxPSKLength: 1_000))
+        }
 
         // Then
 

@@ -12,7 +12,7 @@ public struct PSKIdentity: Property {
         let resolver: SSLPSKIdentityResolver
         let hint: String?
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection.pskHint = hint
             secureConnection.pskIdentityResolver = resolver
         }
