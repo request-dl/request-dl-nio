@@ -99,7 +99,6 @@ Payload(userModel, contentType: .formURLEncoded)
 ### Configure how the data will be uploaded
 
 - ``RequestDL/Property/payloadChunkSize(_:)``
-- ``RequestDL/Property/payloadPartLength(_:)``
 
 ### Setting up the download strategy
 

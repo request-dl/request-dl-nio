@@ -163,7 +163,6 @@ Learn more in:
 
 - ``RequestDL/BaseURL``
 - ``RequestDL/URLScheme``
-- ``RequestDL/InternetProtocol``
 - ``RequestDL/BaseURLError``
 - ``RequestDL/FlexibleURL``
 - ``RequestDL/FlexibleURLError``
