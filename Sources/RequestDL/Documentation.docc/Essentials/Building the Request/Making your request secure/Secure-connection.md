@@ -107,6 +107,7 @@ This rule is necessary to avoid the instantiation of new clients provided by `As
 ### The basics about certificates
 
 - ``RequestDL/Certificate``
+- ``RequestDL/SecureFileError``
 
 ### Configuring the server trust
 
