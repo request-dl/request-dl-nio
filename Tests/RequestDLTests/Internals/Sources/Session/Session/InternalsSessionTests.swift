@@ -261,4 +261,69 @@ struct InternalsSessionTests {
                 )
         )
     }
+
+    @Test
+    func session_whenCompressionEnabled_shouldSendCompressedBody() async throws {
+        let testState = try await TestState()
+        // Given
+        let localServer = testState.localServer
+        let testingSession = testState.session
+
+        let certificates = Certificates().server()
+        let message = "Hello World"
+
+        // Highly-compressible: a single repeated byte, so gzip shrinks it drastically.
+        let payload = Data(String(repeating: "a", count: 100_000).utf8)
+
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: message
+        )
+
+        localServer.insert(response, at: testState.uri)
+
+        // When
+        var requestConfiguration = RequestConfiguration()
+        requestConfiguration.baseURL = "https://\(localServer.baseURL)"
+        requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
+        requestConfiguration.method = "POST"
+        requestConfiguration.body = await RequestBody(buffers: [Internals.DataBuffer(payload)])
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([
+            .init(certificates.certificateURL.absolutePath(percentEncoded: false), format: .pem)
+        ])
+
+        var configuration = testingSession.configuration
+        configuration.secureConnection = secureConnection
+        configuration.compression = .enabled(.gzip)
+
+        let session = Internals.Session(
+            provider: testingSession.provider,
+            configuration: configuration
+        )
+
+        let task = try await session.execute(
+            requestConfiguration: requestConfiguration,
+            dataCache: .init(),
+            logger: nil
+        )
+
+        var download: (ResponseHead, Data)?
+
+        for try await result in task() {
+            if case .download(let step) = result {
+                download = (step.head, try await Data(Array(step.bytes).joined()))
+            }
+        }
+
+        // Then
+        let result = try (download?.1).map(HTTPResult<String>.init)
+
+        #expect(result?.response == message)
+
+        // The server only ever sees the wire bytes it read, so a `receivedBytes` well below the
+        // original payload size is proof the request body actually went out gzip-compressed.
+        let receivedBytes = try #require(result?.receivedBytes)
+        #expect(receivedBytes < payload.count / 2)
+    }
 }
