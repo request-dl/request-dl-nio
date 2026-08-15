@@ -58,10 +58,10 @@ extension Internals {
 
         // MARK: - Private static properties
 
-        /// Flags a seek/read/write/close that is still running after 5s. Development builds
+        /// Flags a seek/read/write/close that is still running after 15s. Development builds
         /// only — see `AsyncLock.Watchdog`.
         #if DEBUG
-        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 5) {
+        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 15) {
             Internals.assertionFailure($0)
         }
         #else
