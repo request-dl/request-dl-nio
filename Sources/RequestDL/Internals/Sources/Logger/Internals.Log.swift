@@ -82,7 +82,13 @@ extension Internals.Log {
     ) -> Internals.Log {
         Internals.Log(
             """
-            An error occurred while trying to access an invalid file path.
+            Couldn't find \(String(describing: resource)) in the given bundle.
+
+            RequestDL looked for a resource matching that name (and, if it contains "/", inside \
+            that subdirectory) among the bundle's resources and found nothing. This usually \
+            means the file isn't part of the bundle at all — check that it's added to the \
+            target's "Copy Bundle Resources" build phase — or that the name or extension passed \
+            here doesn't match the file on disk.
             """,
             metadata: [
                 String(describing: type(of: resource)): .string(.init(describing: resource)),

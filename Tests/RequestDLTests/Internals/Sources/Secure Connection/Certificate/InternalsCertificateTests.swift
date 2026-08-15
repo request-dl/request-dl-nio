@@ -74,4 +74,52 @@ struct InternalsCertificateTests {
         let expectedCertificates = try [NIOSSLCertificate.fromDERFile(path)]
         #expect(resolved == expectedCertificates)
     }
+
+    @Test
+    func certificate_whenFileDoesNotExist_shouldThrowSecureFileErrorWithPath() async throws {
+        try await withTemporaryFileURL("missing.pem", createPath: false) { url in
+            // Given
+            let path = url.absolutePath(percentEncoded: false)
+
+            // When
+            do {
+                _ = try Internals.Certificate(path, format: .pem).build()
+                Issue.record("Not expecting success")
+            } catch let error as SecureFileError {
+                // Then
+                #expect(error.resource == .certificate)
+                #expect(error.path == path)
+                #expect(error.isRelativePath == false)
+
+                guard case .cantOpenFile = error.context else {
+                    Issue.record("Expected .cantOpenFile, got \(error.context)")
+                    return
+                }
+            }
+        }
+    }
+
+    @Test
+    func certificate_whenFileContentsAreInvalid_shouldThrowSecureFileErrorWithInvalidContents() async throws {
+        try await withTemporaryFileURL("invalid.pem") { url in
+            // Given
+            try await url.write(Data("not a certificate".utf8))
+            let path = url.absolutePath(percentEncoded: false)
+
+            // When
+            do {
+                _ = try Internals.Certificate(path, format: .pem).build()
+                Issue.record("Not expecting success")
+            } catch let error as SecureFileError {
+                // Then
+                #expect(error.resource == .certificate)
+                #expect(error.path == path)
+
+                guard case .invalidContents = error.context else {
+                    Issue.record("Expected .invalidContents, got \(error.context)")
+                    return
+                }
+            }
+        }
+    }
 }

@@ -58,7 +58,7 @@ struct InternalsLogTests {
         let log = Internals.Log.cantOpenCertificateFile("cert.pem", SomeBundle())
 
         // Then
-        #expect(log.message().description.contains("invalid file path"))
+        #expect(log.message().description.contains("Couldn't find"))
         #expect(log.metadata?().count == 2)
     }
 
@@ -139,7 +139,7 @@ struct InternalsLogTests {
         // `logMetadata` embeds the metadata description straight into the log message rather
         // than passing it through `Logger.Metadata`, so it shows up on `record.message`.
         #expect(capturedMetadata.wrappedValue?.message.description.contains("cert.pem") == true)
-        #expect(capturedAssertion.wrappedValue?.contains("invalid file path") == true)
+        #expect(capturedAssertion.wrappedValue?.contains("Couldn't find") == true)
     }
 
     @Test
