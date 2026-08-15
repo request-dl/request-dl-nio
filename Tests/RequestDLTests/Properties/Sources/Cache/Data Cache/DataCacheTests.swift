@@ -392,6 +392,43 @@ struct DataCacheTests {
         #expect(cached == nil)
     }
 
+    /// Regression test for #271: `DataCache.Storage` threads a disk usage estimate across
+    /// sequential writes to skip `DiskStorage.freeSpace`'s directory rescan, rather than
+    /// discovering it fresh from disk on every single write. This exercises that estimate
+    /// across several real, sequential writes through the public API — the same path
+    /// `Storage.allocateDiskBuffer` now takes — to confirm eviction still lands correctly with
+    /// the estimate in the loop, not just when `DiskStorage` is driven directly.
+    @Test
+    func cache_whenManySequentialDiskWritesExceedCapacity_shouldEvictOldestAndKeepNewest() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        let entryLength = 10_000
+        dataCache.diskCapacity = 25_000
+        await dataCache.waitUntilIdle()
+
+        // When: five entries are written one after another, each well past what the previous
+        // writes already used, on a capacity that cannot hold more than about two at once.
+        for index in 0..<5 {
+            let cachedData = await mockCachedData(
+                url: "https://sequential-eviction.example.com/\(index)",
+                length: entryLength,
+                policy: .disk
+            )
+            await dataCache.setCachedData(cachedData, forKey: "key\(index)")
+            await dataCache.waitUntilIdle()
+        }
+
+        // Then: the oldest entry didn't survive five entries' worth of writes on a capacity
+        // sized for about two, and the most recent write — always made room for by construction
+        // — did.
+        let oldest = await dataCache.getCachedData(forKey: "key0", policy: .disk)
+        let newest = await dataCache.getCachedData(forKey: "key4", policy: .disk)
+        #expect(oldest == nil)
+        #expect(newest != nil)
+    }
+
     @Test
     func cache_whenUpdateCachedForExistingKey_shouldReplaceMetadataAndKeepBuffer() async throws {
         let testState = await TestState()

@@ -299,38 +299,80 @@ struct DiskStorage: Sendable {
         )
     }
 
+    /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
+    /// decide whether `freeSpace` can skip its directory rescan below. See that method's doc
+    /// for the safety argument — passing a stale or absent estimate never risks correctness,
+    /// only an avoidable rescan.
+    /// - Returns: The buffer to write through, and disk usage immediately after this write
+    /// (`nil` when the write didn't happen, e.g. the entry doesn't fit at all), for the caller
+    /// to keep as its next `knownUsage`.
     func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
         contentLength: Int64,
-        maximumCapacity: Int64
-    ) async -> Internals.AnyBuffer? {
-        guard let response = try? JSONEncoder().encode(cachedResponse) else { return nil }
+        maximumCapacity: Int64,
+        knownUsage: Int64? = nil
+    ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?) {
+        guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil) }
 
         let writableBytes = Int64(response.count) + contentLength
-        guard writableBytes <= maximumCapacity else { return nil }
+        guard writableBytes <= maximumCapacity else { return (nil, nil) }
 
-        await freeSpace(maximumCapacity - writableBytes)
+        let usageAfterEviction = await freeSpace(
+            maximumCapacity - writableBytes,
+            knownUsage: knownUsage
+        )
 
-        guard let record = await record(key, createdAt: cachedResponse.date) else { return nil }
+        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil) }
 
         do {
             try await writeAndClose(response, to: record.responseURL)
         } catch {
-            return nil
+            return (nil, nil)
         }
 
-        return await Internals.FileBuffer(record.dataURL)
+        let buffer = await Internals.FileBuffer(record.dataURL)
+        return (buffer, usageAfterEviction + writableBytes)
     }
 
-    func freeSpace(_ maximumCapacity: Int64) async {
+    /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
+    ///
+    /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
+    /// `maximumCapacity`, the directory rescan below — a full `listContents()` plus a
+    /// reachability check and a size stat *per existing entry* — is skipped outright, since
+    /// nothing would be evicted anyway. This is the difference between a single cache write
+    /// costing O(1) versus O(current entry count): the latter turns writing `n` entries into
+    /// O(n²) total filesystem operations, cheap enough to hide on a fast local disk but not on
+    /// a simulator's slower, host-bridged filesystem, where it has been the underlying cause of
+    /// `AsyncLock.Watchdog` firing on otherwise-healthy cache writes (see #271).
+    ///
+    /// Skipping is safe regardless of how accurate `knownUsage` is:
+    /// - If it undercounts (e.g. another process sharing this directory, via `suiteName`, wrote
+    ///   since it was last reconciled here), the result is a transient, bounded overshoot of
+    ///   `maximumCapacity` — never data loss or corruption — that self-corrects the next time
+    ///   this runs without a `knownUsage` that still fits, which forces the real rescan below
+    ///   and hands back a freshly reconciled total.
+    /// - If it overcounts, this just skips straight to an unnecessary-but-harmless rescan.
+    ///
+    /// A missing `knownUsage` always takes the rescan path, so a first call with no estimate
+    /// yet, or one that no longer fits, behaves exactly as before this parameter existed.
+    ///
+    /// - Returns: Usage immediately after this call — either the untouched `knownUsage` when
+    /// skipped, or the freshly measured total otherwise — for the caller to reuse as its next
+    /// `knownUsage`.
+    @discardableResult
+    func freeSpace(_ maximumCapacity: Int64, knownUsage: Int64? = nil) async -> Int64 {
+        if let knownUsage, knownUsage <= maximumCapacity {
+            return knownUsage
+        }
+
         var entries = await records()
 
         if maximumCapacity == .zero {
             for entry in entries {
                 _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
-            return
+            return .zero
         }
 
         entries.sort { $0.date < $1.date }
@@ -352,6 +394,8 @@ struct DiskStorage: Sendable {
             )
             totalSize -= size
         }
+
+        return totalSize
     }
 
     // MARK: - Private methods
