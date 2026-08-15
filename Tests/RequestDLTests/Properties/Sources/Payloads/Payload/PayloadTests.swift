@@ -609,6 +609,36 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenInitURLFileDoesNotExist_shouldThrowFilePayloadError() async throws {
+        // Given
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.missing.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        url: url,
+                        contentType: .octetStream
+                    )
+                }
+            )
+            Issue.record("Not expecting success")
+        } catch let error as FilePayloadError {
+            // Then
+            #expect(error.url == url)
+
+            guard case .notFound = error.context else {
+                Issue.record("Expected .notFound, got \(error.context)")
+                return
+            }
+        }
+    }
+
+    @Test
     func payload_whenInitURLWithCustomType() async throws {
         // Given
         let data = await Data.randomData(length: 1_024 * 1_024)
