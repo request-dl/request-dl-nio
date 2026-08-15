@@ -46,7 +46,7 @@ struct DiskStorageTests {
             // Given: a first entry, written with plenty of room. The data file has to actually
             // exist on disk for the record to be discoverable later, so a byte is written and
             // the buffer closed.
-            var firstBuffer = await storage.allocateBuffer(
+            var (firstBuffer, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: firstResponse,
                 contentLength: 0,
@@ -59,7 +59,7 @@ struct DiskStorageTests {
 
             // When: a second entry is allocated with a capacity that only has room for itself
             // plus a sliver more — not enough to also keep the first entry around.
-            var secondBuffer = await storage.allocateBuffer(
+            var (secondBuffer, _) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
                 contentLength: 0,
@@ -72,6 +72,99 @@ struct DiskStorageTests {
             #expect(secondBuffer != nil)
             #expect(await storage["k1"] == nil)
             #expect(await storage["k2"] != nil)
+        }
+    }
+
+    @Test
+    func freeSpace_whenKnownUsageFitsUnderCapacity_shouldSkipRescanAndKeepEverything() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+            let response = makeCachedResponse(key: "k1")
+
+            // Given: a real entry that is already over whatever capacity `freeSpace` is about
+            // to be called with — a rescan would find it and evict it.
+            var (buffer, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+            #expect(await storage["k1"] != nil)
+
+            // When: freeing space down to zero, but with a `knownUsage` of zero — a trusted
+            // (if, here, deliberately wrong) claim that there is nothing to evict.
+            let result = await storage.freeSpace(.zero, knownUsage: .zero)
+
+            // Then: the rescan was skipped on the strength of that claim, so the over-capacity
+            // entry survives, and the call reports back exactly the `knownUsage` it was given.
+            #expect(result == .zero)
+            #expect(await storage["k1"] != nil)
+        }
+    }
+
+    @Test
+    func freeSpace_whenKnownUsageExceedsCapacity_shouldRescanAndEvict() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+            let response = makeCachedResponse(key: "k1")
+
+            var (buffer, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+            #expect(await storage["k1"] != nil)
+
+            // When: `knownUsage` itself already claims to be over capacity, so the shortcut
+            // cannot apply and the real rescan below has to run.
+            let result = await storage.freeSpace(.zero, knownUsage: .max)
+
+            // Then: the real scan found and evicted the entry, and reported the true resulting
+            // total — zero, since it was the only entry — rather than the stale `knownUsage`.
+            #expect(result == .zero)
+            #expect(await storage["k1"] == nil)
+        }
+    }
+
+    @Test
+    func allocateBuffer_shouldReturnUsageReflectingTheNewEntry() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+
+            let firstResponse = makeCachedResponse(key: "k1")
+            let firstResponseSize = Int64(try JSONEncoder().encode(firstResponse).count)
+
+            // Given/When: the first entry in an empty directory, so usage after it is exactly
+            // its own size.
+            let (_, firstUsage) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: firstResponse,
+                contentLength: 10,
+                maximumCapacity: .max
+            )
+            #expect(firstUsage == firstResponseSize + 10)
+
+            // When: a second entry is allocated reusing that reported usage as `knownUsage` —
+            // the shape `DataCache.Storage` relies on to thread the estimate across calls.
+            try? await Task.sleep(nanoseconds: 2_000_000)
+            let secondResponse = makeCachedResponse(key: "k2")
+            let secondResponseSize = Int64(try JSONEncoder().encode(secondResponse).count)
+
+            let (_, secondUsage) = await storage.allocateBuffer(
+                key: "k2",
+                cachedResponse: secondResponse,
+                contentLength: 20,
+                maximumCapacity: .max,
+                knownUsage: firstUsage
+            )
+
+            // Then: usage accumulates exactly, with no rescan needed in between.
+            #expect(secondUsage == firstResponseSize + 10 + secondResponseSize + 20)
         }
     }
 

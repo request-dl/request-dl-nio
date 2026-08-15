@@ -159,6 +159,45 @@ struct InternalsPrivateKeyTests {
         #expect(resolved == expectedPrivateKey)
     }
 
+    @Test
+    func private_whenFileDoesNotExist_shouldThrowSecureFileErrorWithPath() async throws {
+        try await withTemporaryFileURL("missing.pem", createPath: false) { url in
+            // Given
+            let path = url.absolutePath(percentEncoded: false)
+
+            // When
+            do {
+                _ = try Internals.PrivateKey(path, format: .pem).build()
+                Issue.record("Not expecting success")
+            } catch let error as SecureFileError {
+                // Then
+                #expect(error.resource == .privateKey)
+                #expect(error.path == path)
+                #expect(error.isRelativePath == false)
+
+                guard case .cantOpenFile = error.context else {
+                    Issue.record("Expected .cantOpenFile, got \(error.context)")
+                    return
+                }
+            }
+        }
+    }
+
+    @Test
+    func private_whenRelativePathDoesNotExist_shouldReportRelativePath() async throws {
+        // Given
+        let path = "definitely-not-a-real-private-key.pem"
+
+        // When
+        do {
+            _ = try Internals.PrivateKey(path, format: .pem).build()
+            Issue.record("Not expecting success")
+        } catch let error as SecureFileError {
+            // Then
+            #expect(error.isRelativePath == true)
+        }
+    }
+
     // MARK: - Genuinely encrypted key (passphrase closure actually invoked)
 
     /// Unlike the bundled `client_password` fixture, this key is genuinely passphrase

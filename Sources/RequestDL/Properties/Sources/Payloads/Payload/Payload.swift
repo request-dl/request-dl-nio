@@ -47,10 +47,15 @@ import class Foundation.JSONSerialization
 /// ### Sending files
 ///
 /// - ``RequestDL/Payload/init(url:contentType:)``
+/// - ``RequestDL/Payload/init(url:from:contentType:)``
 ///
 /// ### Sending Encodable
 ///
 /// - ``RequestDL/Payload/init(_:encoder:contentType:)``
+///
+/// ### Sending values through a custom encoder
+///
+/// - ``RequestDL/PayloadEncoder``
 ///
 /// ### Sending JSON objects
 ///
@@ -113,6 +118,27 @@ public struct Payload: Property {
     }
 
     ///
+    /// Initializes a `Payload` with a value serialized through a custom ``PayloadEncoder``.
+    ///
+    /// - Parameters:
+    ///    - value: The value to be serialized.
+    ///    - encoder: The encoder used to serialize `value`.
+    ///    - contentType: The content type of the payload. Defaults to the encoder's own
+    ///      ``PayloadEncoder/contentType``.
+    ///
+    public init<Value: Sendable, Encoder: PayloadEncoder>(
+        _ value: Value,
+        encoder: Encoder,
+        contentType: ContentType? = nil
+    ) {
+        factory = PayloadEncoderFactory(
+            value,
+            encoder: encoder,
+            contentType: contentType
+        )
+    }
+
+    ///
     /// Initializes a `Payload` with a string verbatim.
     ///
     /// - Parameters:
@@ -160,6 +186,37 @@ public struct Payload: Property {
         factory = FilePayloadFactory(
             url: url,
             contentType: contentType
+        )
+    }
+
+    ///
+    /// Initializes a `Payload` with a file URL, starting the upload's byte stream at an
+    /// arbitrary offset instead of from the beginning of the file.
+    ///
+    /// This does not implement resumable upload by itself — HTTP has no universal mechanism for
+    /// that. It provides the one transport-agnostic building block a resume implementation needs:
+    /// a way to start streaming from a byte position other than zero. Track how many bytes were
+    /// sent (e.g. via ``UploadStep``), and on failure, start a fresh upload with a payload
+    /// beginning at that offset.
+    ///
+    /// - Parameters:
+    ///    - url: The file URL.
+    ///    - offset: The byte offset at which the upload's stream should start.
+    ///    - contentType: The content type of the payload.
+    ///
+    /// - Note: `offset` is only validated once the request is resolved, not at initialization
+    /// time. Resolving a request with a `Payload` whose offset is greater than the file's
+    /// current size throws ``InvalidPayloadOffsetError``.
+    ///
+    public init(
+        url: URL,
+        from offset: UInt64,
+        contentType: ContentType
+    ) {
+        factory = FilePayloadFactory(
+            url: url,
+            contentType: contentType,
+            offset: offset
         )
     }
 

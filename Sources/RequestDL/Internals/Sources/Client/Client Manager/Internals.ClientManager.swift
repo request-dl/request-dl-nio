@@ -26,13 +26,13 @@ extension Internals {
         // MARK: - Private static properties
 
         /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
-        /// running after 30s. Set higher than the other `AsyncLock`s in `Internals`:
+        /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`:
         /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients
         /// serially in one sweep, each a real network drain, so a wide margin is needed to avoid
         /// flagging a legitimately busy sweep. Development builds only — see
         /// `AsyncLock.Watchdog`.
         #if DEBUG
-        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 30) {
+        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 45) {
             Internals.assertionFailure($0)
         }
         #else

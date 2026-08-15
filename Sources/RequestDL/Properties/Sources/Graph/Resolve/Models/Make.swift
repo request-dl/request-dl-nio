@@ -17,6 +17,13 @@ struct Make: Sendable {
     /// `sessionConfiguration`, and that is what the client cache keys on.
     var resolvesSystemProxy: Bool
 
+    /// Rules accumulated by every declared `URLOverride`, in declaration order.
+    ///
+    /// Matched against the final `baseURL`/`pathComponents` in `Resolve.build()`, once every
+    /// property (including whichever `BaseURL` wins) has contributed — matching here, while the
+    /// tree is still being walked, could still miss a `BaseURL` or `Path` declared later.
+    var urlOverrides: [URLOverrideRule]
+
     // MARK: - Inits
 
     init(
@@ -28,5 +35,6 @@ struct Make: Sendable {
         self.requestConfiguration = requestConfiguration
         self.cacheConfiguration = .init()
         self.resolvesSystemProxy = false
+        self.urlOverrides = []
     }
 }

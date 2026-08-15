@@ -14,15 +14,43 @@ struct FilePayloadFactory: PayloadFactory {
 
     let url: URL
     let contentType: ContentType
+    let offset: UInt64
+
+    // MARK: - Inits
+
+    init(
+        url: URL,
+        contentType: ContentType,
+        offset: UInt64 = .zero
+    ) {
+        self.url = url
+        self.contentType = contentType
+        self.offset = offset
+    }
 
     // MARK: - Internal methods
 
     func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
         try await validateFileExists()
 
-        return await .init(
+        var buffer = await Internals.FileBuffer(url)
+
+        if offset > .zero {
+            let availableBytes = buffer.writerIndex
+
+            guard offset <= UInt64(availableBytes) else {
+                throw InvalidPayloadOffsetError(
+                    offset: offset,
+                    availableBytes: availableBytes
+                )
+            }
+
+            buffer.moveReaderIndex(to: Int(offset))
+        }
+
+        return .init(
             contentType: contentType,
-            source: .buffer(Internals.FileBuffer(url))
+            source: .buffer(buffer)
         )
     }
 

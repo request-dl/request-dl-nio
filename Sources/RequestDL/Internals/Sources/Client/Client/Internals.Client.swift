@@ -30,11 +30,11 @@ extension Internals {
 
         // MARK: - Private static properties
 
-        /// Flags a `shutdown()` that is still running after 10s — draining real, in-flight
+        /// Flags a `shutdown()` that is still running after 20s — draining real, in-flight
         /// connections can legitimately take a few seconds under load, longer than the other
         /// `AsyncLock`s in `Internals`. Development builds only — see `AsyncLock.Watchdog`.
         #if DEBUG
-        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 10) {
+        private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 20) {
             Internals.assertionFailure($0)
         }
         #else
