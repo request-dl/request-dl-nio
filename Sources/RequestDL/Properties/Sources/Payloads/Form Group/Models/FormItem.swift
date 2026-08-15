@@ -44,12 +44,16 @@ struct FormItem: Sendable {
     ///
     /// - Note: `method` is `nil` because a form part has no HTTP method of its own. Only the
     /// top level payload consults it, to decide between a query string and a body.
+    ///
+    /// - Note: `payloadEncoder` is `nil` because `Form` has no `PayloadEncoder`-based
+    /// initializer — none of its factories ever read it.
     func callAsFunction() async throws -> Output {
         let output = try await factory(
             .init(
                 method: nil,
                 charset: charset,
-                urlEncoder: urlEncoder
+                urlEncoder: urlEncoder,
+                payloadEncoder: nil
             )
         )
 

@@ -14,7 +14,7 @@ That's why RequestDL provides ``RequestDL/Payload`` and ``RequestDL/Form`` to ma
 
 > Tip: Each object has 5 initializers that standardize data configuration in a request: Data, String, URL, Codable, and JSON (also known as [String: Any]).
 
-> Tip: Need a serialization format other than JSON, such as Protobuf or MessagePack? Implement ``RequestDL/PayloadEncoder`` and pass it to `Payload(_:encoder:contentType:)`.
+> Tip: Need a serialization format other than JSON, such as Protobuf or MessagePack? Implement ``RequestDL/PayloadEncoder`` and pass it to `Payload(_:encoder:contentType:)`. Passing `encoder: nil` there defers to a default set once via ``RequestDL/Property/payloadEncoder(_:)`` on an enclosing property, instead of repeating the same encoder at every `Payload(...)` call site.
 
 ### Payload
 
@@ -70,6 +70,7 @@ Payload(userModel, contentType: .formURLEncoded)
 
 - ``RequestDL/Payload``
 - ``RequestDL/PayloadEncoder``
+- ``RequestDL/Property/payloadEncoder(_:)``
 - ``RequestDL/EncodingPayloadError``
 
 ### Using the multipart form data

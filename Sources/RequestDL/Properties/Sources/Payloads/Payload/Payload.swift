@@ -120,15 +120,19 @@ public struct Payload: Property {
     ///
     /// Initializes a `Payload` with a value serialized through a custom ``PayloadEncoder``.
     ///
+    /// Pass `encoder: nil` to defer to the default set via ``Property/payloadEncoder(_:)`` on an
+    /// enclosing property. Resolving to no encoder at all — neither passed here nor set on the
+    /// environment — throws ``EncodingPayloadError`` with context `.missingPayloadEncoder`.
+    ///
     /// - Parameters:
     ///    - value: The value to be serialized.
-    ///    - encoder: The encoder used to serialize `value`.
+    ///    - encoder: The encoder used to serialize `value`, or `nil` to use the environment's.
     ///    - contentType: The content type of the payload. Defaults to the encoder's own
     ///      ``PayloadEncoder/contentType``.
     ///
-    public init<Value: Sendable, Encoder: PayloadEncoder>(
+    public init<Value: Sendable>(
         _ value: Value,
-        encoder: Encoder,
+        encoder: (any PayloadEncoder)?,
         contentType: ContentType? = nil
     ) {
         factory = PayloadEncoderFactory(
@@ -234,7 +238,8 @@ public struct Payload: Property {
                 factory: property.factory,
                 charset: inputs.environment.charset,
                 urlEncoder: inputs.environment.urlEncoder,
-                chunkSize: inputs.environment.payloadChunkSize
+                chunkSize: inputs.environment.payloadChunkSize,
+                payloadEncoder: inputs.environment.payloadEncoder
             )
         )
     }

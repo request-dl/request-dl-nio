@@ -320,6 +320,82 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenPayloadEncoderIsNil_usesEnvironmentDefault() async throws {
+        // Given
+        let verbatim = "Hello world!"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: nil
+                )
+                .payloadEncoder(PayloadEncoderMock())
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-mock"]
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenPayloadEncoderIsExplicit_overridesEnvironmentDefault() async throws {
+        // Given
+        let verbatim = "Hello world!"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: PayloadEncoderMock(contentType: "application/x-explicit")
+                )
+                .payloadEncoder(PayloadEncoderMock(contentType: "application/x-environment"))
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        // The encoder passed directly to `Payload` wins over `.payloadEncoder(_:)`.
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-explicit"]
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenPayloadEncoderIsNilAndNoEnvironmentDefault_throwsMissingPayloadEncoder() async throws {
+        // Given
+        var encodingError: EncodingPayloadError?
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        "Hello world!",
+                        encoder: nil
+                    )
+                }
+            )
+        } catch let error as EncodingPayloadError {
+            encodingError = error
+        }
+
+        // Then
+        #expect(encodingError?.context == .missingPayloadEncoder)
+    }
+
+    @Test
     func payload_whenInitString() async throws {
         // Given
         let verbatim = "Hello world!"

@@ -31,6 +31,7 @@ struct PayloadInput {
     let method: String?
     let charset: Charset
     let urlEncoder: URLEncoder
+    let payloadEncoder: (any PayloadEncoder)?
 
     func jsonObject(_ array: [Any], contentType: ContentType) throws -> PayloadOutput {
         .init(
