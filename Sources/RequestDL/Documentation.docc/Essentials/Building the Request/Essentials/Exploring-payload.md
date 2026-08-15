@@ -72,6 +72,8 @@ Payload(userModel, contentType: .formURLEncoded)
 - ``RequestDL/PayloadEncoder``
 - ``RequestDL/Property/payloadEncoder(_:)``
 - ``RequestDL/EncodingPayloadError``
+- ``RequestDL/FilePayloadError``
+- ``RequestDL/InvalidPayloadOffsetError``
 
 ### Using the multipart form data
 
