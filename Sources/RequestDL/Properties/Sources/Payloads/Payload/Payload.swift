@@ -47,6 +47,7 @@ import class Foundation.JSONSerialization
 /// ### Sending files
 ///
 /// - ``RequestDL/Payload/init(url:contentType:)``
+/// - ``RequestDL/Payload/init(url:from:contentType:)``
 ///
 /// ### Sending Encodable
 ///
@@ -160,6 +161,37 @@ public struct Payload: Property {
         factory = FilePayloadFactory(
             url: url,
             contentType: contentType
+        )
+    }
+
+    ///
+    /// Initializes a `Payload` with a file URL, starting the upload's byte stream at an
+    /// arbitrary offset instead of from the beginning of the file.
+    ///
+    /// This does not implement resumable upload by itself — HTTP has no universal mechanism for
+    /// that. It provides the one transport-agnostic building block a resume implementation needs:
+    /// a way to start streaming from a byte position other than zero. Track how many bytes were
+    /// sent (e.g. via ``UploadStep``), and on failure, start a fresh upload with a payload
+    /// beginning at that offset.
+    ///
+    /// - Parameters:
+    ///    - url: The file URL.
+    ///    - offset: The byte offset at which the upload's stream should start.
+    ///    - contentType: The content type of the payload.
+    ///
+    /// - Note: `offset` is only validated once the request is resolved, not at initialization
+    /// time. Resolving a request with a `Payload` whose offset is greater than the file's
+    /// current size throws ``InvalidPayloadOffsetError``.
+    ///
+    public init(
+        url: URL,
+        from offset: UInt64,
+        contentType: ContentType
+    ) {
+        factory = FilePayloadFactory(
+            url: url,
+            contentType: contentType,
+            offset: offset
         )
     }
 

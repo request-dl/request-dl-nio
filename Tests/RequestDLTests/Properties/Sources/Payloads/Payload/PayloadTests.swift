@@ -487,6 +487,117 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenInitURLWithOffset() async throws {
+        // Given
+        let data = await Data.randomData(length: 1_024 * 1_024)
+        let offset = 1_024 * 256
+
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+
+        try data.write(to: url)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    url: url,
+                    from: UInt64(offset),
+                    contentType: .octetStream
+                )
+            }
+        )
+
+        let builtData = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/octet-stream"]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(data.count - offset)]
+        )
+
+        #expect(builtData == data[offset...])
+    }
+
+    @Test
+    func payload_whenInitURLWithOffsetAtEndOfFile() async throws {
+        // Given
+        let data = await Data.randomData(length: 1_024)
+
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+
+        try data.write(to: url)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    url: url,
+                    from: UInt64(data.count),
+                    contentType: .octetStream
+                )
+            }
+        )
+
+        let builtData = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
+        #expect(builtData == Data())
+    }
+
+    @Test
+    func payload_whenInitURLWithOffsetPastEndOfFile() async throws {
+        // Given
+        let data = await Data.randomData(length: 1_024)
+
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+
+        try data.write(to: url)
+
+        var offsetError: InvalidPayloadOffsetError?
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        url: url,
+                        from: UInt64(data.count) + 1,
+                        contentType: .octetStream
+                    )
+                }
+            )
+        } catch let error as InvalidPayloadOffsetError {
+            offsetError = error
+        }
+
+        // Then
+        #expect(offsetError?.offset == UInt64(data.count) + 1)
+        #expect(offsetError?.availableBytes == data.count)
+    }
+
+    @Test
     func payload_whenBodyCalled_shouldBeNever() async throws {
         // Given
         let property = Payload(data: Data())
