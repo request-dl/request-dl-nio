@@ -120,6 +120,15 @@ public struct DataCache: Sendable, Equatable {
         private var _memoryStorage: MemoryStorage
         private var _diskStorage: DiskStorage
 
+        /// Best-effort disk usage estimate, `nil` until first reconciled. Purely a hint for
+        /// `DiskStorage.freeSpace(_:knownUsage:)` to skip its directory rescan on the common
+        /// write that isn't anywhere near capacity — never relied on for correctness, so a
+        /// stale or absent value only costs an extra rescan, not a wrong eviction. Deliberately
+        /// left untouched by `remove`/`removeAll`/capacity changes: those only ever move usage
+        /// down or reset it, so an estimate that predates them is at worst a harmless
+        /// overcount that triggers one avoidable rescan next time. See #271.
+        private var _diskUsageEstimate: Int64?
+
         // MARK: - Internal methods
 
         /// Mutates the memory tier inside a single critical section.
@@ -133,6 +142,34 @@ public struct DataCache: Sendable, Equatable {
         /// storage from inside `body`, including the capacities.
         func withMemoryStorage<Output>(_ body: (inout MemoryStorage) -> Output) -> Output {
             lock.withLock { body(&_memoryStorage) }
+        }
+
+        /// Allocates a disk buffer, reusing `_diskUsageEstimate` so a write nowhere near
+        /// capacity can skip `DiskStorage.freeSpace`'s directory rescan. See that method and
+        /// `_diskUsageEstimate`'s doc for the safety argument behind reading and writing this
+        /// estimate outside the lock that guards it.
+        func allocateDiskBuffer(
+            key: String,
+            cachedResponse: CachedResponse,
+            contentLength: Int64
+        ) async -> Internals.AnyBuffer? {
+            let (diskStorage, maximumCapacity, knownUsage) = lock.withLock {
+                (_diskStorage, _diskCapacity, _diskUsageEstimate)
+            }
+
+            let (buffer, usage) = await diskStorage.allocateBuffer(
+                key: key,
+                cachedResponse: cachedResponse,
+                contentLength: contentLength,
+                maximumCapacity: maximumCapacity,
+                knownUsage: knownUsage
+            )
+
+            if let usage {
+                lock.withLock { _diskUsageEstimate = usage }
+            }
+
+            return buffer
         }
 
         // MARK: - Init
@@ -488,11 +525,10 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if cachedResponse.policy.contains(.disk) {
-            diskBuffer = await storage.diskStorage.allocateBuffer(
+            diskBuffer = await storage.allocateDiskBuffer(
                 key: key,
                 cachedResponse: cachedResponse,
-                contentLength: contentLength,
-                maximumCapacity: diskCapacity
+                contentLength: contentLength
             )
         }
 
