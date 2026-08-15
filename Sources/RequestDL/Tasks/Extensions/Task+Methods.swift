@@ -23,8 +23,6 @@ extension RequestTask {
     ///
     /// - Throws: An error if any ping request fails (i.e., if the underlying `result()` call throws).
     ///
-    /// - Returns: `Void`. This method does not return data—it only ensures the request completes successfully.
-    ///
     public func ping(_ times: Int = 1, logger: Logger? = nil) async throws {
         if times <= 0 {
             return

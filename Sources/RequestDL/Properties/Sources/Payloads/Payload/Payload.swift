@@ -51,7 +51,7 @@ import class Foundation.JSONSerialization
 ///
 /// ### Sending Encodable
 ///
-/// - ``RequestDL/Payload/init(_:encoder:contentType:)``
+/// - ``RequestDL/Payload/init(_:encoder:contentType:)-(Object,_,_)``
 ///
 /// ### Sending values through a custom encoder
 ///

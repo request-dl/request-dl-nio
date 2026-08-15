@@ -62,7 +62,7 @@ public struct StoredObject<Object: AnyObject & Sendable>: DynamicValue {
     ///
     /// Initializes a new `StoredObject` with the given object.
     ///
-    /// - Parameter wrappedValue: The object that will be stored in memory.
+    /// - Parameter thunk: The object that will be stored in memory.
     ///
     public init(wrappedValue thunk: @autoclosure @escaping @Sendable () -> Object) {
         self.thunk = thunk
