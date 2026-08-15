@@ -61,12 +61,22 @@ extension URLOverrideEndpoint {
     /// declared) — this runs after the property tree has already fully resolved, past the point
     /// where a `Property` can still fail the build; an unmatched request should just pass through.
     init?(baseURL: String) {
-        guard let separatorRange = baseURL.range(of: "://") else {
+        // Neither `range(of:)` (a Foundation member this file has no import for) nor
+        // `firstRange(of:)`/`contains(_:)` for a substring pattern (stdlib, but gated to
+        // macOS 13/iOS 16 — newer than this package's macOS 12/iOS 15 minimum). A single
+        // `Character` lookup plus `hasPrefix` has neither restriction.
+        guard let colonIndex = baseURL.firstIndex(of: ":") else {
             return nil
         }
 
-        let scheme = String(baseURL[..<separatorRange.lowerBound])
-        let host = String(baseURL[separatorRange.upperBound...])
+        let afterColon = baseURL.index(after: colonIndex)
+
+        guard baseURL[afterColon...].hasPrefix("//") else {
+            return nil
+        }
+
+        let scheme = String(baseURL[..<colonIndex])
+        let host = String(baseURL[baseURL.index(afterColon, offsetBy: 2)...])
 
         guard !scheme.isEmpty, !host.isEmpty else {
             return nil
