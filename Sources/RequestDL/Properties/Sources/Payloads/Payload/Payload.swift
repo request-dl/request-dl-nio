@@ -52,6 +52,10 @@ import class Foundation.JSONSerialization
 ///
 /// - ``RequestDL/Payload/init(_:encoder:contentType:)``
 ///
+/// ### Sending values through a custom encoder
+///
+/// - ``RequestDL/PayloadEncoder``
+///
 /// ### Sending JSON objects
 ///
 /// - ``RequestDL/Payload/init(_:options:contentType:)``
@@ -107,6 +111,27 @@ public struct Payload: Property {
     ) {
         factory = EncodablePayloadFactory(
             object,
+            encoder: encoder,
+            contentType: contentType
+        )
+    }
+
+    ///
+    /// Initializes a `Payload` with a value serialized through a custom ``PayloadEncoder``.
+    ///
+    /// - Parameters:
+    ///    - value: The value to be serialized.
+    ///    - encoder: The encoder used to serialize `value`.
+    ///    - contentType: The content type of the payload. Defaults to the encoder's own
+    ///      ``PayloadEncoder/contentType``.
+    ///
+    public init<Value: Sendable, Encoder: PayloadEncoder>(
+        _ value: Value,
+        encoder: Encoder,
+        contentType: ContentType? = nil
+    ) {
+        factory = PayloadEncoderFactory(
+            value,
             encoder: encoder,
             contentType: contentType
         )

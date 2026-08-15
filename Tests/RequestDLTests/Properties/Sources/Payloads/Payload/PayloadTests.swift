@@ -234,6 +234,92 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenInitPayloadEncoder() async throws {
+        // Given
+        let verbatim = "Hello world!"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: PayloadEncoderMock()
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-mock"]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenInitPayloadEncoderWithCustomType() async throws {
+        // Given
+        let verbatim = "Hello world!"
+        let customType = ContentType("application/x-mock+request-dl")
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: PayloadEncoderMock(),
+                    contentType: customType
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        // A `contentType` passed at the call site overrides the encoder's own
+        // `PayloadEncoder/contentType`.
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == [String(customType)]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenPayloadEncoderThrows() async throws {
+        // Given
+        var encodingError: EncodingPayloadError?
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        // Anything but a `String` triggers `PayloadEncoderMock`'s error path.
+                        42,
+                        encoder: PayloadEncoderMock()
+                    )
+                }
+            )
+        } catch let error as EncodingPayloadError {
+            encodingError = error
+        }
+
+        // Then
+        #expect(encodingError?.context == .invalidStringEncoding)
+    }
+
+    @Test
     func payload_whenInitString() async throws {
         // Given
         let verbatim = "Hello world!"
