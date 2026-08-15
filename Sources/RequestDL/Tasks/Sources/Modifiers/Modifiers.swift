@@ -44,8 +44,6 @@
 /// - ``RequestDL/RequestEnvironmentKey``
 /// - ``RequestDL/RequestEnvironmentValues``
 /// - ``RequestDL/Modifiers/Environment``
-/// - ``RequestDL/TaskEnvironmentKey``
-/// - ``RequestDL/TaskEnvironmentValues``
 ///
 /// ### Erasing the task type
 ///

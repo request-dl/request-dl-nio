@@ -6,12 +6,12 @@
 /// network call.
 ///
 /// The `content` block is a request description just like any other task's — ``RequestDL/BaseURL``,
-/// ``RequestDL/Headers``, ``RequestDL/AcceptHeader``, ``RequestDL/Authorization``,
+/// ``RequestDL/HeaderGroup``, ``RequestDL/AcceptHeader``, ``RequestDL/Authorization``,
 /// ``RequestDL/Payload``, and so on. Resolving it produces the mocked response: every header the
 /// request would carry (including `Content-Type`/`Content-Length` from ``RequestDL/Payload``) is
 /// copied onto the response, and ``RequestDL/Payload``'s bytes become the response body. That makes
 /// `MockedTask` a way to inspect exactly what a request would look like — URL, headers, encoded body
-/// — by running it through the same result-processing pipeline (``RequestDL/RequestTask/collectData()``,
+/// — by running it through the same result-processing pipeline (``RequestDL/RequestTask/collectData()-3viv5``,
 /// modifiers, `.decode(_:)`, ...) a real task would use, without a live server.
 ///
 /// ```swift
