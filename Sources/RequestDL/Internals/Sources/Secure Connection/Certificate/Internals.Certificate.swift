@@ -37,11 +37,15 @@ extension Internals {
             case .bytes(let bytes):
                 return try [NIOSSLCertificate(bytes: bytes, format: format.build())]
             case .file(let file):
-                switch format {
-                case .der:
-                    return try [NIOSSLCertificate.fromDERFile(file)]
-                case .pem:
-                    return try NIOSSLCertificate.fromPEMFile(file)
+                do {
+                    switch format {
+                    case .der:
+                        return try [NIOSSLCertificate.fromDERFile(file)]
+                    case .pem:
+                        return try NIOSSLCertificate.fromPEMFile(file)
+                    }
+                } catch {
+                    throw SecureFileError(resource: .certificate, path: file, underlying: error)
                 }
             }
         }

@@ -60,12 +60,16 @@ extension Internals {
                     return try .init(bytes: bytes, format: format)
                 }
             case .file(let file):
-                if let password {
-                    return try .init(file: file, format: format) {
-                        $0(Array(password))
+                do {
+                    if let password {
+                        return try .init(file: file, format: format) {
+                            $0(Array(password))
+                        }
+                    } else {
+                        return try .init(file: file, format: format)
                     }
-                } else {
-                    return try .init(file: file, format: format)
+                } catch {
+                    throw SecureFileError(resource: .privateKey, path: file, underlying: error)
                 }
             }
         }
