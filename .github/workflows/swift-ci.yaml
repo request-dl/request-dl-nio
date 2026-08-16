@@ -31,7 +31,11 @@ concurrency:
 jobs:
   ci:
     name: "Swift CI"
-    uses: request-dl/.github/.github/workflows/swift-ci.yaml@main
+    # TEMP: pointed at the .github Android-build fix branch instead of @main
+    # while request-dl/.github#94 is still in flight, so we can iterate on
+    # android-build failures without merging to .github's main each time.
+    # Revert to @main once #94 merges.
+    uses: request-dl/.github/.github/workflows/swift-ci.yaml@ci/android-sdk-fix
     with:
       name: request-dl
       product-name: RequestDL
