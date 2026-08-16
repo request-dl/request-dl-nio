@@ -53,7 +53,6 @@ jobs:
       xcode-version: '26.6'
       apple-coverage-enabled: true
       apple-tests-parallel-testing-worker-count: '2'
-      debug: true
 
       # Step 3 – Third Party
       enable-third-party-tests: true
