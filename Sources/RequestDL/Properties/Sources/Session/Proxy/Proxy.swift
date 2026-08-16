@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 /// `Proxy` is a struct that defines a proxy configuration for network requests.
 ///
 /// To create an instance of `Proxy`, initialize it with the host, port, connection protocol, and optionally, authorization credentials.
@@ -39,8 +41,6 @@
 ///
 /// > Note: The `Headers` generic parameter represents the type of the `CONNECT` headers
 /// composition. If none are needed, the default is `EmptyProperty`.
-import RequestDLInternals
-
 public struct Proxy<Headers: Property>: Property {
 
     private struct Node: PropertyNode {
