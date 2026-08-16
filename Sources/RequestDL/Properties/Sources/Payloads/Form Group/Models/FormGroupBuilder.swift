@@ -2,8 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Assembles a list of form items into the buffers of a `multipart/form-data` body.
 import RequestDLInternals
+
+/// Assembles a list of form items into the buffers of a `multipart/form-data` body.
 
 struct FormGroupBuilder: Sendable {
 

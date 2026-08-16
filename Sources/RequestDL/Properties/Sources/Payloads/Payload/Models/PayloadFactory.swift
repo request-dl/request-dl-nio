@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 /// Turns a source value into the bytes of a request body, plus the content type describing them.
 ///
 /// ## When to declare a charset
@@ -21,8 +23,6 @@
 /// one is a false claim, which is worse.
 ///
 /// A consequence worth knowing: `.charset(_:)` has no effect on JSON payloads, by design.
-import RequestDLInternals
-
 protocol PayloadFactory: Sendable {
 
     func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput
