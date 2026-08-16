@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import RequestDLInternals
 #endif
 
 struct DataPayloadFactory: PayloadFactory {

@@ -9,6 +9,7 @@ import FoundationEssentials
 #else
 import struct Foundation.Date
 import struct Foundation.URL
+import RequestDLInternals
 #endif
 
 struct MemoryStorage: Sendable {

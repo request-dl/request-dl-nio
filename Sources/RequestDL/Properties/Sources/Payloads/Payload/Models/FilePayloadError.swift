@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import RequestDLInternals
 #endif
 
 /// An error thrown when RequestDL cannot read the file behind a `Form` or `Payload` file upload.

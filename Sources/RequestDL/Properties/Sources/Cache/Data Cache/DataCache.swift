@@ -13,6 +13,7 @@ import struct Foundation.URL
 import struct Foundation.Data
 import struct Foundation.Date
 import class Foundation.ProcessInfo
+import RequestDLInternals
 #endif
 
 /// A data cache that stores and retrieves data based on specified capacities and policies.

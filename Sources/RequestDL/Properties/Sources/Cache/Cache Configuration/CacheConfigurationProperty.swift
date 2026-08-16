@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import RequestDLInternals
 #endif
 
 private struct CacheConfigurationProperty: Property {

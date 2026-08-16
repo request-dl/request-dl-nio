@@ -3,6 +3,8 @@
 //
 
 /// A structure that represents an asynchronous response.
+import RequestDLInternals
+
 public struct AsyncResponse: Sendable, AsyncSequence {
 
     ///

@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.Date
+import RequestDLInternals
 #endif
 
 struct CachedResponse: Sendable, Codable, Hashable {

@@ -3,6 +3,8 @@
 //
 
 /// Assembles a list of form items into the buffers of a `multipart/form-data` body.
+import RequestDLInternals
+
 struct FormGroupBuilder: Sendable {
 
     // MARK: - Internal properties

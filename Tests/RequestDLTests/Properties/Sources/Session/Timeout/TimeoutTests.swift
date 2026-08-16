@@ -22,7 +22,7 @@ struct TimeoutTests {
         )
 
         // Then
-        #expect(resolved.session.configuration.timeout.connect == timeout)
+        #expect(resolved.session.configuration.timeout.connect == timeout.nanoseconds)
     }
 
     @Test
@@ -35,7 +35,7 @@ struct TimeoutTests {
         let resolved = try await resolve(TestProperty(Timeout(timeout, for: resourceTimeout)))
 
         // Then
-        #expect(resolved.session.configuration.timeout.connect == timeout)
+        #expect(resolved.session.configuration.timeout.connect == timeout.nanoseconds)
     }
 
     @Test
@@ -48,8 +48,8 @@ struct TimeoutTests {
         let resolved = try await resolve(TestProperty(Timeout(timeout, for: requestTimeout)))
 
         // Then
-        #expect(resolved.session.configuration.timeout.read == timeout)
-        #expect(resolved.session.configuration.timeout.connect == timeout)
+        #expect(resolved.session.configuration.timeout.read == timeout.nanoseconds)
+        #expect(resolved.session.configuration.timeout.connect == timeout.nanoseconds)
     }
 
     @Test

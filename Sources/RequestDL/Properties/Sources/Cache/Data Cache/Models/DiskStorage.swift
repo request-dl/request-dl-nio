@@ -14,6 +14,7 @@ import struct Foundation.Date
 import struct Foundation.Data
 import class Foundation.JSONDecoder
 import class Foundation.JSONEncoder
+import RequestDLInternals
 #endif
 
 struct DiskStorage: Sendable {

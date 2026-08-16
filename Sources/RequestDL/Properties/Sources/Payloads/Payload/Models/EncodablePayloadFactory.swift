@@ -7,6 +7,7 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 import class Foundation.JSONEncoder
+import RequestDLInternals
 #endif
 
 struct EncodablePayloadFactory: Sendable, PayloadFactory {

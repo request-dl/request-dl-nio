@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 extension Never: Property {
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -14,6 +16,6 @@ extension Property {
 
     func bodyException() -> Never {
         Internals.Log.accessingNeverBody(self)
-            .preconditionFailure()
+            .preconditionFailure(logger: RequestEnvironmentValues.current.logger)
     }
 }

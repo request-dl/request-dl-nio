@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 extension Proxy {
 
     /// An enumeration representing the type of connection protocol used by the proxy server.

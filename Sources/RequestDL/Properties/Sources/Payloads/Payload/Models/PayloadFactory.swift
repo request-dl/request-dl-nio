@@ -21,6 +21,8 @@
 /// one is a false claim, which is worse.
 ///
 /// A consequence worth knowing: `.charset(_:)` has no effect on JSON payloads, by design.
+import RequestDLInternals
+
 protocol PayloadFactory: Sendable {
 
     func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput

@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 protocol IdentifiedGraphValue: Sendable {
 
     var id: GraphID { get }
@@ -40,6 +42,6 @@ extension IdentifiedGraphValue {
         // Was a `preconditionFailure`. This guards structural coherence of the graph, not
         // memory safety, so it belongs in development rather than in a user's app.
         Internals.Log.unexpectedGraphPathway()
-            .assertionFailure()
+            .assertionFailure(logger: RequestEnvironmentValues.current.logger)
     }
 }

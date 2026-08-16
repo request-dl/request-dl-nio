@@ -9,6 +9,7 @@ import FoundationEssentials
 #else
 #if canImport(Darwin)
 import class Foundation.Bundle
+import RequestDLInternals
 #endif
 #endif
 

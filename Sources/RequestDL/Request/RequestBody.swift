@@ -4,6 +4,7 @@
 
 import AsyncHTTPClient
 import NIOCore
+import RequestDLInternals
 
 /// A structure representing the body of an HTTP request.
 /// This type encapsulates the data and settings for the request body,

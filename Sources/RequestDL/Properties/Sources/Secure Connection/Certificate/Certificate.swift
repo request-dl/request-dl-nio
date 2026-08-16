@@ -7,6 +7,7 @@ import Logging
 #if canImport(Darwin)
 import class Foundation.Bundle
 import struct Foundation.URL
+import RequestDLInternals
 #endif
 
 /// Set a certificate of type `PEM` or `DER`.
@@ -56,7 +57,7 @@ public struct Certificate: Property {
                 Internals.Log.cantOpenCertificateFile(
                     resourceName,
                     bundle
-                ).preconditionFailure()
+                ).preconditionFailure(logger: RequestEnvironmentValues.current.logger)
             }
 
             return resourceURL.absolutePath(percentEncoded: false)

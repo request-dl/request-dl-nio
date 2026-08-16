@@ -3,6 +3,8 @@
 //
 
 /// A structure that represents default trust roots.
+import RequestDLInternals
+
 public struct DefaultTrustRoots: Property {
 
     private struct Node: SecureConnectionPropertyNode {

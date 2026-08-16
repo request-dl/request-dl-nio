@@ -22,6 +22,8 @@
 ///     )
 /// }
 /// ```
+import RequestDLInternals
+
 public struct Proxy: Property {
 
     private struct Node: PropertyNode {

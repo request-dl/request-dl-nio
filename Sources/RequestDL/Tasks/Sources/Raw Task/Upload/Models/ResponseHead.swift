@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import RequestDLInternals
 #endif
 
 /// A structure representing the head of an HTTP response.
@@ -149,7 +150,7 @@ public struct ResponseHead: Sendable, Hashable {
             url: .init(string: head.url),
             status: .init(head.status),
             version: .init(head.version),
-            headers: head.headers,
+            headers: HTTPHeaders(head.headers.map { ($0.name, $0.value) }),
             isKeepAlive: head.isKeepAlive
         )
     }
