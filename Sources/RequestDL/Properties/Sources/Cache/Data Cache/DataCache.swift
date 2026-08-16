@@ -3,6 +3,7 @@
 //
 
 import Logging
+import RequestDLInternals
 import SwiftAsyncStream
 import SystemPackage
 

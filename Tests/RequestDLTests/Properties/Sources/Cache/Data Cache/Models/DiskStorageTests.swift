@@ -6,6 +6,7 @@ import NIOFileSystem
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -24,7 +25,7 @@ struct DiskStorageTests {
                 url: "https://www.apple.com/\(key)",
                 status: .init(code: 200, reason: "OK"),
                 version: .init(minor: 0, major: 1),
-                headers: [:],
+                headers: [],
                 isKeepAlive: true
             ),
             policy: .all

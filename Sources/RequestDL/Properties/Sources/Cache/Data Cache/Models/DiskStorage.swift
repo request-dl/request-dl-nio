@@ -4,6 +4,7 @@
 
 import NIOCore
 import NIOFileSystem
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

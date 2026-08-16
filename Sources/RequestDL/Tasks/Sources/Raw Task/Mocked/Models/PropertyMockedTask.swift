@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import RequestDLInternals
 
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
@@ -34,7 +35,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         }
 
         let logger = Internals.TaskLogger(
-            requestConfiguration: requestConfiguration,
+            baseURL: requestConfiguration.baseURL,
+            pathComponents: requestConfiguration.pathComponents,
             logger: environment.logger
         )
 
@@ -44,14 +46,23 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             logger: logger
         )
 
-        let client = try await Internals.ClientManager.shared.client(
-            provider: resolved.session.provider,
-            sessionConfiguration: resolved.session.configuration
-        )
+        let client: Internals.Client
+
+        do {
+            client = try await Internals.ClientManager.shared.client(
+                provider: resolved.session.provider,
+                sessionConfiguration: resolved.session.configuration
+            )
+        } catch let error as Internals.SecureFileLoadError {
+            throw SecureFileError(error)
+        }
 
         switch await cacheControl(client) {
         case .task(let task):
-            return task()
+            return AsyncResponse(
+                seed: task.seed,
+                response: task.response
+            )
         case .cache(let cache):
             return try await .init(
                 seed: Internals.TaskSeed.withoutCancellation,
@@ -163,7 +174,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             url: resolved.requestConfiguration.url,
             status: .init(code: status.code, reason: status.reason),
             version: .init(minor: version.minor, major: version.major),
-            headers: responseHeaders,
+            headers: responseHeaders.map { Internals.ResponseHead.HeaderField(name: $0.name, value: $0.value) },
             isKeepAlive: isKeepAlive
         )
     }

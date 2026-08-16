@@ -20,6 +20,8 @@
 /// In this example, an instance of `MyClass` will be stored in memory so that the `myObject` property
 /// can always refer to the same instance. However, there are certain conditions that may cause the
 /// reference to expire, leading to the replacement of the instance with a new one.
+import RequestDLInternals
+
 @propertyWrapper
 public struct StoredObject<Object: AnyObject & Sendable>: DynamicValue {
 

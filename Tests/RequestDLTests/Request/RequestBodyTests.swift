@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL

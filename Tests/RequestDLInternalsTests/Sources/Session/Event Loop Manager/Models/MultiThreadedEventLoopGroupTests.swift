@@ -1,0 +1,23 @@
+//
+// See LICENSE for this package's licensing information.
+//
+
+import NIOPosix
+import Testing
+
+@testable import RequestDLInternals
+
+struct MultiThreadedEventLoopGroupTests {
+
+    @Test
+    func multiThreaded_whenObtainShared_shouldBeTheSameInSecondAccess() async throws {
+        // Given
+        let sut = MultiThreadedEventLoopGroup.shared
+
+        // When
+        let multiThreaded = MultiThreadedEventLoopGroup.shared
+
+        // Then
+        #expect(sut === multiThreaded)
+    }
+}

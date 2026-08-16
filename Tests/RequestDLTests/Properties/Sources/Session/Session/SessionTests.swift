@@ -4,6 +4,7 @@
 
 import AsyncHTTPClient
 import NIOPosix
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL

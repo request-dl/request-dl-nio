@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import SystemPackage
 
 /// An error thrown when RequestDL cannot load a certificate or private key from a file path.
@@ -19,6 +20,15 @@ public struct SecureFileError: Error, Sendable {
         case certificate
         /// A private key, loaded by ``PrivateKey``.
         case privateKey
+
+        init(_ resource: Internals.SecureFileLoadError.Resource) {
+            switch resource {
+            case .certificate:
+                self = .certificate
+            case .privateKey:
+                self = .privateKey
+            }
+        }
     }
 
     /// The specific reason loading failed.
@@ -61,6 +71,17 @@ public struct SecureFileError: Error, Sendable {
         self.context =
             filePath.probeOpenFailure().map { .cantOpenFile(reason: $0.description) }
             ?? .invalidContents(underlying)
+    }
+
+    /// Rewraps the raw load-failure context `Internals.Certificate`/`Internals.PrivateKey`
+    /// throw from `RequestDLInternals`, where the public, documented ``SecureFileError`` itself
+    /// isn't reachable.
+    init(_ error: Internals.SecureFileLoadError) {
+        self.init(
+            resource: Resource(error.resource),
+            path: error.path,
+            underlying: error.underlying
+        )
     }
 }
 

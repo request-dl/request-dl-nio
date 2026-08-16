@@ -3,6 +3,8 @@
 //
 
 /// One part of a `multipart/form-data` body: its headers and its bytes.
+import RequestDLInternals
+
 struct FormItem: Sendable {
 
     struct Output {

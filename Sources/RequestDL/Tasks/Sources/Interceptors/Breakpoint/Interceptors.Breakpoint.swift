@@ -4,6 +4,7 @@
 
 #if canImport(signal_h)
 import signal_h
+import RequestDLInternals
 
 extension Interceptors {
 

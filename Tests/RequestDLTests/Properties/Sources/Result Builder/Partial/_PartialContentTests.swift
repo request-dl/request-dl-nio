@@ -186,8 +186,8 @@ struct _PartialContentTests {
         #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
         #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
 
-        #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
-        #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.read == 40)
+        #expect(resolved.session.configuration.timeout.connect == 40)
     }
 
     @Test
@@ -239,8 +239,8 @@ struct _PartialContentTests {
         #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
         #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
 
-        #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
-        #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.read == 40)
+        #expect(resolved.session.configuration.timeout.connect == 40)
     }
 
     @Test
@@ -296,8 +296,8 @@ struct _PartialContentTests {
         #expect(resolved.requestConfiguration.headers["Origin"] == ["https://apple.com"])
         #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
 
-        #expect(resolved.session.configuration.timeout.read == .nanoseconds(40))
-        #expect(resolved.session.configuration.timeout.connect == .nanoseconds(40))
+        #expect(resolved.session.configuration.timeout.read == 40)
+        #expect(resolved.session.configuration.timeout.connect == 40)
     }
 
     @Test

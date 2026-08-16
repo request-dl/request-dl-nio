@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 struct RawTask<Content: Property>: RequestTask {
 
     // MARK: - Internal properties
@@ -17,16 +19,45 @@ struct RawTask<Content: Property>: RequestTask {
         ).build()
 
         let logger = Internals.TaskLogger(
-            requestConfiguration: resolved.requestConfiguration,
+            baseURL: resolved.requestConfiguration.baseURL,
+            pathComponents: resolved.requestConfiguration.pathComponents,
             logger: environment.logger
         )
 
-        let sessionTask = try await resolved.session.execute(
+        let client: Internals.Client
+
+        do {
+            client = try await resolved.session.client()
+        } catch let error as Internals.SecureFileLoadError {
+            throw SecureFileError(error)
+        }
+
+        let cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,
             dataCache: resolved.dataCache,
             logger: logger
         )
 
-        return sessionTask()
+        let sessionTask: SessionTask
+
+        switch await cacheControl(client) {
+        case .task(let task):
+            sessionTask = task
+        case .cache(let cache):
+            sessionTask = try await resolved.session.execute(
+                client: client,
+                request: try resolved.requestConfiguration.build(eventLoop: client.eventLoopGroup.any()),
+                url: resolved.requestConfiguration.url,
+                readingMode: resolved.requestConfiguration.readingMode,
+                uploadingBytes: resolved.requestConfiguration.body?.totalSize ?? .zero,
+                cache: cache,
+                logger: logger
+            )
+        }
+
+        return AsyncResponse(
+            seed: sessionTask.seed,
+            response: sessionTask.response
+        )
     }
 }

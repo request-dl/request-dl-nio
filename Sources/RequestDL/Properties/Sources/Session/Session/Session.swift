@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import RequestDLInternals
 
 /// The Session object is used to set various properties related to the request context.
 ///
