@@ -30,7 +30,7 @@ extension CertificateResource {
     ) {
         self.format = format
 
-        let dottedPath = path.replacingOccurrences(of: "_", with: ".")
+        let dottedPath = path.split(separator: "_", omittingEmptySubsequences: false).joined(separator: ".")
         let directory = testResourcesDirectory.appendingPathComponent(path, isDirectory: true)
 
         self.certificateURL = directory.appendingPathComponent(

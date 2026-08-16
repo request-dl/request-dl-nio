@@ -62,7 +62,7 @@ struct LocalServerConcurrencyTests {
                     let client = try await session.client()
 
                     let request = try HTTPClient.Request(
-                        url: "https://\(localServer.baseURL)/\(uri.trimmingCharacters(in: .init(charactersIn: "/")))"
+                        url: "https://\(localServer.baseURL)/\(uri.trimming { $0 == "/" })"
                     )
 
                     let task = try await session.execute(
