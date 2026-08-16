@@ -3,13 +3,13 @@
 //
 
 import Collections
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Date
 import struct Foundation.URL
-import RequestDLInternals
 #endif
 
 struct MemoryStorage: Sendable {

@@ -2,13 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.URL
 import protocol Foundation.DataProtocol
-import RequestDLInternals
 #endif
 
 /// A struct representing cached data with associated metadata.

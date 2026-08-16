@@ -2,11 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Date
-import RequestDLInternals
 #endif
 
 struct CachedResponse: Sendable, Codable, Hashable {

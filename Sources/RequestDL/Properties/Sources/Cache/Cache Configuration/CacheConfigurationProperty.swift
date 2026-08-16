@@ -2,11 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.URL
-import RequestDLInternals
 #endif
 
 private struct CacheConfigurationProperty: Property {

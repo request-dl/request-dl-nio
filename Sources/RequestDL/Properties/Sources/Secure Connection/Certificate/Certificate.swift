@@ -3,11 +3,11 @@
 //
 
 import Logging
+import RequestDLInternals
 
 #if canImport(Darwin)
 import class Foundation.Bundle
 import struct Foundation.URL
-import RequestDLInternals
 #endif
 
 /// Set a certificate of type `PEM` or `DER`.

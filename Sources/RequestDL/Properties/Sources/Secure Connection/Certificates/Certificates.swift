@@ -2,13 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
-#if canImport(Darwin)
+#elseif canImport(Darwin)
 import class Foundation.Bundle
-import RequestDLInternals
-#endif
 #endif
 
 /// A structure representing chain certificate for a property used inside

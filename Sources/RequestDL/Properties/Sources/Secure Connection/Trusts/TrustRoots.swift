@@ -2,13 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
-#if canImport(Darwin)
+#elseif canImport(Darwin)
 import class Foundation.Bundle
-import RequestDLInternals
-#endif
 #endif
 
 /// Configure the trusted roots certificates to validate the server using TLS.

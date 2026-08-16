@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
 import class Foundation.JSONEncoder
-import RequestDLInternals
 #endif
 
 struct EncodablePayloadFactory: Sendable, PayloadFactory {

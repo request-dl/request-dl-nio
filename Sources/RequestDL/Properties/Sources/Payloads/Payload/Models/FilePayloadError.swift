@@ -2,11 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.URL
-import RequestDLInternals
 #endif
 
 /// An error thrown when RequestDL cannot read the file behind a `Form` or `Payload` file upload.
