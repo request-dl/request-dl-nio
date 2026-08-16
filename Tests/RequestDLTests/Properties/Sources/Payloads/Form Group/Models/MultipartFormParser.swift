@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

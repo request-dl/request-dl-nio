@@ -5,7 +5,8 @@
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 struct InternalsDataStreamTests {
 

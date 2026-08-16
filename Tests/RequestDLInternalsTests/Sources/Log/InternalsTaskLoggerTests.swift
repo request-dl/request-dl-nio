@@ -5,27 +5,25 @@
 import Logging
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
 
 struct InternalsTaskLoggerTests {
 
-    private func makeTaskLogger(baseURL: String = "https://apple.com") -> Internals.TaskLogger {
-        var requestConfiguration = RequestConfiguration()
-        requestConfiguration.baseURL = baseURL
-
-        return Internals.TaskLogger(
-            requestConfiguration: requestConfiguration,
+    private func makeTaskLogger(
+        baseURL: String = "https://apple.com",
+        pathComponents: [String] = []
+    ) -> Internals.TaskLogger {
+        Internals.TaskLogger(
+            baseURL: baseURL,
+            pathComponents: pathComponents,
             logger: Logger(label: "RequestDL.Tests")
         )!
     }
 
     @Test
     func initWithoutLoggerReturnsNil() {
-        // Given
-        let requestConfiguration = RequestConfiguration()
-
         // When
-        let taskLogger = Internals.TaskLogger(requestConfiguration: requestConfiguration, logger: nil)
+        let taskLogger = Internals.TaskLogger(baseURL: "https://apple.com", pathComponents: [], logger: nil)
 
         // Then
         #expect(taskLogger == nil)

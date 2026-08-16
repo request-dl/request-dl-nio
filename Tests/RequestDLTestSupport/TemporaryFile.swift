@@ -2,10 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import SystemPackage
-import Testing
-
-@testable import RequestDL
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

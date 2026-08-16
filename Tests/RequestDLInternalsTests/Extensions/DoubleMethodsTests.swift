@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
 
 struct DoubleMethodsTests {
 

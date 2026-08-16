@@ -5,6 +5,8 @@
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -14,13 +16,37 @@ import struct Foundation.UUID
 import struct Foundation.URL
 #endif
 
+/// Executes `requestConfiguration` through `session` with caching bypassed, mirroring the
+/// cache-then-execute orchestration `RawTask.result()` performs -- this file drives
+/// `Internals.Session` directly (no `Property` tree to resolve), so it takes over just the
+/// `client()` + `execute(client:request:...)` half of that pipeline.
+private func execute(
+    session: Internals.Session,
+    requestConfiguration: RequestConfiguration
+) async throws -> AsyncResponse {
+    let client = try await session.client()
+    let request = try requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
+
+    let task = try await session.execute(
+        client: client,
+        request: request,
+        url: requestConfiguration.url,
+        readingMode: requestConfiguration.readingMode,
+        uploadingBytes: requestConfiguration.body?.totalSize ?? .zero,
+        cache: nil,
+        logger: nil
+    )
+
+    return AsyncResponse(seed: task.seed, response: task.response)
+}
+
 // `session_whenUploadingFile_shouldBeValid` pushes 100MB through the same 2-thread event loop
 // group (`Session.provider`, see below) that the other three tests here use for a prompt
 // response; swift-testing runs `@Test`s in a suite concurrently by default, and the upload
 // starves the group's threads until the others hit `connectTimeout`. `.serialized` keeps this
 // suite's tests from overlapping, which the connection-pool tuning below alone didn't fix.
 @Suite(.serialized)
-struct InternalsSessionTests {
+struct SessionExecutionTests {
 
     final class TestState: Sendable {
 
@@ -52,7 +78,7 @@ struct InternalsSessionTests {
             // 10s default connect timeout can be too tight for this suite's requests when heavy
             // CI contention queues its TLS handshake behind other suites' traffic (ci-triage/
             // TASKS.md T1b).
-            configuration.timeout.connect = .seconds(60)
+            configuration.timeout.connect = 60_000_000_000
 
             session = Internals.Session(
                 provider: .identified("com.requestdl.tests.local-server", numberOfThreads: 2),
@@ -76,13 +102,7 @@ struct InternalsSessionTests {
         requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
 
         // When
-        let task = try await session.execute(
-            requestConfiguration: requestConfiguration,
-            dataCache: .init(),
-            logger: nil
-        )
-
-        let result = try await Array(task())
+        let result = try await Array(execute(session: session, requestConfiguration: requestConfiguration))
 
         // Then
         #expect(result.count == 1)
@@ -111,13 +131,7 @@ struct InternalsSessionTests {
         ])
 
         // When
-        let task = try await session.execute(
-            requestConfiguration: requestConfiguration,
-            dataCache: .init(),
-            logger: nil
-        )
-
-        let result = try await Array(task())
+        let result = try await Array(execute(session: session, requestConfiguration: requestConfiguration))
 
         // Then
         let uploadSteps = result.compactMap { step -> UploadStep? in
@@ -156,12 +170,7 @@ struct InternalsSessionTests {
         requestConfiguration.body = RequestBody(buffers: [])
 
         // When
-        let task = try await session.execute(
-            requestConfiguration: requestConfiguration,
-            dataCache: .init(),
-            logger: nil
-        )
-        let result = try await Array(task())
+        let result = try await Array(execute(session: session, requestConfiguration: requestConfiguration))
 
         // Then
         #expect(result.count == 1)
@@ -225,16 +234,12 @@ struct InternalsSessionTests {
             configuration: configuration
         )
 
-        let task = try await session.execute(
-            requestConfiguration: requestConfiguration,
-            dataCache: .init(),
-            logger: nil
-        )
+        let asyncResponse = try await execute(session: session, requestConfiguration: requestConfiguration)
 
         var uploadedBytes: [Int] = []
         var download: (ResponseHead, Data)?
 
-        for try await result in task() {
+        for try await result in asyncResponse {
             switch result {
             case .upload(let step):
                 print("Send \(step.chunkSize) bytes of \(step.totalSize) (\(uploadedBytes.count))")
@@ -302,15 +307,11 @@ struct InternalsSessionTests {
             configuration: configuration
         )
 
-        let task = try await session.execute(
-            requestConfiguration: requestConfiguration,
-            dataCache: .init(),
-            logger: nil
-        )
+        let asyncResponse = try await execute(session: session, requestConfiguration: requestConfiguration)
 
         var download: (ResponseHead, Data)?
 
-        for try await result in task() {
+        for try await result in asyncResponse {
             if case .download(let step) = result {
                 download = (step.head, try await Data(Array(step.bytes).joined()))
             }

@@ -6,7 +6,8 @@ import NIOCore
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

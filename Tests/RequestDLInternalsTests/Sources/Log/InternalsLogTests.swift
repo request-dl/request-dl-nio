@@ -6,7 +6,8 @@ import Logging
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 struct InternalsLogTests {
 
@@ -102,10 +103,10 @@ struct InternalsLogTests {
         let log = Internals.Log.cantOpenCertificateFile("cert.pem", SomeBundle())
 
         // When
-        await Logger.withTesting(
+        await Logger.withTestHandler(
             recorded: { captured.wrappedValue = $0 },
-            perform: {
-                log.log(level: .error, logger: RequestEnvironmentValues.current.logger)
+            perform: { logger in
+                log.log(level: .error, logger: logger)
             }
         )
 
@@ -124,13 +125,13 @@ struct InternalsLogTests {
         let log = Internals.Log.cantOpenCertificateFile("cert.pem", SomeBundle())
 
         // When
-        await Logger.withTesting(
+        await Logger.withTestHandler(
             recorded: { capturedMetadata.wrappedValue = $0 },
-            perform: {
+            perform: { logger in
                 Internals.Override.AssertionFailure.replace { message, _, _ in
                     capturedAssertion.wrappedValue = message
                 } perform: {
-                    log.assertionFailure(logger: RequestEnvironmentValues.current.logger)
+                    log.assertionFailure(logger: logger)
                 }
             }
         )

@@ -6,7 +6,8 @@ import AsyncHTTPClient
 import NIOCore
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -58,8 +59,8 @@ struct InternalsSessionConfigurationTests {
         // Given
         var configuration = Internals.Session.Configuration()
 
-        let connect = UnitTime.seconds(60)
-        let read = UnitTime.seconds(60)
+        let connect: Int64 = 60_000_000_000
+        let read: Int64 = 60_000_000_000
 
         let timeout = Internals.Timeout(
             connect: connect,
@@ -72,8 +73,8 @@ struct InternalsSessionConfigurationTests {
         let builtConfiguration = try configuration.build()
 
         // Then
-        #expect(builtConfiguration.timeout.connect == connect.build())
-        #expect(builtConfiguration.timeout.read == read.build())
+        #expect(builtConfiguration.timeout.connect == .nanoseconds(connect))
+        #expect(builtConfiguration.timeout.read == .nanoseconds(read))
     }
 
     @Test

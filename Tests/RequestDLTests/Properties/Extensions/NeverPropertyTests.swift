@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
 
 struct NeverPropertyTests {
 

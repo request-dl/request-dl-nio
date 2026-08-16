@@ -106,11 +106,15 @@ let package = Package(
             name: "RequestDLTestSupport",
             dependencies: [
                 "RequestDLInternals",
+                "RequestDL",
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
                 .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "Logging", package: "swift-log"),
             ],
             path: "Tests/RequestDLTestSupport",
@@ -121,6 +125,7 @@ let package = Package(
             name: "RequestDLTests",
             dependencies: [
                 "RequestDL",
+                "RequestDLInternals",
                 "RequestDLTestSupport",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
@@ -132,8 +137,19 @@ let package = Package(
             dependencies: [
                 "RequestDLInternals",
                 "RequestDLTestSupport",
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                .product(name: "Logging", package: "swift-log"),
             ],
-            path: "Tests/RequestDLInternalsTests"
+            path: "Tests/RequestDLInternalsTests",
+            resources: [.process("Resources")]
         ),
     ]
 )

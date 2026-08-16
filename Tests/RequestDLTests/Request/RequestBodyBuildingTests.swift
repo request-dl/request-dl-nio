@@ -5,6 +5,8 @@
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -12,7 +14,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-struct InternalsBodyTests {
+struct RequestBodyBuildingTests {
 
     @Test
     func requestBody_whenSmallBody_shouldSendItInASingleChunk() async throws {

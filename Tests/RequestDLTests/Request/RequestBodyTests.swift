@@ -6,6 +6,7 @@ import NIOCore
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
 
 struct RequestBodyTests {
 

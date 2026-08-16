@@ -7,6 +7,8 @@ import NIOSSL
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
+@testable import RequestDLTestSupport
 
 struct SecureConnectionTests {
 

@@ -6,6 +6,7 @@ import NIOSSL
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
 
 struct PSKIdentityTests {
 

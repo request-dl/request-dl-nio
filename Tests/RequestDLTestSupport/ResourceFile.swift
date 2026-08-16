@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-@testable import RequestDL
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -15,18 +15,21 @@ import struct Foundation.URL
 /// through `Bundle.module` — the resource bundle machinery needs `Foundation`, which is not
 /// part of `FoundationEssentials`.
 ///
-/// Anchored on the `RequestDLTests` path component rather than a fixed number of
+/// Anchored on the `Tests` path component rather than a fixed number of
 /// `deletingLastPathComponent()` calls, so a fixture consumer moving to a different
-/// subdirectory does not silently point at the wrong place.
+/// subdirectory does not silently point at the wrong place. The fixtures themselves live
+/// under `RequestDLTests/Resources` regardless of which test target this file is compiled
+/// into, since that is the one target declaring them as processed resources.
 let testResourcesDirectory: URL = {
     let components = #filePath.split(separator: "/")
 
-    guard let testsRootIndex = components.firstIndex(of: "RequestDLTests") else {
-        preconditionFailure("Expected '\(#filePath)' to live under a 'RequestDLTests' directory")
+    guard let testsRootIndex = components.firstIndex(of: "Tests") else {
+        preconditionFailure("Expected '\(#filePath)' to live under a 'Tests' directory")
     }
 
     let testsRootPath = "/" + components[0...testsRootIndex].joined(separator: "/")
     return URL(fileURLWithPath: testsRootPath, isDirectory: true)
+        .appendingPathComponent("RequestDLTests", isDirectory: true)
         .appendingPathComponent("Resources", isDirectory: true)
 }()
 

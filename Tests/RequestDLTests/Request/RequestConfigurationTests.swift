@@ -6,8 +6,9 @@ import NIOCore
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLInternals
 
-struct InternalsRequestTests {
+struct RequestConfigurationTests {
 
     @Test
     func request_whenInitURL_shouldBeEqual() async throws {

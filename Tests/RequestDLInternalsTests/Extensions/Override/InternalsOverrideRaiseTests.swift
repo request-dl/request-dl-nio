@@ -5,7 +5,7 @@
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
 
 #if DEBUG
 struct InternalsOverrideRaiseTests {

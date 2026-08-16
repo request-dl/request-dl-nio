@@ -5,6 +5,8 @@
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
+@testable import RequestDLTestSupport
 
 struct TimeoutTests {
 

@@ -2,11 +2,33 @@
 // See LICENSE for this package's licensing information.
 //
 
+import AsyncHTTPClient
 import NIOCore
 import NIOPosix
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+
+/// Executes a bare GET against `urlString` through `session`, mirroring what
+/// `RequestDL`'s `RawTask` does once it has resolved a `RequestConfiguration` into a plain
+/// `HTTPClient.Request` -- this file has no access to `RequestConfiguration` itself, since that
+/// type lives in `RequestDL`, which depends on this module rather than the other way around.
+private func execute(session: Internals.Session, urlString: String) async throws -> Internals.AsyncResponse {
+    let client = try await session.client()
+    let request = try HTTPClient.Request(url: urlString)
+
+    let task = try await session.execute(
+        client: client,
+        request: request,
+        url: urlString,
+        readingMode: .length(1_024),
+        uploadingBytes: .zero,
+        cache: nil,
+        logger: nil
+    )
+
+    return task.response
+}
 
 struct InternalsClientResponseReceiverTests {
 
@@ -18,26 +40,19 @@ struct InternalsClientResponseReceiverTests {
         // `ClientResponseReceiver` is still in its initial `.idle` state when `didReceiveError`
         // fires. A short connect timeout keeps this from riding out the client's full default.
         var configuration = Internals.Session.Configuration()
-        configuration.timeout.connect = .milliseconds(200)
+        configuration.timeout.connect = 200_000_000
 
         let session = Internals.Session(
             provider: .identified("com.requestdl.tests.connection-refused", numberOfThreads: 1),
             configuration: configuration
         )
 
-        var requestConfiguration = RequestConfiguration()
-        requestConfiguration.baseURL = "http://127.0.0.1:1"
-
         // When
-        let task = try await session.execute(
-            requestConfiguration: requestConfiguration,
-            dataCache: .init(),
-            logger: nil
-        )
+        let response = try await execute(session: session, urlString: "http://127.0.0.1:1")
 
         // Then
         await #expect(throws: (any Error).self) {
-            for try await _ in task() {}
+            for try await _ in response {}
         }
     }
 
@@ -53,19 +68,12 @@ struct InternalsClientResponseReceiverTests {
                 configuration: .init()
             )
 
-            var requestConfiguration = RequestConfiguration()
-            requestConfiguration.baseURL = "http://127.0.0.1:\(port)"
-
             // When
-            let task = try await session.execute(
-                requestConfiguration: requestConfiguration,
-                dataCache: .init(),
-                logger: nil
-            )
+            let response = try await execute(session: session, urlString: "http://127.0.0.1:\(port)")
 
             // Then
             await #expect(throws: (any Error).self) {
-                for try await _ in task() {}
+                for try await _ in response {}
             }
         }
     }
@@ -81,21 +89,14 @@ struct InternalsClientResponseReceiverTests {
                 configuration: .init()
             )
 
-            var requestConfiguration = RequestConfiguration()
-            requestConfiguration.baseURL = "http://127.0.0.1:\(port)"
-
             // When
-            let task = try await session.execute(
-                requestConfiguration: requestConfiguration,
-                dataCache: .init(),
-                logger: nil
-            )
+            let response = try await execute(session: session, urlString: "http://127.0.0.1:\(port)")
 
             // Then
             // The truncated body surfaces while draining `step.bytes`, not at the top-level
-            // `task()` sequence itself — the head alone arrives intact.
+            // `response` sequence itself — the head alone arrives intact.
             await #expect(throws: (any Error).self) {
-                for try await step in task() {
+                for try await step in response {
                     guard case .download(let download) = step else { continue }
                     for try await _ in download.bytes {}
                 }
@@ -114,19 +115,12 @@ struct InternalsClientResponseReceiverTests {
                 configuration: .init()
             )
 
-            var requestConfiguration = RequestConfiguration()
-            requestConfiguration.baseURL = "http://127.0.0.1:\(port)"
-
             // When
-            let task = try await session.execute(
-                requestConfiguration: requestConfiguration,
-                dataCache: .init(),
-                logger: nil
-            )
+            let response = try await execute(session: session, urlString: "http://127.0.0.1:\(port)")
 
             // Then
             await #expect(throws: (any Error).self) {
-                for try await step in task() {
+                for try await step in response {
                     guard case .download(let download) = step else { continue }
                     for try await _ in download.bytes {}
                 }

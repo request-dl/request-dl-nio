@@ -2,9 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import AsyncHTTPClient
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -37,7 +39,7 @@ struct LocalServerConcurrencyTests {
 
         var mutableConfiguration = Internals.Session.Configuration()
         mutableConfiguration.secureConnection = secureConnection
-        mutableConfiguration.timeout.connect = .seconds(60)
+        mutableConfiguration.timeout.connect = 60_000_000_000
         let configuration = mutableConfiguration
 
         let clock = ContinuousClock()
@@ -57,19 +59,29 @@ struct LocalServerConcurrencyTests {
                         configuration: configuration
                     )
 
-                    var requestConfiguration = RequestConfiguration()
-                    requestConfiguration.baseURL = "https://\(localServer.baseURL)"
-                    requestConfiguration.pathComponents = [
-                        uri.trimmingCharacters(in: .init(charactersIn: "/"))
-                    ]
+                    let client = try await session.client()
+
+                    let request = try HTTPClient.Request(
+                        url: "https://\(localServer.baseURL)/\(uri.trimmingCharacters(in: .init(charactersIn: "/")))"
+                    )
 
                     let task = try await session.execute(
-                        requestConfiguration: requestConfiguration,
-                        dataCache: .init(),
+                        client: client,
+                        request: request,
+                        url: request.url.absoluteString,
+                        readingMode: .length(1_024),
+                        uploadingBytes: .zero,
+                        cache: nil,
                         logger: nil
                     )
 
-                    return try await Array(task()).count
+                    var count = 0
+
+                    for try await _ in task.response {
+                        count += 1
+                    }
+
+                    return count
                 }
             }
 

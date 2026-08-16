@@ -7,6 +7,7 @@ import NIOPosix
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
 
 struct SessionTests {
 

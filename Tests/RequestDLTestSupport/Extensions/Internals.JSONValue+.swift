@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-@testable import RequestDL
+import RequestDLInternals
 
 extension Internals.JSONValue {
 

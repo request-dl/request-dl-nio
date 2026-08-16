@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
 
 #if canImport(Darwin)
 import class Foundation.Bundle

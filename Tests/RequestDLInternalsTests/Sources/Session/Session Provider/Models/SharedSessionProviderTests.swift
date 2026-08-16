@@ -6,7 +6,7 @@ import NIOCore
 import NIOPosix
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
 
 #if canImport(Darwin)
 import NIOTransportServices

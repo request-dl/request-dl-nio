@@ -6,6 +6,8 @@ import NIOSSL
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

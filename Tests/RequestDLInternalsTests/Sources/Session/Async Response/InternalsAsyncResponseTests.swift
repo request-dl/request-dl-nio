@@ -4,7 +4,8 @@
 
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -96,7 +97,7 @@ struct InternalsAsyncResponseTests {
             url: "https://127.0.0.1",
             status: .init(code: 200, reason: "OK"),
             version: .init(minor: .zero, major: 1),
-            headers: .init([("Content-Length", String(data.count))]),
+            headers: [.init(name: "Content-Length", value: String(data.count))],
             isKeepAlive: false
         )
 

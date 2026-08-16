@@ -6,6 +6,8 @@ import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
+import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

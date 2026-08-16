@@ -5,7 +5,8 @@
 import NIOSSL
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -76,7 +77,7 @@ struct InternalsCertificateTests {
     }
 
     @Test
-    func certificate_whenFileDoesNotExist_shouldThrowSecureFileErrorWithPath() async throws {
+    func certificate_whenFileDoesNotExist_shouldThrowSecureFileLoadErrorWithPath() async throws {
         try await withTemporaryFileURL("missing.pem", createPath: false) { url in
             // Given
             let path = url.absolutePath(percentEncoded: false)
@@ -85,22 +86,20 @@ struct InternalsCertificateTests {
             do {
                 _ = try Internals.Certificate(path, format: .pem).build()
                 Issue.record("Not expecting success")
-            } catch let error as SecureFileError {
+            } catch let error as Internals.SecureFileLoadError {
                 // Then
+                // The finer-grained classification (relative-path detection, "can't open" vs.
+                // "invalid contents") lives entirely in `RequestDL.SecureFileError.init`, built
+                // from exactly this `resource`/`path`/`underlying` triple -- see
+                // `SecureFileErrorTests` in `RequestDLTests` for that coverage.
                 #expect(error.resource == .certificate)
                 #expect(error.path == path)
-                #expect(error.isRelativePath == false)
-
-                guard case .cantOpenFile = error.context else {
-                    Issue.record("Expected .cantOpenFile, got \(error.context)")
-                    return
-                }
             }
         }
     }
 
     @Test
-    func certificate_whenFileContentsAreInvalid_shouldThrowSecureFileErrorWithInvalidContents() async throws {
+    func certificate_whenFileContentsAreInvalid_shouldThrowSecureFileLoadErrorWithUnderlyingError() async throws {
         try await withTemporaryFileURL("invalid.pem") { url in
             // Given
             try await url.write(Data("not a certificate".utf8))
@@ -110,15 +109,10 @@ struct InternalsCertificateTests {
             do {
                 _ = try Internals.Certificate(path, format: .pem).build()
                 Issue.record("Not expecting success")
-            } catch let error as SecureFileError {
+            } catch let error as Internals.SecureFileLoadError {
                 // Then
                 #expect(error.resource == .certificate)
                 #expect(error.path == path)
-
-                guard case .invalidContents = error.context else {
-                    Issue.record("Expected .invalidContents, got \(error.context)")
-                    return
-                }
             }
         }
     }

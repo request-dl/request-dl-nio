@@ -5,7 +5,8 @@
 import NIOCore
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 struct InternalsClientManagerTests {
 
@@ -40,7 +41,7 @@ struct InternalsClientManagerTests {
         let sessionConfiguration1 = Internals.Session.Configuration()
 
         var sessionConfiguration2 = Internals.Session.Configuration()
-        sessionConfiguration2.timeout.connect = .seconds(1_000)
+        sessionConfiguration2.timeout.connect = 1_000_000_000_000
 
         // When
         let sut1 = try await manager.client(

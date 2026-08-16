@@ -5,7 +5,8 @@
 import NIOSSL
 import Testing
 
-@testable import RequestDL
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -160,7 +161,7 @@ struct InternalsPrivateKeyTests {
     }
 
     @Test
-    func private_whenFileDoesNotExist_shouldThrowSecureFileErrorWithPath() async throws {
+    func private_whenFileDoesNotExist_shouldThrowSecureFileLoadErrorWithPath() async throws {
         try await withTemporaryFileURL("missing.pem", createPath: false) { url in
             // Given
             let path = url.absolutePath(percentEncoded: false)
@@ -169,22 +170,20 @@ struct InternalsPrivateKeyTests {
             do {
                 _ = try Internals.PrivateKey(path, format: .pem).build()
                 Issue.record("Not expecting success")
-            } catch let error as SecureFileError {
+            } catch let error as Internals.SecureFileLoadError {
                 // Then
+                // Relative-path detection and "can't open" vs. "invalid contents"
+                // classification live entirely in `RequestDL.SecureFileError.init`, built from
+                // exactly this `resource`/`path`/`underlying` triple -- see `SecureFileErrorTests`
+                // in `RequestDLTests` for that coverage.
                 #expect(error.resource == .privateKey)
                 #expect(error.path == path)
-                #expect(error.isRelativePath == false)
-
-                guard case .cantOpenFile = error.context else {
-                    Issue.record("Expected .cantOpenFile, got \(error.context)")
-                    return
-                }
             }
         }
     }
 
     @Test
-    func private_whenRelativePathDoesNotExist_shouldReportRelativePath() async throws {
+    func private_whenRelativePathDoesNotExist_shouldPropagatePathUnchanged() async throws {
         // Given
         let path = "definitely-not-a-real-private-key.pem"
 
@@ -192,9 +191,9 @@ struct InternalsPrivateKeyTests {
         do {
             _ = try Internals.PrivateKey(path, format: .pem).build()
             Issue.record("Not expecting success")
-        } catch let error as SecureFileError {
+        } catch let error as Internals.SecureFileLoadError {
             // Then
-            #expect(error.isRelativePath == true)
+            #expect(error.path == path)
         }
     }
 
