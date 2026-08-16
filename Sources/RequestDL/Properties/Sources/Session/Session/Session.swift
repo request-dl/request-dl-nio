@@ -161,6 +161,20 @@ public struct Session: Property {
         edit { $0.decompression = .enabled(decompressionLimit.build()) }
     }
 
+    ///
+    /// Compresses the outgoing request body before it's sent over the wire, setting the
+    /// `Content-Encoding` header accordingly.
+    ///
+    /// This is independent of which `Payload` source produced the body (`Data`/`JSON`/`String`/
+    /// `File`/`Form`) and only applies to connections negotiated as HTTP/1.1.
+    ///
+    /// - Parameter algorithm: The algorithm used to compress the request body.
+    /// - Returns: The modified `Session` instance with request-body compression configured.
+    ///
+    public func compression(_ algorithm: CompressionAlgorithm) -> Self {
+        edit { $0.compression = .enabled(algorithm.build()) }
+    }
+
     // MARK: - Private properties
 
     private func edit(

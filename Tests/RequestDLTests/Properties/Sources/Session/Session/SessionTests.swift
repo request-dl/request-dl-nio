@@ -221,6 +221,46 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenCompressionDefault_shouldBeDisabled() async throws {
+        // Given
+        let property = Session()
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compression == .disabled)
+    }
+
+    @Test
+    func session_whenCompressionGzip_shouldBeValid() async throws {
+        // Given
+        let algorithm = Session.CompressionAlgorithm.gzip
+        let property = Session()
+            .compression(algorithm)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
+    }
+
+    @Test
+    func session_whenCompressionDeflate_shouldBeValid() async throws {
+        // Given
+        let algorithm = Session.CompressionAlgorithm.deflate
+        let property = Session()
+            .compression(algorithm)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
+    }
+
+    @Test
     func session_whenNeverBody_shouldBeNever() async throws {
         // Given
         let property = Session()
