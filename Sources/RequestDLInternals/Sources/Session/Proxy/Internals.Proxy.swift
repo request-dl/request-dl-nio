@@ -3,10 +3,11 @@
 //
 
 import AsyncHTTPClient
+import NIOHTTP1
 
 extension Internals {
 
-    package struct Proxy: Sendable, Hashable {
+    package struct Proxy: Sendable {
 
         package enum Authorization: Sendable, Hashable {
 
@@ -36,33 +37,57 @@ extension Internals {
         package let connectionProtocol: ConnectionProtocol
         package let authorization: Authorization?
 
+        /// Extra headers sent only on the HTTP `CONNECT` request to an `.http` proxy.
+        ///
+        /// Ignored for `.socks`, which has no `CONNECT` phase. Excluded from `Hashable`, same as
+        /// upstream's own `HTTPClient.Configuration.Proxy` — `NIOHTTP1.HTTPHeaders` isn't `Hashable`.
+        package let connectHeaders: HTTPHeaders
+
         package init(
             host: String,
             port: Int,
             connection connectionProtocol: ConnectionProtocol,
-            authorization: Authorization?
+            authorization: Authorization?,
+            connectHeaders: HTTPHeaders = [:]
         ) {
             self.host = host
             self.port = port
             self.connectionProtocol = connectionProtocol
             self.authorization = authorization
+            self.connectHeaders = connectHeaders
         }
 
         package func build() -> HTTPClient.Configuration.Proxy {
             switch connectionProtocol {
             case .http:
-                if let authorization {
-                    return .server(
-                        host: host,
-                        port: port,
-                        authorization: authorization.build()
-                    )
-                } else {
-                    return .server(host: host, port: port)
-                }
+                return .server(
+                    host: host,
+                    port: port,
+                    authorization: authorization?.build(),
+                    connectHeaders: connectHeaders
+                )
             case .socks:
                 return .socksServer(host: host, port: port)
             }
         }
+    }
+}
+
+// MARK: - Hashable
+
+extension Internals.Proxy: Hashable {
+
+    package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.host == rhs.host
+            && lhs.port == rhs.port
+            && lhs.connectionProtocol == rhs.connectionProtocol
+            && lhs.authorization == rhs.authorization
+    }
+
+    package func hash(into hasher: inout Hasher) {
+        hasher.combine(host)
+        hasher.combine(port)
+        hasher.combine(connectionProtocol)
+        hasher.combine(authorization)
     }
 }
