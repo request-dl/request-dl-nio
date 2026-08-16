@@ -4,6 +4,8 @@
 
 #if canImport(Darwin)
 import Darwin
+#elseif canImport(Android)
+@preconcurrency import Android
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
@@ -67,6 +69,8 @@ extension Internals.Override {
     fileprivate static func systemRaise(_ value: Int32) -> Int32 {
         #if canImport(Darwin)
         return Darwin.raise(value)
+        #elseif canImport(Android)
+        return Android.raise(value)
         #elseif canImport(Glibc)
         return Glibc.raise(value)
         #elseif canImport(Musl)
