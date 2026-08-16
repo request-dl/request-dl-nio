@@ -3,7 +3,6 @@
 //
 
 import NIOCore
-
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)

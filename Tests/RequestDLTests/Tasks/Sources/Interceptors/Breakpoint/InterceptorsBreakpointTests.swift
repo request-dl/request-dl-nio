@@ -2,11 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
-import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

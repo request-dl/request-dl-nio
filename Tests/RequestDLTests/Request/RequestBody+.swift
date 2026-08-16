@@ -5,10 +5,10 @@
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
+import RequestDLInternals
 import SwiftAsyncStream
 
 @testable import RequestDL
-import RequestDLInternals
 @testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)

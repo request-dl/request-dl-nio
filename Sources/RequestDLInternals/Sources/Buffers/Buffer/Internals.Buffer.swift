@@ -676,7 +676,8 @@ extension Internals.Buffer {
     /// Overwrites bytes already in the buffer, leaving this cursor where it was.
     /// - Warning: Same caveat as ``setData(_:at:)``.
     /// - Precondition: `index` is not negative.
-    package func setBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes, at index: Int) async where Bytes.Element == UInt8 {
+    package func setBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes, at index: Int) async
+    where Bytes.Element == UInt8 {
         precondition(index >= .zero, "Buffer index \(index) is negative")
         _ = await storage.write(at: UInt64(index), data: Data(bytes))
     }

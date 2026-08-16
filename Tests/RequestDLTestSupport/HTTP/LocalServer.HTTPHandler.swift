@@ -5,7 +5,6 @@
 import NIO
 import NIOConcurrencyHelpers
 import NIOHTTP1
-
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)

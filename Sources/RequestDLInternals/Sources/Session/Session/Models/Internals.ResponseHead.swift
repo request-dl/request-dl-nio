@@ -67,7 +67,8 @@ extension Internals {
         package func headerValues(named name: String) -> [String] {
             let name = name.lowercased()
 
-            return headers
+            return
+                headers
                 .filter { $0.name.lowercased() == name }
                 .map(\.value)
         }

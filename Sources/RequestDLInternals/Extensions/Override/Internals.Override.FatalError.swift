@@ -28,7 +28,8 @@ extension Internals.Override {
             try await $closure.withValue(closure, operation: perform)
         }
 
-        package static func replace<T>(with closure: @escaping Closure, perform: @Sendable () throws -> T) rethrows -> T {
+        package static func replace<T>(with closure: @escaping Closure, perform: @Sendable () throws -> T) rethrows -> T
+        {
             try $closure.withValue(closure, operation: perform)
         }
     }
@@ -55,7 +56,8 @@ extension Internals.Override {
 extension Internals {
 
     /// Stops the process over a bug in this package, as opposed to a misuse of it by the caller.
-    package static func preconditionFailure(_ message: String, file: StaticString = #file, line: UInt = #line) -> Never {
+    package static func preconditionFailure(_ message: String, file: StaticString = #file, line: UInt = #line) -> Never
+    {
         #if DEBUG
         Internals.Override.fatalError("🐞 RequestDL bug: \(message)", file: file, line: line)
         #else

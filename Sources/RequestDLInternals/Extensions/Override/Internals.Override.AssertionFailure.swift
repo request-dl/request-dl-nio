@@ -25,7 +25,8 @@ extension Internals.Override {
             try await $closure.withValue(closure, operation: perform)
         }
 
-        package static func replace<T>(with closure: @escaping Closure, perform: @Sendable () throws -> T) rethrows -> T {
+        package static func replace<T>(with closure: @escaping Closure, perform: @Sendable () throws -> T) rethrows -> T
+        {
             try $closure.withValue(closure, operation: perform)
         }
     }

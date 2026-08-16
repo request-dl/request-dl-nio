@@ -4,10 +4,10 @@
 
 import NIOCore
 import NIOSSL
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
-import RequestDLInternals
 @testable import RequestDLTestSupport
 
 struct SecureConnectionTests {

@@ -3,10 +3,10 @@
 //
 
 import NIOCore
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
-import RequestDLInternals
 
 struct RequestBodyTests {
 

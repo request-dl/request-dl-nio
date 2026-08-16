@@ -83,7 +83,8 @@ extension Internals {
             }
         }
 
-        package func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void> {
+        package func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void>
+        {
             decide {
                 guard
                     ([.idle, .uploading].contains(_state) && _phase == .upload)
@@ -129,7 +130,8 @@ extension Internals {
             return task.eventLoop.makeSucceededVoidFuture()
         }
 
-        package func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void> {
+        package func didReceiveBodyPart(task: HTTPClient.Task<Response>, _ buffer: ByteBuffer) -> EventLoopFuture<Void>
+        {
             // Built before the lock, and synchronously.
             //
             // Wrapping a `ByteBuffer` costs nothing: the store is already in memory and the

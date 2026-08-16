@@ -3,10 +3,10 @@
 //
 
 import NIOSSL
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
-import RequestDLInternals
 
 struct PSKIdentityTests {
 

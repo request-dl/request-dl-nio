@@ -2,11 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
-import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

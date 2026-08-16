@@ -6,11 +6,11 @@ import Logging
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
-import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
