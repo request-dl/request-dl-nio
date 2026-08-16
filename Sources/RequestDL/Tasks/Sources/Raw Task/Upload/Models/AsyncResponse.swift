@@ -2,8 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// A structure that represents an asynchronous response.
 import RequestDLInternals
+
+/// A structure that represents an asynchronous response.
 
 public struct AsyncResponse: Sendable, AsyncSequence {
 
