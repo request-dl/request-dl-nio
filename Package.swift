@@ -136,7 +136,7 @@ let package = Package(
             name: "RequestDLInternalsTests",
             dependencies: [
                 "RequestDLInternals",
-                "RequestDLTestSupport"
+                "RequestDLTestSupport",
             ],
             path: "Tests/RequestDLInternalsTests",
             resources: [.process("Resources")]
