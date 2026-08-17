@@ -5,7 +5,6 @@
 import RequestDLInternals
 
 /// A structure that represents an asynchronous response.
-
 public struct AsyncResponse: Sendable, AsyncSequence {
 
     ///

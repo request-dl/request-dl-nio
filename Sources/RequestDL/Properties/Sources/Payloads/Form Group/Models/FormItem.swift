@@ -5,7 +5,6 @@
 import RequestDLInternals
 
 /// One part of a `multipart/form-data` body: its headers and its bytes.
-
 struct FormItem: Sendable {
 
     struct Output {
