@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// One part of a `multipart/form-data` body: its headers and its bytes.
 import RequestDLInternals
 
+/// One part of a `multipart/form-data` body: its headers and its bytes.
 struct FormItem: Sendable {
 
     struct Output {

@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// A structure that represents default trust roots.
 import RequestDLInternals
 
+/// A structure that represents default trust roots.
 public struct DefaultTrustRoots: Property {
 
     private struct Node: SecureConnectionPropertyNode {
