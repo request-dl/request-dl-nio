@@ -3,13 +3,12 @@
 //
 
 import NIOSSL
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
-#if canImport(Darwin)
+#elseif canImport(Darwin)
 import class Foundation.Bundle
-#endif
 #endif
 
 /// A struct representing a private key for `SecureConnection` configuration.

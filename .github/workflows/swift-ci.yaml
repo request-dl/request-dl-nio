@@ -52,6 +52,7 @@ jobs:
       package-name: "request-dl"
       xcode-version: '26.6'
       apple-coverage-enabled: true
+      apple-tests-parallel-testing-worker-count: '2'
 
       # Step 3 – Third Party
       enable-third-party-tests: true
@@ -59,6 +60,9 @@ jobs:
 
       # Step 3 – Linkage Test (renomeado de test-foundation-essentials)
       enable-linkage-test: true
+
+      # Step 3 – Android Build
+      enable-android-build: true
 
       # Step 4
       enable-coverage-upload: true

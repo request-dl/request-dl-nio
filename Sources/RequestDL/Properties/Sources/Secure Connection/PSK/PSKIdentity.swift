@@ -3,6 +3,7 @@
 //
 
 import NIOSSL
+import RequestDLInternals
 
 /// A struct representing a pre-shared key (PSK).
 public struct PSKIdentity: Property {

@@ -2,9 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -234,6 +236,168 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenInitPayloadEncoder() async throws {
+        // Given
+        let verbatim = "Hello world!"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: PayloadEncoderMock()
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-mock"]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenInitPayloadEncoderWithCustomType() async throws {
+        // Given
+        let verbatim = "Hello world!"
+        let customType = ContentType("application/x-mock+request-dl")
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: PayloadEncoderMock(),
+                    contentType: customType
+                )
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        // A `contentType` passed at the call site overrides the encoder's own
+        // `PayloadEncoder/contentType`.
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == [String(customType)]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenPayloadEncoderThrows() async throws {
+        // Given
+        var encodingError: EncodingPayloadError?
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        // Anything but a `String` triggers `PayloadEncoderMock`'s error path.
+                        42,
+                        encoder: PayloadEncoderMock()
+                    )
+                }
+            )
+        } catch let error as EncodingPayloadError {
+            encodingError = error
+        }
+
+        // Then
+        #expect(encodingError?.context == .invalidStringEncoding)
+    }
+
+    @Test
+    func payload_whenPayloadEncoderIsNil_usesEnvironmentDefault() async throws {
+        // Given
+        let verbatim = "Hello world!"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: nil
+                )
+                .payloadEncoder(PayloadEncoderMock())
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-mock"]
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenPayloadEncoderIsExplicit_overridesEnvironmentDefault() async throws {
+        // Given
+        let verbatim = "Hello world!"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    verbatim,
+                    encoder: PayloadEncoderMock(contentType: "application/x-explicit")
+                )
+                .payloadEncoder(PayloadEncoderMock(contentType: "application/x-environment"))
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        // The encoder passed directly to `Payload` wins over `.payloadEncoder(_:)`.
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/x-explicit"]
+        )
+
+        #expect(data == Data(verbatim.utf8))
+    }
+
+    @Test
+    func payload_whenPayloadEncoderIsNilAndNoEnvironmentDefault_throwsMissingPayloadEncoder() async throws {
+        // Given
+        var encodingError: EncodingPayloadError?
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        "Hello world!",
+                        encoder: nil
+                    )
+                }
+            )
+        } catch let error as EncodingPayloadError {
+            encodingError = error
+        }
+
+        // Then
+        #expect(encodingError?.context == .missingPayloadEncoder)
+    }
+
+    @Test
     func payload_whenInitString() async throws {
         // Given
         let verbatim = "Hello world!"
@@ -447,6 +611,36 @@ struct PayloadTests {
     }
 
     @Test
+    func payload_whenInitURLFileDoesNotExist_shouldThrowFilePayloadError() async throws {
+        // Given
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.missing.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        url: url,
+                        contentType: .octetStream
+                    )
+                }
+            )
+            Issue.record("Not expecting success")
+        } catch let error as FilePayloadError {
+            // Then
+            #expect(error.url == url)
+
+            guard case .notFound = error.context else {
+                Issue.record("Expected .notFound, got \(error.context)")
+                return
+            }
+        }
+    }
+
+    @Test
     func payload_whenInitURLWithCustomType() async throws {
         // Given
         let data = await Data.randomData(length: 1_024 * 1_024)
@@ -484,6 +678,117 @@ struct PayloadTests {
         )
 
         #expect(builtData == data)
+    }
+
+    @Test
+    func payload_whenInitURLWithOffset() async throws {
+        // Given
+        let data = await Data.randomData(length: 1_024 * 1_024)
+        let offset = 1_024 * 256
+
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+
+        try data.write(to: url)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    url: url,
+                    from: UInt64(offset),
+                    contentType: .octetStream
+                )
+            }
+        )
+
+        let builtData = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == ["application/octet-stream"]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == [String(data.count - offset)]
+        )
+
+        #expect(builtData == data[offset...])
+    }
+
+    @Test
+    func payload_whenInitURLWithOffsetAtEndOfFile() async throws {
+        // Given
+        let data = await Data.randomData(length: 1_024)
+
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+
+        try data.write(to: url)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    url: url,
+                    from: UInt64(data.count),
+                    contentType: .octetStream
+                )
+            }
+        )
+
+        let builtData = try await resolved.requestConfiguration.body?.data()
+
+        // Then
+        #expect(resolved.requestConfiguration.headers["Content-Length"] == nil)
+        #expect(builtData == Data())
+    }
+
+    @Test
+    func payload_whenInitURLWithOffsetPastEndOfFile() async throws {
+        // Given
+        let data = await Data.randomData(length: 1_024)
+
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("payload.\(UUID())")
+            .appendingPathExtension(".raw")
+
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+
+        try data.write(to: url)
+
+        var offsetError: InvalidPayloadOffsetError?
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Payload(
+                        url: url,
+                        from: UInt64(data.count) + 1,
+                        contentType: .octetStream
+                    )
+                }
+            )
+        } catch let error as InvalidPayloadOffsetError {
+            offsetError = error
+        }
+
+        // Then
+        #expect(offsetError?.offset == UInt64(data.count) + 1)
+        #expect(offsetError?.availableBytes == data.count)
     }
 
     @Test

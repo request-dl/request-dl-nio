@@ -134,6 +134,7 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 
 ### Certificate fundamentals
 - ``RequestDL/Certificate``
+- ``RequestDL/SecureFileError``
 
 ### Configuring the server trust
 

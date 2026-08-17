@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 /// A structure that represents default trust roots.
 public struct DefaultTrustRoots: Property {
 

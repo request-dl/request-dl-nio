@@ -3,6 +3,7 @@
 //
 
 import Dispatch
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL

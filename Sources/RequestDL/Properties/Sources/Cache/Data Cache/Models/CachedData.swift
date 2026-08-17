@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -109,7 +111,7 @@ public struct CachedData: Sendable {
                 minor: response.version.minor,
                 major: response.version.major
             ),
-            headers: response.headers,
+            headers: response.headers.map { Internals.ResponseHead.HeaderField(name: $0.name, value: $0.value) },
             isKeepAlive: response.isKeepAlive
         )
     }

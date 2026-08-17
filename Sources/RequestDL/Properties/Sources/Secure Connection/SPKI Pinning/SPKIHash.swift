@@ -3,6 +3,7 @@
 //
 
 import Crypto
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

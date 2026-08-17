@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 /// Turns a source value into the bytes of a request body, plus the content type describing them.
 ///
 /// ## When to declare a charset
@@ -31,6 +33,7 @@ struct PayloadInput {
     let method: String?
     let charset: Charset
     let urlEncoder: URLEncoder
+    let payloadEncoder: (any PayloadEncoder)?
 
     func jsonObject(_ array: [Any], contentType: ContentType) throws -> PayloadOutput {
         .init(

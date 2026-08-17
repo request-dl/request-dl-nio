@@ -4,6 +4,7 @@
 
 import AsyncHTTPClient
 import NIOCore
+import RequestDLInternals
 
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,

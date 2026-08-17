@@ -5,6 +5,7 @@
 #if canImport(Darwin)
 import struct Foundation.Data
 import class Foundation.JSONSerialization
+import RequestDLInternals
 
 /// Serialises a loosely typed JSON object.
 ///

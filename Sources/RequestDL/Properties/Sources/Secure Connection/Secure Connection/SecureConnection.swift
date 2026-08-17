@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import RequestDLInternals
 
 /// Represents a secure connection with various configuration options.
 public struct SecureConnection<Content: Property>: Property {

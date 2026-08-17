@@ -3,6 +3,7 @@
 //
 
 import Logging
+import RequestDLInternals
 
 protocol SecureConnectionCollectorPropertyNode: Sendable {
 

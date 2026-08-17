@@ -3,6 +3,7 @@
 //
 
 import AsyncHTTPClient
+import RequestDLInternals
 
 /// SPKI-based certificate pinning configuration for secure connections.
 ///

@@ -140,7 +140,7 @@ let result = try await MockedTask(
 print(result.payload)
 ```
 
-> Tip: ``RequestDL/MockedTask`` returns an ``RequestDL/AsyncResponse``, just like ``RequestDL/UploadTask``. Use ``RequestDL/RequestTask/collectData()`` to collapse it into a ``RequestDL/TaskResult`` the same way ``RequestDL/DataTask`` does.
+> Tip: ``RequestDL/MockedTask`` returns an ``RequestDL/AsyncResponse``, just like ``RequestDL/UploadTask``. Use ``RequestDL/RequestTask/collectData()-3viv5`` to collapse it into a ``RequestDL/TaskResult`` the same way ``RequestDL/DataTask`` does.
 
 Use the `headers` parameter to overlay something that is not part of the request itself — it takes precedence over a mirrored header with the same name. Use `delay` to simulate network latency, and ``RequestDL/MockedTask/init(throwing:delay:)`` to simulate a transport-level failure instead of a response:
 

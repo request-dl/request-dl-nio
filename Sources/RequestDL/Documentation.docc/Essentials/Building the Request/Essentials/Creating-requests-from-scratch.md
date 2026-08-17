@@ -163,7 +163,6 @@ Learn more in:
 
 - ``RequestDL/BaseURL``
 - ``RequestDL/URLScheme``
-- ``RequestDL/InternetProtocol``
 - ``RequestDL/BaseURLError``
 - ``RequestDL/FlexibleURL``
 - ``RequestDL/FlexibleURLError``
@@ -213,7 +212,10 @@ Learn more in:
 
 - ``RequestDL/Session``
 - ``RequestDL/Proxy``
+- ``RequestDL/SystemProxy``
 - ``RequestDL/DNSOverride``
+- ``RequestDL/URLOverride``
+- ``RequestDL/URLOverrideError``
 
 ### Adding request timeout
 

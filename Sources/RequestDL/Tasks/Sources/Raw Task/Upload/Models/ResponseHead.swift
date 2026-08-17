@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -149,7 +151,7 @@ public struct ResponseHead: Sendable, Hashable {
             url: .init(string: head.url),
             status: .init(head.status),
             version: .init(head.version),
-            headers: head.headers,
+            headers: HTTPHeaders(head.headers.map { ($0.name, $0.value) }),
             isKeepAlive: head.isKeepAlive
         )
     }

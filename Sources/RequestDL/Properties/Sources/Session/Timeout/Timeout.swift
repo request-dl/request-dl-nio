@@ -32,11 +32,11 @@ public struct Timeout: Property {
 
         func make(_ make: inout Make) async throws {
             if source.contains(.connect) {
-                make.sessionConfiguration.timeout.connect = timeout
+                make.sessionConfiguration.timeout.connect = timeout.nanoseconds
             }
 
             if source.contains(.read) {
-                make.sessionConfiguration.timeout.read = timeout
+                make.sessionConfiguration.timeout.read = timeout.nanoseconds
             }
         }
     }

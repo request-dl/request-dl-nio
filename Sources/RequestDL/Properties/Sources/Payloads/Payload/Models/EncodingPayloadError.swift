@@ -13,6 +13,10 @@ public struct EncodingPayloadError: Sendable, Error {
 
         /// The error occurred due to an invalid string encoding
         case invalidStringEncoding
+
+        /// `Payload(_:encoder:contentType:)` was called with `encoder: nil` and no default
+        /// ``PayloadEncoder`` was set via ``Property/payloadEncoder(_:)``.
+        case missingPayloadEncoder
     }
 
     /// The context of the error.

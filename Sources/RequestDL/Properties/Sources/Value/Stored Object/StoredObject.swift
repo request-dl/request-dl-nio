@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 /// A property wrapper that defines a stored object inside `Property` objects.
 ///
 /// This wrapper can be used to store any **class** inside the property declaration.
@@ -62,7 +64,7 @@ public struct StoredObject<Object: AnyObject & Sendable>: DynamicValue {
     ///
     /// Initializes a new `StoredObject` with the given object.
     ///
-    /// - Parameter wrappedValue: The object that will be stored in memory.
+    /// - Parameter thunk: The object that will be stored in memory.
     ///
     public init(wrappedValue thunk: @autoclosure @escaping @Sendable () -> Object) {
         self.thunk = thunk

@@ -1,0 +1,2 @@
+This directory exists so the RequestDLInternalsTests target has a non-empty resource bundle
+(Bundle.module), which BundleMethodsTests.swift exercises directly.

@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 struct CertificateNode: SecureConnectionCollectorPropertyNode {
 
     enum Source: Sendable, Hashable {
