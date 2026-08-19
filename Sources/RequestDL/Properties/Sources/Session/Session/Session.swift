@@ -108,7 +108,7 @@ public struct Session: Property {
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
     ///
-    public func enableNetworkFramework(_ enabled: Bool = true) -> some Property {
+    public func enableNetworkFramework(_ enabled: Bool = true) -> Self {
         edit { $0.enableNetworkFramework = enabled }
     }
 
