@@ -21,7 +21,7 @@ struct InternalsUnsafeTaskTests {
             )
 
             let request = try HTTPClient.Request(url: "http://127.0.0.1:\(port)/")
-            let unsafeTask = client.execute(request: request, logger: nil)
+            let unsafeTask = await client.execute(request: request, logger: nil)
 
             let responseTask = _Concurrency.Task {
                 try await unsafeTask.response()
@@ -52,8 +52,8 @@ struct InternalsUnsafeTaskTests {
             )
 
             let request = try HTTPClient.Request(url: "http://127.0.0.1:\(port)/")
-            let first = client.execute(request: request, logger: nil)
-            let second = client.execute(request: request, logger: nil)
+            let first = await client.execute(request: request, logger: nil)
+            let second = await client.execute(request: request, logger: nil)
             let firstCopy = first
 
             // Then
@@ -78,7 +78,7 @@ struct InternalsUnsafeTaskTests {
 /// A bare TCP server that accepts a connection and never writes anything back — used to keep a
 /// request genuinely in flight so it can be cancelled mid-request, something `LocalServer`
 /// cannot do, since it always answers immediately.
-private func withHangingServer<Result>(
+func withHangingServer<Result>(
     _ body: (Int) async throws -> Result
 ) async throws -> Result {
     let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -103,7 +103,7 @@ private func withHangingServer<Result>(
     }
 }
 
-private final class HangingServerHandler: ChannelInboundHandler, @unchecked Sendable {
+final class HangingServerHandler: ChannelInboundHandler, @unchecked Sendable {
 
     typealias InboundIn = ByteBuffer
 

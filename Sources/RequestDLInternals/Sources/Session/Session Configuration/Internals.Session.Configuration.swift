@@ -24,6 +24,7 @@ extension Internals.Session {
         package var networkFrameworkWaitForConnectivity: Bool?
         package var httpVersion: Internals.HTTPVersion?
         package var enableNetworkFramework: Bool = false
+        package var maximumConcurrentConnections: Int?
 
         // MARK: - Inits
 

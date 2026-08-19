@@ -69,7 +69,7 @@ extension Internals {
                 download: download.stream
             )
 
-            let unsafeTask = client.execute(
+            let unsafeTask = await client.execute(
                 request: request,
                 delegate: delegate,
                 logger: logger

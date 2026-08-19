@@ -106,6 +106,23 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenMaxConcurrentConnections_shouldBeValid() async throws {
+        // Given
+        let maximumConcurrentConnections = 4
+
+        let property = Session()
+            .maximumConcurrentConnections(maximumConcurrentConnections)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(
+            resolved.session.configuration.maximumConcurrentConnections == maximumConcurrentConnections
+        )
+    }
+
+    @Test
     func session_whenDisableRedirect_shouldBeValid() async throws {
         // Given
         let property = Session()
