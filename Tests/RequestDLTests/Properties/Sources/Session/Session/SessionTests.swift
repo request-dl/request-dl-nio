@@ -27,7 +27,6 @@ struct SessionTests {
         #expect(sut.timeout.connect == configuration.timeout.connect)
         #expect(sut.timeout.read == configuration.timeout.read)
         #expect(sut.proxy == configuration.proxy)
-        #expect(sut.ignoreUncleanSSLShutdown == configuration.ignoreUncleanSSLShutdown)
         #expect(
             String(describing: sut.decompression) == String(describing: configuration.decompression)
         )

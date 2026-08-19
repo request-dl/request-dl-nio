@@ -18,7 +18,6 @@ extension Internals.Session {
         package var timeout: Internals.Timeout = .init()
         package var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
-        package var ignoreUncleanSSLShutdown: Bool = false
         package var decompression: Internals.Decompression = .disabled
         package var compression: Internals.Compression = .disabled
         package var dnsOverride: [String: String] = [:]
@@ -34,14 +33,17 @@ extension Internals.Session {
         // MARK: - Internal methods
 
         package func build() throws -> HTTPClient.Configuration {
-            var configuration = try HTTPClient.Configuration(
-                tlsConfiguration: secureConnection?.build(),
+            let secureConnectionOutput = try secureConnection?.build()
+
+            var configuration = HTTPClient.Configuration.init(
+                tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
+                tlsPinning: secureConnectionOutput?.tlsPinning,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
                 connectionPool: connectionPool,
                 proxy: proxy?.build(),
-                ignoreUncleanSSLShutdown: ignoreUncleanSSLShutdown,
-                decompression: decompression.build()
+                decompression: decompression.build(),
+                tracing: .init()
             )
 
             configuration.dnsOverride = dnsOverride
