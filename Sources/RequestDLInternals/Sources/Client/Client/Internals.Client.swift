@@ -48,6 +48,11 @@ extension Internals {
         private let manager = Internals.ClientOperationQueue()
         private let _client: HTTPClient
 
+        /// Caps how many requests this client may have in flight at once, from the moment a
+        /// request is asked to execute until it completes, is cancelled, or is released.
+        /// `nil` when the session was not configured with a limit, leaving requests unthrottled.
+        private let connectionSemaphore: AsyncSemaphore?
+
         // MARK: - Unsafe properties
 
         private var _isClosed: Bool
@@ -56,13 +61,15 @@ extension Internals {
 
         package init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
-            configuration: HTTPClient.Configuration
+            configuration: HTTPClient.Configuration,
+            maximumConcurrentConnections: Int? = nil
         ) {
             _isClosed = false
             _client = .init(
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
+            connectionSemaphore = maximumConcurrentConnections.map { .init(permits: $0) }
         }
 
         deinit {
@@ -86,8 +93,8 @@ extension Internals {
         package func execute(
             request: HTTPClient.Request,
             logger: TaskLogger?
-        ) -> UnsafeTask<ResponseAccumulator.Response> {
-            execute(
+        ) async -> UnsafeTask<ResponseAccumulator.Response> {
+            await execute(
                 request: request,
                 delegate: ResponseAccumulator(request: request),
                 logger: logger
@@ -98,7 +105,11 @@ extension Internals {
             request: HTTPClient.Request,
             delegate: Delegate,
             logger: TaskLogger?
-        ) -> UnsafeTask<Delegate.Response> {
+        ) async -> UnsafeTask<Delegate.Response> {
+            // Waited on before anything else, so a session configured with a limit never opens
+            // more connections than that, whether or not one is free to reuse.
+            await connectionSemaphore?.wait()
+
             // Registered before the request goes out, so the client counts as busy from the
             // moment it is asked to do anything.
             let operation = manager.operation()
@@ -118,11 +129,14 @@ extension Internals {
                 )
             }
 
+            let connectionSemaphore = self.connectionSemaphore
+
             return UnsafeTask(task) {
                 // No lock and no task hop. Completing an operation is a counter decrement now,
                 // so wrapping it in `AsyncLock` only bought a suspension on a path that can be
                 // reached from an event loop.
                 operation.complete()
+                connectionSemaphore?.signal()
             }
         }
 

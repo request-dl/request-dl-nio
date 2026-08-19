@@ -217,7 +217,8 @@ extension Internals {
         ) throws -> Internals.Client {
             let client = Internals.Client(
                 eventLoopGroupProvider: .shared(eventLoopGroup),
-                configuration: try sessionConfiguration.build()
+                configuration: try sessionConfiguration.build(),
+                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
             )
 
             tableLock.withLock {

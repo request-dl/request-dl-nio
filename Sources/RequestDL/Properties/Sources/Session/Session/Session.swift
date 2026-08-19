@@ -123,6 +123,21 @@ public struct Session: Property {
     }
 
     ///
+    /// Caps how many requests made through this session may be in flight at once, across every
+    /// host, from the moment a request is asked to execute until it completes.
+    ///
+    /// Unlike ``maximumConnectionsPerHost(_:)``, which is a per-host soft limit that AsyncHTTPClient
+    /// may exceed, this is an exact, session-wide cap: once it is reached, further requests wait
+    /// in line for a slot to free up rather than opening another connection.
+    ///
+    /// - Parameter maximum: The maximum number of requests this session may have in flight at once.
+    /// - Returns: The modified `Session` instance with the concurrency limit configured.
+    ///
+    public func maximumConcurrentConnections(_ maximum: Int) -> Self {
+        edit { $0.maximumConcurrentConnections = maximum }
+    }
+
+    ///
     /// Disables redirect for the session.
     ///
     /// - Returns: The modified `Session` instance with redirect disabled.
