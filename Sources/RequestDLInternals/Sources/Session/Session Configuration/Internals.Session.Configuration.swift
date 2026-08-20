@@ -19,7 +19,19 @@ extension Internals.Session {
         package var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
         package var ignoreUncleanSSLShutdown: Bool = false
+
+        /// Defaults to unbounded auto-decompression on Apple platforms, matching URLSession's own
+        /// behavior there — URLSession always decodes `Content-Encoding` transparently with no
+        /// limit, and no way to turn it off. Matching that by default keeps this setting from
+        /// silently diverging depending on which executor a request happens to run on. Off by
+        /// default elsewhere, where URLSession isn't a runtime option and NIOHTTPCompression's
+        /// zip-bomb guard has no counterpart to match against anyway.
+        #if canImport(Darwin)
+        package var decompression: Internals.Decompression = .enabled(.none)
+        #else
         package var decompression: Internals.Decompression = .disabled
+        #endif
+
         package var compression: Internals.Compression = .disabled
         package var dnsOverride: [String: String] = [:]
         package var networkFrameworkWaitForConnectivity: Bool?

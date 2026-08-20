@@ -263,12 +263,18 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.timeout.connect == nil)
         #expect(builtConfiguration.timeout.read == nil)
         #expect(builtConfiguration.proxy == nil)
+        #if canImport(Darwin)
+        let expectedDecompression = HTTPClient.Decompression.enabled(limit: .none)
+        #else
+        let expectedDecompression = HTTPClient.Decompression.disabled
+        #endif
+
         #expect(
             String(
                 describing: builtConfiguration.decompression
             )
                 == String(
-                    describing: HTTPClient.Decompression.disabled
+                    describing: expectedDecompression
                 )
         )
         #expect(builtConfiguration.httpVersion == .automatic)
