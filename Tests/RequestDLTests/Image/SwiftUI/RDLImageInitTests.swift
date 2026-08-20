@@ -3,12 +3,13 @@
 //
 
 import Foundation
-import SwiftUI
 import Testing
 
 @testable import RequestDL
 
 #if canImport(SwiftUI) && (canImport(UIKit) || canImport(AppKit))
+import SwiftUI
+
 /// `RDLImage` leans on `_ConditionalContent`-returning generic initializers to mirror
 /// `AsyncImage`'s API. That machinery is easy to break silently — the type still compiles, just
 /// against a narrower or looser signature than intended — so these tests exist to pin every

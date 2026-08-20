@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-import SwiftUI
 import Testing
 
 @testable import RequestDL
 
 #if canImport(SwiftUI) && (canImport(UIKit) || canImport(AppKit))
+import SwiftUI
+
 @MainActor
 struct RDLImagePhaseTests {
 
