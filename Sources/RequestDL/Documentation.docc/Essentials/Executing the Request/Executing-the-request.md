@@ -17,3 +17,7 @@ Discover the possibilities to execute your request and manipulate the received d
 ### Monitoring upload and download progress
 
 - <doc:Upload-and-download-progress>
+
+### Loading images
+
+- <doc:Loading-images>
