@@ -76,7 +76,7 @@ PrivateKey(privateFile1)
 
 Using shared symmetric keys between the server and the client, PSK is a secure way to communicate with the server.
 
-The configuration is simple and only requires implementing the ``SSLPSKIdentityResolver``. When using it in the ``Property``, you should secure the instance of the implemented resolver using ``StoredObject`` to optimize the code.
+The configuration is simple and only requires implementing the `SSLPSKIdentityResolver` protocol. When using it in the ``Property``, you should secure the instance of the implemented resolver using ``StoredObject`` to optimize the code.
 
 ```swift 
 struct GithubAPI: Property {
@@ -123,7 +123,6 @@ This rule is necessary to avoid the instantiation of new clients provided by `As
 ### Working with PSK
 
 - ``RequestDL/PSKIdentity``
-- ``RequestDL/SSLPSKIdentityResolver``
 
 ### The TLS configuration
 
@@ -133,4 +132,3 @@ This rule is necessary to avoid the instantiation of new clients provided by `As
 - ``RequestDL/CertificateVerification``
 - ``RequestDL/SignatureAlgorithm``
 - ``RequestDL/RenegotiationSupport``
-- ``RequestDL/SSLKeyLogger``

@@ -62,4 +62,3 @@ In addition, each received element is inserted into a queue that remains availab
 
 - ``RequestDL/AsyncResponse``
 - ``RequestDL/AsyncBytes``
-- ``RequestDL/AlreadyConsumedError``
