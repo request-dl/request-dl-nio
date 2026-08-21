@@ -2,7 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(AppKit)
+// `canImport(AppKit)` is true under Mac Catalyst too, but `NSImageView` itself is marked
+// unavailable there — Catalyst apps use `UIImageView` (see UIImageView+RequestDL.swift), which
+// `canImport(UIKit)` picks up on its own. Excluded explicitly so this file doesn't fail to
+// compile for that target.
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 
 #if canImport(FoundationEssentials)
@@ -19,6 +23,10 @@ private nonisolated(unsafe) var rdlLoadTaskKey: UInt8 = 0
 
 extension NSImageView: RDLCompatible {}
 
+/// `@MainActor`-isolated because `NSImageView.image` is: setting it synchronously from
+/// `setImage` (the `placeholder` assignment, ahead of the actual load) needs the compiler to
+/// know it's already on the main actor, not just that it happens to run there in practice.
+@MainActor
 extension RDLWrapper where Base: NSImageView {
 
     /// The in-flight load started by `setImage`, if any.

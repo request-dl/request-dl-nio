@@ -19,6 +19,10 @@ private nonisolated(unsafe) var rdlLoadTaskKey: UInt8 = 0
 
 extension UIImageView: RDLCompatible {}
 
+/// `@MainActor`-isolated because `UIImageView.image` is: setting it synchronously from
+/// `setImage` (the `placeholder` assignment, ahead of the actual load) needs the compiler to
+/// know it's already on the main actor, not just that it happens to run there in practice.
+@MainActor
 extension RDLWrapper where Base: UIImageView {
 
     /// The in-flight load started by `setImage`, if any.
