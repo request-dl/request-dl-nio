@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 struct Resolve<Root: Property>: Sendable {
 
     // MARK: - Private properties
@@ -22,7 +24,8 @@ struct Resolve<Root: Property>: Sendable {
     // MARK: - Internal methods
 
     func build() async throws -> Resolved {
-        let (_, make) = try await partiallyBuild()
+        var (_, make) = try await partiallyBuild()
+        applyingURLOverride(&make)
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
@@ -88,6 +91,51 @@ struct Resolve<Root: Property>: Sendable {
         )
 
         return configuration
+    }
+
+    /// Rewrites `baseURL`/`pathComponents` per the last-declared `URLOverride` rule whose origin
+    /// (scheme + host + optional path prefix) matches the final resolved request.
+    ///
+    /// Done here rather than inside `URLOverride`'s node for the same reason system-proxy
+    /// resolution is: matching needs the final `baseURL`/`pathComponents`, complete only once
+    /// every property (including whichever `BaseURL` wins) has contributed. Runs before
+    /// `sessionConfiguration(for:)` so a resolved system proxy answers for the overridden
+    /// destination, not the original one.
+    private func applyingURLOverride(_ make: inout Make) {
+        guard
+            !make.urlOverrides.isEmpty,
+            let origin = URLOverrideEndpoint(baseURL: make.requestConfiguration.baseURL)
+        else {
+            return
+        }
+
+        let pathComponents = Array(
+            make.requestConfiguration.pathComponents
+                .joinedAsPath()
+                .split(separator: "/")
+                .map(String.init)
+        )
+
+        var match: (destination: URLOverrideEndpoint, remainder: [String])?
+
+        for rule in make.urlOverrides {
+            guard
+                rule.origin.scheme == origin.scheme,
+                rule.origin.host == origin.host,
+                pathComponents.starts(with: rule.origin.pathComponents)
+            else {
+                continue
+            }
+
+            match = (rule.destination, Array(pathComponents.dropFirst(rule.origin.pathComponents.count)))
+        }
+
+        guard let (destination, remainder) = match else {
+            return
+        }
+
+        make.requestConfiguration.baseURL = "\(destination.scheme)://\(destination.host)"
+        make.requestConfiguration.pathComponents = destination.pathComponents + remainder
     }
 
     private func inputs() -> _PropertyInputs {

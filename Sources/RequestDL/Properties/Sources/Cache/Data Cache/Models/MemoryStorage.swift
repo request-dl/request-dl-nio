@@ -3,6 +3,7 @@
 //
 
 import Collections
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

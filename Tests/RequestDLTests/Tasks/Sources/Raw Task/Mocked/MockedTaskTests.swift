@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -24,6 +25,7 @@ struct MockedTaskTests {
         let data = Data("Hello World".utf8)
 
         // When
+        // The mocked response mirrors every header the resolved request would carry.
         let result = try await MockedTask(
             status: .init(code: statusCode, reason: "Ok"),
             content: {
@@ -50,6 +52,36 @@ struct MockedTaskTests {
                     ("Content-Length", String(data.count)),
                 ])
         )
+    }
+
+    @Test
+    func mock_whenHeadersOverlaysOnTopOfMirroredRequest() async throws {
+        // Given
+        let data = Data("Hello World".utf8)
+
+        // When
+        // `headers` overlays on top of the mirrored request headers: it overrides a name already
+        // there (`Content-Type`) and adds one that is not part of the request at all.
+        let result = try await MockedTask(
+            headers: [
+                "Content-Type": "application/json",
+                "X-Mock-Only": "true",
+            ],
+            content: {
+                BaseURL("localhost")
+                AcceptHeader(.json)
+                Payload(data: data, contentType: .text)
+            }
+        )
+        .collectData()
+        .result()
+
+        // Then
+        let response = result.head
+        #expect(response.headers.first(name: "Content-Type") == "application/json")
+        #expect(response.headers.first(name: "Content-Length") == String(data.count))
+        #expect(response.headers.first(name: "Accept") == "application/json")
+        #expect(response.headers.first(name: "X-Mock-Only") == "true")
     }
 
     @Test
@@ -139,9 +171,9 @@ struct MockedTaskTests {
 
         // When
         // Deliberately no `Payload` here: `RequestConfiguration.isCacheEnabled` requires a
-        // `nil` body, and a mocked task repurposes `Payload` to feed the mocked *response*
-        // through the same mechanism a real request would use for its upload body — so setting
-        // one would disable caching altogether and never reach `CacheControl`'s cache-hit path.
+        // `nil` body, and a mocked task mirrors `Payload` into the response body through the
+        // same mechanism a real request would use for its upload body — so setting one would
+        // disable caching altogether and never reach `CacheControl`'s cache-hit path.
         let result = try await MockedTask {
             BaseURL("localhost")
             Path(path)
@@ -212,5 +244,63 @@ struct MockedTaskTests {
 
         // Then
         #expect(result.head.headers.first(name: "rdl-request-method") == "POST")
+    }
+
+    @Test
+    func mock_whenThrowing_throwsErrorInsteadOfReturningResponse() async throws {
+        // Given
+        struct SimulatedTransportError: Error, Equatable {}
+
+        // When
+        do {
+            _ = try await MockedTask(throwing: SimulatedTransportError())
+                .collectData()
+                .result()
+            Issue.record("Expected MockedTask(throwing:) to throw")
+        } catch let error as SimulatedTransportError {
+            // Then
+            #expect(error == SimulatedTransportError())
+        }
+    }
+
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func mock_whenDelay_waitsBeforeDeliveringResponse() async throws {
+        // Given
+        let clock = ContinuousClock()
+        let delay = UnitTime.milliseconds(200)
+
+        // When
+        let start = clock.now
+        _ = try await MockedTask(delay: delay) {
+            BaseURL("localhost")
+        }
+        .collectData()
+        .result()
+        let elapsed = clock.now - start
+
+        // Then
+        #expect(elapsed >= .nanoseconds(delay.nanoseconds))
+    }
+
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func mock_whenThrowingWithDelay_waitsBeforeThrowing() async throws {
+        // Given
+        struct SimulatedTransportError: Error {}
+        let clock = ContinuousClock()
+        let delay = UnitTime.milliseconds(200)
+
+        // When
+        let start = clock.now
+        await #expect(throws: SimulatedTransportError.self) {
+            try await MockedTask(throwing: SimulatedTransportError(), delay: delay)
+                .collectData()
+                .result()
+        }
+        let elapsed = clock.now - start
+
+        // Then
+        #expect(elapsed >= .nanoseconds(delay.nanoseconds))
     }
 }

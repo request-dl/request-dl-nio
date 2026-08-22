@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 struct PayloadNode: PropertyNode {
 
     // MARK: - Internal properties
@@ -10,6 +12,7 @@ struct PayloadNode: PropertyNode {
     let charset: Charset
     let urlEncoder: URLEncoder
     let chunkSize: Int?
+    let payloadEncoder: (any PayloadEncoder)?
 
     // MARK: - Internal methods
 
@@ -18,7 +21,8 @@ struct PayloadNode: PropertyNode {
         let input = PayloadInput(
             method: make.requestConfiguration.method,
             charset: charset,
-            urlEncoder: urlEncoder
+            urlEncoder: urlEncoder,
+            payloadEncoder: payloadEncoder
         )
 
         let output = try await factory(input)

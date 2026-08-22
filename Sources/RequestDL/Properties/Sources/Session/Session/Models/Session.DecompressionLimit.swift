@@ -3,6 +3,7 @@
 //
 
 import NIOHTTPCompression
+import RequestDLInternals
 
 extension Session {
 

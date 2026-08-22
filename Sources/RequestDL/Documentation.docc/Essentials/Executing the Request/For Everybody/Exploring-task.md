@@ -116,9 +116,9 @@ for (page, result) in results {
 
 ### MockedTask
 
-``RequestDL/MockedTask`` lets you fabricate a response without performing any real network call, which is useful for tests and previews where you want deterministic data and no dependency on a live server.
+``RequestDL/MockedTask`` mirrors a resolved request back as its own response, without performing any real network call — useful for tests and previews where you want deterministic data and no dependency on a live server, or simply to inspect exactly what a request would look like.
 
-You specify the response head — `version`, `status`, and `isKeepAlive` — along with a ``RequestDL/Property`` block describing the mocked body, exactly as you would for a real request.
+You specify the response head — `version`, `status`, and `isKeepAlive` — along with a ``RequestDL/Property`` block describing the request, exactly as you would for a real one. Every header it would carry (including `Content-Type`/`Content-Length` from ``RequestDL/Payload``) is copied onto the response, and ``RequestDL/Payload``'s bytes become the response body.
 
 ```swift
 let result = try await MockedTask(
@@ -140,7 +140,15 @@ let result = try await MockedTask(
 print(result.payload)
 ```
 
-> Tip: ``RequestDL/MockedTask`` returns an ``RequestDL/AsyncResponse``, just like ``RequestDL/UploadTask``. Use ``RequestDL/RequestTask/collectData()`` to collapse it into a ``RequestDL/TaskResult`` the same way ``RequestDL/DataTask`` does.
+> Tip: ``RequestDL/MockedTask`` returns an ``RequestDL/AsyncResponse``, just like ``RequestDL/UploadTask``. Use ``RequestDL/RequestTask/collectData()-3viv5`` to collapse it into a ``RequestDL/TaskResult`` the same way ``RequestDL/DataTask`` does.
+
+Use the `headers` parameter to overlay something that is not part of the request itself — it takes precedence over a mirrored header with the same name. Use `delay` to simulate network latency, and ``RequestDL/MockedTask/init(throwing:delay:)`` to simulate a transport-level failure instead of a response:
+
+```swift
+struct OfflineError: Error {}
+
+let task = MockedTask(throwing: OfflineError(), delay: .seconds(1))
+```
 
 ## Topics
 

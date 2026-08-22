@@ -20,7 +20,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/swift-server/async-http-client",
-            from: "1.30.2"
+            from: "1.36.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
@@ -36,11 +36,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
-            from: "1.26.0"
+            from: "1.28.0"
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.14.0"
+            from: "1.15.0"
         ),
         .package(
             url: "https://github.com/apple/swift-collections",
@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.4"
+            from: "2.0.7"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
@@ -56,12 +56,12 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-system",
-            from: "1.6.3"
+            from: "1.8.1"
         ),
     ],
     targets: [
         .target(
-            name: "RequestDL",
+            name: "RequestDLInternals",
             dependencies: [
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
@@ -76,16 +76,69 @@ let package = Package(
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
+            ],
+            swiftSettings: [.defaultIsolation(nil)],
+        ),
+
+        .target(
+            name: "RequestDL",
+            dependencies: [
+                "RequestDLInternals",
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+                .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
+                .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
-            ]
+            ],
+            swiftSettings: [.defaultIsolation(nil)],
+        ),
+
+        .target(
+            name: "RequestDLTestSupport",
+            dependencies: [
+                "RequestDLInternals",
+                "RequestDL",
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "Logging", package: "swift-log"),
+            ],
+            path: "Tests/RequestDLTestSupport",
+            swiftSettings: [.defaultIsolation(nil)],
         ),
 
         .testTarget(
             name: "RequestDLTests",
             dependencies: [
                 "RequestDL",
+                "RequestDLInternals",
+                "RequestDLTestSupport",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
+            resources: [.process("Resources")]
+        ),
+
+        .testTarget(
+            name: "RequestDLInternalsTests",
+            dependencies: [
+                "RequestDLInternals",
+                "RequestDLTestSupport",
+            ],
+            path: "Tests/RequestDLInternalsTests",
             resources: [.process("Resources")]
         ),
     ]

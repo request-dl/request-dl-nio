@@ -3,6 +3,7 @@
 //
 
 import Logging
+import RequestDLInternals
 
 #if canImport(Darwin)
 import class Foundation.Bundle
@@ -56,7 +57,7 @@ public struct Certificate: Property {
                 Internals.Log.cantOpenCertificateFile(
                     resourceName,
                     bundle
-                ).preconditionFailure()
+                ).preconditionFailure(logger: RequestEnvironmentValues.current.logger)
             }
 
             return resourceURL.absolutePath(percentEncoded: false)

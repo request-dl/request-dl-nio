@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import RequestDLInternals
 
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
@@ -10,12 +11,18 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     let version: ResponseHead.Version
     let status: ResponseHead.Status
+    let headers: HTTPHeaders
     let isKeepAlive: Bool
+    let delay: UnitTime
     let content: Content
 
     // MARK: - Internal methods
 
     func result(_ environment: RequestEnvironmentValues) async throws -> AsyncResponse {
+        if delay > .zero {
+            try await Task.sleep(nanoseconds: UInt64(delay.nanoseconds))
+        }
+
         let resolved = try await Resolve(
             root: content,
             environment: environment
@@ -28,7 +35,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         }
 
         let logger = Internals.TaskLogger(
-            requestConfiguration: requestConfiguration,
+            baseURL: requestConfiguration.baseURL,
+            pathComponents: requestConfiguration.pathComponents,
             logger: environment.logger
         )
 
@@ -38,14 +46,23 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             logger: logger
         )
 
-        let client = try await Internals.ClientManager.shared.client(
-            provider: resolved.session.provider,
-            sessionConfiguration: resolved.session.configuration
-        )
+        let client: Internals.Client
+
+        do {
+            client = try await Internals.ClientManager.shared.client(
+                provider: resolved.session.provider,
+                sessionConfiguration: resolved.session.configuration
+            )
+        } catch let error as Internals.SecureFileLoadError {
+            throw SecureFileError(error)
+        }
 
         switch await cacheControl(client) {
         case .task(let task):
-            return task()
+            return AsyncResponse(
+                seed: task.seed,
+                response: task.response
+            )
         case .cache(let cache):
             return try await .init(
                 seed: Internals.TaskSeed.withoutCancellation,
@@ -142,17 +159,22 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     }
 
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {
-        var headers = resolved.requestConfiguration.headers
+        // Mirrors every header the resolved request would carry — `Headers`, `AcceptHeader`,
+        // `Authorization`, `Payload`'s `Content-Type`/`Content-Length`, and so on — so the mocked
+        // response doubles as a way to inspect exactly what the request would have looked like.
+        // `headers` overlays on top, for anything that isn't part of the request itself.
+        var responseHeaders = resolved.requestConfiguration.headers
+            .merging(headers) { _, theirs in theirs }
 
         if let method = resolved.requestConfiguration.method {
-            headers.set(name: "rdl-request-method", value: method)
+            responseHeaders.set(name: "rdl-request-method", value: method)
         }
 
         return .init(
             url: resolved.requestConfiguration.url,
             status: .init(code: status.code, reason: status.reason),
             version: .init(minor: version.minor, major: version.major),
-            headers: headers,
+            headers: responseHeaders.map { Internals.ResponseHead.HeaderField(name: $0.name, value: $0.value) },
             isKeepAlive: isKeepAlive
         )
     }

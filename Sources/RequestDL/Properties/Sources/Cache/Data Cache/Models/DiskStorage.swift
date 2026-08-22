@@ -4,7 +4,7 @@
 
 import NIOCore
 import NIOFileSystem
-import SystemPackage
+import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -32,8 +32,8 @@ struct DiskStorage: Sendable {
                 let responsePath = responseURL.filePath
                 let dataPath = dataURL.filePath
 
-                let responseInfo = try? await FileSystem.shared.info(forFileAt: responsePath)
-                let dataInfo = try? await FileSystem.shared.info(forFileAt: dataPath)
+                let responseInfo = try? await Internals.fileSystem.info(forFileAt: responsePath)
+                let dataInfo = try? await Internals.fileSystem.info(forFileAt: dataPath)
 
                 return (responseInfo?.size ?? 0) + (dataInfo?.size ?? 0)
             }
@@ -95,7 +95,7 @@ struct DiskStorage: Sendable {
             self.dataURL = dataURL
 
             do {
-                try await FileSystem.shared.createDirectory(
+                try await Internals.fileSystem.createDirectory(
                     at: url.filePath,
                     withIntermediateDirectories: true
                 )
@@ -106,7 +106,7 @@ struct DiskStorage: Sendable {
 
         // MARK: - Private static methods
 
-        /// Whether `url` exists, retrying past the transient miss `FileSystem.shared.info`
+        /// Whether `url` exists, retrying past the transient miss `Internals.fileSystem.info`
         /// is already known to produce.
         ///
         /// This is the same flake `Internals.Buffer.Storage._isResourceAvailable()` retries
@@ -188,7 +188,7 @@ struct DiskStorage: Sendable {
     private func readResponseData(at url: URL) async -> Data? {
         guard
             let handle = await Self.retryingUntilSuccess({
-                try? await FileSystem.shared.openFile(forReadingAt: url.filePath)
+                try? await Internals.fileSystem.openFile(forReadingAt: url.filePath)
             })
         else {
             return nil
@@ -209,16 +209,23 @@ struct DiskStorage: Sendable {
 
     // MARK: - Private static methods
 
-    /// Retries `operation` past the transient stat/open miss `FileSystem.shared` is already
+    /// Retries `operation` past the transient stat/open miss `Internals.fileSystem` is already
     /// known to produce under heavy concurrent disk access on sandboxed Apple simulators: a
     /// check or open can intermittently fail for a file that was just written/confirmed, with
     /// nothing thrown and no descriptor left open. Shared by `Record.isReachableWithRetry` and
     /// `readResponseData`, the two places here that read a `.cached` entry right after its own
     /// existence was (or is about to be) confirmed, where a fresh miss is that flake, not a
     /// genuine absence.
+    ///
+    /// - Note: 50 attempts, 10ms apart — a 500ms budget. The previous 5×2ms (10ms total) was
+    /// sized for a quiet machine; under the parallel test load this runs under in CI, the
+    /// transient window this retries past can outlast that easily, which is what turned
+    /// `diskStorage_whenFreeingSpaceBelowTotalUsage_shouldEvictOnlyTheOldestEntries` flaky. The
+    /// happy path still returns on the first attempt; this only changes how long a genuinely
+    /// slow stat gets before being treated as a real miss.
     private static func retryingUntilSuccess<T>(
-        attempts: Int = 5,
-        retryDelay: UInt64 = 2_000_000,
+        attempts: Int = 50,
+        retryDelay: UInt64 = 10_000_000,
         _ operation: () async -> T?
     ) async -> T? {
         for attempt in 0..<attempts {
@@ -236,7 +243,7 @@ struct DiskStorage: Sendable {
 
     func remove(_ key: String) async {
         guard let record = await record(key) else { return }
-        _ = try? await FileSystem.shared.removeItem(
+        _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
     }
@@ -248,7 +255,7 @@ struct DiskStorage: Sendable {
     func removeAll(since date: Date) async {
         let recordsToCheck = await records()
         for record in recordsToCheck where record.date <= date {
-            _ = try? await FileSystem.shared.removeItem(
+            _ = try? await Internals.fileSystem.removeItem(
                 at: record.url.filePath
             )
         }
@@ -263,7 +270,7 @@ struct DiskStorage: Sendable {
             let response = try? JSONEncoder().encode(cachedResponse)
         else { return }
 
-        let responseInfo = try? await FileSystem.shared.info(forFileAt: record.responseURL.filePath)
+        let responseInfo = try? await Internals.fileSystem.info(forFileAt: record.responseURL.filePath)
         let responseLength = responseInfo?.size ?? 0
         let spaceChange = Int64(response.count) - Int64(responseLength)
         let spaceNeeded = Int64(spaceChange < 0 ? 0 : spaceChange)
@@ -279,52 +286,94 @@ struct DiskStorage: Sendable {
         do {
             let oldDataPath = record.dataURL.filePath
             let newDataPath = newRecord.dataURL.filePath
-            try await FileSystem.shared.moveItem(at: oldDataPath, to: newDataPath)
+            try await Internals.fileSystem.moveItem(at: oldDataPath, to: newDataPath)
 
             try await writeAndClose(response, to: newRecord.responseURL)
         } catch {
-            _ = try? await FileSystem.shared.removeItem(
+            _ = try? await Internals.fileSystem.removeItem(
                 at: newRecord.url.filePath
             )
         }
 
-        _ = try? await FileSystem.shared.removeItem(
+        _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
     }
 
+    /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
+    /// decide whether `freeSpace` can skip its directory rescan below. See that method's doc
+    /// for the safety argument — passing a stale or absent estimate never risks correctness,
+    /// only an avoidable rescan.
+    /// - Returns: The buffer to write through, and disk usage immediately after this write
+    /// (`nil` when the write didn't happen, e.g. the entry doesn't fit at all), for the caller
+    /// to keep as its next `knownUsage`.
     func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
         contentLength: Int64,
-        maximumCapacity: Int64
-    ) async -> Internals.AnyBuffer? {
-        guard let response = try? JSONEncoder().encode(cachedResponse) else { return nil }
+        maximumCapacity: Int64,
+        knownUsage: Int64? = nil
+    ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?) {
+        guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil) }
 
         let writableBytes = Int64(response.count) + contentLength
-        guard writableBytes <= maximumCapacity else { return nil }
+        guard writableBytes <= maximumCapacity else { return (nil, nil) }
 
-        await freeSpace(maximumCapacity - writableBytes)
+        let usageAfterEviction = await freeSpace(
+            maximumCapacity - writableBytes,
+            knownUsage: knownUsage
+        )
 
-        guard let record = await record(key, createdAt: cachedResponse.date) else { return nil }
+        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil) }
 
         do {
             try await writeAndClose(response, to: record.responseURL)
         } catch {
-            return nil
+            return (nil, nil)
         }
 
-        return await Internals.FileBuffer(record.dataURL)
+        let buffer = await Internals.FileBuffer(record.dataURL)
+        return (buffer, usageAfterEviction + writableBytes)
     }
 
-    func freeSpace(_ maximumCapacity: Int64) async {
+    /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
+    ///
+    /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
+    /// `maximumCapacity`, the directory rescan below — a full `listContents()` plus a
+    /// reachability check and a size stat *per existing entry* — is skipped outright, since
+    /// nothing would be evicted anyway. This is the difference between a single cache write
+    /// costing O(1) versus O(current entry count): the latter turns writing `n` entries into
+    /// O(n²) total filesystem operations, cheap enough to hide on a fast local disk but not on
+    /// a simulator's slower, host-bridged filesystem, where it has been the underlying cause of
+    /// `AsyncLock.Watchdog` firing on otherwise-healthy cache writes (see #271).
+    ///
+    /// Skipping is safe regardless of how accurate `knownUsage` is:
+    /// - If it undercounts (e.g. another process sharing this directory, via `suiteName`, wrote
+    ///   since it was last reconciled here), the result is a transient, bounded overshoot of
+    ///   `maximumCapacity` — never data loss or corruption — that self-corrects the next time
+    ///   this runs without a `knownUsage` that still fits, which forces the real rescan below
+    ///   and hands back a freshly reconciled total.
+    /// - If it overcounts, this just skips straight to an unnecessary-but-harmless rescan.
+    ///
+    /// A missing `knownUsage` always takes the rescan path, so a first call with no estimate
+    /// yet, or one that no longer fits, behaves exactly as before this parameter existed.
+    ///
+    /// - Returns: Usage immediately after this call — either the untouched `knownUsage` when
+    /// skipped, or the freshly measured total otherwise — for the caller to reuse as its next
+    /// `knownUsage`.
+    @discardableResult
+    func freeSpace(_ maximumCapacity: Int64, knownUsage: Int64? = nil) async -> Int64 {
+        if let knownUsage, knownUsage <= maximumCapacity {
+            return knownUsage
+        }
+
         var entries = await records()
 
         if maximumCapacity == .zero {
             for entry in entries {
-                _ = try? await FileSystem.shared.removeItem(at: entry.url.filePath)
+                _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
-            return
+            return .zero
         }
 
         entries.sort { $0.date < $1.date }
@@ -341,11 +390,13 @@ struct DiskStorage: Sendable {
             if totalSize <= maximumCapacity {
                 break
             }
-            _ = try? await FileSystem.shared.removeItem(
+            _ = try? await Internals.fileSystem.removeItem(
                 at: entry.url.filePath
             )
             totalSize -= size
         }
+
+        return totalSize
     }
 
     // MARK: - Private methods
@@ -364,7 +415,7 @@ struct DiskStorage: Sendable {
     /// - Important: Must not open, write, and close as three statements inside one `do` block:
     ///
     /// ```swift
-    /// let handle = try await FileSystem.shared.openFile(...)
+    /// let handle = try await Internals.fileSystem.openFile(...)
     /// try await handle.write(contentsOf: response, toAbsoluteOffset: .zero)
     /// try await handle.close()
     /// ```
@@ -380,7 +431,7 @@ struct DiskStorage: Sendable {
     /// wrong half of the problem, and the two call sites already have their own recovery for a
     /// write that failed.
     private func writeAndClose(_ data: Data, to url: URL) async throws {
-        let handle = try await FileSystem.shared.openFile(
+        let handle = try await Internals.fileSystem.openFile(
             forWritingAt: url.filePath,
             options: .newFile(replaceExisting: true)
         )
@@ -409,7 +460,7 @@ struct DiskStorage: Sendable {
         var foundRecords: [Record] = []
 
         do {
-            try await FileSystem.shared.withDirectoryHandle(atPath: dirPath) { dir in
+            try await Internals.fileSystem.withDirectoryHandle(atPath: dirPath) { dir in
                 for try await entry in dir.listContents() {
                     if entry.name.string.hasSuffix(".\(Record.pathExtension)") {
                         let entryURL = directory.appendingPathComponent(entry.name.string)

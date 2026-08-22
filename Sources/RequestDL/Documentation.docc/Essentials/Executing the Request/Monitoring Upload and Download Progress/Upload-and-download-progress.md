@@ -62,6 +62,5 @@ print(result.payload)
 ### Discover the modifiers
 
 - ``RequestDL/Modifiers/Progress``
-- ``RequestDL/Modifiers/IgnoresProgress``
 - ``RequestDL/Modifiers/CollectBytes``
 - ``RequestDL/Modifiers/CollectData``

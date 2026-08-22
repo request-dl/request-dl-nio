@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import RequestDLInternals
 
 /// The Session object is used to set various properties related to the request context.
 ///
@@ -107,7 +108,7 @@ public struct Session: Property {
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
     ///
-    public func enableNetworkFramework(_ enabled: Bool = true) -> some Property {
+    public func enableNetworkFramework(_ enabled: Bool = true) -> Self {
         edit { $0.enableNetworkFramework = enabled }
     }
 
@@ -119,6 +120,21 @@ public struct Session: Property {
     ///
     public func maximumConnectionsPerHost(_ maximum: Int) -> Self {
         edit { $0.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = maximum }
+    }
+
+    ///
+    /// Caps how many requests made through this session may be in flight at once, across every
+    /// host, from the moment a request is asked to execute until it completes.
+    ///
+    /// Unlike ``maximumConnectionsPerHost(_:)``, which is a per-host soft limit that AsyncHTTPClient
+    /// may exceed, this is an exact, session-wide cap: once it is reached, further requests wait
+    /// in line for a slot to free up rather than opening another connection.
+    ///
+    /// - Parameter maximum: The maximum number of requests this session may have in flight at once.
+    /// - Returns: The modified `Session` instance with the concurrency limit configured.
+    ///
+    public func maximumConcurrentConnections(_ maximum: Int) -> Self {
+        edit { $0.maximumConcurrentConnections = maximum }
     }
 
     ///
@@ -159,6 +175,20 @@ public struct Session: Property {
     ///
     public func decompressionLimit(_ decompressionLimit: DecompressionLimit) -> Self {
         edit { $0.decompression = .enabled(decompressionLimit.build()) }
+    }
+
+    ///
+    /// Compresses the outgoing request body before it's sent over the wire, setting the
+    /// `Content-Encoding` header accordingly.
+    ///
+    /// This is independent of which `Payload` source produced the body (`Data`/`JSON`/`String`/
+    /// `File`/`Form`) and only applies to connections negotiated as HTTP/1.1.
+    ///
+    /// - Parameter algorithm: The algorithm used to compress the request body.
+    /// - Returns: The modified `Session` instance with request-body compression configured.
+    ///
+    public func compression(_ algorithm: CompressionAlgorithm) -> Self {
+        edit { $0.compression = .enabled(algorithm.build()) }
     }
 
     // MARK: - Private properties

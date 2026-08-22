@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import SwiftAsyncStream
 import Testing
 

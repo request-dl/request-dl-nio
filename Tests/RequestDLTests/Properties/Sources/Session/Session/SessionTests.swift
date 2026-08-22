@@ -4,6 +4,7 @@
 
 import AsyncHTTPClient
 import NIOPosix
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -102,6 +103,23 @@ struct SessionTests {
         #expect(
             resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
                 == maximumConnections
+        )
+    }
+
+    @Test
+    func session_whenMaxConcurrentConnections_shouldBeValid() async throws {
+        // Given
+        let maximumConcurrentConnections = 4
+
+        let property = Session()
+            .maximumConcurrentConnections(maximumConcurrentConnections)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(
+            resolved.session.configuration.maximumConcurrentConnections == maximumConcurrentConnections
         )
     }
 
@@ -218,6 +236,46 @@ struct SessionTests {
         #expect(
             resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
         )
+    }
+
+    @Test
+    func session_whenCompressionDefault_shouldBeDisabled() async throws {
+        // Given
+        let property = Session()
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compression == .disabled)
+    }
+
+    @Test
+    func session_whenCompressionGzip_shouldBeValid() async throws {
+        // Given
+        let algorithm = Session.CompressionAlgorithm.gzip
+        let property = Session()
+            .compression(algorithm)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
+    }
+
+    @Test
+    func session_whenCompressionDeflate_shouldBeValid() async throws {
+        // Given
+        let algorithm = Session.CompressionAlgorithm.deflate
+        let property = Session()
+            .compression(algorithm)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
     }
 
     @Test

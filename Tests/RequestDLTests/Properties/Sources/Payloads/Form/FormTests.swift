@@ -2,9 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -288,6 +290,37 @@ struct FormTests {
                 )
             ]
         )
+    }
+
+    @Test
+    func form_whenInitURLFileDoesNotExist_shouldThrowFilePayloadError() async throws {
+        // Given
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("form.missing.\(UUID())")
+            .appendingPathExtension("raw")
+
+        // When
+        do {
+            _ = try await resolve(
+                TestProperty {
+                    Form(
+                        name: "foo",
+                        contentType: .pdf,
+                        url: url
+                    )
+                }
+            )
+            Issue.record("Not expecting success")
+        } catch let error as FilePayloadError {
+            // Then
+            #expect(error.url == url)
+
+            guard case .notFound = error.context else {
+                Issue.record("Expected .notFound, got \(error.context)")
+                return
+            }
+        }
     }
 
     @Test
