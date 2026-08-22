@@ -25,20 +25,7 @@ extension Internals {
         /// negotiate without them rather than fail loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
-            return certificateChain == nil
-                && privateKey == nil
-                && keyLogger == nil
-                && certificateVerification != .noHostnameVerification
-                && cipherSuites == nil
-                && cipherSuiteValues == nil
-                && additionalTrustRoots == nil
-                && renegotiationSupport == nil
-                && signingSignatureAlgorithms == nil
-                && verifySignatureAlgorithms == nil
-                && sendCANameList == nil
-                && shutdownTimeout == nil
-                && pskHint == nil
-                && pskIdentityResolver == nil
+            return networkFrameworkIncompatibilityReasons().isEmpty
             #else
             return false
             #endif
@@ -69,6 +56,55 @@ extension Internals {
         package init() {}
 
         // MARK: - Internal methods
+
+        /// Backs `isCompatibleWithNetworkFramework` above -- single source of truth instead of
+        /// two lists that can drift apart again the way the original 4-field check did.
+        package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
+            var reasons: [Internals.ExecutorIncompatibilityReason] = []
+
+            if certificateChain != nil { reasons.append(.certificateChain) }
+            if privateKey != nil { reasons.append(.privateKey) }
+            if keyLogger != nil { reasons.append(.keyLogger) }
+            if certificateVerification == .noHostnameVerification {
+                reasons.append(.noHostnameVerificationUnderNetworkFramework)
+            }
+            if cipherSuites != nil { reasons.append(.cipherSuites) }
+            if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
+            if additionalTrustRoots != nil { reasons.append(.additionalTrustRootsUnderNetworkFramework) }
+            if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
+            if signingSignatureAlgorithms != nil { reasons.append(.signingSignatureAlgorithms) }
+            if verifySignatureAlgorithms != nil { reasons.append(.verifySignatureAlgorithms) }
+            if sendCANameList != nil { reasons.append(.sendCANameList) }
+            if shutdownTimeout != nil { reasons.append(.shutdownTimeout) }
+            if pskHint != nil { reasons.append(.pskHint) }
+            if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
+
+            return reasons
+        }
+
+        /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
+        /// `.noHostnameVerification` -- all four are reachable under URLSession via a Keychain
+        /// round-trip and `SecTrust`/`SecPolicy` respectively, unlike under Network.framework
+        /// (see `networkFrameworkIncompatibilityReasons()` above). Whether the app actually
+        /// carries the Keychain Sharing entitlement the identity round-trip needs is a runtime
+        /// fact this static check cannot see; a missing entitlement surfaces at identity-build
+        /// time as its own runtime error, not as a reason in this list.
+        package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
+            var reasons: [Internals.ExecutorIncompatibilityReason] = []
+
+            if signingSignatureAlgorithms != nil { reasons.append(.signingSignatureAlgorithms) }
+            if verifySignatureAlgorithms != nil { reasons.append(.verifySignatureAlgorithms) }
+            if sendCANameList != nil { reasons.append(.sendCANameList) }
+            if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
+            if shutdownTimeout != nil { reasons.append(.shutdownTimeout) }
+            if pskHint != nil { reasons.append(.pskHint) }
+            if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
+            if keyLogger != nil { reasons.append(.keyLogger) }
+            if cipherSuites != nil { reasons.append(.cipherSuites) }
+            if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
+
+            return reasons
+        }
 
         package func build() throws -> NIOSSL.TLSConfiguration {
             var tlsConfiguration = try makeTLSConfigurationByContext()

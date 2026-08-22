@@ -105,11 +105,63 @@ public struct Session: Property {
     /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
     /// or specific secure connection settings.
     ///
+    /// - Note: Not yet deprecated in favor of ``preferredExecutor(_:)``, even though both concern
+    /// Network.framework (``Session/Executor/nioTransportServices``): this is the flag that
+    /// actually opts a session into it today, while `.preferredExecutor(.nioTransportServices)`
+    /// is not yet wired into that same decision. The two will be unified in a later release, at
+    /// which point this may become the deprecated one.
+    ///
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
     ///
     public func enableNetworkFramework(_ enabled: Bool = true) -> Self {
         edit { $0.enableNetworkFramework = enabled }
+    }
+
+    ///
+    /// Prefers `executor` for this session's requests, among whichever executors the rest of its
+    /// configuration is already compatible with.
+    ///
+    /// This is a tiebreaker, not an override: it never forces an executor onto a configuration
+    /// that can't actually run on it. For example, preferring ``Session/Executor/nioTransportServices``
+    /// on a session that also sets `PSKIdentityResolver` (unsupported under Network.framework)
+    /// has no effect — that field already rules `.nioTransportServices` out on its own, so
+    /// resolution falls through to whatever is next in line. If you need a guarantee instead of a
+    /// hint — so an incompatible configuration fails loudly instead of silently landing somewhere
+    /// else — use ``requiredExecutor(_:)``.
+    ///
+    /// - Parameter executor: The executor to prefer when this session's configuration supports it.
+    /// - Returns: The modified `Session` instance with the executor preference configured.
+    ///
+    public func preferredExecutor(_ executor: Session.Executor) -> Self {
+        edit { $0.preferredExecutor = executor.build() }
+    }
+
+    ///
+    /// Pins this session to `executor`, failing the request rather than silently falling back
+    /// when the rest of its configuration can't actually run on it.
+    ///
+    /// Unlike ``preferredExecutor(_:)``, this is a guarantee: if any configured field is
+    /// unsupported under `executor` — a client certificate under `.nioTransportServices`, a SOCKS
+    /// proxy under `.urlSession`, and so on — the request throws ``ExecutorRequirementError``
+    /// instead of quietly running on a different executor than the one you pinned. Useful for
+    /// debugging, benchmarking a specific transport, or a deployment target where only one
+    /// executor is actually viable and a silent fallback would hide a real misconfiguration.
+    ///
+    /// ```swift
+    /// struct MyRequest: Property {
+    ///     var body: some Property {
+    ///         BaseURL("api.example.com")
+    ///         Session().requiredExecutor(.urlSession)
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter executor: The executor this session's configuration must be compatible with.
+    /// - Returns: The modified `Session` instance with the executor requirement configured.
+    ///
+    public func requiredExecutor(_ executor: Session.Executor) -> Self {
+        edit { $0.requiredExecutor = executor.build() }
     }
 
     ///

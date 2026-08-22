@@ -145,6 +145,13 @@ extension LocalServer {
                 jsonObject["response"] = response
             }
 
+            // Lets a test prove what the client actually sent, not just what the server chose to
+            // send back -- e.g. confirming a cookie set by an earlier response was (or, for
+            // Phase 5d's `.urlSession` no-jar normalization, was *not*) resent automatically.
+            if let cookie = _incomeHeaders?.first(name: "Cookie") {
+                jsonObject["receivedCookieHeader"] = .string(cookie)
+            }
+
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
             return try? encoder.encode(jsonObject)

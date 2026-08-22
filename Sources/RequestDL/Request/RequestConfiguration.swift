@@ -100,6 +100,70 @@ public struct RequestConfiguration: Sendable {
     }
 }
 
+#if canImport(Darwin)
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+extension RequestConfiguration {
+
+    /// `URLSession` counterpart to `build(eventLoop:)` -- needs no `EventLoop`, since it drains
+    /// `RequestBody` through its `AsyncSequence` conformance rather than the
+    /// `EventLoopFuture`-driven streaming path `build(eventLoop:)` uses.
+    ///
+    /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See
+    /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart (Phase 5f of
+    /// `URLSESSION_TASK.md`), which does not buffer `body` at all.
+    func buildURLRequest() async throws -> URLRequest {
+        var request = try buildURLRequestWithoutBody()
+
+        if let body {
+            var data = Data()
+            data.reserveCapacity(body.totalSize)
+
+            for await buffer in body {
+                data.append(contentsOf: buffer.readableBytesView)
+            }
+
+            request.httpBody = data
+        }
+
+        return request
+    }
+
+    /// URL/method/headers only -- deliberately never touches `body`. Pairs with
+    /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`
+    /// (Phase 5f), which drives `body` itself via `uploadTask(withStreamedRequest:)` +
+    /// `needNewBodyStream`; that API ignores whatever `httpBody`/`httpBodyStream` the request
+    /// carries, so setting either here would be dead weight the caller has to know to not rely on
+    /// rather than something actually used.
+    func buildURLRequestWithoutBody() throws -> URLRequest {
+        guard let requestURL = URL(string: url) else {
+            throw InvalidRequestURLError(url: url)
+        }
+
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = method ?? "GET"
+
+        for (name, value) in headers {
+            request.addValue(value, forHTTPHeaderField: name)
+        }
+
+        return request
+    }
+}
+
+/// `url` failed to parse as a `Foundation.URL` -- mirrors `build(eventLoop:)`'s own failure mode,
+/// where `HTTPClient.Request`'s URL parser rejects the same kind of malformed string.
+struct InvalidRequestURLError: Error, Sendable {
+    let url: String
+}
+
+#endif
+
 // MARK: - String extension
 
 extension String {

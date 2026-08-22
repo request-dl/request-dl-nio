@@ -50,8 +50,7 @@ extension Internals {
 
         /// Caps how many requests this client may have in flight at once, from the moment a
         /// request is asked to execute until it completes, is cancelled, or is released.
-        /// `nil` when the session was not configured with a limit, leaving requests unthrottled.
-        private let connectionSemaphore: AsyncSemaphore?
+        private let throttledExecutor: Internals.ThrottledExecutor
 
         // MARK: - Unsafe properties
 
@@ -69,7 +68,9 @@ extension Internals {
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
-            connectionSemaphore = maximumConcurrentConnections.map { .init(permits: $0) }
+            throttledExecutor = Internals.ThrottledExecutor(
+                maximumConcurrentConnections: maximumConcurrentConnections
+            )
         }
 
         deinit {
@@ -108,7 +109,7 @@ extension Internals {
         ) async -> UnsafeTask<Delegate.Response> {
             // Waited on before anything else, so a session configured with a limit never opens
             // more connections than that, whether or not one is free to reuse.
-            await connectionSemaphore?.wait()
+            let release = await throttledExecutor.acquire()
 
             // Registered before the request goes out, so the client counts as busy from the
             // moment it is asked to do anything.
@@ -129,15 +130,64 @@ extension Internals {
                 )
             }
 
-            let connectionSemaphore = self.connectionSemaphore
-
             return UnsafeTask(task) {
                 // No lock and no task hop. Completing an operation is a counter decrement now,
                 // so wrapping it in `AsyncLock` only bought a suspension on a path that can be
                 // reached from an event loop.
                 operation.complete()
-                connectionSemaphore?.signal()
+                release()
             }
+        }
+
+        /// Executes `request`, streaming the response through a `SessionTask` -- upload
+        /// progress, head, and body, optionally teed to `cache` as it downloads.
+        ///
+        /// Moved here from `Internals.Session.execute(client:request:...)` (Phase 7b1 of
+        /// `URLSESSION_TASK.md`) -- that method's body never actually touched `Internals.Session`
+        /// itself (`provider`/`configuration`/`manager`), just the `client` it took as a
+        /// parameter, so it belongs on the client that does the executing. `Internals.Session.execute`
+        /// now forwards here rather than duplicating this body, so its three existing direct
+        /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
+        /// `InternalsClientResponseReceiverTests`) keep working unmodified.
+        package func execute(
+            request: HTTPClient.Request,
+            url: String,
+            readingMode: Internals.DownloadStep.ReadingMode,
+            uploadingBytes: Int,
+            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            logger: TaskLogger?
+        ) async throws -> SessionTask {
+            let upload = Internals.AsyncStream<Int>()
+            let head = Internals.AsyncStream<Internals.ResponseHead>()
+            let download = await Internals.DownloadBuffer(readingMode: readingMode)
+
+            let delegate = Internals.ClientResponseReceiver(
+                url: url,
+                upload: upload,
+                head: head,
+                download: download,
+                cache: cache,
+                logger: logger
+            )
+
+            let response = Internals.AsyncResponse(
+                logger: logger,
+                uploadingBytes: uploadingBytes,
+                upload: upload,
+                head: head,
+                download: download.stream
+            )
+
+            let unsafeTask = await execute(
+                request: request,
+                delegate: delegate,
+                logger: logger
+            )
+
+            return SessionTask(
+                seed: unsafeTask(),
+                response: response
+            )
         }
 
         package func shutdown() async throws -> Bool {
