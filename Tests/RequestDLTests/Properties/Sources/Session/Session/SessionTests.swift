@@ -279,6 +279,34 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenPreferredExecutor_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .preferredExecutor(.nioTransportServices)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.preferredExecutor == .nioTransportServices)
+        #expect(resolved.session.configuration.requiredExecutor == nil)
+    }
+
+    @Test
+    func session_whenRequiredExecutor_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .requiredExecutor(.urlSession)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.requiredExecutor == .urlSession)
+        #expect(resolved.session.configuration.preferredExecutor == nil)
+    }
+
+    @Test
     func session_whenNeverBody_shouldBeNever() async throws {
         // Given
         let property = Session()

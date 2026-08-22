@@ -39,6 +39,18 @@ extension Internals.Session {
         package var enableNetworkFramework: Bool = false
         package var maximumConcurrentConnections: Int?
 
+        /// Soft hint: reorders `resolveExecutor()`'s pick among the executors this configuration
+        /// is already compatible with -- never forces one it isn't. `nil` leaves the default
+        /// priority order (`.urlSession` › `.nioTransportServices` › `.nio`) untouched. See
+        /// `Session.preferredExecutor(_:)`.
+        package var preferredExecutor: Internals.Executor?
+
+        /// Hard pin: `requireExecutor(_:)` throws `IncompatibleExecutorConfigurationError` rather
+        /// than falling back when this is set and the configuration can't actually run on it.
+        /// `nil` means no pin -- resolution is free to fall back. See
+        /// `Session.requiredExecutor(_:)`.
+        package var requiredExecutor: Internals.Executor?
+
         // MARK: - Inits
 
         package init() {}
@@ -150,10 +162,28 @@ extension Internals.Session.Configuration {
     /// (public API) let a caller override it.
     package func resolveExecutor() -> Internals.Executor {
         #if canImport(Darwin)
-        if urlSessionIncompatibilityReasons().isEmpty {
+        let isURLSessionCompatible = urlSessionIncompatibilityReasons().isEmpty
+        let isNetworkFrameworkCompatible = secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true
+
+        // `preferredExecutor` only ever reorders among the candidates the two checks above
+        // already say are compatible -- it is never consulted on its own, and never returned
+        // without the matching compatibility check passing first. `.nio` needs no such check: it
+        // is the universal fallback (`requireExecutor(_:)` never produces reasons for it either).
+        switch preferredExecutor {
+        case .urlSession where isURLSessionCompatible:
+            return .urlSession
+        case .nioTransportServices where isNetworkFrameworkCompatible:
+            return .nioTransportServices
+        case .nio:
+            return .nio
+        case .urlSession, .nioTransportServices, nil:
+            break
+        }
+
+        if isURLSessionCompatible {
             return .urlSession
         }
-        if secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true {
+        if isNetworkFrameworkCompatible {
             return .nioTransportServices
         }
         #endif

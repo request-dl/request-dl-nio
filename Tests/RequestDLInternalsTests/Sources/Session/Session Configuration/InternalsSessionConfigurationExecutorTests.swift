@@ -278,6 +278,85 @@ struct InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
+    // MARK: - resolveExecutor() with preferredExecutor
+
+    @Test
+    func resolveExecutor_whenNIOTransportServicesPreferredAndCompatible_resolvesToItOverURLSession() async throws {
+        // Given -- compatible with both `.urlSession` and `.nioTransportServices`, so the
+        // preference is what breaks the tie rather than falling to the default priority order.
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(.none)
+        configuration.preferredExecutor = .nioTransportServices
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    @Test
+    func resolveExecutor_whenNIOPreferred_resolvesToNIORegardlessOfOtherCompatibility() async throws {
+        // Given -- compatible with everything, yet `.nio` is explicitly preferred.
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(.none)
+        configuration.preferredExecutor = .nio
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #expect(sut == .nio)
+    }
+
+    /// A preference the configuration can't actually satisfy is not an override -- §6.4's whole
+    /// point. Resolution must fall through to whatever the default priority order would have
+    /// picked among the compatible candidates, not honor the preference anyway.
+    @Test
+    func resolveExecutor_whenNIOTransportServicesPreferredButIncompatible_fallsBackToURLSession() async throws {
+        // Given -- reachable under URLSession (§6.1), unreachable under NIOTransportServices
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(.none)
+        configuration.preferredExecutor = .nioTransportServices
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .urlSession)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    @Test
+    func resolveExecutor_whenURLSessionPreferredButIncompatible_fallsBackToNIOTransportServices() async throws {
+        // Given -- unreachable under URLSession (bucket D), unaffected under NIOTransportServices
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(.none)
+        configuration.preferredExecutor = .urlSession
+        configuration.httpVersion = .http1Only
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
     // MARK: - requireExecutor(_:)
 
     @Test

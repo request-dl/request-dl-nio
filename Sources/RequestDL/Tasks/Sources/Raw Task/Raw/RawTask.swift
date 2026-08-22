@@ -18,6 +18,17 @@ struct RawTask<Content: Property>: RequestTask {
             environment: environment
         ).build()
 
+        // Checked before anything else touches `resolved` -- a hard-pinned executor this
+        // configuration can't actually run on must fail loudly (§6.4 of URLSESSION_REPORT.md),
+        // not after paying for a logger/client/cache setup nobody will get to use.
+        if let requiredExecutor = resolved.session.configuration.requiredExecutor {
+            do {
+                try resolved.session.configuration.requireExecutor(requiredExecutor)
+            } catch let error as Internals.IncompatibleExecutorConfigurationError {
+                throw ExecutorRequirementError(error)
+            }
+        }
+
         let logger = Internals.TaskLogger(
             baseURL: resolved.requestConfiguration.baseURL,
             pathComponents: resolved.requestConfiguration.pathComponents,
