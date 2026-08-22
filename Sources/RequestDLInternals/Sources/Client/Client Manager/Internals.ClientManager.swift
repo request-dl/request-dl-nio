@@ -78,8 +78,8 @@ extension Internals {
 
                 // `withLock` rather than a manual lock and unlock pair with a return in the
                 // middle of it, which balances today and stops balancing on the next edit.
-                if let client = tableLock.withLock({
-                    _reusableClient(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                if case .nio(let client) = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
                 }) {
                     return client
                 }
@@ -95,6 +95,53 @@ extension Internals {
                     sessionConfiguration: sessionConfiguration
                 )
             }
+        }
+
+        /// Executor-aware counterpart to `client(provider:sessionConfiguration:)` -- resolves
+        /// `sessionConfiguration.resolveExecutor()` (Phase 3) and actually builds/caches the
+        /// client that decision points to, rather than only deciding in the abstract. Phase 6 of
+        /// `URLSESSION_TASK.md`.
+        ///
+        /// Shares this manager's own `_table` with the NIO-only `client(provider:sessionConfiguration:)`
+        /// above -- a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for
+        /// the same provider (see `_createNewURLSessionClient`'s `id`), so the two can never
+        /// collide or be handed back for each other.
+        package func resolvedClient(
+            provider: SessionProvider,
+            sessionConfiguration: Internals.Session.Configuration
+        ) async throws -> Internals.ClientManager.Client {
+            #if canImport(Darwin)
+            guard sessionConfiguration.resolveExecutor() == .urlSession else {
+                return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
+            }
+
+            let sessionProviderID =
+                "URLSession."
+                + provider.uniqueIdentifier(
+                    with: SessionProviderOptions(isCompatibleWithNetworkFramework: false)
+                )
+
+            return try await lock.withLock {
+                try Task.checkCancellation()
+
+                if let item = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                }),
+                    case .urlSession = item
+                {
+                    return item
+                }
+
+                return .urlSession(
+                    try _createNewURLSessionClient(
+                        id: sessionProviderID,
+                        sessionConfiguration: sessionConfiguration
+                    )
+                )
+            }
+            #else
+            return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
+            #endif
         }
 
         // MARK: - Private methods
@@ -170,10 +217,15 @@ extension Internals {
         // MARK: - Unsafe methods
 
         /// - Warning: Lockless. The caller must be holding ``tableLock``.
-        private func _reusableClient(
+        ///
+        /// Returns the cached `Internals.ClientManager.Client` regardless of which backend it
+        /// wraps -- shared by both `client(provider:sessionConfiguration:)` (NIO-only, unwraps
+        /// `.nio`) and `resolvedClient(provider:sessionConfiguration:)` (unwraps `.urlSession`),
+        /// so the age/reuse logic below is written once rather than duplicated per backend.
+        private func _reusableItem(
             id: String,
             sessionConfiguration: Internals.Session.Configuration
-        ) -> Internals.Client? {
+        ) -> Internals.ClientManager.Client? {
             let now = {
                 #if canImport(Darwin)
                 DispatchTime.now().uptimeNanoseconds
@@ -227,7 +279,7 @@ extension Internals {
                 items.append(
                     .createNew(
                         sessionConfiguration: sessionConfiguration,
-                        client: client
+                        client: .nio(client)
                     )
                 )
 
@@ -236,5 +288,41 @@ extension Internals {
 
             return client
         }
+
+        #if canImport(Darwin)
+        /// - Warning: Lockless with respect to ``tableLock``, which it takes itself.
+        ///
+        /// `id` is expected to already carry `resolvedClient(provider:sessionConfiguration:)`'s
+        /// `"URLSession."` prefix, keeping this entry apart from any `.nio` one the same provider
+        /// might also have cached under its bare (or `"NTW."`-prefixed) id.
+        private func _createNewURLSessionClient(
+            id: String,
+            sessionConfiguration: Internals.Session.Configuration
+        ) throws -> Internals.URLSessionClient {
+            let client = try Internals.URLSessionClient(
+                configuration: sessionConfiguration.buildURLSessionConfiguration(),
+                secureConnection: sessionConfiguration.secureConnection,
+                redirectConfiguration: sessionConfiguration.redirectConfiguration
+                    ?? .follow(max: 5, allowCycles: false),
+                proxy: sessionConfiguration.proxy,
+                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            )
+
+            tableLock.withLock {
+                var items = _table[id] ?? []
+
+                items.append(
+                    .createNew(
+                        sessionConfiguration: sessionConfiguration,
+                        client: .urlSession(client)
+                    )
+                )
+
+                _table[id] = items
+            }
+
+            return client
+        }
+        #endif
     }
 }

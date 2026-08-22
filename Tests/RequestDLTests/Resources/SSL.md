@@ -1,3 +1,9 @@
+> **Superseded by [`.scripts/generate-test-certificates.sh`](../../../.scripts/generate-test-certificates.sh).**
+> The recipe below produces certificates with no Extended Key Usage/SAN and a 30-year validity,
+> which `SecTrustEvaluateWithError` (the URLSession executor's TLS validation, see
+> `URLSESSION_TASK.md` Phase 5e) rejects outright. Kept here as a historical record of how the
+> fixtures used to be generated; run the script instead.
+
 # Generate Certificate with Password
 
 ```

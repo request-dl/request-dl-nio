@@ -50,8 +50,7 @@ extension Internals {
 
         /// Caps how many requests this client may have in flight at once, from the moment a
         /// request is asked to execute until it completes, is cancelled, or is released.
-        /// `nil` when the session was not configured with a limit, leaving requests unthrottled.
-        private let connectionSemaphore: AsyncSemaphore?
+        private let throttledExecutor: Internals.ThrottledExecutor
 
         // MARK: - Unsafe properties
 
@@ -69,7 +68,9 @@ extension Internals {
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
-            connectionSemaphore = maximumConcurrentConnections.map { .init(permits: $0) }
+            throttledExecutor = Internals.ThrottledExecutor(
+                maximumConcurrentConnections: maximumConcurrentConnections
+            )
         }
 
         deinit {
@@ -108,7 +109,7 @@ extension Internals {
         ) async -> UnsafeTask<Delegate.Response> {
             // Waited on before anything else, so a session configured with a limit never opens
             // more connections than that, whether or not one is free to reuse.
-            await connectionSemaphore?.wait()
+            let release = await throttledExecutor.acquire()
 
             // Registered before the request goes out, so the client counts as busy from the
             // moment it is asked to do anything.
@@ -129,14 +130,12 @@ extension Internals {
                 )
             }
 
-            let connectionSemaphore = self.connectionSemaphore
-
             return UnsafeTask(task) {
                 // No lock and no task hop. Completing an operation is a counter decrement now,
                 // so wrapping it in `AsyncLock` only bought a suspension on a path that can be
                 // reached from an event loop.
                 operation.complete()
-                connectionSemaphore?.signal()
+                release()
             }
         }
 

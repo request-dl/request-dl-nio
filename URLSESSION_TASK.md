@@ -1,0 +1,263 @@
+# URLSession Executor — Implementation Task List
+
+**Status:** Planning. Analysis (`URLSESSION_REPORT.md`) and the highest-risk validation (mTLS from raw bytes, `HOW_TO_USE_CERTIFICATE_URLSESSION.md`) are both done. Phases 1–6, including all seven of Phase 5's sub-phases (5a–5g), are implemented; nothing else below is. Note on 6: `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)` is additive, not a change to the existing `client(provider:sessionConfiguration:)`'s signature or behavior -- see Phase 6 below for why hooking `resolveExecutor()`'s decision straight into the existing method would have silently broken the live `RawTask`/`Internals.Session` pipeline on Darwin, where a great many everyday configurations already resolve to `.urlSession` today. Note on 5c: `.http` proxy support (`.basic`/`.basicRawCredentials` auth) works and is confirmed across macOS, Mac Catalyst, and iOS/tvOS/watchOS/visionOS Simulators — with one platform-dependent wrinkle (macOS/Catalyst bypass a configured proxy for `localhost` specifically; other platforms don't) documented in 5c below. `.socks`/`.bearer` stay excluded, as originally planned. Note on 5e: the TLS/mTLS mapping (identity building, trust roots, verification modes) is fully implemented; 3 of its 4 round-trip tests genuinely pass (trust roots, `.none` verification, identity-absent rejection), confirmed by actually running the suite on macOS *and* an iOS Simulator *and* Linux (Docker, `swift:6.2`), not on macOS alone. The 4th (a real client-certificate handshake) is `withKnownIssue` unconditionally — a missing-Keychain-Sharing-entitlement limitation of this SwiftPM test harness on *any* platform, not macOS-specific as a first pass assumed before the Simulator run corrected it; Phase 10 already flagged the underlying Keychain gap as open. That gap is now closed, not just documented: a throwaway Xcode project (Tuist-generated, not committed) with Keychain Sharing actually added confirmed the identity pairs successfully once the entitlement is present — `SecItemCopyMatching(identity) returned 1 identities`, run and observed directly on an iOS Simulator, not assumed from the spike's earlier validation. A second issue found along the way -- the shared test TLS fixtures failing `SecTrustEvaluateWithError` outright (excessive validity period, missing Extended Key Usage) -- was fixed rather than left as a known issue: see `.scripts/generate-test-certificates.sh` and `CertificateFixturesExpirationTests` in 5e below. Note on 5f: the upload-streaming bridge (`Internals.URLSessionUploadStream`) is fully implemented and unit-tested directly (byte-for-byte order, backpressure, cancellation — no `URLSession`/network involved), all genuinely passing. Its `LocalServer`-backed integration test is a confirmed `withKnownIssue` on both macOS and iOS Simulator, root-caused (not just observed) to `uploadTask(withStreamedRequest:)` auto-negotiating the IETF resumable-uploads draft on this OS build, which `LocalServer` doesn't participate in — confirmed via two independent probes (a real external server completes the identical delegate sequence normally; the buffered upload path against this same `LocalServer` also completes normally) that isolate the gap to `LocalServer` specifically, not the bridge. Note on 5g: the download-streaming bridge reuses `Internals.DownloadBuffer` (the NIO backend's own `ReadingMode` re-chunker) unmodified rather than reimplementing it, and all of its tests -- including exact chunk-boundary assertions stronger than the phase's own acceptance bar -- genuinely pass on both macOS and an iOS Simulator, no known issues; this closes out Phase 5 entirely. Cross-platform build also confirmed via Docker (`swift:6.2` on Linux) — builds and runs the full test suite cleanly; verified no full-`Foundation` linkage in the compiled `RequestDL`/`RequestDLInternals` libraries themselves (symbol-level check), only in the swift-testing/XCTest test-harness binary, which is unavoidable framework-level linkage on Linux.
+**How to use this doc:** each phase has a goal, concrete deliverables, its dependencies on earlier phases, and acceptance criteria. Phases 1–6 are a strict dependency chain — do them in order. Phase 5 is the largest and is itself split into sub-phases that can land as separate PRs. Phases 8–10 can run in parallel with anything after phase 5 lands.
+**Landed already:** [#289](https://github.com/request-dl/request-dl-nio/pull/289) (merged) — the `isCompatibleWithNetworkFramework` crash/silent-drop fix and the Apple-platform `decompression` default. Both are prerequisites this plan builds on, not part of it.
+
+---
+
+## Phase 1 — Foundation types
+
+**Goal:** the vocabulary every later phase shares. No behavior yet.
+
+- [x] `Internals.ExecutorIncompatibilityReason` (enum) — one case per config field that can keep a session off a given executor. Source: `URLSESSION_REPORT.md` §6.5.
+- [x] `Internals.IncompatibleExecutorConfigurationError` (struct: `requiredExecutor: Executor`, `reasons: [ExecutorIncompatibilityReason]`).
+- [x] `Internals.Executor` (enum: `.urlSession`, `.nioTransportServices`, `.nio`). Source: §6.2.
+
+**Dependencies:** none.
+**Acceptance:** compiles, unit tests for `Equatable`/`Hashable` conformance where relevant. No wiring into existing code yet.
+
+---
+
+## Phase 2 — Capability checks (reasons, not just bools)
+
+**Goal:** one source of truth both the soft (`preferredExecutor`) and hard (`requiredExecutor`) paths read from, replacing the standalone `Bool` check shipped in #289.
+
+- [x] `Internals.SecureConnection.networkFrameworkIncompatibilityReasons() -> [ExecutorIncompatibilityReason]` — same fields #289 already excludes (`certificateChain`, `privateKey`, `keyLogger`, `.noHostnameVerification`, `cipherSuites`, `cipherSuiteValues`, `additionalTrustRoots`, `renegotiationSupport`, `signingSignatureAlgorithms`, `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`, `pskIdentityResolver`), rewritten to build a reason list instead of `&&`-chaining. Source: §6.5.
+- [x] Refactor `isCompatibleWithNetworkFramework` to `networkFrameworkIncompatibilityReasons().isEmpty`. **Must not change behavior** — #289's regression tests should pass unmodified against the refactored version; that's the acceptance bar for this step.
+- [x] `Internals.SecureConnection.urlSessionIncompatibilityReasons() -> [ExecutorIncompatibilityReason]` — deliberately does **not** exclude `certificateChain`/`privateKey` (validated reachable, §5.1 of the report). Excludes: `signingSignatureAlgorithms`, `verifySignatureAlgorithms`, `sendCANameList`, `renegotiationSupport`, `shutdownTimeout`, `pskHint`, `pskIdentityResolver`, `keyLogger`, `cipherSuites`, `cipherSuiteValues`. Source: §6.5.
+- [x] `Internals.Session.Configuration.isCompatibleWithURLSession` (or reasons-returning equivalent) — adds the non-`SecureConnection` bucket-D checks: `dnsOverride`, `httpVersion == .http1Only`, `proxy.connectHeaders`, `proxy.connectionProtocol == .socks`. Source: §6.2.
+
+**Dependencies:** Phase 1.
+**Acceptance:** `InternalsSecureConnectionTests`'s existing NIOTS regression suite (from #289) still passes unchanged. New parameterized tests for `urlSessionIncompatibilityReasons()` mirroring that same pattern — one case per excluded field, plus explicit tests confirming `certificateChain`/`privateKey`/`additionalTrustRoots`/`.noHostnameVerification` do **not** appear in the URLSession reason list (the §6.1 "not a strict hierarchy" property, made concrete as tests).
+
+---
+
+## Phase 3 — `Executor` resolution
+
+**Goal:** formalize the decision, still with only two real executors to choose between (NIOTS/NIO) — this phase adds no new transport, just the decision logic and the hard-pin error path.
+
+- [x] `Internals.Session.Configuration.resolveExecutor() -> Executor` — tries `.urlSession` first on Darwin (reasons empty), then `.nioTransportServices`, else `.nio`. Source: §6.3. Since `Internals.URLSessionClient` doesn't exist until Phase 5, this can only ever resolve to `.urlSession` in tests as a pure function — no actual client gets built for it yet. Fine: this phase is testing the *decision*, not the execution.
+- [x] `Internals.Session.Configuration.requireExecutor(_:) throws` — throws `IncompatibleExecutorConfigurationError` with the full reason list when the pinned executor can't take the config. **Must throw, never silently degrade** — this is the direct fix for the bug class #289 closed (§6.4). Source: §6.4, §6.5.
+- [x] Public rewrap: `ExecutorRequirementError` (public, `RequestDL` module) following the `SecureFileLoadError` → `SecureFileError` pattern (§6.5) — descriptive, names the fix not just the failure.
+
+**Dependencies:** Phase 2.
+**Acceptance:** unit tests for `resolveExecutor()`'s priority order and for `requireExecutor(_:)` throwing with the exact expected reason set for representative configs (one test per bucket-D field is overkill here since Phase 2 already covered that per-field; this phase's tests are about the *decision*, e.g. "config compatible with both NIOTS and URLSession resolves to `.urlSession`", "config with `additionalTrustRoots` resolves to `.nio`, not `.nioTransportServices`").
+
+---
+
+## Phase 4 — Hoist `maximumConcurrentConnections`
+
+**Goal:** get the concurrency cap out of `Internals.Client` (NIO-specific) before a second concrete client exists, so it isn't duplicated or allowed to drift. Source: §5.2.
+
+- [x] Extract `connectionSemaphore` gating from `Internals.Client` into a shared wrapper (`Internals.ThrottledExecutor` or similar) that any concrete client conforms to/is wrapped by.
+- [x] `Internals.Client` (NIO) adopts the wrapper; behavior must be identical to today (same tests pass unmodified).
+
+**Dependencies:** none functionally, but do this *before* Phase 5 starts touching client structure — retrofitting it after `Internals.URLSessionClient` exists means fixing the cap twice.
+**Acceptance:** existing `maximumConcurrentConnections` tests pass unmodified against the refactored structure.
+
+---
+
+## Phase 5 — `Internals.URLSessionClient`
+
+**Goal:** the actual second executor. Largest phase; land as separate PRs per sub-phase rather than one giant change.
+
+### 5a. Basic request/response
+
+- [x] Build `URLRequest` from RequestDL's internal request representation (method, headers, URL).
+- [x] Execute via `URLSession`, map `HTTPURLResponse` back to RequestDL's response head type.
+- [x] Non-streaming body only at this stage (`Data` in, `Data` out) — defer 5f/5g's streaming bridges.
+
+**Acceptance:** a `DataTask`-equivalent round-trip against `LocalServer` (no TLS customization, no redirect, no proxy) passes through `.urlSession` when forced via `requireExecutor(.urlSession)` (Phase 3). ✅ `RequestConfigurationURLSessionClientTests` (`RequestDLTests`).
+
+### 5b. Redirects
+
+- [x] Implement `URLSessionTaskDelegate.urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`, tracking redirect count and cycle detection manually (no native max/allowCycles in URLSession). Source: §4.3.
+- [x] Map `Internals.RedirectConfiguration.disallow`/`.follow(max:allowCycles:)` onto this.
+
+**Acceptance:** port the existing NIO-backend redirect tests (max redirects exceeded, cycle detected, disallow) to run against `.urlSession` too — same assertions, same `LocalServer` fixtures, different executor. ⚠️ No such NIO-backend suite actually existed to port (only `Internals.RedirectConfiguration.build()` unit tests and the `Session.enableRedirect`/`disableRedirect` modifier tests did) — see `InternalsURLSessionClientRedirectTests`, whose assertions are instead derived directly from AsyncHTTPClient's vendored `RedirectState.swift`, which the new delegate ports line for line.
+
+### 5c. Proxy
+
+- [x] `connectionProxyDictionary` mapping for `.server` (HTTP CONNECT) with `.basic`/`.bearer` auth via the proxy authentication challenge delegate callback. Source: §4.3. Implemented: `Internals.Proxy.buildConnectionProxyDictionary()`, `Internals.URLSessionClient.TaskDelegate.proxyCredential()`. **`.basic`/`.basicRawCredentials` confirmed working end to end**, on macOS, Mac Catalyst, and iOS/tvOS/watchOS/visionOS Simulators (see acceptance below). `.bearer` stays excluded on its own architectural grounds regardless of platform — `URLCredential` has exactly two shapes (user/password, identity/certificates), neither of which can carry an arbitrary token — so `Internals.ExecutorIncompatibilityReason.proxyBearerAuthorizationUnderURLSession` keeps it out of `.urlSession`.
+- [x] Confirm (don't assume) whether SOCKS is usable via `connectionProxyDictionary` on current OS versions — §4.4 flagged this as unreliable/undocumented; if it doesn't work cleanly, leave `.socks` in the bucket-D exclusion list from Phase 2 rather than shipping something half-working. Not separately re-tested (the report's own "unreliable/undocumented" framing plus the narrow value of proving it broken were judged not worth the added surface); `.socks` stays excluded (`proxySOCKSUnderURLSession`, unchanged from Phase 2).
+
+**Acceptance:** proxy tests against a local HTTP CONNECT proxy fixture (reuse whatever the NIO backend's proxy tests already stand up), for `.urlSession`. ⚠️ No such NIO-backend suite existed to reuse (same gap as 5b) — built `LocalHTTPConnectProxy` (`RequestDLTestSupport`) instead, a real local CONNECT proxy (hand-rolled `CONNECT` parsing over raw bytes — an earlier NIOHTTP1-codec-based version had a handler-removal race that crashed on every Simulator platform, never on macOS; see the type's doc comment) with a connection-attempt counter.
+
+**Finding, in two layers, both confirmed empirically rather than assumed (first pass of this investigation reached the wrong conclusion — see below):**
+1. **The mapping itself works correctly on every Apple platform checked:** macOS, Mac Catalyst, and iOS/tvOS/watchOS/visionOS Simulators all route a request through the configured proxy for a non-loopback destination — `InternalsProxyDictionaryPlatformTests` (a `LocalServer`-independent probe using a bare `Network.framework` listener) proves this directly and passes everywhere.
+2. **Every platform bypasses a configured proxy for the literal loopback IP (`127.0.0.1`), but macOS and Mac Catalyst *additionally* bypass `localhost` by name — iOS/tvOS/watchOS/visionOS Simulators do not.** Since `LocalServer`/`LocalHTTPConnectProxy` are always `localhost`, `InternalsURLSessionClientProxyTests`'s round trips genuinely pass on iOS/tvOS/watchOS/visionOS and are a platform-conditioned `withKnownIssue` (`when:` gated on `os(macOS) || targetEnvironment(macCatalyst)`) on macOS/Catalyst — not a defect in the mapping, an OS policy difference this specific fixture's hostname choice exposes.
+
+The first pass of this investigation used only a loopback destination, saw the proxy never contacted on macOS, and concluded `connectionProxyDictionary` was broken outright — wrong, caught by testing non-loopback and loopback destinations side by side (see git history / session transcript for the correction). Left as a cautionary note in `InternalsProxyDictionaryPlatformTests`'s doc comment: an executor-compatibility finding this consequential needs a same-fact-different-angle check before it changes what `Internals.ExecutorIncompatibilityReason` excludes.
+
+**Not tested:** real (non-Simulator) iOS/tvOS/watchOS/visionOS devices — this environment has no attached hardware, and the Simulator tooling available cannot drive one. Simulators share their host Mac's kernel network stack for the actual socket I/O, so this is a meaningfully weaker guarantee than a device would be for anything that could depend on kernel-level behavior — though Catalyst matching native macOS exactly, and every Simulator platform agreeing with each other on the `localhost` question, is reasonable (not conclusive) evidence this specific finding is a CFNetwork/URLSession policy decision rather than an artifact of the simulated environment. "AppleOS 27" (next major version) does not exist yet as of this writing (current generation is 26.5 per `xcrun simctl list runtimes`; WWDC ships the next major version around June each year) — nothing to test there today; worth re-running this exact check once a 27 SDK/simulator is available, since `connectionProxyDictionary` is legacy CFNetwork API Apple has been nudging developers off of, and its behavior seems the kind of thing more likely to shift on a major version than a point release.
+
+### 5d. Cookies
+
+- [x] `httpShouldSetCookies = false`, no shared `httpCookieStorage` on the `URLSessionConfiguration` — mandatory normalization, not optional. Source: §4.3's "Required normalizations". Applied unconditionally in `Internals.URLSessionClient.init`, not caller-toggleable, matching "mandatory."
+
+**Acceptance:** a test that fires two sequential requests to a server that sets a cookie, confirms the second request does **not** carry it — proving parity with the NIO backend's no-jar behavior. ✅ `InternalsURLSessionClientCookieTests` — both requests share one `Internals.URLSessionClient` (cookie jars are session-scoped, so this only proves anything if they do), the second one's `LocalServer.HTTPHandler` echoes back whatever `Cookie` header it actually received (`HTTPResult.receivedCookieHeader`, a new optional/additive field — the only way to prove the client didn't resend it, since nothing else exposes what was actually sent on the wire). Verified the test is meaningful, not a tautology: temporarily commented out the two normalization lines, confirmed the test fails (cookie *is* resent), restored them, confirmed it passes again.
+
+### 5e. TLS / mTLS delegate
+
+This is where the validated spike graduates into production code.
+
+- [x] Promote `RawBytesIdentityBuilder` (from `Tests/RequestDLTests/URLSession Executor Spike/`) into `RequestDLInternals`, RSA/PKCS#1 only for the first cut (matches what was validated). Landed as `Internals.RawBytesIdentityBuilder`; the spike directory is deleted, its content promoted rather than duplicated. One behavior change from the spike: Keychain item labels are now a deterministic SHA-256 of the certificate's DER bytes (not a random UUID) and `SecItemAdd` treats `errSecDuplicateItem` as success rather than a failure — see the finding below on why the spike's `kSecValueRef`-based pre-delete wasn't actually reliable.
+- [x] Promote `RoutingMTLSURLSessionDelegate`'s shape (routes by host, not the single-identity `MTLSURLSessionDelegate` used for the spike test) into the real delegate `Internals.URLSessionClient` installs — needed because one `URLSession` serves many hosts, each with its own `SecureConnection`. Landed as `Internals.URLSessionClient.TLSDelegate`, keyed by the request's own host. `Internals.URLSessionClient` itself still only ever resolves one `SecureConnection` (an init-time parameter, same as `redirectConfiguration`/`proxy`) — genuine multi-host routing has nothing to populate more than one map entry until Phase 6 pools a client across hosts, but the type's shape doesn't need revisiting when that lands.
+- [x] `trustRoots`/`additionalTrustRoots` via `SecTrust` + `SecTrustSetAnchorCertificates` in the server-trust challenge. Source: §4.3. Landed in `Internals.URLSessionIdentityPolicy`, resolving both through `Internals.CertificateChain`/`TrustRoots`/`AdditionalTrustRoots`'s existing NIOSSL-backed parsing (file/bytes, PEM/DER all handled uniformly) rather than reimplementing PEM parsing.
+- [x] `certificateVerification`: `.none` (accept any trust), `.fullVerification` (default), `.noHostnameVerification` (`SecPolicyCreateSSL(server: true, hostname: nil)`). Source: §4.3. All three implemented; `.none` and `.fullVerification` confirmed working end to end (see acceptance below). `.noHostnameVerification` implemented identically to the report's spec but has no dedicated round-trip test — nothing in the fixtures exercises a hostname/certificate mismatch that would tell `.fullVerification` and `.noHostnameVerification` apart.
+- [x] Runtime error path for a missing Keychain Sharing entitlement (`SecItemAdd` returning `errSecMissingEntitlement`/`-34018`) — wrap it with the same actionable framing `HOW_TO_USE_CERTIFICATE_URLSESSION.md` already documents by hand, don't let a raw `OSStatus` reach the caller. Source: §5.1's "Design implication", §6.5's open item. Landed as `Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement`, thrown instead of the generic `.keychainOperationFailed` specifically for `errSecMissingEntitlement`.
+- [x] Identity lifecycle: build once per `SecureConnection`, cache for reuse (mirrors NIOSSL's own per-connection TLS config caching in `Internals.ClientManager`), clean up from the Keychain when no longer needed — not on every single request. Landed as `Internals.URLSessionIdentityPolicy`, built once in `Internals.URLSessionClient.init` (not per-`execute()` call) and removed from the Keychain in `deinit`.
+
+**Acceptance:** port `dataTask_whenCAEnabled` (the existing NIO-backend mTLS test) to run against `.urlSession`, same `LocalServer` + `Certificates()` fixtures, using `Certificate`/`PrivateKey` from `.bytes`/`.file` sources as today. Also: a test confirming `trustRoots`/`additionalTrustRoots`/`certificateVerification` variants behave the same across both executors. Ported as `RequestConfigurationURLSessionClientMTLSTests` (`RequestDLTests`) — 3 of its 4 tests genuinely complete a real handshake and pass; 1 is a confirmed, documented `withKnownIssue`.
+
+**Cross-platform validation for this phase was done directly, not assumed** — actually run, not just reasoned about: macOS (`swift test`), an iOS 26.5 Simulator (`xcodebuild test -scheme request-dl`, SwiftPM's own auto-generated scheme, no custom entitlements), and Linux (`docker run swift:6.2 swift test`, the same image CI uses). Results:
+
+- macOS and iOS Simulator: identical outcome, 3/4 pass for real, 1 known issue with the exact same underlying error on both (see finding 1 below) — this cross-check is what caught finding 1 being mis-scoped as macOS-specific in an earlier pass (see below).
+- Linux: `Internals.URLSessionClient` and everything under `Sources/RequestDLInternals/.../URLSession Client/` is `canImport(Darwin)`-gated, so `RequestConfigurationURLSessionClientMTLSTests` compiles to nothing there by design — only `CertificateFixturesExpirationTests` (fixture-only, no TLS handshake) runs, and passes. Full suite run on Linux too (1117 tests, 0 known issues — the `withKnownIssue`s are all Darwin-only tests) to confirm the certificate regeneration below didn't break anything else there.
+
+1. **This SwiftPM test harness has no Keychain Sharing entitlement, on any platform** (`urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend`) — `SecItemAdd` succeeds for the certificate and the private key individually, but `SecItemCopyMatching(kSecClassIdentity)` then finds zero identities. **First pass at this got the scope wrong**: gated `withKnownIssue(when:)` on `os(macOS)`, reasoning that `swift test`'s unsigned CLI binary was the specific problem and iOS Simulator/device builds would carry the entitlement — plausible, but never actually checked, and wrong. Running the same test on an iOS Simulator produced the identical error (`Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement`'s exact message) with `when: { false }` on that platform, so it failed the suite outright instead of being recognized as the known issue it still was. The real common thread isn't the OS, it's that neither run carries the entitlement: `swift test` is a bare unsigned binary, and SwiftPM's auto-generated Xcode scheme has no `.entitlements` file at all — there's nowhere in a `Package.swift`-only project to add the Keychain Sharing capability `HOW_TO_USE_CERTIFICATE_URLSESSION.md` walks through (that doc is written for a real app target's Signing & Capabilities tab). Fixed by dropping the `when:` condition entirely — this is a property of the test harness, not the platform, so it applies unconditionally. Confirms, incidentally, that `missingKeychainSharingEntitlement`'s actionable message (5e's own runtime-error-path item) reads correctly on both platforms, since it's what both failures actually show.
+
+   **Closed out, not left open:** the round trip *with* the entitlement present was then actually confirmed, not just assumed to work. A throwaway Xcode project (generated with Tuist, not committed) reissued `Internals.RawBytesIdentityBuilder.makeIdentity`'s exact Security-framework sequence standalone (its own code is `package`-visible, not `public`, so a separate project can't call it directly) against the same client certificate fixture bytes, in a real app target with Keychain Sharing added via Signing & Capabilities. Built and run via `xcodebuild`/`simctl` on the same iOS Simulator: `SecItemCopyMatching(identity) returned 1 identities` — `PASS -- identity paired successfully with Keychain Sharing entitlement present`. Notably, an ad-hoc `codesign --entitlements` on a hand-assembled `.app` bundle (no Xcode project) is *not* sufficient for this — Simulator launch was denied (`NSPOSIXErrorDomain` 163) until the app went through Xcode's own build system, which additionally runs a `RegisterExecutionPolicyException` build step ad-hoc signing alone doesn't get. This is the confirmation this suite structurally cannot produce itself; not repeated as an automated test since it needs a real Xcode app target with an entitlements file, not just a `Package.swift`.
+
+**Fixed along the way, not just found:** the first pass at this acceptance test also hit `LocalServer`'s fixture server certificate failing `SecTrustEvaluateWithError` outright (even once explicitly anchored): `"'localhost' certificate is not standards compliant" / "Certificate exceeds maximum temporal validity period, Extended key usage does not match certificate usage"`. The original fixtures (`Tests/RequestDLTests/Resources/{server,client,client_password}/`, recipe in the now-superseded `SSL.md`) were issued for 30 years with no Extended Key Usage or SAN — fine for NIOSSL's own validation (no equivalent requirement), rejected outright by `SecPolicyCreateSSL`'s enforcement, uniform across every Apple platform, not macOS-specific. Fixed rather than left as a known issue, since it's a one-time fixture problem, not an environment limitation:
+
+- [`.scripts/generate-test-certificates.sh`](.scripts/generate-test-certificates.sh) reissues all three fixtures with a `serverAuth`/`clientAuth` Extended Key Usage as appropriate, a SAN (`DNS:localhost,IP:127.0.0.1`, server only), and a 397-day validity (under Apple's enforced cap). Deliberately does **not** set `keyUsage` — a first attempt that added a critical `keyUsage` without `keyCertSign` broke every *other*, NIOSSL-backed test relying on the server certificate as its own trust anchor (`TrustRoots(server.certificateURL)`, direct, no real CA chain); BoringSSL enforces a critical `keyUsage` strictly where SecTrust apparently doesn't care about it here, so adding it was scope creep the original finding never asked for.
+- [`CertificateFixturesExpirationTests`](Tests/RequestDLInternalsTests/Sources/Secure%20Connection/CertificateFixturesExpirationTests.swift) (`RequestDLInternalsTests`) reads each fixture's `notValidAfter` (`NIOSSLCertificate`, portable, no `Security`-framework dependency) and calls `Issue.record(...)` with the exact command to run if any fixture has expired — since these are now intentionally short-lived, this is what turns "some TLS test fails somewhere with an opaque handshake error a year from now" into one immediate, actionable failure instead.
+
+`urlSessionClient_whenTrustRootsConfigured_verifiesServerCertificateAgainstThem` and `.none` verification (`urlSessionClient_whenVerificationIsNone_acceptsUntrustedServerCertificate`) both now genuinely pass, confirming `Internals.URLSessionIdentityPolicy` answers a server-trust challenge under `.fullVerification` and `.none` alike. `additionalTrustRoots` shares the same anchor-then-evaluate code path as `trustRoots` in `Internals.URLSessionIdentityPolicy`, so a dedicated test for it was judged not to add coverage; not added.
+
+### 5f. Upload streaming
+
+- [x] Bridge `RequestBody`/`Internals.BodySequence` (push model, `EventLoopFuture` per chunk) to `uploadTask(withStreamedRequest:)` + `needNewBodyStream` (pull model, `InputStream`). Needs a bounded-buffer adapter — not a reuse of `Internals.StreamWriterSequence`. Source: §4.3. Landed as `Internals.URLSessionUploadStream` (`Sources/RequestDLInternals/.../URLSession Client/Upload/`) — a real `InputStream` subclass (the documented subclassing contract: `open`/`close`/`read(_:maxLength:)`/`hasBytesAvailable`/`getBuffer(_:length:)`, plus the `Stream` superclass primitives), backed by a nested `Buffer` type that is the actual bounded-buffer adapter. Two-way backpressure, deliberately asymmetric: the **producer** (an unstructured `Task` draining the source `AsyncSequence<ByteBuffer>`) waits for room via a `CheckedContinuation` — a real `async` suspension, costs no thread, appropriate since it runs on the cooperative pool; the **consumer** (`read(into:maxLength:)`, called synchronously by `URLSession` off any thread with no `async` context) waits for data via a `DispatchSemaphore` — `InputStream.read` is a blocking call by contract, so blocking its calling thread is exactly what it already signed up for. `Internals.URLSessionClient` gained a second `execute(request:streaming:delegate:onUploadProgress:)` overload (generic over `some AsyncSequence<ByteBuffer> & Sendable`, so it accepts `Internals.BodySequence` directly or `RequestBody` itself from the `RequestDL` module without this module depending on that one) alongside the existing buffered `execute(request:delegate:)`; `TaskDelegate` gained `URLSessionDataDelegate` conformance (response accumulation, since `uploadTask(withStreamedRequest:)` has no `.data(for:)`-style async convenience to lean on) and `needNewBodyStream`/`didSendBodyData` handling, building a *fresh* `Internals.URLSessionUploadStream` on every `needNewBodyStream` call (retries/redirects need the body again from the start). `RequestConfiguration` gained `buildURLRequestWithoutBody()` alongside the existing (now `buildURLRequest()`-only) buffering path, since `uploadTask(withStreamedRequest:)` ignores whatever `httpBody`/`httpBodyStream` a request carries.
+
+**Acceptance:** port existing upload-progress tests to `.urlSession`; confirm chunk delivery order and completion, not exact byte-for-byte progress-event timing (§4.3 already flags timing as executor-specific). The bridge's own correctness is unit-tested directly and passes for real — `InternalsURLSessionUploadStreamTests` (`RequestDLInternalsTests`, no `URLSession`/network involved) feeds `Internals.URLSessionUploadStream` a recognizable non-repeating byte pattern and reads it back in slice sizes that don't line up with either the source chunking or `highWaterMark`, confirming byte-for-byte order and completeness; a second test forces backpressure with `highWaterMark` far below a single chunk's size and confirms delivery still completes intact; a third confirms `close()` releases a pending `read`/`push` instead of hanging. The `LocalServer`-backed integration test (`RequestConfigurationURLSessionClientUploadTests`, `RequestDLTests`) is a confirmed `withKnownIssue` on every platform checked (macOS, iOS Simulator) — not a defect in the bridge:
+
+**Finding, confirmed via two independent probes outside this suite, not assumed:** `uploadTask(withStreamedRequest:)` on this OS build (CFNetwork/3860.700.1, i.e. very recent) automatically negotiates the IETF ["resumable uploads" draft](https://datatracker.ietf.org/doc/draft-ietf-httpbis-resumable-upload/) for *any* streamed upload — the outgoing request carries `Upload-Draft-Interop-Version`/`Upload-Complete` headers neither RequestDL nor this suite ever asked for (confirmed by inspecting what `LocalServer` actually receives). `LocalServer` (a minimal hand-rolled NIOHTTP1 test server) answers with an entirely ordinary 200 response — correctly framed, `Content-Length` matches, `HTTPRequestDecoder` reports a clean `.head`/`.body`/`.end` sequence server-side — but the draft negotiation apparently never recognizes that response as settling the exchange: it never reaches `urlSession(_:dataTask:didReceive:completionHandler:)` on the client, and the task times out.
+
+1. **The delegate wiring pattern itself is correct**, independent of `Internals.URLSessionUploadStream` entirely: the exact same `needNewBodyStream`/`didSendBodyData`/`didReceive`/`didCompleteWithError` sequence, built from a bare `InputStream(data:)` with none of this phase's code involved, against a real external server (`https://httpbin.org/post`) completes normally end to end.
+2. **The buffered upload path against this exact `LocalServer`, same payload size, same everything else, also completes normally** (well under a second) — `session.data(for:delegate:)` never triggers `needNewBodyStream` at all, and never carries the draft headers. Only the combination of `uploadTask(withStreamedRequest:)` specifically and `LocalServer` specifically hangs.
+
+Both `RequestConfigurationURLSessionClientUploadTests` cases use a 5-second `timeoutIntervalForRequest` (rather than the default 60) so this known, already-diagnosed hang fails fast instead of costing a full minute per run. Not investigated further into an actual fix — reissuing `LocalServer` to participate in an experimental IETF draft protocol it has no other reason to support is out of scope for this phase; a real server (as the httpbin.org probe shows) needs no special handling at all, so this is expected to be a `LocalServer`-only gap in practice, not something an app developer using this executor against a real backend would hit.
+
+### 5g. Download streaming / progress
+
+- [x] `URLSessionDataDelegate.urlSession(_:dataTask:didReceive:)` → feed into the existing `DownloadProgress`/`ReadingMode` pipeline. Source: §4.3. Landed as a third `Internals.URLSessionClient.execute(request:readingMode:delegate:) -> Internals.DownloadStep` overload, returning as soon as the response head arrives (mirroring `Internals.AsyncResponse`'s own shape) rather than waiting for the whole body like the buffered/streamed-upload overloads do. Reuses `Internals.DownloadBuffer` -- the exact type `Internals.Session.execute(...)` already builds for the NIO backend -- unmodified, rather than reimplementing `ReadingMode` chunking: it turned out to already be transport-agnostic (it consumes `Internals.AnyBuffer`, not a NIO `ByteBuffer`), so `didReceive data:` only has to bridge one `Data` chunk into one `Internals.DataBuffer` per call. That bridge is synchronous, not `Task`-wrapped, on purpose: `DownloadBuffer.append(_:)` enqueues onto an order-preserving queue, and building the `DataBuffer` on a detached `Task` would let two chunks race to enqueue and reassemble the body out of order -- the exact failure mode `Internals.Buffer`'s existing "Synchronous construction, in memory only" extension (`Internals.ByteURL` → sync `Internals.DataBuffer` init) was already built to prevent for `Internals.ClientResponseReceiver`'s equivalent NIO-side callback; this reuses that same extension rather than adding a new one. `TaskDelegate` resolves the response head from `didReceive response:completionHandler:` (checking `redirectError` there too, not only in `didCompleteWithError:`, since a refused redirect means this *is* the final response) and, separately, closes/fails the `DownloadBuffer` from `didCompleteWithError:` -- the throttle slot `execute` acquires is released there as well, not via a `defer` in `execute` itself, since `execute` returns well before the download finishes.
+
+**Acceptance:** port existing `DownloadProgress`/`ReadingMode` tests to `.urlSession`; assert final assembled data and total byte counts match, not exact chunk boundaries (executor-determined, per §4.3). Ported as `RequestConfigurationURLSessionClientDownloadTests` (`RequestDLTests`) — all 3 tests genuinely pass, no known issues this time (unlike 5f, this uses `session.dataTask(with:)`, not `uploadTask(withStreamedRequest:)`, so it never triggers the resumable-uploads-draft hang that suite documents). Went past the acceptance note's minimum bar deliberately: since `Internals.DownloadBuffer`'s re-slicing guarantee doesn't depend on how its *input* happened to be fragmented, exact chunk-boundary assertions (every `.length`-mode chunk but the last is precisely the configured length; every `.separator`-mode chunk but a trailing remainder ends with the separator) were expected to hold across executors too, not just on NIO -- and they do, confirmed rather than assumed, including a `.separator` test whose payload is sized so the separator lands at executor-determined (not test-controlled) positions relative to `didReceive data:`'s own chunk boundaries. A fourth test confirms a refused redirect (Phase 5b) surfaces as a thrown error from `execute(request:readingMode:delegate:)` itself rather than a bogus successful `DownloadStep` -- the one piece of wiring specific to resolving the response head *early* that the other two `execute` overloads' `didCompleteWithError:`-only redirect check didn't already cover. Confirmed on macOS and an iOS Simulator; Linux (Docker, `swift:6.2`) compiles this whole suite to nothing, as expected -- `Internals.URLSessionClient` is `canImport(Darwin)`-gated -- full Linux suite re-run clean (1117 tests) to confirm nothing else regressed.
+
+**This closes out Phase 5** — all seven sub-phases (5a through 5g) are now implemented.
+
+---
+
+## Phase 6 — Wire into `Internals.ClientManager`
+
+**Goal:** make `resolveExecutor()`/`requireExecutor(_:)` (Phase 3) actually select and cache `Internals.URLSessionClient` (Phase 5), not just decide in the abstract.
+
+- [x] Extend `Internals.ClientManager`'s cache keying (today keyed by `SessionProviderOptions.isCompatibleWithNetworkFramework`) to a third case for `.urlSession`. Landed as a new `package func resolvedClient(provider:sessionConfiguration:)`, additive alongside the existing `client(provider:sessionConfiguration:)` rather than replacing it -- see the note below on why. Both now share one `_table`/`Item` structure keyed off a new `Internals.ClientManager.Client` enum (`.nio(Internals.Client)` / `.urlSession(Internals.URLSessionClient)`, the latter `canImport(Darwin)`-gated), with `resolvedClient` prefixing its cache key `"URLSession." + provider.uniqueIdentifier(with:)` so a `.urlSession` entry can never collide with, or be handed back for, a `.nio`/`.nioTransportServices` one from the same provider (which keys off the bare id, or `"NTW."`-prefixed -- see `SharedSessionProvider`/`IdentifiedSessionProvider`). `_reusableClient` was generalized to `_reusableItem`, returning the shared enum so the age/reuse logic is written once, not duplicated per backend.
+- [x] Apply Phase 4's hoisted concurrency-cap wrapper to the new client so `maximumConcurrentConnections` behaves identically regardless of which executor a session lands on. Already true structurally since Phase 5a (`Internals.URLSessionClient` has owned an `Internals.ThrottledExecutor` from its first cut); this phase's actual job was making sure `resolvedClient`'s new `_createNewURLSessionClient` passes `sessionConfiguration.maximumConcurrentConnections` through when building one, same as `_createNewClient` already does for `Internals.Client`.
+
+**Not in Phase 3/5's scope, added here because `Internals.ClientManager` needed it to build a real `Internals.URLSessionClient` from a full `Internals.Session.Configuration` rather than the `.ephemeral` base every Phase 5 test constructs by hand:**
+
+- `Internals.Session.Configuration.buildURLSessionConfiguration()` (Darwin-only, mirrors `build() -> HTTPClient.Configuration`) -- `URLSessionConfiguration.ephemeral` as the base (no disk-backed cache/cookie storage to leak across cache entries this manager pools and later shuts down), with only `timeout.read` mapped onto `timeoutIntervalForRequest` (`URLSessionConfiguration` has no distinct connect-phase timeout for `timeout.connect` to land on). Every other field either has no `URLSessionConfiguration` counterpart to translate to (`connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) or is already excluded from resolving to `.urlSession` at all by `urlSessionIncompatibilityReasons()` (`dnsOverride`, `httpVersion == .http1Only`, `proxy.connectHeaders`/`.socks`/`.bearer`, `decompression == .disabled`), so there is nothing left for a compatible configuration to lose in translation. `compression` (request-body gzip) is a known, pre-existing gap in `urlSessionIncompatibilityReasons()` itself, not something this phase introduces or was asked to fix -- `URLSessionConfiguration` has no request-compression equivalent to `NIOHTTPRequestCompressor`'s debug-initializer hook, and bucket D never excluded it, so it silently goes unhonored under `.urlSession` today.
+- `Internals.URLSessionClient.isRunning`/`shutdown()` -- `Internals.ClientManager`'s idle-cleanup sweep (`cleanupIfNeeded()`) reads `item.client.isRunning`/calls `item.client.shutdown()` on every cached entry regardless of backend, and neither existed on `Internals.URLSessionClient` before this phase (Phase 5's tests never pooled it through `ClientManager`, so nothing needed them). `isRunning` reuses `Internals.ClientOperationQueue` -- the same transport-agnostic in-flight counter `Internals.Client` already uses -- threaded through all three `execute` overloads (the download overload's operation completes from `onDownloadComplete`, alongside the throttle release, since that overload returns before the download itself finishes). `shutdown()` mirrors `Internals.Client.shutdown()`'s idempotent, not-while-running guard, then calls `session.invalidateAndCancel()`.
+
+**Deliberately not done in this phase, left for Phase 7:** `Internals.Session.execute`/`RawTask`/`Internals.CacheControl` -- the actual per-request pipeline every public `DataTask`/`UploadTask`/`DownloadTask` goes through -- are untouched and still hardcoded to `Internals.Client`/`HTTPClient.Request` unconditionally. This is why `resolvedClient` is a new, additive method rather than a change to `client(provider:sessionConfiguration:)`'s existing signature: `resolveExecutor()` already resolves a great many everyday configurations to `.urlSession` on Darwin (it's tried first, see Phase 3), so if the *existing* method started honoring that decision, every current Apple-platform caller through `Internals.Session.client()` would immediately start getting back a client shape `RawTask`/`CacheControl` have no code path to run a request against -- silently breaking the live pipeline on the very platforms this feature targets, rather than adding to it. Reconciling `RawTask`'s NIO-only pipeline with a second, differently-shaped executor is exactly the kind of real, unresolved design question Phase 7 already flags for itself (§6.4); `resolvedClient` is the ready-made entry point for whatever that design lands on, proven independently at the `ClientManager` level in the meantime.
+
+**Dependencies:** Phases 3, 4, 5.
+**Acceptance:** an end-to-end test with no explicit executor preference, on a config compatible with all three executors, confirms `.urlSession` is actually the one that runs (not just what `resolveExecutor()` says in isolation) — e.g. by asserting on some URLSession-specific side effect, or via a debug hook. `InternalsClientManagerExecutorTests` (`RequestDLInternalsTests`): a default `Internals.Session.Configuration()` (`resolveExecutor() == .urlSession`, confirmed inline before the real assertion) resolved through `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)` unwraps to the `.urlSession` case, and the `Internals.URLSessionClient` inside it completes a real round trip against `LocalServer` -- proving `resolvedClient` built and cached an actually-usable client, not just a matching enum case. Two more tests confirm the cache actually pools (`resolvedClient` called twice with the same provider/configuration returns the identical `Internals.URLSessionClient` instance, `===`) and that the executor-aware path still falls back correctly (a SOCKS-proxy configuration -- excluded from `.urlSession` since Phase 2 -- resolves to `.nio` through `resolvedClient`, not `.urlSession`). All existing `Internals.ClientManager`/`Internals.URLSessionClient` tests, and the full suite (1205 tests), pass unmodified.
+
+---
+
+## Phase 7 — Public API
+
+**Goal:** expose executor selection to callers. This is the one phase with real open design questions (§6.4) rather than a spec to implement — resolve them here, don't guess earlier.
+
+- [ ] `Session.preferredExecutor(_:)` — soft hint, always falls back safely (Phase 3).
+- [ ] `Session.requiredExecutor(_:)` — hard pin, throws `ExecutorRequirementError` (Phase 3).
+- [ ] Decide `enableNetworkFramework(_:)`'s fate: deprecate in favor of `preferredExecutor(.nioTransportServices)`, or keep both. Source: §6.5's open items.
+- [ ] Public naming pass for `ExecutorRequirementError.Reason`'s cases — the internal `ExecutorIncompatibilityReason` names (e.g. `.noHostnameVerificationUnderNetworkFramework`) are fine for `Internals`, not for a public error message; needs prose-quality public names/descriptions.
+
+**Dependencies:** Phase 6 (there should be something real to select before the public API ships).
+**Acceptance:** DocC coverage for both modifiers; a test suite specifically for `requiredExecutor`'s error messages being actionable (not just "it throws").
+
+---
+
+## Phase 8 — Runtime Keychain error UX (can start once Phase 5e lands)
+
+- [ ] Confirm the wrapped error from 5e actually reads well end to end — i.e., someone who hits it without having read `HOW_TO_USE_CERTIFICATE_URLSESSION.md` can self-diagnose "enable Keychain Sharing" from the error text alone.
+- [ ] Cross-link the error's documentation comment to `HOW_TO_USE_CERTIFICATE_URLSESSION.md` (or fold that doc's content into a DocC article once the feature ships — it was written as a standalone Markdown file specifically because the feature wasn't shippable yet).
+
+**Dependencies:** Phase 5e.
+
+---
+
+## Phase 9 — Test parity strategy
+
+Not a phase with its own deliverable — a constraint that applies across Phase 5's sub-phases: **every behavioral test that exists for the NIO backend and has a bucket A/B/C equivalent should be parameterized or duplicated to also run against `.urlSession`**, using `requireExecutor(.urlSession)` (Phase 3) to force it deterministically rather than relying on `resolveExecutor()`'s heuristics in tests. Bucket D items (§4.4) don't need this — there's nothing to test on the URLSession side for those, they're fallback-only by design.
+
+---
+
+## Phase 10 — Follow-up, non-blocking
+
+Tracked so they don't get lost, not required for the executor to ship:
+
+- [ ] PKCS#8 and EC key support in the promoted `RawBytesIdentityBuilder` (RSA/PKCS#1 only today).
+- [ ] tvOS/watchOS physical validation of the Keychain round-trip (expected to match iOS, unconfirmed).
+- [ ] Non-sandboxed macOS validation — genuinely unresolved, hit a *different* Keychain identity-pairing issue in earlier testing, unrelated to entitlements. Don't ship macOS mTLS-via-URLSession support without dedicated testing there.
+- [ ] SOCKS proxy support, if 5c determines it's viable after all.
+- [ ] Investigate a redirect-cycle test crash (`InternalsURLSessionClientRedirectTests.execute_whenRedirectRevisitsURL_throwsRedirectCycleDetectedError`/`execute_whenRedirectAllowsCycles_followsBackToAVisitedURL`) found while cross-platform-validating 5c: both pass cleanly alone or alongside unrelated suites on every platform including iOS, but crash the test process on iOS Simulator specifically when run concurrently with several other `LocalServer`-backed suites at once (swift-testing's default parallelism). Reproducible; looks like Simulator-specific resource contention (ports/threads) across multiple concurrent `MultiThreadedEventLoopGroup`s rather than a defect in the redirect logic itself (Phase 5b), since serializing or isolating the suite makes it disappear. Not investigated further here — out of scope for 5c.
+
+---
+
+## Topics for future exploration
+
+Not a phase, not scoped, nothing here is required for anything above to ship. Tracked so a real
+direction doesn't get lost the next time someone asks "can this do X" and the answer turns out to
+be "not with what's built."
+
+### Background `URLSession` (`URLSessionConfiguration.background(withIdentifier:)`) + `AppDelegate`
+
+Background transfers are cited in `URLSESSION_REPORT.md` (§6.3) as one of the original
+motivations for wanting a URLSession executor at all — but nothing in Phases 1–7 actually delivers
+it, and it doesn't fall out of Phase 6 (wiring) or Phase 7 (public API) for free. The design built
+across 5a–5g is incompatible with background sessions in specific, structural ways, not just
+missing a flag:
+
+- **Streamed upload (5f) is a disallowed API shape for background sessions.** Apple requires
+  background uploads to come from a file (`uploadTask(with:fromFile:)`); `uploadTask(withStreamedRequest:)`
+  — what `Internals.URLSessionUploadStream` bridges into — isn't a valid call at all in a
+  background session.
+- **Streamed download (5g) works against the grain of how background sessions are meant to be
+  used.** A background download is expected to be a `URLSessionDownloadTask` writing straight to a
+  temp file, delivered via `didFinishDownloadingTo`, not accumulated in-process through
+  `didReceive data:` the way `Internals.DownloadBuffer` is fed today.
+- **Per-task delegates (`task.delegate = ...`) don't survive process relaunch.** Every `execute`
+  overload built so far relies on this pattern (since 5a) precisely because it's the ergonomic
+  match for `async`/`await`. But the entire point of a background session is continuing after the
+  app is suspended or killed — when `application(_:handleEventsForBackgroundURLSession:completionHandler:)`
+  relaunches the app, there is no surviving `URLSessionTask` object to have set a delegate on in
+  the first place. Reattaching only works through the *session's* own delegate, recreated with the
+  same identifier, not a per-task one.
+- **`Internals.URLSessionClient`'s session lifecycle doesn't match.** It creates one `URLSession`
+  inline per client instance today. A background session needs a stable identifier and a lifecycle
+  that can outlive (and be recreated independently of) whatever `Internals.URLSessionClient`
+  instance originally created it.
+
+None of this means it's not doable — it means it's a materially different code path from 5f/5g's
+streaming bridges, not an extension of them: a session-level (not per-task) delegate design,
+file-based upload/download instead of streams, and a way for a host app to hand this package its
+`AppDelegate`'s background completion handler and get reconnected to in-flight tasks after a
+relaunch. Worth a dedicated design pass of its own — probably its own report section, the way
+`URLSESSION_REPORT.md` covers the executor split — rather than being squeezed into the existing
+phase numbering.
+
+---
+
+## References
+
+- [URLSESSION_REPORT.md](URLSESSION_REPORT.md) — full compatibility mapping and design rationale every phase above cites.
+- [HOW_TO_USE_CERTIFICATE_URLSESSION.md](HOW_TO_USE_CERTIFICATE_URLSESSION.md) — consumer-facing Keychain Sharing walkthrough (Phase 5e/8).
+- [request-dl-nio#287](https://github.com/request-dl/request-dl-nio/discussions/287) — closed, mTLS feasibility discussion.
+- [#289](https://github.com/request-dl/request-dl-nio/pull/289) — merged, the two prerequisite fixes Phase 2 builds on.
+- `Tests/RequestDLTests/URLSession Executor Spike/` — the validated spike Phase 5e promoted into production code (`Internals.RawBytesIdentityBuilder`, `Internals.URLSessionIdentityPolicy`, `Internals.URLSessionClient.TLSDelegate`); the directory itself is deleted, superseded by `RequestConfigurationURLSessionClientMTLSTests`.

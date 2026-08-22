@@ -100,4 +100,131 @@ extension Internals.Session.Configuration {
 
         return false
     }
+
+    /// The bucket-D fields that keep a configuration off `.urlSession` regardless of what
+    /// `secureConnection` allows -- these are AsyncHTTPClient/HTTP-layer concerns orthogonal to
+    /// which TLS transport is underneath, so they're checked here rather than on `SecureConnection`.
+    package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
+        var reasons = secureConnection?.urlSessionIncompatibilityReasons() ?? []
+
+        if !dnsOverride.isEmpty {
+            reasons.append(.dnsOverrideUnderURLSession)
+        }
+
+        if httpVersion == .http1Only {
+            reasons.append(.http1OnlyUnderURLSession)
+        }
+
+        if let proxy {
+            if !proxy.connectHeaders.isEmpty {
+                reasons.append(.proxyConnectHeadersUnderURLSession)
+            }
+
+            if proxy.connectionProtocol == .socks {
+                reasons.append(.proxySOCKSUnderURLSession)
+            }
+
+            if case .bearer = proxy.authorization {
+                reasons.append(.proxyBearerAuthorizationUnderURLSession)
+            }
+        }
+
+        if case .disabled = decompression {
+            reasons.append(.decompressionDisabledUnderURLSession)
+        }
+
+        return reasons
+    }
 }
+
+extension Internals.Session.Configuration {
+
+    /// Picks the best executor this configuration actually supports, in priority order.
+    ///
+    /// URLSession is tried first on Apple platforms -- best OS integration (background transfers,
+    /// ATS, HTTP/3 maturity) -- then NIOTransportServices, then plain NIO as the universal
+    /// fallback. `.urlSession` and `.nioTransportServices` are independent capability checks, not
+    /// a hierarchy: a field can be reachable on one and not the other (see
+    /// `urlSessionIncompatibilityReasons()`/`SecureConnection.networkFrameworkIncompatibilityReasons()`).
+    /// This is a default ordering, not a fixed law -- `preferredExecutor`/`requiredExecutor`
+    /// (public API) let a caller override it.
+    package func resolveExecutor() -> Internals.Executor {
+        #if canImport(Darwin)
+        if urlSessionIncompatibilityReasons().isEmpty {
+            return .urlSession
+        }
+        if secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true {
+            return .nioTransportServices
+        }
+        #endif
+        return .nio
+    }
+
+    /// Hard-pins execution to `executor`, throwing rather than silently falling back when this
+    /// configuration can't actually run on it.
+    ///
+    /// This is the direct fix for the bug class #289 closed: NIOTransportServices used to
+    /// silently drop settings it couldn't carry over instead of failing loudly. A caller pinning
+    /// an executor explicitly is asking for a guarantee, not a best-effort -- ignoring what it
+    /// can't do here would just move that same silent-degradation bug to a new call site.
+    package func requireExecutor(_ executor: Internals.Executor) throws {
+        let reasons: [Internals.ExecutorIncompatibilityReason]
+
+        switch executor {
+        case .urlSession:
+            reasons = urlSessionIncompatibilityReasons()
+        case .nioTransportServices:
+            reasons = secureConnection?.networkFrameworkIncompatibilityReasons() ?? []
+        case .nio:
+            reasons = []
+        }
+
+        guard reasons.isEmpty else {
+            throw Internals.IncompatibleExecutorConfigurationError(
+                requiredExecutor: executor,
+                reasons: reasons
+            )
+        }
+    }
+}
+
+#if canImport(Darwin)
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+extension Internals.Session.Configuration {
+
+    /// `URLSession` counterpart to `build() -> HTTPClient.Configuration` -- built fresh per
+    /// `Internals.URLSessionClient` instance, mirroring how `build()` is also called once per
+    /// `Internals.Client`. Phase 6 of `URLSESSION_TASK.md`.
+    ///
+    /// Ephemeral: no disk-backed cache or cookie storage to leak across the cache entries
+    /// `Internals.ClientManager` pools and later shuts down. Cookies are additionally disabled
+    /// unconditionally in `Internals.URLSessionClient.init` itself (Phase 5d) regardless of what
+    /// this builds.
+    ///
+    /// Only `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has
+    /// no distinct connect-phase timeout to receive `timeout.connect`. Every other field this
+    /// configuration could carry that has no `URLSessionConfiguration` counterpart (`connectionPool`,
+    /// `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`, `compression`) is either
+    /// NIO/NIOTS-specific with nothing to translate to, or -- for the fields that matter, like
+    /// `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
+    /// `decompression == .disabled` -- already excluded from resolving to `.urlSession` at all by
+    /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
+    /// configuration to lose in translation.
+    func buildURLSessionConfiguration() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.ephemeral
+
+        if let read = timeout.read {
+            configuration.timeoutIntervalForRequest = TimeInterval(read) / 1_000_000_000
+        }
+
+        return configuration
+    }
+}
+
+#endif
