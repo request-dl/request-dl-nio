@@ -35,7 +35,7 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        let client: Internals.Client
+        let client: any RequestExecutingClient
 
         do {
             client = try await resolved.session.client()
@@ -55,12 +55,8 @@ struct RawTask<Content: Property>: RequestTask {
         case .task(let task):
             sessionTask = task
         case .cache(let cache):
-            sessionTask = try await resolved.session.execute(
-                client: client,
-                request: try resolved.requestConfiguration.build(eventLoop: client.eventLoopGroup.any()),
-                url: resolved.requestConfiguration.url,
-                readingMode: resolved.requestConfiguration.readingMode,
-                uploadingBytes: resolved.requestConfiguration.body?.totalSize ?? .zero,
+            sessionTask = try await client.execute(
+                configuration: resolved.requestConfiguration,
                 cache: cache,
                 logger: logger
             )

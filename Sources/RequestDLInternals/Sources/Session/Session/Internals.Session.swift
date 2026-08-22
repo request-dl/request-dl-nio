@@ -37,6 +37,13 @@ extension Internals {
             )
         }
 
+        /// Forwards to `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`
+        /// -- kept here, with this exact signature, only because it already has direct test
+        /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
+        /// `InternalsClientResponseReceiverTests`); the actual implementation moved onto
+        /// `Internals.Client` itself in Phase 7b1 of `URLSESSION_TASK.md`, since this method's
+        /// body never touched `self` (`provider`/`configuration`/`manager`) to begin with -- only
+        /// `client`, taken as a parameter.
         package func execute(
             client: Internals.Client,
             request: HTTPClient.Request,
@@ -46,38 +53,13 @@ extension Internals {
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?
         ) async throws -> SessionTask {
-            let upload = Internals.AsyncStream<Int>()
-            let head = Internals.AsyncStream<Internals.ResponseHead>()
-            let download = await Internals.DownloadBuffer(
-                readingMode: readingMode
-            )
-
-            let delegate = Internals.ClientResponseReceiver(
+            try await client.execute(
+                request: request,
                 url: url,
-                upload: upload,
-                head: head,
-                download: download,
+                readingMode: readingMode,
+                uploadingBytes: uploadingBytes,
                 cache: cache,
                 logger: logger
-            )
-
-            let response = Internals.AsyncResponse(
-                logger: logger,
-                uploadingBytes: uploadingBytes,
-                upload: upload,
-                head: head,
-                download: download.stream
-            )
-
-            let unsafeTask = await client.execute(
-                request: request,
-                delegate: delegate,
-                logger: logger
-            )
-
-            return SessionTask(
-                seed: unsafeTask(),
-                response: response
             )
         }
     }

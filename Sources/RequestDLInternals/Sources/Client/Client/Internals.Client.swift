@@ -139,6 +139,57 @@ extension Internals {
             }
         }
 
+        /// Executes `request`, streaming the response through a `SessionTask` -- upload
+        /// progress, head, and body, optionally teed to `cache` as it downloads.
+        ///
+        /// Moved here from `Internals.Session.execute(client:request:...)` (Phase 7b1 of
+        /// `URLSESSION_TASK.md`) -- that method's body never actually touched `Internals.Session`
+        /// itself (`provider`/`configuration`/`manager`), just the `client` it took as a
+        /// parameter, so it belongs on the client that does the executing. `Internals.Session.execute`
+        /// now forwards here rather than duplicating this body, so its three existing direct
+        /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
+        /// `InternalsClientResponseReceiverTests`) keep working unmodified.
+        package func execute(
+            request: HTTPClient.Request,
+            url: String,
+            readingMode: Internals.DownloadStep.ReadingMode,
+            uploadingBytes: Int,
+            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            logger: TaskLogger?
+        ) async throws -> SessionTask {
+            let upload = Internals.AsyncStream<Int>()
+            let head = Internals.AsyncStream<Internals.ResponseHead>()
+            let download = await Internals.DownloadBuffer(readingMode: readingMode)
+
+            let delegate = Internals.ClientResponseReceiver(
+                url: url,
+                upload: upload,
+                head: head,
+                download: download,
+                cache: cache,
+                logger: logger
+            )
+
+            let response = Internals.AsyncResponse(
+                logger: logger,
+                uploadingBytes: uploadingBytes,
+                upload: upload,
+                head: head,
+                download: download.stream
+            )
+
+            let unsafeTask = await execute(
+                request: request,
+                delegate: delegate,
+                logger: logger
+            )
+
+            return SessionTask(
+                seed: unsafeTask(),
+                response: response
+            )
+        }
+
         package func shutdown() async throws -> Bool {
             try await lock.withLock {
                 guard !isRunning && !_isClosed else {
