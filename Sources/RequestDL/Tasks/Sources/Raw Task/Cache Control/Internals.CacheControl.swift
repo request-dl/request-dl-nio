@@ -142,7 +142,7 @@ extension Internals {
 
             return SessionTask(
                 seed: .init {
-                    download.failed(HTTPClientError.cancelled)
+                    download.failed(Internals.TaskCancelledError())
                     download.close()
                 },
                 response: .init(

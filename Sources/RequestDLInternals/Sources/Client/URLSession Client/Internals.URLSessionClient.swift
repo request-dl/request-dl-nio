@@ -261,6 +261,161 @@ extension Internals {
             }
         }
 
+        /// Executes `request`, returning a `SessionTask` whose response streams upload progress
+        /// (when `request` carries a body), the response head, and the body -- optionally teed
+        /// to `cache` as it downloads. Phase 7b2 of `URLSESSION_TASK.md`.
+        ///
+        /// Mirrors `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`
+        /// (Phase 7b1): gives `RequestExecutingClient`'s `.urlSession` conformance the same three
+        /// independent `Internals.AsyncStream`s (`upload`/`head`/`download`) to build an
+        /// `Internals.AsyncResponse` from that the NIO backend already produces, just fed by this
+        /// client's own callbacks instead of `Internals.ClientResponseReceiver`'s.
+        ///
+        /// No new delegate machinery -- reuses the exact `headCompletion`/`downloadBuffer`
+        /// mechanism `execute(request:readingMode:delegate:)` already has below, just resolving
+        /// into these three streams instead of a continuation. The cache tee
+        /// (`Internals.DownloadBuffer.cacheStream(_:)`) attaches from right here, at the same
+        /// point `Internals.ClientResponseReceiver.didReceiveHead` attaches it on the NIO side --
+        /// before any body chunk can arrive, since `didReceive response:completionHandler:`
+        /// always precedes `didReceive data:`.
+        package func execute(
+            request: URLRequest,
+            readingMode: Internals.DownloadStep.ReadingMode,
+            uploadingBytes: Int,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            logger: Internals.TaskLogger?,
+            delegate: URLSessionTaskDelegate? = nil
+        ) async throws -> SessionTask {
+            try await executeSessionTask(
+                request: request,
+                readingMode: readingMode,
+                uploadingBytes: uploadingBytes,
+                cache: cache,
+                logger: logger,
+                forwarding: delegate,
+                makeBodyStream: nil,
+                makeTask: { self.session.dataTask(with: $0) }
+            )
+        }
+
+        /// Combines what `execute(request:streaming:delegate:onUploadProgress:)` (Phase 5f) and
+        /// `execute(request:readingMode:delegate:)` (Phase 5g) each built separately -- a
+        /// genuinely streamed request body *and* a genuinely streamed response, at once. Phase
+        /// 7b2 of `URLSESSION_TASK.md`.
+        ///
+        /// `TaskDelegate` already implements both `needNewBodyStream`/`didSendBodyData` and
+        /// `didReceive response:`/`didReceive data:` unconditionally -- this is the first call
+        /// site that activates both sets of optional fields on the same task, not new delegate
+        /// logic. See `execute(request:readingMode:uploadingBytes:cache:logger:)` just above for
+        /// everything else (the three-stream `SessionTask` shape, the cache tee).
+        package func execute<Body: AsyncSequence & Sendable>(
+            request: URLRequest,
+            streaming body: Body,
+            readingMode: Internals.DownloadStep.ReadingMode,
+            uploadingBytes: Int,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            logger: Internals.TaskLogger?,
+            delegate: URLSessionTaskDelegate? = nil
+        ) async throws -> SessionTask where Body.Element == ByteBuffer {
+            try await executeSessionTask(
+                request: request,
+                readingMode: readingMode,
+                uploadingBytes: uploadingBytes,
+                cache: cache,
+                logger: logger,
+                forwarding: delegate,
+                makeBodyStream: { Internals.URLSessionUploadStream(body: body) },
+                makeTask: { self.session.uploadTask(withStreamedRequest: $0) }
+            )
+        }
+
+        /// Shared body for the two `SessionTask`-producing `execute` overloads above -- they
+        /// differ only in whether a body is streamed in (`makeBodyStream`) and which `URLSession`
+        /// task constructor that requires (`makeTask`).
+        private func executeSessionTask(
+            request: URLRequest,
+            readingMode: Internals.DownloadStep.ReadingMode,
+            uploadingBytes: Int,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            logger: Internals.TaskLogger?,
+            forwarding delegate: URLSessionTaskDelegate?,
+            makeBodyStream: (@Sendable () -> InputStream)?,
+            makeTask: (URLRequest) -> URLSessionTask
+        ) async throws -> SessionTask {
+            let release = await throttledExecutor.acquire()
+            let operation = operationQueue.operation()
+
+            let tlsDelegate = identityPolicy.flatMap { policy in
+                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
+            }
+
+            let upload = Internals.AsyncStream<Int>()
+            let head = Internals.AsyncStream<Internals.ResponseHead>()
+            let downloadBuffer = await Internals.DownloadBuffer(readingMode: readingMode)
+
+            let taskDelegate = TaskDelegate(
+                redirectConfiguration: redirectConfiguration,
+                initialURL: request.url?.absoluteString ?? "",
+                proxyAuthorization: proxyAuthorization,
+                tls: tlsDelegate,
+                forwarding: delegate,
+                makeBodyStream: makeBodyStream,
+                onUploadProgress: { bytesSent, _ in
+                    upload.append(.success(bytesSent))
+                },
+                downloadBuffer: downloadBuffer,
+                onDownloadComplete: {
+                    upload.close()
+                    release()
+                    operation.complete()
+                }
+            )
+
+            // Set before `task.resume()`, same ordering `execute(request:readingMode:delegate:)`
+            // already relies on, so no callback can fire before this closure is in place.
+            taskDelegate.headCompletion = { result in
+                // A response head -- success or failure -- can only exist once the request body
+                // finished sending, so this is also where `upload` closes: mirrors
+                // `Internals.ClientResponseReceiver.didReceiveHead`, which closes `upload` again
+                // here too even though `didSendRequest` already closed it once, redundantly and
+                // harmlessly (`Internals.AsyncStream.close()` is idempotent) -- `onDownloadComplete`
+                // below closes it a third time for the same reason: any path that reaches the end
+                // must leave `upload` closed, not just the common one.
+                upload.close()
+
+                switch result {
+                case .success(let step):
+                    // Attached before `head` is ever read from -- ordered against every future
+                    // `downloadBuffer.append(_:)` by `Internals.DownloadBuffer`'s own queue, the
+                    // same guarantee `Internals.ClientResponseReceiver.didReceiveHead` relies on.
+                    if let cacheStream = cache?(step.head) {
+                        downloadBuffer.cacheStream(cacheStream)
+                    }
+                    head.append(.success(step.head))
+                case .failure(let error):
+                    head.append(.failure(error))
+                }
+                head.close()
+            }
+
+            let task = makeTask(request)
+            task.delegate = taskDelegate
+            task.resume()
+
+            let response = Internals.AsyncResponse(
+                logger: logger,
+                uploadingBytes: uploadingBytes,
+                upload: upload,
+                head: head,
+                download: downloadBuffer.stream
+            )
+
+            return SessionTask(
+                seed: Internals.TaskSeed { task.cancel() },
+                response: response
+            )
+        }
+
         /// Invalidates the underlying `URLSession` -- mirrors `Internals.Client.shutdown()`, read
         /// by `Internals.ClientManager`'s idle-cleanup sweep (Phase 6). Idempotent and a no-op
         /// while a request is still in flight, same guard as the NIO counterpart.
