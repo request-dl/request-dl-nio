@@ -31,6 +31,10 @@ concurrency:
 jobs:
   ci:
     name: "Swift CI"
+    # Skip draft PRs -- `pull_request`'s `synchronize`/`opened`/`reopened` fire regardless of
+    # draft state, so this has to be a job-level condition, not a trigger filter. Push events
+    # (main) have no `pull_request` payload at all, hence the `event_name` guard first.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     uses: request-dl/.github/.github/workflows/swift-ci.yaml@main
     with:
       name: request-dl
