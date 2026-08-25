@@ -14,15 +14,14 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5a of `URLSESSION_TASK.md`: a non-streaming request/response round trip through
-/// `Internals.URLSessionClient`, forced onto `.urlSession` via `requireExecutor(_:)` (Phase 3)
-/// rather than through the public `DataTask` API -- `Session.requiredExecutor(_:)` is Phase 7,
-/// not built yet, so there is no way to pin an executor from a `Property` tree today.
+/// A non-streaming request/response round trip through `Internals.URLSessionClient`, forced onto
+/// `.urlSession` via `requireExecutor(_:)` directly at the `Internals` layer rather than through
+/// the public `DataTask` API (`RawTaskExecutorDispatchTests` covers that end-to-end path).
 ///
 /// Mirrors `DataTaskTests.dataTask()` (same `LocalServer`/`ResponseConfiguration` fixtures, same
 /// `{"receivedBytes", "response"}` envelope), but drives `RequestConfiguration.buildURLRequest()`
 /// + `Internals.URLSessionClient` directly instead of `DataTask`, and skips `SecureConnection`
-/// entirely -- no TLS customization is in scope for 5a, so trusting `LocalServer`'s self-signed
+/// entirely -- no TLS customization is in scope here, so trusting `LocalServer`'s self-signed
 /// certificate is handled by a test-only `URLSessionTaskDelegate` instead.
 struct RequestConfigurationURLSessionClientTests {
 
@@ -68,11 +67,10 @@ struct RequestConfigurationURLSessionClientTests {
     }
 }
 
-/// Phase 5e of `URLSESSION_TASK.md`: the TLS/mTLS challenge handling promoted from
-/// `Internals.RawBytesIdentityBuilder`/`Internals.URLSessionIdentityPolicy` -- built from
-/// whatever `Internals.SecureConnection` the resolved `Property` tree carries, same as the NIO
-/// backend, instead of the `AcceptAnyServerTrustDelegate` workaround the still-TLS-unaware Phase
-/// 5a test above needs.
+/// The TLS/mTLS challenge handling promoted from `Internals.RawBytesIdentityBuilder`/
+/// `Internals.URLSessionIdentityPolicy` -- built from whatever `Internals.SecureConnection` the
+/// resolved `Property` tree carries, same as the NIO backend, instead of the
+/// `AcceptAnyServerTrustDelegate` workaround the still-TLS-unaware test above needs.
 ///
 /// **The client-identity round trip (`urlSessionClient_whenMTLSConfigured_...` below) is a known
 /// issue running through this bare SwiftPM test harness on *any* platform, not macOS
@@ -80,17 +78,18 @@ struct RequestConfigurationURLSessionClientTests {
 /// test`, unsigned CLI binary) and on an iOS Simulator (`xcodebuild test -scheme request-dl`,
 /// SwiftPM's auto-generated scheme), both fail identically with
 /// `Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement`'s exact message --
-/// which is itself the confirmation the actionable-error-wrapping half of Phase 5e works
+/// which is itself the confirmation the actionable-error-wrapping half of that mapping works
 /// correctly on both. The common thread is not the OS, it's that neither run carries a Keychain
 /// Sharing entitlement: `swift test` produces a bare unsigned binary, and SwiftPM's
 /// auto-generated Xcode scheme has no `.entitlements` file to add the capability to (there is
 /// nowhere in a `Package.swift`-only project to configure it -- see
-/// HOW_TO_USE_CERTIFICATE_URLSESSION.md, which is written for a real app target's Signing &
+/// `Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md`,
+/// which is written for a real app target's Signing &
 /// Capabilities tab, not a SwiftPM test bundle). A properly configured Xcode *app* project/target
-/// (or extension) with Keychain Sharing added -- the setup HOW_TO_USE_CERTIFICATE_URLSESSION.md
-/// walks through, and what the original spike this promotes from was validated against -- is
-/// expected to complete this same round trip for real; this suite cannot exercise that shape of
-/// project. The server-trust-only tests below it (no client identity involved) are unaffected by
+/// (or extension) with Keychain Sharing added -- the setup that same article walks through, and
+/// what the original spike this promotes from was validated against -- is expected to complete
+/// this same round trip for real; this suite cannot exercise that shape of project. The
+/// server-trust-only tests below it (no client identity involved) are unaffected by
 /// any of this and genuinely pass on macOS, iOS Simulator, and Linux (Docker, `swift:6.2`) alike
 /// -- Linux and Simulator confirmed directly, not assumed either. `Internals.URLSessionClient`
 /// and everything under `Sources/RequestDLInternals/.../URLSession Client/` is Apple-only
@@ -176,8 +175,7 @@ struct RequestConfigurationURLSessionClientMTLSTests {
     /// anchored via `SecTrustSetAnchorCertificates`, a `SecPolicyCreateSSL` enforcement uniform
     /// across every Apple platform that NIOSSL's own validation (what
     /// `DataTaskTests.dataTask_whenCAEnabled` exercises for the same fixture) has no equivalent
-    /// of. See `URLSESSION_TASK.md`, Phase 5e. `CertificateFixturesExpirationTests` guards
-    /// against these fixtures going stale again.
+    /// of. `CertificateFixturesExpirationTests` guards against these fixtures going stale again.
     @Test
     func urlSessionClient_whenTrustRootsConfigured_verifiesServerCertificateAgainstThem() async throws {
         // Given
@@ -308,7 +306,7 @@ struct RequestConfigurationURLSessionClientMTLSTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- `LocalServer` is
+/// Test-only stand-in for the real client's own TLS challenge handling -- `LocalServer` is
 /// always TLS-terminated with a throwaway self-signed certificate, even outside any TLS feature
 /// under test, so *something* has to trust it for a plain, no-customization round trip to
 /// complete at all.

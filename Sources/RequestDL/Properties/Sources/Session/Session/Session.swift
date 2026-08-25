@@ -105,21 +105,14 @@ public struct Session: Property {
     /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
     /// or specific secure connection settings.
     ///
-    /// - Note: Deprecated as of Phase 7b3.5 of `URLSESSION_TASK.md`, in favor of
-    /// ``preferredExecutor(_:)`` -- specifically `.preferredExecutor(.nioTransportServices)`,
-    /// which as of this phase is wired into the same live decision this flag always was
-    /// (`Internals.ClientManager.resolvedClient(...)` now reads `resolveExecutor()`'s own
-    /// NIOTransportServices-vs-plain-NIO answer for a real request, not just the `.urlSession`-vs-not
-    /// one two phases prior). This was held back twice before landing: 7a deferred it because
-    /// `preferredExecutor` had no live effect yet at all, and 7b3 deferred it again because that
-    /// phase's unification only covered the `.urlSession` axis, not this one.
-    ///
-    /// `enableNetworkFramework(true)` is not simply left behaving as before, either --
-    /// `resolveExecutor()` now treats it as an *implicit* `preferredExecutor(.nioTransportServices)`
-    /// whenever nothing else already set a preference, specifically so this deprecation doesn't
-    /// silently change which transport an existing caller's already-released code gets. An
-    /// explicit `preferredExecutor` (any case) still overrides that implicit one. New code should
-    /// call `preferredExecutor(.nioTransportServices)` directly rather than lean on this shim.
+    /// - Note: Deprecated in favor of ``preferredExecutor(_:)`` -- specifically
+    /// `.preferredExecutor(.nioTransportServices)`, which is wired into the same live decision
+    /// this flag drives. `enableNetworkFramework(true)` keeps working exactly as before: it's
+    /// treated as an *implicit* `preferredExecutor(.nioTransportServices)` whenever nothing else
+    /// already set a preference, so this deprecation doesn't silently change which transport an
+    /// existing caller gets. An explicit `preferredExecutor` (any case) still overrides that
+    /// implicit one. New code should call `preferredExecutor(.nioTransportServices)` directly
+    /// rather than lean on this shim.
     ///
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
@@ -169,8 +162,7 @@ public struct Session: Property {
     /// ``ExecutorRequirementError`` can't check ahead of time: building that certificate into a
     /// `URLSession`-presentable identity is a Keychain round-trip that needs the Keychain Sharing
     /// capability, a one-time Xcode project setting. A request missing it throws
-    /// ``ClientIdentityError`` instead — see
-    /// [HOW_TO_USE_CERTIFICATE_URLSESSION.md](https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md)
+    /// ``ClientIdentityError`` instead — see <doc:Using-a-Client-Certificate-with-URLSession>
     /// for the full walkthrough. This also applies without pinning anything, since `.urlSession`
     /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
     /// the configuration supports it.

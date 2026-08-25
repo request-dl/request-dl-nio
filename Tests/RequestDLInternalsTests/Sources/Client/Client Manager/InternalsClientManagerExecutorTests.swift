@@ -13,10 +13,10 @@ import Testing
 import Foundation
 import NIOTransportServices
 
-/// Phase 6 of `URLSESSION_TASK.md`: `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)`
-/// actually selects and caches an `Internals.URLSessionClient` for a configuration
-/// `resolveExecutor()` (Phase 3) picks `.urlSession` for, rather than that decision staying
-/// abstract. Distinct from `RequestConfigurationURLSessionClientTests` (`RequestDLTests`), which
+/// `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)` actually selects and
+/// caches an `Internals.URLSessionClient` for a configuration `resolveExecutor()` picks
+/// `.urlSession` for, rather than that decision staying abstract. Distinct from
+/// `RequestConfigurationURLSessionClientTests` (`RequestDLTests`), which
 /// forces `.urlSession` by hand-building `Internals.URLSessionClient` directly and bypasses
 /// `Internals.ClientManager` entirely -- these tests are the ones that would fail if
 /// `resolvedClient` merely inspected `resolveExecutor()` without ever building/caching a real
@@ -101,7 +101,7 @@ struct InternalsClientManagerExecutorTests {
 
     @Test
     func resolvedClient_whenConfigurationIsIncompatibleWithURLSession_fallsBackToNIO() async throws {
-        // Given -- a SOCKS proxy is excluded from `.urlSession` (bucket D, Phase 2), so
+        // Given -- a SOCKS proxy is excluded from `.urlSession` (bucket D), so
         // `resolveExecutor()` must fall through to `.nio`/`.nioTransportServices`, and
         // `resolvedClient` must cache a `.nio` entry rather than a `.urlSession` one.
         let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
@@ -130,14 +130,14 @@ struct InternalsClientManagerExecutorTests {
         }
     }
 
-    /// Phase 7b3.5 of `URLSESSION_TASK.md`: regression coverage for the second half of the
-    /// `enableNetworkFramework`/executor unification -- `resolvedClient`'s `.nio` fallback branch
-    /// used to always call `client(provider:sessionConfiguration:)` unmodified, which decides
+    /// Regression coverage for the `enableNetworkFramework`/executor unification --
+    /// `resolvedClient`'s `.nio` fallback branch used to always call
+    /// `client(provider:sessionConfiguration:)` unmodified, which decides
     /// NIOTransportServices-vs-plain-NIO purely from the `enableNetworkFramework` flag, never from
     /// `resolveExecutor()`'s own (correct) answer. `preferredExecutor(.nioTransportServices)`
-    /// therefore had zero effect on which event loop group backed a real client, even after Phase
-    /// 6/7b3 landed. `enableNetworkFramework` is never set here at all -- proving this is
-    /// `resolveExecutor()`'s decision alone, not the flag's.
+    /// therefore had zero effect on which event loop group backed a real client.
+    /// `enableNetworkFramework` is never set here at all -- proving this is `resolveExecutor()`'s
+    /// decision alone, not the flag's.
     @Test
     func
         resolvedClient_whenNIOTransportServicesPreferredWithoutEnableNetworkFrameworkFlag_actuallyUsesNIOTSEventLoopGroup()
@@ -196,9 +196,9 @@ struct InternalsClientManagerExecutorTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- see the identical
-/// delegate in `InternalsURLSessionClientTests`/`RequestConfigurationURLSessionClientTests` for
-/// why this exists at all: `LocalServer` is always TLS-terminated with a throwaway self-signed
+/// Test-only stand-in for the real TLS challenge handling -- see the identical delegate in
+/// `InternalsURLSessionClientTests`/`RequestConfigurationURLSessionClientTests` for why this
+/// exists at all: `LocalServer` is always TLS-terminated with a throwaway self-signed
 /// certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 

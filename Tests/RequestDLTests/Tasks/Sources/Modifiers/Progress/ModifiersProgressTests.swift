@@ -275,15 +275,14 @@ struct ModifiersProgressTests {
 
             ReadingMode(length: length)
 
-            // Pinned to `.nio` (Phase 9 of URLSESSION_TASK.md's test-parity strategy): the
-            // assertion below expects upload progress to fire in exact `payloadChunkSize(64)`
-            // increments, which is `Internals.BodySequence`'s own NIO/streaming-body chunking
-            // guarantee, not a portable one -- URLSession's `uploadTask(with:from:)` (used for a
-            // body this small) reports the whole upload in a single `didSendBodyData` callback
-            // instead, matching Phase 5f's own documented note that individual upload chunk
-            // sizes are executor-specific. The download chunk-boundary assertion further below
-            // stays executor-portable on purpose (Phase 5g confirmed it holds on `.urlSession`
-            // too) -- only the upload half of this test is backend-specific.
+            // Pinned to `.nio`: the assertion below expects upload progress to fire in exact
+            // `payloadChunkSize(64)` increments, which is `Internals.BodySequence`'s own
+            // NIO/streaming-body chunking guarantee, not a portable one -- URLSession's
+            // `uploadTask(with:from:)` (used for a body this small) reports the whole upload in a
+            // single `didSendBodyData` callback instead, since individual upload chunk sizes are
+            // executor-specific. The download chunk-boundary assertion further below stays
+            // executor-portable on purpose (it holds on `.urlSession` too) -- only the upload
+            // half of this test is backend-specific.
             Session.localServer
                 .requiredExecutor(.nio)
 

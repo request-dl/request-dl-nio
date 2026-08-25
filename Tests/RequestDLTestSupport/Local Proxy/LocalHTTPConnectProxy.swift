@@ -12,7 +12,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-/// A minimal HTTP `CONNECT` proxy, for Phase 5c of `URLSESSION_TASK.md`.
+/// A minimal HTTP `CONNECT` proxy.
 ///
 /// No pre-existing NIO-backend proxy round-trip fixture existed to reuse -- `ProxyTests`
 /// (`RequestDLTests`) and `InternalsProxyTests` (`RequestDLInternalsTests`) only cover config

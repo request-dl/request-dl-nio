@@ -84,7 +84,7 @@ struct InternalsURLSessionClientTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
 /// delegate in `RequestConfigurationURLSessionClientTests` (`RequestDLTests`) for why this exists
 /// at all: `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

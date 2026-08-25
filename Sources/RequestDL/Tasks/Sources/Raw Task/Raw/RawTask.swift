@@ -19,8 +19,8 @@ struct RawTask<Content: Property>: RequestTask {
         ).build()
 
         // Checked before anything else touches `resolved` -- a hard-pinned executor this
-        // configuration can't actually run on must fail loudly (§6.4 of URLSESSION_REPORT.md),
-        // not after paying for a logger/client/cache setup nobody will get to use.
+        // configuration can't actually run on must fail loudly, not after paying for a
+        // logger/client/cache setup nobody will get to use.
         if let requiredExecutor = resolved.session.configuration.requiredExecutor {
             do {
                 try resolved.session.configuration.requireExecutor(requiredExecutor)
@@ -35,12 +35,12 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        // Phase 7b3 of URLSESSION_TASK.md: `resolvedClient()` -- not `client()` -- is what makes
-        // `preferredExecutor`/`requiredExecutor` (validated just above, for the hard-pin case)
-        // actually decide which backend this request runs over, instead of always the NIO one.
-        // `resolvedClient()` returns `Internals.ClientManager.Client` (an enum), not `any
-        // RequestExecutingClient` directly -- see that method's own doc comment for why -- so
-        // this is the one place that unwraps it into the existential everything below expects.
+        // `resolvedClient()` -- not `client()` -- is what makes `preferredExecutor`/
+        // `requiredExecutor` (validated just above, for the hard-pin case) actually decide which
+        // backend this request runs over, instead of always the NIO one. `resolvedClient()`
+        // returns `Internals.ClientManager.Client` (an enum), not `any RequestExecutingClient`
+        // directly -- see that method's own doc comment for why -- so this is the one place that
+        // unwraps it into the existential everything below expects.
         let client: any RequestExecutingClient
 
         do {

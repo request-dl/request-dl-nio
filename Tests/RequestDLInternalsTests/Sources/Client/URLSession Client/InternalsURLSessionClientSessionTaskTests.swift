@@ -12,10 +12,10 @@ import Testing
 
 import Foundation
 
-/// Phase 7b2 of `URLSESSION_TASK.md`: `Internals.URLSessionClient`'s two `SessionTask`-producing
-/// `execute` overloads -- the pieces `RequestExecutingClient`'s `.urlSession` conformance
+/// `Internals.URLSessionClient`'s two `SessionTask`-producing `execute` overloads -- the pieces
+/// `RequestExecutingClient`'s `.urlSession` conformance
 /// (`Internals.URLSessionClient+RequestExecutingClient.swift`, `RequestDLTests`) is built from.
-/// Exercised directly here, no `RawTask`/`RequestConfiguration` involved (that's 7b3).
+/// Exercised directly here, no `RawTask`/`RequestConfiguration` involved.
 struct InternalsURLSessionClientSessionTaskTests {
 
     @Test
@@ -184,9 +184,10 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(!stillRunning)
     }
 
-    /// **Used to be a confirmed `withKnownIssue`** -- Phase 5f/7b2's original `uploadTask(withStreamedRequest:)`
-    /// bridge hit the CFNetwork bug `INPUT_STREAM_ANALISYS.md` (repo root) root-caused; Phase 7b4
-    /// replaced it with `Internals.URLSessionUploadFile` (small bodies stay in memory and upload
+    /// **Used to be a confirmed `withKnownIssue`** -- the original `uploadTask(withStreamedRequest:)`
+    /// bridge hit a confirmed CFNetwork bug (a custom `InputStream` is never recognized as
+    /// reaching end-of-body); it was replaced with `Internals.URLSessionUploadFile` (small bodies
+    /// stay in memory and upload
     /// via `uploadTask(with:from:)`; anything past `inMemoryThreshold` spills to a temp file and
     /// uploads via `uploadTask(with:fromFile:)`), neither of which touches `InputStream`/
     /// `needNewBodyStream`, so neither is affected -- this test's 128 KiB payload takes the
@@ -248,7 +249,7 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(chunkSizes.last == payload.count)
     }
 
-    /// Same fix as the test above (Phase 7b4's file-backed upload bridge). Kept here (rather than
+    /// Same fix as the test above (the file-backed upload bridge). Kept here (rather than
     /// relying on that test alone) to also exercise the download half of this specific overload,
     /// which the old `uploadTask(withStreamedRequest:)`-based bridge could never reach via
     /// `LocalServer`.
@@ -301,7 +302,7 @@ struct InternalsURLSessionClientSessionTaskTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
 /// delegate elsewhere in this suite for why this exists at all: `LocalServer` is always
 /// TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

@@ -115,8 +115,8 @@ extension RequestConfiguration {
     /// `EventLoopFuture`-driven streaming path `build(eventLoop:)` uses.
     ///
     /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See
-    /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart (Phase 5f/7b4 of
-    /// `URLSESSION_TASK.md`), which drains `body` itself -- into memory too, for anything under
+    /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart, which drains `body`
+    /// itself -- into memory too, for anything under
     /// `Internals.URLSessionUploadFile.inMemoryThreshold`, or a temporary file for anything larger.
     func buildURLRequest() async throws -> URLRequest {
         var request = try buildURLRequestWithoutBody()
@@ -136,9 +136,9 @@ extension RequestConfiguration {
     }
 
     /// URL/method/headers only -- deliberately never touches `body`. Pairs with
-    /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`
-    /// (Phase 5f, reworked in 7b4), which drives `body` itself -- via `uploadTask(with:from:)` or
-    /// `uploadTask(with:fromFile:)` depending on size, see `Internals.URLSessionUploadFile`; both
+    /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`, which
+    /// drives `body` itself -- via `uploadTask(with:from:)` or `uploadTask(with:fromFile:)`
+    /// depending on size, see `Internals.URLSessionUploadFile`; both
     /// ignore whatever `httpBody`/`httpBodyStream` the request carries, so setting either here
     /// would be dead weight the caller has to know to not rely on rather than something actually
     /// used.

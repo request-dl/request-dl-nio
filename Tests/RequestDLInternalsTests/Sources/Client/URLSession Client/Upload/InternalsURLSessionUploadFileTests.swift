@@ -15,11 +15,10 @@ import FoundationEssentials
 import Foundation
 #endif
 
-/// Phase 7b4 of `URLSESSION_TASK.md` -- unit coverage for `Internals.URLSessionUploadFile`, the
-/// replacement for the `InputStream`-based upload bridge (`Internals.URLSessionUploadStream`,
-/// removed) that `INPUT_STREAM_ANALISYS.md` (repo root) found to be permanently broken against
-/// `uploadTask(withStreamedRequest:)`. Independent of `URLSession`/a real network round trip --
-/// that's `RequestConfigurationURLSessionClientUploadTests` in `RequestDLTests`.
+/// Unit coverage for `Internals.URLSessionUploadFile`, the replacement for the `InputStream`-based
+/// upload bridge (`Internals.URLSessionUploadStream`, removed) that was found to be permanently
+/// broken against `uploadTask(withStreamedRequest:)`. Independent of `URLSession`/a real network
+/// round trip -- that's `RequestConfigurationURLSessionClientUploadTests` in `RequestDLTests`.
 ///
 /// `inMemoryThreshold` is passed explicitly and small throughout, rather than relying on the
 /// production default (`Internals.URLSessionUploadFile.inMemoryThreshold`, 8 MiB) -- these tests

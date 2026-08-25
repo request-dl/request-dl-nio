@@ -96,3 +96,4 @@ We are excited to expand this list with many other features. Start by making you
 ### Advanced
 
 - <doc:Request-Customization>
+- <doc:Using-a-Client-Certificate-with-URLSession>

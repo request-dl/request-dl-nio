@@ -12,8 +12,7 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5d of `URLSESSION_TASK.md`: the "required normalization" from URLSESSION_REPORT.md
-/// §4.3. `URLSession` persists cookies in a jar by default (unlike the NIO
+/// A required normalization: `URLSession` persists cookies in a jar by default (unlike the NIO
 /// executor, which has none at all); `Internals.URLSessionClient.init` disables that explicitly
 /// (`httpShouldSetCookies = false`, `httpCookieStorage = nil`) so which executor a session
 /// resolves to never silently changes behavior across requests sharing that session.
@@ -74,7 +73,7 @@ struct InternalsURLSessionClientCookieTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
 /// delegate in the other `Internals.URLSessionClient` test files for why this exists at all:
 /// `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

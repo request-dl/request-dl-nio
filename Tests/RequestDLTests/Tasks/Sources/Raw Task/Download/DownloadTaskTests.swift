@@ -59,10 +59,10 @@ struct DownloadTaskTests {
 
 extension DownloadTaskTests {
 
-    /// Phase 9 of `URLSESSION_TASK.md`'s test-parity strategy, forced deterministically rather
-    /// than relying on `resolveExecutor()`'s own default preference the way `dataTask()` above
-    /// does -- same round trip, pinned explicitly to `.urlSession`. Darwin-only: `.urlSession`
-    /// isn't a real executor anywhere else, so pinning it there is not this test's intent.
+    /// Forced deterministically rather than relying on `resolveExecutor()`'s own default
+    /// preference the way `dataTask()` above does -- same round trip, pinned explicitly to
+    /// `.urlSession`. Darwin-only: `.urlSession` isn't a real executor anywhere else, so pinning
+    /// it there is not this test's intent.
     @Test
     func dataTask_whenURLSessionRequired_deliversWholeBodyIntact() async throws {
         // Given

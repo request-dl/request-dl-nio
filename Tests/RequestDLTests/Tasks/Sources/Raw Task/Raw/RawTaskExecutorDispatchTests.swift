@@ -18,12 +18,10 @@ import FoundationEssentials
 import struct Foundation.UUID
 #endif
 
-/// Phase 7b3 of `URLSESSION_TASK.md`: `RawTask.result()` dispatches through
-/// `Internals.Session.resolvedClient()` (backed by `Internals.ClientManager.shared`, the same
-/// pool every real request in the process shares) instead of the NIO-only `client()`, so
-/// `preferredExecutor`/`requiredExecutor` finally decide which backend a real `DataTask` runs
-/// over -- closing the gap Phase 7a's own acceptance section flagged: pinning or preferring
-/// `.urlSession` validated and threw correctly, but never actually routed a real request there.
+/// `RawTask.result()` dispatches through `Internals.Session.resolvedClient()` (backed by
+/// `Internals.ClientManager.shared`, the same pool every real request in the process shares)
+/// instead of the NIO-only `client()`, so `preferredExecutor`/`requiredExecutor` decide which
+/// backend a real `DataTask` runs over.
 ///
 /// `InternalsClientManagerExecutorTests` (`RequestDLInternalsTests`) already proved
 /// `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)` resolves and caches a
@@ -37,7 +35,7 @@ struct RawTaskExecutorDispatchTests {
     @Test
     func dataTask_whenNoExecutorPreferenceSet_actuallyDispatchesOverURLSessionOnDarwin() async throws {
         // Given -- a config compatible with every executor, so `.urlSession` is
-        // `resolveExecutor()`'s own default preference (Phase 3), not something forced here. A
+        // `resolveExecutor()`'s own default preference, not something forced here. A
         // session id unique to this test run keeps it off `Session.localServer`'s shared pooled
         // entry, so nothing else running concurrently can affect (or be affected by) the
         // `Internals.ClientManager.shared` lookup below.
@@ -128,8 +126,8 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
-    /// Phase 7b4's last open item: cancellation, validated for real. `Internals.TaskSeed`
-    /// (already transport-agnostic) cancels when the response is *dropped*, not when the
+    /// Cancellation, validated for real. `Internals.TaskSeed` (transport-agnostic) cancels when
+    /// the response is *dropped*, not when the
     /// awaiting `_Concurrency.Task` is marked cancelled -- nothing in the iteration path
     /// (`AsyncBytes.AsyncIterator.next()`, `Internals.AsyncStream`) checks
     /// `Task.isCancelled`/`Task.checkCancellation()`. So the whole round trip below runs inside
@@ -204,11 +202,11 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
-    /// Phase 8 of `URLSESSION_TASK.md`: confirms the identity-building failure a real mTLS
-    /// `DataTask` hits under `.urlSession` on this SwiftPM test harness (no Keychain Sharing
-    /// entitlement -- see `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment,
-    /// Phase 5e) surfaces through the *public* API as a documented ``ClientIdentityError``, not a
-    /// raw `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy
+    /// Confirms the identity-building failure a real mTLS `DataTask` hits under `.urlSession` on
+    /// this SwiftPM test harness (no Keychain Sharing entitlement -- see
+    /// `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment) surfaces through the
+    /// *public* API as a documented ``ClientIdentityError``, not a raw
+    /// `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy
     /// .ConfigurationError` -- both package-visible types a real consumer app cannot even name,
     /// and whose `localizedDescription` (Foundation's generic NSError fallback, absent this fix)
     /// carries none of their own actionable `description` text. `ClientIdentityErrorTests` covers
@@ -220,8 +218,8 @@ struct RawTaskExecutorDispatchTests {
     /// Deliberately does not assert on the *specific* ``ClientIdentityError/Reason`` -- this
     /// harness has been observed to hit this gap two different ways (`errSecMissingEntitlement`
     /// on `SecItemAdd`, or `errSecItemNotFound` on the identity lookup right after a successful
-    /// add -- see `URLSESSION_TASK.md` Phase 5e/8's own findings), and both are genuine,
-    /// independently-reachable failure modes this test should pass under either way.
+    /// add), and both are genuine, independently-reachable failure modes this test should pass
+    /// under either way.
     @Test
     func dataTask_whenCAEnabledUnderURLSessionWithoutKeychainSharing_throwsClientIdentityError() async throws {
         let server = Certificates().server()

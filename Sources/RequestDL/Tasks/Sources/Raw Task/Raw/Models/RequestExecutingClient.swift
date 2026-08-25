@@ -5,7 +5,7 @@
 import RequestDLInternals
 
 /// What `RawTask`/`Internals.CacheControl` actually need from a client, independent of which
-/// transport is underneath -- Phase 7b1 of `URLSESSION_TASK.md`.
+/// transport is underneath.
 ///
 /// Declared here, in `RequestDL`, rather than under `Internals` in `RequestDLInternals`: both
 /// methods take a `RequestConfiguration`, a `RequestDL`-only type, and `RequestDLInternals` can't

@@ -4,9 +4,8 @@
 
 // Promoted from the URLSession Executor Spike (formerly
 // `Tests/RequestDLTests/URLSession Executor Spike/RawBytesIdentityBuilder.swift`) for
-// request-dl-nio#287 -- Phase 5e of URLSESSION_TASK.md. RSA/PKCS#1 only for this first cut,
-// matching what the spike validated; PKCS#8 and EC key support are tracked as Phase 10
-// follow-ups.
+// request-dl-nio#287. RSA/PKCS#1 only for this first cut, matching what the spike validated;
+// PKCS#8 and EC key support are not yet implemented.
 
 #if canImport(Darwin)
 
@@ -56,7 +55,8 @@ extension Internals {
                         capability mTLS under the URLSession executor needs in order to store a \
                         client certificate/private key. In Xcode, select this target's Signing & \
                         Capabilities tab, click "+ Capability", and add "Keychain Sharing" -- no \
-                        further configuration is needed. See HOW_TO_USE_CERTIFICATE_URLSESSION.md \
+                        further configuration is needed. See \
+                        https://github.com/request-dl/request-dl-nio/blob/main/Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md \
                         for the full walkthrough.
                         """
                 case .identityLookupReturnedWrongType:

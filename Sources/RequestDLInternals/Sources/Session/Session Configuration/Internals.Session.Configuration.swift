@@ -170,15 +170,14 @@ extension Internals.Session.Configuration {
     ///
     /// - Important: `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`, already
     /// public/released API predating `preferredExecutor`) is treated as an implicit
-    /// `preferredExecutor(.nioTransportServices)` when nothing else already set one. Needed as of
-    /// Phase 7b3.5 of `URLSESSION_TASK.md`: once this method's own NIOTransportServices-vs-plain-NIO
-    /// answer started actually driving a real request (previously only `enableNetworkFramework`
-    /// did, in `Internals.ClientManager.client(provider:sessionConfiguration:)`, independent of
-    /// this method entirely), `.urlSession`'s default first-priority position would otherwise
-    /// silently take over for anyone calling only `enableNetworkFramework(true)` -- a transport
-    /// switch neither this flag's existing callers nor its own doc comment ever signed up for. An
-    /// explicit `preferredExecutor` (any case, including `.urlSession`) still wins over this
-    /// implicit one.
+    /// `preferredExecutor(.nioTransportServices)` when nothing else already set one. Needed
+    /// because this method's own NIOTransportServices-vs-plain-NIO answer now actually drives a
+    /// real request (rather than only `enableNetworkFramework`, read independently by
+    /// `Internals.ClientManager.client(provider:sessionConfiguration:)`): without the implicit
+    /// preference, `.urlSession`'s default first-priority position would otherwise silently take
+    /// over for anyone calling only `enableNetworkFramework(true)` -- a transport switch neither
+    /// this flag's existing callers nor its own doc comment ever signed up for. An explicit
+    /// `preferredExecutor` (any case, including `.urlSession`) still wins over this implicit one.
     package func resolveExecutor() -> Internals.Executor {
         if let requiredExecutor {
             return requiredExecutor
@@ -256,12 +255,11 @@ extension Internals.Session.Configuration {
 
     /// `URLSession` counterpart to `build() -> HTTPClient.Configuration` -- built fresh per
     /// `Internals.URLSessionClient` instance, mirroring how `build()` is also called once per
-    /// `Internals.Client`. Phase 6 of `URLSESSION_TASK.md`.
+    /// `Internals.Client`.
     ///
     /// Ephemeral: no disk-backed cache or cookie storage to leak across the cache entries
     /// `Internals.ClientManager` pools and later shuts down. Cookies are additionally disabled
-    /// unconditionally in `Internals.URLSessionClient.init` itself (Phase 5d) regardless of what
-    /// this builds.
+    /// unconditionally in `Internals.URLSessionClient.init` itself regardless of what this builds.
     ///
     /// Only `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has
     /// no distinct connect-phase timeout to receive `timeout.connect`. Every other field this

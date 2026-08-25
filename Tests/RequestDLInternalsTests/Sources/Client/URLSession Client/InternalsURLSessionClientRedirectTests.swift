@@ -12,8 +12,8 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5b of `URLSESSION_TASK.md`: `Internals.RedirectConfiguration` enforced by hand over
-/// `.urlSession`, since URLSession has no native "max redirects" / "allow cycles" concept.
+/// `Internals.RedirectConfiguration` enforced by hand over `.urlSession`, since URLSession has
+/// no native "max redirects" / "allow cycles" concept.
 ///
 /// There was no pre-existing NIO-backend redirect round-trip suite to port from -- only unit
 /// tests for `Internals.RedirectConfiguration.build()`'s mapping and the `Session.enableRedirect`/
@@ -257,7 +257,7 @@ struct InternalsURLSessionClientRedirectTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
 /// delegate in `InternalsURLSessionClientTests`/`RequestConfigurationURLSessionClientTests` for
 /// why this exists at all: `LocalServer` is always TLS-terminated with a throwaway self-signed
 /// certificate, on every hop of a redirect chain, not only the first request.

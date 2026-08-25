@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Phase 5e of URLSESSION_TASK.md.
-
 #if canImport(Darwin)
 
 #if canImport(FoundationEssentials)
@@ -16,11 +14,10 @@ extension Internals.URLSessionClient {
 
     /// Routes a TLS challenge (server-trust, client-certificate) to `policy` only when it's for
     /// `host` -- promoted from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`,
-    /// not the single-identity `MTLSURLSessionDelegate` the spike test itself used. Now that
-    /// Phase 6 pools `Internals.URLSessionClient` into `Internals.ClientManager`, one `URLSession`
-    /// -- and so one `URLSessionClient` -- genuinely does end up serving requests to many hosts;
-    /// the host check is what keeps a challenge for one host from being answered with a policy
-    /// meant for another.
+    /// not the single-identity `MTLSURLSessionDelegate` the spike test itself used. One
+    /// `URLSession` -- and so one `URLSessionClient`, pooled by `Internals.ClientManager` --
+    /// genuinely does end up serving requests to many hosts; the host check is what keeps a
+    /// challenge for one host from being answered with a policy meant for another.
     ///
     /// `Internals.URLSessionClient` only ever resolves one `Internals.SecureConnection` (the one
     /// it was configured with, same as `redirectConfiguration`/`proxy`), so there is only ever one

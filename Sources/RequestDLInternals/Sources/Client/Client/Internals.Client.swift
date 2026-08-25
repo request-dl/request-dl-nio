@@ -142,13 +142,13 @@ extension Internals {
         /// Executes `request`, streaming the response through a `SessionTask` -- upload
         /// progress, head, and body, optionally teed to `cache` as it downloads.
         ///
-        /// Moved here from `Internals.Session.execute(client:request:...)` (Phase 7b1 of
-        /// `URLSESSION_TASK.md`) -- that method's body never actually touched `Internals.Session`
-        /// itself (`provider`/`configuration`/`manager`), just the `client` it took as a
-        /// parameter, so it belongs on the client that does the executing. `Internals.Session.execute`
-        /// now forwards here rather than duplicating this body, so its three existing direct
-        /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
-        /// `InternalsClientResponseReceiverTests`) keep working unmodified.
+        /// Moved here from `Internals.Session.execute(client:request:...)` -- that method's body
+        /// never actually touched `Internals.Session` itself (`provider`/`configuration`/
+        /// `manager`), just the `client` it took as a parameter, so it belongs on the client that
+        /// does the executing. `Internals.Session.execute` now forwards here rather than
+        /// duplicating this body, so its three existing direct callers (`SessionExecutionTests`,
+        /// `LocalServerConcurrencyTests`, `InternalsClientResponseReceiverTests`) keep working
+        /// unmodified.
         package func execute(
             request: HTTPClient.Request,
             url: String,

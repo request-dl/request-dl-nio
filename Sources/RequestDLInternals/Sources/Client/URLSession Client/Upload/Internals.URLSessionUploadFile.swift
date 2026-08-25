@@ -2,13 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Phase 7b4 of URLSESSION_TASK.md -- workaround for the CFNetwork bug root-caused (but not fixed
-// upstream, and not yet reported) in INPUT_STREAM_ANALISYS.md at the repo root:
+// Workaround for a confirmed CFNetwork bug (root-caused, but not fixed upstream or yet reported):
 // `uploadTask(withStreamedRequest:)` never recognizes end-of-body for a custom `InputStream` --
 // confirmed across four servers and three independently-written subclasses, plus a genuine
 // `CFReadStream` built from raw callbacks, that every callback plausibly involved
 // (`copyProperty`/`setProperty`/`getBuffer`/object-identity) was ruled out as the cause -- only
-// Foundation's own concrete, singular `InputStream(data:)` class ever completes. Phase 5f's
+// Foundation's own concrete, singular `InputStream(data:)` class ever completes. The earlier
 // `Internals.URLSessionUploadStream` (an `InputStream` subclass) hit exactly that bug and is gone;
 // this replaces it with two different `URLSession` code paths -- `uploadTask(with:from:)` for a
 // body small enough to just hold in memory, `uploadTask(with:fromFile:)` for everything else --

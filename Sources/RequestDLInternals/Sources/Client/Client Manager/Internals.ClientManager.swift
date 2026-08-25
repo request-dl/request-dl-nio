@@ -71,14 +71,12 @@ extension Internals {
         }
 
         /// Executor-aware counterpart to `client(provider:sessionConfiguration:)` -- resolves
-        /// `sessionConfiguration.resolveExecutor()` (Phase 3) and actually builds/caches the
-        /// client that decision points to, rather than only deciding in the abstract. Phase 6 of
-        /// `URLSESSION_TASK.md` (the `.urlSession` branch); Phase 7b3.5 (the `.nio`/
-        /// `.nioTransportServices` branch, previously delegated to `client(provider:sessionConfiguration:)`
-        /// unmodified, which meant `resolveExecutor()`'s own answer for *that* choice was computed
-        /// and then never consulted -- only `enableNetworkFramework` decided it, so
-        /// `preferredExecutor(.nioTransportServices)`/`requiredExecutor(.nioTransportServices)`
-        /// had no effect on a real request even after this method existed).
+        /// `sessionConfiguration.resolveExecutor()` and actually builds/caches the client that
+        /// decision points to, rather than only deciding in the abstract. Covers both axes:
+        /// `.urlSession` vs. not, and -- within the `.nio` branch -- plain NIO vs.
+        /// NIOTransportServices, so `preferredExecutor(.nioTransportServices)`/
+        /// `requiredExecutor(.nioTransportServices)` actually decide which event loop group a real
+        /// request gets, not just `enableNetworkFramework`.
         ///
         /// Shares this manager's own `_table` with the NIO-only `client(provider:sessionConfiguration:)`
         /// above -- a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for

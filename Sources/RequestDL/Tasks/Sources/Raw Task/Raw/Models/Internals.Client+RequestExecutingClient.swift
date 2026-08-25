@@ -6,9 +6,9 @@ import AsyncHTTPClient
 import RequestDLInternals
 
 /// Adapts `Internals.Client`'s existing, NIO-specific `execute` methods onto
-/// `RequestExecutingClient` -- Phase 7b1 of `URLSESSION_TASK.md`. No new client behavior: both
-/// methods just build the `HTTPClient.Request` a `RequestConfiguration` already knows how to
-/// produce (`RequestConfiguration.build(eventLoop:)`) and call straight through to what
+/// `RequestExecutingClient`. No new client behavior: both methods just build the
+/// `HTTPClient.Request` a `RequestConfiguration` already knows how to produce
+/// (`RequestConfiguration.build(eventLoop:)`) and call straight through to what
 /// `Internals.Client` already did.
 extension Internals.Client: RequestExecutingClient {
 

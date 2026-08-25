@@ -17,8 +17,8 @@ import protocol Foundation.LocalizedError
 /// `URLSession`-presentable identity, under the `.urlSession` executor (`Session.Executor`).
 ///
 /// Building that identity is a Keychain round-trip with no in-memory alternative on Apple
-/// platforms -- see [HOW_TO_USE_CERTIFICATE_URLSESSION.md](https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md)
-/// for the full walkthrough, including the one-time Xcode project setting
+/// platforms -- see <doc:Using-a-Client-Certificate-with-URLSession> for the full walkthrough,
+/// including the one-time Xcode project setting
 /// (``Reason/missingKeychainSharingEntitlement(operation:)``'s most common cause) most apps using
 /// ``Certificate``/``PrivateKey`` under this executor need.
 ///
@@ -42,8 +42,7 @@ public struct ClientIdentityError: Error, Sendable {
 
         /// The configured private key isn't in a format this executor supports yet. `header` is
         /// the first line of what was actually supplied, to help spot the mismatch (e.g. a
-        /// PKCS#8 `"-----BEGIN PRIVATE KEY-----"` key, not yet supported -- see
-        /// `URLSESSION_TASK.md` Phase 10).
+        /// PKCS#8 `"-----BEGIN PRIVATE KEY-----"` key, not yet supported).
         case unsupportedKeyFormat(header: String)
 
         /// The Security framework rejected the private key bytes outright while building a
@@ -54,7 +53,7 @@ public struct ClientIdentityError: Error, Sendable {
         /// certificate/private key into the Keychain requires. `operation` names the specific
         /// Keychain call that failed. This is almost always fixed by adding **Keychain Sharing**
         /// under the affected target's Signing & Capabilities tab in Xcode -- see
-        /// [HOW_TO_USE_CERTIFICATE_URLSESSION.md](https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md#troubleshooting).
+        /// <doc:Using-a-Client-Certificate-with-URLSession>.
         case missingKeychainSharingEntitlement(operation: String)
 
         /// A Keychain operation failed for a reason other than a missing entitlement. `operation`
@@ -62,9 +61,8 @@ public struct ClientIdentityError: Error, Sendable {
         ///
         /// On a non-sandboxed macOS process (a bare command-line tool, for instance), this can
         /// surface even with Keychain Sharing correctly configured -- see
-        /// [HOW_TO_USE_CERTIFICATE_URLSESSION.md](https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md)'s
-        /// "Platforms" section for that specific, still-unresolved gap (`URLSESSION_TASK.md` Phase
-        /// 10) -- adding Keychain Sharing again will not fix it.
+        /// <doc:Using-a-Client-Certificate-with-URLSession>'s "Platforms" section for that
+        /// specific, still-unresolved gap -- adding Keychain Sharing again will not fix it.
         case keychainOperationFailed(operation: String, status: OSStatus)
 
         /// An internal Keychain query returned a value of an unexpected type. Not expected to
@@ -127,8 +125,9 @@ public struct ClientIdentityError: Error, Sendable {
 extension ClientIdentityError: LocalizedError {
 
     /// A message describing what went wrong, self-diagnosable without needing to have already
-    /// read `HOW_TO_USE_CERTIFICATE_URLSESSION.md` -- this is what `error.localizedDescription`
-    /// surfaces, the way most callers actually display a caught error.
+    /// read <doc:Using-a-Client-Certificate-with-URLSession> -- this is what
+    /// `error.localizedDescription` surfaces, the way most callers actually display a caught
+    /// error.
     public var errorDescription: String? {
         description
     }
@@ -170,7 +169,7 @@ extension ClientIdentityError.Reason: CustomStringConvertible {
                 mTLS under the URLSession executor needs, in order to store a client certificate/\
                 private key. In Xcode, select this target's Signing & Capabilities tab, click "+ \
                 Capability", and add "Keychain Sharing" -- no further configuration is needed. See \
-                https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md#troubleshooting \
+                https://github.com/request-dl/request-dl-nio/blob/main/Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md#troubleshooting \
                 for the full walkthrough.
                 """
         case .keychainOperationFailed(let operation, let status):

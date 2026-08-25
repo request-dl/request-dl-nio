@@ -9,7 +9,7 @@ extension Internals.ClientManager {
     /// `.nio` backs both plain NIO and NIOTransportServices -- `Internals.Client` is the same
     /// type either way, differentiated only by which `EventLoopGroup` `SessionProvider.group(with:)`
     /// handed it, so there is nothing for this enum to distinguish between those two. `.urlSession`
-    /// is the one genuinely different transport, wired in by Phase 6 of `URLSESSION_TASK.md`.
+    /// is the one genuinely different transport.
     package enum Client: @unchecked Sendable {
         case nio(Internals.Client)
 

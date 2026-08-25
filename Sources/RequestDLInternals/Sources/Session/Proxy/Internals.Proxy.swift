@@ -102,16 +102,15 @@ extension Internals.Proxy {
     /// (`kCFNetworkProxiesHTTPEnable` etc.) because they are stable, widely relied upon by
     /// networking libraries, and avoid an extra platform-conditional import for three key names.
     ///
-    /// `.http`-only: `.socks` stays excluded from `.urlSession` entirely (bucket D,
-    /// `Internals.ExecutorIncompatibilityReason.proxySOCKSUnderURLSession`) -- SOCKS via this
-    /// same dictionary is documented as unreliable/unsupported (URLSESSION_REPORT.md §4.4), so
-    /// this deliberately does not attempt it rather than ship something half-working. Both the
-    /// `HTTP*` and `HTTPS*` key triples are set, since HTTPS targets are what actually trigger
-    /// the `CONNECT` tunnel this proxy exists to build.
+    /// `.http`-only: `.socks` stays excluded from `.urlSession` entirely
+    /// (`Internals.ExecutorIncompatibilityReason.proxySOCKSUnderURLSession`) -- SOCKS via this
+    /// same dictionary is unreliable/unsupported, so this deliberately does not attempt it rather
+    /// than ship something half-working. Both the `HTTP*` and `HTTPS*` key triples are set, since
+    /// HTTPS targets are what actually trigger the `CONNECT` tunnel this proxy exists to build.
     ///
-    /// Verified working on macOS for non-loopback destinations (Phase 5c, `URLSESSION_TASK.md`,
-    /// confirmed with a real listener standing in for the proxy) -- see
-    /// `InternalsProxyDictionaryPlatformTests` for the up-to-date per-platform picture. **Not**
+    /// Verified working on macOS for non-loopback destinations (confirmed with a real listener
+    /// standing in for the proxy) -- see `InternalsProxyDictionaryPlatformTests` for the
+    /// up-to-date per-platform picture. **Not**
     /// provable the same way against `127.0.0.1`/`localhost` targets specifically: macOS bypasses
     /// any configured proxy for loopback destinations as a matter of OS policy, independent of
     /// this mapping being correct -- `LocalServer`/`LocalHTTPConnectProxy`-based round trips in

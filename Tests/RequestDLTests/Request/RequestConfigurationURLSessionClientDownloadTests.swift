@@ -13,15 +13,15 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5g of `URLSESSION_TASK.md`: streamed response-body downloads through
+/// Streamed response-body downloads through
 /// `Internals.URLSessionClient.execute(request:readingMode:delegate:)`, forced onto `.urlSession`
-/// via `requireExecutor(_:)` (Phase 3) the same way every other `RequestConfigurationURLSessionClient*`
-/// suite drives its own sub-phase -- `Session.requiredExecutor(_:)` is Phase 7, not built yet.
+/// via `requireExecutor(_:)` directly at the `Internals` layer, the same way every other
+/// `RequestConfigurationURLSessionClient*` suite in this file does.
 ///
-/// Unlike Phase 5f's upload tests, there is no known issue here to work around: this uses
+/// Unlike the upload tests, there is no known issue here to work around: this uses
 /// `session.dataTask(with:)` under the hood, not `uploadTask(withStreamedRequest:)`, so it never
-/// triggers the resumable-uploads-draft auto-negotiation that made `LocalServer` hang for 5f (see
-/// `RequestConfigurationURLSessionClientUploadTests.swift`'s type doc comment) -- and the existing
+/// triggers the resumable-uploads-draft auto-negotiation that made `LocalServer` hang for uploads
+/// (see `RequestConfigurationURLSessionClientUploadTests.swift`'s type doc comment) -- and the existing
 /// buffered `execute(request:delegate:)`, which is also backed by a plain data task, already
 /// confirmed as much.
 ///
@@ -155,7 +155,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
         #expect(chunks.dropLast().allSatisfy { $0.suffix(1) == separatorByte })
     }
 
-    /// A refused redirect (Phase 5b) fires before any response ever reaches
+    /// A refused redirect fires before any response ever reaches
     /// `didReceive response:completionHandler:` for the *destination* -- it's the redirect
     /// itself `willPerformHTTPRedirection` refuses, so `redirectError` has to be checked in
     /// `resolveHead(with:downloadBuffer:)`, not just in the buffered/streamed-upload paths'
@@ -214,7 +214,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- `LocalServer` is
+/// Test-only stand-in for the real client's own TLS challenge handling -- `LocalServer` is
 /// always TLS-terminated with a throwaway self-signed certificate, even outside any TLS feature
 /// under test, so *something* has to trust it for a plain, no-customization round trip to
 /// complete at all. Duplicated from `RequestConfigurationURLSessionClientTests.swift` (`private`

@@ -12,7 +12,7 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5c of `URLSESSION_TASK.md`: `.http` (`.server`) `CONNECT` proxying, mapped onto
+/// `.http` (`.server`) `CONNECT` proxying, mapped onto
 /// `URLSessionConfiguration.connectionProxyDictionary`, with `.basic`/`.basicRawCredentials`
 /// proxy authentication answered through the proxy authentication challenge delegate callback.
 ///
@@ -139,7 +139,7 @@ struct InternalsURLSessionClientProxyTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
 /// delegate in the other `Internals.URLSessionClient` test files for why this exists at all:
 /// `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

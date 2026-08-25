@@ -37,9 +37,9 @@ extension Internals {
             )
         }
 
-        /// Executor-aware counterpart to `client()` -- Phase 7b3 of `URLSESSION_TASK.md`. Returns
-        /// whichever backend `configuration.resolveExecutor()` (Phase 3) actually points to,
-        /// rather than always the NIO one `client()` above hands back unconditionally.
+        /// Executor-aware counterpart to `client()`. Returns whichever backend
+        /// `configuration.resolveExecutor()` actually points to, rather than always the NIO one
+        /// `client()` above hands back unconditionally.
         ///
         /// Returns `Internals.ClientManager.Client` (the enum), not `any RequestExecutingClient`,
         /// because that protocol -- and both concrete conformances -- live in the `RequestDL`
@@ -57,9 +57,9 @@ extension Internals {
         /// -- kept here, with this exact signature, only because it already has direct test
         /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
         /// `InternalsClientResponseReceiverTests`); the actual implementation moved onto
-        /// `Internals.Client` itself in Phase 7b1 of `URLSESSION_TASK.md`, since this method's
-        /// body never touched `self` (`provider`/`configuration`/`manager`) to begin with -- only
-        /// `client`, taken as a parameter.
+        /// `Internals.Client` itself, since this method's body never touched `self`
+        /// (`provider`/`configuration`/`manager`) to begin with -- only `client`, taken as a
+        /// parameter.
         package func execute(
             client: Internals.Client,
             request: HTTPClient.Request,

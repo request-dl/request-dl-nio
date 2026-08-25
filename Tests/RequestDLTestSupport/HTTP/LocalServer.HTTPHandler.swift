@@ -146,8 +146,8 @@ extension LocalServer {
             }
 
             // Lets a test prove what the client actually sent, not just what the server chose to
-            // send back -- e.g. confirming a cookie set by an earlier response was (or, for
-            // Phase 5d's `.urlSession` no-jar normalization, was *not*) resent automatically.
+            // send back -- e.g. confirming a cookie set by an earlier response was (or, under
+            // `.urlSession`'s no-jar normalization, was *not*) resent automatically.
             if let cookie = _incomeHeaders?.first(name: "Cookie") {
                 jsonObject["receivedCookieHeader"] = .string(cookie)
             }

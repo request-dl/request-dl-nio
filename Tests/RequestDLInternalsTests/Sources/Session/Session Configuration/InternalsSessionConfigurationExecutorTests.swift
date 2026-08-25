@@ -235,8 +235,8 @@ struct InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
-    /// §6.1's "not a strict hierarchy" property: a field unsupported under URLSession and a
-    /// *different* field unsupported under NIOTransportServices together must fall all the way
+    /// Executor compatibility is not a strict hierarchy: a field unsupported under URLSession and
+    /// a *different* field unsupported under NIOTransportServices together must fall all the way
     /// back to `.nio`, not get silently paired with whichever executor happens to tolerate one
     /// of them.
     @Test
@@ -259,7 +259,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin() async throws {
-        // Given -- reachable under URLSession (§6.1), unlike under NIOTransportServices
+        // Given -- reachable under URLSession, unlike under NIOTransportServices
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(.none)
 
@@ -313,12 +313,12 @@ struct InternalsSessionConfigurationExecutorTests {
         #expect(sut == .nio)
     }
 
-    /// A preference the configuration can't actually satisfy is not an override -- §6.4's whole
-    /// point. Resolution must fall through to whatever the default priority order would have
-    /// picked among the compatible candidates, not honor the preference anyway.
+    /// A preference the configuration can't actually satisfy is not an override. Resolution must
+    /// fall through to whatever the default priority order would have picked among the
+    /// compatible candidates, not honor the preference anyway.
     @Test
     func resolveExecutor_whenNIOTransportServicesPreferredButIncompatible_fallsBackToURLSession() async throws {
-        // Given -- reachable under URLSession (§6.1), unreachable under NIOTransportServices
+        // Given -- reachable under URLSession, unreachable under NIOTransportServices
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(.none)
         configuration.preferredExecutor = .nioTransportServices
@@ -359,13 +359,12 @@ struct InternalsSessionConfigurationExecutorTests {
 
     // MARK: - resolveExecutor() with enableNetworkFramework
 
-    /// Phase 7b3.5 of `URLSESSION_TASK.md`: `enableNetworkFramework(true)` (`Session
-    /// .enableNetworkFramework(_:)`) is already public, released API that predates
-    /// `preferredExecutor` -- its whole point, historically, was opting a session into
-    /// NIOTransportServices. Once this method's own NIOTransportServices-vs-plain-NIO answer
-    /// started driving a real request (Phase 7b3.5), `.urlSession`'s default first-priority
-    /// position would otherwise silently take over for a caller who only ever set this flag,
-    /// changing which transport they get on upgrade without them touching a single line of their
+    /// `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`) is already public,
+    /// released API that predates `preferredExecutor` -- its whole point, historically, was
+    /// opting a session into NIOTransportServices. Since this method's own
+    /// NIOTransportServices-vs-plain-NIO answer drives a real request, `.urlSession`'s default
+    /// first-priority position would otherwise silently take over for a caller who only ever set
+    /// this flag, changing which transport they get without them touching a single line of their
     /// own code. This section is the regression coverage for treating the flag as an implicit
     /// `preferredExecutor(.nioTransportServices)` specifically to prevent that.
     @Test
@@ -417,7 +416,7 @@ struct InternalsSessionConfigurationExecutorTests {
     /// section.
     @Test
     func resolveExecutor_whenNetworkFrameworkEnabledButIncompatible_fallsThroughToURLSession() async throws {
-        // Given -- reachable under URLSession (§6.1), unreachable under NIOTransportServices
+        // Given -- reachable under URLSession, unreachable under NIOTransportServices
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(.none)
         configuration.enableNetworkFramework = true
@@ -439,10 +438,10 @@ struct InternalsSessionConfigurationExecutorTests {
 
     // MARK: - resolveExecutor() with requiredExecutor
 
-    /// Phase 7b3 of `URLSESSION_TASK.md`: regression coverage for a real bug this phase's
-    /// end-to-end testing caught -- `resolveExecutor()`'s own doc comment already claimed
-    /// `requiredExecutor` "lets a caller override it," but the implementation below only ever
-    /// consulted `preferredExecutor`. `requiredExecutor(.nio)` validated (via `requireExecutor(_:)`,
+    /// Regression coverage for a real bug end-to-end testing caught -- `resolveExecutor()`'s own
+    /// doc comment already claimed `requiredExecutor` "lets a caller override it," but the
+    /// implementation below only ever consulted `preferredExecutor`. `requiredExecutor(.nio)`
+    /// validated (via `requireExecutor(_:)`,
     /// called separately) without ever actually being the executor a real request dispatched
     /// over -- `resolveExecutor()` picked `.urlSession` anyway on a compatible config, silently.
     /// Caught by a `DataTaskTests` test pinning `.requiredExecutor(.nio)` to keep a client-cert

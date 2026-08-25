@@ -2,11 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Phase 5a of URLSESSION_TASK.md -- a single non-streaming request/response round trip (`Data`
-// in, `Data` out). Phase 5b adds redirect enforcement, Phase 5c adds `.server` proxy support,
-// Phase 5d disables URLSession's own cookie jar, Phase 5e adds TLS/mTLS challenge handling, Phase
-// 5f adds streamed request-body uploads, Phase 5g (the plan's last sub-phase) adds streamed
-// response-body downloads.
+// Covers a single non-streaming request/response round trip (`Data` in, `Data` out), redirect
+// enforcement, `.server` proxy support, disabling URLSession's own cookie jar, TLS/mTLS challenge
+// handling, streamed request-body uploads, and streamed response-body downloads.
 
 #if canImport(Darwin)
 
@@ -28,9 +26,8 @@ extension Internals {
         // MARK: - Internal properties
 
         /// Whether this client currently has any request in flight -- mirrors
-        /// `Internals.Client.isRunning`, read by `Internals.ClientManager`'s idle-cleanup sweep
-        /// (Phase 6 of `URLSESSION_TASK.md`) so a busy client is never recycled out from under an
-        /// in-flight request.
+        /// `Internals.Client.isRunning`, read by `Internals.ClientManager`'s idle-cleanup sweep so
+        /// a busy client is never recycled out from under an in-flight request.
         package var isRunning: Bool {
             operationQueue.isRunning
         }
@@ -56,7 +53,7 @@ extension Internals {
 
         /// - Parameter secureConnection: Resolved once, here, into an
         /// `Internals.URLSessionIdentityPolicy` -- including the Keychain round-trip a client
-        /// identity needs (Phase 5e) -- and cached for the lifetime of this client, mirroring
+        /// identity needs -- and cached for the lifetime of this client, mirroring
         /// NIOSSL's own per-connection `TLSConfiguration` caching in `Internals.ClientManager`.
         /// `nil` when the resolved request carries no TLS customization at all.
         /// - Parameter redirectConfiguration: Defaults to AsyncHTTPClient's own default
@@ -81,8 +78,8 @@ extension Internals {
                 configuration.connectionProxyDictionary = proxy.buildConnectionProxyDictionary()
             }
 
-            // Required normalization (URLSESSION_REPORT.md §4.3), not optional: URLSession
-            // persists cookies in a jar by default, the NIO executor has none at all -- without
+            // Required normalization, not optional: URLSession persists cookies in a jar by
+            // default, the NIO executor has none at all -- without
             // this, which executor a session happens to resolve to would silently change
             // behavior across requests that share a session.
             configuration.httpShouldSetCookies = false
@@ -153,22 +150,20 @@ extension Internals {
             return (Internals.ResponseHead(httpResponse), data)
         }
 
-        /// Executes `request` with a body drained from `body` rather than buffered into
-        /// `Data` up front -- Phase 5f, reworked in Phase 7b4. Materializes `body` (any
-        /// `AsyncSequence` of `ByteBuffer`; in practice `Internals.BodySequence`, or `RequestBody`
-        /// itself from the `RequestDL` module, both of which conform) via
-        /// `Internals.URLSessionUploadFile`, then uploads from whichever shape that produced --
-        /// `uploadTask(with:from:)` for a body small enough to just hold in memory,
-        /// `uploadTask(with:fromFile:)` for one that spilled to disk.
+        /// Executes `request` with a body drained from `body` rather than buffered into `Data` up
+        /// front. Materializes `body` (any `AsyncSequence` of `ByteBuffer`; in practice
+        /// `Internals.BodySequence`, or `RequestBody` itself from the `RequestDL` module, both of
+        /// which conform) via `Internals.URLSessionUploadFile`, then uploads from whichever shape
+        /// that produced -- `uploadTask(with:from:)` for a body small enough to just hold in
+        /// memory, `uploadTask(with:fromFile:)` for one that spilled to disk.
         ///
-        /// Phase 5f originally bridged `body` into a custom `InputStream` and drove
-        /// `uploadTask(withStreamedRequest:)` + `needNewBodyStream` -- see `INPUT_STREAM_ANALISYS.md`
-        /// (repo root) for why that never worked: a confirmed CFNetwork bug where no custom
+        /// Deliberately does not drive `uploadTask(withStreamedRequest:)` + `needNewBodyStream`
+        /// via a custom `InputStream`: that path has a confirmed CFNetwork bug where no custom
         /// `InputStream` (Swift subclass or a genuine `CFReadStream`) is ever recognized as
         /// reaching end-of-body. Neither of the two shapes used here goes through `InputStream` at
         /// all, so neither is affected; the file-backed one also re-reads the file itself for any
-        /// retry/redirect that resends the body -- unlike the old approach, nothing here needs to
-        /// hand back a fresh body more than once.
+        /// retry/redirect that resends the body -- nothing here needs to hand back a fresh body
+        /// more than once.
         ///
         /// - Parameter existingUploadFile: Set when the caller already knows `body`'s entire
         /// content is sitting untouched in this file (`RequestBody.wholeFileURL`, a
@@ -179,7 +174,7 @@ extension Internals {
         /// - Parameter onUploadProgress: Called once per `didSendBodyData` callback, in delivery
         /// order, with `(bytesSentThisCall, totalBytesExpectedToSend)`. Order and eventual
         /// completion are what's guaranteed -- individual chunk sizes are URLSession's own to
-        /// pick, not RequestDL's (see URLSESSION_TASK.md Phase 5f's acceptance note).
+        /// pick, not RequestDL's.
         package func execute<Body: AsyncSequence & Sendable>(
             request: URLRequest,
             streaming body: Body,
@@ -244,7 +239,7 @@ extension Internals {
         }
 
         /// Executes `request`, returning as soon as the response head arrives rather than
-        /// waiting for the whole body -- Phase 5g. Mirrors the NIO backend's own
+        /// waiting for the whole body. Mirrors the NIO backend's own
         /// `Internals.AsyncResponse` shape: `Internals.DownloadStep.bytes` is a live
         /// `Internals.AsyncBytes` a caller iterates separately, re-chunked to `readingMode` by
         /// `Internals.DownloadBuffer` -- the same type `Internals.Session.execute(...)` builds for
@@ -301,10 +296,10 @@ extension Internals {
 
         /// Executes `request`, returning a `SessionTask` whose response streams upload progress
         /// (when `request` carries a body), the response head, and the body -- optionally teed
-        /// to `cache` as it downloads. Phase 7b2 of `URLSESSION_TASK.md`.
+        /// to `cache` as it downloads.
         ///
-        /// Mirrors `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`
-        /// (Phase 7b1): gives `RequestExecutingClient`'s `.urlSession` conformance the same three
+        /// Mirrors `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`:
+        /// gives `RequestExecutingClient`'s `.urlSession` conformance the same three
         /// independent `Internals.AsyncStream`s (`upload`/`head`/`download`) to build an
         /// `Internals.AsyncResponse` from that the NIO backend already produces, just fed by this
         /// client's own callbacks instead of `Internals.ClientResponseReceiver`'s.
@@ -335,10 +330,9 @@ extension Internals {
             )
         }
 
-        /// Combines what `execute(request:streaming:delegate:onUploadProgress:)` (Phase 5f) and
-        /// `execute(request:readingMode:delegate:)` (Phase 5g) each built separately -- a
-        /// genuinely streamed request body *and* a genuinely streamed response, at once. Phase
-        /// 7b2 of `URLSESSION_TASK.md`.
+        /// Combines what `execute(request:streaming:delegate:onUploadProgress:)` and
+        /// `execute(request:readingMode:delegate:)` each build separately -- a genuinely streamed
+        /// request body *and* a genuinely streamed response, at once.
         ///
         /// `TaskDelegate` already implements both `needNewBodyStream`/`didSendBodyData` and
         /// `didReceive response:`/`didReceive data:` unconditionally -- this is the first call
@@ -485,8 +479,8 @@ extension Internals {
         }
 
         /// Invalidates the underlying `URLSession` -- mirrors `Internals.Client.shutdown()`, read
-        /// by `Internals.ClientManager`'s idle-cleanup sweep (Phase 6). Idempotent and a no-op
-        /// while a request is still in flight, same guard as the NIO counterpart.
+        /// by `Internals.ClientManager`'s idle-cleanup sweep. Idempotent and a no-op while a
+        /// request is still in flight, same guard as the NIO counterpart.
         ///
         /// - Returns: `true` if this call actually invalidated the session, `false` if it was
         /// already closed or is still busy.
@@ -540,10 +534,10 @@ extension Internals.URLSessionClient {
     package struct RedirectCycleDetectedError: Error, Sendable {}
 }
 
-/// `Internals.URLSessionClient`'s own per-request delegate: redirect enforcement (Phase 5b),
-/// proxy authentication (Phase 5c), and -- when this client was built with a `secureConnection`
-/// -- TLS challenge handling (Phase 5e), none of which URLSession has a configuration-level API
-/// for; all must instead be answered through delegate callbacks. A TLS challenge this delegate's
+/// `Internals.URLSessionClient`'s own per-request delegate: redirect enforcement, proxy
+/// authentication, and -- when this client was built with a `secureConnection` -- TLS challenge
+/// handling, none of which URLSession has a configuration-level API for; all must instead be
+/// answered through delegate callbacks. A TLS challenge this delegate's
 /// own `tlsDelegate` can't answer (no `identityPolicy`, or a different host) falls through to
 /// `forwardingDelegate`, the caller-supplied `delegate` `execute(request:delegate:)` was given,
 /// since URLSession allows only one delegate per task.
@@ -558,8 +552,8 @@ extension Internals.URLSessionClient {
         private let tlsDelegate: TLSDelegate?
         private let forwardingDelegate: URLSessionTaskDelegate?
         private let onUploadProgress: (@Sendable (Int, Int) -> Void)?
-        /// Set for the streamed-download `execute(request:readingMode:delegate:)` path (Phase 5g)
-        /// only -- `nil` for the other two, which is exactly the switch `didReceive
+        /// Set for the streamed-download `execute(request:readingMode:delegate:)` path only --
+        /// `nil` for the other two, which is exactly the switch `didReceive
         /// response:completionHandler:`/`didReceive data:`/`didCompleteWithError:` use below to
         /// tell which of the three modes this instance is answering for.
         private let downloadBuffer: Internals.DownloadBuffer?

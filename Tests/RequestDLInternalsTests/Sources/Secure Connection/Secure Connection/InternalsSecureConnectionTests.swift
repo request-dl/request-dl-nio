@@ -439,8 +439,8 @@ extension InternalsSecureConnectionTests {
     }
 
     /// Mirrors `secureConnection_whenNetworkFrameworkUnsupportedFieldSet_isIncompatible` above,
-    /// but for the URLSession-facing reason list -- deliberately a *different* field set (§6.1:
-    /// the two executors aren't a strict hierarchy of each other).
+    /// but for the URLSession-facing reason list -- deliberately a *different* field set, since
+    /// the two executors aren't a strict hierarchy of each other.
     @Test(
         arguments: [
             { (secureConnection: inout Internals.SecureConnection) in
@@ -482,8 +482,8 @@ extension InternalsSecureConnectionTests {
         #expect(!secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
-    /// §6.1's "not a strict hierarchy" property, made concrete: these four fields are excluded
-    /// from `networkFrameworkIncompatibilityReasons()`'s counterpart list but reachable under
+    /// Executor compatibility is not a strict hierarchy, made concrete: these four fields are
+    /// excluded from `networkFrameworkIncompatibilityReasons()`'s counterpart list but reachable under
     /// URLSession (via a Keychain round-trip for the identity fields, `SecTrust`/`SecPolicy` for
     /// trust roots and hostname verification), so they must never appear in the URLSession
     /// reason list.

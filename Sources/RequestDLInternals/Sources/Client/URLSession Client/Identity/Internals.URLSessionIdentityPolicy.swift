@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Phase 5e of URLSESSION_TASK.md -- bridges `Internals.SecureConnection` (NIOSSL-shaped) into
-// what `URLSession`'s TLS challenge delegate callbacks need (`SecIdentity`/`SecCertificate`/
-// `SecTrust`), via `Internals.RawBytesIdentityBuilder`.
+// Bridges `Internals.SecureConnection` (NIOSSL-shaped) into what `URLSession`'s TLS challenge
+// delegate callbacks need (`SecIdentity`/`SecCertificate`/`SecTrust`), via
+// `Internals.RawBytesIdentityBuilder`.
 
 #if canImport(Darwin)
 
@@ -138,8 +138,8 @@ extension Internals {
                 }
 
                 if case .none = certificateVerification {
-                    // Mirrors NIOSSL's `CertificateVerification.none` (bucket C,
-                    // URLSESSION_REPORT.md §4.3) -- deliberately unsafe, opt-in only.
+                    // Mirrors NIOSSL's `CertificateVerification.none` -- deliberately unsafe,
+                    // opt-in only.
                     completionHandler(.useCredential, URLCredential(trust: serverTrust))
                     return
                 }

@@ -115,4 +115,4 @@ These were some basic examples of how to configure certificates to validate the 
 
 Although it may not be the most secure option, we also support implementing mTLS or PSK. Continue exploring our documentation for more relevant information.
 
-If a request presenting a client certificate (mTLS, `Certificate`/`PrivateKey` on `SecureConnection`) runs under the `.urlSession` executor on an Apple platform, one extra one-time project setting — enabling Keychain Sharing in Xcode — is required; see [HOW_TO_USE_CERTIFICATE_URLSESSION.md](https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md) for the full walkthrough and troubleshooting. A missing entitlement surfaces as ``ClientIdentityError``.
+If a request presenting a client certificate (mTLS, `Certificate`/`PrivateKey` on `SecureConnection`) runs under the `.urlSession` executor on an Apple platform, one extra one-time project setting — enabling Keychain Sharing in Xcode — is required; see <doc:Using-a-Client-Certificate-with-URLSession> for the full walkthrough and troubleshooting.

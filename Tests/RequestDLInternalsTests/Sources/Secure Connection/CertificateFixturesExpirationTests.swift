@@ -20,9 +20,9 @@ import typealias Foundation.TimeInterval
 /// Not hypothetical: the originals were issued for 30 years with no Extended Key Usage or SAN
 /// (see the git history of `Tests/RequestDLTests/Resources/SSL.md`), which
 /// `SecTrustEvaluateWithError` -- the URLSession executor's certificate validation -- rejects
-/// outright even when the certificate is explicitly anchored as trusted. See
-/// `URLSESSION_TASK.md`, Phase 5e. The replacements `.scripts/generate-test-certificates.sh`
-/// produces are deliberately short-lived (under Apple's enforced validity cap), which is exactly
+/// outright even when the certificate is explicitly anchored as trusted. The replacements
+/// `.scripts/generate-test-certificates.sh` produces are deliberately short-lived (under Apple's
+/// enforced validity cap), which is exactly
 /// why this check exists: it turns a stale fixture into one immediate, actionable failure here,
 /// instead of a confusing TLS handshake error discovered later in an unrelated test.
 struct CertificateFixturesExpirationTests {

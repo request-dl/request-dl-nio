@@ -6,8 +6,8 @@
 
 import RequestDLInternals
 
-/// Adapts `Internals.URLSessionClient`'s `SessionTask`-producing `execute` overloads (Phase 7b2
-/// of `URLSESSION_TASK.md`) onto `RequestExecutingClient` -- the `.urlSession` counterpart to
+/// Adapts `Internals.URLSessionClient`'s `SessionTask`-producing `execute` overloads onto
+/// `RequestExecutingClient` -- the `.urlSession` counterpart to
 /// `Internals.Client+RequestExecutingClient.swift`.
 ///
 /// A request with a body always goes through `execute(request:streaming:...)`, matching the NIO
@@ -15,8 +15,8 @@ import RequestDLInternals
 /// unconditionally there too, with no buffered-vs-streamed distinction at this layer). What that
 /// call actually uploads *from* is `Internals.URLSessionClient`'s own decision (memory, a fresh
 /// temp file, or -- via `existingUploadFile: body.wholeFileURL` below -- a `Payload(url:)` body's
-/// own file directly, skipping a redundant copy) -- see `Internals.URLSessionUploadFile` (Phase
-/// 7b4 of `URLSESSION_TASK.md`) for that logic; this conformance only forwards the hint.
+/// own file directly, skipping a redundant copy) -- see `Internals.URLSessionUploadFile` for that
+/// logic; this conformance only forwards the hint.
 extension Internals.URLSessionClient: RequestExecutingClient {
 
     package func execute(

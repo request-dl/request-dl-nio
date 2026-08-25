@@ -14,27 +14,28 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5f/7b4 of `URLSESSION_TASK.md`: streamed request-body uploads through
+/// Streamed request-body uploads through
 /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`, forced onto
-/// `.urlSession` via `requireExecutor(_:)` (Phase 3) the same way `RequestConfigurationURLSessionClientTests`
-/// (Phase 5a) drives the non-streaming path -- `Session.requiredExecutor(_:)` is Phase 7, not built
-/// yet. Mirrors `UploadTaskTests.uploadTask()` (same `LocalServer`/`HTTPResult` fixtures: the
-/// server reports the total bytes it actually received, not per-chunk), but drives
-/// `RequestConfiguration.buildURLRequestWithoutBody()` + the new streaming `execute` overload
-/// directly instead of `UploadTask`, and trusts `LocalServer`'s self-signed certificate via a
-/// test-only delegate the same way 5a does -- no TLS customization is in scope here either.
+/// `.urlSession` via `requireExecutor(_:)` directly at the `Internals` layer, the same way
+/// `RequestConfigurationURLSessionClientTests` drives the non-streaming path. Mirrors
+/// `UploadTaskTests.uploadTask()` (same `LocalServer`/`HTTPResult` fixtures: the server reports
+/// the total bytes it actually received, not per-chunk), but drives
+/// `RequestConfiguration.buildURLRequestWithoutBody()` + the streaming `execute` overload directly
+/// instead of `UploadTask`, and trusts `LocalServer`'s self-signed certificate via a test-only
+/// delegate the same way the non-streaming suite does -- no TLS customization is in scope here
+/// either.
 ///
-/// **Both tests below used to be a confirmed `withKnownIssue`** -- Phase 5f's original bridge
+/// **Both tests below used to be a confirmed `withKnownIssue`** -- the original bridge
 /// (`Internals.URLSessionUploadStream`, an `InputStream` subclass) drove
 /// `uploadTask(withStreamedRequest:)`, which on this OS build automatically negotiates the IETF
-/// "resumable uploads" draft for any streamed upload, and a from-scratch investigation
-/// (`INPUT_STREAM_ANALISYS.md`, repo root) confirmed the real cause runs deeper than that draft
-/// negotiation alone: no custom `InputStream` -- a Swift subclass or a genuine `CFReadStream` --
-/// is ever recognized by CFNetwork as reaching end-of-body, on `LocalServer`, two independent
-/// HTTP/2 servers, and `https://httpbin.org/post` alike. Every callback-level hypothesis
-/// (`copyProperty`/`setProperty`, `getBuffer`, object-identity) was ruled out without finding the
-/// mechanism. Phase 7b4 works around it instead of fixing it: `Internals.URLSessionUploadFile`
-/// drains `body` and this now drives `uploadTask(with:from:)` (small bodies, kept in memory) or
+/// "resumable uploads" draft for any streamed upload, and a from-scratch investigation confirmed
+/// the real cause runs deeper than that draft negotiation alone: no custom `InputStream` -- a
+/// Swift subclass or a genuine `CFReadStream` -- is ever recognized by CFNetwork as reaching
+/// end-of-body, on `LocalServer`, two independent HTTP/2 servers, and `https://httpbin.org/post`
+/// alike. Every callback-level hypothesis (`copyProperty`/`setProperty`, `getBuffer`,
+/// object-identity) was ruled out without finding the mechanism. `Internals.URLSessionUploadFile`
+/// works around it instead of fixing it: it drains `body` and this now drives
+/// `uploadTask(with:from:)` (small bodies, kept in memory) or
 /// `uploadTask(with:fromFile:)` (anything past `Internals.URLSessionUploadFile.inMemoryThreshold`,
 /// spilled to a temporary file) -- both completely different `URLSession` code paths that never
 /// touch `InputStream`/`needNewBodyStream` (or the resumable-uploads draft) at all. Both payloads
@@ -105,7 +106,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
         #expect(decoded.response == output)
     }
 
-    /// The other half of Phase 7b4's refinement (see the type doc comment): a `Payload(url:)`
+    /// The other half of the refinement described in the type doc comment: a `Payload(url:)`
     /// body is backed by exactly one unread, non-temporary `Internals.FileBuffer`, so
     /// `RequestBody.wholeFileURL` resolves to the fixture file itself and
     /// `Internals.URLSessionClient+RequestExecutingClient.swift` passes it straight through as
@@ -177,14 +178,14 @@ struct RequestConfigurationURLSessionClientUploadTests {
         #expect(await fileURL.isReachable)
     }
 
-    /// Not exact chunk-by-chunk byte counts or timing (URLSession's own to pick, not RequestDL's
-    /// -- see the acceptance note in `URLSESSION_TASK.md` Phase 5f) -- just that
-    /// `didSendBodyData` fires in a sequence whose cumulative total is monotonically increasing
-    /// and reaches the whole body, mirroring what `ModifiersProgressTests`'s looser upload
-    /// assertion (`uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count`, sum only) checks
-    /// on the NIO backend. `uploadTask(with:fromFile:)` still fires `didSendBodyData` the same way
-    /// a streamed upload would (Phase 7b4), so this observes it the same way 5f originally
-    /// intended, once that phase's `InputStream`-based bridge stopped being what drove it.
+    /// Not exact chunk-by-chunk byte counts or timing (URLSession's own to pick, not RequestDL's)
+    /// -- just that `didSendBodyData` fires in a sequence whose cumulative total is monotonically
+    /// increasing and reaches the whole body, mirroring what `ModifiersProgressTests`'s looser
+    /// upload assertion (`uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count`, sum only)
+    /// checks on the NIO backend. `uploadTask(with:fromFile:)` still fires `didSendBodyData` the
+    /// same way a streamed upload would, so this observes it the same way originally intended,
+    /// even though the file-backed bridge is what actually drives it now, not the
+    /// `InputStream`-based one.
     @Test
     func urlSessionClient_whenStreamingUpload_reportsProgressInIncreasingOrder() async throws {
         // Given
@@ -239,7 +240,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
     }
 }
 
-/// Test-only stand-in for the TLS challenge handling Phase 5e adds for real -- `LocalServer` is
+/// Test-only stand-in for the real client's own TLS challenge handling -- `LocalServer` is
 /// always TLS-terminated with a throwaway self-signed certificate, even outside any TLS feature
 /// under test, so *something* has to trust it for a plain, no-customization round trip to
 /// complete at all. Duplicated from `RequestConfigurationURLSessionClientTests.swift` (`private`

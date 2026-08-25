@@ -50,10 +50,10 @@ struct MockedTaskTests {
                     ("Accept", "application/json"),
                     ("Content-Type", "text/plain"),
                     ("Content-Length", String(data.count)),
-                    // `Payload` defaults the method to `"POST"` when nothing else sets one
-                    // (Phase 7b3 of URLSESSION_TASK.md -- a body attached to a request that
-                    // would otherwise default to GET fails outright on `.urlSession`), so the
-                    // mirrored `rdl-request-method` header now reflects that resolved value.
+                    // `Payload` defaults the method to `"POST"` when nothing else sets one -- a
+                    // body attached to a request that would otherwise default to GET fails
+                    // outright on `.urlSession` -- so the mirrored `rdl-request-method` header
+                    // now reflects that resolved value.
                     ("rdl-request-method", "POST"),
                 ])
         )
