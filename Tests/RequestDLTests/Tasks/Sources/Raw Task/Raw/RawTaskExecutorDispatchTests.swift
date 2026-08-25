@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOCore
+import NIOPosix
 import Testing
 
 @testable import RequestDL
@@ -124,6 +126,265 @@ struct RawTaskExecutorDispatchTests {
             Issue.record("Expected the DataTask call above to have dispatched over .nio")
             return
         }
+    }
+
+    /// Phase 7b4's last open item: cancellation, validated for real. `Internals.TaskSeed`
+    /// (already transport-agnostic) cancels when the response is *dropped*, not when the
+    /// awaiting `_Concurrency.Task` is marked cancelled -- nothing in the iteration path
+    /// (`AsyncBytes.AsyncIterator.next()`, `Internals.AsyncStream`) checks
+    /// `Task.isCancelled`/`Task.checkCancellation()`. So the whole round trip below runs inside
+    /// one scope: read the one chunk `withPartialResponseServer` ever sends, then let that scope
+    /// end -- dropping both the loop's iterator and the `TaskResult<AsyncBytes>` itself, the only
+    /// two things holding the seed alive.
+    ///
+    /// `LocalServer` always answers fully and immediately, and a "just make the body big" version
+    /// of this test (tried first) turned out not to prove anything: over a local loopback
+    /// connection, even a multi-megabyte body transfers, and the underlying `URLSessionTask`
+    /// completes naturally, well before any scope-based cancellation logic gets a chance to do
+    /// anything -- the test passed whether or not cancellation actually worked. `withPartialResponseServer`
+    /// sends valid HTTP/1.1 headers plus a small body, then goes silent while declaring a
+    /// `Content-Length` it never finishes -- keeping the connection genuinely, indefinitely
+    /// "mid-transfer" until this test explicitly ends it, so the poll below can only pass because
+    /// dropping the response actually cancelled something still running.
+    @Test
+    func downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingURLSessionClient() async throws {
+        try await withPartialResponseServer { port in
+            // Given -- plain HTTP: this server speaks raw bytes, not TLS, and `.urlSession`
+            // reaches `127.0.0.1` over HTTP with no ATS issue in this test harness (confirmed by
+            // running it, not assumed).
+            let content = TestProperty {
+                BaseURL(.http, host: "127.0.0.1:\(port)")
+
+                Session("com.requestdl.tests.7b4-cancel.\(UUID())")
+                    .requiredExecutor(.urlSession)
+
+                // The default reading mode (`.length(1_024)`) waits for a full 1024-byte chunk
+                // before yielding anything -- `withPartialResponseServer` only ever sends 19
+                // bytes ("partial-body-bytes") before going silent, so the default would wait
+                // forever for a chunk boundary that can never arrive. A length well under that
+                // lets the first (and only) chunk surface promptly instead.
+                ReadingMode(length: 4)
+            }
+
+            let resolved = try await resolve(content)
+
+            guard case .urlSession(let client) = try await resolved.session.resolvedClient() else {
+                Issue.record("Expected .urlSession")
+                return
+            }
+
+            #expect(!client.isRunning)
+
+            // When
+            var observedRunningMidFlight = false
+
+            try await {
+                let result = try await DownloadTask { content }.result()
+                for try await _ in result.payload {
+                    // The server has already gone silent for good at this point, having declared
+                    // far more `Content-Length` than it will ever actually send -- genuinely
+                    // mid-flight, not a download that happened to finish before this loop got
+                    // here.
+                    observedRunningMidFlight = client.isRunning
+                    break
+                }
+            }()
+
+            #expect(observedRunningMidFlight)
+
+            // Then -- `didCompleteWithError:` releases the operation-queue slot asynchronously,
+            // so poll briefly rather than asserting immediately after the scope above ends.
+            var stillRunning = client.isRunning
+            for _ in 0..<50 where stillRunning {
+                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
+                stillRunning = client.isRunning
+            }
+
+            #expect(!stillRunning)
+        }
+    }
+
+    /// Companion to the test above: confirms cancellation frees the throttle slot for real, not
+    /// just that `isRunning` (a separate counter, released in the same completion callback but
+    /// not the same value) happens to drop -- the same bar `InternalsClientConcurrencyLimitTests`
+    /// already holds the NIO path to, one layer up through the public API. `Internals.ThrottledExecutor`
+    /// exposes no inspectable count of its own, so this proves it indirectly: with
+    /// `maximumConcurrentConnections(1)`, a second request genuinely cannot proceed while the
+    /// first still holds the only permit, and does proceed once the first is cancelled.
+    @Test
+    func downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest() async throws {
+        try await withPartialResponseServer { firstPort in
+            try await withCompleteResponseServer { secondPort in
+                // Given -- both requests share one `Session` id/configuration (hence one pooled
+                // `Internals.URLSessionClient`, hence one throttle) even though they hit two
+                // different plain-HTTP servers.
+                let sessionID = "com.requestdl.tests.7b4-throttle.\(UUID())"
+
+                func content(port: Int) -> some Property {
+                    TestProperty {
+                        BaseURL(.http, host: "127.0.0.1:\(port)")
+
+                        Session(sessionID)
+                            .requiredExecutor(.urlSession)
+                            .maximumConcurrentConnections(1)
+
+                        // See the identical note on the test above: the default reading mode
+                        // would wait forever for a 1024-byte chunk `withPartialResponseServer`
+                        // never completes.
+                        ReadingMode(length: 4)
+                    }
+                }
+
+                let releaseSignal = ReleaseSignal()
+                let secondRequestState = SecondRequestState()
+
+                // When -- holds the only permit until explicitly told to let go, so this test
+                // controls the moment of cancellation directly instead of racing a timeout
+                // against it.
+                async let firstDownload: Void = {
+                    let result = try await DownloadTask { content(port: firstPort) }.result()
+                    for try await _ in result.payload {
+                        await releaseSignal.wait()
+                        break
+                    }
+                }()
+
+                // Gives the first request time to actually acquire the (only) permit before the
+                // second is attempted at all.
+                try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+
+                async let secondDownload: Void = {
+                    _ = try await DownloadTask { content(port: secondPort) }.result()
+                    await secondRequestState.markCompleted()
+                }()
+
+                // Then -- still queued behind the first request's held permit.
+                try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+                #expect(await !secondRequestState.isCompleted)
+
+                // Cancel the first (drop its response), releasing the permit.
+                await releaseSignal.fire()
+                try await firstDownload
+
+                // The second request can now actually proceed and complete.
+                try await secondDownload
+                #expect(await secondRequestState.isCompleted)
+            }
+        }
+    }
+}
+
+/// Lets a test hold a cancellation at an exact, chosen moment instead of racing a fixed delay
+/// against it -- used by `downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest`
+/// to keep the first request's throttle permit held until the test is ready to observe the second
+/// request still being blocked by it.
+private actor ReleaseSignal {
+
+    private var isFired = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        guard !isFired else { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func fire() {
+        isFired = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor SecondRequestState {
+
+    private(set) var isCompleted = false
+
+    func markCompleted() {
+        isCompleted = true
+    }
+}
+
+// MARK: - Raw servers for deterministic mid-flight state
+
+/// A server that answers with valid HTTP/1.1 headers -- including a `Content-Length` far larger
+/// than what it will ever actually send -- plus a small amount of body, then goes silent. The
+/// connection stays open, genuinely "mid-transfer," for as long as the test wants, until the
+/// client cancels it or the test closes the server. `LocalServer` always answers a request fully
+/// and immediately, so it cannot produce this state on its own.
+private func withPartialResponseServer<Result>(
+    _ body: (Int) async throws -> Result
+) async throws -> Result {
+    try await withRawServer(PartialResponseHandler.init, body)
+}
+
+/// A server that answers a request fully and immediately, over plain HTTP -- the throttle test's
+/// second, "should actually complete once let through" request.
+private func withCompleteResponseServer<Result>(
+    _ body: (Int) async throws -> Result
+) async throws -> Result {
+    try await withRawServer(CompleteResponseHandler.init, body)
+}
+
+private func withRawServer<Handler: ChannelInboundHandler & Sendable, Result>(
+    _ makeHandler: @escaping @Sendable () -> Handler,
+    _ body: (Int) async throws -> Result
+) async throws -> Result {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+    let bootstrap = ServerBootstrap(group: group)
+        .childChannelInitializer { channel in
+            channel.pipeline.addHandler(makeHandler())
+        }
+
+    let serverChannel = try await bootstrap.bind(host: "127.0.0.1", port: 0).get()
+    let port = serverChannel.localAddress!.port!
+
+    do {
+        let result = try await body(port)
+        try? await serverChannel.close()
+        try await group.shutdownGracefully()
+        return result
+    } catch {
+        try? await serverChannel.close()
+        try await group.shutdownGracefully()
+        throw error
+    }
+}
+
+private final class PartialResponseHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = ByteBuffer
+    typealias OutboundOut = ByteBuffer
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        var buffer = context.channel.allocator.buffer(capacity: 256)
+        buffer.writeString(
+            "HTTP/1.1 200 OK\r\n"
+                + "Content-Type: application/octet-stream\r\n"
+                + "Content-Length: 100000000\r\n"
+                + "\r\n"
+                + "partial-body-bytes"
+        )
+        context.writeAndFlush(wrapOutboundOut(buffer), promise: nil)
+        // Deliberately writes nothing further -- see this file's own doc comment on
+        // `withPartialResponseServer` for why.
+    }
+}
+
+private final class CompleteResponseHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = ByteBuffer
+    typealias OutboundOut = ByteBuffer
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let body = "Hello World"
+        var buffer = context.channel.allocator.buffer(capacity: 256)
+        buffer.writeString(
+            "HTTP/1.1 200 OK\r\n"
+                + "Content-Type: text/plain\r\n"
+                + "Content-Length: \(body.utf8.count)\r\n"
+                + "\r\n"
+                + body
+        )
+        context.writeAndFlush(wrapOutboundOut(buffer), promise: nil)
     }
 }
 
