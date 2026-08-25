@@ -66,7 +66,7 @@ extension Internals {
                     throw ConfigurationError.emptyCertificateChain
                 }
 
-                let privateKeyDER = try Self.rsaPKCS1DER(from: privateKey)
+                let privateKeyDER = try Self.privateKeyDER(from: privateKey)
 
                 identityHandle = try RawBytesIdentityBuilder.makeIdentity(
                     certificateDER: leaf,
@@ -212,11 +212,12 @@ extension Internals {
             }
         }
 
-        /// RSA/PKCS#1 only for this first cut (`Internals.RawBytesIdentityBuilder`'s own scope) --
-        /// a `.der`-formatted key is assumed to already be raw PKCS#1 DER (SecKeyCreateWithData
-        /// fails loudly if it isn't); a password-protected key is rejected outright, since there
-        /// is no public API to export a decrypted key back out to DER once NIOSSL has parsed it.
-        private static func rsaPKCS1DER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
+        /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
+        /// down to DER -- `RawBytesIdentityBuilder.secKey(fromDER:)` does the actual format
+        /// classification (RSA/EC, PKCS#1/PKCS#8/SEC1) once real DER bytes are in hand either
+        /// way. A password-protected key is rejected outright, since there is no public API to
+        /// export a decrypted key back out to DER once NIOSSL has parsed it.
+        private static func privateKeyDER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
             switch privateKeySource {
             case .privateKey(let privateKey):
                 guard privateKey.password == nil else {
@@ -239,7 +240,7 @@ extension Internals {
                 case .der:
                     return rawBytes
                 case .pem:
-                    return try RawBytesIdentityBuilder.rsaPKCS1DER(fromPEM: rawBytes)
+                    return try RawBytesIdentityBuilder.privateKeyDER(fromPEM: rawBytes)
                 }
             }
         }

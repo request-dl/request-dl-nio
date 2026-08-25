@@ -40,9 +40,10 @@ public struct ClientIdentityError: Error, Sendable {
         /// The configured certificate bytes could not be parsed as a certificate at all.
         case invalidCertificateData
 
-        /// The configured private key isn't in a format this executor supports yet. `header` is
-        /// the first line of what was actually supplied, to help spot the mismatch (e.g. a
-        /// PKCS#8 `"-----BEGIN PRIVATE KEY-----"` key, not yet supported).
+        /// The configured private key isn't RSA (PKCS#1 or PKCS#8) or EC P-256/P-384/P-521 (SEC1
+        /// or PKCS#8) -- the shapes this executor recognizes. `header` describes what was
+        /// actually supplied, to help spot the mismatch (e.g. an Ed25519 key, which has no
+        /// `SecKeyCreateWithData` entry point at all).
         case unsupportedKeyFormat(header: String)
 
         /// The Security framework rejected the private key bytes outright while building a
@@ -157,9 +158,9 @@ extension ClientIdentityError.Reason: CustomStringConvertible {
             return "the configured certificate data could not be parsed as a certificate."
         case .unsupportedKeyFormat(let header):
             return """
-                the configured private key isn't in a supported format (found: "\(header)"). Only \
-                RSA/PKCS#1 ("-----BEGIN RSA PRIVATE KEY-----") is supported for mTLS under the \
-                URLSession executor today.
+                the configured private key isn't in a supported format (found: "\(header)"). RSA \
+                (PKCS#1 or PKCS#8) and EC P-256/P-384/P-521 (SEC1 or PKCS#8) are supported for \
+                mTLS under the URLSession executor.
                 """
         case .keyCreationFailed(let message):
             return "the configured private key was rejected: \(message)."
