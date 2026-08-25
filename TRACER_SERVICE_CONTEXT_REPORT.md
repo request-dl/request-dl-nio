@@ -281,3 +281,66 @@ This report exists so the fix can be pursued upstream; RequestDL's side is left 
 already correctly documented as currently ineffective) so it starts working with no further RequestDL
 changes once gap #1 is fixed there, and so `RequestServiceContext` is ready to also inject headers
 once/if RequestDL migrates its execution path to close gap #2 as well.
+
+## Appendix: `TracingConfiguration.attributeKeys` — why making it public is not a viable ask
+
+Separate from the `ServiceContext` propagation bug above, the original RequestDL discussion
+(https://github.com/orgs/request-dl/discussions/284) also listed `TracingConfiguration.attributeKeys`
+customization as out of scope, since it's `package`-visibility in `async-http-client` with a
+`// TODO: Open up customization of keys we use?` comment. Before pursuing a PR to make it `public`,
+checked the project's actual issue/PR history for how the maintainers have handled this exact class of
+request. **They have already, explicitly and recently, rejected it.**
+
+### The maintainers have a stated anti-configuration-knob philosophy for tracing attributes
+
+[PR #906](https://github.com/swift-server/async-http-client/pull/906) ("Set `url.full` attribute on
+spans logged for HTTP requests", merged 2026-07-27) originally included an opt-in/opt-out
+configuration option for the new attribute. The response:
+
+> **czechboy0** (2026-06-05): "I think `url.full` should be enabled by default, following
+> OpenTelemetry standard attributes [...] Almost any string field can, in theory, have PII, and I
+> think this is the wrong place to try to make that call. Let application owners filter PII in their
+> telemetry backends instead."
+
+> **ktoso**, author of `swift-distributed-tracing` (2026-06-08): "Agree on not doing tens of settings
+> in the lib itself, collectors can handle that 👍"
+
+The contributor removed the configuration option from the PR in direct response
+(2026-06-05 comment: "Updated the PR to remove the configuration options.") before it was merged.
+This is a stated design position, not an oversight: attribute-level customization belongs in the
+telemetry collector/backend, not as knobs on `HTTPClient.Configuration`. Making `AttributeKeys`
+`public` (with setters) is exactly the shape of change this rejects.
+
+### A PR attempting this exact change has been stuck for 7+ months
+
+[PR #881](https://github.com/swift-server/async-http-client/pull/881) ("Add more span attributes
+(URL, network)", opened 2026-01-21, still open, `mergeable: CONFLICTING`) implements several of the
+attributes requested in [issue #860](https://github.com/swift-server/async-http-client/issues/860)
+("[Tracing] Add more span attributes", `good first issue`, opened by ktoso), including changing
+`responseStatusCode`'s default from the legacy `http.status_code` to the current
+`http.response.status_code` — the exact semconv drift this report's author independently noticed by
+reading `HTTPClient.swift:1149-1155` before finding this issue. A maintainer with write access
+blocked it:
+
+> **fabianfett** (MEMBER, 2026-02-20): "I'm fine with adding the additional tracing attributes.
+> However I'm not a fan of changing the previously agreed upon approach to tracing."
+
+No further commits since 2026-03-23; the PR has sat unresolved since. So even a change that doesn't
+add new public API — just correcting a stale default value — has not landed cleanly, for reasons tied
+to some "previously agreed upon approach" not stated in the thread.
+
+### What this means for `attributeKeys`
+
+- **Making `AttributeKeys`/`attributeKeys` `public` and settable is very likely dead on arrival.** It
+  is precisely the "tens of settings in the lib itself" pattern maintainers rejected in #906, days to
+  weeks before this was written. Do not lead with this ask.
+- **The one narrower thing that's arguably still aligned with what maintainers want**: issue #860
+  itself, filed by ktoso, explicitly asks for more/corrected span attributes — including the
+  `http.status_code` → `http.response.status_code` rename — as *default value* fixes, not new
+  configuration surface. That is a much smaller, values-only change with no new public API. It is
+  still not guaranteed smooth (see PR #881's stall over "previously agreed upon approach"), so it is
+  worth scoping as tightly as possible — ideally just the one rename, referencing #860 directly,
+  rather than bundling in the other attributes #881 tried to add at once.
+- Versions referenced above: `swift-server/async-http-client` main branch and PR/issue state as of
+  2026-08-25; the package RequestDL depends on is `1.36.0` (tagged 2026-07-23), which already
+  includes #862 (async-API header injection) but predates #906.
