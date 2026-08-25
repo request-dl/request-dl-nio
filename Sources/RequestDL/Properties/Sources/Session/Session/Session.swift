@@ -105,15 +105,31 @@ public struct Session: Property {
     /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
     /// or specific secure connection settings.
     ///
-    /// - Note: Not yet deprecated in favor of ``preferredExecutor(_:)``, even though both concern
-    /// Network.framework (``Session/Executor/nioTransportServices``): this is the flag that
-    /// actually opts a session into it today, while `.preferredExecutor(.nioTransportServices)`
-    /// is not yet wired into that same decision. The two will be unified in a later release, at
-    /// which point this may become the deprecated one.
+    /// - Note: Deprecated as of Phase 7b3.5 of `URLSESSION_TASK.md`, in favor of
+    /// ``preferredExecutor(_:)`` -- specifically `.preferredExecutor(.nioTransportServices)`,
+    /// which as of this phase is wired into the same live decision this flag always was
+    /// (`Internals.ClientManager.resolvedClient(...)` now reads `resolveExecutor()`'s own
+    /// NIOTransportServices-vs-plain-NIO answer for a real request, not just the `.urlSession`-vs-not
+    /// one two phases prior). This was held back twice before landing: 7a deferred it because
+    /// `preferredExecutor` had no live effect yet at all, and 7b3 deferred it again because that
+    /// phase's unification only covered the `.urlSession` axis, not this one.
+    ///
+    /// `enableNetworkFramework(true)` is not simply left behaving as before, either --
+    /// `resolveExecutor()` now treats it as an *implicit* `preferredExecutor(.nioTransportServices)`
+    /// whenever nothing else already set a preference, specifically so this deprecation doesn't
+    /// silently change which transport an existing caller's already-released code gets. An
+    /// explicit `preferredExecutor` (any case) still overrides that implicit one. New code should
+    /// call `preferredExecutor(.nioTransportServices)` directly rather than lean on this shim.
     ///
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use .preferredExecutor(.nioTransportServices) instead. enableNetworkFramework(true) already resolves to exactly that internally, so existing behavior is unchanged -- this now exists only for source compatibility."
+    )
     public func enableNetworkFramework(_ enabled: Bool = true) -> Self {
         edit { $0.enableNetworkFramework = enabled }
     }

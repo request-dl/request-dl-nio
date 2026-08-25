@@ -11,6 +11,7 @@ import Testing
 #if canImport(Darwin)
 
 import Foundation
+import NIOTransportServices
 
 /// Phase 6 of `URLSESSION_TASK.md`: `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)`
 /// actually selects and caches an `Internals.URLSessionClient` for a configuration
@@ -127,6 +128,71 @@ struct InternalsClientManagerExecutorTests {
             Issue.record("Expected .nio, got \(resolved)")
             return
         }
+    }
+
+    /// Phase 7b3.5 of `URLSESSION_TASK.md`: regression coverage for the second half of the
+    /// `enableNetworkFramework`/executor unification -- `resolvedClient`'s `.nio` fallback branch
+    /// used to always call `client(provider:sessionConfiguration:)` unmodified, which decides
+    /// NIOTransportServices-vs-plain-NIO purely from the `enableNetworkFramework` flag, never from
+    /// `resolveExecutor()`'s own (correct) answer. `preferredExecutor(.nioTransportServices)`
+    /// therefore had zero effect on which event loop group backed a real client, even after Phase
+    /// 6/7b3 landed. `enableNetworkFramework` is never set here at all -- proving this is
+    /// `resolveExecutor()`'s decision alone, not the flag's.
+    @Test
+    func
+        resolvedClient_whenNIOTransportServicesPreferredWithoutEnableNetworkFrameworkFlag_actuallyUsesNIOTSEventLoopGroup()
+        async throws
+    {
+        // Given
+        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let provider = Internals.SharedSessionProvider()
+
+        var configuration = Internals.Session.Configuration()
+        configuration.preferredExecutor = .nioTransportServices
+
+        #expect(configuration.resolveExecutor() == .nioTransportServices)
+        #expect(!configuration.enableNetworkFramework)
+
+        // When
+        let resolved = try await manager.resolvedClient(
+            provider: provider,
+            sessionConfiguration: configuration
+        )
+
+        // Then
+        guard case .nio(let client) = resolved else {
+            Issue.record("Expected .nio, got \(resolved)")
+            return
+        }
+
+        #expect(client.eventLoopGroup is NIOTSEventLoopGroup)
+    }
+
+    /// Counterpart to the test above: a config `resolveExecutor()` sends to plain `.nio` (here,
+    /// pinned explicitly) must not end up on a NIOTransportServices-backed event loop group just
+    /// because the configuration happens to be compatible with it.
+    @Test
+    func resolvedClient_whenNIORequired_doesNotUseNIOTransportServicesEventLoopGroup() async throws {
+        // Given
+        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let provider = Internals.SharedSessionProvider()
+
+        var configuration = Internals.Session.Configuration()
+        configuration.requiredExecutor = .nio
+
+        // When
+        let resolved = try await manager.resolvedClient(
+            provider: provider,
+            sessionConfiguration: configuration
+        )
+
+        // Then
+        guard case .nio(let client) = resolved else {
+            Issue.record("Expected .nio, got \(resolved)")
+            return
+        }
+
+        #expect(!(client.eventLoopGroup is NIOTSEventLoopGroup))
     }
 }
 

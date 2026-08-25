@@ -55,6 +55,15 @@ struct DataTaskTests {
         #expect(result.response == output)
     }
 
+    /// Pinned to `.nio` (Phase 9 of URLSESSION_TASK.md's test-parity strategy): a real
+    /// client-certificate handshake over `.urlSession` is a confirmed, unconditional
+    /// `withKnownIssue` on this SwiftPM test harness (no Keychain Sharing entitlement on any
+    /// platform -- see `RequestConfigurationURLSessionClientMTLSTests`'s type doc comment, which
+    /// already tracks this exact gap at the `Internals.URLSessionClient` layer). Since
+    /// `resolveExecutor()` now actually decides which backend a real `DataTask` runs over (Phase
+    /// 7b3), this test would otherwise hit that same unconditional gap by default and fail for a
+    /// reason that has nothing to do with what it's actually verifying -- that mTLS client-cert
+    /// auth works end to end through the public `DataTask` API, which NIO already does reliably.
     @Test
     func dataTask_whenCAEnabled() async throws {
         // Given
@@ -87,6 +96,7 @@ struct DataTaskTests {
             Path(uri)
 
             Session.localServer
+                .requiredExecutor(.nio)
 
             SecureConnection {
                 TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))

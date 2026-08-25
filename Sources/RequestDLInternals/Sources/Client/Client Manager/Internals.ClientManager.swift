@@ -63,56 +63,48 @@ extension Internals {
             provider: SessionProvider,
             sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.Client {
-            let options = SessionProviderOptions(
+            try await _nioClient(
+                provider: provider,
+                sessionConfiguration: sessionConfiguration,
                 isCompatibleWithNetworkFramework: sessionConfiguration.isCompatibleWithNetworkFramework
             )
-
-            let sessionProviderID = provider.uniqueIdentifier(with: options)
-
-            return try await lock.withLock {
-                // `AsyncLock` never aborts acquisition, so a task cancelled while queued behind
-                // a cleanup sweep would otherwise still pay for (or trigger) client creation and
-                // go on to fire a request nobody wants anymore. Checked first, before touching
-                // the table, so a cancelled caller does no work at all here.
-                try Task.checkCancellation()
-
-                // `withLock` rather than a manual lock and unlock pair with a return in the
-                // middle of it, which balances today and stops balancing on the next edit.
-                if case .nio(let client) = tableLock.withLock({
-                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-                }) {
-                    return client
-                }
-
-                let eventLoopGroup = await EventLoopGroupManager.shared.provider(
-                    provider,
-                    with: options
-                )
-
-                return try _createNewClient(
-                    id: sessionProviderID,
-                    eventLoopGroup: eventLoopGroup,
-                    sessionConfiguration: sessionConfiguration
-                )
-            }
         }
 
         /// Executor-aware counterpart to `client(provider:sessionConfiguration:)` -- resolves
         /// `sessionConfiguration.resolveExecutor()` (Phase 3) and actually builds/caches the
         /// client that decision points to, rather than only deciding in the abstract. Phase 6 of
-        /// `URLSESSION_TASK.md`.
+        /// `URLSESSION_TASK.md` (the `.urlSession` branch); Phase 7b3.5 (the `.nio`/
+        /// `.nioTransportServices` branch, previously delegated to `client(provider:sessionConfiguration:)`
+        /// unmodified, which meant `resolveExecutor()`'s own answer for *that* choice was computed
+        /// and then never consulted -- only `enableNetworkFramework` decided it, so
+        /// `preferredExecutor(.nioTransportServices)`/`requiredExecutor(.nioTransportServices)`
+        /// had no effect on a real request even after this method existed).
         ///
         /// Shares this manager's own `_table` with the NIO-only `client(provider:sessionConfiguration:)`
         /// above -- a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for
         /// the same provider (see `_createNewURLSessionClient`'s `id`), so the two can never
-        /// collide or be handed back for each other.
+        /// collide or be handed back for each other. Likewise, `_nioClient`'s own `isCompatibleWithNetworkFramework`
+        /// parameter -- not `sessionConfiguration.isCompatibleWithNetworkFramework` -- is what
+        /// keys a NIOTransportServices entry apart from a plain-NIO one here
+        /// (`SessionProvider.uniqueIdentifier(with:)`'s `"NTW."` prefix reads that parameter, not
+        /// `enableNetworkFramework` directly), so an executor-resolved and a flag-resolved client
+        /// for the same provider can only ever collide if they'd have made the identical choice
+        /// anyway.
         package func resolvedClient(
             provider: SessionProvider,
             sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.ClientManager.Client {
             #if canImport(Darwin)
-            guard sessionConfiguration.resolveExecutor() == .urlSession else {
-                return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
+            let executor = sessionConfiguration.resolveExecutor()
+
+            guard executor == .urlSession else {
+                return .nio(
+                    try await _nioClient(
+                        provider: provider,
+                        sessionConfiguration: sessionConfiguration,
+                        isCompatibleWithNetworkFramework: executor == .nioTransportServices
+                    )
+                )
             }
 
             let sessionProviderID =
@@ -145,6 +137,49 @@ extension Internals {
         }
 
         // MARK: - Private methods
+
+        /// Shared body for `client(provider:sessionConfiguration:)` and `resolvedClient(provider:sessionConfiguration:)`'s
+        /// `.nio`/`.nioTransportServices` branch -- the two differ only in *how* they decide
+        /// `isCompatibleWithNetworkFramework` (the `enableNetworkFramework` flag directly, vs.
+        /// `resolveExecutor()`'s own answer), never in what happens once that's decided.
+        private func _nioClient(
+            provider: SessionProvider,
+            sessionConfiguration: Internals.Session.Configuration,
+            isCompatibleWithNetworkFramework: Bool
+        ) async throws -> Internals.Client {
+            let options = SessionProviderOptions(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
+
+            let sessionProviderID = provider.uniqueIdentifier(with: options)
+
+            return try await lock.withLock {
+                // `AsyncLock` never aborts acquisition, so a task cancelled while queued behind
+                // a cleanup sweep would otherwise still pay for (or trigger) client creation and
+                // go on to fire a request nobody wants anymore. Checked first, before touching
+                // the table, so a cancelled caller does no work at all here.
+                try Task.checkCancellation()
+
+                // `withLock` rather than a manual lock and unlock pair with a return in the
+                // middle of it, which balances today and stops balancing on the next edit.
+                if case .nio(let client) = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                }) {
+                    return client
+                }
+
+                let eventLoopGroup = await EventLoopGroupManager.shared.provider(
+                    provider,
+                    with: options
+                )
+
+                return try _createNewClient(
+                    id: sessionProviderID,
+                    eventLoopGroup: eventLoopGroup,
+                    sessionConfiguration: sessionConfiguration
+                )
+            }
+        }
 
         private func scheduleCleanup() {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in

@@ -160,16 +160,42 @@ extension Internals.Session.Configuration {
     /// `urlSessionIncompatibilityReasons()`/`SecureConnection.networkFrameworkIncompatibilityReasons()`).
     /// This is a default ordering, not a fixed law -- `preferredExecutor`/`requiredExecutor`
     /// (public API) let a caller override it.
+    ///
+    /// - Important: `requiredExecutor`, when set, is returned unconditionally, without
+    /// re-checking compatibility here -- that check already happened, and already threw if it
+    /// failed, in `requireExecutor(_:)` (called separately, before this, by `RawTask.result()`).
+    /// A caller that reaches this method with `requiredExecutor` set and never called
+    /// `requireExecutor(_:)` first bypasses that guarantee -- same contract `Internals.ClientManager
+    /// .resolvedClient(provider:sessionConfiguration:)`'s own callers already have to honor.
+    ///
+    /// - Important: `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`, already
+    /// public/released API predating `preferredExecutor`) is treated as an implicit
+    /// `preferredExecutor(.nioTransportServices)` when nothing else already set one. Needed as of
+    /// Phase 7b3.5 of `URLSESSION_TASK.md`: once this method's own NIOTransportServices-vs-plain-NIO
+    /// answer started actually driving a real request (previously only `enableNetworkFramework`
+    /// did, in `Internals.ClientManager.client(provider:sessionConfiguration:)`, independent of
+    /// this method entirely), `.urlSession`'s default first-priority position would otherwise
+    /// silently take over for anyone calling only `enableNetworkFramework(true)` -- a transport
+    /// switch neither this flag's existing callers nor its own doc comment ever signed up for. An
+    /// explicit `preferredExecutor` (any case, including `.urlSession`) still wins over this
+    /// implicit one.
     package func resolveExecutor() -> Internals.Executor {
+        if let requiredExecutor {
+            return requiredExecutor
+        }
+
         #if canImport(Darwin)
         let isURLSessionCompatible = urlSessionIncompatibilityReasons().isEmpty
         let isNetworkFrameworkCompatible = secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true
 
-        // `preferredExecutor` only ever reorders among the candidates the two checks above
-        // already say are compatible -- it is never consulted on its own, and never returned
-        // without the matching compatibility check passing first. `.nio` needs no such check: it
-        // is the universal fallback (`requireExecutor(_:)` never produces reasons for it either).
-        switch preferredExecutor {
+        let effectivePreferredExecutor = preferredExecutor ?? (enableNetworkFramework ? .nioTransportServices : nil)
+
+        // `effectivePreferredExecutor` only ever reorders among the candidates the two checks
+        // above already say are compatible -- it is never consulted on its own, and never
+        // returned without the matching compatibility check passing first. `.nio` needs no such
+        // check: it is the universal fallback (`requireExecutor(_:)` never produces reasons for
+        // it either).
+        switch effectivePreferredExecutor {
         case .urlSession where isURLSessionCompatible:
             return .urlSession
         case .nioTransportServices where isNetworkFrameworkCompatible:

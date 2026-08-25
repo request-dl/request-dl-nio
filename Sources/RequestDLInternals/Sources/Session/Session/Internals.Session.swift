@@ -37,6 +37,22 @@ extension Internals {
             )
         }
 
+        /// Executor-aware counterpart to `client()` -- Phase 7b3 of `URLSESSION_TASK.md`. Returns
+        /// whichever backend `configuration.resolveExecutor()` (Phase 3) actually points to,
+        /// rather than always the NIO one `client()` above hands back unconditionally.
+        ///
+        /// Returns `Internals.ClientManager.Client` (the enum), not `any RequestExecutingClient`,
+        /// because that protocol -- and both concrete conformances -- live in the `RequestDL`
+        /// module, which depends on this one (`RequestDLInternals`), not the other way around.
+        /// `RawTask.result()`, in `RequestDL`, is what actually unwraps this into the protocol
+        /// existential it needs.
+        package func resolvedClient() async throws -> Internals.ClientManager.Client {
+            try await manager.resolvedClient(
+                provider: provider,
+                sessionConfiguration: configuration
+            )
+        }
+
         /// Forwards to `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`
         /// -- kept here, with this exact signature, only because it already has direct test
         /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,

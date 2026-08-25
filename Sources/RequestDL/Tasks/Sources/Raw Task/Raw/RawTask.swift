@@ -35,10 +35,23 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
+        // Phase 7b3 of URLSESSION_TASK.md: `resolvedClient()` -- not `client()` -- is what makes
+        // `preferredExecutor`/`requiredExecutor` (validated just above, for the hard-pin case)
+        // actually decide which backend this request runs over, instead of always the NIO one.
+        // `resolvedClient()` returns `Internals.ClientManager.Client` (an enum), not `any
+        // RequestExecutingClient` directly -- see that method's own doc comment for why -- so
+        // this is the one place that unwraps it into the existential everything below expects.
         let client: any RequestExecutingClient
 
         do {
-            client = try await resolved.session.client()
+            switch try await resolved.session.resolvedClient() {
+            case .nio(let nioClient):
+                client = nioClient
+            #if canImport(Darwin)
+            case .urlSession(let urlSessionClient):
+                client = urlSessionClient
+            #endif
+            }
         } catch let error as Internals.SecureFileLoadError {
             throw SecureFileError(error)
         }

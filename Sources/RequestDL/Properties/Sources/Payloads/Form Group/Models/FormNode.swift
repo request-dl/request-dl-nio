@@ -37,6 +37,14 @@ struct FormNode: PropertyNode {
             return
         }
 
+        // See `PayloadNode.setBodyWithBuffer`'s identical guard for why: a body attached to a
+        // request whose method is otherwise left to default to `"GET"` fails outright on
+        // `.urlSession` (Phase 7b3 of URLSESSION_TASK.md). Only fills in a default, never
+        // overrides an explicit `RequestMethod`.
+        if make.requestConfiguration.method == nil {
+            make.requestConfiguration.method = "POST"
+        }
+
         let constructor = FormGroupBuilder(items)
 
         make.requestConfiguration.headers.set(

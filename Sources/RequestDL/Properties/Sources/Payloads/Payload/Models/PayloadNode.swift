@@ -76,6 +76,17 @@ struct PayloadNode: PropertyNode {
         output: PayloadOutput,
         make: inout Make
     ) {
+        // Only fills in a default, never overrides an explicit `RequestMethod` -- whichever
+        // node runs first wins, since `RequestMethod`'s own node assigns unconditionally. A
+        // body attached to whatever method ends up unset otherwise falls through to `"GET"` at
+        // request-build time, which AsyncHTTPClient tolerates silently but URLSession/CFNetwork
+        // does not: a GET carrying a body fails outright (`NSURLErrorDataLengthExceedsMaximum`,
+        // confirmed against a real server, not LocalServer- or beta-OS-specific) once a real
+        // request can actually reach `.urlSession` (Phase 7b3 of URLSESSION_TASK.md).
+        if make.requestConfiguration.method == nil {
+            make.requestConfiguration.method = "POST"
+        }
+
         make.requestConfiguration.headers.set(
             name: "Content-Type",
             value: String(output.contentType)
