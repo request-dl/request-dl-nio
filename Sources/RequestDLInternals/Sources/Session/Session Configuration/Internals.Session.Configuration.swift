@@ -6,10 +6,11 @@ import AsyncHTTPClient
 import NIOCore
 import NIOHTTP1
 import NIOHTTPCompression
+import Tracing
 
 extension Internals.Session {
 
-    package struct Configuration: Sendable, Equatable {
+    package struct Configuration: Sendable {
 
         // MARK: - Internal properties
 
@@ -19,6 +20,10 @@ extension Internals.Session {
         package var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
         package var ignoreUncleanSSLShutdown: Bool = false
+
+        /// Excluded from `Equatable` — `any Tracer` isn't `Equatable`, same reasoning as
+        /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
+        package var tracer: (any Tracer)?
 
         /// Defaults to unbounded auto-decompression on Apple platforms, matching URLSession's own
         /// behavior there — URLSession always decodes `Content-Encoding` transparently with no
@@ -66,6 +71,10 @@ extension Internals.Session {
                 configuration.httpVersion = httpVersion.build()
             }
 
+            if let tracer {
+                configuration.tracing.tracer = tracer
+            }
+
             if case .enabled(let algorithm) = compression {
                 let encoding = algorithm.build()
 
@@ -99,5 +108,26 @@ extension Internals.Session.Configuration {
         }
 
         return false
+    }
+}
+
+// MARK: - Equatable
+
+extension Internals.Session.Configuration: Equatable {
+
+    package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.secureConnection == rhs.secureConnection
+            && lhs.redirectConfiguration == rhs.redirectConfiguration
+            && lhs.timeout == rhs.timeout
+            && lhs.connectionPool == rhs.connectionPool
+            && lhs.proxy == rhs.proxy
+            && lhs.ignoreUncleanSSLShutdown == rhs.ignoreUncleanSSLShutdown
+            && lhs.decompression == rhs.decompression
+            && lhs.compression == rhs.compression
+            && lhs.dnsOverride == rhs.dnsOverride
+            && lhs.networkFrameworkWaitForConnectivity == rhs.networkFrameworkWaitForConnectivity
+            && lhs.httpVersion == rhs.httpVersion
+            && lhs.enableNetworkFramework == rhs.enableNetworkFramework
+            && lhs.maximumConcurrentConnections == rhs.maximumConcurrentConnections
     }
 }

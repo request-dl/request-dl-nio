@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import NIOCore
 import Testing
+import Tracing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
@@ -242,6 +243,33 @@ struct InternalsSessionConfigurationTests {
 
         // Then
         #expect(!builtConfiguration.networkFrameworkWaitForConnectivity)
+    }
+
+    @Test
+    func configuration_whenSetTracer_shouldBeEqual() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        let tracer = NoOpTracer()
+
+        // When
+        configuration.tracer = tracer
+
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        #expect(builtConfiguration.tracing.tracer != nil)
+    }
+
+    @Test
+    func configuration_whenTracerNotSet_shouldKeepDefault() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // When
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        #expect(builtConfiguration.tracing.tracer != nil)
     }
 
     @Test

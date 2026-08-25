@@ -6,6 +6,7 @@ import AsyncHTTPClient
 import NIOPosix
 import RequestDLInternals
 import Testing
+import Tracing
 
 @testable import RequestDL
 
@@ -276,6 +277,34 @@ struct SessionTests {
 
         // Then
         #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
+    }
+
+    @Test
+    func session_whenTracerDefault_shouldBeNil() async throws {
+        // Given
+        let property = Session()
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.tracer == nil)
+    }
+
+    @Test
+    func session_whenTracerSet_shouldBeValid() async throws {
+        // Given
+        let tracer = NoOpTracer()
+
+        let property = Session()
+            .tracer(tracer)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.tracer != nil)
+        #expect(try resolved.session.configuration.build().tracing.tracer != nil)
     }
 
     @Test
