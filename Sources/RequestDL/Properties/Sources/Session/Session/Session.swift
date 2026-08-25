@@ -196,9 +196,9 @@ public struct Session: Property {
     /// Sets the tracer used to record distributed tracing spans for requests made through this
     /// session.
     ///
-    /// When not set, the session falls back to AsyncHTTPClient's own default, which is whatever
-    /// tracer was globally bootstrapped via `InstrumentationSystem.bootstrap(_:)` (a no-op tracer
-    /// if none was bootstrapped).
+    /// When not set, no tracing is performed — the session uses a no-op tracer, regardless of
+    /// whether some other part of the process has globally bootstrapped one via
+    /// `InstrumentationSystem.bootstrap(_:)`. Tracing is opt-in per session, not ambient.
     ///
     /// - Parameter tracer: The tracer to use for this session.
     /// - Returns: The modified `Session` instance with the tracer configured.

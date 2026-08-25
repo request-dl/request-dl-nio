@@ -21,9 +21,14 @@ extension Internals.Session {
         package var proxy: Internals.Proxy?
         package var ignoreUncleanSSLShutdown: Bool = false
 
+        /// Defaults to a no-op tracer rather than inheriting `HTTPClient.Configuration`'s own default
+        /// (whatever tracer some other part of the process happens to have globally bootstrapped via
+        /// `InstrumentationSystem`). RequestDL's API is declarative — a caller that never calls
+        /// `.tracer(_:)` shouldn't have their requests silently traced by ambient global state.
+        ///
         /// Excluded from `Equatable` — `any Tracer` isn't `Equatable`, same reasoning as
         /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
-        package var tracer: (any Tracer)?
+        package var tracer: any Tracer = NoOpTracer()
 
         /// Defaults to unbounded auto-decompression on Apple platforms, matching URLSession's own
         /// behavior there — URLSession always decodes `Content-Encoding` transparently with no
@@ -71,9 +76,7 @@ extension Internals.Session {
                 configuration.httpVersion = httpVersion.build()
             }
 
-            if let tracer {
-                configuration.tracing.tracer = tracer
-            }
+            configuration.tracing.tracer = tracer
 
             if case .enabled(let algorithm) = compression {
                 let encoding = algorithm.build()

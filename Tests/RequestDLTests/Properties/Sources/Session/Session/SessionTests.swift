@@ -280,7 +280,7 @@ struct SessionTests {
     }
 
     @Test
-    func session_whenTracerDefault_shouldBeNil() async throws {
+    func session_whenTracerDefault_shouldBeNoOp() async throws {
         // Given
         let property = Session()
 
@@ -288,13 +288,13 @@ struct SessionTests {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(resolved.session.configuration.tracer == nil)
+        #expect((resolved.session.configuration.tracer as? NoOpTracer) != nil)
     }
 
     @Test
     func session_whenTracerSet_shouldBeValid() async throws {
         // Given
-        let tracer = NoOpTracer()
+        let tracer = RecordingTracer()
 
         let property = Session()
             .tracer(tracer)
@@ -303,8 +303,8 @@ struct SessionTests {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(resolved.session.configuration.tracer != nil)
-        #expect(try resolved.session.configuration.build().tracing.tracer != nil)
+        #expect((resolved.session.configuration.tracer as? RecordingTracer) != nil)
+        #expect(try (resolved.session.configuration.build().tracing.tracer as? RecordingTracer) != nil)
     }
 
     @Test
@@ -333,4 +333,27 @@ struct SessionTests {
         #expect(resolved.session.configuration.decompression == .enabled(.size(200)))
         #expect(resolved.session.configuration.networkFrameworkWaitForConnectivity == true)
     }
+}
+
+private struct RecordingTracer: Tracer, Sendable {
+
+    func startSpan<Instant: TracerInstant>(
+        _ operationName: String,
+        context: @autoclosure () -> ServiceContext,
+        ofKind kind: SpanKind,
+        at instant: @autoclosure () -> Instant,
+        function: String,
+        file fileID: String,
+        line: UInt
+    ) -> NoOpTracer.NoOpSpan {
+        NoOpTracer.NoOpSpan(context: context())
+    }
+
+    func forceFlush() {}
+
+    func inject<Carrier, Inject>(_ context: ServiceContext, into carrier: inout Carrier, using injector: Inject)
+    where Inject: Injector, Carrier == Inject.Carrier {}
+
+    func extract<Carrier, Extract>(_ carrier: Carrier, into context: inout ServiceContext, using extractor: Extract)
+    where Extract: Extractor, Carrier == Extract.Carrier {}
 }
