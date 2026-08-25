@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import NIOCore
 import RequestDLInternals
+import Tracing
 
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,
@@ -57,6 +58,11 @@ public struct RequestConfiguration: Sendable {
     /// The strategy to use for handling cached data. Defaults to `.ignoreCachedData`.
     public internal(set) var cacheStrategy: CacheStrategy
 
+    /// The `ServiceContext` to bind while this request executes. Defaults to `nil`, which leaves
+    /// whatever `ServiceContext.current` task-local is already ambient untouched — only set this
+    /// to explicitly override it for this request, independent of the calling task's own state.
+    public internal(set) var serviceContext: ServiceContext?
+
     // MARK: - Internal properties
 
     /// Only a bodyless GET is cacheable.
@@ -84,6 +90,7 @@ public struct RequestConfiguration: Sendable {
         self.readingMode = .length(1_024)
         self.cachePolicy = []
         self.cacheStrategy = .ignoreCachedData
+        self.serviceContext = nil
     }
 
     // MARK: - Internal methods
