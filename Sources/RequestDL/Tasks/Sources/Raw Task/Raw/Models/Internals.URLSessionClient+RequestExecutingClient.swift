@@ -10,10 +10,13 @@ import RequestDLInternals
 /// of `URLSESSION_TASK.md`) onto `RequestExecutingClient` -- the `.urlSession` counterpart to
 /// `Internals.Client+RequestExecutingClient.swift`.
 ///
-/// A request with a body always streams it (`execute(request:streaming:...)`), matching the NIO
+/// A request with a body always goes through `execute(request:streaming:...)`, matching the NIO
 /// backend's own uniform behavior (`RequestBody`'s streaming `AsyncSequence` conformance is used
-/// unconditionally there too, with no buffered-vs-streamed distinction) -- not a heuristic this
-/// conformance invents, just staying consistent with the executor it sits alongside.
+/// unconditionally there too, with no buffered-vs-streamed distinction at this layer). What that
+/// call actually uploads *from* is `Internals.URLSessionClient`'s own decision (memory, a fresh
+/// temp file, or -- via `existingUploadFile: body.wholeFileURL` below -- a `Payload(url:)` body's
+/// own file directly, skipping a redundant copy) -- see `Internals.URLSessionUploadFile` (Phase
+/// 7b4 of `URLSESSION_TASK.md`) for that logic; this conformance only forwards the hint.
 extension Internals.URLSessionClient: RequestExecutingClient {
 
     package func execute(
@@ -28,7 +31,8 @@ extension Internals.URLSessionClient: RequestExecutingClient {
                 readingMode: configuration.readingMode,
                 uploadingBytes: body.totalSize,
                 cache: cache,
-                logger: logger
+                logger: logger,
+                existingUploadFile: body.wholeFileURL
             )
         }
 

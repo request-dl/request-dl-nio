@@ -153,19 +153,29 @@ extension Internals {
             return (Internals.ResponseHead(httpResponse), data)
         }
 
-        /// Executes `request` with a body streamed from `body` rather than buffered up front,
-        /// via `uploadTask(withStreamedRequest:)` -- Phase 5f. Bridges `body` (any
+        /// Executes `request` with a body drained from `body` rather than buffered into
+        /// `Data` up front -- Phase 5f, reworked in Phase 7b4. Materializes `body` (any
         /// `AsyncSequence` of `ByteBuffer`; in practice `Internals.BodySequence`, or `RequestBody`
-        /// itself from the `RequestDL` module, both of which conform) into the `InputStream`
-        /// `URLSessionTaskDelegate.urlSession(_:task:needNewBodyStream:)` wants, via
-        /// `Internals.URLSessionUploadStream`.
+        /// itself from the `RequestDL` module, both of which conform) via
+        /// `Internals.URLSessionUploadFile`, then uploads from whichever shape that produced --
+        /// `uploadTask(with:from:)` for a body small enough to just hold in memory,
+        /// `uploadTask(with:fromFile:)` for one that spilled to disk.
         ///
-        /// `request` must not carry `httpBody`/`httpBodyStream` -- `uploadTask(withStreamedRequest:)`
-        /// ignores both and calls `needNewBodyStream` instead, possibly more than once per
-        /// logical request (an auth retry, a redirect that re-sends the body), which is exactly
-        /// why `body` is a value this method can re-drain freshly on every call rather than a
-        /// single already-consumed stream.
+        /// Phase 5f originally bridged `body` into a custom `InputStream` and drove
+        /// `uploadTask(withStreamedRequest:)` + `needNewBodyStream` -- see `INPUT_STREAM_ANALISYS.md`
+        /// (repo root) for why that never worked: a confirmed CFNetwork bug where no custom
+        /// `InputStream` (Swift subclass or a genuine `CFReadStream`) is ever recognized as
+        /// reaching end-of-body. Neither of the two shapes used here goes through `InputStream` at
+        /// all, so neither is affected; the file-backed one also re-reads the file itself for any
+        /// retry/redirect that resends the body -- unlike the old approach, nothing here needs to
+        /// hand back a fresh body more than once.
         ///
+        /// - Parameter existingUploadFile: Set when the caller already knows `body`'s entire
+        /// content is sitting untouched in this file (`RequestBody.wholeFileURL`, a
+        /// `Payload(url:)`-only body) -- skips `Internals.URLSessionUploadFile.write(body:)`
+        /// entirely rather than draining `body` only to recreate a copy of a file that already
+        /// exists. `body` is still required in that case (for the generic `Body` type/call-site
+        /// symmetry with the other overload below) but is never iterated.
         /// - Parameter onUploadProgress: Called once per `didSendBodyData` callback, in delivery
         /// order, with `(bytesSentThisCall, totalBytesExpectedToSend)`. Order and eventual
         /// completion are what's guaranteed -- individual chunk sizes are URLSession's own to
@@ -174,6 +184,7 @@ extension Internals {
             request: URLRequest,
             streaming body: Body,
             delegate: URLSessionTaskDelegate? = nil,
+            existingUploadFile: URL? = nil,
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil
         ) async throws -> (head: Internals.ResponseHead, body: Data) where Body.Element == ByteBuffer {
             let release = await throttledExecutor.acquire()
@@ -181,6 +192,13 @@ extension Internals {
 
             let operation = operationQueue.operation()
             defer { operation.complete() }
+
+            let materialized: Internals.URLSessionUploadFile.Materialized
+            if let existingUploadFile {
+                materialized = .existingFile(existingUploadFile)
+            } else {
+                materialized = try await Internals.URLSessionUploadFile.write(body: body)
+            }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
@@ -192,16 +210,36 @@ extension Internals {
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
                 forwarding: delegate,
-                makeBodyStream: { Internals.URLSessionUploadStream(body: body) },
                 onUploadProgress: onUploadProgress
             )
 
-            return try await withCheckedThrowingContinuation { continuation in
-                taskDelegate.completion = { continuation.resume(with: $0) }
+            do {
+                let result = try await withCheckedThrowingContinuation { continuation in
+                    taskDelegate.completion = { continuation.resume(with: $0) }
 
-                let task = session.uploadTask(withStreamedRequest: request)
-                task.delegate = taskDelegate
-                task.resume()
+                    let task: URLSessionTask
+                    switch materialized {
+                    case .data(let data):
+                        task = session.uploadTask(with: request, from: data)
+                    case .file(let bufferURL):
+                        task = session.uploadTask(with: request, fromFile: bufferURL.absoluteURL())
+                    case .existingFile(let url):
+                        task = session.uploadTask(with: request, fromFile: url)
+                    }
+
+                    task.delegate = taskDelegate
+                    task.resume()
+                }
+
+                if case .file(let bufferURL) = materialized {
+                    await bufferURL.removeIfTemporary()
+                }
+                return result
+            } catch {
+                if case .file(let bufferURL) = materialized {
+                    await bufferURL.removeIfTemporary()
+                }
+                throw error
             }
         }
 
@@ -293,8 +331,7 @@ extension Internals {
                 cache: cache,
                 logger: logger,
                 forwarding: delegate,
-                makeBodyStream: nil,
-                makeTask: { self.session.dataTask(with: $0) }
+                makeUploadBody: nil
             )
         }
 
@@ -308,6 +345,9 @@ extension Internals {
         /// site that activates both sets of optional fields on the same task, not new delegate
         /// logic. See `execute(request:readingMode:uploadingBytes:cache:logger:)` just above for
         /// everything else (the three-stream `SessionTask` shape, the cache tee).
+        /// - Parameter existingUploadFile: See the standalone streaming `execute`'s doc comment
+        /// for this same parameter -- identical meaning here, `body` still required but unread
+        /// when set.
         package func execute<Body: AsyncSequence & Sendable>(
             request: URLRequest,
             streaming body: Body,
@@ -315,7 +355,8 @@ extension Internals {
             uploadingBytes: Int,
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?,
-            delegate: URLSessionTaskDelegate? = nil
+            delegate: URLSessionTaskDelegate? = nil,
+            existingUploadFile: URL? = nil
         ) async throws -> SessionTask where Body.Element == ByteBuffer {
             try await executeSessionTask(
                 request: request,
@@ -324,14 +365,21 @@ extension Internals {
                 cache: cache,
                 logger: logger,
                 forwarding: delegate,
-                makeBodyStream: { Internals.URLSessionUploadStream(body: body) },
-                makeTask: { self.session.uploadTask(withStreamedRequest: $0) }
+                makeUploadBody: {
+                    if let existingUploadFile {
+                        return .existingFile(existingUploadFile)
+                    }
+                    return try await Internals.URLSessionUploadFile.write(body: body)
+                }
             )
         }
 
         /// Shared body for the two `SessionTask`-producing `execute` overloads above -- they
-        /// differ only in whether a body is streamed in (`makeBodyStream`) and which `URLSession`
-        /// task constructor that requires (`makeTask`).
+        /// differ only in whether a body needs materializing first (`makeUploadBody`, `nil` for
+        /// the no-body/non-streaming case), which in turn decides whether this builds a
+        /// `dataTask(with:)`, an `uploadTask(with:from:)`, or an `uploadTask(with:fromFile:)`. See
+        /// `execute(request:streaming:delegate:onUploadProgress:)`'s doc comment for why neither
+        /// upload shape streams through an `InputStream`.
         private func executeSessionTask(
             request: URLRequest,
             readingMode: Internals.DownloadStep.ReadingMode,
@@ -339,11 +387,19 @@ extension Internals {
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?,
             forwarding delegate: URLSessionTaskDelegate?,
-            makeBodyStream: (@Sendable () -> InputStream)?,
-            makeTask: (URLRequest) -> URLSessionTask
+            makeUploadBody: (@Sendable () async throws -> Internals.URLSessionUploadFile.Materialized)?
         ) async throws -> SessionTask {
             let release = await throttledExecutor.acquire()
             let operation = operationQueue.operation()
+
+            let uploadBody: Internals.URLSessionUploadFile.Materialized?
+            do {
+                uploadBody = try await makeUploadBody?()
+            } catch {
+                release()
+                operation.complete()
+                throw error
+            }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
@@ -359,7 +415,6 @@ extension Internals {
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
                 forwarding: delegate,
-                makeBodyStream: makeBodyStream,
                 onUploadProgress: { bytesSent, _ in
                     upload.append(.success(bytesSent))
                 },
@@ -368,6 +423,9 @@ extension Internals {
                     upload.close()
                     release()
                     operation.complete()
+                    if case .file(let bufferURL) = uploadBody {
+                        Task { await bufferURL.removeIfTemporary() }
+                    }
                 }
             )
 
@@ -398,7 +456,17 @@ extension Internals {
                 head.close()
             }
 
-            let task = makeTask(request)
+            let task: URLSessionTask
+            switch uploadBody {
+            case .data(let data):
+                task = session.uploadTask(with: request, from: data)
+            case .file(let bufferURL):
+                task = session.uploadTask(with: request, fromFile: bufferURL.absoluteURL())
+            case .existingFile(let url):
+                task = session.uploadTask(with: request, fromFile: url)
+            case nil:
+                task = session.dataTask(with: request)
+            }
             task.delegate = taskDelegate
             task.resume()
 
@@ -489,10 +557,6 @@ extension Internals.URLSessionClient {
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let tlsDelegate: TLSDelegate?
         private let forwardingDelegate: URLSessionTaskDelegate?
-        /// Builds a fresh `InputStream` per `needNewBodyStream` call -- `nil` for the buffered
-        /// `execute(request:delegate:)` path, set for the streamed-upload
-        /// `execute(request:streaming:delegate:onUploadProgress:)` path (Phase 5f).
-        private let makeBodyStream: (@Sendable () -> InputStream)?
         private let onUploadProgress: (@Sendable (Int, Int) -> Void)?
         /// Set for the streamed-download `execute(request:readingMode:delegate:)` path (Phase 5g)
         /// only -- `nil` for the other two, which is exactly the switch `didReceive
@@ -553,7 +617,6 @@ extension Internals.URLSessionClient {
             proxyAuthorization: Internals.Proxy.Authorization?,
             tls tlsDelegate: TLSDelegate?,
             forwarding delegate: URLSessionTaskDelegate?,
-            makeBodyStream: (@Sendable () -> InputStream)? = nil,
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil,
             downloadBuffer: Internals.DownloadBuffer? = nil,
             onDownloadComplete: (@Sendable () -> Void)? = nil
@@ -562,7 +625,6 @@ extension Internals.URLSessionClient {
             self.proxyAuthorization = proxyAuthorization
             self.tlsDelegate = tlsDelegate
             self.forwardingDelegate = delegate
-            self.makeBodyStream = makeBodyStream
             self.onUploadProgress = onUploadProgress
             self.downloadBuffer = downloadBuffer
             self.onDownloadComplete = onDownloadComplete
@@ -651,23 +713,6 @@ extension Internals.URLSessionClient {
             if !forwarded {
                 completionHandler(.performDefaultHandling, nil)
             }
-        }
-
-        /// Only ever called when this task came from `uploadTask(withStreamedRequest:)` --
-        /// `makeBodyStream` is `nil` for every other `execute` overload, so there is nothing to
-        /// hand back and `completionHandler(nil)` is the correct response rather than a
-        /// programmer error: it's what tells `URLSession` "no body for this task."
-        ///
-        /// Can be called more than once for the same logical request (an auth retry, a redirect
-        /// that re-sends the body) -- `makeBodyStream` returning a *fresh*
-        /// `Internals.URLSessionUploadStream` each time, rather than this method caching one, is
-        /// what makes that safe.
-        func urlSession(
-            _ session: URLSession,
-            task: URLSessionTask,
-            needNewBodyStream completionHandler: @escaping (InputStream?) -> Void
-        ) {
-            completionHandler(makeBodyStream?())
         }
 
         func urlSession(

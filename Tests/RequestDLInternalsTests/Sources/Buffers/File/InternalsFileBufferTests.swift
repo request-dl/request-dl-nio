@@ -862,6 +862,55 @@ struct InternalsFileBufferTests {
     }
 
     @Test
+    func fileBuffer_whenBackedByRealFileUnread_wholeFileURLReturnsThatFile() async throws {
+        // Given -- a real, non-temporary file (constructed from an explicit `URL`, not one of
+        // the no-URL initializers that all go through `Internals.FileBufferURL.temporaryURL`).
+        let fileURLManager = try await FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        try Data("Hello world".utf8).write(to: fileURL)
+
+        let fileBuffer = await Internals.FileBuffer(fileURL)
+
+        // Then
+        #expect(fileBuffer.readerIndex == .zero)
+        #expect(fileBuffer.wholeFileURL == fileURL)
+    }
+
+    @Test
+    func fileBuffer_whenReaderIndexAdvanced_wholeFileURLReturnsNil() async throws {
+        // Given -- uploading straight from the file at this point would read more than this
+        // cursor has left, so the shortcut must decline once anything has been read.
+        let fileURLManager = try await FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        let data = Data("Hello world".utf8)
+        try data.write(to: fileURL)
+
+        var fileBuffer = await Internals.FileBuffer(fileURL)
+        _ = await fileBuffer.readData(1)
+
+        // Then
+        #expect(fileBuffer.readerIndex == 1)
+        #expect(fileBuffer.wholeFileURL == nil)
+    }
+
+    @Test
+    func fileBuffer_whenBackedByATemporaryResource_wholeFileURLReturnsNil() async throws {
+        // Given -- every no-URL initializer opens over `Internals.FileBufferURL.temporaryURL`,
+        // a file this package owns and may remove once nothing references it any more, so
+        // handing its `URL` to an unrelated, longer-lived caller (a `URLSessionUploadTask`)
+        // would be unsafe even though the reader index is untouched.
+        let fileBuffer = await Internals.FileBuffer(Data("Hello world".utf8))
+
+        // Then
+        #expect(fileBuffer.readerIndex == .zero)
+        #expect(fileBuffer.wholeFileURL == nil)
+    }
+
+    @Test
     func fileBuffer_whenSetDataWithNegativeIndex_shouldThrowBufferIndexError() async throws {
         // Given
         let fileBuffer = await Internals.FileBuffer()

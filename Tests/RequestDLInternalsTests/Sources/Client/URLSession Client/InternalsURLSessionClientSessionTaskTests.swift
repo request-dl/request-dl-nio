@@ -184,24 +184,18 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(!stillRunning)
     }
 
-    /// **A confirmed `withKnownIssue`, not a separable case** -- the first version of this test
-    /// tried to dodge `LocalServer`'s known `uploadTask(withStreamedRequest:)` incompatibility
-    /// (see `RequestConfigurationURLSessionClientUploadTests`'s type doc comment) by only
-    /// consuming `.upload(_:)` steps and stopping before ever awaiting a `.download(_:)` one, on
-    /// the assumption that upload finishing before a response is expected would keep this clear
-    /// of the hang. Run, not just reasoned about: it still failed, because
-    /// `Internals.AsyncResponse.Iterator.next()` decides "no more uploads, move to download" and
-    /// *starts draining `head` for the response* inside the very same call to `next()` that would
-    /// otherwise yield "nothing more" -- there is no `.upload(_:)` step a caller can stop at
-    /// that's guaranteed to return before that drain begins, so the loop above blocks on the
-    /// exact same head resolution the "completes" test below already documents as hung. Diagnosing
-    /// this *did* find one genuine bug, fixed separately in `executeSessionTask`: `upload` was
-    /// only closing from `onDownloadComplete` (task completion), not as soon as the body actually
-    /// finished sending the way `Internals.ClientResponseReceiver.didReceiveHead`/`didSendRequest`
-    /// close it on the NIO side -- a live progress bar against a *working* server would have hung
-    /// waiting for the whole download before ever hearing "upload done." That fix is real and
-    /// stays; it just doesn't change this test's outcome, since here `headCompletion` itself never
-    /// resolves until the 5s timeout either way.
+    /// **Used to be a confirmed `withKnownIssue`** -- Phase 5f/7b2's original `uploadTask(withStreamedRequest:)`
+    /// bridge hit the CFNetwork bug `INPUT_STREAM_ANALISYS.md` (repo root) root-caused; Phase 7b4
+    /// replaced it with `Internals.URLSessionUploadFile` (small bodies stay in memory and upload
+    /// via `uploadTask(with:from:)`; anything past `inMemoryThreshold` spills to a temp file and
+    /// uploads via `uploadTask(with:fromFile:)`), neither of which touches `InputStream`/
+    /// `needNewBodyStream`, so neither is affected -- this test's 128 KiB payload takes the
+    /// in-memory branch. One genuine bug was found and fixed while diagnosing the old known issue,
+    /// independent of that fix and still in effect: `upload` was only closing from
+    /// `onDownloadComplete` (task completion), not as soon as the body actually finished sending
+    /// the way `Internals.ClientResponseReceiver.didReceiveHead`/`didSendRequest` close it on the
+    /// NIO side -- a live progress bar would otherwise have hung waiting for the whole download
+    /// before ever hearing "upload done."
     @Test
     func sessionTask_whenStreamingUploadAndDownload_reportsUploadProgressInIncreasingOrder() async throws {
         // Given
@@ -229,42 +223,35 @@ struct InternalsURLSessionClientSessionTaskTests {
         configuration.timeoutIntervalForRequest = 5
         let client = try Internals.URLSessionClient(configuration: configuration)
 
-        // When / Then -- see the doc comment above: known issue, confirmed by actually running
-        // the "clever" workaround first and watching it fail the same way.
-        await withKnownIssue(
-            "uploadTask(withStreamedRequest:) auto-negotiates the resumable-uploads draft, which LocalServer doesn't answer -- see RequestConfigurationURLSessionClientUploadTests's type doc comment",
-            {
-                let sessionTask = try await client.execute(
-                    request: request,
-                    streaming: stream,
-                    readingMode: .length(1_024),
-                    uploadingBytes: payload.count,
-                    cache: nil,
-                    logger: nil,
-                    delegate: AcceptAnyServerTrustDelegate()
-                )
-
-                var chunkSizes: [Int] = []
-
-                for try await step in sessionTask.response {
-                    guard case .upload(let uploadStep) = step else { break }
-                    chunkSizes.append(uploadStep.chunkSize)
-                    #expect(uploadStep.totalSize == payload.count)
-                }
-
-                #expect(!chunkSizes.isEmpty)
-                #expect(chunkSizes == chunkSizes.sorted())
-                #expect(chunkSizes.last == payload.count)
-            }
+        // When
+        let sessionTask = try await client.execute(
+            request: request,
+            streaming: stream,
+            readingMode: .length(1_024),
+            uploadingBytes: payload.count,
+            cache: nil,
+            logger: nil,
+            delegate: AcceptAnyServerTrustDelegate()
         )
+
+        var chunkSizes: [Int] = []
+
+        for try await step in sessionTask.response {
+            guard case .upload(let uploadStep) = step else { break }
+            chunkSizes.append(uploadStep.chunkSize)
+            #expect(uploadStep.totalSize == payload.count)
+        }
+
+        // Then
+        #expect(!chunkSizes.isEmpty)
+        #expect(chunkSizes == chunkSizes.sorted())
+        #expect(chunkSizes.last == payload.count)
     }
 
-    /// Confirmed, well-evidenced `withKnownIssue`, same root cause `RequestConfigurationURLSessionClientUploadTests`
-    /// documents in full: `uploadTask(withStreamedRequest:)` auto-negotiates the resumable-uploads
-    /// draft against any server, and `LocalServer` never answers it, so the response never
-    /// arrives. Kept here (rather than relying on the test above alone) to also exercise the
-    /// download half of this specific overload -- unreachable via `LocalServer` today, same as
-    /// upstream, but worth re-checking automatically once that gap closes.
+    /// Same fix as the test above (Phase 7b4's file-backed upload bridge). Kept here (rather than
+    /// relying on that test alone) to also exercise the download half of this specific overload,
+    /// which the old `uploadTask(withStreamedRequest:)`-based bridge could never reach via
+    /// `LocalServer`.
     @Test
     func sessionTask_whenStreamingUploadAndDownloadCompletes_deliversWholeBodyIntact() async throws {
         // Given
@@ -289,32 +276,28 @@ struct InternalsURLSessionClientSessionTaskTests {
         configuration.timeoutIntervalForRequest = 5
         let client = try Internals.URLSessionClient(configuration: configuration)
 
-        // When / Then
-        await withKnownIssue(
-            "uploadTask(withStreamedRequest:) auto-negotiates the resumable-uploads draft, which LocalServer doesn't answer -- see RequestConfigurationURLSessionClientUploadTests's type doc comment",
-            {
-                let sessionTask = try await client.execute(
-                    request: request,
-                    streaming: stream,
-                    readingMode: .length(1_024),
-                    uploadingBytes: payload.count,
-                    cache: nil,
-                    logger: nil,
-                    delegate: AcceptAnyServerTrustDelegate()
-                )
-
-                var chunks: [Data] = []
-
-                for try await step in sessionTask.response {
-                    guard case .download(let downloadStep) = step else { continue }
-                    for try await chunk in downloadStep.bytes {
-                        chunks.append(chunk)
-                    }
-                }
-
-                #expect(!chunks.isEmpty)
-            }
+        // When
+        let sessionTask = try await client.execute(
+            request: request,
+            streaming: stream,
+            readingMode: .length(1_024),
+            uploadingBytes: payload.count,
+            cache: nil,
+            logger: nil,
+            delegate: AcceptAnyServerTrustDelegate()
         )
+
+        var chunks: [Data] = []
+
+        for try await step in sessionTask.response {
+            guard case .download(let downloadStep) = step else { continue }
+            for try await chunk in downloadStep.bytes {
+                chunks.append(chunk)
+            }
+        }
+
+        // Then
+        #expect(!chunks.isEmpty)
     }
 }
 

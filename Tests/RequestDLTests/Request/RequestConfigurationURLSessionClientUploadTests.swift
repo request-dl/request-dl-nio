@@ -3,6 +3,7 @@
 //
 
 import RequestDLInternals
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -13,7 +14,7 @@ import Testing
 import Foundation
 import Security
 
-/// Phase 5f of `URLSESSION_TASK.md`: streamed request-body uploads through
+/// Phase 5f/7b4 of `URLSESSION_TASK.md`: streamed request-body uploads through
 /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`, forced onto
 /// `.urlSession` via `requireExecutor(_:)` (Phase 3) the same way `RequestConfigurationURLSessionClientTests`
 /// (Phase 5a) drives the non-streaming path -- `Session.requiredExecutor(_:)` is Phase 7, not built
@@ -23,31 +24,32 @@ import Security
 /// directly instead of `UploadTask`, and trusts `LocalServer`'s self-signed certificate via a
 /// test-only delegate the same way 5a does -- no TLS customization is in scope here either.
 ///
-/// **Both tests below are a confirmed, well-evidenced `withKnownIssue`, not a defect in
-/// `Internals.URLSessionUploadStream`/the streaming bridge itself.** `uploadTask(withStreamedRequest:)`
-/// on this OS build automatically negotiates the IETF "resumable uploads" draft
-/// (<https://datatracker.ietf.org/doc/draft-ietf-httpbis-resumable-upload/>) for any streamed
-/// upload -- the outgoing request carries `Upload-Draft-Interop-Version`/`Upload-Complete`
-/// headers neither RequestDL nor this suite ever asked for. `LocalServer` (a minimal hand-rolled
-/// NIOHTTP1 test server) answers with a perfectly ordinary 200 response, which the draft
-/// negotiation apparently doesn't recognize as settling the exchange: the response never reaches
-/// `urlSession(_:dataTask:didReceive:completionHandler:)` at all, and the task times out.
+/// **Both tests below used to be a confirmed `withKnownIssue`** -- Phase 5f's original bridge
+/// (`Internals.URLSessionUploadStream`, an `InputStream` subclass) drove
+/// `uploadTask(withStreamedRequest:)`, which on this OS build automatically negotiates the IETF
+/// "resumable uploads" draft for any streamed upload, and a from-scratch investigation
+/// (`INPUT_STREAM_ANALISYS.md`, repo root) confirmed the real cause runs deeper than that draft
+/// negotiation alone: no custom `InputStream` -- a Swift subclass or a genuine `CFReadStream` --
+/// is ever recognized by CFNetwork as reaching end-of-body, on `LocalServer`, two independent
+/// HTTP/2 servers, and `https://httpbin.org/post` alike. Every callback-level hypothesis
+/// (`copyProperty`/`setProperty`, `getBuffer`, object-identity) was ruled out without finding the
+/// mechanism. Phase 7b4 works around it instead of fixing it: `Internals.URLSessionUploadFile`
+/// drains `body` and this now drives `uploadTask(with:from:)` (small bodies, kept in memory) or
+/// `uploadTask(with:fromFile:)` (anything past `Internals.URLSessionUploadFile.inMemoryThreshold`,
+/// spilled to a temporary file) -- both completely different `URLSession` code paths that never
+/// touch `InputStream`/`needNewBodyStream` (or the resumable-uploads draft) at all. Both payloads
+/// in `urlSessionClient_whenStreamingUpload...` below (256 KiB, 128 KiB) sit comfortably under
+/// that threshold, so those two tests specifically exercise the in-memory branch;
+/// `InternalsURLSessionUploadFileTests` (`RequestDLInternalsTests`) covers the file-spillover
+/// branch directly, without a real network round trip. A third shape -- a `Payload(url:)` body
+/// that's already sitting in a file untouched, forwarded as `existingUploadFile` rather than
+/// drained at all (a same-day refinement past the memory/disk split, to avoid a redundant copy
+/// of a file that's already exactly right) -- is exercised by
+/// `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`.
 ///
-/// Confirmed, not assumed, via two independent probes outside this suite: (1) the exact same
-/// `needNewBodyStream`/`didSendBodyData`/`didReceive`/`didCompleteWithError` delegate sequence,
-/// built from a plain `InputStream(data:)` with no `Internals.URLSessionUploadStream` involved at
-/// all, against a real external server (`https://httpbin.org/post`) -- completes normally, proving
-/// the delegate wiring pattern itself is correct; (2) the *buffered* upload path
-/// (`execute(request:delegate:)`, `session.data(for:delegate:)`, no `needNewBodyStream` at all)
-/// against this exact same `LocalServer`, same payload size, same everything else -- also
-/// completes normally in well under a second. Only the combination of `uploadTask(withStreamedRequest:)`
-/// specifically and `LocalServer` specifically hangs. `InternalsURLSessionUploadStreamTests`
-/// (`RequestDLInternalsTests`) is what actually verifies `Internals.URLSessionUploadStream`'s own
-/// correctness (byte-for-byte order, backpressure, cancellation) -- independent of `URLSession`/
-/// `LocalServer` entirely, and unaffected by any of this.
-///
-/// A short `timeoutIntervalForRequest` is used for these two tests specifically so the known,
-/// already-understood hang fails in seconds instead of the default 60.
+/// A short `timeoutIntervalForRequest` is kept on these tests -- harmless now that they pass, and
+/// cheap insurance against a future regression hanging the suite for the default 60s instead of
+/// failing fast.
 struct RequestConfigurationURLSessionClientUploadTests {
 
     private static var shortTimeoutConfiguration: URLSessionConfiguration {
@@ -88,25 +90,91 @@ struct RequestConfigurationURLSessionClientUploadTests {
         let body = try #require(resolved.requestConfiguration.body)
         let request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
 
-        // Then -- see the type doc comment: known issue, `LocalServer` and the resumable-uploads
-        // draft `uploadTask(withStreamedRequest:)` negotiates on its own, not a defect here.
-        await withKnownIssue(
-            "uploadTask(withStreamedRequest:) auto-negotiates the resumable-uploads draft, which LocalServer doesn't answer -- see the type doc comment",
-            {
-                let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
-                let result = try await client.execute(
-                    request: request,
-                    streaming: body,
-                    delegate: AcceptAnyServerTrustDelegate()
-                )
+        // Then
+        let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
+        let result = try await client.execute(
+            request: request,
+            streaming: body,
+            delegate: AcceptAnyServerTrustDelegate()
+        )
 
-                #expect(result.head.status.code == 200)
+        #expect(result.head.status.code == 200)
 
-                let decoded = try HTTPResult<String>(result.body)
-                #expect(decoded.receivedBytes == upload.count)
-                #expect(decoded.response == output)
+        let decoded = try HTTPResult<String>(result.body)
+        #expect(decoded.receivedBytes == upload.count)
+        #expect(decoded.response == output)
+    }
+
+    /// The other half of Phase 7b4's refinement (see the type doc comment): a `Payload(url:)`
+    /// body is backed by exactly one unread, non-temporary `Internals.FileBuffer`, so
+    /// `RequestBody.wholeFileURL` resolves to the fixture file itself and
+    /// `Internals.URLSessionClient+RequestExecutingClient.swift` passes it straight through as
+    /// `existingUploadFile` -- exercised directly here (rather than only at the `RequestBody`
+    /// unit-test level, `RequestBodyBuildingTests`) so a real round trip confirms the shortcut
+    /// still delivers the exact right bytes, not just that the URL gets forwarded correctly.
+    @Test
+    func urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = "Hello World"
+        let upload = await Data.randomData(length: 262_144)
+
+        let fileURL =
+            temporaryDirectoryURL
+            .appendingPathComponent("existingUploadFile.\(UUID())")
+            .appendingPathExtension("raw")
+        try await fileURL.createPathIfNeeded()
+        defer { fileURL.scheduleRemoval() }
+        try upload.write(to: fileURL)
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(localServer.baseURL)
+                Path(uri)
+
+                Session.localServer
+                RequestMethod(.post)
+
+                Payload(url: fileURL, contentType: .octetStream)
             }
         )
+
+        // When
+        try resolved.session.configuration.requireExecutor(.urlSession)
+
+        let body = try #require(resolved.requestConfiguration.body)
+        let request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
+
+        // This is the assertion that makes the rest of the test meaningful: confirms the fixture
+        // above genuinely qualifies for the shortcut, not just that the round trip below happens
+        // to work regardless of which path it took.
+        #expect(body.wholeFileURL == fileURL)
+
+        // Then
+        let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
+        let result = try await client.execute(
+            request: request,
+            streaming: body,
+            delegate: AcceptAnyServerTrustDelegate(),
+            existingUploadFile: body.wholeFileURL
+        )
+
+        #expect(result.head.status.code == 200)
+
+        let decoded = try HTTPResult<String>(result.body)
+        #expect(decoded.receivedBytes == upload.count)
+        #expect(decoded.response == output)
+
+        // The fixture file must survive the upload untouched -- unlike `.file`, `.existingFile`
+        // is never this package's to remove.
+        #expect(await fileURL.isReachable)
     }
 
     /// Not exact chunk-by-chunk byte counts or timing (URLSession's own to pick, not RequestDL's
@@ -114,9 +182,9 @@ struct RequestConfigurationURLSessionClientUploadTests {
     /// `didSendBodyData` fires in a sequence whose cumulative total is monotonically increasing
     /// and reaches the whole body, mirroring what `ModifiersProgressTests`'s looser upload
     /// assertion (`uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count`, sum only) checks
-    /// on the NIO backend. Blocked on the same known issue as the test above -- `didSendBodyData`
-    /// itself fires correctly (confirmed while diagnosing that issue), but the request never
-    /// completes for `execute` to return from, so this can't observe a full run either.
+    /// on the NIO backend. `uploadTask(with:fromFile:)` still fires `didSendBodyData` the same way
+    /// a streamed upload would (Phase 7b4), so this observes it the same way 5f originally
+    /// intended, once that phase's `InputStream`-based bridge stopped being what drove it.
     @Test
     func urlSessionClient_whenStreamingUpload_reportsProgressInIncreasingOrder() async throws {
         // Given
@@ -150,28 +218,24 @@ struct RequestConfigurationURLSessionClientUploadTests {
 
         let progress = ProgressRecorder()
 
-        // When / Then
-        await withKnownIssue(
-            "uploadTask(withStreamedRequest:) auto-negotiates the resumable-uploads draft, which LocalServer doesn't answer -- see the type doc comment",
-            {
-                let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
+        // When
+        let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
 
-                _ = try await client.execute(
-                    request: request,
-                    streaming: body,
-                    delegate: AcceptAnyServerTrustDelegate(),
-                    onUploadProgress: { bytesSent, totalBytesExpectedToSend in
-                        progress.record(bytesSent: bytesSent, total: totalBytesExpectedToSend)
-                    }
-                )
-
-                let samples = progress.samples
-                #expect(!samples.isEmpty)
-                #expect(samples.allSatisfy { $0.total == upload.count })
-                #expect(samples.map(\.bytesSent) == samples.map(\.bytesSent).sorted())
-                #expect(samples.last?.bytesSent == upload.count)
+        _ = try await client.execute(
+            request: request,
+            streaming: body,
+            delegate: AcceptAnyServerTrustDelegate(),
+            onUploadProgress: { bytesSent, totalBytesExpectedToSend in
+                progress.record(bytesSent: bytesSent, total: totalBytesExpectedToSend)
             }
         )
+
+        // Then
+        let samples = progress.samples
+        #expect(!samples.isEmpty)
+        #expect(samples.allSatisfy { $0.total == upload.count })
+        #expect(samples.map(\.bytesSent) == samples.map(\.bytesSent).sorted())
+        #expect(samples.last?.bytesSent == upload.count)
     }
 }
 
@@ -205,7 +269,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
 /// invoked off the main actor.
 private final class ProgressRecorder: @unchecked Sendable {
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _samples: [(bytesSent: Int, total: Int)] = []
 
     var samples: [(bytesSent: Int, total: Int)] {
