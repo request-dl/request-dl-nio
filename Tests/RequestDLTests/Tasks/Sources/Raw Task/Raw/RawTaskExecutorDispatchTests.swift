@@ -204,6 +204,73 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
+    /// Phase 8 of `URLSESSION_TASK.md`: confirms the identity-building failure a real mTLS
+    /// `DataTask` hits under `.urlSession` on this SwiftPM test harness (no Keychain Sharing
+    /// entitlement -- see `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment,
+    /// Phase 5e) surfaces through the *public* API as a documented ``ClientIdentityError``, not a
+    /// raw `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy
+    /// .ConfigurationError` -- both package-visible types a real consumer app cannot even name,
+    /// and whose `localizedDescription` (Foundation's generic NSError fallback, absent this fix)
+    /// carries none of their own actionable `description` text. `ClientIdentityErrorTests` covers
+    /// the rewrap/description logic itself in isolation; this is the same fact proven end to end,
+    /// through the real `DataTask` entry point, the same way `dataTask_whenCAEnabled`
+    /// (`DataTaskTests`, pinned to `.nio` specifically to avoid this exact gap) already does for
+    /// the NIO backend.
+    ///
+    /// Deliberately does not assert on the *specific* ``ClientIdentityError/Reason`` -- this
+    /// harness has been observed to hit this gap two different ways (`errSecMissingEntitlement`
+    /// on `SecItemAdd`, or `errSecItemNotFound` on the identity lookup right after a successful
+    /// add -- see `URLSESSION_TASK.md` Phase 5e/8's own findings), and both are genuine,
+    /// independently-reachable failure modes this test should pass under either way.
+    @Test
+    func dataTask_whenCAEnabledUnderURLSessionWithoutKeychainSharing_throwsClientIdentityError() async throws {
+        let server = Certificates().server()
+        let client = Certificates().client()
+
+        let uri = "/" + UUID().uuidString
+
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8885,
+                option: .client(client)
+            )
+        )
+
+        let output = "Hello World"
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.phase8-identity.\(UUID())")
+                .requiredExecutor(.urlSession)
+
+            SecureConnection {
+                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+            }
+            .verification(.fullVerification)
+        }
+
+        do {
+            _ = try await DataTask { content }.extractPayload().result()
+            Issue.record("Expected this SwiftPM test harness's missing Keychain Sharing entitlement to throw")
+        } catch let error as ClientIdentityError {
+            // Then -- the public, documented type, not a leaked internal one, with the same
+            // actionable text through both access paths a real caller might use.
+            #expect(!error.description.isEmpty)
+            #expect((error as any Error).localizedDescription == error.description)
+        } catch {
+            Issue.record("Expected ClientIdentityError, got \(type(of: error)): \(error)")
+        }
+    }
+
     /// Companion to the test above: confirms cancellation frees the throttle slot for real, not
     /// just that `isRunning` (a separate counter, released in the same completion callback but
     /// not the same value) happens to drop -- the same bar `InternalsClientConcurrencyLimitTests`

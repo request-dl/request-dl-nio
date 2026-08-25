@@ -54,6 +54,16 @@ struct RawTask<Content: Property>: RequestTask {
             }
         } catch let error as Internals.SecureFileLoadError {
             throw SecureFileError(error)
+        } catch {
+            #if canImport(Darwin)
+            if let error = error as? Internals.URLSessionIdentityPolicy.ConfigurationError {
+                throw ClientIdentityError(error)
+            }
+            if let error = error as? Internals.RawBytesIdentityBuilder.Error {
+                throw ClientIdentityError(error)
+            }
+            #endif
+            throw error
         }
 
         let cacheControl = Internals.CacheControl(

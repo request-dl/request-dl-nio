@@ -164,6 +164,17 @@ public struct Session: Property {
     /// debugging, benchmarking a specific transport, or a deployment target where only one
     /// executor is actually viable and a silent fallback would hide a real misconfiguration.
     ///
+    /// Pinning to ``Session/Executor/urlSession`` with a client certificate configured
+    /// (``Certificate``/``PrivateKey`` on ``SecureConnection``) has one further requirement
+    /// ``ExecutorRequirementError`` can't check ahead of time: building that certificate into a
+    /// `URLSession`-presentable identity is a Keychain round-trip that needs the Keychain Sharing
+    /// capability, a one-time Xcode project setting. A request missing it throws
+    /// ``ClientIdentityError`` instead — see
+    /// [HOW_TO_USE_CERTIFICATE_URLSESSION.md](https://github.com/request-dl/request-dl-nio/blob/main/HOW_TO_USE_CERTIFICATE_URLSESSION.md)
+    /// for the full walkthrough. This also applies without pinning anything, since `.urlSession`
+    /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
+    /// the configuration supports it.
+    ///
     /// ```swift
     /// struct MyRequest: Property {
     ///     var body: some Property {

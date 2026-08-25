@@ -14,20 +14,22 @@ import Foundation
 
 extension Internals.URLSessionClient {
 
-    /// Routes TLS challenges (server-trust, client-certificate) by host -- promoted from the
-    /// URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`, not the single-identity
-    /// `MTLSURLSessionDelegate` the spike test itself used. One `URLSession` -- and, once Phase 6
-    /// wires this client into the pooled `Internals.ClientManager` -- potentially one
-    /// `URLSessionClient` can end up serving requests to many hosts, each with its own
-    /// `Internals.SecureConnection`; routing by host is what keeps that from becoming a single
-    /// hardcoded identity/trust policy applied indiscriminately everywhere.
+    /// Routes a TLS challenge (server-trust, client-certificate) to `policy` only when it's for
+    /// `host` -- promoted from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`,
+    /// not the single-identity `MTLSURLSessionDelegate` the spike test itself used. Now that
+    /// Phase 6 pools `Internals.URLSessionClient` into `Internals.ClientManager`, one `URLSession`
+    /// -- and so one `URLSessionClient` -- genuinely does end up serving requests to many hosts;
+    /// the host check is what keeps a challenge for one host from being answered with a policy
+    /// meant for another.
     ///
-    /// Today, `Internals.URLSessionClient` only ever resolves one `Internals.SecureConnection`
-    /// (the one it was configured with, same as `redirectConfiguration`/`proxy`), so `policies`
-    /// carries at most one entry -- keyed by whatever host the caller's request targets, not
-    /// resolved eagerly at init since the client itself isn't tied to one URL. A host with no
-    /// entry defers to the system's own handling, same as the spike's routing delegate: this is
-    /// the routing-delegate equivalent of RequestDL's existing per-request
+    /// `Internals.URLSessionClient` only ever resolves one `Internals.SecureConnection` (the one
+    /// it was configured with, same as `redirectConfiguration`/`proxy`), so there is only ever one
+    /// `Internals.URLSessionIdentityPolicy` to route to -- not a per-host map of them. What varies
+    /// per request is `host`: `execute(...)` builds a fresh `TLSDelegate` for each request, pairing
+    /// that one policy with the request's own destination host, since the client itself isn't tied
+    /// to a single URL. A challenge for any other host (mid-redirect to a different host, for
+    /// instance) falls through to the system's own handling, same as the spike's routing delegate:
+    /// this is the routing-delegate equivalent of RequestDL's existing per-request
     /// `Internals.SecureConnection?` already being optional.
     final class TLSDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
