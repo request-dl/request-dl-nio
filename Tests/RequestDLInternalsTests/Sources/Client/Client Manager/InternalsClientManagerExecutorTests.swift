@@ -101,19 +101,17 @@ struct InternalsClientManagerExecutorTests {
 
     @Test
     func resolvedClient_whenConfigurationIsIncompatibleWithURLSession_fallsBackToNIO() async throws {
-        // Given -- a SOCKS proxy is excluded from `.urlSession` (bucket D), so
-        // `resolveExecutor()` must fall through to `.nio`/`.nioTransportServices`, and
-        // `resolvedClient` must cache a `.nio` entry rather than a `.urlSession` one.
+        // Given -- a DNS override is excluded from `.urlSession` (bucket D; `URLSessionConfiguration`
+        // has no equivalent to hook one in), so `resolveExecutor()` must fall through to
+        // `.nio`/`.nioTransportServices`, and `resolvedClient` must cache a `.nio` entry rather
+        // than a `.urlSession` one. (A SOCKS proxy used to be this test's example -- no longer
+        // incompatible, see `InternalsSessionConfigurationExecutorTests
+        // .configuration_whenSOCKSProxySet_doesNotContainReason`.)
         let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
         let provider = Internals.SharedSessionProvider()
 
         var sessionConfiguration = Internals.Session.Configuration()
-        sessionConfiguration.proxy = Internals.Proxy(
-            host: "127.0.0.1",
-            port: 8080,
-            connection: .socks,
-            authorization: nil
-        )
+        sessionConfiguration.dnsOverride = ["example.com": "127.0.0.1"]
 
         #expect(sessionConfiguration.resolveExecutor() != .urlSession)
 

@@ -31,6 +31,11 @@ public struct ExecutorRequirementError: Error, Sendable {
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
+        @available(
+            *,
+            deprecated,
+            message: "A SOCKS proxy no longer conflicts with .urlSession; this case is never produced."
+        )
         case proxySOCKSUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
         case decompressionDisabledUnderURLSession
@@ -73,8 +78,6 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .http1OnlyUnderURLSession
             case .proxyConnectHeadersUnderURLSession:
                 self = .proxyConnectHeadersUnderURLSession
-            case .proxySOCKSUnderURLSession:
-                self = .proxySOCKSUnderURLSession
             case .proxyBearerAuthorizationUnderURLSession:
                 self = .proxyBearerAuthorizationUnderURLSession
             case .decompressionDisabledUnderURLSession:
@@ -154,7 +157,7 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .proxyConnectHeadersUnderURLSession:
             return "custom proxy CONNECT headers (unsupported under URLSession)"
         case .proxySOCKSUnderURLSession:
-            return "a SOCKS proxy (unsupported under URLSession)"
+            return "a SOCKS proxy (no longer a conflict under URLSession; this case is never produced)"
         case .proxyBearerAuthorizationUnderURLSession:
             return "a bearer-token proxy authorization (unsupported under URLSession)"
         case .decompressionDisabledUnderURLSession:

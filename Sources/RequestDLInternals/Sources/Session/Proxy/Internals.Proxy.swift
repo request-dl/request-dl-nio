@@ -102,11 +102,23 @@ extension Internals.Proxy {
     /// (`kCFNetworkProxiesHTTPEnable` etc.) because they are stable, widely relied upon by
     /// networking libraries, and avoid an extra platform-conditional import for three key names.
     ///
-    /// `.http`-only: `.socks` stays excluded from `.urlSession` entirely
-    /// (`Internals.ExecutorIncompatibilityReason.proxySOCKSUnderURLSession`) -- SOCKS via this
-    /// same dictionary is unreliable/unsupported, so this deliberately does not attempt it rather
-    /// than ship something half-working. Both the `HTTP*` and `HTTPS*` key triples are set, since
-    /// HTTPS targets are what actually trigger the `CONNECT` tunnel this proxy exists to build.
+    /// `.http` sets both the `HTTP*` and `HTTPS*` key triples, since HTTPS targets are what
+    /// actually trigger the `CONNECT` tunnel this proxy exists to build. `.socks` sets the analogous
+    /// `SOCKS*` triple -- no separate HTTPS variant exists for SOCKS, one set of keys covers both.
+    /// Neither branch sets a `*Version` key: `URLSession` defaults to SOCKS5 on its own (confirmed
+    /// by capturing the actual bytes it sends -- a standard SOCKS5 greeting, `05 01 00`, offering
+    /// no-authentication -- not assumed from documentation, which doesn't cover this default at
+    /// all), and this executor's SOCKS support doesn't need SOCKS4's narrower feature set.
+    ///
+    /// `.socks` was excluded from `.urlSession` entirely until this mapping existed
+    /// (`Internals.ExecutorIncompatibilityReason.proxySOCKSUnderURLSession`, now removed) --
+    /// the original analysis called SOCKS via this dictionary "unreliable/undocumented" and
+    /// declined to attempt it. That framing didn't hold up once actually tested:
+    /// `InternalsSOCKSProxyDictionaryPlatformTests` confirms (with a negative control, not just a
+    /// single positive result) that `URLSession` genuinely dials the configured SOCKS address on
+    /// both macOS and an iOS Simulator, and `InternalsURLSessionClientSOCKSProxyTests`
+    /// (`LocalSOCKSProxy`, a real hand-rolled SOCKS5 server) confirms a full handshake completes
+    /// and actually carries traffic end to end.
     ///
     /// Verified working on macOS for non-loopback destinations (confirmed with a real listener
     /// standing in for the proxy) -- see `InternalsProxyDictionaryPlatformTests` for the
@@ -117,18 +129,24 @@ extension Internals.Proxy {
     /// `InternalsURLSessionClientProxyTests` document that gap specifically, they are not
     /// evidence against this mapping.
     package func buildConnectionProxyDictionary() -> [AnyHashable: Any] {
-        guard connectionProtocol == .http else {
-            return [:]
-        }
+        switch connectionProtocol {
+        case .http:
+            return [
+                "HTTPEnable": 1,
+                "HTTPProxy": host,
+                "HTTPPort": port,
+                "HTTPSEnable": 1,
+                "HTTPSProxy": host,
+                "HTTPSPort": port,
+            ]
 
-        return [
-            "HTTPEnable": 1,
-            "HTTPProxy": host,
-            "HTTPPort": port,
-            "HTTPSEnable": 1,
-            "HTTPSProxy": host,
-            "HTTPSPort": port,
-        ]
+        case .socks:
+            return [
+                "SOCKSEnable": 1,
+                "SOCKSProxy": host,
+                "SOCKSPort": port,
+            ]
+        }
     }
 }
 

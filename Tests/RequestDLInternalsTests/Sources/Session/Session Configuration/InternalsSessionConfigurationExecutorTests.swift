@@ -98,11 +98,15 @@ struct InternalsSessionConfigurationExecutorTests {
         // Then
         let reasons = configuration.urlSessionIncompatibilityReasons()
         #expect(!reasons.contains(.proxyConnectHeadersUnderURLSession))
-        #expect(!reasons.contains(.proxySOCKSUnderURLSession))
     }
 
+    /// A SOCKS proxy is reachable under `.urlSession` via `connectionProxyDictionary`'s legacy
+    /// `SOCKSEnable`/`SOCKSProxy`/`SOCKSPort` keys -- confirmed empirically (a bare `NWListener`
+    /// probe, `InternalsSOCKSProxyDictionaryPlatformTests`, shows `URLSession` genuinely dials the
+    /// configured address) before removing this from the exclusion list, not assumed from the
+    /// original analysis's "unreliable/undocumented" framing.
     @Test
-    func configuration_whenSOCKSProxySet_containsReason() async throws {
+    func configuration_whenSOCKSProxySet_doesNotContainReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(.none)
@@ -116,7 +120,7 @@ struct InternalsSessionConfigurationExecutorTests {
         )
 
         // Then
-        #expect(configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSUnderURLSession))
+        #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
     }
 
     @Test

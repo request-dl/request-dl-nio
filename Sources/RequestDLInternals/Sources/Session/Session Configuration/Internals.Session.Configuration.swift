@@ -132,10 +132,6 @@ extension Internals.Session.Configuration {
                 reasons.append(.proxyConnectHeadersUnderURLSession)
             }
 
-            if proxy.connectionProtocol == .socks {
-                reasons.append(.proxySOCKSUnderURLSession)
-            }
-
             if case .bearer = proxy.authorization {
                 reasons.append(.proxyBearerAuthorizationUnderURLSession)
             }

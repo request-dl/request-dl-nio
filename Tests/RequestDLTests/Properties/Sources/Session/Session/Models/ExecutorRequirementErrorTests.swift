@@ -62,7 +62,6 @@ struct ExecutorRequirementErrorTests {
             .dnsOverrideUnderURLSession,
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
-            .proxySOCKSUnderURLSession,
             .proxyBearerAuthorizationUnderURLSession,
             .decompressionDisabledUnderURLSession,
         ]

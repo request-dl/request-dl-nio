@@ -151,8 +151,9 @@ public struct Session: Property {
     /// when the rest of its configuration can't actually run on it.
     ///
     /// Unlike ``preferredExecutor(_:)``, this is a guarantee: if any configured field is
-    /// unsupported under `executor` — a client certificate under `.nioTransportServices`, a SOCKS
-    /// proxy under `.urlSession`, and so on — the request throws ``ExecutorRequirementError``
+    /// unsupported under `executor` — a client certificate under `.nioTransportServices`, a
+    /// bearer-token proxy authorization under `.urlSession`, and so on — the request throws
+    /// ``ExecutorRequirementError``
     /// instead of quietly running on a different executor than the one you pinned. Useful for
     /// debugging, benchmarking a specific transport, or a deployment target where only one
     /// executor is actually viable and a silent fallback would hide a real misconfiguration.

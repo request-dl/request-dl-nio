@@ -27,7 +27,6 @@ extension Internals {
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
-        case proxySOCKSUnderURLSession
         /// No `URLCredential` shape can carry an arbitrary bearer token (only user/password or
         /// identity/certificates), so `.bearer` proxy authorization is unanswerable through the
         /// proxy authentication challenge delegate regardless of platform.
