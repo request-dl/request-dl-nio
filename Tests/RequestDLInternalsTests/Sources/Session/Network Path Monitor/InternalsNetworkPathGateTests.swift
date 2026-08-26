@@ -11,9 +11,9 @@ private struct FakeNetworkPathObserver: Internals.NetworkPathObserving {
     let currentPath: Internals.NetworkPath
     let updateSequence: [Internals.NetworkPath]
 
-    func updates() -> Swift.AsyncStream<Internals.NetworkPath> {
+    func updates() -> _Concurrency.AsyncStream<Internals.NetworkPath> {
         let sequence = updateSequence
-        return Swift.AsyncStream { continuation in
+        return _Concurrency.AsyncStream { continuation in
             for path in sequence {
                 continuation.yield(path)
             }
@@ -28,8 +28,8 @@ private struct HangingNetworkPathObserver: Internals.NetworkPathObserving {
 
     let currentPath: Internals.NetworkPath
 
-    func updates() -> Swift.AsyncStream<Internals.NetworkPath> {
-        Swift.AsyncStream { _ in }
+    func updates() -> _Concurrency.AsyncStream<Internals.NetworkPath> {
+        _Concurrency.AsyncStream { _ in }
     }
 }
 
