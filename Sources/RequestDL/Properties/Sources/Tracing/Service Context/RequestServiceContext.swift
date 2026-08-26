@@ -7,21 +7,15 @@ import Tracing
 /// Binds a `ServiceContext` to a single request, overriding whatever `ServiceContext.current`
 /// task-local happens to be ambient at the point the request executes.
 ///
-/// - Warning: As of `async-http-client` 1.36.0, this currently has **no observable effect** on the
-///   request `async-http-client` actually sends or on the span its configured `.tracer(_:)`
-///   records. Confirmed empirically (see `RequestServiceContextTests.
-///   dataTask_whenServiceContextSet_shouldBeObservedByTracerDuringExecution`), not merely
-///   suspected: `async-http-client` starts the request's span only after execution hops onto a
-///   SwiftNIO `EventLoop` via `EventLoop.execute(_:)` (`NIOLoopBound+Execute.swift`,
-///   `RequestBag.willExecuteRequest`), and Swift's task-locals — which is what
-///   `ServiceContext.current` is built on — do not cross that hop. This is a bug in
-///   `async-http-client` itself, not something fixable from RequestDL's side; full root-cause
-///   analysis and a suggested upstream fix are written up in `TRACER_SERVICE_CONTEXT_REPORT.md` at
-///   the repository root.
-///
-///   This type, `RequestConfiguration.serviceContext`, and the bind around request execution in
-///   `RawTask.result()` are kept in place — harmless today, and require no further RequestDL
-///   changes to start working once the upstream bug is fixed.
+/// RequestDL owns the whole distributed-tracing span lifecycle itself — starting the span, injecting
+/// W3C trace headers, setting attributes, and ending it, all in `RawTask.result()` — rather than
+/// handing `.tracer(_:)`'s tracer to `async-http-client`'s own `HTTPClient.Configuration.tracing
+/// .tracer`. That built-in instrumentation only starts its span after hopping onto a SwiftNIO
+/// `EventLoop`, which loses Swift's task-locals and makes it structurally unable to see a bound
+/// `ServiceContext` (full root cause in `TRACER_SERVICE_CONTEXT_REPORT.md` at the repository root,
+/// filed as an upstream bug). Doing it here instead, one layer up and entirely within the caller's
+/// own task, means this binding has a real, observable effect: it's what the started span picks up
+/// as its parent.
 ///
 /// ```swift
 /// DataTask {

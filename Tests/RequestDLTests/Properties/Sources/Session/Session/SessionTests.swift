@@ -304,7 +304,11 @@ struct SessionTests {
 
         // Then
         #expect((resolved.session.configuration.tracer as? RecordingTracer) != nil)
-        #expect(try (resolved.session.configuration.build().tracing.tracer as? RecordingTracer) != nil)
+
+        // `async-http-client`'s own built-in tracing is always suppressed -- RequestDL owns the
+        // span lifecycle itself, in `RawTask.result()`, using `resolved.session.configuration
+        // .tracer` directly. See `TRACER_SERVICE_CONTEXT_REPORT.md`.
+        #expect(try (resolved.session.configuration.build().tracing.tracer as? NoOpTracer) != nil)
     }
 
     @Test

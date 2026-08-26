@@ -64,23 +64,14 @@ struct RequestServiceContextTests {
         try await assertNever(property.body)
     }
 
-    /// Documents a confirmed upstream bug rather than a RequestDL regression: `async-http-client`
-    /// starts a request's span only after execution hops onto a SwiftNIO `EventLoop` via
-    /// `EventLoop.execute(_:)`, and Swift's task-locals -- which `ServiceContext.current` is built
-    /// on -- don't cross that hop. Root-caused in full in `TRACER_SERVICE_CONTEXT_REPORT.md` at the
-    /// repository root. Wrapped in `withKnownIssue` so this stays red-if-fixed instead of
-    /// red-forever: once the upstream bug is fixed, this starts failing to flag that
-    /// `RequestServiceContext`'s doc comment (and the report) are stale and can be updated.
+    /// `async-http-client`'s own built-in tracing loses `ServiceContext.current` because it only
+    /// starts its span after hopping onto a SwiftNIO `EventLoop` (full root cause in
+    /// `TRACER_SERVICE_CONTEXT_REPORT.md`). RequestDL sidesteps that entirely by owning the span
+    /// lifecycle itself, in `RawTask.result()`, entirely within the caller's own task -- no
+    /// `EventLoop` hop involved -- so this now genuinely works, unlike when tracing was delegated to
+    /// `async-http-client`.
     @Test
     func dataTask_whenServiceContextSet_shouldBeObservedByTracerDuringExecution() async throws {
-        try await withKnownIssue(
-            "async-http-client loses ServiceContext.current across its internal EventLoop hop before starting the request span -- see TRACER_SERVICE_CONTEXT_REPORT.md"
-        ) {
-            try await Self.assertServiceContextObservedByTracer()
-        }
-    }
-
-    private static func assertServiceContextObservedByTracer() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
         let uri = "/" + UUID().uuidString
@@ -98,25 +89,6 @@ struct RequestServiceContextTests {
         context.testID = "trace-\(UUID().uuidString)"
 
         let tracer = ContextCapturingTracer()
-
-        // A cold connection pool dispatches the first request onto the connection's own
-        // EventLoop, off the calling Swift Task -- Swift's task-locals don't cross that hop, so
-        // a warm-up request first (whose reply the test doesn't otherwise care about) gives the
-        // pool an idle, already-established connection for the request that's actually asserted
-        // on, keeping this deterministic instead of racing AsyncHTTPClient's own scheduling.
-        _ = try await DataTask {
-            BaseURL(localServer.baseURL)
-            Path(uri)
-
-            Session.localServer
-                .tracer(tracer)
-
-            SecureConnection {
-                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
-            }
-        }
-        .extractPayload()
-        .result()
 
         // When
         _ = try await DataTask {

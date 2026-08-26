@@ -246,7 +246,7 @@ struct InternalsSessionConfigurationTests {
     }
 
     @Test
-    func configuration_whenSetTracer_shouldBeEqual() async throws {
+    func configuration_whenSetTracer_shouldBeStoredForRequestDLsOwnUse() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
         let tracer = RecordingTracer()
@@ -254,10 +254,22 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.tracer = tracer
 
+        // Then
+        #expect((configuration.tracer as? RecordingTracer) != nil)
+    }
+
+    @Test
+    func configuration_whenSetTracer_shouldNotReachAsyncHTTPClientsOwnTracing() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.tracer = RecordingTracer()
+
+        // When
         let builtConfiguration = try configuration.build()
 
-        // Then
-        #expect((builtConfiguration.tracing.tracer as? RecordingTracer) != nil)
+        // Then -- `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
+        // lifecycle itself (see the doc comment on `Configuration.tracer`).
+        #expect((builtConfiguration.tracing.tracer as? NoOpTracer) != nil)
     }
 
     @Test
@@ -265,11 +277,9 @@ struct InternalsSessionConfigurationTests {
         // Given
         let configuration = Internals.Session.Configuration()
 
-        // When
-        let builtConfiguration = try configuration.build()
-
         // Then
-        #expect((builtConfiguration.tracing.tracer as? NoOpTracer) != nil)
+        #expect((configuration.tracer as? NoOpTracer) != nil)
+        #expect((try configuration.build().tracing.tracer as? NoOpTracer) != nil)
     }
 
     @Test
