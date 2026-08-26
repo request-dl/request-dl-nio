@@ -80,7 +80,9 @@ struct RawTask<Content: Property>: RequestTask {
                         { result in
                             switch result {
                             case .success(let head):
-                                span.attributes["http.response.status_code"] = SpanAttribute.int64(Int64(head.status.code))
+                                span.attributes["http.response.status_code"] = SpanAttribute.int64(
+                                    Int64(head.status.code)
+                                )
                                 span.attributes["network.protocol.version"] = SpanAttribute.string(
                                     "\(head.version.major).\(head.version.minor)"
                                 )
