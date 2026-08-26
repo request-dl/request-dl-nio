@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+import NIOHTTP1
 import RequestDLInternals
+import Tracing
 
 struct RawTask<Content: Property>: RequestTask {
 
@@ -46,26 +48,100 @@ struct RawTask<Content: Property>: RequestTask {
             logger: logger
         )
 
-        let sessionTask: SessionTask
+        typealias OnResponseHead = @Sendable (Result<Internals.ResponseHead, Error>) -> Void
 
-        switch await cacheControl(client) {
-        case .task(let task):
-            sessionTask = task
-        case .cache(let cache):
-            sessionTask = try await resolved.session.execute(
-                client: client,
-                request: try resolved.requestConfiguration.build(eventLoop: client.eventLoopGroup.any()),
-                url: resolved.requestConfiguration.url,
-                readingMode: resolved.requestConfiguration.readingMode,
-                uploadingBytes: resolved.requestConfiguration.body?.totalSize ?? .zero,
-                cache: cache,
-                logger: logger
-            )
+        // Owns the whole span lifecycle itself -- start, header injection, attributes, and end --
+        // rather than handing `tracer` to `async-http-client`'s own `tracing.tracer`. That built-in
+        // instrumentation only starts its span after hopping onto a SwiftNIO `EventLoop`, which loses
+        // Swift's task-locals and makes it structurally impossible for it to see whatever
+        // `ServiceContext` the caller bound (see `TRACER_SERVICE_CONTEXT_REPORT.md`). Running the
+        // whole thing here, one layer up and entirely within the caller's own task, sidesteps that.
+        //
+        // A cache hit (the `.task` case below) never reaches the network, so it isn't traced.
+        func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
+            switch await cacheControl(client) {
+            case .task(let task):
+                return (task, nil)
+            case .cache(let cache):
+                var request = try resolved.requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
+
+                let tracer = resolved.session.configuration.tracer
+                let span = tracer.startSpan(request.method.rawValue, ofKind: .client)
+                span.attributes["http.request.method"] = SpanAttribute.string(request.method.rawValue)
+                span.attributes["url.full"] = SpanAttribute.string(resolved.requestConfiguration.url)
+
+                tracer.inject(span.context, into: &request.headers, using: HTTPHeadersInjector())
+
+                do {
+                    let task = try await resolved.session.execute(
+                        client: client,
+                        request: request,
+                        url: resolved.requestConfiguration.url,
+                        readingMode: resolved.requestConfiguration.readingMode,
+                        uploadingBytes: resolved.requestConfiguration.body?.totalSize ?? .zero,
+                        cache: cache,
+                        logger: logger
+                    )
+
+                    return (
+                        task,
+                        { result in
+                            switch result {
+                            case .success(let head):
+                                span.attributes["http.response.status_code"] = SpanAttribute.int64(
+                                    Int64(head.status.code)
+                                )
+                                span.attributes["network.protocol.version"] = SpanAttribute.string(
+                                    "\(head.version.major).\(head.version.minor)"
+                                )
+
+                                if head.status.code >= 400 {
+                                    span.setStatus(.init(code: .error))
+                                }
+                            case .failure(let error):
+                                span.recordError(error)
+                                span.setStatus(.init(code: .error))
+                            }
+
+                            span.end()
+                        }
+                    )
+                } catch {
+                    span.recordError(error)
+                    span.setStatus(.init(code: .error))
+                    span.end()
+                    throw error
+                }
+            }
+        }
+
+        let sessionTask: SessionTask
+        let onResponseHead: OnResponseHead?
+
+        // Only rebinds the task-local when `RequestServiceContext` was actually declared -- leaving
+        // it untouched otherwise preserves whatever `ServiceContext.current` the caller's own task
+        // already carries. The span started above reads this same task-local, so both the explicit
+        // and the ambient case are picked up correctly here -- there's no `EventLoop` hop between the
+        // bind and the read.
+        if let serviceContext = resolved.requestConfiguration.serviceContext {
+            (sessionTask, onResponseHead) = try await ServiceContext.$current.withValue(serviceContext) {
+                try await executeSessionTask()
+            }
+        } else {
+            (sessionTask, onResponseHead) = try await executeSessionTask()
         }
 
         return AsyncResponse(
             seed: sessionTask.seed,
-            response: sessionTask.response
+            response: sessionTask.response,
+            onResponseHead: onResponseHead
         )
+    }
+}
+
+private struct HTTPHeadersInjector: Injector {
+
+    func inject(_ value: String, forKey key: String, into headers: inout NIOHTTP1.HTTPHeaders) {
+        headers.add(name: key, value: value)
     }
 }

@@ -4,6 +4,7 @@
 
 import NIOCore
 import RequestDLInternals
+import Tracing
 
 /// The Session object is used to set various properties related to the request context.
 ///
@@ -246,6 +247,21 @@ public struct Session: Property {
     ///
     public func compression(_ algorithm: CompressionAlgorithm) -> Self {
         edit { $0.compression = .enabled(algorithm.build()) }
+    }
+
+    ///
+    /// Sets the tracer used to record distributed tracing spans for requests made through this
+    /// session.
+    ///
+    /// When not set, no tracing is performed — the session uses a no-op tracer, regardless of
+    /// whether some other part of the process has globally bootstrapped one via
+    /// `InstrumentationSystem.bootstrap(_:)`. Tracing is opt-in per session, not ambient.
+    ///
+    /// - Parameter tracer: The tracer to use for this session.
+    /// - Returns: The modified `Session` instance with the tracer configured.
+    ///
+    public func tracer(_ tracer: any Tracer) -> Self {
+        edit { $0.tracer = tracer }
     }
 
     // MARK: - Private properties

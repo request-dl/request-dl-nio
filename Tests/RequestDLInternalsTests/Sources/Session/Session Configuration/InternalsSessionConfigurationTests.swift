@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import NIOCore
 import Testing
+import Tracing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
@@ -322,6 +323,43 @@ struct InternalsSessionConfigurationTests {
     }
 
     @Test
+    func configuration_whenSetTracer_shouldBeStoredForRequestDLsOwnUse() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        let tracer = RecordingTracer()
+
+        // When
+        configuration.tracer = tracer
+
+        // Then
+        #expect((configuration.tracer as? RecordingTracer) != nil)
+    }
+
+    @Test
+    func configuration_whenSetTracer_shouldNotReachAsyncHTTPClientsOwnTracing() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.tracer = RecordingTracer()
+
+        // When
+        let builtConfiguration = try configuration.build()
+
+        // Then -- `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
+        // lifecycle itself (see the doc comment on `Configuration.tracer`).
+        #expect((builtConfiguration.tracing.tracer as? NoOpTracer) != nil)
+    }
+
+    @Test
+    func configuration_whenTracerNotSet_shouldDefaultToNoOp() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // Then
+        #expect((configuration.tracer as? NoOpTracer) != nil)
+        #expect((try configuration.build().tracing.tracer as? NoOpTracer) != nil)
+    }
+
+    @Test
     func configuration_whenInit_shouldBeDefault() async throws {
         // When
         let configuration = Internals.Session.Configuration()
@@ -357,4 +395,27 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.httpVersion == .automatic)
         #expect(!builtConfiguration.enableMultipath)
     }
+}
+
+private struct RecordingTracer: Tracer, Sendable {
+
+    func startSpan<Instant: TracerInstant>(
+        _ operationName: String,
+        context: @autoclosure () -> ServiceContext,
+        ofKind kind: SpanKind,
+        at instant: @autoclosure () -> Instant,
+        function: String,
+        file fileID: String,
+        line: UInt
+    ) -> NoOpTracer.NoOpSpan {
+        NoOpTracer.NoOpSpan(context: context())
+    }
+
+    func forceFlush() {}
+
+    func inject<Carrier, Inject>(_ context: ServiceContext, into carrier: inout Carrier, using injector: Inject)
+    where Inject: Injector, Carrier == Inject.Carrier {}
+
+    func extract<Carrier, Extract>(_ carrier: Carrier, into context: inout ServiceContext, using extractor: Extract)
+    where Extract: Extractor, Carrier == Extract.Carrier {}
 }
