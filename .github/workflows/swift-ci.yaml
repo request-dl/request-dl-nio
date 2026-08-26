@@ -31,7 +31,7 @@ concurrency:
 jobs:
   ci:
     name: "Swift CI"
-    uses: request-dl/.github/.github/workflows/swift-ci.yaml@main
+    uses: request-dl/.github/.github/workflows/swift-ci.yaml@claude/proposal-release-builds-static-sdk-d53aed
     with:
       name: request-dl
       product-name: RequestDL
