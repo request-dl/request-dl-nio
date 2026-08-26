@@ -112,10 +112,11 @@ extension Internals.Session.Configuration {
     /// can skip `Internals.NetworkPathGate` -- and therefore skip ever starting
     /// `Internals.NetworkPathMonitor` -- entirely for sessions that never use this API.
     package var networkPathConstraints: Internals.NetworkPathGate.Constraints? {
-        guard allowsCellularAccess != nil
-            || allowsExpensiveNetworkAccess != nil
-            || allowsConstrainedNetworkAccess != nil
-            || waitsForConnectivity != nil
+        guard
+            allowsCellularAccess != nil
+                || allowsExpensiveNetworkAccess != nil
+                || allowsConstrainedNetworkAccess != nil
+                || waitsForConnectivity != nil
         else {
             return nil
         }

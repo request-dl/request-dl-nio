@@ -88,10 +88,12 @@ extension NetworkAvailabilityError: CustomStringConvertible {
         case .expensiveNotAllowed:
             reasonDescription = "the current network path is expensive, and allowsExpensiveNetworkAccess(false) was set"
         case .constrainedNotAllowed:
-            reasonDescription = "the current network path is constrained, and allowsConstrainedNetworkAccess(false) was set"
+            reasonDescription =
+                "the current network path is constrained, and allowsConstrainedNetworkAccess(false) was set"
         }
 
-        let waitNote = waitedForConnectivity
+        let waitNote =
+            waitedForConnectivity
             ? "RequestDL waited for a satisfying path, but the request was cancelled before one arrived."
             : "RequestDL did not wait for connectivity — pass waitsForConnectivity(true) to Session to wait instead of failing immediately."
 
