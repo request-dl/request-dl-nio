@@ -104,6 +104,25 @@ extension Internals {
         /// the server-trust/client-certificate challenge (see `TaskDelegate` below) all run
         /// regardless of `delegate`; `delegate` is only consulted for a TLS challenge this client
         /// has no `identityPolicy` to answer.
+        ///
+        /// Deliberately not `session.data(for:request:delegate:)` -- a captured crash report
+        /// (`EXC_BREAKPOINT`/`SIGTRAP`, entirely inside Foundation's own
+        /// `NSURLSession.data(for:delegate:)` closures on the `com.apple.NSURLSession-work`
+        /// queue, no frame of this package's own code anywhere in the crashing thread) confirms a
+        /// real, if rare, bug in that bridge -- reproducible on an iOS Simulator under heavy
+        /// concurrent test load, not this package's own delegate (`TaskDelegate`'s shared state
+        /// is already lock-protected). Bridged by hand instead, the same way the streamed-upload
+        /// overload below already does: build a plain `dataTask(with:)` with no completion
+        /// handler of its own, so `TaskDelegate` (already `URLSessionDataDelegate`-conforming) is
+        /// the *only* thing consuming the response/data, and let its own
+        /// `didCompleteWithError:` -- which already knows how to turn `redirectError`/the
+        /// accumulated response into exactly this method's return shape -- resolve `completion`
+        /// once the task finishes. (An earlier version of this fix instead read `data`/`response`
+        /// off a `dataTask(with:completionHandler:)` completion handler directly, alongside the
+        /// same delegate -- reachable together, but not guaranteed to agree with each other:
+        /// caught by `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError`, which
+        /// started failing with `MissingURLResponseError` instead of the expected
+        /// `RedirectLimitReachedError` once a redirect was actually refused.)
         package func execute(
             request: URLRequest,
             delegate: URLSessionTaskDelegate? = nil
@@ -129,25 +148,13 @@ extension Internals {
                 forwarding: delegate
             )
 
-            let (data, response) = try await session.data(for: request, delegate: taskDelegate)
+            return try await withCheckedThrowingContinuation { continuation in
+                taskDelegate.completion = { continuation.resume(with: $0) }
 
-            // A refused redirect does not fail `data(for:delegate:)` itself -- URLSession has no
-            // API for a redirect delegate callback to fail the task with a caller-supplied error,
-            // only to stop following (`completionHandler(nil)`), which completes the task
-            // successfully with the redirect response as final. `redirectError` is how the
-            // delegate reports that refusal back here, so it can be surfaced the same way
-            // AsyncHTTPClient surfaces `HTTPClientError.redirectLimitReached`/
-            // `.redirectCycleDetected`: failing the whole request, not returning a truncated
-            // response.
-            if let redirectError = taskDelegate.redirectError {
-                throw redirectError
+                let task = session.dataTask(with: request)
+                task.delegate = taskDelegate
+                task.resume()
             }
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw UnexpectedURLResponseError(response: response)
-            }
-
-            return (Internals.ResponseHead(httpResponse), data)
         }
 
         /// Executes `request` with a body drained from `body` rather than buffered into `Data` up
