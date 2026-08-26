@@ -167,7 +167,11 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.decompression == rhs.decompression
             && lhs.compression == rhs.compression
             && lhs.dnsOverride == rhs.dnsOverride
-            && lhs.networkFrameworkWaitForConnectivity == rhs.networkFrameworkWaitForConnectivity
+            && lhs.waitsForConnectivity == rhs.waitsForConnectivity
+            && lhs.allowsCellularAccess == rhs.allowsCellularAccess
+            && lhs.allowsExpensiveNetworkAccess == rhs.allowsExpensiveNetworkAccess
+            && lhs.allowsConstrainedNetworkAccess == rhs.allowsConstrainedNetworkAccess
+            && lhs.multipathServiceType == rhs.multipathServiceType
             && lhs.httpVersion == rhs.httpVersion
             && lhs.enableNetworkFramework == rhs.enableNetworkFramework
             && lhs.maximumConcurrentConnections == rhs.maximumConcurrentConnections
