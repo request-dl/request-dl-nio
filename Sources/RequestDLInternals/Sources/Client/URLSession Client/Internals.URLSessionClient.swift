@@ -123,6 +123,11 @@ extension Internals {
         /// caught by `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError`, which
         /// started failing with `MissingURLResponseError` instead of the expected
         /// `RedirectLimitReachedError` once a redirect was actually refused.)
+        ///
+        /// `session.data(for:delegate:)` also cancelled its underlying `URLSessionTask`
+        /// automatically when the awaiting Swift `Task` was cancelled -- a guarantee this hand
+        /// bridge has to restore explicitly, via `CancellableTaskBox`, since nothing does that for
+        /// a bare `withCheckedThrowingContinuation` on its own.
         package func execute(
             request: URLRequest,
             delegate: URLSessionTaskDelegate? = nil
@@ -148,12 +153,19 @@ extension Internals {
                 forwarding: delegate
             )
 
-            return try await withCheckedThrowingContinuation { continuation in
-                taskDelegate.completion = { continuation.resume(with: $0) }
+            let box = CancellableTaskBox()
 
-                let task = session.dataTask(with: request)
-                task.delegate = taskDelegate
-                task.resume()
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    taskDelegate.completion = { continuation.resume(with: $0) }
+
+                    let task = session.dataTask(with: request)
+                    task.delegate = taskDelegate
+                    box.task = task
+                    task.resume()
+                }
+            } onCancel: {
+                box.cancel()
             }
         }
 
@@ -539,6 +551,41 @@ extension Internals.URLSessionClient {
     /// `Internals.RedirectConfiguration.follow(_:allowCycles:)`'s `allowCycles` is `false`.
     /// Mirrors `HTTPClientError.redirectCycleDetected` from the NIO executor.
     package struct RedirectCycleDetectedError: Error, Sendable {}
+
+    /// Lets a `withTaskCancellationHandler`'s `onCancel` closure reach a `URLSessionTask` that a
+    /// concurrently-running `operation` closure is still in the middle of creating.
+    ///
+    /// `onCancel` can fire the instant cancellation is requested -- including strictly before
+    /// `operation` ever assigns `task` -- so a plain `URLSessionTask?` written to after the fact
+    /// could miss a cancellation that arrived in that gap. `task`'s setter checks for exactly that
+    /// ordering and cancels immediately instead of losing it.
+    fileprivate final class CancellableTaskBox: @unchecked Sendable {
+
+        private let lock = Lock()
+        private var _task: URLSessionTask?
+        private var _isCancelled = false
+
+        var task: URLSessionTask? {
+            get { lock.withLock { _task } }
+            set {
+                let shouldCancelImmediately = lock.withLock {
+                    _task = newValue
+                    return _isCancelled
+                }
+                if shouldCancelImmediately {
+                    newValue?.cancel()
+                }
+            }
+        }
+
+        func cancel() {
+            let task = lock.withLock {
+                _isCancelled = true
+                return _task
+            }
+            task?.cancel()
+        }
+    }
 }
 
 /// `Internals.URLSessionClient`'s own per-request delegate: redirect enforcement, proxy
