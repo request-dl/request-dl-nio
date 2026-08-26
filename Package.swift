@@ -58,6 +58,10 @@ let package = Package(
             url: "https://github.com/apple/swift-system",
             from: "1.8.1"
         ),
+        .package(
+            url: "https://github.com/apple/swift-distributed-tracing",
+            from: "1.1.0"
+        ),
     ],
     targets: [
         .target(
@@ -76,6 +80,7 @@ let package = Package(
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),
@@ -98,6 +103,7 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),
