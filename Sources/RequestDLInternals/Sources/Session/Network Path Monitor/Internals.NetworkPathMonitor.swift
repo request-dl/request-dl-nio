@@ -31,7 +31,7 @@ extension Internals {
 
         /// Guarded by `lock`. Keyed by subscription identity so each `updates()` call can
         /// deregister only its own continuation on termination.
-        private var _subscribers: [ObjectIdentifier: Swift.AsyncStream<NetworkPath>.Continuation] = [:]
+        private var _subscribers: [ObjectIdentifier: _Concurrency.AsyncStream<NetworkPath>.Continuation] = [:]
 
         package var currentPath: NetworkPath {
             lock.withLock { _currentPath }
@@ -49,11 +49,11 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        package func updates() -> Swift.AsyncStream<NetworkPath> {
+        package func updates() -> _Concurrency.AsyncStream<NetworkPath> {
             let token = SubscriberToken()
             let id = ObjectIdentifier(token)
 
-            return Swift.AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            return _Concurrency.AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
                 let initialPath = lock.withLock { () -> NetworkPath in
                     _subscribers[id] = continuation
                     return _currentPath
@@ -77,7 +77,7 @@ extension Internals {
         // MARK: - Private methods
 
         private func updatePath(_ path: NetworkPath) {
-            let subscribers = lock.withLock { () -> [Swift.AsyncStream<NetworkPath>.Continuation] in
+            let subscribers = lock.withLock { () -> [_Concurrency.AsyncStream<NetworkPath>.Continuation] in
                 _currentPath = path
                 return Array(_subscribers.values)
             }

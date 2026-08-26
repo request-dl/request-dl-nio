@@ -17,10 +17,10 @@ extension Internals {
         /// the new subscriber and then yielding every subsequent change. Ends when the
         /// subscribing task is cancelled.
         ///
-        /// - Note: `Swift.AsyncStream`, explicitly qualified -- an unqualified reference here
+        /// - Note: `_Concurrency.AsyncStream`, explicitly qualified -- an unqualified reference here
         /// would resolve to `Internals.AsyncStream` instead, a throwing, replay-everything type
         /// meant for one-shot response bodies, a poor fit for a long-lived, ever-changing path
         /// signal.
-        func updates() -> Swift.AsyncStream<NetworkPath>
+        func updates() -> _Concurrency.AsyncStream<NetworkPath>
     }
 }

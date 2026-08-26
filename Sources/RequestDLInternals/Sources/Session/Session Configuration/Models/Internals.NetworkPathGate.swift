@@ -118,8 +118,8 @@ extension Internals {
                 .init(isSatisfied: true, usesCellular: false, isExpensive: false, isConstrained: false)
             }
 
-            func updates() -> Swift.AsyncStream<NetworkPath> {
-                Swift.AsyncStream { $0.finish() }
+            func updates() -> _Concurrency.AsyncStream<NetworkPath> {
+                _Concurrency.AsyncStream { $0.finish() }
             }
         }
         #endif
