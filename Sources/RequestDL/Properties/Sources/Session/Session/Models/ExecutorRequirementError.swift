@@ -31,7 +31,6 @@ public struct ExecutorRequirementError: Error, Sendable {
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
-        case proxySOCKSUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
         case decompressionDisabledUnderURLSession
 
@@ -73,8 +72,6 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .http1OnlyUnderURLSession
             case .proxyConnectHeadersUnderURLSession:
                 self = .proxyConnectHeadersUnderURLSession
-            case .proxySOCKSUnderURLSession:
-                self = .proxySOCKSUnderURLSession
             case .proxyBearerAuthorizationUnderURLSession:
                 self = .proxyBearerAuthorizationUnderURLSession
             case .decompressionDisabledUnderURLSession:
@@ -153,8 +150,6 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "an HTTP/1-only version pin (unsupported under URLSession)"
         case .proxyConnectHeadersUnderURLSession:
             return "custom proxy CONNECT headers (unsupported under URLSession)"
-        case .proxySOCKSUnderURLSession:
-            return "a SOCKS proxy (unsupported under URLSession)"
         case .proxyBearerAuthorizationUnderURLSession:
             return "a bearer-token proxy authorization (unsupported under URLSession)"
         case .decompressionDisabledUnderURLSession:

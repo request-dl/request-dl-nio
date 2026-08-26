@@ -49,12 +49,11 @@ struct InternalsExecutorIncompatibilityReasonTests {
             .dnsOverrideUnderURLSession,
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
-            .proxySOCKSUnderURLSession,
             .proxyBearerAuthorizationUnderURLSession,
             .decompressionDisabledUnderURLSession,
         ]
 
         // Then
-        #expect(cases.count == 20)
+        #expect(cases.count == 19)
     }
 }

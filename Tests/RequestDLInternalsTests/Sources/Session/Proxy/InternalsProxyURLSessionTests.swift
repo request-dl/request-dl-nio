@@ -33,9 +33,8 @@ struct InternalsProxyURLSessionTests {
     }
 
     @Test
-    func buildConnectionProxyDictionary_whenSOCKS_isEmpty() async throws {
-        // Given -- `.socks` stays excluded from `.urlSession` entirely (bucket D,
-        // `proxySOCKSUnderURLSession`), so this is a defensive no-op, not the authoritative gate.
+    func buildConnectionProxyDictionary_whenSOCKS_setsSOCKSKeys() async throws {
+        // Given
         let proxy = Internals.Proxy(
             host: "proxy.example.com",
             port: 1080,
@@ -47,7 +46,11 @@ struct InternalsProxyURLSessionTests {
         let dictionary = proxy.buildConnectionProxyDictionary()
 
         // Then
-        #expect(dictionary.isEmpty)
+        #expect(dictionary["SOCKSEnable"] as? Int == 1)
+        #expect(dictionary["SOCKSProxy"] as? String == "proxy.example.com")
+        #expect(dictionary["SOCKSPort"] as? Int == 1080)
+        // No `HTTP*`/`HTTPS*` keys leak in from the other branch.
+        #expect(dictionary["HTTPEnable"] == nil)
     }
 }
 

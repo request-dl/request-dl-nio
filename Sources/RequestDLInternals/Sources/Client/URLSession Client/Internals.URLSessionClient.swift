@@ -60,10 +60,10 @@ extension Internals {
         /// (`.follow(max: 5, allowCycles: false)`, see `HTTPClient.Configuration.RedirectConfiguration.init()`)
         /// so a caller that does not set `Internals.Session.Configuration.redirectConfiguration`
         /// gets identical behavior regardless of which executor the session resolves to.
-        /// - Parameter proxy: Only `.http` (`.server`) is mapped onto `configuration`; `.socks`
-        /// and `.bearer` authorization both stay excluded from `.urlSession` upstream (bucket D,
-        /// `Internals.ExecutorIncompatibilityReason.proxySOCKSUnderURLSession`/
-        /// `.proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes them
+        /// - Parameter proxy: Both `.http` (`.server`) and `.socks` are mapped onto
+        /// `configuration` -- `.bearer` proxy authorization is the one thing that stays excluded
+        /// from `.urlSession` upstream (`Internals.ExecutorIncompatibilityReason
+        /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here -- see `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
         package init(

@@ -333,8 +333,10 @@ private final class ConnectHandler: ChannelInboundHandler {
 }
 
 /// The destination side of a tunnel: forwards every byte read back to the original client
-/// connection, and closes it once the destination goes away.
-private final class OutboundRelayHandler: ChannelInboundHandler {
+/// connection, and closes it once the destination goes away. Not `private` -- `LocalSOCKSProxy`
+/// reuses this verbatim for its own tunnel, the relay half being identical regardless of which
+/// proxy protocol negotiated it.
+final class OutboundRelayHandler: ChannelInboundHandler {
     typealias InboundIn = ByteBuffer
 
     private let destination: Channel
