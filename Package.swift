@@ -102,7 +102,7 @@ let package = Package(
             swiftSettings: [.defaultIsolation(nil)],
         ),
 
-        .target(
+        .testTarget(
             name: "RequestDLTestSupport",
             dependencies: [
                 "RequestDLInternals",
