@@ -5,6 +5,73 @@ Target repo: `swift-server/async-http-client`.
 Discovered while implementing request-scoped `ServiceContext` binding for RequestDL
 (https://github.com/orgs/request-dl/discussions/284), see [Origin in RequestDL](#origin-in-requestdl) below.
 
+## Implementation plan
+
+For whoever picks this up next, on the dedicated fork branch. Ordered by priority — do items in
+order, each is a separate issue/PR against `swift-server/async-http-client`, don't bundle them (see
+why in item 3's notes).
+
+1. **Fix `ServiceContext.current` loss before span start (Gap #1 — the actual bug).**
+   Highest priority: it's a genuine correctness bug, not a design-philosophy conflict, and it affects
+   *every* consumer of `HTTPClient.Configuration.tracing.tracer`, both API surfaces. Full trace in
+   [Root cause](#root-cause-traced-through-the-call-chain).
+   - Preferred approach: capture `ServiceContext.current` once in `RequestBag.init`
+     (`RequestBag.swift`) — the caller's task-local is still reliably visible there, before any
+     `EventLoop.execute` hop happens — and thread it explicitly into
+     `startRequestSpan(tracer:context:)` (`RequestBag+Tracing.swift`) instead of relying on
+     `Tracer.startSpan`'s implicit `ServiceContext.current` default. This touches only the tracing
+     path, not `NIOLoopBound+Execute.swift` (general-purpose plumbing used well beyond tracing, so
+     patching it has a much wider review surface and blast radius — avoid that route unless this one
+     turns out not to work).
+   - File as an issue first with the reproduction from [Reproduction](#reproduction), let a
+     maintainer confirm the diagnosis before investing in the PR — this is a subtle enough
+     cross-cutting-concerns bug that it's worth a maintainer sanity-check on the fix location before
+     writing it.
+   - Once fixed upstream and released, RequestDL needs no changes at all —
+     `RequestServiceContext`/`RawTask.result()`'s bind already does the right thing on RequestDL's
+     side; only remove the `withKnownIssue` wrap on
+     `RequestServiceContextTests.dataTask_whenServiceContextSet_shouldBeObservedByTracerDuringExecution`
+     and update `RequestServiceContext`'s doc comment to drop the warning.
+
+2. **Decide the strategy for Gap #2 (no header injection on the legacy delegate API) — likely a
+   RequestDL-side call, not an async-http-client PR.**
+   Two options, pick one:
+   - (a) Ask upstream to backport `tracer.inject(...)` into the delegate-based
+     `execute(request:delegate:)` path. Lower odds of a quick yes than item 1: maintainers may
+     reasonably respond "that API predates tracing support and is being superseded by
+     `HTTPClientRequest`, migrate instead" — the delegate-based `execute` overloads aren't deprecated
+     but the newer async API is clearly where feature investment goes (see #862, #906 — both only
+     touch `AsyncAwait/`).
+   - (b) Migrate RequestDL's own request execution (`Internals.Client.execute`,
+     `Sources/RequestDLInternals/Sources/Client/Client/Internals.Client.swift`) from the delegate-based
+     API onto `HTTPClientRequest`/`execute() async`. This is the RequestDL-side option — no upstream
+     dependency, gets header injection "for free" once done, but is a real migration (delegate
+     callbacks → async streaming), not a small change. Worth checking whether this overlaps with
+     the already-tracked `feature/urlsession-executor` branch's scope before starting it as separate
+     work.
+   - Recommendation: don't file anything upstream for this until (a) vs (b) is decided — filing (a)
+     and then doing (b) anyway wastes a maintainer's review time on a PR RequestDL wouldn't end up
+     needing.
+
+3. **Only after 1 (and optionally 2) land: the narrow `attributeKeys` value fix, scoped tightly.**
+   Just the `responseStatusCode` default: `http.status_code` → `http.response.status_code`
+   (`HTTPClient.swift:1153`), referencing
+   [issue #860](https://github.com/swift-server/async-http-client/issues/860) directly. No new public
+   API, no configuration surface — see
+   [why that distinction matters](#appendix-tracingconfigurationattributekeys--why-making-it-public-is-not-a-viable-ask).
+   **Do not bundle in the other attributes from PR #881** (`url.path`, `server.hostname`,
+   `network.protocol.version`, etc.) **and especially not `http.request.header`/`http.response.header`**
+   — the header-attribute additions are the most plausible source of PR #881's "previously agreed
+   upon approach" objection from `fabianfett` (verbose, PII-adjacent, a bigger design call than a
+   rename), and bundling a safe rename together with a contentious addition risks blocking the safe
+   part too. If maintainers want the other attributes added incrementally after this lands, that's a
+   separate PR per attribute (or a small batch of the clearly uncontroversial structural ones —
+   `url.path`, `url.scheme`, `server.hostname`, `server.port`, `network.protocol.version` — kept
+   separate from the header-content ones either way).
+
+4. **Do not pursue: making `AttributeKeys`/`attributeKeys` `public` or otherwise customizable.**
+   Confirmed dead-on-arrival — see the appendix. Skip straight to item 3's values-only fix instead.
+
 ## Versions
 
 | Package | Version resolved |
