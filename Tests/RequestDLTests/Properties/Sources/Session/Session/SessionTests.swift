@@ -32,6 +32,12 @@ struct SessionTests {
             String(describing: sut.decompression) == String(describing: configuration.decompression)
         )
         #expect(sut.connectionPool == configuration.connectionPool)
+        #expect(sut.allowsCellularAccess == nil)
+        #expect(sut.allowsExpensiveNetworkAccess == nil)
+        #expect(sut.allowsConstrainedNetworkAccess == nil)
+        #expect(sut.waitsForConnectivity == nil)
+        #expect(sut.multipathServiceType == .none)
+        #expect(sut.networkPathConstraints == nil)
     }
 
     @Test
@@ -83,9 +89,67 @@ struct SessionTests {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(
-            try resolved.session.configuration.build().networkFrameworkWaitForConnectivity == waitsForConnectivity
-        )
+        #expect(resolved.session.configuration.waitsForConnectivity == waitsForConnectivity)
+    }
+
+    @Test
+    func session_whenAllowsCellularAccess_shouldBeValid() async throws {
+        // Given
+        let allowsCellularAccess = false
+
+        let property = Session()
+            .allowsCellularAccess(allowsCellularAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsCellularAccess == allowsCellularAccess)
+    }
+
+    @Test
+    func session_whenAllowsExpensiveNetworkAccess_shouldBeValid() async throws {
+        // Given
+        let allowsExpensiveNetworkAccess = false
+
+        let property = Session()
+            .allowsExpensiveNetworkAccess(allowsExpensiveNetworkAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsExpensiveNetworkAccess == allowsExpensiveNetworkAccess)
+    }
+
+    @Test
+    func session_whenAllowsConstrainedNetworkAccess_shouldBeValid() async throws {
+        // Given
+        let allowsConstrainedNetworkAccess = false
+
+        let property = Session()
+            .allowsConstrainedNetworkAccess(allowsConstrainedNetworkAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsConstrainedNetworkAccess == allowsConstrainedNetworkAccess)
+    }
+
+    @Test
+    func session_whenMultipathServiceType_shouldBeValid() async throws {
+        // Given
+        let multipathServiceType = Session.MultipathServiceType.handover
+
+        let property = Session()
+            .multipathServiceType(multipathServiceType)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.multipathServiceType == multipathServiceType.build())
     }
 
     @Test
@@ -302,6 +366,6 @@ struct SessionTests {
 
         // Then
         #expect(resolved.session.configuration.decompression == .enabled(.size(200)))
-        #expect(resolved.session.configuration.networkFrameworkWaitForConnectivity == true)
+        #expect(resolved.session.configuration.waitsForConnectivity == true)
     }
 }

@@ -229,19 +229,96 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.httpVersion == version.build())
     }
 
-    @Test
-    func configuration_whenWaitForConnectivity_shouldBeEqual() async throws {
+    @Test(arguments: [
+        Internals.MultipathServiceType.handover,
+        .interactive,
+        .aggregate,
+    ])
+    func configuration_whenSetMultipathServiceType_shouldForwardEnableMultipath(
+        _ multipathServiceType: Internals.MultipathServiceType
+    ) async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        let waitForConnectivity = false
 
         // When
-        configuration.networkFrameworkWaitForConnectivity = waitForConnectivity
+        configuration.multipathServiceType = multipathServiceType
 
         let builtConfiguration = try configuration.build()
 
         // Then
-        #expect(!builtConfiguration.networkFrameworkWaitForConnectivity)
+        #expect(builtConfiguration.enableMultipath)
+    }
+
+    @Test
+    func configuration_whenMultipathServiceTypeNone_shouldNotEnableMultipath() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // When
+        let builtConfiguration = try configuration.build()
+
+        // Then
+        #expect(!builtConfiguration.enableMultipath)
+    }
+
+    @Test
+    func configuration_whenNetworkPathConstraintsAllNil_shouldBeNil() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // Then
+        #expect(configuration.networkPathConstraints == nil)
+    }
+
+    @Test
+    func configuration_whenAllowsCellularAccessSet_shouldPopulateNetworkPathConstraints() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        // When
+        configuration.allowsCellularAccess = false
+
+        // Then
+        #expect(configuration.networkPathConstraints?.allowsCellularAccess == false)
+        #expect(configuration.networkPathConstraints?.allowsExpensiveNetworkAccess == nil)
+        #expect(configuration.networkPathConstraints?.allowsConstrainedNetworkAccess == nil)
+        #expect(configuration.networkPathConstraints?.waitsForConnectivity == nil)
+    }
+
+    @Test
+    func configuration_whenAllowsExpensiveNetworkAccessSet_shouldPopulateNetworkPathConstraints() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        // When
+        configuration.allowsExpensiveNetworkAccess = false
+
+        // Then
+        #expect(configuration.networkPathConstraints?.allowsExpensiveNetworkAccess == false)
+    }
+
+    @Test
+    func configuration_whenAllowsConstrainedNetworkAccessSet_shouldPopulateNetworkPathConstraints() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        // When
+        configuration.allowsConstrainedNetworkAccess = false
+
+        // Then
+        #expect(configuration.networkPathConstraints?.allowsConstrainedNetworkAccess == false)
+    }
+
+    @Test
+    func configuration_whenWaitsForConnectivitySet_shouldPopulateNetworkPathConstraints() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        // When
+        configuration.waitsForConnectivity = true
+
+        // Then
+        #expect(configuration.networkPathConstraints?.waitsForConnectivity == true)
     }
 
     @Test
@@ -278,6 +355,6 @@ struct InternalsSessionConfigurationTests {
                 )
         )
         #expect(builtConfiguration.httpVersion == .automatic)
-        #expect(builtConfiguration.networkFrameworkWaitForConnectivity)
+        #expect(!builtConfiguration.enableMultipath)
     }
 }
