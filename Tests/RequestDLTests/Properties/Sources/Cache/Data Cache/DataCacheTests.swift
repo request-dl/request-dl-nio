@@ -3,6 +3,7 @@
 //
 
 import AsyncAlgorithms
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDL
@@ -21,7 +22,7 @@ private let globalMemoryCapacity: Int64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: Int64 = 64 * 1_024 * 1_024
 private let globalDataCache = DataCache(suiteName: UUID().uuidString)
 
-@Suite(.serialized)
+@Suite(.serialized, .concurrent(2))
 struct DataCacheTests {
 
     final class TestState: Sendable {

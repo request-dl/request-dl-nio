@@ -3,6 +3,7 @@
 //
 
 import NIOCore
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
@@ -15,6 +16,7 @@ import struct Foundation.Data
 import struct Foundation.URL
 #endif
 
+@Suite(.concurrent(2))
 struct InternalsDataBufferTests {
 
     @Test

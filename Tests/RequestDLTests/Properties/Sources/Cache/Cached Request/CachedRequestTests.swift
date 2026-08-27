@@ -7,6 +7,7 @@ import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 import RequestDLInternals
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDL
@@ -22,7 +23,7 @@ import struct Foundation.Date
 import class Foundation.JSONEncoder
 #endif
 
-@Suite(.serialized)
+@Suite(.serialized, .concurrent(2))
 struct CachedRequestTests {
 
     final class TestState: Sendable {
