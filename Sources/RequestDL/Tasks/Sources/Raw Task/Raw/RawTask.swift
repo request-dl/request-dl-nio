@@ -54,8 +54,8 @@ struct RawTask<Content: Property>: RequestTask {
         // rather than handing `tracer` to `async-http-client`'s own `tracing.tracer`. That built-in
         // instrumentation only starts its span after hopping onto a SwiftNIO `EventLoop`, which loses
         // Swift's task-locals and makes it structurally impossible for it to see whatever
-        // `ServiceContext` the caller bound (see `TRACER_SERVICE_CONTEXT_REPORT.md`). Running the
-        // whole thing here, one layer up and entirely within the caller's own task, sidesteps that.
+        // `ServiceContext` the caller bound. Running the whole thing here, one layer up and entirely
+        // within the caller's own task, sidesteps that.
         //
         // A cache hit (the `.task` case below) never reaches the network, so it isn't traced.
         func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {

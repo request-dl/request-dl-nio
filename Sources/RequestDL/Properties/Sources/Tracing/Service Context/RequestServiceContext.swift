@@ -12,10 +12,9 @@ import Tracing
 /// handing `.tracer(_:)`'s tracer to `async-http-client`'s own `HTTPClient.Configuration.tracing
 /// .tracer`. That built-in instrumentation only starts its span after hopping onto a SwiftNIO
 /// `EventLoop`, which loses Swift's task-locals and makes it structurally unable to see a bound
-/// `ServiceContext` (full root cause in `TRACER_SERVICE_CONTEXT_REPORT.md` at the repository root,
-/// filed as an upstream bug). Doing it here instead, one layer up and entirely within the caller's
-/// own task, means this binding has a real, observable effect: it's what the started span picks up
-/// as its parent.
+/// `ServiceContext` — a confirmed upstream bug, reported against `async-http-client`. Doing it here
+/// instead, one layer up and entirely within the caller's own task, means this binding has a real,
+/// observable effect: it's what the started span picks up as its parent.
 ///
 /// ```swift
 /// DataTask {
