@@ -78,6 +78,7 @@ try await DataTask {
 - [x] [Swift Concurrency](<doc:Swift-concurrency>);
 - [x] [Combine support](<doc:Exploring-combine>) (Apple platforms only);
 - [x] [Image loading for SwiftUI, UIKit, AppKit and watchOS](<doc:Loading-images>) (Apple platforms only);
+- [x] [Downloading in the background](<doc:Downloading-in-the-Background>) (Apple platforms only);
 
 We are excited to expand this list with many other features. Start by making your contribution in [Discussions](https://github.com/orgs/request-dl/discussions) or by opening a PR (Pull Request).
 
@@ -97,3 +98,4 @@ We are excited to expand this list with many other features. Start by making you
 
 - <doc:Request-Customization>
 - <doc:Using-a-Client-Certificate-with-URLSession>
+- <doc:Downloading-in-the-Background>
