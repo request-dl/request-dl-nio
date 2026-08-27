@@ -44,24 +44,35 @@ public actor RDLImageLoader {
 
     // MARK: - Inits
 
-    /// Creates a new, independent loader with its own dedupe bookkeeping.
+    /// Creates a new, independent loader with its own dedupe bookkeeping and its own default
+    /// on-disk cache — see ``dataCache``.
     ///
     /// Most callers should use ``shared`` instead, so unrelated call sites requesting the same
     /// image still dedupe against each other.
     ///
-    /// - Parameter dataCache: The cache ``load(url:)`` uses. Defaults to a dedicated on-disk
-    /// cache separate from ``DataCache/shared`` — see ``dataCache``.
-    public init(
-        dataCache: DataCache = DataCache(
-            // Sized for a meaningful number of typical thumbnail/avatar-sized images without
-            // growing unbounded; pass a `dataCache` with a different capacity for anything else.
-            diskCapacity: 50 * 1_024 * 1_024,
-            // Kept separate from `DataCache.shared`'s directory: without this, image bytes
-            // would compete for space with — and be subject to eviction by — whatever unrelated
-            // HTTP responses the host app also caches through the default cache.
-            suiteName: "com.request-dl-nio.RDLImage"
+    /// - Note: A separate overload from ``init(dataCache:)`` rather than one `dataCache`
+    /// parameter with a default value, so this stays the same `init()` symbol it always was —
+    /// giving it a default argument instead would change its signature and break binary
+    /// compatibility with anything already linked against it.
+    public init() {
+        self.init(
+            dataCache: DataCache(
+                // Sized for a meaningful number of typical thumbnail/avatar-sized images
+                // without growing unbounded; use `init(dataCache:)` for a different capacity.
+                diskCapacity: 50 * 1_024 * 1_024,
+                // Kept separate from `DataCache.shared`'s directory: without this, image bytes
+                // would compete for space with — and be subject to eviction by — whatever
+                // unrelated HTTP responses the host app also caches through the default cache.
+                suiteName: "com.request-dl-nio.RDLImage"
+            )
         )
-    ) {
+    }
+
+    /// Creates a new, independent loader with its own dedupe bookkeeping, backed by `dataCache`
+    /// instead of the default one ``init()`` builds.
+    ///
+    /// - Parameter dataCache: The cache ``load(url:)`` uses. See ``dataCache``.
+    public init(dataCache: DataCache) {
         self.dataCache = dataCache
     }
 
