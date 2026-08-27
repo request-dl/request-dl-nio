@@ -201,29 +201,25 @@ extension ResolveTests {
                         }
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
-                        leafs = [
-                            LeafNode<QueryNode> {
-                                property = QueryNode {
-                                    name = q,
-                                    value = some question,
-                                    urlEncoder = URLEncoder {
-                                        lock = Lock,
-                                        _configuration = Configuration {
-                                            date = .iso8601,
-                                            key = .literal,
-                                            data = .base64,
-                                            bool = .literal,
-                                            optional = .literal,
-                                            array = .droppingIndex,
-                                            dictionary = .subscripted,
-                                            whitespace = .percentEscaping
-                                        }
-                                    }
+                ChildrenNode {
+                    LeafNode<QueryNode> {
+                        property = QueryNode {
+                            name = q,
+                            value = some question,
+                            urlEncoder = URLEncoder {
+                                lock = Lock,
+                                _configuration = Configuration {
+                                    date = .iso8601,
+                                    key = .literal,
+                                    data = .base64,
+                                    bool = .literal,
+                                    optional = .literal,
+                                    array = .droppingIndex,
+                                    dictionary = .subscripted,
+                                    whitespace = .percentEscaping
                                 }
                             }
-                        ]
+                        }
                     }
                 }
             }
