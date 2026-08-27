@@ -81,6 +81,72 @@ struct BackgroundDownloadsSessionTests {
         #expect(BackgroundDownloads.Session.decodeServerTrust("not a descriptor") == nil)
     }
 
+    // MARK: - clientIdentity encoding
+
+    @Test
+    func encodeThenDecodeClientIdentity_roundTripsDescriptor() async throws {
+        // Given
+        let descriptor = Internals.ClientIdentityDescriptor(
+            certificateChainFilePath: "/tmp/client.pem",
+            privateKeyFilePath: "/tmp/client.key",
+            privateKeyFormat: .pem
+        )
+
+        // When
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            clientIdentity: descriptor
+        )
+        let decoded = BackgroundDownloads.Session.decodeClientIdentity(encoded)
+
+        // Then
+        #expect(decoded == descriptor)
+    }
+
+    @Test
+    func decodeClientIdentity_whenNoneWasEncoded_returnsNil() async throws {
+        // Given -- the common case: no client certificate configured.
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
+        )
+
+        // When / Then
+        #expect(BackgroundDownloads.Session.decodeClientIdentity(encoded) == nil)
+    }
+
+    @Test
+    func decodeClientIdentity_whenTaskDescriptionIsNotEncodedByThisType_returnsNil() async throws {
+        #expect(BackgroundDownloads.Session.decodeClientIdentity("not a descriptor") == nil)
+    }
+
+    @Test
+    func encodeThenDecode_carriesBothServerTrustAndClientIdentityIndependently() async throws {
+        // Given -- both configured at once, the mTLS + custom-trust-roots combination.
+        let serverTrust = Internals.ServerTrustPolicy.Descriptor(
+            trustedRootCertificatesDER: [Data([0x01])],
+            verification: .fullVerification
+        )
+        let clientIdentity = Internals.ClientIdentityDescriptor(
+            certificateChainFilePath: "/tmp/client.pem",
+            privateKeyFilePath: "/tmp/client.key",
+            privateKeyFormat: .pem
+        )
+
+        // When
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            serverTrust: serverTrust,
+            clientIdentity: clientIdentity
+        )
+
+        // Then
+        #expect(BackgroundDownloads.Session.decodeServerTrust(encoded) == serverTrust)
+        #expect(BackgroundDownloads.Session.decodeClientIdentity(encoded) == clientIdentity)
+    }
+
     // MARK: - firstTask(matching:in:)
 
     /// `cancel(id:)`'s own matching logic, pulled out so it's testable against a plain array of

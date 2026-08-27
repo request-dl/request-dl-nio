@@ -35,10 +35,11 @@ import struct Foundation.URL
 /// ```
 ///
 /// `content` can configure ``TrustRoots``/``AdditionalTrustRoots``/``SecureConnection/verification(_:)``
-/// -- none of them need a Keychain round-trip to survive a relaunch, only the certificate bytes
-/// themselves, which travel alongside `id`/`destination` in the scheduled task's own state. A
-/// client certificate (mTLS) is different: see ``BackgroundDownloadUnsupportedConfigurationError``
-/// for why that's still rejected.
+/// freely -- none of them need a Keychain round-trip to survive a relaunch, only the certificate
+/// bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state.
+/// A client certificate (mTLS) works too, as long as both ``Certificate`` and ``PrivateKey`` come
+/// from a **file path**, not in-memory bytes -- see ``BackgroundDownloadUnsupportedConfigurationError``
+/// for the specific cases that still aren't supported.
 public struct BackgroundDownloadTask<Content: Property> {
 
     // MARK: - Private properties
@@ -72,9 +73,10 @@ public struct BackgroundDownloadTask<Content: Property> {
     /// use ``BackgroundDownloads/onEvent`` to observe how it turns out.
     ///
     /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
-    ///   client certificate (mTLS), or any error `content` itself throws while being resolved
-    ///   into a request (an invalid URL, a certificate file that can't be read, etc.) -- the same
-    ///   errors any other task can throw at this stage.
+    ///   client certificate this executor can't rebuild after a relaunch (see its own
+    ///   documentation for the specific cases), or any error `content` itself throws while being
+    ///   resolved into a request (an invalid URL, a certificate file that can't be read, etc.) --
+    ///   the same errors any other task can throw at this stage.
     public func result() async throws {
         let resolved = try await Resolve(
             root: content,
@@ -82,12 +84,16 @@ public struct BackgroundDownloadTask<Content: Property> {
         ).build()
 
         let serverTrust = try resolved.session.configuration.secureConnection.map {
-            (secureConnection: Internals.SecureConnection) -> Internals.ServerTrustPolicy.Descriptor in
-            guard secureConnection.certificateChain == nil, secureConnection.privateKey == nil else {
-                throw BackgroundDownloadUnsupportedConfigurationError()
-            }
+            try Internals.ServerTrustPolicy.resolve(from: $0).descriptor
+        }
 
-            return try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let clientIdentity: Internals.ClientIdentityDescriptor?
+        do {
+            clientIdentity = try resolved.session.configuration.secureConnection.flatMap {
+                try Internals.ClientIdentityDescriptor.resolve(from: $0)
+            }
+        } catch let error as Internals.ClientIdentityDescriptor.ResolutionError {
+            throw BackgroundDownloadUnsupportedConfigurationError(error)
         }
 
         let request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
@@ -96,7 +102,8 @@ public struct BackgroundDownloadTask<Content: Property> {
             request: request,
             id: id,
             destination: destination,
-            serverTrust: serverTrust
+            serverTrust: serverTrust,
+            clientIdentity: clientIdentity
         )
     }
 }

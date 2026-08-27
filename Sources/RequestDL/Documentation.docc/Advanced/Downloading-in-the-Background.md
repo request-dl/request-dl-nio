@@ -86,11 +86,32 @@ try await BackgroundDownloadTask(
 .result()
 ```
 
-None of these need a Keychain round-trip to survive a relaunch — only the certificate bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state, the same way. A **client certificate** (mTLS) is different: see ``BackgroundDownloadUnsupportedConfigurationError`` for why that's still rejected.
+None of these need a Keychain round-trip to survive a relaunch — only the certificate bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state, the same way.
+
+## Presenting a client certificate (mTLS)
+
+Works too, as long as both ``Certificate`` and ``PrivateKey`` come from a **file path**, not in-memory bytes:
+
+```swift
+try await BackgroundDownloadTask(
+    id: "episode-42",
+    destination: episodesDirectory.appendingPathComponent("episode-42.mp3")
+) {
+    BaseURL("api.example.com")
+    Path("episodes/42/audio")
+
+    SecureConnection {
+        Certificates(certificateFileURL.absolutePath(percentEncoded: false))
+        PrivateKey(privateKeyFileURL.absolutePath(percentEncoded: false))
+    }
+}
+.result()
+```
+
+Only the file path is persisted alongside `id`/`destination` — never the key material itself. The identity is rebuilt from that file via a fresh Keychain round-trip on every challenge, live or after a relaunch alike, the same way it would be for a foreground request. This is exactly why the path has to be stable: a certificate/key backed by in-memory bytes has nothing left to rebuild from once the process that held them is gone. See ``BackgroundDownloadUnsupportedConfigurationError`` for the specific cases that still aren't supported (in-memory bytes, a pre-built certificate, or a password-protected private key).
 
 ## What's not supported yet
 
-- **A client certificate (mTLS).** A request configured with `Certificates`/`PrivateKey` throws ``BackgroundDownloadUnsupportedConfigurationError`` before it's ever scheduled — presenting one needs a `SecIdentity` built via a Keychain round-trip, which would have to be redone from scratch after a relaunch, and isn't implemented yet.
 - **Modifiers and interceptors.** ``BackgroundDownloadTask`` does not conform to ``RequestTask`` — its result doesn't arrive in-process the way every modifier/interceptor assumes.
 
 ## Topics

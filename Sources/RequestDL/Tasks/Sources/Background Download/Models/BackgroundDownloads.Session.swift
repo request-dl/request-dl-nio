@@ -61,10 +61,16 @@ extension BackgroundDownloads {
             request: URLRequest,
             id: String,
             destination: URL,
-            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil
+            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
+            clientIdentity: Internals.ClientIdentityDescriptor? = nil
         ) {
             let task = urlSession().downloadTask(with: request)
-            task.taskDescription = Self.encode(id: id, destination: destination, serverTrust: serverTrust)
+            task.taskDescription = Self.encode(
+                id: id,
+                destination: destination,
+                serverTrust: serverTrust,
+                clientIdentity: clientIdentity
+            )
             task.resume()
         }
 
@@ -146,6 +152,11 @@ extension BackgroundDownloads {
             didReceive challenge: URLAuthenticationChallenge,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
+            if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate {
+                handleClientCertificateChallenge(task: task, completionHandler: completionHandler)
+                return
+            }
+
             guard let descriptor = Self.decodeServerTrust(task.taskDescription) else {
                 completionHandler(.performDefaultHandling, nil)
                 return
@@ -153,6 +164,41 @@ extension BackgroundDownloads {
 
             Internals.ServerTrustPolicy(descriptor: descriptor)
                 .handle(challenge: challenge, completionHandler: completionHandler)
+        }
+
+        /// Rebuilds the identity fresh from disk for this one challenge and removes it again
+        /// right after handing the credential over -- no identity is cached across calls, so
+        /// there's nothing to invalidate if the same task is challenged again later (a redirect
+        /// to a new host, for instance): it's simply rebuilt again, from the same file, the same
+        /// way. Safe to remove immediately: once `SecItemCopyMatching` has handed back a
+        /// `SecIdentity`, the in-memory object doesn't stop working just because the Keychain
+        /// entry backing it is deleted afterward, the same assumption
+        /// `Internals.URLSessionIdentityPolicy.deinit` already relies on, just at a smaller grain
+        /// here.
+        private func handleClientCertificateChallenge(
+            task: URLSessionTask,
+            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        ) {
+            guard let descriptor = Self.decodeClientIdentity(task.taskDescription) else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+
+            guard let (handle, intermediates) = try? descriptor.makeIdentity() else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+
+            completionHandler(
+                .useCredential,
+                URLCredential(
+                    identity: handle.identity,
+                    certificates: intermediates.isEmpty ? nil : intermediates,
+                    persistence: .forSession
+                )
+            )
+
+            Internals.RawBytesIdentityBuilder.remove(handle)
         }
 
         // MARK: - URLSessionDownloadDelegate
@@ -232,6 +278,7 @@ extension BackgroundDownloads {
             let id: String
             let destination: URL
             let serverTrust: Internals.ServerTrustPolicy.Descriptor?
+            let clientIdentity: Internals.ClientIdentityDescriptor?
         }
 
         // Not `private` -- unit-tested directly (`@testable import`) independent of any real
@@ -240,11 +287,17 @@ extension BackgroundDownloads {
         static func encode(
             id: String,
             destination: URL,
-            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil
+            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
+            clientIdentity: Internals.ClientIdentityDescriptor? = nil
         ) -> String? {
             guard
                 let data = try? JSONEncoder().encode(
-                    Descriptor(id: id, destination: destination, serverTrust: serverTrust)
+                    Descriptor(
+                        id: id,
+                        destination: destination,
+                        serverTrust: serverTrust,
+                        clientIdentity: clientIdentity
+                    )
                 )
             else {
                 return nil
@@ -266,6 +319,13 @@ extension BackgroundDownloads {
         /// only correct response is the same: defer to the system's default handling.
         static func decodeServerTrust(_ taskDescription: String?) -> Internals.ServerTrustPolicy.Descriptor? {
             Self.decodeDescriptor(taskDescription)?.serverTrust
+        }
+
+        /// `nil` both when `taskDescription` isn't one this type encoded at all, and when it is
+        /// but carries no `clientIdentity` (no mTLS configured) -- either way, the caller's only
+        /// correct response is the same: defer to the system's default handling.
+        static func decodeClientIdentity(_ taskDescription: String?) -> Internals.ClientIdentityDescriptor? {
+            Self.decodeDescriptor(taskDescription)?.clientIdentity
         }
 
         private static func decodeDescriptor(_ taskDescription: String?) -> Descriptor? {
