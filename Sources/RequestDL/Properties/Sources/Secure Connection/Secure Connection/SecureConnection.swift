@@ -15,10 +15,12 @@ public struct SecureConnection<Content: Property>: Property {
 
         // Conforms to `SecureConnectionPropertyNode` (rather than mutating `Make` directly) so
         // that `_makeProperty` can wrap it in a `SecureConnectionNode`, the same leaf type this
-        // node itself searches for. Without that, a `SecureConnection` nested inside another
-        // `SecureConnection` — via its own `.leaf(Node(...))` collapsing everything into a
-        // private wrapper type — would be invisible to the outer one's search, and every
-        // certificate/trust root/TLS setting it configured would be silently dropped.
+        // node itself searches for and the same one every other secure connection property
+        // (`TrustRoots`, `Certificates`, `PrivateKey`, ...) wraps itself in. Without that, a
+        // `SecureConnection` nested inside another `SecureConnection` — via its own
+        // `.leaf(Node(...))` collapsing everything into a private wrapper type — would be
+        // invisible to the outer one's search, and every certificate/trust root/TLS setting it
+        // configured would be silently dropped.
         //
         // Mirrors, synchronously, the exact sequence the top-level path already runs: replace
         // the base wholesale, then apply each found `SecureConnectionNode` on top of it via its
@@ -62,6 +64,31 @@ public struct SecureConnection<Content: Property>: Property {
         self.content = content()
     }
 
+    /// Initializes a secure connection with no additional content, for chaining its fluent
+    /// modifiers directly.
+    ///
+    /// ```swift
+    /// DataTask {
+    ///     BaseURL("apple.com")
+    ///
+    ///     SecureConnection()
+    ///         .version(minimum: .v1_3)
+    ///
+    ///     TrustRoots {
+    ///         Certificate(rootPath, format: .der)
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// > Note: `TrustRoots`, `Certificates`, `AdditionalTrustRoots`, `PrivateKey`, and
+    /// `PSKIdentity` no longer require an enclosing `SecureConnection` at all — this initializer
+    /// exists for configuring the settings that only `SecureConnection` itself exposes
+    /// (`version`, `cipherSuites`, `keyLogger`, ...) without also needing to nest other content
+    /// inside it, the same way `Session()` is used.
+    public init() where Content == EmptyProperty {
+        self.init {}
+    }
+
     // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
@@ -78,7 +105,7 @@ public struct SecureConnection<Content: Property>: Property {
 
         return .leaf(
             SecureConnectionNode(
-                root: Node(
+                Node(
                     secureConnection: property.secureConnection,
                     nodes: outputs.node.search(for: SecureConnectionNode.self)
                 ),

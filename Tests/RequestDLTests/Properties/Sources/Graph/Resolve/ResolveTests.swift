@@ -241,7 +241,7 @@ extension ResolveTests {
                 },
                 LeafNode<SecureConnectionNode> {
                     property = SecureConnectionNode {
-                        source = Source.root(
+                        source = Source.node(
                             Node {
                                 secureConnection = SecureConnection {
                                     certificateChain = nil,

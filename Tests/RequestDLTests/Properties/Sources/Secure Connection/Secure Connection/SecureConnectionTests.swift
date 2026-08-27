@@ -436,4 +436,23 @@ struct SecureConnectionTests {
         #expect(sut?.trustRoots != nil)
         #expect(sut?.certificateVerification == RequestDL.CertificateVerification.noHostnameVerification.build())
     }
+
+    @Test
+    func secure_whenInitWithoutContent_chainsModifiersDirectly() async throws {
+        // Given
+        let verification: RequestDL.CertificateVerification = .noHostnameVerification
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection()
+                    .verification(verification)
+            }
+        )
+
+        let sut = resolved.session.configuration.secureConnection
+
+        // Then
+        #expect(sut?.certificateVerification == verification.build())
+    }
 }
