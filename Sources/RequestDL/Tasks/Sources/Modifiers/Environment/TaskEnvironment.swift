@@ -1,8 +1,5 @@
 //
-//  File.swift
-//  request-dl
-//
-//  Created by Brenno de Moura on 23/09/25.
+// See LICENSE for this package's licensing information.
 //
 
 /// A property wrapper that provides safe, dynamic access to task-scoped environment values.

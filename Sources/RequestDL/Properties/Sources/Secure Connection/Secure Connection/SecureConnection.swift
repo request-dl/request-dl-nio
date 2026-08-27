@@ -6,18 +6,41 @@ import NIOCore
 import RequestDLInternals
 
 /// Represents a secure connection with various configuration options.
+///
+/// > Note: ``TrustRoots``, ``Certificates``, ``AdditionalTrustRoots``, ``PrivateKey``,
+/// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection` —
+/// each creates the underlying secure connection configuration on its own the first time it's
+/// needed. Nest them here only when also configuring settings that live directly on
+/// `SecureConnection` (`version`, `cipherSuites`, `keyLogger`, ...).
 public struct SecureConnection<Content: Property>: Property {
 
-    private struct Node: PropertyNode {
+    private struct Node: SecureConnectionPropertyNode {
 
         let secureConnection: Internals.SecureConnection
         let nodes: [LeafNode<SecureConnectionNode>]
 
-        func make(_ make: inout Make) async throws {
-            make.sessionConfiguration.secureConnection = secureConnection
+        // Conforms to `SecureConnectionPropertyNode` (rather than mutating `Make` directly) so
+        // that `_makeProperty` can wrap it in a `SecureConnectionNode`, the same leaf type this
+        // node itself searches for and the same one every other secure connection property
+        // (`TrustRoots`, `Certificates`, `PrivateKey`, ...) wraps itself in. Without that, a
+        // `SecureConnection` nested inside another `SecureConnection` — via its own
+        // `.leaf(Node(...))` collapsing everything into a private wrapper type — would be
+        // invisible to the outer one's search, and every certificate/trust root/TLS setting it
+        // configured would be silently dropped.
+        //
+        // Mirrors, synchronously, the exact sequence the top-level path already runs: replace
+        // the base wholesale, then apply each found `SecureConnectionNode` on top of it via its
+        // own fresh collector. `secureConnection`'s own settings (TLS version, cipher suites,
+        // etc.) are not tracked field-by-field the way `trustRoots`/`certificateChain`/
+        // `additionalTrustRoots` are, so nesting still replaces the whole base — only how that
+        // replacement becomes reachable when nested has changed here, not what it does.
+        func make(_ secureConnection: inout Internals.SecureConnection) {
+            secureConnection = self.secureConnection
 
             for node in nodes {
-                try await node.make(&make)
+                var collector = secureConnection.collector()
+                node.passthrough(&collector)
+                secureConnection = collector(\.self)
             }
         }
     }
@@ -47,6 +70,25 @@ public struct SecureConnection<Content: Property>: Property {
         self.content = content()
     }
 
+    /// Initializes a secure connection with no additional content, for chaining its fluent
+    /// modifiers directly — the same way `Session()` is used.
+    ///
+    /// ```swift
+    /// DataTask {
+    ///     BaseURL("apple.com")
+    ///
+    ///     SecureConnection()
+    ///         .version(minimum: .v1_3)
+    ///
+    ///     TrustRoots {
+    ///         Certificate(rootPath, format: .der)
+    ///     }
+    /// }
+    /// ```
+    public init() where Content == EmptyProperty {
+        self.init {}
+    }
+
     // MARK: - Public static methods
 
     /// This method is used internally and should not be called directly.
@@ -62,9 +104,12 @@ public struct SecureConnection<Content: Property>: Property {
         )
 
         return .leaf(
-            Node(
-                secureConnection: property.secureConnection,
-                nodes: outputs.node.search(for: SecureConnectionNode.self)
+            SecureConnectionNode(
+                Node(
+                    secureConnection: property.secureConnection,
+                    nodes: outputs.node.search(for: SecureConnectionNode.self)
+                ),
+                logger: inputs.environment.logger
             )
         )
     }
