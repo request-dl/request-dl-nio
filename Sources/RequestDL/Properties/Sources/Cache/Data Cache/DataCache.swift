@@ -16,6 +16,10 @@ import struct Foundation.Date
 import class Foundation.ProcessInfo
 #endif
 
+#if canImport(Darwin)
+import struct Foundation.FileProtectionType
+#endif
+
 /// A data cache that stores and retrieves data based on specified capacities and policies.
 public struct DataCache: Sendable, Equatable {
 
@@ -57,6 +61,13 @@ public struct DataCache: Sendable, Equatable {
         var diskStorage: DiskStorage {
             lock.withLock { _diskStorage }
         }
+
+        #if canImport(Darwin)
+        var fileProtection: FileProtectionType? {
+            get { lock.withLock { _diskStorage.fileProtection } }
+            set { lock.withLock { _diskStorage.fileProtection = newValue } }
+        }
+        #endif
 
         /// Cache writes started and not yet finished.
         let pendingWrites = Internals.PendingTasks(priority: .background)
@@ -205,6 +216,24 @@ public struct DataCache: Sendable, Equatable {
         get { storage.diskCapacity }
         nonmutating set { storage.diskCapacity = newValue }
     }
+
+    #if canImport(Darwin)
+    ///
+    /// The Data Protection class applied to newly written disk cache files.
+    ///
+    /// `nil`, the default, leaves the system default protection class in place — the same
+    /// behavior as before this property existed. Setting it only affects cache entries written
+    /// from that point on; existing files on disk keep whatever class they already had.
+    ///
+    /// `.completeUntilFirstUserAuthentication` is the usual choice for a cache: it keeps entries
+    /// unreadable before the device's first unlock after boot, without the stricter classes'
+    /// risk of a background write or read failing outright while the device is locked.
+    ///
+    public var fileProtection: FileProtectionType? {
+        get { storage.fileProtection }
+        nonmutating set { storage.fileProtection = newValue }
+    }
+    #endif
 
     // MARK: - Internal properties
 

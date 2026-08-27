@@ -17,6 +17,12 @@ import class Foundation.JSONDecoder
 import class Foundation.JSONEncoder
 #endif
 
+#if canImport(Darwin)
+import class Foundation.FileManager
+import struct Foundation.FileAttributeKey
+import struct Foundation.FileProtectionType
+#endif
+
 struct DiskStorage: Sendable {
 
     struct Record: Sendable {
@@ -132,6 +138,15 @@ struct DiskStorage: Sendable {
 
     // MARK: - Private properties
     private let directory: URL
+
+    // MARK: - Internal properties
+
+    /// The Data Protection class newly written cache files are given, on platforms that support
+    /// it. `nil` (the default) leaves the system default in place, matching this type's
+    /// behavior before this property existed.
+    #if canImport(Darwin)
+    var fileProtection: FileProtectionType?
+    #endif
 
     // MARK: - Inits
     init(directory: URL) {
@@ -289,6 +304,14 @@ struct DiskStorage: Sendable {
             try await Internals.fileSystem.moveItem(at: oldDataPath, to: newDataPath)
 
             try await writeAndClose(response, to: newRecord.responseURL)
+
+            // `newDataPath` carries whatever protection class it already had across the move
+            // above — renaming within the same volume does not touch a file's contents or its
+            // extended attributes. Only the freshly (re)written response record needs it applied
+            // again here.
+            #if canImport(Darwin)
+            await applyFileProtection(toResponseRecordAt: newRecord.responseURL)
+            #endif
         } catch {
             _ = try? await Internals.fileSystem.removeItem(
                 at: newRecord.url.filePath
@@ -331,6 +354,10 @@ struct DiskStorage: Sendable {
         } catch {
             return (nil, nil)
         }
+
+        #if canImport(Darwin)
+        await applyFileProtection(to: record)
+        #endif
 
         let buffer = await Internals.FileBuffer(record.dataURL)
         return (buffer, usageAfterEviction + writableBytes)
@@ -444,6 +471,67 @@ struct DiskStorage: Sendable {
             throw error
         }
     }
+
+    #if canImport(Darwin)
+    /// Applies `fileProtection` to a freshly written record's `response.record`, and
+    /// pre-creates its `data.record` under the same class before anything is streamed into it.
+    ///
+    /// - Note: `data.record` does not exist yet at this point — `Internals.FileBuffer` opens it
+    /// lazily, on the first byte written through it, which can happen an arbitrary amount of
+    /// time after this call returns and has no single moment this type controls to apply the
+    /// class retroactively. Pre-creating an empty file here, with the class already set, means
+    /// the later lazy open (`.modifyFile(createIfNecessary: true, ...)`) just finds it already
+    /// there and writes into it — the same outcome as if the whole file had been created with
+    /// the class from the start.
+    private func applyFileProtection(to record: Record) async {
+        guard let fileProtection else { return }
+
+        #if targetEnvironment(simulator)
+        // Every Apple Simulator backs its file system with the host Mac's plain APFS volume,
+        // not the per-class, hardware-derived encryption real devices use — a protection class
+        // set here has no effect and does not even round-trip back through
+        // `FileManager.attributesOfItem`. Skipping outright avoids paying for syscalls that can
+        // never do anything, on the same shared thread pool every other blocking file op in
+        // `Internals` already contends for. `data.record` is left for `Internals.FileBuffer` to
+        // create lazily, exactly as it would with `fileProtection` unset.
+        return
+        #else
+        let responsePath = record.responseURL.path
+        let dataPath = record.dataURL.path
+
+        try? await Internals.FileSystemManager.run {
+            let attributes: [FileAttributeKey: Any] = [.protectionKey: fileProtection]
+
+            try? FileManager.default.setAttributes(attributes, ofItemAtPath: responsePath)
+
+            if !FileManager.default.fileExists(atPath: dataPath) {
+                FileManager.default.createFile(atPath: dataPath, contents: nil, attributes: attributes)
+            }
+        }
+        #endif
+    }
+
+    /// Applies `fileProtection` to a `response.record` that already exists on disk — the
+    /// revalidation rewrite in `updateCached`, where (unlike `allocateBuffer`) there is no
+    /// `data.record` left to pre-create: it was moved forward from the old record as-is, class
+    /// and all.
+    private func applyFileProtection(toResponseRecordAt url: URL) async {
+        guard let fileProtection else { return }
+
+        #if targetEnvironment(simulator)
+        // See the identical guard in `applyFileProtection(to:)` above: a protection class has
+        // no effect, and does not even round-trip back through `FileManager.attributesOfItem`,
+        // in any Apple Simulator.
+        return
+        #else
+        let path = url.path
+
+        try? await Internals.FileSystemManager.run {
+            try? FileManager.default.setAttributes([.protectionKey: fileProtection], ofItemAtPath: path)
+        }
+        #endif
+    }
+    #endif
 
     private func record(_ key: String, createdAt date: Date? = nil) async -> Record? {
         switch date {

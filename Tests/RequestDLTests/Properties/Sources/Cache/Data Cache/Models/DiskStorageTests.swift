@@ -17,6 +17,11 @@ import struct Foundation.URL
 import class Foundation.JSONEncoder
 #endif
 
+#if canImport(Darwin)
+import class Foundation.FileManager
+import struct Foundation.FileProtectionType
+#endif
+
 struct DiskStorageTests {
 
     private func makeCachedResponse(key: String) -> CachedResponse {
@@ -233,4 +238,89 @@ struct DiskStorageTests {
             #expect(await storage[key] == nil)
         }
     }
+
+    #if canImport(Darwin)
+    private func recordDirectoryURL(in directoryURL: URL) throws -> URL {
+        let contents = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+        let recordName = try #require(contents.first { $0.hasSuffix(".cached") })
+        return directoryURL.appendingPathComponent(recordName, isDirectory: true)
+    }
+
+    private func protectionType(atPath path: String) -> FileProtectionType? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        return attributes?[.protectionKey] as? FileProtectionType
+    }
+
+    @Test
+    func allocateBuffer_whenFileProtectionIsSet_shouldApplyItToBothRecordFilesUpFront() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.fileProtection = .completeUntilFirstUserAuthentication
+
+            let response = makeCachedResponse(key: "k1")
+
+            // Given/When: a buffer is allocated but nothing has been written into it yet.
+            let (buffer, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            #expect(buffer != nil)
+
+            let recordURL = try recordDirectoryURL(in: directoryURL)
+            let responsePath = recordURL.appendingPathComponent("response.record").path
+            let dataPath = recordURL.appendingPathComponent("data.record").path
+
+            #if targetEnvironment(simulator)
+            // Every Apple Simulator backs its file system with the host Mac's plain APFS
+            // volume, not the per-class, hardware-derived encryption real devices use — a
+            // protection class has no effect there and does not round-trip back through
+            // `FileManager.attributesOfItem`. `DiskStorage` knows this and skips the (otherwise
+            // pointless) work outright, degrading to the same behavior as `fileProtection ==
+            // nil`: nothing pre-created, no attribute to observe.
+            #expect(!FileManager.default.fileExists(atPath: dataPath))
+            #else
+            // Then: "response.record" is fully written already, and "data.record" was
+            // pre-created empty — both already carry the configured protection class, rather
+            // than only picking it up once actual content is streamed in later.
+            #expect(protectionType(atPath: responsePath) == .completeUntilFirstUserAuthentication)
+            #expect(protectionType(atPath: dataPath) == .completeUntilFirstUserAuthentication)
+
+            var mutableBuffer = buffer
+            await mutableBuffer?.writeData(Data([0x1]))
+            try? await mutableBuffer?.close()
+
+            // And: writing content afterward does not reset the class already established at
+            // creation.
+            #expect(protectionType(atPath: dataPath) == .completeUntilFirstUserAuthentication)
+            #endif
+        }
+    }
+
+    @Test
+    func allocateBuffer_whenFileProtectionIsNil_shouldLeaveRecordFilesAtTheSystemDefault() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+            #expect(storage.fileProtection == nil)
+
+            let response = makeCachedResponse(key: "k1")
+
+            let (buffer, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            #expect(buffer != nil)
+
+            // Then: with no class configured, "data.record" is not even pre-created — it is
+            // left entirely to `Internals.FileBuffer`'s own lazy-open behavior, unchanged from
+            // before this feature existed.
+            let recordURL = try recordDirectoryURL(in: directoryURL)
+            let dataPath = recordURL.appendingPathComponent("data.record").path
+            #expect(!FileManager.default.fileExists(atPath: dataPath))
+        }
+    }
+    #endif
 }
