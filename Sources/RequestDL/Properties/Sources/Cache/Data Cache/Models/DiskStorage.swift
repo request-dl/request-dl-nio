@@ -486,6 +486,16 @@ struct DiskStorage: Sendable {
     private func applyFileProtection(to record: Record) async {
         guard let fileProtection else { return }
 
+        #if targetEnvironment(simulator)
+        // Every Apple Simulator backs its file system with the host Mac's plain APFS volume,
+        // not the per-class, hardware-derived encryption real devices use — a protection class
+        // set here has no effect and does not even round-trip back through
+        // `FileManager.attributesOfItem`. Skipping outright avoids paying for syscalls that can
+        // never do anything, on the same shared thread pool every other blocking file op in
+        // `Internals` already contends for. `data.record` is left for `Internals.FileBuffer` to
+        // create lazily, exactly as it would with `fileProtection` unset.
+        return
+        #else
         let responsePath = record.responseURL.path
         let dataPath = record.dataURL.path
 
@@ -498,6 +508,7 @@ struct DiskStorage: Sendable {
                 FileManager.default.createFile(atPath: dataPath, contents: nil, attributes: attributes)
             }
         }
+        #endif
     }
 
     /// Applies `fileProtection` to a `response.record` that already exists on disk — the
@@ -507,11 +518,18 @@ struct DiskStorage: Sendable {
     private func applyFileProtection(toResponseRecordAt url: URL) async {
         guard let fileProtection else { return }
 
+        #if targetEnvironment(simulator)
+        // See the identical guard in `applyFileProtection(to:)` above: a protection class has
+        // no effect, and does not even round-trip back through `FileManager.attributesOfItem`,
+        // in any Apple Simulator.
+        return
+        #else
         let path = url.path
 
         try? await Internals.FileSystemManager.run {
             try? FileManager.default.setAttributes([.protectionKey: fileProtection], ofItemAtPath: path)
         }
+        #endif
     }
     #endif
 

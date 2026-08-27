@@ -272,6 +272,15 @@ struct DiskStorageTests {
             let responsePath = recordURL.appendingPathComponent("response.record").path
             let dataPath = recordURL.appendingPathComponent("data.record").path
 
+            #if targetEnvironment(simulator)
+            // Every Apple Simulator backs its file system with the host Mac's plain APFS
+            // volume, not the per-class, hardware-derived encryption real devices use — a
+            // protection class has no effect there and does not round-trip back through
+            // `FileManager.attributesOfItem`. `DiskStorage` knows this and skips the (otherwise
+            // pointless) work outright, degrading to the same behavior as `fileProtection ==
+            // nil`: nothing pre-created, no attribute to observe.
+            #expect(!FileManager.default.fileExists(atPath: dataPath))
+            #else
             // Then: "response.record" is fully written already, and "data.record" was
             // pre-created empty — both already carry the configured protection class, rather
             // than only picking it up once actual content is streamed in later.
@@ -285,6 +294,7 @@ struct DiskStorageTests {
             // And: writing content afterward does not reset the class already established at
             // creation.
             #expect(protectionType(atPath: dataPath) == .completeUntilFirstUserAuthentication)
+            #endif
         }
     }
 
