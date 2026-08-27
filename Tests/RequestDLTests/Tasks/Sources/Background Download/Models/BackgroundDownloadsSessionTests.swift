@@ -4,6 +4,7 @@
 
 #if canImport(Darwin)
 
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -39,6 +40,45 @@ struct BackgroundDownloadsSessionTests {
     @Test
     func decode_whenTaskDescriptionIsNotEncodedByThisType_returnsNil() async throws {
         #expect(BackgroundDownloads.Session.decode("not a descriptor") == nil)
+    }
+
+    // MARK: - serverTrust encoding
+
+    @Test
+    func encodeThenDecodeServerTrust_roundTripsDescriptor() async throws {
+        // Given
+        let descriptor = Internals.ServerTrustPolicy.Descriptor(
+            trustedRootCertificatesDER: [Data([0x01, 0x02, 0x03])],
+            verification: .noHostnameVerification
+        )
+
+        // When
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            serverTrust: descriptor
+        )
+        let decoded = BackgroundDownloads.Session.decodeServerTrust(encoded)
+
+        // Then
+        #expect(decoded == descriptor)
+    }
+
+    @Test
+    func decodeServerTrust_whenNoneWasEncoded_returnsNil() async throws {
+        // Given -- the common case: a plain download, `serverTrust` defaulted to `nil`.
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
+        )
+
+        // When / Then
+        #expect(BackgroundDownloads.Session.decodeServerTrust(encoded) == nil)
+    }
+
+    @Test
+    func decodeServerTrust_whenTaskDescriptionIsNotEncodedByThisType_returnsNil() async throws {
+        #expect(BackgroundDownloads.Session.decodeServerTrust("not a descriptor") == nil)
     }
 
     // MARK: - firstTask(matching:in:)

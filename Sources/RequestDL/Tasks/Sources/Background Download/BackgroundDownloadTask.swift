@@ -4,6 +4,8 @@
 
 #if canImport(Darwin)
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -32,8 +34,11 @@ import struct Foundation.URL
 /// .result()
 /// ```
 ///
-/// `content` cannot configure a ``SecureConnection`` -- see
-/// ``BackgroundDownloadUnsupportedConfigurationError`` for why.
+/// `content` can configure ``TrustRoots``/``AdditionalTrustRoots``/``SecureConnection/verification(_:)``
+/// -- none of them need a Keychain round-trip to survive a relaunch, only the certificate bytes
+/// themselves, which travel alongside `id`/`destination` in the scheduled task's own state. A
+/// client certificate (mTLS) is different: see ``BackgroundDownloadUnsupportedConfigurationError``
+/// for why that's still rejected.
 public struct BackgroundDownloadTask<Content: Property> {
 
     // MARK: - Private properties
@@ -67,17 +72,22 @@ public struct BackgroundDownloadTask<Content: Property> {
     /// use ``BackgroundDownloads/onEvent`` to observe how it turns out.
     ///
     /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
-    ///   ``SecureConnection``, or any error `content` itself throws while being resolved into a
-    ///   request (an invalid URL, a certificate file that can't be read for an otherwise-unrelated
-    ///   property, etc.) -- the same errors any other task can throw at this stage.
+    ///   client certificate (mTLS), or any error `content` itself throws while being resolved
+    ///   into a request (an invalid URL, a certificate file that can't be read, etc.) -- the same
+    ///   errors any other task can throw at this stage.
     public func result() async throws {
         let resolved = try await Resolve(
             root: content,
             environment: RequestEnvironmentValues.current
         ).build()
 
-        guard resolved.session.configuration.secureConnection == nil else {
-            throw BackgroundDownloadUnsupportedConfigurationError()
+        let serverTrust = try resolved.session.configuration.secureConnection.map {
+            (secureConnection: Internals.SecureConnection) -> Internals.ServerTrustPolicy.Descriptor in
+            guard secureConnection.certificateChain == nil, secureConnection.privateKey == nil else {
+                throw BackgroundDownloadUnsupportedConfigurationError()
+            }
+
+            return try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
         }
 
         let request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
@@ -85,7 +95,8 @@ public struct BackgroundDownloadTask<Content: Property> {
         BackgroundDownloads.Session.shared.schedule(
             request: request,
             id: id,
-            destination: destination
+            destination: destination,
+            serverTrust: serverTrust
         )
     }
 }

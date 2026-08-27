@@ -20,8 +20,10 @@ import Foundation
 extension Internals {
 
     /// The resolved, `URLSession`-ready form of one `Internals.SecureConnection`: a client
-    /// identity (if `certificateChain`/`privateKey` were configured) plus the trust roots and
-    /// verification mode to apply to the server side of the handshake.
+    /// identity (if `certificateChain`/`privateKey` were configured), composed with an
+    /// `Internals.ServerTrustPolicy` for the trust roots/verification mode half -- the one part
+    /// of this that needs no Keychain round-trip, and so is reusable on its own wherever only
+    /// that half is needed.
     ///
     /// Built once per `SecureConnection` and held for as long as the owning
     /// `Internals.URLSessionClient` is alive -- mirrors NIOSSL's own per-connection
@@ -48,8 +50,7 @@ extension Internals {
 
         private let identityHandle: Internals.RawBytesIdentityBuilder.Handle?
         private let intermediateCertificates: [SecCertificate]
-        private let trustedRootCertificates: [SecCertificate]
-        private let certificateVerification: NIOSSL.CertificateVerification
+        private let serverTrustPolicy: Internals.ServerTrustPolicy
 
         // MARK: - Inits
 
@@ -80,24 +81,7 @@ extension Internals {
                 throw ConfigurationError.incompleteClientIdentity
             }
 
-            var trustedRootCertificates: [SecCertificate] = []
-
-            if let trustRoots = secureConnection.trustRoots {
-                trustedRootCertificates += try Self.certificates(from: trustRoots).map {
-                    try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
-                }
-            }
-
-            if let additionalTrustRoots = secureConnection.additionalTrustRoots {
-                for additionalTrustRoot in additionalTrustRoots {
-                    trustedRootCertificates += try Self.certificates(from: additionalTrustRoot).map {
-                        try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
-                    }
-                }
-            }
-
-            self.trustedRootCertificates = trustedRootCertificates
-            self.certificateVerification = secureConnection.certificateVerification ?? .fullVerification
+            self.serverTrustPolicy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
         }
 
         deinit {
@@ -115,57 +99,24 @@ extension Internals {
             challenge: URLAuthenticationChallenge,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
-            switch challenge.protectionSpace.authenticationMethod {
-            case NSURLAuthenticationMethodClientCertificate:
-                guard let identityHandle else {
-                    completionHandler(.performDefaultHandling, nil)
-                    return
-                }
-
-                completionHandler(
-                    .useCredential,
-                    URLCredential(
-                        identity: identityHandle.identity,
-                        certificates: intermediateCertificates.isEmpty ? nil : intermediateCertificates,
-                        persistence: .forSession
-                    )
-                )
-
-            case NSURLAuthenticationMethodServerTrust:
-                guard let serverTrust = challenge.protectionSpace.serverTrust else {
-                    completionHandler(.performDefaultHandling, nil)
-                    return
-                }
-
-                if case .none = certificateVerification {
-                    // Mirrors NIOSSL's `CertificateVerification.none` -- deliberately unsafe,
-                    // opt-in only.
-                    completionHandler(.useCredential, URLCredential(trust: serverTrust))
-                    return
-                }
-
-                if certificateVerification == .noHostnameVerification {
-                    let policy = SecPolicyCreateSSL(true, nil)
-                    _ = SecTrustSetPolicies(serverTrust, policy as CFTypeRef)
-                }
-
-                if !trustedRootCertificates.isEmpty {
-                    _ = SecTrustSetAnchorCertificates(serverTrust, trustedRootCertificates as CFArray)
-                    _ = SecTrustSetAnchorCertificatesOnly(serverTrust, true)
-                }
-
-                var evaluationError: CFError?
-                let isTrusted = SecTrustEvaluateWithError(serverTrust, &evaluationError)
-
-                if isTrusted {
-                    completionHandler(.useCredential, URLCredential(trust: serverTrust))
-                } else {
-                    completionHandler(.cancelAuthenticationChallenge, nil)
-                }
-
-            default:
-                completionHandler(.performDefaultHandling, nil)
+            guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate else {
+                serverTrustPolicy.handle(challenge: challenge, completionHandler: completionHandler)
+                return
             }
+
+            guard let identityHandle else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+
+            completionHandler(
+                .useCredential,
+                URLCredential(
+                    identity: identityHandle.identity,
+                    certificates: intermediateCertificates.isEmpty ? nil : intermediateCertificates,
+                    persistence: .forSession
+                )
+            )
         }
 
         // MARK: - Private methods
@@ -185,30 +136,6 @@ extension Internals {
                     )
                 }
                 return Data(try certificate.toDERBytes())
-            }
-        }
-
-        private static func certificates(from trustRoots: Internals.TrustRoots) throws -> [NIOSSLCertificate] {
-            switch trustRoots {
-            case .file(let file):
-                return try Internals.Certificate(file, format: .pem).build()
-            case .bytes(let bytes):
-                return try Internals.Certificate(bytes, format: .pem).build()
-            case .certificates(let certificates):
-                return try certificates.flatMap { try $0.build() }
-            }
-        }
-
-        private static func certificates(
-            from additionalTrustRoots: Internals.AdditionalTrustRoots
-        ) throws -> [NIOSSLCertificate] {
-            switch additionalTrustRoots {
-            case .file(let file):
-                return try Internals.Certificate(file, format: .pem).build()
-            case .bytes(let bytes):
-                return try Internals.Certificate(bytes, format: .pem).build()
-            case .certificates(let certificates):
-                return try certificates.flatMap { try $0.build() }
             }
         }
 

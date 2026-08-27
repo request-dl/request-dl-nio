@@ -4,6 +4,7 @@
 
 #if canImport(Darwin)
 
+import RequestDLInternals
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -56,9 +57,14 @@ extension BackgroundDownloads {
 
         // MARK: - Internal methods
 
-        func schedule(request: URLRequest, id: String, destination: URL) {
+        func schedule(
+            request: URLRequest,
+            id: String,
+            destination: URL,
+            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil
+        ) {
             let task = urlSession().downloadTask(with: request)
-            task.taskDescription = Self.encode(id: id, destination: destination)
+            task.taskDescription = Self.encode(id: id, destination: destination, serverTrust: serverTrust)
             task.resume()
         }
 
@@ -125,6 +131,28 @@ extension BackgroundDownloads {
                 _urlSession = urlSession
                 return urlSession
             }
+        }
+
+        // MARK: - URLSessionTaskDelegate
+
+        /// Not part of `URLSessionDownloadDelegate` itself -- `URLSessionTaskDelegate`, which
+        /// `URLSessionDownloadDelegate` already inherits from, so no extra protocol conformance
+        /// is needed to implement it. A task with no persisted `serverTrust` (the common case:
+        /// plain HTTPS, system trust) defers to the system's own default handling, exactly the
+        /// behavior this method not existing at all already had before this existed.
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            didReceive challenge: URLAuthenticationChallenge,
+            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        ) {
+            guard let descriptor = Self.decodeServerTrust(task.taskDescription) else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+
+            Internals.ServerTrustPolicy(descriptor: descriptor)
+                .handle(challenge: challenge, completionHandler: completionHandler)
         }
 
         // MARK: - URLSessionDownloadDelegate
@@ -203,13 +231,22 @@ extension BackgroundDownloads {
         private struct Descriptor: Codable {
             let id: String
             let destination: URL
+            let serverTrust: Internals.ServerTrustPolicy.Descriptor?
         }
 
         // Not `private` -- unit-tested directly (`@testable import`) independent of any real
         // `URLSessionTask`, the same way `InternalsURLSessionUploadFileTests` covers its bridge
         // without a network round trip.
-        static func encode(id: String, destination: URL) -> String? {
-            guard let data = try? JSONEncoder().encode(Descriptor(id: id, destination: destination)) else {
+        static func encode(
+            id: String,
+            destination: URL,
+            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil
+        ) -> String? {
+            guard
+                let data = try? JSONEncoder().encode(
+                    Descriptor(id: id, destination: destination, serverTrust: serverTrust)
+                )
+            else {
                 return nil
             }
 
@@ -217,6 +254,21 @@ extension BackgroundDownloads {
         }
 
         static func decode(_ taskDescription: String?) -> (id: String, destination: URL)? {
+            guard let descriptor = Self.decodeDescriptor(taskDescription) else {
+                return nil
+            }
+
+            return (descriptor.id, descriptor.destination)
+        }
+
+        /// `nil` both when `taskDescription` isn't one this type encoded at all, and when it is
+        /// but carries no `serverTrust` (the common, plain-HTTPS case) -- either way, the caller's
+        /// only correct response is the same: defer to the system's default handling.
+        static func decodeServerTrust(_ taskDescription: String?) -> Internals.ServerTrustPolicy.Descriptor? {
+            Self.decodeDescriptor(taskDescription)?.serverTrust
+        }
+
+        private static func decodeDescriptor(_ taskDescription: String?) -> Descriptor? {
             guard
                 let taskDescription,
                 let data = taskDescription.data(using: .utf8),
@@ -225,7 +277,7 @@ extension BackgroundDownloads {
                 return nil
             }
 
-            return (descriptor.id, descriptor.destination)
+            return descriptor
         }
 
         // MARK: - Task matching

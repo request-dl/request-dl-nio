@@ -67,9 +67,30 @@ let wasRunning = await BackgroundDownloads.cancel(id: "episode-42")
 
 There's no separate "cancelled" case in ``BackgroundDownloads/Event`` — a cancelled download is reported through ``BackgroundDownloads/onEvent`` as an ordinary `.failed` event, with `NSURLErrorCancelled` as its underlying error, the same way any other failure is. ``BackgroundDownloads/cancel(id:)`` returns `false` when there's nothing to cancel — the download already finished, failed, or never existed under that `id`.
 
+## Trusting a specific server certificate
+
+``TrustRoots``, ``AdditionalTrustRoots``, and ``SecureConnection/verification(_:)`` all work exactly as they do with ``DownloadTask``:
+
+```swift
+try await BackgroundDownloadTask(
+    id: "episode-42",
+    destination: episodesDirectory.appendingPathComponent("episode-42.mp3")
+) {
+    BaseURL("api.example.com")
+    Path("episodes/42/audio")
+
+    SecureConnection {
+        TrustRoots(certificateURL)
+    }
+}
+.result()
+```
+
+None of these need a Keychain round-trip to survive a relaunch — only the certificate bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state, the same way. A **client certificate** (mTLS) is different: see ``BackgroundDownloadUnsupportedConfigurationError`` for why that's still rejected.
+
 ## What's not supported yet
 
-- **``SecureConnection``.** A request configured with one throws ``BackgroundDownloadUnsupportedConfigurationError`` before it's ever scheduled. A background download's delegate can be asked to answer a TLS challenge long after the process that built the original request is gone, with no `Property` tree left to rebuild a client identity or custom trust roots from — that gap isn't closed yet, so it's rejected up front rather than left to fail unpredictably after a relaunch.
+- **A client certificate (mTLS).** A request configured with `Certificates`/`PrivateKey` throws ``BackgroundDownloadUnsupportedConfigurationError`` before it's ever scheduled — presenting one needs a `SecIdentity` built via a Keychain round-trip, which would have to be redone from scratch after a relaunch, and isn't implemented yet.
 - **Modifiers and interceptors.** ``BackgroundDownloadTask`` does not conform to ``RequestTask`` — its result doesn't arrive in-process the way every modifier/interceptor assumes.
 
 ## Topics
