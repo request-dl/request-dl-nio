@@ -64,6 +64,10 @@ jobs:
       # Step 3 – Android Build
       enable-android-build: true
 
+      # Step 3 – Release Builds / Static SDK
+      enable-release-builds: true
+      enable-static-sdk: true
+
       # Step 4
       enable-coverage-upload: true
     secrets: inherit
