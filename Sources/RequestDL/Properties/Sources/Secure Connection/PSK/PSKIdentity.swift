@@ -6,10 +6,6 @@ import NIOSSL
 import RequestDLInternals
 
 /// A struct representing a pre-shared key (PSK).
-///
-/// > Note: Does not require an enclosing ``SecureConnection`` — a base secure connection
-/// configuration is created automatically the first time it's needed. Nest it inside a
-/// ``SecureConnection`` only when also configuring other secure connection settings alongside it.
 public struct PSKIdentity: Property {
 
     private struct Node: SecureConnectionPropertyNode {

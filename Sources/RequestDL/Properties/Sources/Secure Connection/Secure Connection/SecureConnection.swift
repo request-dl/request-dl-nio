@@ -6,6 +6,12 @@ import NIOCore
 import RequestDLInternals
 
 /// Represents a secure connection with various configuration options.
+///
+/// > Note: ``TrustRoots``, ``Certificates``, ``AdditionalTrustRoots``, ``PrivateKey``,
+/// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection` —
+/// each creates the underlying secure connection configuration on its own the first time it's
+/// needed. Nest them here only when also configuring settings that live directly on
+/// `SecureConnection` (`version`, `cipherSuites`, `keyLogger`, ...).
 public struct SecureConnection<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -65,7 +71,7 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Initializes a secure connection with no additional content, for chaining its fluent
-    /// modifiers directly.
+    /// modifiers directly — the same way `Session()` is used.
     ///
     /// ```swift
     /// DataTask {
@@ -79,12 +85,6 @@ public struct SecureConnection<Content: Property>: Property {
     ///     }
     /// }
     /// ```
-    ///
-    /// > Note: `TrustRoots`, `Certificates`, `AdditionalTrustRoots`, `PrivateKey`, and
-    /// `PSKIdentity` no longer require an enclosing `SecureConnection` at all — this initializer
-    /// exists for configuring the settings that only `SecureConnection` itself exposes
-    /// (`version`, `cipherSuites`, `keyLogger`, ...) without also needing to nest other content
-    /// inside it, the same way `Session()` is used.
     public init() where Content == EmptyProperty {
         self.init {}
     }

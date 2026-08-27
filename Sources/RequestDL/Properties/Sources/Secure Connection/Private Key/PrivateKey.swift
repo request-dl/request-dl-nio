@@ -12,10 +12,6 @@ import class Foundation.Bundle
 #endif
 
 /// A struct representing a private key for `SecureConnection` configuration.
-///
-/// > Note: Does not require an enclosing ``SecureConnection`` — a base secure connection
-/// configuration is created automatically the first time it's needed. Nest it inside a
-/// ``SecureConnection`` only when also configuring other secure connection settings alongside it.
 public struct PrivateKey: Property {
 
     private struct Node: SecureConnectionPropertyNode {

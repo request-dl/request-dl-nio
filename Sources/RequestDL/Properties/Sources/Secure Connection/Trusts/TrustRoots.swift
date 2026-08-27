@@ -11,10 +11,6 @@ import class Foundation.Bundle
 #endif
 
 /// Configure the trusted roots certificates to validate the server using TLS.
-///
-/// > Note: Does not require an enclosing ``SecureConnection`` — a base secure connection
-/// configuration is created automatically the first time it's needed. Nest it inside a
-/// ``SecureConnection`` only when also configuring other secure connection settings alongside it.
 public struct TrustRoots<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
