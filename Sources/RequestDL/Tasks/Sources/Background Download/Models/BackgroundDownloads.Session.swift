@@ -31,11 +31,13 @@ extension BackgroundDownloads {
 
         static let shared = Session()
 
-        // MARK: - Private static properties
+        // MARK: - Internal static properties
 
         /// Stable across launches (same bundle, same string every time) -- required for the
-        /// system to reconnect this session to tasks that outlived a previous process.
-        private static let identifier = "\(Bundle.main.bundleIdentifier ?? "RequestDL").BackgroundDownloadTask"
+        /// system to reconnect this session to tasks that outlived a previous process. Not
+        /// `private` -- `handleEvents(forIdentifier:completionHandler:)`'s identifier-matching
+        /// guard is unit-tested directly against this exact value, rather than duplicating it.
+        static let identifier = "\(Bundle.main.bundleIdentifier ?? "RequestDL").BackgroundDownloadTask"
 
         // MARK: - Private properties
 
