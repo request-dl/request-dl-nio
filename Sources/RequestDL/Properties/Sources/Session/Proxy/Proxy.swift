@@ -74,7 +74,7 @@ public struct Proxy<Headers: Property>: Property {
     let host: String
     let port: Int
     let connectionProtocol: ConnectionProtocol
-    let authorization: Authorization?
+    let authorization: ProxyAuthorization?
     let connectHeaders: Headers
 
     // MARK: - Inits
@@ -91,7 +91,7 @@ public struct Proxy<Headers: Property>: Property {
     ///
     /// > Note: This initializer is available when `Headers` is `EmptyProperty`.
     ///
-    public init(host: String, port: Int, authorization: Authorization) where Headers == EmptyProperty {
+    public init(host: String, port: Int, authorization: ProxyAuthorization) where Headers == EmptyProperty {
         self.host = host
         self.port = port
         self.connectionProtocol = .http
@@ -144,7 +144,7 @@ public struct Proxy<Headers: Property>: Property {
     public init(
         host: String,
         port: Int,
-        authorization: Authorization? = nil,
+        authorization: ProxyAuthorization? = nil,
         @PropertyBuilder connectHeaders: () -> Headers
     ) {
         self.host = host
