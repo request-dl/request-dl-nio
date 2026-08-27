@@ -53,7 +53,17 @@ extension Internals.Session {
 
         package var compression: Internals.Compression = .disabled
         package var dnsOverride: [String: String] = [:]
-        package var networkFrameworkWaitForConnectivity: Bool?
+
+        /// Renamed from the old `networkFrameworkWaitForConnectivity` -- no longer a straight
+        /// forward to AsyncHTTPClient's own field of that name (which only took effect on
+        /// NIOTransportServices). Consumed by `Internals.NetworkPathGate` instead, via
+        /// `networkPathConstraints`, uniformly across every executor. See `build()`.
+        package var waitsForConnectivity: Bool?
+        package var allowsCellularAccess: Bool?
+        package var allowsExpensiveNetworkAccess: Bool?
+        package var allowsConstrainedNetworkAccess: Bool?
+        package var multipathServiceType: Internals.MultipathServiceType = .none
+
         package var httpVersion: Internals.HTTPVersion?
         package var enableNetworkFramework: Bool = false
         package var maximumConcurrentConnections: Int?
@@ -76,10 +86,7 @@ extension Internals.Session {
             )
 
             configuration.dnsOverride = dnsOverride
-
-            if let flag = networkFrameworkWaitForConnectivity {
-                configuration.networkFrameworkWaitForConnectivity = flag
-            }
+            configuration.enableMultipath = (multipathServiceType != .none)
 
             if let httpVersion {
                 configuration.httpVersion = httpVersion.build()
@@ -123,6 +130,27 @@ extension Internals.Session.Configuration {
 
         return false
     }
+
+    /// `nil` when none of the four network-availability knobs were touched, so `RawTask.result()`
+    /// can skip `Internals.NetworkPathGate` -- and therefore skip ever starting
+    /// `Internals.NetworkPathMonitor` -- entirely for sessions that never use this API.
+    package var networkPathConstraints: Internals.NetworkPathGate.Constraints? {
+        guard
+            allowsCellularAccess != nil
+                || allowsExpensiveNetworkAccess != nil
+                || allowsConstrainedNetworkAccess != nil
+                || waitsForConnectivity != nil
+        else {
+            return nil
+        }
+
+        return .init(
+            allowsCellularAccess: allowsCellularAccess,
+            allowsExpensiveNetworkAccess: allowsExpensiveNetworkAccess,
+            allowsConstrainedNetworkAccess: allowsConstrainedNetworkAccess,
+            waitsForConnectivity: waitsForConnectivity
+        )
+    }
 }
 
 // MARK: - Equatable
@@ -139,7 +167,11 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.decompression == rhs.decompression
             && lhs.compression == rhs.compression
             && lhs.dnsOverride == rhs.dnsOverride
-            && lhs.networkFrameworkWaitForConnectivity == rhs.networkFrameworkWaitForConnectivity
+            && lhs.waitsForConnectivity == rhs.waitsForConnectivity
+            && lhs.allowsCellularAccess == rhs.allowsCellularAccess
+            && lhs.allowsExpensiveNetworkAccess == rhs.allowsExpensiveNetworkAccess
+            && lhs.allowsConstrainedNetworkAccess == rhs.allowsConstrainedNetworkAccess
+            && lhs.multipathServiceType == rhs.multipathServiceType
             && lhs.httpVersion == rhs.httpVersion
             && lhs.enableNetworkFramework == rhs.enableNetworkFramework
             && lhs.maximumConcurrentConnections == rhs.maximumConcurrentConnections

@@ -20,6 +20,14 @@ struct RawTask<Content: Property>: RequestTask {
             environment: environment
         ).build()
 
+        if let constraints = resolved.session.configuration.networkPathConstraints {
+            do {
+                try await Internals.NetworkPathGate.wait(for: constraints)
+            } catch let error as Internals.NetworkPathUnsatisfiedError {
+                throw NetworkAvailabilityError(error)
+            }
+        }
+
         let logger = Internals.TaskLogger(
             baseURL: resolved.requestConfiguration.baseURL,
             pathComponents: resolved.requestConfiguration.pathComponents,
