@@ -26,9 +26,8 @@ extension Internals.Session {
         /// `async-http-client`'s own built-in tracing (`HTTPClient.Configuration.tracing.tracer`) is
         /// unconditionally suppressed in `build()` below: its span-start reads `ServiceContext
         /// .current` only after hopping onto a SwiftNIO `EventLoop`, which loses Swift's task-locals
-        /// and makes it impossible to parent the span correctly (see `TRACER_SERVICE_CONTEXT_REPORT
-        /// .md` at the repository root) -- RequestDL owns the whole span lifecycle itself instead, one
-        /// layer up, entirely within the caller's own task.
+        /// and makes it impossible to parent the span correctly -- RequestDL owns the whole span
+        /// lifecycle itself instead, one layer up, entirely within the caller's own task.
         ///
         /// Defaults to a no-op tracer rather than inheriting ambient global state: RequestDL's API is
         /// declarative, so a caller that never calls `.tracer(_:)` shouldn't have their requests

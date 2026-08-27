@@ -65,11 +65,10 @@ struct RequestServiceContextTests {
     }
 
     /// `async-http-client`'s own built-in tracing loses `ServiceContext.current` because it only
-    /// starts its span after hopping onto a SwiftNIO `EventLoop` (full root cause in
-    /// `TRACER_SERVICE_CONTEXT_REPORT.md`). RequestDL sidesteps that entirely by owning the span
-    /// lifecycle itself, in `RawTask.result()`, entirely within the caller's own task -- no
-    /// `EventLoop` hop involved -- so this now genuinely works, unlike when tracing was delegated to
-    /// `async-http-client`.
+    /// starts its span after hopping onto a SwiftNIO `EventLoop`. RequestDL sidesteps that entirely
+    /// by owning the span lifecycle itself, in `RawTask.result()`, entirely within the caller's own
+    /// task -- no `EventLoop` hop involved -- so this now genuinely works, unlike when tracing was
+    /// delegated to `async-http-client`.
     @Test
     func dataTask_whenServiceContextSet_shouldBeObservedByTracerDuringExecution() async throws {
         // Given
