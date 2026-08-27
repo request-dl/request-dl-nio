@@ -62,6 +62,10 @@ let package = Package(
             url: "https://github.com/apple/swift-distributed-tracing",
             from: "1.1.0"
         ),
+        .package(
+            url: "https://github.com/apple/swift-configuration",
+            from: "1.0.0"
+        ),
     ],
     targets: [
         .target(
@@ -104,6 +108,7 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Configuration", package: "swift-configuration"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),
@@ -134,6 +139,7 @@ let package = Package(
                 "RequestDLInternals",
                 "RequestDLTestSupport",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "Configuration", package: "swift-configuration"),
             ],
             resources: [.process("Resources")]
         ),
