@@ -74,6 +74,19 @@ public enum BackgroundDownloads {
     ) {
         Session.shared.handleEvents(forIdentifier: identifier, completionHandler: completionHandler)
     }
+
+    /// Cancels the ``BackgroundDownloadTask`` scheduled with this `id`, if it's still running.
+    ///
+    /// A cancelled download is reported through ``onEvent`` as an ordinary `.failed` event (the
+    /// underlying error is `NSURLErrorCancelled`), the same way any other failure is -- there is
+    /// no separate "was cancelled" event of its own.
+    ///
+    /// - Returns: `true` if a matching, still-running download was found and cancelled; `false`
+    ///   if none was -- it may have already finished, failed, or never existed.
+    @discardableResult
+    public static func cancel(id: String) async -> Bool {
+        await Session.shared.cancel(id: id)
+    }
 }
 
 #endif

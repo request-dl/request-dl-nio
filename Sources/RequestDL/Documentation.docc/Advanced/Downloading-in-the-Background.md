@@ -59,10 +59,17 @@ func application(
 
 This is required, not optional — without it, a download that finishes while your app is suspended or not running has no way to reconnect and report back through ``BackgroundDownloads/onEvent``.
 
+## Cancelling a download
+
+```swift
+let wasRunning = await BackgroundDownloads.cancel(id: "episode-42")
+```
+
+There's no separate "cancelled" case in ``BackgroundDownloads/Event`` — a cancelled download is reported through ``BackgroundDownloads/onEvent`` as an ordinary `.failed` event, with `NSURLErrorCancelled` as its underlying error, the same way any other failure is. ``BackgroundDownloads/cancel(id:)`` returns `false` when there's nothing to cancel — the download already finished, failed, or never existed under that `id`.
+
 ## What's not supported yet
 
 - **``SecureConnection``.** A request configured with one throws ``BackgroundDownloadUnsupportedConfigurationError`` before it's ever scheduled. A background download's delegate can be asked to answer a TLS challenge long after the process that built the original request is gone, with no `Property` tree left to rebuild a client identity or custom trust roots from — that gap isn't closed yet, so it's rejected up front rather than left to fail unpredictably after a relaunch.
-- **Cancellation.** There's no `BackgroundDownloadTask.cancel(id:)` yet.
 - **Modifiers and interceptors.** ``BackgroundDownloadTask`` does not conform to ``RequestTask`` — its result doesn't arrive in-process the way every modifier/interceptor assumes.
 
 ## Topics
@@ -71,7 +78,7 @@ This is required, not optional — without it, a download that finishes while yo
 
 - ``BackgroundDownloadTask``
 
-### Observing events
+### Observing and managing downloads
 
 - ``BackgroundDownloads``
 - ``BackgroundDownloads/Event``

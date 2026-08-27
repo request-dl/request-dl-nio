@@ -31,8 +31,6 @@ extension BackgroundDownloads {
 
         static let shared = Session()
 
-        // MARK: - Internal static properties
-
         /// Stable across launches (same bundle, same string every time) -- required for the
         /// system to reconnect this session to tasks that outlived a previous process. Not
         /// `private` -- `handleEvents(forIdentifier:completionHandler:)`'s identifier-matching
@@ -81,6 +79,37 @@ extension BackgroundDownloads {
             // identifier is what makes the system replay queued delegate callbacks -- there is no
             // separate "reconnect" call.
             _ = urlSession()
+        }
+
+        /// Cancels the download with this `id`, if one is currently running.
+        ///
+        /// No index of `id` -> `URLSessionTask` is kept around -- there is nowhere safe to keep
+        /// one that would still be valid after a relaunch anyway, since a fresh process starts
+        /// with nothing in memory. `allTasks` is the system's own live answer instead, always
+        /// asked fresh: cheap enough for something that only runs when a caller explicitly asks
+        /// to cancel something, not on any hot path.
+        ///
+        /// Cancelling a `URLSessionTask` this way makes it fail with `NSURLErrorCancelled`
+        /// shortly after, through the ordinary `didCompleteWithError` callback below -- so a
+        /// cancellation is reported through ``BackgroundDownloads/onEvent`` as an ordinary
+        /// `.failed` event, not a distinct case of its own.
+        ///
+        /// - Returns: `true` if a matching, still-running download was found and cancelled;
+        /// `false` if none was (already finished, never existed, or no download has ever been
+        /// scheduled in this process at all -- checked without creating a session just to find
+        /// out, since there would be nothing in it to cancel either way).
+        @discardableResult
+        func cancel(id: String) async -> Bool {
+            guard let urlSession = lock.withLock({ _urlSession }) else {
+                return false
+            }
+
+            guard let match = Self.firstTask(matching: id, in: await urlSession.allTasks) else {
+                return false
+            }
+
+            match.cancel()
+            return true
         }
 
         // MARK: - Private methods
@@ -197,6 +226,16 @@ extension BackgroundDownloads {
             }
 
             return (descriptor.id, descriptor.destination)
+        }
+
+        // MARK: - Task matching
+
+        /// The pure part of ``cancel(id:)`` -- picking the right task out of a list -- pulled out
+        /// on its own specifically so it's testable without a real background `URLSession` to ask
+        /// `allTasks` of. A task with no `taskDescription`, or one this type didn't encode, simply
+        /// never matches, the same way `decode(_:)`'s callers already treat it elsewhere.
+        static func firstTask(matching id: String, in tasks: [URLSessionTask]) -> URLSessionTask? {
+            tasks.first { decode($0.taskDescription)?.id == id }
         }
     }
 }
