@@ -126,6 +126,32 @@ struct ProxyTests {
     }
 
     @Test
+    func proxy_whenHTTPConnectionWithConnectHeadersFromHeaderGroup() async throws {
+        // Given
+        // Regression test: `HeaderGroup` used to wrap its resolved headers into an opaque leaf
+        // node, invisible to `Proxy`'s `search(for: HeaderNode.self)` over its `connectHeaders`
+        // content, so every header composed through it here silently disappeared.
+        let host = UUID().uuidString
+        let port = 1_090
+        let name = UUID().uuidString
+        let value = UUID().uuidString
+
+        // When
+        let resolved = try await resolve(
+            Proxy(host: host, port: port) {
+                HeaderGroup {
+                    CustomHeader(name: name, value: value)
+                }
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.host == host)
+        #expect(resolved.session.configuration.proxy?.port == port)
+        #expect(resolved.session.configuration.proxy?.connectHeaders.first(name: name) == value)
+    }
+
+    @Test
     func proxy_whenHTTPConnectionWithAuthorizationAndConnectHeaders() async throws {
         // Given
         let host = UUID().uuidString

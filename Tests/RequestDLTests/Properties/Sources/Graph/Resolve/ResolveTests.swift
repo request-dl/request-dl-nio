@@ -181,28 +181,24 @@ extension ResolveTests {
                         path = v2
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
-                        nodes = [
-                            LeafNode<HeaderNode> {
-                                property = HeaderNode {
-                                    key = Accept,
-                                    value = application/json,
-                                    strategy = .adding,
-                                    separator = nil
-                                }
-                            },
-                            LeafNode<HeaderNode> {
-                                property = HeaderNode {
-                                    key = Cache-Control,
-                                    value = public,
-                                    strategy = .adding,
-                                    separator = Optional<String> {
-                                        some = ,
-                                    }
-                                }
+                ChildrenNode {
+                    LeafNode<HeaderNode> {
+                        property = HeaderNode {
+                            key = Accept,
+                            value = application/json,
+                            strategy = .adding,
+                            separator = nil
+                        }
+                    },
+                    LeafNode<HeaderNode> {
+                        property = HeaderNode {
+                            key = Cache-Control,
+                            value = public,
+                            strategy = .adding,
+                            separator = Optional<String> {
+                                some = ,
                             }
-                        ]
+                        }
                     }
                 },
                 LeafNode<Node> {
