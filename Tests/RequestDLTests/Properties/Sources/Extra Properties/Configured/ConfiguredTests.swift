@@ -3,9 +3,17 @@
 //
 
 import Configuration
+import NIOSSL
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.UUID
+#endif
 
 struct ConfiguredTests {
 
@@ -14,7 +22,7 @@ struct ConfiguredTests {
     func baseURL() async throws {
         // Given
         let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "baseURL": "example.com"
+            "baseURL": "https://example.com"
         ]))
 
         // When
@@ -117,6 +125,46 @@ struct ConfiguredTests {
 
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func baseURLRelativePathAppendsToExistingBaseURL() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "baseURL": "users/123"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.example.com")
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://api.example.com/users/123")
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func baseURLCompleteURLOverridesExistingBaseURL() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "baseURL": "https://override.example.com/v2"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.example.com")
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://override.example.com/v2")
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func missingKeysContributeNothing() async throws {
         // Given
         let reader = ConfigReader(provider: InMemoryProvider(values: [:]))
@@ -140,7 +188,7 @@ struct ConfiguredTests {
     func explicitPropertyDeclaredAfterWins() async throws {
         // Given
         let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "baseURL": "example.com"
+            "baseURL": "https://example.com"
         ]))
 
         // When
@@ -275,6 +323,53 @@ struct ConfiguredTests {
         // Then
         #expect(resolved.session.configuration.dnsOverride["localhost"] == "127.0.0.1")
         #expect(resolved.session.configuration.dnsOverride["example.com"] == "192.168.1.1")
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func urlOverrides() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "urlOverrides": .init(
+                .stringArray(["https://google.com|https://apple.com"]),
+                isSecret: false
+            )
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://apple.com")
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func urlOverridesWithPathPrefix() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "urlOverrides": .init(
+                .stringArray(["https://google.com/api/v1|https://apple.com/v2"]),
+                isSecret: false
+            )
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("api/v1/users")
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://apple.com/v2/users")
     }
 
     @Test
@@ -478,10 +573,478 @@ struct ConfiguredTests {
 
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func cachePolicyMemory() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "cachePolicy": "memory"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.cachePolicy == .memory)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func cachePolicyDisk() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "cachePolicy": "disk"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.cachePolicy == .disk)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func cachePolicyAll() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "cachePolicy": "all"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.cachePolicy == .all)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func invalidCachePolicyThrows() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "cachePolicy": "ssd"
+        ]))
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test(
+        arguments: [
+            ("ignoreCachedData", CacheStrategy.ignoreCachedData),
+            ("reloadAndValidateCachedData", CacheStrategy.reloadAndValidateCachedData),
+            ("returnCachedDataElseLoad", CacheStrategy.returnCachedDataElseLoad),
+            ("useCachedDataOnly", CacheStrategy.useCachedDataOnly),
+        ]
+    )
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func cacheStrategy(value: String, expected: CacheStrategy) async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "cacheStrategy": .init(.string(value), isSecret: false)
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.cacheStrategy == expected)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func invalidCacheStrategyThrows() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "cacheStrategy": "ignoreEverything"
+        ]))
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionTrustRoots() async throws {
+        // Given
+        let file = UUID().uuidString
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.trustRoots": .init(.string(file), isSecret: false)
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
+        #expect(resolved.session.configuration.secureConnection?.trustRoots == .file(file))
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionAdditionalTrustRoots() async throws {
+        // Given
+        let file = UUID().uuidString
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.additionalTrustRoots": .init(.string(file), isSecret: false)
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.additionalTrustRoots
+                == .init([.file(file)])
+        )
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionCertificates() async throws {
+        // Given
+        let file = UUID().uuidString
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.certificates": .init(.string(file), isSecret: false)
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.secureConnection?.certificateChain == .file(file))
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionPrivateKeyWithoutPassword() async throws {
+        // Given
+        let file = UUID().uuidString
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.privateKey.file": .init(.string(file), isSecret: false),
+            "secureConnection.privateKey.format": "der",
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(.init(file, format: .der))
+        )
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionPrivateKeyWithPassword() async throws {
+        // Given
+        let file = UUID().uuidString
+        let password = UUID().uuidString
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.privateKey.file": .init(.string(file), isSecret: false),
+            "secureConnection.privateKey.password": .init(.string(password), isSecret: true),
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    .init(file, format: .pem, password: NIOSSLSecureBytes(password.utf8))
+                )
+        )
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func invalidPrivateKeyFormatThrows() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.privateKey.file": "key.p12",
+            "secureConnection.privateKey.format": "p12",
+        ]))
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionTLSVersionRange() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.tlsMinimumVersion": "1.2",
+            "secureConnection.tlsMaximumVersion": "1.3",
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.secureConnection?.minimumTLSVersion == TLSVersion.v1_2.build())
+        #expect(resolved.session.configuration.secureConnection?.maximumTLSVersion == TLSVersion.v1_3.build())
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionMissingKeysContributeNothing() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [:]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("example.com")
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.secureConnection == nil)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func invalidTLSVersionThrows() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "secureConnection.tlsMinimumVersion": "1.4"
+        ]))
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func redirectFollow() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "redirect.mode": "follow",
+            "redirect.maxRedirects": 10,
+            "redirect.allowCycles": true,
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.redirectConfiguration == .follow(max: 10, allowCycles: true))
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func redirectFollowDefaults() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "redirect.mode": "follow"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.redirectConfiguration == .follow(max: 5, allowCycles: false))
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func redirectDisallow() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "redirect.mode": "disallow"
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.redirectConfiguration == .disallow)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func redirectMissingModeContributesNothing() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [:]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.redirectConfiguration == nil)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func invalidRedirectModeThrows() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "redirect.mode": "bounce"
+        ]))
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func maximumConnectionsPerHost() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "maximumConnectionsPerHost": 16
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit == 16)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func maximumConcurrentConnections() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "maximumConcurrentConnections": 4
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.maximumConcurrentConnections == 4)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func connectionLimitsCombined() async throws {
+        // Given
+        let reader = ConfigReader(provider: InMemoryProvider(values: [
+            "maximumConnectionsPerHost": 16,
+            "maximumConcurrentConnections": 4,
+        ]))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit == 16)
+        #expect(resolved.session.configuration.maximumConcurrentConnections == 4)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func scopedReader() async throws {
         // Given
         let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "myAPI.baseURL": "example.com"
+            "myAPI.baseURL": "https://example.com"
         ]))
 
         // When

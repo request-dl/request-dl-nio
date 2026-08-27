@@ -22,6 +22,20 @@ public struct ConfiguredError: Error {
         /// `"http"` nor `"socks"`, `proxy.port` is missing for an `"http"` proxy, or
         /// `proxy.authorization`/`proxy.connectHeaders` is specified for a `"socks"` proxy.
         case invalidProxyConfiguration
+
+        /// `cachePolicy` was specified but is neither `"memory"`, `"disk"`, nor `"all"`.
+        case invalidCachePolicy
+
+        /// `cacheStrategy` was specified but is none of the ``CacheStrategy`` case names.
+        case invalidCacheStrategy
+
+        /// `secureConnection.privateKey.format` was specified but is neither `"pem"` nor
+        /// `"der"`, or `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
+        /// was specified but is none of `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`.
+        case invalidSecureConnectionConfiguration
+
+        /// `redirect.mode` was specified but is neither `"follow"` nor `"disallow"`.
+        case invalidRedirectConfiguration
     }
 
     // MARK: - Public properties

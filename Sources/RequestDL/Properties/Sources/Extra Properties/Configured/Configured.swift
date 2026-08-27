@@ -3,6 +3,7 @@
 //
 
 import Configuration
+import NIOSSL
 
 /// A property that derives declarative request properties from an external configuration source.
 ///
@@ -24,7 +25,14 @@ import Configuration
 ///
 /// ## Configuration keys
 ///
-/// - `baseURL` (string, optional): passed to ``BaseURL/init(_:)``.
+/// - `baseURL` (string, optional): passed to ``FlexibleURL/init(_:)`` — not ``BaseURL``, since
+///   `FlexibleURL` already covers everything a bare host would (a complete `"scheme://host/..."`
+///   value sets the base URL, same as `BaseURL`) while also accepting a relative value (e.g.
+///   `"/users/123"`, appended to whatever base URL is otherwise in effect) or a query-only value
+///   (e.g. `"?active=true"`) in the same field, the same trade-offs `FlexibleURL` documents on its
+///   own. A bare host with no scheme (e.g. `"example.com"`) is **not** recognized as a host here —
+///   it has no `://`, so `FlexibleURL` reads it as a relative path instead; write
+///   `"https://example.com"` for the base URL case.
 /// - `method` (string, optional): uppercased and passed to ``RequestMethod/init(_:)``.
 /// - `timeout` (int, optional): interpreted as seconds and passed to ``Timeout/init(_:for:)``.
 /// - `headers` (string array, optional): each entry is a colon-separated `"Name: Value"` pair,
@@ -37,6 +45,9 @@ import Configuration
 ///   `"bearer"` reads `authorization.token`.
 /// - `dnsOverrides` (string array, optional): each entry is a colon-separated `"host:IP"` pair,
 ///   one ``DNSOverride`` per entry.
+/// - `urlOverrides` (string array, optional): each entry is a `"origin|destination"` pair — both
+///   full `"scheme://host[/path]"` strings, so `:`/`/` couldn't serve as the separator the way
+///   they do for `dnsOverrides`/`headers` — collected into a single ``URLOverride``.
 /// - `systemProxy` (bool, optional, default: `false`): includes ``SystemProxy`` when `true`.
 /// - `proxy` (scoped, optional): passed to ``Proxy``. Reads `proxy.enabled` (default `false`;
 ///   skipped entirely when not `true`), `proxy.host` (required), `proxy.port` (required for
@@ -44,6 +55,34 @@ import Configuration
 ///   `"http"`). For `"http"` proxies only, also reads `proxy.authorization` (same shape as the
 ///   top-level `authorization` key) and `proxy.connectHeaders` (string array, colon-separated
 ///   pairs, sent only on the proxy's `CONNECT` request).
+/// - `cachePolicy` (string, optional): `"memory"`, `"disk"`, or `"all"`, passed to
+///   ``Property/cachePolicy(_:)``.
+/// - `cacheStrategy` (string, optional): `"ignoreCachedData"`, `"reloadAndValidateCachedData"`,
+///   `"returnCachedDataElseLoad"`, or `"useCachedDataOnly"` — the ``CacheStrategy`` case names
+///   verbatim — passed to ``Property/cacheStrategy(_:)``.
+/// - `secureConnection` (scoped, optional): reads `secureConnection.trustRoots`,
+///   `secureConnection.additionalTrustRoots`, and `secureConnection.certificates` (each a string
+///   path to a `PEM` file, passed to ``TrustRoots``, ``AdditionalTrustRoots``, and ``Certificates``
+///   respectively — none of these require nesting inside a `SecureConnection`, so each is included
+///   independently); `secureConnection.privateKey` (scoped: `.file` required, `.format`
+///   (`"pem"`/`"der"`, default `"pem"`), `.password` optional, treated as secret) passed to
+///   ``PrivateKey``; and `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
+///   (`"1.0"`/`"1.1"`/`"1.2"`/`"1.3"`), passed to ``SecureConnection/version(minimum:)``/
+///   ``SecureConnection/version(maximum:)`` — these two, unlike the rest, do require a
+///   `SecureConnection` wrapper, since they configure `SecureConnection` itself rather than a
+///   certificate.
+/// - `redirect` (scoped, optional): passed to ``Session``. Reads `redirect.mode` (`"follow"` or
+///   `"disallow"`; absent entirely, the key contributes nothing rather than assuming either).
+///   `"follow"` additionally reads `redirect.maxRedirects` (int, default `5`) and
+///   `redirect.allowCycles` (bool, default `false`), passed to
+///   ``Session/enableRedirectFollow(max:allowCycles:)``; `"disallow"` is passed to
+///   ``Session/disableRedirect()``.
+/// - `maximumConnectionsPerHost` (int, optional): passed to
+///   ``Session/maximumConnectionsPerHost(_:)``.
+/// - `maximumConcurrentConnections` (int, optional): passed to
+///   ``Session/maximumConcurrentConnections(_:)``. Both are read independently and, when either
+///   is present, chained onto the same ``Session`` value — same as declaring
+///   `Session().maximumConnectionsPerHost(x).maximumConcurrentConnections(y)` directly.
 ///
 /// Every key is read independently and is optional: a missing key simply contributes nothing, the
 /// same as any other absent property. An explicit property declared after `Configured` in the same
@@ -51,10 +90,15 @@ import Configuration
 /// established by ``BaseURL`` and ``DNSOverride``.
 ///
 /// - Throws: ``ConfiguredError`` if `authorization.scheme` or `proxy.authorization.scheme` is
-///   specified but invalid, if the fields either requires are missing, if `proxy.enabled` is `true`
+///   specified but invalid, if the fields the specified scheme requires are missing, if
+///   `proxy.enabled` is `true`
 ///   but `proxy.host` is missing or `proxy.type` is unknown, if `proxy.port` is missing for an
-///   `"http"` proxy, or if `proxy.authorization`/`proxy.connectHeaders` is specified for a `"socks"`
-///   proxy.
+///   `"http"` proxy, if `proxy.authorization`/`proxy.connectHeaders` is specified for a `"socks"`
+///   proxy, if `cachePolicy`/`cacheStrategy` is specified but is none of the recognized values, if
+///   `secureConnection.privateKey.format` is specified but is neither `"pem"` nor `"der"`, if
+///   `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion` is specified but is
+///   none of the recognized values, or if `redirect.mode` is specified but is neither `"follow"`
+///   nor `"disallow"`.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 public struct Configured: Property {
 
@@ -80,7 +124,7 @@ public struct Configured: Property {
 
         return AsyncProperty {
             if let baseURL = reader.string(forKey: "baseURL") {
-                BaseURL(baseURL)
+                FlexibleURL(baseURL)
             }
 
             if let method = reader.string(forKey: "method") {
@@ -109,15 +153,187 @@ public struct Configured: Property {
                 }
             }
 
+            if let urlOverridePairs = reader.stringArray(forKey: "urlOverrides") {
+                URLOverride(Self.pairs(urlOverridePairs, separatedBy: "|"))
+            }
+
             if reader.bool(forKey: "systemProxy", default: false) {
                 SystemProxy()
             }
 
             try Self.proxy(reader.scoped(to: "proxy"))
+
+            if let cachePolicy = reader.string(forKey: "cachePolicy") {
+                EmptyProperty().cachePolicy(try Self.cachePolicy(cachePolicy))
+            }
+
+            if let cacheStrategy = reader.string(forKey: "cacheStrategy") {
+                EmptyProperty().cacheStrategy(try Self.cacheStrategy(cacheStrategy))
+            }
+
+            let secureConnectionReader = reader.scoped(to: "secureConnection")
+
+            if let trustRootsFile = secureConnectionReader.string(forKey: "trustRoots") {
+                TrustRoots(trustRootsFile)
+            }
+
+            if let additionalTrustRootsFile = secureConnectionReader.string(forKey: "additionalTrustRoots") {
+                AdditionalTrustRoots(additionalTrustRootsFile)
+            }
+
+            if let certificatesFile = secureConnectionReader.string(forKey: "certificates") {
+                Certificates(certificatesFile)
+            }
+
+            if let privateKey = try Self.privateKey(secureConnectionReader.scoped(to: "privateKey")) {
+                privateKey
+            }
+
+            if let secureConnection = try Self.secureConnectionVersion(secureConnectionReader) {
+                secureConnection
+            }
+
+            if let redirect = try Self.redirect(reader.scoped(to: "redirect")) {
+                redirect
+            }
+
+            if let connectionLimits = Self.connectionLimits(reader) {
+                connectionLimits
+            }
         }
     }
 
     // MARK: - Private static methods
+
+    private static func connectionLimits(_ reader: ConfigReader) -> Session? {
+        let maximumConnectionsPerHost = reader.int(forKey: "maximumConnectionsPerHost")
+        let maximumConcurrentConnections = reader.int(forKey: "maximumConcurrentConnections")
+
+        guard maximumConnectionsPerHost != nil || maximumConcurrentConnections != nil else {
+            return nil
+        }
+
+        var session = Session()
+
+        if let maximumConnectionsPerHost {
+            session = session.maximumConnectionsPerHost(maximumConnectionsPerHost)
+        }
+
+        if let maximumConcurrentConnections {
+            session = session.maximumConcurrentConnections(maximumConcurrentConnections)
+        }
+
+        return session
+    }
+
+    private static func redirect(_ reader: ConfigReader) throws -> Session? {
+        guard let mode = reader.string(forKey: "mode") else {
+            return nil
+        }
+
+        switch mode {
+        case "follow":
+            return Session().enableRedirectFollow(
+                max: reader.int(forKey: "maxRedirects", default: 5),
+                allowCycles: reader.bool(forKey: "allowCycles", default: false)
+            )
+        case "disallow":
+            return Session().disableRedirect()
+        default:
+            throw ConfiguredError(context: .invalidRedirectConfiguration)
+        }
+    }
+
+    private static func privateKey(_ reader: ConfigReader) throws -> PrivateKey? {
+        guard let file = reader.string(forKey: "file") else {
+            return nil
+        }
+
+        let format = try Self.certificateFormat(reader.string(forKey: "format", default: "pem"))
+
+        if let password = reader.string(forKey: "password", isSecret: true) {
+            return PrivateKey(file, format: format, password: NIOSSLSecureBytes(password.utf8))
+        }
+
+        return PrivateKey(file, format: format)
+    }
+
+    private static func secureConnectionVersion(
+        _ reader: ConfigReader
+    ) throws -> SecureConnection<EmptyProperty>? {
+        let minimum = try reader.string(forKey: "tlsMinimumVersion").map(Self.tlsVersion)
+        let maximum = try reader.string(forKey: "tlsMaximumVersion").map(Self.tlsVersion)
+
+        guard minimum != nil || maximum != nil else {
+            return nil
+        }
+
+        var secureConnection = SecureConnection()
+
+        if let minimum {
+            secureConnection = secureConnection.version(minimum: minimum)
+        }
+
+        if let maximum {
+            secureConnection = secureConnection.version(maximum: maximum)
+        }
+
+        return secureConnection
+    }
+
+    private static func certificateFormat(_ value: String) throws -> Certificate.Format {
+        switch value {
+        case "pem":
+            return .pem
+        case "der":
+            return .der
+        default:
+            throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
+        }
+    }
+
+    private static func tlsVersion(_ value: String) throws -> TLSVersion {
+        switch value {
+        case "1.0":
+            return .v1
+        case "1.1":
+            return .v1_1
+        case "1.2":
+            return .v1_2
+        case "1.3":
+            return .v1_3
+        default:
+            throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
+        }
+    }
+
+    private static func cacheStrategy(_ value: String) throws -> CacheStrategy {
+        switch value {
+        case "ignoreCachedData":
+            return .ignoreCachedData
+        case "reloadAndValidateCachedData":
+            return .reloadAndValidateCachedData
+        case "returnCachedDataElseLoad":
+            return .returnCachedDataElseLoad
+        case "useCachedDataOnly":
+            return .useCachedDataOnly
+        default:
+            throw ConfiguredError(context: .invalidCacheStrategy)
+        }
+    }
+
+    private static func cachePolicy(_ value: String) throws -> DataCache.Policy.Set {
+        switch value {
+        case "memory":
+            return .memory
+        case "disk":
+            return .disk
+        case "all":
+            return .all
+        default:
+            throw ConfiguredError(context: .invalidCachePolicy)
+        }
+    }
 
     // Returns a type-erased `AnyProperty` rather than `some Property`: the "http" and "socks"
     // branches each resolve to a different specialization of the generic `Proxy<Headers>`, and
@@ -174,15 +390,11 @@ public struct Configured: Property {
         }
     }
 
-    // Matches the `Headers` specialization `proxy(_:)` always builds its `connectHeaders` closure
-    // with below (a `PropertyForEach` over the parsed pairs, empty when none are configured), so
-    // `Proxy<ProxyConnectHeaders>.Authorization` is the same specialization the compiler infers
-    // for the call in `proxy(_:)` — keeping `proxyAuthorization`'s return type generic-free.
     private typealias ProxyConnectHeaders = PropertyForEach<[String: String], String, CustomHeader>
 
     private static func proxyAuthorization(
         _ reader: ConfigReader
-    ) throws -> Proxy<ProxyConnectHeaders>.Authorization? {
+    ) throws -> ProxyAuthorization? {
         guard let scheme = reader.string(forKey: "scheme") else {
             return nil
         }
