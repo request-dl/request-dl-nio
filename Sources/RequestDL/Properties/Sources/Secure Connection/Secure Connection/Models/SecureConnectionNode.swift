@@ -152,15 +152,12 @@ struct SecureConnectionNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        guard let secureConnection = make.sessionConfiguration.secureConnection else {
-            #if DEBUG
-            Internals.Log.cantCreateCertificateOutsideSecureConnection().log(
-                level: .warning,
-                logger: logger
-            )
-            #endif
-            return
-        }
+        // Certificates, trust roots, TLS settings, and so on no longer require an enclosing
+        // `SecureConnection` to attach to: the base is created lazily, right here, the first
+        // time any of them is actually resolved. `SecureConnection` itself is just one more way
+        // to reach this same point (its own `Node` conforms to `SecureConnectionPropertyNode`
+        // too), not the only one.
+        let secureConnection = make.sessionConfiguration.secureConnection ?? .init()
 
         var collector = secureConnection.collector()
         passthrough(&collector)

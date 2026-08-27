@@ -407,4 +407,52 @@ struct SecureConnectionTests {
         // Then
         try await assertNever(sut.body)
     }
+
+    @Test
+    func secure_whenNestedInsideAnotherSecureConnection_shouldBeDiscovered() async throws {
+        // Given
+        // Regression test: `SecureConnection` used to wrap its resolved output into a private
+        // leaf node distinct from `SecureConnectionNode`, so an outer `SecureConnection`'s own
+        // `search(for: SecureConnectionNode.self)` never found a nested one — every certificate
+        // and TLS setting the inner `SecureConnection` configured was silently dropped.
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.SecureConnection {
+                        TrustRoots {
+                            Certificate([1, 2, 3])
+                        }
+                    }
+                    .verification(.noHostnameVerification)
+                }
+            }
+        )
+
+        let sut = resolved.session.configuration.secureConnection
+
+        // Then
+        #expect(sut?.trustRoots != nil)
+        #expect(sut?.certificateVerification == RequestDL.CertificateVerification.noHostnameVerification.build())
+    }
+
+    @Test
+    func secure_whenInitWithoutContent_chainsModifiersDirectly() async throws {
+        // Given
+        let verification: RequestDL.CertificateVerification = .noHostnameVerification
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection()
+                    .verification(verification)
+            }
+        )
+
+        let sut = resolved.session.configuration.secureConnection
+
+        // Then
+        #expect(sut?.certificateVerification == verification.build())
+    }
 }
