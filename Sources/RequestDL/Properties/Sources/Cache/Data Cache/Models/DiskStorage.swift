@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import NIOCore
 import NIOFileSystem
 import RequestDLInternals
@@ -148,6 +149,12 @@ struct DiskStorage: Sendable {
     var fileProtection: FileProtectionType?
     #endif
 
+    /// The key `response.record` and `data.record` are encrypted with, on platforms and disk
+    /// tiers this type controls. `nil` (the default) leaves both files in plaintext, matching
+    /// this type's behavior before this property existed. Cross-platform, unlike
+    /// `fileProtection`: `swift-crypto` needs no OS-specific support.
+    var encryptionKey: DataCache.EncryptionKey?
+
     // MARK: - Inits
     init(directory: URL) {
         self.directory = directory
@@ -172,7 +179,7 @@ struct DiskStorage: Sendable {
 
             return await .init(
                 cachedResponse: cachedResponse,
-                buffer: Internals.FileBuffer(record.dataURL)
+                buffer: dataBuffer(for: record)
             )
         }
     }
@@ -216,10 +223,41 @@ struct DiskStorage: Sendable {
             return nil
         }
 
-        return buffer.getData(
+        let raw = buffer.getData(
             at: buffer.readerIndex,
             length: buffer.readableBytes
         ) ?? Data()
+
+        guard let encryptionKey else {
+            return raw
+        }
+
+        // Wrong/rotated key, and a corrupted or tampered file, both fail here — `try?` turns
+        // either into a miss, matching every other fault-tolerance path in this type.
+        guard
+            let sealedBox = try? AES.GCM.SealedBox(combined: raw),
+            let opened = try? AES.GCM.open(sealedBox, using: encryptionKey.symmetricKey)
+        else {
+            return nil
+        }
+
+        return opened
+    }
+
+    /// The buffer `data.record` is read through or written into — plain when no key is
+    /// configured, chunk-encrypted otherwise. Both satisfy `Internals.AnyBuffer`, so nothing
+    /// above this call site needs to know which one it got.
+    private func dataBuffer(for record: Record) async -> Internals.AnyBuffer {
+        guard let encryptionKey else {
+            return await Internals.FileBuffer(record.dataURL)
+        }
+
+        let url = Internals.EncryptedFileBufferURL(
+            inner: .init(record.dataURL),
+            key: encryptionKey.symmetricKey
+        )
+
+        return await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
     }
 
     // MARK: - Private static methods
@@ -359,7 +397,7 @@ struct DiskStorage: Sendable {
         await applyFileProtection(to: record)
         #endif
 
-        let buffer = await Internals.FileBuffer(record.dataURL)
+        let buffer = await dataBuffer(for: record)
         return (buffer, usageAfterEviction + writableBytes)
     }
 
@@ -457,14 +495,36 @@ struct DiskStorage: Sendable {
     /// propagated: reporting a failure to close over a failure to write would point at the
     /// wrong half of the problem, and the two call sites already have their own recovery for a
     /// write that failed.
+    /// Guards the `combined` unwrap in `writeAndClose` below — reachable only if a future change
+    /// starts passing an explicit non-default nonce to `AES.GCM.seal`, which `.combined` cannot
+    /// represent. Never expected to actually throw today.
+    private struct SealFailureError: Error {}
+
     private func writeAndClose(_ data: Data, to url: URL) async throws {
+        let payload: Data
+
+        if let encryptionKey {
+            // `.combined` bundles a fresh random nonce with the ciphertext and tag in one blob —
+            // self-describing, no extra framing needed for a file this small (`response.record`
+            // is metadata/headers, never the response body). `nil` only when a non-default nonce
+            // size was used, which never happens here (no explicit nonce is passed) — guarded
+            // rather than force-unwrapped so a future change can't silently start writing
+            // plaintext under this branch; it throws instead, same as any other write failure.
+            guard let combined = try AES.GCM.seal(data, using: encryptionKey.symmetricKey).combined else {
+                throw SealFailureError()
+            }
+            payload = combined
+        } else {
+            payload = data
+        }
+
         let handle = try await Internals.fileSystem.openFile(
             forWritingAt: url.filePath,
             options: .newFile(replaceExisting: true)
         )
 
         do {
-            try await handle.write(contentsOf: data, toAbsoluteOffset: .zero)
+            try await handle.write(contentsOf: payload, toAbsoluteOffset: .zero)
             try await handle.close()
         } catch {
             try? await handle.close()
