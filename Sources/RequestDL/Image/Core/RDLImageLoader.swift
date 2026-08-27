@@ -25,6 +25,14 @@ public actor RDLImageLoader {
     /// integrations by default.
     public static let shared = RDLImageLoader()
 
+    // MARK: - Public properties
+
+    /// The cache ``load(url:)`` stores downloaded image data in. Defaults to a dedicated
+    /// on-disk cache, separate from ``DataCache/shared``. Configure it directly — its
+    /// capacities, or, on Apple platforms, its `fileProtection` — or pass your own instance at
+    /// init to share a cache across loaders.
+    public let dataCache: DataCache
+
     // MARK: - Private properties
 
     /// In-flight downloads, keyed by the caller-supplied `id`.
@@ -40,7 +48,22 @@ public actor RDLImageLoader {
     ///
     /// Most callers should use ``shared`` instead, so unrelated call sites requesting the same
     /// image still dedupe against each other.
-    public init() {}
+    ///
+    /// - Parameter dataCache: The cache ``load(url:)`` uses. Defaults to a dedicated on-disk
+    /// cache separate from ``DataCache/shared`` — see ``dataCache``.
+    public init(
+        dataCache: DataCache = DataCache(
+            // Sized for a meaningful number of typical thumbnail/avatar-sized images without
+            // growing unbounded; pass a `dataCache` with a different capacity for anything else.
+            diskCapacity: 50 * 1_024 * 1_024,
+            // Kept separate from `DataCache.shared`'s directory: without this, image bytes
+            // would compete for space with — and be subject to eviction by — whatever unrelated
+            // HTTP responses the host app also caches through the default cache.
+            suiteName: "com.request-dl-nio.RDLImage"
+        )
+    ) {
+        self.dataCache = dataCache
+    }
 
     // MARK: - Public methods
 
@@ -83,14 +106,22 @@ public actor RDLImageLoader {
     /// Loads and decodes the image at `url`, deduplicating against any other concurrent load of
     /// the same URL.
     ///
+    /// Cached to disk by default, through ``dataCache``.
+    ///
     /// - Parameter url: The URL of the image.
     /// - Returns: The decoded image.
     /// - Throws: An error if the request fails or the response could not be decoded.
     ///
     public func load(url: URL) async throws -> PlatformImage {
-        try await load(
+        let dataCache = self.dataCache
+
+        return try await load(
             id: url.absoluteString,
-            task: DataTask { URLImageProperty(url: url) }
+            task: DataTask {
+                URLImageProperty(url: url)
+                    .cachePolicy(.disk)
+                    .cache(url: dataCache.directoryURL)
+            }
         )
     }
 
