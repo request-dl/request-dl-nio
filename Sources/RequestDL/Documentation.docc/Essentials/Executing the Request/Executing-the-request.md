@@ -21,3 +21,7 @@ Discover the possibilities to execute your request and manipulate the received d
 ### Loading images
 
 - <doc:Loading-images>
+
+### Distributed tracing
+
+- <doc:Distributed-tracing>
