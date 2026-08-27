@@ -239,130 +239,135 @@ extension ResolveTests {
                         host = apple.com
                     }
                 },
-                LeafNode<Node> {
-                    property = Node {
-                        secureConnection = SecureConnection {
-                            certificateChain = nil,
-                            certificateVerification = nil,
-                            useDefaultTrustRoots = false,
-                            trustRoots = nil,
-                            additionalTrustRoots = nil,
-                            privateKey = nil,
-                            signingSignatureAlgorithms = nil,
-                            verifySignatureAlgorithms = nil,
-                            sendCANameList = nil,
-                            renegotiationSupport = nil,
-                            shutdownTimeout = nil,
-                            pskHint = nil,
-                            applicationProtocols = nil,
-                            keyLogger = nil,
-                            pskIdentityResolver = nil,
-                            minimumTLSVersion = nil,
-                            maximumTLSVersion = nil,
-                            cipherSuites = nil,
-                            cipherSuiteValues = nil
-                        },
-                        nodes = [
-                            LeafNode<SecureConnectionNode> {
-                                property = SecureConnectionNode {
-                                    source = Source.node(
-                                        Node {
-                                            source = Source.nodes(
-                                                [
-                                                    LeafNode<SecureConnectionNode> {
-                                                        property = SecureConnectionNode {
-                                                            source = Source.collectorNode(
-                                                                CertificateNode {
-                                                                    source = Source.bytes([0, 1, 2]),
-                                                                    property = .chain,
-                                                                    format = .pem
+                LeafNode<SecureConnectionNode> {
+                    property = SecureConnectionNode {
+                        source = Source.root(
+                            Node {
+                                secureConnection = SecureConnection {
+                                    certificateChain = nil,
+                                    certificateVerification = nil,
+                                    useDefaultTrustRoots = false,
+                                    trustRoots = nil,
+                                    additionalTrustRoots = nil,
+                                    privateKey = nil,
+                                    signingSignatureAlgorithms = nil,
+                                    verifySignatureAlgorithms = nil,
+                                    sendCANameList = nil,
+                                    renegotiationSupport = nil,
+                                    shutdownTimeout = nil,
+                                    pskHint = nil,
+                                    applicationProtocols = nil,
+                                    keyLogger = nil,
+                                    pskIdentityResolver = nil,
+                                    minimumTLSVersion = nil,
+                                    maximumTLSVersion = nil,
+                                    cipherSuites = nil,
+                                    cipherSuiteValues = nil
+                                },
+                                nodes = [
+                                    LeafNode<SecureConnectionNode> {
+                                        property = SecureConnectionNode {
+                                            source = Source.node(
+                                                Node {
+                                                    source = Source.nodes(
+                                                        [
+                                                            LeafNode<SecureConnectionNode> {
+                                                                property = SecureConnectionNode {
+                                                                    source = Source.collectorNode(
+                                                                        CertificateNode {
+                                                                            source = Source.bytes([0, 1, 2]),
+                                                                            property = .chain,
+                                                                            format = .pem
+                                                                        }
+                                                                    ),
+                                                                    logger = nil
                                                                 }
-                                                            ),
-                                                            logger = nil
-                                                        }
-                                                    }
-                                                ]
-                                            )
+                                                            }
+                                                        ]
+                                                    )
+                                                }
+                                            ),
+                                            logger = nil
                                         }
-                                    ),
-                                    logger = nil
-                                }
-                            },
-                            LeafNode<SecureConnectionNode> {
-                                property = SecureConnectionNode {
-                                    source = Source.node(
-                                        Node {
-                                            source = Source.nodes(
-                                                [
-                                                    LeafNode<SecureConnectionNode> {
-                                                        property = SecureConnectionNode {
-                                                            source = Source.collectorNode(
-                                                                CertificateNode {
-                                                                    source = Source.bytes([6, 7, 8]),
-                                                                    property = .trust,
-                                                                    format = .pem
+                                    },
+                                    LeafNode<SecureConnectionNode> {
+                                        property = SecureConnectionNode {
+                                            source = Source.node(
+                                                Node {
+                                                    source = Source.nodes(
+                                                        [
+                                                            LeafNode<SecureConnectionNode> {
+                                                                property = SecureConnectionNode {
+                                                                    source = Source.collectorNode(
+                                                                        CertificateNode {
+                                                                            source = Source.bytes([6, 7, 8]),
+                                                                            property = .trust,
+                                                                            format = .pem
+                                                                        }
+                                                                    ),
+                                                                    logger = nil
                                                                 }
-                                                            ),
-                                                            logger = nil
-                                                        }
-                                                    },
-                                                    LeafNode<SecureConnectionNode> {
-                                                        property = SecureConnectionNode {
-                                                            source = Source.collectorNode(
-                                                                CertificateNode {
-                                                                    source = Source.bytes([8, 9, 10]),
-                                                                    property = .trust,
-                                                                    format = .pem
+                                                            },
+                                                            LeafNode<SecureConnectionNode> {
+                                                                property = SecureConnectionNode {
+                                                                    source = Source.collectorNode(
+                                                                        CertificateNode {
+                                                                            source = Source.bytes([8, 9, 10]),
+                                                                            property = .trust,
+                                                                            format = .pem
+                                                                        }
+                                                                    ),
+                                                                    logger = nil
                                                                 }
-                                                            ),
-                                                            logger = nil
-                                                        }
-                                                    }
-                                                ]
-                                            )
+                                                            }
+                                                        ]
+                                                    )
+                                                }
+                                            ),
+                                            logger = nil
                                         }
-                                    ),
-                                    logger = nil
-                                }
-                            },
-                            LeafNode<SecureConnectionNode> {
-                                property = SecureConnectionNode {
-                                    source = Source.node(
-                                        Node {
-                                            source = Source.nodes(
-                                                [
-                                                    LeafNode<SecureConnectionNode> {
-                                                        property = SecureConnectionNode {
-                                                            source = Source.collectorNode(
-                                                                CertificateNode {
-                                                                    source = Source.bytes([2, 3, 4]),
-                                                                    property = .additionalTrust,
-                                                                    format = .pem
+                                    },
+                                    LeafNode<SecureConnectionNode> {
+                                        property = SecureConnectionNode {
+                                            source = Source.node(
+                                                Node {
+                                                    source = Source.nodes(
+                                                        [
+                                                            LeafNode<SecureConnectionNode> {
+                                                                property = SecureConnectionNode {
+                                                                    source = Source.collectorNode(
+                                                                        CertificateNode {
+                                                                            source = Source.bytes([2, 3, 4]),
+                                                                            property = .additionalTrust,
+                                                                            format = .pem
+                                                                        }
+                                                                    ),
+                                                                    logger = nil
                                                                 }
-                                                            ),
-                                                            logger = nil
-                                                        }
-                                                    },
-                                                    LeafNode<SecureConnectionNode> {
-                                                        property = SecureConnectionNode {
-                                                            source = Source.collectorNode(
-                                                                CertificateNode {
-                                                                    source = Source.bytes([4, 5, 6]),
-                                                                    property = .additionalTrust,
-                                                                    format = .pem
+                                                            },
+                                                            LeafNode<SecureConnectionNode> {
+                                                                property = SecureConnectionNode {
+                                                                    source = Source.collectorNode(
+                                                                        CertificateNode {
+                                                                            source = Source.bytes([4, 5, 6]),
+                                                                            property = .additionalTrust,
+                                                                            format = .pem
+                                                                        }
+                                                                    ),
+                                                                    logger = nil
                                                                 }
-                                                            ),
-                                                            logger = nil
-                                                        }
-                                                    }
-                                                ]
-                                            )
+                                                            }
+                                                        ]
+                                                    )
+                                                }
+                                            ),
+                                            logger = nil
                                         }
-                                    ),
-                                    logger = nil
-                                }
+                                    }
+                                ]
                             }
-                        ]
+                        ),
+                        logger = nil
                     }
                 },
                 LeafNode<SecureConnectionNode> {

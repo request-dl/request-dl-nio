@@ -93,7 +93,7 @@ struct SecureConnectionNode: PropertyNode {
             switch source {
             case .collectorNode(let property):
                 return property is Property
-            case .node(let property):
+            case .node(let property), .root(let property):
                 return property is Property
             }
         }
@@ -109,7 +109,7 @@ struct SecureConnectionNode: PropertyNode {
 
         func callAsFunction(_ collector: inout Collector) {
             switch source {
-            case .node(let node):
+            case .node(let node), .root(let node):
                 node.make(&collector.secureConnection)
             case .collectorNode(let node):
                 node.make(&collector)
@@ -120,6 +120,12 @@ struct SecureConnectionNode: PropertyNode {
     fileprivate enum Source: Sendable {
         case collectorNode(SecureConnectionCollectorPropertyNode)
         case node(SecureConnectionPropertyNode)
+        // Only ever constructed by `SecureConnection` itself. Unlike `.node` — which requires an
+        // already-established `Internals.SecureConnection` to attach to, and warns when used
+        // without one — `.root` is allowed to be the thing that establishes it: at the true top
+        // of the graph, `make.sessionConfiguration.secureConnection` starts out nil, and that's
+        // the expected starting state for `SecureConnection`, not a misuse warning worth logging.
+        case root(SecureConnectionPropertyNode)
     }
 
     // MARK: - Internal properties
@@ -149,10 +155,21 @@ struct SecureConnectionNode: PropertyNode {
         self.logger = logger
     }
 
+    init(root node: SecureConnectionPropertyNode, logger: Logger?) {
+        self.source = .root(node)
+        self.logger = logger
+    }
+
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        guard let secureConnection = make.sessionConfiguration.secureConnection else {
+        let secureConnection: Internals.SecureConnection
+
+        if let existing = make.sessionConfiguration.secureConnection {
+            secureConnection = existing
+        } else if case .root = source {
+            secureConnection = .init()
+        } else {
             #if DEBUG
             Internals.Log.cantCreateCertificateOutsideSecureConnection().log(
                 level: .warning,
