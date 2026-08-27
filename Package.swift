@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.7"
+            from: "2.1.2"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
@@ -60,7 +60,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-distributed-tracing",
-            from: "1.1.0"
+            from: "1.4.1"
         ),
     ],
     targets: [
