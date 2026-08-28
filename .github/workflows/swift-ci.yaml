@@ -53,6 +53,7 @@ jobs:
       xcode-version: '26.6'
       apple-coverage-enabled: true
       apple-tests-max-parallelization-width: '2'
+      apple-tests-parallel-testing-worker-count: '2'
 
       # Step 3 – Third Party
       enable-third-party-tests: true
