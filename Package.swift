@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.7"
+            from: "2.1.4"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
@@ -64,7 +64,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-configuration",
-            from: "1.0.0"
+            from: "1.2.0"
         ),
     ],
     targets: [
@@ -140,6 +140,7 @@ let package = Package(
                 "RequestDLTestSupport",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "Configuration", package: "swift-configuration"),
+                .product(name: "SwiftAsyncTesting", package: "swift-async-stream"),
             ],
             resources: [.process("Resources")]
         ),
@@ -149,6 +150,7 @@ let package = Package(
             dependencies: [
                 "RequestDLInternals",
                 "RequestDLTestSupport",
+                .product(name: "SwiftAsyncTesting", package: "swift-async-stream"),
             ],
             path: "Tests/RequestDLInternalsTests",
             resources: [.process("Resources")]
