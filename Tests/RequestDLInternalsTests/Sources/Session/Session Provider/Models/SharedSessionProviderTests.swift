@@ -13,7 +13,7 @@ import Testing
 import NIOTransportServices
 #endif
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct SharedSessionProviderTests {
 
     @Test

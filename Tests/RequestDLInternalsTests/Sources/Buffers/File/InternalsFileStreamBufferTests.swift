@@ -14,7 +14,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct InternalsFileStreamBufferTests {
 
     @Test

@@ -17,7 +17,7 @@ import struct Foundation.UUID
 import class Foundation.JSONEncoder
 #endif
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct MockedTaskTests {
 
     @Test

@@ -9,7 +9,7 @@ import Testing
 
 @testable import RequestDLInternals
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct InternalsEventLoopManagerTests {
 
     struct CustomProvider: SessionProvider {

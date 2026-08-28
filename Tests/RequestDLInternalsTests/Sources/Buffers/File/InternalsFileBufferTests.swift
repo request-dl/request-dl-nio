@@ -17,7 +17,7 @@ import struct Foundation.URL
 import struct Foundation.UUID
 #endif
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct InternalsFileBufferTests {
 
     /// Owns a scratch file for the lifetime of one test.

@@ -9,7 +9,7 @@ import Testing
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct InternalsClientManagerTests {
 
     @Test

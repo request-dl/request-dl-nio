@@ -23,7 +23,7 @@ import struct Foundation.Date
 import class Foundation.JSONEncoder
 #endif
 
-@Suite(.serialized, .concurrent(2))
+@Suite(.serialized, .concurrent(2), .nonFatalWatchdog)
 struct CachedRequestTests {
 
     final class TestState: Sendable {

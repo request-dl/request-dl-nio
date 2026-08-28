@@ -16,7 +16,7 @@ import struct Foundation.Data
 import struct Foundation.URL
 #endif
 
-@Suite(.concurrent(2))
+@Suite(.concurrent(2), .nonFatalWatchdog)
 struct InternalsDataBufferTests {
 
     @Test
