@@ -78,6 +78,11 @@ public struct RequestConfiguration: Sendable {
 
     var readingMode: Internals.DownloadStep.ReadingMode
 
+    /// Request-side ``CacheHeader`` directives the local cache engine honours in addition to
+    /// ``cacheStrategy``/``cachePolicy``. Defaults to fully permissive, matching the behavior
+    /// when ``CacheHeader`` isn't used at all.
+    var requestCacheDirectives: RequestCacheDirectives
+
     // MARK: - Inits
 
     init() {
@@ -91,6 +96,7 @@ public struct RequestConfiguration: Sendable {
         self.cachePolicy = []
         self.cacheStrategy = .ignoreCachedData
         self.serviceContext = nil
+        self.requestCacheDirectives = .init()
     }
 
     // MARK: - Internal methods

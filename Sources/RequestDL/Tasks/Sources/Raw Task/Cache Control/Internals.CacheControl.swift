@@ -38,7 +38,7 @@ extension Internals {
                 ]
             )
 
-            if requestConfiguration.cacheStrategy != .ignoreCachedData {
+            if effectiveCacheStrategy != .ignoreCachedData {
                 if let cachedData = await storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
                         client: client,
@@ -49,7 +49,7 @@ extension Internals {
                         logger?.log(level: .debug, "Cache hit - returning cached session task")
                         return .task(cachedSessionTask)
                     }
-                } else if case .useCachedDataOnly = requestConfiguration.cacheStrategy {
+                } else if case .useCachedDataOnly = effectiveCacheStrategy {
                     logger?.log(
                         level: .warning,
                         "No cached data available, but strategy is 'useCachedDataOnly' — returning error"
@@ -96,11 +96,38 @@ extension Internals {
             )
         }
 
+        /// The strategy actually applied, folding request-side ``CacheHeader`` directives on top
+        /// of ``RequestConfiguration/cacheStrategy``.
+        ///
+        /// - Important: Only ever escalates towards a more network-averse strategy, never
+        /// loosens what `.cacheStrategy(_:)` explicitly configured — order-independent by
+        /// construction, since it reads both inputs fresh rather than letting one `PropertyNode`
+        /// overwrite what another wrote.
+        private var effectiveCacheStrategy: CacheStrategy {
+            let directives = requestConfiguration.requestCacheDirectives
+
+            // Gated on `isCacheEnabled`: `only-if-cached` addresses *any* cache in the request
+            // path (a CDN or proxy downstream), which is a distinct thing from this package's own
+            // on-disk cache. Escalating unconditionally would force `EmptyCachedDataError` on
+            // every request carrying the directive even when the developer never opted into
+            // local caching via `.cachePolicy(_:)` — turning a pure wire-level signal into an
+            // always-on local failure.
+            if directives.isOnlyIfCached, requestConfiguration.isCacheEnabled {
+                return .useCachedDataOnly
+            }
+
+            if directives.requiresRevalidation, requestConfiguration.cacheStrategy == .returnCachedDataElseLoad {
+                return .reloadAndValidateCachedData
+            }
+
+            return requestConfiguration.cacheStrategy
+        }
+
         private func checkIfCachedDataStillValid(
             client: Internals.Client,
             cached cachedData: CachedData
         ) async -> SessionTask? {
-            switch requestConfiguration.cacheStrategy {
+            switch effectiveCacheStrategy {
             case .ignoreCachedData:
                 return nil
 
@@ -331,7 +358,10 @@ extension Internals {
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 let headHeaders = HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
-                guard !containsNoCache(headers: headHeaders["Cache-Control"] ?? []) else {
+                guard
+                    !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
+                    requestConfiguration.requestCacheDirectives.isStoringAllowed
+                else {
                     return nil
                 }
 

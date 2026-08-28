@@ -555,6 +555,117 @@ struct CachedRequestTests {
         let savedRecord = recordBox.records.first { $0.metadata["size_bytes"] != nil }
         #expect(savedRecord != nil)
     }
+
+    @Test
+    func cache_whenOnlyIfCachedRequestDirective_escalatesToUseCachedDataOnly() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        var thrownError: Error?
+
+        // When
+        // `.returnCachedDataElseLoad` alone would hit the network since there's no cached
+        // entry yet — `CacheHeader().onlyIfCached(true)` must escalate this to behave like
+        // `.useCachedDataOnly` instead.
+        do {
+            _ = try await performCacheRequest(
+                testState: testState,
+                headers: makeHeaders(),
+                cacheStrategy: .returnCachedDataElseLoad,
+                cacheHeader: CacheHeader().onlyIfCached(true)
+            )
+        } catch {
+            thrownError = error
+        }
+
+        // Then
+        #expect(thrownError is EmptyCachedDataError)
+    }
+
+    @Test
+    func cache_whenOnlyIfCachedRequestDirective_withCachingDisabled_doesNotForceLocalCacheOnly() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // When
+        // `only-if-cached` addresses caches downstream of this client (a CDN or proxy) — with no
+        // `.cachePolicy(_:)` configured, this package's own on-disk cache was never opted into,
+        // so the directive must not force `EmptyCachedDataError` locally; the request should just
+        // go through normally.
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cachePolicy: [],
+            cacheStrategy: .returnCachedDataElseLoad,
+            cacheHeader: CacheHeader().onlyIfCached(true)
+        )
+
+        // Then
+        #expect(response.head.status.code == 200)
+    }
+
+    @Test
+    func cache_whenNoCacheRequestDirective_escalatesReturnCachedDataElseLoadToRevalidate() async throws {
+        let testState = try await TestState()
+        let staleETag = UUID()
+        let freshETag = UUID()
+        let cacheData = await mockCachedData(makeHeaders(eTag: staleETag))
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        // `.returnCachedDataElseLoad` alone would serve the stale cached entry without ever
+        // asking the server — `CacheHeader().cached(false)` (`no-cache`) must escalate this to
+        // revalidate, so the fresh ETag from the server wins.
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: freshETag),
+            cacheStrategy: .returnCachedDataElseLoad,
+            cacheHeader: CacheHeader().cached(false)
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let updatedCachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(updatedCachedData?.response != cacheData.response)
+        #expect(response.head != cacheData.response)
+    }
+
+    @Test
+    func cache_whenNoStoreRequestDirective_skipsCaching() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        // The response is cacheable (`public, max-age=...`), but `CacheHeader().stored(false)`
+        // (`no-store`) must still prevent it from being written to disk.
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cacheStrategy: .returnCachedDataElseLoad,
+            cacheHeader: CacheHeader().stored(false)
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let cachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(cachedData == nil)
+    }
 }
 
 extension CachedRequestTests {
@@ -635,7 +746,8 @@ extension CachedRequestTests {
         cachePolicy: DataCache.Policy.Set = .all,
         cacheStrategy: CacheStrategy,
         memoryCapacity: Int64 = .zero,
-        diskCapacity: Int64 = .zero
+        diskCapacity: Int64 = .zero,
+        cacheHeader: CacheHeader? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
 
@@ -659,6 +771,10 @@ extension CachedRequestTests {
 
             BaseURL(testState.localServer.baseURL)
             Path(testState.uri)
+
+            if let cacheHeader {
+                cacheHeader
+            }
         }
         .result()
 

@@ -51,6 +51,7 @@ struct CacheHeaderTests {
         #expect(!cache.isImmutable)
 
         #expect(resolved.requestConfiguration.headers.isEmpty)
+        #expect(resolved.requestConfiguration.requestCacheDirectives == .init())
     }
 
     @Test
@@ -101,6 +102,31 @@ struct CacheHeaderTests {
                 """
             ]
         )
+
+        #expect(
+            resolved.requestConfiguration.requestCacheDirectives == RequestCacheDirectives(
+                isStoringAllowed: false,
+                requiresRevalidation: true,
+                isOnlyIfCached: true
+            )
+        )
+    }
+
+    @Test
+    func requestCacheDirectivesReflectOnlyTheRequestMeaningfulFlags() async throws {
+        // Given
+        let cache = CacheHeader()
+            .maxAge(1_000)
+            .sharedMaxAge(16_000)
+            .immutable()
+
+        // When
+        let resolved = try await resolve(TestProperty(cache))
+
+        // Then
+        // `maxAge`, `sharedMaxAge` and `immutable` aren't reflected in `requestCacheDirectives` —
+        // they're serialized onto the wire but have no defined local-cache-engine meaning here.
+        #expect(resolved.requestConfiguration.requestCacheDirectives == .init())
     }
 
     @Test
