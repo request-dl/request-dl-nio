@@ -2,6 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `RequestDLTestSupport` is a regular target, built unconditionally by every `swift build`
+// (Release, Static SDK, Android, ...), not just test runs:
+// - Unlike a `.testTarget`, it has no automatic access to `Testing`, and the module genuinely
+//   isn't there on some of those toolchains (confirmed on the Static SDK and Android builds).
+// - `Internals.Override.AssertionFailure`, which this file calls into, only exists `#if DEBUG`
+//   in RequestDLInternals — a Release build compiles this target too (confirmed on Release 6.2
+//   and 6.3), where that whole type is unavailable.
+// Degrading to empty rather than failing keeps this file harmless everywhere it isn't needed.
+#if DEBUG && canImport(Testing)
 import RequestDLInternals
 import Testing
 
@@ -59,3 +68,4 @@ extension Trait where Self == NonFatalWatchdogTrait {
     /// Records `AsyncLock.Watchdog` trips as a test issue instead of crashing the process.
     public static var nonFatalWatchdog: Self { Self() }
 }
+#endif
