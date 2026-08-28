@@ -4,6 +4,7 @@
 
 import NIOCore
 import NIOPosix
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
@@ -12,6 +13,7 @@ import Testing
 import NIOTransportServices
 #endif
 
+@Suite(.concurrent(2))
 struct SharedSessionProviderTests {
 
     @Test

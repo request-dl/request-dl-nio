@@ -5,10 +5,12 @@
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
 
+@Suite(.concurrent(2))
 struct InternalsClientConcurrencyLimitTests {
 
     @Test

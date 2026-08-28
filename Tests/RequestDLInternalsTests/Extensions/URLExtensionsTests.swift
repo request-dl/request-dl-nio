@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
@@ -13,6 +14,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
+@Suite(.concurrent(2))
 struct URLExtensionsTests {
 
     @Test
