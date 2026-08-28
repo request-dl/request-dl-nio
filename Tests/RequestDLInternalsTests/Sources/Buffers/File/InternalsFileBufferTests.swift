@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncTesting
 import SystemPackage
 import Testing
 
@@ -16,6 +17,7 @@ import struct Foundation.URL
 import struct Foundation.UUID
 #endif
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsFileBufferTests {
 
     /// Owns a scratch file for the lifetime of one test.
