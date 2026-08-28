@@ -21,9 +21,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func baseURL() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "baseURL": "https://example.com"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": "https://example.com"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -40,9 +42,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func method() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "method": "post"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "method": "post"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -59,9 +63,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func timeout() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "timeout": 75
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "timeout": 75
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -79,9 +85,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func headers() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "headers": .init(.stringArray(["Content-Type: application/json", "x-api-key: 123"]), isSecret: false)
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "headers": .init(.stringArray(["Content-Type: application/json", "x-api-key: 123"]), isSecret: false)
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -99,9 +107,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func queries() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "queries": .init(.stringArray(["number=123", "page=1"]), isSecret: false)
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "queries": .init(.stringArray(["number=123", "page=1"]), isSecret: false)
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -127,9 +137,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func baseURLRelativePathAppendsToExistingBaseURL() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "baseURL": "users/123"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": "users/123"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -147,9 +159,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func baseURLCompleteURLOverridesExistingBaseURL() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "baseURL": "https://override.example.com/v2"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": "https://override.example.com/v2"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -187,9 +201,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func explicitPropertyDeclaredAfterWins() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "baseURL": "https://example.com"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": "https://example.com"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -207,10 +223,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func bearerAuthorization() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "authorization.scheme": "bearer",
-            "authorization.token": "abc123",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "authorization.scheme": "bearer",
+                "authorization.token": "abc123",
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -227,11 +245,13 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func basicAuthorizationFromUsernameAndPassword() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "authorization.scheme": "basic",
-            "authorization.username": "user",
-            "authorization.password": "pass",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "authorization.scheme": "basic",
+                "authorization.username": "user",
+                "authorization.password": "pass",
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -248,10 +268,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func basicAuthorizationFromCredentials() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "authorization.scheme": "basic",
-            "authorization.credentials": "dXNlcjpwYXNz",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "authorization.scheme": "basic",
+                "authorization.credentials": "dXNlcjpwYXNz",
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -268,9 +290,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidAuthorizationSchemeThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "authorization.scheme": "digest"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "authorization.scheme": "digest"
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -287,9 +311,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func incompleteBearerAuthorizationThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "authorization.scheme": "bearer"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "authorization.scheme": "bearer"
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -306,12 +332,14 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func dnsOverrides() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "dnsOverrides": .init(
-                .stringArray(["localhost:127.0.0.1", "example.com:192.168.1.1"]),
-                isSecret: false
-            )
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "dnsOverrides": .init(
+                    .stringArray(["localhost:127.0.0.1", "example.com:192.168.1.1"]),
+                    isSecret: false
+                )
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -329,12 +357,14 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func urlOverrides() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "urlOverrides": .init(
-                .stringArray(["https://google.com|https://apple.com"]),
-                isSecret: false
-            )
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "urlOverrides": .init(
+                    .stringArray(["https://google.com|https://apple.com"]),
+                    isSecret: false
+                )
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -352,12 +382,14 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func urlOverridesWithPathPrefix() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "urlOverrides": .init(
-                .stringArray(["https://google.com/api/v1|https://apple.com/v2"]),
-                isSecret: false
-            )
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "urlOverrides": .init(
+                    .stringArray(["https://google.com/api/v1|https://apple.com/v2"]),
+                    isSecret: false
+                )
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -376,9 +408,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func systemProxyEnabled() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "systemProxy": true
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "systemProxy": true
+            ])
+        )
 
         // When / Then
         // No assertion on the resolved host/port: the system/environment proxy is
@@ -396,11 +430,13 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func httpProxyWithoutAuthorization() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true,
-            "proxy.host": "proxy.example.com",
-            "proxy.port": 8080,
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "proxy.example.com",
+                "proxy.port": 8080,
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -419,15 +455,17 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func httpProxyWithBasicAuthorizationAndConnectHeaders() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true,
-            "proxy.host": "proxy.example.com",
-            "proxy.port": 8080,
-            "proxy.authorization.scheme": "basic",
-            "proxy.authorization.username": "user",
-            "proxy.authorization.password": "pass",
-            "proxy.connectHeaders": .init(.stringArray(["X-Proxy-Token: abc123"]), isSecret: false),
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "proxy.example.com",
+                "proxy.port": 8080,
+                "proxy.authorization.scheme": "basic",
+                "proxy.authorization.username": "user",
+                "proxy.authorization.password": "pass",
+                "proxy.connectHeaders": .init(.stringArray(["X-Proxy-Token: abc123"]), isSecret: false),
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -450,11 +488,13 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func socksProxy() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true,
-            "proxy.host": "socks-proxy.example.com",
-            "proxy.type": "socks",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "socks-proxy.example.com",
+                "proxy.type": "socks",
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -472,10 +512,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func proxyDisabledContributesNothing() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.host": "proxy.example.com",
-            "proxy.port": 8080,
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.host": "proxy.example.com",
+                "proxy.port": 8080,
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -492,9 +534,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func proxyEnabledWithoutHostThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -511,10 +555,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func httpProxyWithoutPortThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true,
-            "proxy.host": "proxy.example.com",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "proxy.example.com",
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -531,13 +577,15 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func socksProxyWithAuthorizationThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true,
-            "proxy.host": "socks-proxy.example.com",
-            "proxy.type": "socks",
-            "proxy.authorization.scheme": "bearer",
-            "proxy.authorization.token": "abc123",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "socks-proxy.example.com",
+                "proxy.type": "socks",
+                "proxy.authorization.scheme": "bearer",
+                "proxy.authorization.token": "abc123",
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -554,11 +602,13 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidProxyTypeThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "proxy.enabled": true,
-            "proxy.host": "proxy.example.com",
-            "proxy.type": "ftp",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "proxy.example.com",
+                "proxy.type": "ftp",
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -575,9 +625,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func cachePolicyMemory() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "cachePolicy": "memory"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "cachePolicy": "memory"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -594,9 +646,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func cachePolicyDisk() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "cachePolicy": "disk"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "cachePolicy": "disk"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -613,9 +667,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func cachePolicyAll() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "cachePolicy": "all"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "cachePolicy": "all"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -632,9 +688,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidCachePolicyThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "cachePolicy": "ssd"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "cachePolicy": "ssd"
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -658,9 +716,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func cacheStrategy(value: String, expected: CacheStrategy) async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "cacheStrategy": .init(.string(value), isSecret: false)
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "cacheStrategy": .init(.string(value), isSecret: false)
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -677,9 +737,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidCacheStrategyThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "cacheStrategy": "ignoreEverything"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "cacheStrategy": "ignoreEverything"
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -697,9 +759,11 @@ struct ConfiguredTests {
     func secureConnectionTrustRoots() async throws {
         // Given
         let file = UUID().uuidString
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.trustRoots": .init(.string(file), isSecret: false)
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.trustRoots": .init(.string(file), isSecret: false)
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -718,9 +782,11 @@ struct ConfiguredTests {
     func secureConnectionAdditionalTrustRoots() async throws {
         // Given
         let file = UUID().uuidString
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.additionalTrustRoots": .init(.string(file), isSecret: false)
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.additionalTrustRoots": .init(.string(file), isSecret: false)
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -741,9 +807,11 @@ struct ConfiguredTests {
     func secureConnectionCertificates() async throws {
         // Given
         let file = UUID().uuidString
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.certificates": .init(.string(file), isSecret: false)
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.certificates": .init(.string(file), isSecret: false)
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -761,10 +829,12 @@ struct ConfiguredTests {
     func secureConnectionPrivateKeyWithoutPassword() async throws {
         // Given
         let file = UUID().uuidString
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.privateKey.file": .init(.string(file), isSecret: false),
-            "secureConnection.privateKey.format": "der",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.privateKey.file": .init(.string(file), isSecret: false),
+                "secureConnection.privateKey.format": "der",
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -786,10 +856,12 @@ struct ConfiguredTests {
         // Given
         let file = UUID().uuidString
         let password = UUID().uuidString
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.privateKey.file": .init(.string(file), isSecret: false),
-            "secureConnection.privateKey.password": .init(.string(password), isSecret: true),
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.privateKey.file": .init(.string(file), isSecret: false),
+                "secureConnection.privateKey.password": .init(.string(password), isSecret: true),
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -811,10 +883,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidPrivateKeyFormatThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.privateKey.file": "key.p12",
-            "secureConnection.privateKey.format": "p12",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.privateKey.file": "key.p12",
+                "secureConnection.privateKey.format": "p12",
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -831,10 +905,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func secureConnectionTLSVersionRange() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.tlsMinimumVersion": "1.2",
-            "secureConnection.tlsMaximumVersion": "1.3",
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.tlsMinimumVersion": "1.2",
+                "secureConnection.tlsMaximumVersion": "1.3",
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -870,9 +946,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidTLSVersionThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "secureConnection.tlsMinimumVersion": "1.4"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.tlsMinimumVersion": "1.4"
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -889,11 +967,13 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func redirectFollow() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "redirect.mode": "follow",
-            "redirect.maxRedirects": 10,
-            "redirect.allowCycles": true,
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "redirect.mode": "follow",
+                "redirect.maxRedirects": 10,
+                "redirect.allowCycles": true,
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -910,9 +990,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func redirectFollowDefaults() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "redirect.mode": "follow"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "redirect.mode": "follow"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -929,9 +1011,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func redirectDisallow() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "redirect.mode": "disallow"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "redirect.mode": "disallow"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -965,9 +1049,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func invalidRedirectModeThrows() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "redirect.mode": "bounce"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "redirect.mode": "bounce"
+            ])
+        )
 
         // Then
         await #expect(throws: ConfiguredError.self) {
@@ -984,9 +1070,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func maximumConnectionsPerHost() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "maximumConnectionsPerHost": 16
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "maximumConnectionsPerHost": 16
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -1003,9 +1091,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func maximumConcurrentConnections() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "maximumConcurrentConnections": 4
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "maximumConcurrentConnections": 4
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -1022,10 +1112,12 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func connectionLimitsCombined() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "maximumConnectionsPerHost": 16,
-            "maximumConcurrentConnections": 4,
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "maximumConnectionsPerHost": 16,
+                "maximumConcurrentConnections": 4,
+            ])
+        )
 
         // When
         let resolved = try await resolve(
@@ -1043,9 +1135,11 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func scopedReader() async throws {
         // Given
-        let reader = ConfigReader(provider: InMemoryProvider(values: [
-            "myAPI.baseURL": "https://example.com"
-        ]))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "myAPI.baseURL": "https://example.com"
+            ])
+        )
 
         // When
         let resolved = try await resolve(
