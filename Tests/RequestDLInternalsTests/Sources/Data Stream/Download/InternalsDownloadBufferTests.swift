@@ -14,7 +14,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-@Suite(.concurrent(2), .nonFatalWatchdog)
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsDownloadBufferTests {
 
     @Test

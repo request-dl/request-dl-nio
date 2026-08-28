@@ -8,8 +8,9 @@ import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
-@Suite(.concurrent(2), .nonFatalWatchdog)
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsEventLoopManagerTests {
 
     struct CustomProvider: SessionProvider {

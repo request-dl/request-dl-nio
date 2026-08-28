@@ -27,7 +27,7 @@ import struct Foundation.UUID
 // .connect` below is also widened past AsyncHTTPClient's 10s default for the same reason: even on
 // its own dedicated group, 200 simultaneous TLS handshakes under heavy CI contention can
 // legitimately take longer than that.
-@Suite(.concurrent(2), .nonFatalWatchdog)
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct LocalServerConcurrencyTests {
 
     @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)

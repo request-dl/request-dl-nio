@@ -46,7 +46,7 @@ private func execute(
 // response; swift-testing runs `@Test`s in a suite concurrently by default, and the upload
 // starves the group's threads until the others hit `connectTimeout`. `.serialized` keeps this
 // suite's tests from overlapping, which the connection-pool tuning below alone didn't fix.
-@Suite(.serialized, .concurrent(2), .nonFatalWatchdog)
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct SessionExecutionTests {
 
     final class TestState: Sendable {

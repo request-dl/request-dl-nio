@@ -8,12 +8,13 @@ import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(Darwin)
 import NIOTransportServices
 #endif
 
-@Suite(.concurrent(2), .nonFatalWatchdog)
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct SharedSessionProviderTests {
 
     @Test
