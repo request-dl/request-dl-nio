@@ -60,7 +60,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-distributed-tracing",
-            from: "1.1.0"
+            from: "1.4.1"
         ),
     ],
     targets: [
