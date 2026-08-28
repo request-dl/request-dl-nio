@@ -30,9 +30,9 @@ import Testing
 /// idempotent and thread-safe no matter how many suites reference it concurrently, and — because
 /// the override is process-wide rather than per-suite — it also covers every other suite in the
 /// same test run once installed, not just the ones that carry this trait.
-public struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
+package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 
-    public var isRecursive: Bool { true }
+    package var isRecursive: Bool { true }
 
     private static let install: Void = {
         Internals.Override.AssertionFailure.installGlobally { message, _, _ in
@@ -49,11 +49,11 @@ public struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
     /// (thread-safe: every caller either runs the initializer once or blocks until whoever is
     /// already running it finishes), so once it returns, nothing tied to this trait will ever
     /// call `installGlobally` again for the rest of the process.
-    public static func ensureInstalled() {
+    package static func ensureInstalled() {
         _ = install
     }
 
-    public func provideScope(
+    package func provideScope(
         for test: Test,
         testCase: Test.Case?,
         performing function: @Sendable () async throws -> Void
@@ -66,6 +66,6 @@ public struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 extension Trait where Self == NonFatalWatchdogTrait {
 
     /// Records `AsyncLock.Watchdog` trips as a test issue instead of crashing the process.
-    public static var nonFatalWatchdog: Self { Self() }
+    package static var nonFatalWatchdog: Self { Self() }
 }
 #endif

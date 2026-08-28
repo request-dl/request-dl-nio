@@ -52,7 +52,7 @@ extension Internals {
 
         package var offset: UInt64 {
             get async throws {
-                await lock.withLock { _offset }
+                await _lock.withLock { _offset }
             }
         }
 
@@ -70,7 +70,7 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let lock = AsyncLock(watchdog: watchdog)
+        private let _lock = AsyncLock(watchdog: watchdog)
         private let handle: Handle
 
         // MARK: - Unsafe properties
@@ -109,7 +109,7 @@ extension Internals {
         /// Cheap, and never fails. Seeking past the end is allowed: a write there leaves a hole,
         /// and a read there comes back empty.
         package func seek(to offset: UInt64) async throws {
-            await lock.withLock { _offset = offset }
+            await _lock.withLock { _offset = offset }
         }
 
         /// Writes every byte of `data`, looping over short writes.
@@ -124,7 +124,7 @@ extension Internals {
                 return
             }
 
-            try await lock.withLock {
+            try await _lock.withLock {
                 var written = 0
 
                 while written < bytes.count {
@@ -166,7 +166,7 @@ extension Internals {
                 return nil
             }
 
-            return try await lock.withLock { () async throws -> Data? in
+            return try await _lock.withLock { () async throws -> Data? in
                 var data = Data()
                 var read = 0
 
@@ -200,7 +200,7 @@ extension Internals {
         /// streams before closing them, so this should not happen, and closing a handle that
         /// has already been closed is a far worse outcome than a redundant call.
         package func close() async throws {
-            try await lock.withLock {
+            try await _lock.withLock {
                 guard !_isClosed else {
                     return
                 }
@@ -215,5 +215,22 @@ extension Internals {
                 }
             }
         }
+    }
+}
+
+// MARK: - Testing
+
+extension Internals.FileStreamBuffer {
+
+    /// The lock serializing every seek/read/write/close.
+    ///
+    /// `FileStreamBuffer` itself is `package`, not `public`, so this needs no `@_spi(Testing)`
+    /// on top — nothing outside this package can name the type to reach it regardless. Exposed
+    /// so a test can wait for a task to actually be queued behind the lock (via
+    /// `AsyncLock.waitForPendingOperations(_:timeout:)`) before cancelling it, rather than
+    /// creating the task and hoping cancellation wins a race against it starting — under CI
+    /// scheduler contention, it does not always.
+    package var lock: AsyncLock {
+        _lock
     }
 }
