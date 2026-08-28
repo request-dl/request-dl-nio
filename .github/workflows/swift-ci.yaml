@@ -43,35 +43,43 @@ jobs:
       platform: macos-26
 
       # Step 1
+      enable-header-validation: true
+      header-template: |
+        //
+        // See LICENSE for this package's licensing information.
+        //
+
+      # Step 2
       enable-format: true
       format-swift-version: '6.3'
 
-      # Step 2
+      # Step 3
       enable-breaking-changes: true
       skip-on-major-update: true
       force-skip-breaking-changes: ${{ contains(github.event.pull_request.labels.*.name, 'force-skip-ci') }}
 
-      # Step 3 – Apple
+      # Step 4 – Apple
       enable-apple-tests: true
       package-name: "request-dl"
       xcode-version: '26.6'
       apple-coverage-enabled: true
+      apple-tests-max-parallelization-width: '2'
       apple-tests-parallel-testing-worker-count: '2'
 
-      # Step 3 – Third Party
+      # Step 4 – Third Party
       enable-third-party-tests: true
       third-party-coverage-enabled: true
 
-      # Step 3 – Linkage Test (renomeado de test-foundation-essentials)
+      # Step 4 – Linkage Test (renomeado de test-foundation-essentials)
       enable-linkage-test: true
 
-      # Step 3 – Android Build
+      # Step 4 – Android Build
       enable-android-build: true
 
-      # Step 3 – Release Builds / Static SDK
+      # Step 4 – Release Builds / Static SDK
       enable-release-builds: true
       enable-static-sdk: true
 
-      # Step 4
+      # Step 5
       enable-coverage-upload: true
     secrets: inherit

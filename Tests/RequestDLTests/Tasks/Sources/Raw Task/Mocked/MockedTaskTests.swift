@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDL
@@ -16,6 +17,7 @@ import struct Foundation.UUID
 import class Foundation.JSONEncoder
 #endif
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct MockedTaskTests {
 
     @Test
