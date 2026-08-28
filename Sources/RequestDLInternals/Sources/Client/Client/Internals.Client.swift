@@ -51,7 +51,7 @@ extension Internals {
         /// Caps how many requests this client may have in flight at once, from the moment a
         /// request is asked to execute until it completes, is cancelled, or is released.
         /// `nil` when the session was not configured with a limit, leaving requests unthrottled.
-        private let _connectionSemaphore: AsyncSemaphore?
+        private let connectionSemaphore: AsyncSemaphore?
 
         // MARK: - Unsafe properties
 
@@ -69,7 +69,7 @@ extension Internals {
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
-            _connectionSemaphore = maximumConcurrentConnections.map { .init(permits: $0) }
+            connectionSemaphore = maximumConcurrentConnections.map { .init(permits: $0) }
         }
 
         deinit {
@@ -108,7 +108,7 @@ extension Internals {
         ) async -> UnsafeTask<Delegate.Response> {
             // Waited on before anything else, so a session configured with a limit never opens
             // more connections than that, whether or not one is free to reuse.
-            await _connectionSemaphore?.wait()
+            await connectionSemaphore?.wait()
 
             // Registered before the request goes out, so the client counts as busy from the
             // moment it is asked to do anything.
@@ -129,7 +129,7 @@ extension Internals {
                 )
             }
 
-            let connectionSemaphore = self._connectionSemaphore
+            let connectionSemaphore = self.connectionSemaphore
 
             return UnsafeTask(task) {
                 // No lock and no task hop. Completing an operation is a counter decrement now,
@@ -156,18 +156,19 @@ extension Internals {
 
 // MARK: - Testing
 
+@_spi(Testing)
 extension Internals.Client {
 
     /// The semaphore backing `maximumConcurrentConnections`, `nil` when the client was not
     /// configured with a limit.
     ///
-    /// `Client` itself is `package`, not `public`, so this needs no `@_spi(Testing)` on top —
-    /// nothing outside this package can name the type to reach it regardless. Exposed so a test
-    /// can wait for an exact ``AsyncSemaphore/waitingCount`` instead of sleeping a fixed
-    /// duration and hoping the right number of requests reached the semaphore by then —
-    /// sleep-based synchronization races under CI scheduler contention the same way
-    /// `AsyncLock.Watchdog` false positives do.
-    package var connectionSemaphore: AsyncSemaphore? {
-        _connectionSemaphore
+    /// Named apart from the private `connectionSemaphore` it exposes, and gated behind
+    /// `@_spi(Testing)` on top of `package`, so this reads as a deliberate escape hatch and not
+    /// something ordinary package code reaches for by accident. Exposed so a test can wait for
+    /// an exact ``AsyncSemaphore/waitingCount`` instead of sleeping a fixed duration and hoping
+    /// the right number of requests reached the semaphore by then — sleep-based synchronization
+    /// races under CI scheduler contention the same way `AsyncLock.Watchdog` false positives do.
+    public var connectionSemaphoreForTesting: AsyncSemaphore? {
+        connectionSemaphore
     }
 }

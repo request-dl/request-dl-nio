@@ -6,7 +6,7 @@
 import SwiftAsyncTesting
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
 @testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
@@ -30,15 +30,15 @@ struct InternalsFileStreamBufferTests {
             // `cancel()`. `AsyncLock` guarantees a cancelled waiter still takes its turn and
             // runs `writeData`'s loop, which checks `Task.checkCancellation()` before doing
             // anything else — see `Internals.FileStreamBuffer.writeData`.
-            await stream.lock.lock()
+            await stream.lockForTesting.lock()
 
             let task = _Concurrency.Task<Void, Error> {
                 try await stream.writeData(Data("Hello world".utf8))
             }
-            try await stream.lock.waitForPendingOperations(1, timeout: 5)
+            try await stream.lockForTesting.waitForPendingOperations(1, timeout: 5)
 
             task.cancel()
-            stream.lock.unlock()
+            stream.lockForTesting.unlock()
 
             await #expect(throws: CancellationError.self) {
                 try await task.value
@@ -57,15 +57,15 @@ struct InternalsFileStreamBufferTests {
             let stream = try await Internals.FileStreamBuffer(readingFrom: .init(url))
 
             // Same reasoning as the writeData test above.
-            await stream.lock.lock()
+            await stream.lockForTesting.lock()
 
             let task = _Concurrency.Task<Data?, Error> {
                 try await stream.readData(length: UInt64(data.count))
             }
-            try await stream.lock.waitForPendingOperations(1, timeout: 5)
+            try await stream.lockForTesting.waitForPendingOperations(1, timeout: 5)
 
             task.cancel()
-            stream.lock.unlock()
+            stream.lockForTesting.unlock()
 
             await #expect(throws: CancellationError.self) {
                 try await task.value

@@ -9,7 +9,7 @@ import NIOPosix
 import SwiftAsyncTesting
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
 @testable import RequestDLTestSupport
 
 @Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
@@ -52,12 +52,12 @@ struct InternalsClientConcurrencyLimitTests {
                 // happen once the other 2 have already acquired a permit — i.e. once the
                 // concurrency limit is actually in effect, not after a guessed wall-clock
                 // delay that a loaded CI runner can blow through.
-                try await client.connectionSemaphore?.waitForWaiters(requestCount - 2, timeout: 5)
+                try await client.connectionSemaphoreForTesting?.waitForWaiters(requestCount - 2, timeout: 5)
 
                 // Then: only as many requests as the configured limit have actually acquired a
                 // permit; the rest are still queued on the semaphore.
-                #expect(client.connectionSemaphore?.waitingCount == requestCount - 2)
-                #expect(client.connectionSemaphore?.availablePermits == 0)
+                #expect(client.connectionSemaphoreForTesting?.waitingCount == requestCount - 2)
+                #expect(client.connectionSemaphoreForTesting?.availablePermits == 0)
 
                 releaseSignal.signal()
                 try await taskGroup.waitForAll()
