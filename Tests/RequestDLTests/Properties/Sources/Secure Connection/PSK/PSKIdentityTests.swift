@@ -45,6 +45,36 @@ struct PSKIdentityTests {
     }
 
     @Test
+    func identity_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
+        // Given
+        // Regression test: `PSKIdentity` used to require an enclosing `SecureConnection`. The
+        // base `Internals.SecureConnection` is now created lazily the first time it's needed.
+        let identity = "host"
+        let key = NIOSSLSecureBytes([0, 1, 2])
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.PSKIdentity(
+                    ClientResolver(
+                        key: key,
+                        identity: identity,
+                        received: { _ in }
+                    )
+                )
+            }
+        )
+
+        let sut = try resolved.session.configuration.secureConnection?.pskIdentityResolver?(
+            PSKClientContext(hint: "hint", maxPSKLength: 3)
+        )
+
+        // Then
+        #expect(sut?.key == key)
+        #expect(sut?.identity == identity)
+    }
+
+    @Test
     func pSK_whenAccessBody_shouldBeNever() async throws {
         // Given
         let identity = "host"
