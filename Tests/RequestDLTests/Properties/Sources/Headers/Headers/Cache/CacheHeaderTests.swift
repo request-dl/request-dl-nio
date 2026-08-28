@@ -104,11 +104,12 @@ struct CacheHeaderTests {
         )
 
         #expect(
-            resolved.requestConfiguration.requestCacheDirectives == RequestCacheDirectives(
-                isStoringAllowed: false,
-                requiresRevalidation: true,
-                isOnlyIfCached: true
-            )
+            resolved.requestConfiguration.requestCacheDirectives
+                == RequestCacheDirectives(
+                    isStoringAllowed: false,
+                    requiresRevalidation: true,
+                    isOnlyIfCached: true
+                )
         )
     }
 
