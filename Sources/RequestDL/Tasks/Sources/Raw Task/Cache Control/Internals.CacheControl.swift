@@ -104,7 +104,17 @@ extension Internals {
         /// construction, since it reads both inputs fresh rather than letting one `PropertyNode`
         /// overwrite what another wrote.
         private var effectiveCacheStrategy: CacheStrategy {
-            let directives = requestConfiguration.requestCacheDirectives
+            // Read straight off the outgoing `Cache-Control` request header — not a typed
+            // side-channel set by `CacheHeader`'s own `PropertyNode`. `HeaderGroup` (and
+            // `Proxy.connectHeaders`/`Form`'s per-part headers) reconstruct their subtree by
+            // searching for `LeafNode<HeaderNode>` specifically; a `CacheHeader` wrapped in
+            // anything but a plain `HeaderNode` becomes invisible to that search and gets
+            // silently dropped whenever it's nested inside one of those. Deriving from the
+            // already-serialized header sidesteps the node-graph representation entirely, so it
+            // keeps working no matter how the header got there — `CacheHeader`, a raw
+            // `Headers { "Cache-Control": ... }`, nested in a group, or anything else.
+            let requestDirectives = directives(requestConfiguration.headers["Cache-Control"] ?? [])
+                .map { $0.lowercased() }
 
             // Gated on `isCacheEnabled`: `only-if-cached` addresses *any* cache in the request
             // path (a CDN or proxy downstream), which is a distinct thing from this package's own
@@ -112,15 +122,26 @@ extension Internals {
             // every request carrying the directive even when the developer never opted into
             // local caching via `.cachePolicy(_:)` — turning a pure wire-level signal into an
             // always-on local failure.
-            if directives.isOnlyIfCached, requestConfiguration.isCacheEnabled {
+            if requestDirectives.contains("only-if-cached"), requestConfiguration.isCacheEnabled {
                 return .useCachedDataOnly
             }
 
-            if directives.requiresRevalidation, requestConfiguration.cacheStrategy == .returnCachedDataElseLoad {
+            let requiresRevalidation = requestDirectives.contains {
+                $0 == "no-cache" || $0.hasPrefix("no-cache=")
+            }
+
+            if requiresRevalidation, requestConfiguration.cacheStrategy == .returnCachedDataElseLoad {
                 return .reloadAndValidateCachedData
             }
 
             return requestConfiguration.cacheStrategy
+        }
+
+        /// Whether the outgoing request declares `no-store` (RFC 7234 §5.2.1.5) — this response
+        /// must not be persisted to this package's on-disk cache.
+        private var requestForbidsStoring: Bool {
+            directives(requestConfiguration.headers["Cache-Control"] ?? [])
+                .contains { $0.lowercased() == "no-store" }
         }
 
         private func checkIfCachedDataStillValid(
@@ -360,7 +381,7 @@ extension Internals {
 
                 guard
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
-                    requestConfiguration.requestCacheDirectives.isStoringAllowed
+                    !requestForbidsStoring
                 else {
                     return nil
                 }

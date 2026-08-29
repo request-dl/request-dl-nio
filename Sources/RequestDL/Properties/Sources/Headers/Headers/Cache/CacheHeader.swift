@@ -12,17 +12,6 @@
 /// ```
 public struct CacheHeader: Property {
 
-    private struct Node: PropertyNode {
-
-        let headerNode: HeaderNode
-        let directives: RequestCacheDirectives
-
-        func make(_ make: inout Make) async throws {
-            try await headerNode.make(&make)
-            make.requestConfiguration.requestCacheDirectives = directives
-        }
-    }
-
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -74,11 +63,9 @@ public struct CacheHeader: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let cache = property.pointer()
         let separator = inputs.environment.headerSeparator ?? ","
 
-        let value =
-            cache
+        let value = property.pointer()
             .makeContents()
             .joined(separator: separator)
 
@@ -87,18 +74,11 @@ public struct CacheHeader: Property {
         }
 
         return .leaf(
-            Node(
-                headerNode: HeaderNode(
-                    key: "Cache-Control",
-                    value: value,
-                    strategy: inputs.environment.headerStrategy,
-                    separator: separator
-                ),
-                directives: RequestCacheDirectives(
-                    isStoringAllowed: cache.isStored,
-                    requiresRevalidation: !cache.isCached,
-                    isOnlyIfCached: cache.isOnlyIfCached
-                )
+            HeaderNode(
+                key: "Cache-Control",
+                value: value,
+                strategy: inputs.environment.headerStrategy,
+                separator: separator
             )
         )
     }
