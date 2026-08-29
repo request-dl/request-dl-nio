@@ -67,6 +67,10 @@ let package = Package(
             from: "1.2.0",
             traits: []
         ),
+        .package(
+            url: "https://github.com/apple/swift-crypto.git",
+            from: "4.5.1"
+        ),
     ],
     targets: [
         .target(
@@ -86,6 +90,7 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),
@@ -109,6 +114,7 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Configuration", package: "swift-configuration"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
@@ -151,6 +157,7 @@ let package = Package(
             dependencies: [
                 "RequestDLInternals",
                 "RequestDLTestSupport",
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SwiftAsyncTesting", package: "swift-async-stream"),
             ],
             path: "Tests/RequestDLInternalsTests",

@@ -272,6 +272,57 @@ struct CachedRequestTests {
     }
 
     @Test
+    func cache_whenEncryptionKeySetWithValidCache_returnsCachedDataRatherThanRefetching() async throws {
+        let testState = try await TestState()
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
+        testState.dataCache.encryptionKey = encryptionKey
+
+        // `policy: .disk` — the memory tier stays unencrypted and is deliberately out of scope
+        // (see the discussion this feature came out of), so a `.all`-policy entry would let a
+        // memory hit shadow the disk read entirely and this test would pass regardless of
+        // whether the encrypted disk path works at all. Disk-only forces the read this test
+        // actually cares about.
+        let cacheData = await mockCachedData(makeHeaders(), policy: .disk)
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When: seeded through the real encrypted disk tier — `setCachedData` routes through
+        // `DiskStorage.allocateBuffer`, honoring whatever key is set on the shared `Storage` this
+        // directory resolves to, exactly like a real write would.
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        // `encryptionKey` has to be passed through this call explicitly, not just left set on
+        // `testState.dataCache` above: `.cache(...)` unconditionally assigns whatever it's given
+        // to the same shared `Storage` (`nil` included, unlike `memoryCapacity`/`diskCapacity`,
+        // which have a floor to fall back on), so a request that didn't repeat it here would
+        // silently clear it before the read that follows even runs.
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let updatedCachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then: this is the critical regression test for at-rest encryption on the disk tier.
+        // `isCachedDataValid` rejects an entry whose `buffer.readableBytes` doesn't match the
+        // origin's `Content-Length` — if `EncryptedFileBufferURL.writtenBytes` ever reported the
+        // real (ciphertext-plus-framing) file size instead of the logical plaintext size, that
+        // check would fail for every encrypted entry, permanently, and every request would fall
+        // through to a live fetch instead of ever hitting the cache. `cacheData.response` is
+        // synthetic (a fixed URL/status/headers that bear no resemblance to what the local test
+        // server actually returns), so equality here can only hold if the seeded, encrypted entry
+        // was read back and judged valid — a genuine re-fetch could not produce a matching value.
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
+    }
+
+    @Test
     func cache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
         let testState = try await TestState()
         let cacheData = await mockCachedData(makeHeaders())
@@ -682,7 +733,8 @@ extension CachedRequestTests {
 
     func mockCachedData(
         _ headers: [(String, String)] = [],
-        contentLengthOverride: Int? = nil
+        contentLengthOverride: Int? = nil,
+        policy: DataCache.Policy.Set = .all
     ) async -> CachedData {
         let data = try? JSONEncoder().encode(["receivedBytes": "0"])
 
@@ -698,7 +750,7 @@ extension CachedRequestTests {
                 ),
                 isKeepAlive: false
             ),
-            policy: .all,
+            policy: policy,
             data: data ?? Data()
         )
     }
@@ -747,6 +799,7 @@ extension CachedRequestTests {
         cacheStrategy: CacheStrategy,
         memoryCapacity: Int64 = .zero,
         diskCapacity: Int64 = .zero,
+        encryptionKey: DataCache.EncryptionKey? = nil,
         cacheHeader: CacheHeader? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
@@ -760,7 +813,8 @@ extension CachedRequestTests {
                 .cache(
                     memoryCapacity: memoryCapacity,
                     diskCapacity: diskCapacity,
-                    url: testState.dataCache.directoryURL
+                    url: testState.dataCache.directoryURL,
+                    encryptionKey: encryptionKey
                 )
 
             SecureConnection {

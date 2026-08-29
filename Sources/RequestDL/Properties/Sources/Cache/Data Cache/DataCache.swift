@@ -69,6 +69,11 @@ public struct DataCache: Sendable, Equatable {
         }
         #endif
 
+        var encryptionKey: DataCache.EncryptionKey? {
+            get { lock.withLock { _diskStorage.encryptionKey } }
+            set { lock.withLock { _diskStorage.encryptionKey = newValue } }
+        }
+
         /// Cache writes started and not yet finished.
         let pendingWrites = Internals.PendingTasks(priority: .background)
 
@@ -234,6 +239,21 @@ public struct DataCache: Sendable, Equatable {
         nonmutating set { storage.fileProtection = newValue }
     }
     #endif
+
+    ///
+    /// The key used to encrypt the disk tier at rest.
+    ///
+    /// `nil`, the default, leaves the disk tier unencrypted — the same behavior as before this
+    /// property existed. Setting it only affects cache entries written from that point on;
+    /// existing plaintext files on disk are left alone. Supplying a new key does not invalidate
+    /// entries written under a previous one: they simply fail to decrypt and are treated as
+    /// misses, re-encrypting under the current key the next time they're written. See
+    /// ``removeAll()`` for clearing the cache outright, e.g. after a suspected key compromise.
+    ///
+    public var encryptionKey: DataCache.EncryptionKey? {
+        get { storage.encryptionKey }
+        nonmutating set { storage.encryptionKey = newValue }
+    }
 
     // MARK: - Internal properties
 
