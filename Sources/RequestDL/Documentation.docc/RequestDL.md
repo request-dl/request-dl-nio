@@ -79,6 +79,7 @@ try await DataTask {
 - [x] [Combine support](<doc:Exploring-combine>) (Apple platforms only);
 - [x] [Image loading for SwiftUI, UIKit, AppKit and watchOS](<doc:Loading-images>) (Apple platforms only);
 - [x] [Distributed tracing](<doc:Distributed-tracing>);
+- [x] [Configuration-driven requests](<doc:Configuration-driven-requests>) (via swift-configuration);
 
 We are excited to expand this list with many other features. Start by making your contribution in [Discussions](https://github.com/orgs/request-dl/discussions) or by opening a PR (Pull Request).
 

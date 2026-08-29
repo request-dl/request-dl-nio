@@ -3,11 +3,13 @@
 //
 
 import NIOCore
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsClientManagerTests {
 
     @Test
