@@ -41,9 +41,9 @@ extension Internals {
         /// fallback here would be a footgun worth avoiding outright.
         package static var temporaryURL: Internals.EncryptedFileBufferURL {
             Internals.assertionFailure(
-                "EncryptedFileBufferURL.temporaryURL reached — a caller bypassed " +
-                "Internals.Buffer<EncryptedFileStreamBuffer>(addressing:) with a key already in " +
-                "hand, and fell back to the keyless generic Buffer construction path instead."
+                "EncryptedFileBufferURL.temporaryURL reached — a caller bypassed "
+                    + "Internals.Buffer<EncryptedFileStreamBuffer>(addressing:) with a key already in "
+                    + "hand, and fell back to the keyless generic Buffer construction path instead."
             )
 
             // Release builds don't trap on the assertion above. A random, immediately discarded

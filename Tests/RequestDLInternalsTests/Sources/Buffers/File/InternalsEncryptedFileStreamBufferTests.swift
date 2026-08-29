@@ -19,7 +19,8 @@ struct InternalsEncryptedFileStreamBufferTests {
 
     private let chunkPlaintextSize = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
 
-    private func makeURL(_ fileURL: URL, key: SymmetricKey = .init(size: .bits256)) -> Internals.EncryptedFileBufferURL {
+    private func makeURL(_ fileURL: URL, key: SymmetricKey = .init(size: .bits256)) -> Internals.EncryptedFileBufferURL
+    {
         .init(inner: .init(fileURL), key: key)
     }
 

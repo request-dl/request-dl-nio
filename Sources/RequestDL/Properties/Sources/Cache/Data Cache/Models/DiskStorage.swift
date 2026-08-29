@@ -223,10 +223,11 @@ struct DiskStorage: Sendable {
             return nil
         }
 
-        let raw = buffer.getData(
-            at: buffer.readerIndex,
-            length: buffer.readableBytes
-        ) ?? Data()
+        let raw =
+            buffer.getData(
+                at: buffer.readerIndex,
+                length: buffer.readableBytes
+            ) ?? Data()
 
         guard let encryptionKey else {
             return raw
