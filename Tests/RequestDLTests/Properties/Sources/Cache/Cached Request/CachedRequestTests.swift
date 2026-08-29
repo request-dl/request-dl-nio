@@ -8,6 +8,7 @@ import NIOCore
 import NIOHTTP1
 import RequestDLInternals
 import Testing
+import SwiftAsyncStream
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
@@ -525,7 +526,7 @@ struct CachedRequestTests {
                 lock.withLock { _records }
             }
 
-            private let lock = NIOLock()
+            private let lock = SwiftAsyncStream.Lock()
             private var _records: [TestLogHandler.LogRecord] = []
 
             func append(_ record: TestLogHandler.LogRecord) {
