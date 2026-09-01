@@ -372,32 +372,41 @@ struct DiskStorage: Sendable {
     /// decide whether `freeSpace` can skip its directory rescan below. See that method's doc
     /// for the safety argument — passing a stale or absent estimate never risks correctness,
     /// only an avoidable rescan.
-    /// - Returns: The buffer to write through, and disk usage immediately after this write
-    /// (`nil` when the write didn't happen, e.g. the entry doesn't fit at all), for the caller
-    /// to keep as its next `knownUsage`.
+    /// - Returns: The buffer to write through, disk usage immediately after this write (`nil`
+    /// when the write didn't happen, e.g. the entry doesn't fit at all) for the caller to keep
+    /// as its next `knownUsage`, and the exact directory this call created on disk (`nil`
+    /// exactly when `buffer` is), for the caller to hand back to ``removeRecord(at:)`` if the
+    /// write it's about to do through `buffer` ends up never finishing.
     func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
         contentLength: Int64,
         maximumCapacity: Int64,
         knownUsage: Int64? = nil
-    ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?) {
-        guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil) }
+    ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?, recordURL: URL?) {
+        guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil, nil) }
 
         let writableBytes = Int64(response.count) + contentLength
-        guard writableBytes <= maximumCapacity else { return (nil, nil) }
+        guard writableBytes <= maximumCapacity else { return (nil, nil, nil) }
 
         let usageAfterEviction = await freeSpace(
             maximumCapacity - writableBytes,
             knownUsage: knownUsage
         )
 
-        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil) }
+        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil, nil) }
 
         do {
             try await writeAndClose(response, to: record.responseURL)
         } catch {
-            return (nil, nil)
+            // The directory itself was already created above (`Record.init(directory:key:at:)`
+            // creates it unconditionally). Left behind, it would be indistinguishable from the
+            // orphan `removeRecord(at:)` exists to clean up elsewhere — except nobody has a
+            // reason to call that for a write that never even got a buffer back. Deleting it
+            // here, while its exact URL is still in hand, is cheaper and more certain than
+            // hoping a later cleanup pass finds it by name.
+            await removeRecord(at: record.url)
+            return (nil, nil, nil)
         }
 
         #if canImport(Darwin)
@@ -405,7 +414,22 @@ struct DiskStorage: Sendable {
         #endif
 
         let buffer = await dataBuffer(for: record)
-        return (buffer, usageAfterEviction + writableBytes)
+        return (buffer, usageAfterEviction + writableBytes, record.url)
+    }
+
+    /// Deletes exactly the record directory at `url`, bypassing `record(_:)`'s completeness
+    /// gate entirely.
+    ///
+    /// That gate — both `response.record` and `data.record` present — is correct for every
+    /// read path (`subscript`, `updateCached`, eviction), which must never serve or reason
+    /// about a write that never finished. But it also means those lookups can never be used to
+    /// find and delete such a write's own leftover directory: an entry missing `data.record` is
+    /// invisible to them by design. This exists for the one caller that already knows exactly
+    /// which directory to remove without needing to look it up — the `URL` `allocateBuffer`
+    /// itself just handed back — so cleaning up a cancelled or errored cache write never has to
+    /// go searching for what it already knows.
+    func removeRecord(at url: URL) async {
+        _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
     }
 
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
