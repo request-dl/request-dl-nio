@@ -3,6 +3,7 @@
 //
 
 import AsyncAlgorithms
+import NIOFileSystem
 import SwiftAsyncTesting
 import Testing
 
@@ -612,5 +613,62 @@ extension DataCacheTests {
                 }
             }
         }
+    }
+
+    /// Regression test for a cache write whose body stream is cancelled or errors before a
+    /// single byte reaches disk: `allocateBuffer` already created the record's directory and
+    /// wrote `response.record`, but `data.record` never came into being. The `catch` block in
+    /// `Internals.CacheControl.cacheIfNeeded` is supposed to clean this up by calling
+    /// `discardFailedWrite`.
+    ///
+    /// Before that method existed, cleanup went through `remove(forKey:)`, which looks entries
+    /// up via `DiskStorage.record(_:)` — and that lookup requires `response.record` *and*
+    /// `data.record` to already both be present to even recognize the entry. An entry missing
+    /// `data.record` was therefore invisible to it, `remove(forKey:)` silently did nothing, and
+    /// the half-written directory was orphaned on disk permanently — where it stayed invisible
+    /// to every future read for the same reason, while still costing each of them the full
+    /// `isReachableWithRetry` retry budget (up to ~15s) for a `data.record` that would never
+    /// appear.
+    @Test
+    func discardFailedWrite_whenBodyNeverArrives_shouldDeleteTheOrphanedCacheDirectory() async throws {
+        let dataCache = DataCache(
+            diskCapacity: 8 * 1_024 * 1_024,
+            suiteName: UUID().uuidString
+        )
+
+        let key = UUID().uuidString
+
+        // Given: a cache write that allocated its disk record but never wrote a body byte
+        // through it — the exact shape `cacheIfNeeded` leaves behind for a request that gets
+        // cancelled, errors, or is interrupted before the response body starts streaming.
+        let buffer = await dataCache.allocateBuffer(
+            key: key,
+            cachedResponse: .init(
+                response: .init(
+                    url: key,
+                    status: .init(code: 200, reason: "OK"),
+                    version: .init(minor: 0, major: 1),
+                    headers: [],
+                    isKeepAlive: true
+                ),
+                policy: .disk
+            ),
+            contentLength: 0
+        )
+
+        let allocatedBuffer = try #require(buffer)
+        #expect(allocatedBuffer.diskRecordURL != nil)
+
+        // When
+        await dataCache.discardFailedWrite(allocatedBuffer, forKey: key)
+
+        // Then: no leftover ".cached" directory under this cache's own storage directory.
+        var foundOrphan = false
+        try? await FileSystem.shared.withDirectoryHandle(atPath: dataCache.directoryURL.filePath) { dir in
+            for try await entry in dir.listContents() where entry.name.string.hasSuffix(".cached") {
+                foundOrphan = true
+            }
+        }
+        #expect(!foundOrphan)
     }
 }

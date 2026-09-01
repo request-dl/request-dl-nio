@@ -4,6 +4,12 @@
 
 import RequestDLInternals
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
+
 extension DataCache {
 
     struct Buffer: Sendable {
@@ -11,6 +17,14 @@ extension DataCache {
         var readableBytes: Int {
             (memoryBuffer ?? diskBuffer)?.readableBytes ?? .zero
         }
+
+        /// The exact disk record directory `diskBuffer` writes into, `nil` when there is no
+        /// disk tier (memory-only policy, or the disk write couldn't be allocated). Kept around
+        /// so a caller whose body stream never finishes writing through this buffer can hand it
+        /// straight to ``DataCache/discardFailedWrite(_:forKey:)`` — precise cleanup of exactly
+        /// this write, not a search by key that could catch an unrelated, still in-progress
+        /// write to the same key from a concurrent request.
+        let diskRecordURL: URL?
 
         // MARK: - Private properties
 
@@ -21,10 +35,12 @@ extension DataCache {
 
         init(
             memoryBuffer: Internals.AnyBuffer?,
-            diskBuffer: Internals.AnyBuffer?
+            diskBuffer: Internals.AnyBuffer?,
+            diskRecordURL: URL? = nil
         ) {
             self.memoryBuffer = memoryBuffer
             self.diskBuffer = diskBuffer
+            self.diskRecordURL = diskRecordURL
         }
 
         // MARK: - Internal methods

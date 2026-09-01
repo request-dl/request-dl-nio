@@ -169,12 +169,12 @@ public struct DataCache: Sendable, Equatable {
             key: String,
             cachedResponse: CachedResponse,
             contentLength: Int64
-        ) async -> Internals.AnyBuffer? {
+        ) async -> (buffer: Internals.AnyBuffer?, recordURL: URL?) {
             let (diskStorage, maximumCapacity, knownUsage) = lock.withLock {
                 (_diskStorage, _diskCapacity, _diskUsageEstimate)
             }
 
-            let (buffer, usage) = await diskStorage.allocateBuffer(
+            let (buffer, usage, recordURL) = await diskStorage.allocateBuffer(
                 key: key,
                 cachedResponse: cachedResponse,
                 contentLength: contentLength,
@@ -186,7 +186,7 @@ public struct DataCache: Sendable, Equatable {
                 lock.withLock { _diskUsageEstimate = usage }
             }
 
-            return buffer
+            return (buffer, recordURL)
         }
 
         // MARK: - Init
@@ -542,6 +542,7 @@ public struct DataCache: Sendable, Equatable {
 
         var memoryBuffer: Internals.AnyBuffer?
         var diskBuffer: Internals.AnyBuffer?
+        var diskRecordURL: URL?
 
         if cachedResponse.policy.contains(.memory) {
             // Two steps, and they have to be two.
@@ -575,7 +576,7 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if cachedResponse.policy.contains(.disk) {
-            diskBuffer = await storage.allocateDiskBuffer(
+            (diskBuffer, diskRecordURL) = await storage.allocateDiskBuffer(
                 key: key,
                 cachedResponse: cachedResponse,
                 contentLength: contentLength
@@ -584,8 +585,33 @@ public struct DataCache: Sendable, Equatable {
 
         return .init(
             memoryBuffer: memoryBuffer,
-            diskBuffer: diskBuffer
+            diskBuffer: diskBuffer,
+            diskRecordURL: diskRecordURL
         )
+    }
+
+    /// Discards a cache write that started via ``allocateBuffer(key:cachedResponse:contentLength:)``
+    /// but never finished — its body stream was cancelled, errored, or otherwise gave up before
+    /// writing through `buffer` completed.
+    ///
+    /// - Important: Not the same thing as ``remove(forKey:)``. That method looks entries up by
+    /// key through `DiskStorage.record(_:)`, which requires a disk entry's `response.record`
+    /// *and* `data.record` to already both be on disk before it can even be found — exactly the
+    /// gate a write that never finished can't pass. Called there, it would silently do nothing,
+    /// leaving the half-written directory behind: invisible to every future read for the same
+    /// reason, yet still costing each of them a multi-second retry budget for `data.record`
+    /// permanently missing. This method instead targets `buffer.diskRecordURL` — the exact
+    /// directory captured at allocation time — so it finds and deletes precisely the write that
+    /// failed, without searching by key and risking an unrelated, still in-progress write to the
+    /// same key from a concurrent request.
+    func discardFailedWrite(_ buffer: Buffer, forKey key: String) async {
+        let key = base64EncodedKey(key)
+
+        storage.withMemoryStorage { $0.remove(key) }
+
+        if let diskRecordURL = buffer.diskRecordURL {
+            await storage.diskStorage.removeRecord(at: diskRecordURL)
+        }
     }
 
     /// Runs a cache write and keeps track of it, so `waitUntilIdle()` can join it later.
