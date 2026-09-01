@@ -4,6 +4,7 @@
 
 import NIOCore
 import RequestDLInternals
+import Tracing
 
 /// The Session object is used to set various properties related to the request context.
 ///
@@ -92,11 +93,68 @@ public struct Session: Property {
     ///
     /// Set whether the session should wait for connectivity before making a request.
     ///
+    /// Checked once, right before the request is dispatched, against the device's current
+    /// network path — the same way `URLSession`'s own `waitsForConnectivity` only covers a
+    /// task's initial connection phase, never a network change mid-transfer. Effective across
+    /// every executor (previously this only had any effect when Network framework backed the
+    /// connection).
+    ///
     /// - Parameter flag: `true` to wait for connectivity or `false` to not wait for it.
     /// - Returns: The modified `Session` instance with the waiting for connectivity flag configured.
     ///
     public func waitsForConnectivity(_ flag: Bool) -> Self {
-        edit { $0.networkFrameworkWaitForConnectivity = flag }
+        edit { $0.waitsForConnectivity = flag }
+    }
+
+    ///
+    /// Set whether the session may send requests over a cellular network path.
+    ///
+    /// Enforced with a pre-flight check against the device's current network path, mirroring
+    /// `URLSessionConfiguration.allowsCellularAccess` — see ``NetworkAvailabilityError``.
+    ///
+    /// - Parameter flag: `true` to allow cellular access, `false` to require a non-cellular path.
+    /// - Returns: The modified `Session` instance with the cellular-access flag configured.
+    ///
+    public func allowsCellularAccess(_ flag: Bool) -> Self {
+        edit { $0.allowsCellularAccess = flag }
+    }
+
+    ///
+    /// Set whether the session may send requests over an expensive network path (for example, a
+    /// personal hotspot or a metered connection).
+    ///
+    /// Enforced with a pre-flight check against the device's current network path, mirroring
+    /// `URLSessionConfiguration.allowsExpensiveNetworkAccess` — see ``NetworkAvailabilityError``.
+    ///
+    /// - Parameter flag: `true` to allow expensive access, `false` to require a non-expensive path.
+    /// - Returns: The modified `Session` instance with the expensive-access flag configured.
+    ///
+    public func allowsExpensiveNetworkAccess(_ flag: Bool) -> Self {
+        edit { $0.allowsExpensiveNetworkAccess = flag }
+    }
+
+    ///
+    /// Set whether the session may send requests over a constrained network path (for example,
+    /// when the user has enabled Low Data Mode).
+    ///
+    /// Enforced with a pre-flight check against the device's current network path, mirroring
+    /// `URLSessionConfiguration.allowsConstrainedNetworkAccess` — see ``NetworkAvailabilityError``.
+    ///
+    /// - Parameter flag: `true` to allow constrained access, `false` to require an unconstrained path.
+    /// - Returns: The modified `Session` instance with the constrained-access flag configured.
+    ///
+    public func allowsConstrainedNetworkAccess(_ flag: Bool) -> Self {
+        edit { $0.allowsConstrainedNetworkAccess = flag }
+    }
+
+    ///
+    /// Configures multipath TCP for the session, mirroring `URLSessionConfiguration.multipathServiceType`.
+    ///
+    /// - Parameter type: The multipath service type to use.
+    /// - Returns: The modified `Session` instance with multipath configured.
+    ///
+    public func multipathServiceType(_ type: MultipathServiceType) -> Self {
+        edit { $0.multipathServiceType = type.build() }
     }
 
     ///
@@ -108,7 +166,7 @@ public struct Session: Property {
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
     ///
-    public func enableNetworkFramework(_ enabled: Bool = true) -> some Property {
+    public func enableNetworkFramework(_ enabled: Bool = true) -> Self {
         edit { $0.enableNetworkFramework = enabled }
     }
 
@@ -189,6 +247,21 @@ public struct Session: Property {
     ///
     public func compression(_ algorithm: CompressionAlgorithm) -> Self {
         edit { $0.compression = .enabled(algorithm.build()) }
+    }
+
+    ///
+    /// Sets the tracer used to record distributed tracing spans for requests made through this
+    /// session.
+    ///
+    /// When not set, no tracing is performed — the session uses a no-op tracer, regardless of
+    /// whether some other part of the process has globally bootstrapped one via
+    /// `InstrumentationSystem.bootstrap(_:)`. Tracing is opt-in per session, not ambient.
+    ///
+    /// - Parameter tracer: The tracer to use for this session.
+    /// - Returns: The modified `Session` instance with the tracer configured.
+    ///
+    public func tracer(_ tracer: any Tracer) -> Self {
+        edit { $0.tracer = tracer }
     }
 
     // MARK: - Private properties

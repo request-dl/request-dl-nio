@@ -15,17 +15,6 @@
 /// ```
 public struct HeaderGroup<Content: Property>: Property {
 
-    private struct Node: PropertyNode {
-
-        let nodes: [LeafNode<HeaderNode>]
-
-        func make(_ make: inout Make) async throws {
-            for node in nodes {
-                try await node.make(&make)
-            }
-        }
-    }
-
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -62,7 +51,19 @@ public struct HeaderGroup<Content: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(Node(nodes: outputs.node.search(for: HeaderNode.self)))
+        // Kept as individual `LeafNode<HeaderNode>` children rather than collapsed into one
+        // opaque wrapper node: consumers that search the resolved graph for `HeaderNode`
+        // directly — `Proxy`'s `connectHeaders`, `Form`'s per-part headers — need each header
+        // to still be structurally discoverable. A single combined leaf hid them from that
+        // search entirely, silently dropping every header composed through `HeaderGroup` in
+        // those contexts.
+        var children = ChildrenNode()
+
+        for header in outputs.node.search(for: HeaderNode.self) {
+            children.append(header)
+        }
+
+        return .children(children)
     }
 }
 

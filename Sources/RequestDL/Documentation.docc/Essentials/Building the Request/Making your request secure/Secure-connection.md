@@ -20,7 +20,7 @@ As supported by SwiftNIO, we have the following definitions:
 4. **SPKI Pinning**
    Cryptographic pinning of the server's public key structure for explicit trust validation.
 
-> Warning: Any TLS configuration must be performed within ``RequestDL/SecureConnection``. Otherwise, RequestDL will not recognize the declarations.
+> Note: ``RequestDL/TrustRoots``, ``RequestDL/DefaultTrustRoots``, ``RequestDL/AdditionalTrustRoots``, ``RequestDL/Certificates``, ``RequestDL/PrivateKey``, ``RequestDL/PSKIdentity``, and ``RequestDL/SPKIPinning`` can each be declared on their own — RequestDL creates the underlying secure connection configuration automatically the first time one of them is resolved. Wrap them in ``RequestDL/SecureConnection`` only when you also need to configure a setting that lives directly on it, such as the TLS version range or cipher suites (see "TLS settings" below).
 
 ### SPKI Pinning
 
@@ -115,14 +115,34 @@ struct GithubAPI: Property {
     @StoredObject var psk = GithubPSKResolver()
 
     var body: some Property {
-        SecureConnection {
-            PSKIdentity(psk)
-        }
+        // Other property specifications
+        PSKIdentity(psk)
     }
 }
 ```
 
 > Warning: Exclusively choose either Trust/Client Authorization *or* PSK. Defining both may cause undefined behavior.
+
+### TLS settings
+
+Some settings — the TLS version range, cipher suites, key logging, renegotiation support, and so on — only exist on ``RequestDL/SecureConnection`` itself, not on any of the properties above. Use it directly, the same way you'd use ``RequestDL/Session``:
+
+```swift
+SecureConnection()
+    .version(minimum: .v1_3)
+    .cipherSuites(.TLS_CHACHA20_POLY1305_SHA256)
+```
+
+You can still wrap other content in it when you want to configure both at once:
+
+```swift
+SecureConnection {
+    TrustRoots {
+        Certificate(caFile, format: .pem)
+    }
+}
+.version(minimum: .v1_3)
+```
 
 ### Optimizations
 
@@ -152,7 +172,6 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 
 ### PSK authentication
 - ``RequestDL/PSKIdentity``
-- ``RequestDL/SSLPSKIdentityResolver``
 
 ### TLS configuration
 - ``RequestDL/SecureConnection``
@@ -161,4 +180,3 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 - ``RequestDL/CertificateVerification``
 - ``RequestDL/SignatureAlgorithm``
 - ``RequestDL/RenegotiationSupport``
-- ``RequestDL/SSLKeyLogger``

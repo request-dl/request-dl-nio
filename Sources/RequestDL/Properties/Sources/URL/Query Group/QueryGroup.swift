@@ -15,21 +15,6 @@
 ///  ```
 public struct QueryGroup<Content: Property>: Property {
 
-    struct Node: PropertyNode {
-
-        let leafs: [LeafNode<QueryNode>]
-
-        fileprivate init(_ leafs: [LeafNode<QueryNode>]) {
-            self.leafs = leafs
-        }
-
-        func make(_ make: inout Make) async throws {
-            for leaf in leafs {
-                try await leaf.make(&make)
-            }
-        }
-    }
-
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -66,7 +51,20 @@ public struct QueryGroup<Content: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(Node(output.node.search(for: QueryNode.self)))
+        // Kept as individual `LeafNode<QueryNode>` children rather than collapsed into one
+        // opaque wrapper node: a `QueryGroup` nested inside another `QueryGroup` needs its own
+        // resolved queries to still be structurally discoverable by the outer group's own
+        // `search(for: QueryNode.self)`. A single combined leaf hid them from that search
+        // entirely, silently dropping every query composed through a nested `QueryGroup` — the
+        // same class of bug fixed for `HeaderGroup`, whose leaf-wrapping broke `Proxy`'s and
+        // `Form`'s external searches for `HeaderNode` the same way.
+        var children = ChildrenNode()
+
+        for query in output.node.search(for: QueryNode.self) {
+            children.append(query)
+        }
+
+        return .children(children)
     }
 }
 

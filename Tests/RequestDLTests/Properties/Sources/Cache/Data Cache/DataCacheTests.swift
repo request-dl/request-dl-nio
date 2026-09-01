@@ -3,7 +3,8 @@
 //
 
 import AsyncAlgorithms
-import SwiftAsyncStream
+import NIOFileSystem
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDL
@@ -22,7 +23,7 @@ private let globalMemoryCapacity: Int64 = 8 * 1_024 * 1_024
 private let globalDiskCapacity: Int64 = 64 * 1_024 * 1_024
 private let globalDataCache = DataCache(suiteName: UUID().uuidString)
 
-@Suite(.serialized)
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct DataCacheTests {
 
     final class TestState: Sendable {
@@ -573,41 +574,101 @@ extension DataCacheTests {
 extension DataCacheTests {
 
     @Test
-    func accessingAllocateBufferMultipleTimes() async throws {
+    func accessingAllocateBufferMultipleTimes() async {
         let dataCache = DataCache(
             memoryCapacity: 100 * 1_024 * 1_024,
             suiteName: UUID().uuidString
         )
 
         let key = UUID().uuidString
-        var locks = [AsyncSignal]()
 
-        for index in 0..<1_000 {
-            let lock = AsyncSignal()
-            locks.append(lock)
+        // Bounded in batches rather than firing all 1,000 accesses as loose concurrent
+        // tasks: an unbounded burst saturates the cooperative thread pool on CI's Apple
+        // simulator runners badly enough that a perfectly healthy access can sit in the
+        // backlog longer than `AsyncLock.Watchdog`'s deadline, failing the job on
+        // wall-clock scheduler contention rather than an actual bug. Concurrent access
+        // is still exercised within each batch; only the total in flight at once is
+        // capped.
+        let batchSize = 50
 
-            Task.detached(priority: .background) {
-                defer { lock.signal() }
-
-                _ = await dataCache.allocateBuffer(
-                    key: key + "\(index)",
-                    cachedResponse: .init(
-                        response: .init(
-                            url: UUID().uuidString,
-                            status: .init(code: 200, reason: UUID().uuidString),
-                            version: .init(minor: 0, major: 10),
-                            headers: .init(),
-                            isKeepAlive: false
-                        ),
-                        policy: .memory
-                    ),
-                    contentLength: 1_024 * 1_024
-                )
+        for batchStart in stride(from: 0, to: 1_000, by: batchSize) {
+            await withTaskGroup(of: Void.self) { group in
+                for index in batchStart..<min(batchStart + batchSize, 1_000) {
+                    group.addTask(priority: .background) {
+                        _ = await dataCache.allocateBuffer(
+                            key: key + "\(index)",
+                            cachedResponse: .init(
+                                response: .init(
+                                    url: UUID().uuidString,
+                                    status: .init(code: 200, reason: UUID().uuidString),
+                                    version: .init(minor: 0, major: 10),
+                                    headers: .init(),
+                                    isKeepAlive: false
+                                ),
+                                policy: .memory
+                            ),
+                            contentLength: 1_024 * 1_024
+                        )
+                    }
+                }
             }
         }
+    }
 
-        for lock in locks {
-            try await lock.wait()
+    /// Regression test for a cache write whose body stream is cancelled or errors before a
+    /// single byte reaches disk: `allocateBuffer` already created the record's directory and
+    /// wrote `response.record`, but `data.record` never came into being. The `catch` block in
+    /// `Internals.CacheControl.cacheIfNeeded` is supposed to clean this up by calling
+    /// `discardFailedWrite`.
+    ///
+    /// Before that method existed, cleanup went through `remove(forKey:)`, which looks entries
+    /// up via `DiskStorage.record(_:)` — and that lookup requires `response.record` *and*
+    /// `data.record` to already both be present to even recognize the entry. An entry missing
+    /// `data.record` was therefore invisible to it, `remove(forKey:)` silently did nothing, and
+    /// the half-written directory was orphaned on disk permanently — where it stayed invisible
+    /// to every future read for the same reason, while still costing each of them the full
+    /// `isReachableWithRetry` retry budget (up to ~15s) for a `data.record` that would never
+    /// appear.
+    @Test
+    func discardFailedWrite_whenBodyNeverArrives_shouldDeleteTheOrphanedCacheDirectory() async throws {
+        let dataCache = DataCache(
+            diskCapacity: 8 * 1_024 * 1_024,
+            suiteName: UUID().uuidString
+        )
+
+        let key = UUID().uuidString
+
+        // Given: a cache write that allocated its disk record but never wrote a body byte
+        // through it — the exact shape `cacheIfNeeded` leaves behind for a request that gets
+        // cancelled, errors, or is interrupted before the response body starts streaming.
+        let buffer = await dataCache.allocateBuffer(
+            key: key,
+            cachedResponse: .init(
+                response: .init(
+                    url: key,
+                    status: .init(code: 200, reason: "OK"),
+                    version: .init(minor: 0, major: 1),
+                    headers: [],
+                    isKeepAlive: true
+                ),
+                policy: .disk
+            ),
+            contentLength: 0
+        )
+
+        let allocatedBuffer = try #require(buffer)
+        #expect(allocatedBuffer.diskRecordURL != nil)
+
+        // When
+        await dataCache.discardFailedWrite(allocatedBuffer, forKey: key)
+
+        // Then: no leftover ".cached" directory under this cache's own storage directory.
+        var foundOrphan = false
+        try? await FileSystem.shared.withDirectoryHandle(atPath: dataCache.directoryURL.filePath) { dir in
+            for try await entry in dir.listContents() where entry.name.string.hasSuffix(".cached") {
+                foundOrphan = true
+            }
         }
+        #expect(!foundOrphan)
     }
 }

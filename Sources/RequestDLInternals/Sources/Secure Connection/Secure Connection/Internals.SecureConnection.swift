@@ -12,13 +12,34 @@ extension Internals {
 
         // MARK: - Internal properties
 
+        /// - Note: Mirrors exactly what AsyncHTTPClient's NIOTransportServices bridge
+        /// (`TLSConfiguration.getNWProtocolTLSOptions`) can carry over into native
+        /// `sec_protocol_options` when running on Network.framework. `certificateChain`,
+        /// `privateKey`, `keyLogger`, and `.noHostnameVerification` trap there via
+        /// `precondition` — reaching this transport with any of them set would crash the
+        /// process, not just silently downgrade. The others listed below (`cipherSuiteValues`,
+        /// `additionalTrustRoots`, `renegotiationSupport`, `signingSignatureAlgorithms`,
+        /// `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`,
+        /// `pskIdentityResolver`) aren't rejected there at all — they're read from the built
+        /// `TLSConfiguration` and then never looked at again, so the connection would silently
+        /// negotiate without them rather than fail loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return certificateChain == nil
                 && privateKey == nil
                 && keyLogger == nil
+                && certificateVerification != .noHostnameVerification
                 && cipherSuites == nil
                 && tlsPins == nil
+                && cipherSuiteValues == nil
+                && additionalTrustRoots == nil
+                && renegotiationSupport == nil
+                && signingSignatureAlgorithms == nil
+                && verifySignatureAlgorithms == nil
+                && sendCANameList == nil
+                && shutdownTimeout == nil
+                && pskHint == nil
+                && pskIdentityResolver == nil
             #else
             return false
             #endif

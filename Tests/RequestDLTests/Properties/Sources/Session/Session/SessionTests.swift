@@ -6,6 +6,7 @@ import AsyncHTTPClient
 import NIOPosix
 import RequestDLInternals
 import Testing
+import Tracing
 
 @testable import RequestDL
 
@@ -31,6 +32,12 @@ struct SessionTests {
             String(describing: sut.decompression) == String(describing: configuration.decompression)
         )
         #expect(sut.connectionPool == configuration.connectionPool)
+        #expect(sut.allowsCellularAccess == nil)
+        #expect(sut.allowsExpensiveNetworkAccess == nil)
+        #expect(sut.allowsConstrainedNetworkAccess == nil)
+        #expect(sut.waitsForConnectivity == nil)
+        #expect(sut.multipathServiceType == .none)
+        #expect(sut.networkPathConstraints == nil)
     }
 
     @Test
@@ -82,9 +89,67 @@ struct SessionTests {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(
-            try resolved.session.configuration.build().networkFrameworkWaitForConnectivity == waitsForConnectivity
-        )
+        #expect(resolved.session.configuration.waitsForConnectivity == waitsForConnectivity)
+    }
+
+    @Test
+    func session_whenAllowsCellularAccess_shouldBeValid() async throws {
+        // Given
+        let allowsCellularAccess = false
+
+        let property = Session()
+            .allowsCellularAccess(allowsCellularAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsCellularAccess == allowsCellularAccess)
+    }
+
+    @Test
+    func session_whenAllowsExpensiveNetworkAccess_shouldBeValid() async throws {
+        // Given
+        let allowsExpensiveNetworkAccess = false
+
+        let property = Session()
+            .allowsExpensiveNetworkAccess(allowsExpensiveNetworkAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsExpensiveNetworkAccess == allowsExpensiveNetworkAccess)
+    }
+
+    @Test
+    func session_whenAllowsConstrainedNetworkAccess_shouldBeValid() async throws {
+        // Given
+        let allowsConstrainedNetworkAccess = false
+
+        let property = Session()
+            .allowsConstrainedNetworkAccess(allowsConstrainedNetworkAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsConstrainedNetworkAccess == allowsConstrainedNetworkAccess)
+    }
+
+    @Test
+    func session_whenMultipathServiceType_shouldBeValid() async throws {
+        // Given
+        let multipathServiceType = Session.MultipathServiceType.handover
+
+        let property = Session()
+            .multipathServiceType(multipathServiceType)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.multipathServiceType == multipathServiceType.build())
     }
 
     @Test
@@ -278,6 +343,38 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenTracerDefault_shouldBeNoOp() async throws {
+        // Given
+        let property = Session()
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect((resolved.session.configuration.tracer as? NoOpTracer) != nil)
+    }
+
+    @Test
+    func session_whenTracerSet_shouldBeValid() async throws {
+        // Given
+        let tracer = RecordingTracer()
+
+        let property = Session()
+            .tracer(tracer)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect((resolved.session.configuration.tracer as? RecordingTracer) != nil)
+
+        // `async-http-client`'s own built-in tracing is always suppressed -- RequestDL owns the
+        // span lifecycle itself, in `RawTask.result()`, using `resolved.session.configuration
+        // .tracer` directly.
+        #expect(try (resolved.session.configuration.build().tracing.tracer as? NoOpTracer) != nil)
+    }
+
+    @Test
     func session_whenNeverBody_shouldBeNever() async throws {
         // Given
         let property = Session()
@@ -301,6 +398,29 @@ struct SessionTests {
 
         // Then
         #expect(resolved.session.configuration.decompression == .enabled(.size(200)))
-        #expect(resolved.session.configuration.networkFrameworkWaitForConnectivity == true)
+        #expect(resolved.session.configuration.waitsForConnectivity == true)
     }
+}
+
+private struct RecordingTracer: Tracer, Sendable {
+
+    func startSpan<Instant: TracerInstant>(
+        _ operationName: String,
+        context: @autoclosure () -> ServiceContext,
+        ofKind kind: SpanKind,
+        at instant: @autoclosure () -> Instant,
+        function: String,
+        file fileID: String,
+        line: UInt
+    ) -> NoOpTracer.NoOpSpan {
+        NoOpTracer.NoOpSpan(context: context())
+    }
+
+    func forceFlush() {}
+
+    func inject<Carrier, Inject>(_ context: ServiceContext, into carrier: inout Carrier, using injector: Inject)
+    where Inject: Injector, Carrier == Inject.Carrier {}
+
+    func extract<Carrier, Extract>(_ carrier: Carrier, into context: inout ServiceContext, using extractor: Extract)
+    where Extract: Extractor, Carrier == Extract.Carrier {}
 }

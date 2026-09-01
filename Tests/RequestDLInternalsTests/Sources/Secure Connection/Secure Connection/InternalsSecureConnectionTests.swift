@@ -368,4 +368,66 @@ extension InternalsSecureConnectionTests {
 
         #expect(result.map { Data($0.key) } == Data(identity.utf8))
     }
+
+    @Test
+    func secureConnection_whenDefault_isCompatibleWithNetworkFramework() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(secureConnection.isCompatibleWithNetworkFramework)
+        #else
+        #expect(!secureConnection.isCompatibleWithNetworkFramework)
+        #endif
+    }
+
+    /// Regression coverage for the fields AsyncHTTPClient's NIOTransportServices bridge either
+    /// traps on (`certificateChain`, `privateKey`, `keyLogger`, `.noHostnameVerification`) or
+    /// silently drops (everything else here) when running on Network.framework. Each one must
+    /// flip `isCompatibleWithNetworkFramework` to `false` so the caller falls back to plain NIO
+    /// instead of crashing or losing the setting without any signal.
+    @Test(
+        arguments: [
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.certificateVerification = .noHostnameVerification
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.additionalTrustRoots = [.file("/dev/null")]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.renegotiationSupport = .once
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.signingSignatureAlgorithms = [.ecdsaSecp256R1Sha256]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.verifySignatureAlgorithms = [.ecdsaSecp256R1Sha256]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.sendCANameList = true
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.shutdownTimeout = .seconds(5)
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.pskHint = "hint"
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.cipherSuiteValues = [.TLS_AES_128_GCM_SHA256]
+            },
+        ] as [@Sendable (inout Internals.SecureConnection) -> Void]
+    )
+    func secureConnection_whenNetworkFrameworkUnsupportedFieldSet_isIncompatible(
+        _ mutate: @Sendable (inout Internals.SecureConnection) -> Void
+    ) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+
+        // When
+        mutate(&secureConnection)
+
+        // Then
+        #expect(!secureConnection.isCompatibleWithNetworkFramework)
+    }
 }

@@ -7,6 +7,7 @@ import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 import RequestDLInternals
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDL
@@ -22,7 +23,7 @@ import struct Foundation.Date
 import class Foundation.JSONEncoder
 #endif
 
-@Suite(.serialized)
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct CachedRequestTests {
 
     final class TestState: Sendable {
@@ -266,6 +267,57 @@ struct CachedRequestTests {
         )
 
         // Then
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
+    }
+
+    @Test
+    func cache_whenEncryptionKeySetWithValidCache_returnsCachedDataRatherThanRefetching() async throws {
+        let testState = try await TestState()
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
+        testState.dataCache.encryptionKey = encryptionKey
+
+        // `policy: .disk` — the memory tier stays unencrypted and is deliberately out of scope
+        // (see the discussion this feature came out of), so a `.all`-policy entry would let a
+        // memory hit shadow the disk read entirely and this test would pass regardless of
+        // whether the encrypted disk path works at all. Disk-only forces the read this test
+        // actually cares about.
+        let cacheData = await mockCachedData(makeHeaders(), policy: .disk)
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When: seeded through the real encrypted disk tier — `setCachedData` routes through
+        // `DiskStorage.allocateBuffer`, honoring whatever key is set on the shared `Storage` this
+        // directory resolves to, exactly like a real write would.
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        // `encryptionKey` has to be passed through this call explicitly, not just left set on
+        // `testState.dataCache` above: `.cache(...)` unconditionally assigns whatever it's given
+        // to the same shared `Storage` (`nil` included, unlike `memoryCapacity`/`diskCapacity`,
+        // which have a floor to fall back on), so a request that didn't repeat it here would
+        // silently clear it before the read that follows even runs.
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let updatedCachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then: this is the critical regression test for at-rest encryption on the disk tier.
+        // `isCachedDataValid` rejects an entry whose `buffer.readableBytes` doesn't match the
+        // origin's `Content-Length` — if `EncryptedFileBufferURL.writtenBytes` ever reported the
+        // real (ciphertext-plus-framing) file size instead of the logical plaintext size, that
+        // check would fail for every encrypted entry, permanently, and every request would fall
+        // through to a live fetch instead of ever hitting the cache. `cacheData.response` is
+        // synthetic (a fixed URL/status/headers that bear no resemblance to what the local test
+        // server actually returns), so equality here can only hold if the seeded, encrypted entry
+        // was read back and judged valid — a genuine re-fetch could not produce a matching value.
         #expect(updatedCachedData?.response == cacheData.response)
         #expect(response.head == cacheData.response)
     }
@@ -554,6 +606,117 @@ struct CachedRequestTests {
         let savedRecord = recordBox.records.first { $0.metadata["size_bytes"] != nil }
         #expect(savedRecord != nil)
     }
+
+    @Test
+    func cache_whenOnlyIfCachedRequestDirective_escalatesToUseCachedDataOnly() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        var thrownError: Error?
+
+        // When
+        // `.returnCachedDataElseLoad` alone would hit the network since there's no cached
+        // entry yet — `CacheHeader().onlyIfCached(true)` must escalate this to behave like
+        // `.useCachedDataOnly` instead.
+        do {
+            _ = try await performCacheRequest(
+                testState: testState,
+                headers: makeHeaders(),
+                cacheStrategy: .returnCachedDataElseLoad,
+                cacheHeader: CacheHeader().onlyIfCached(true)
+            )
+        } catch {
+            thrownError = error
+        }
+
+        // Then
+        #expect(thrownError is EmptyCachedDataError)
+    }
+
+    @Test
+    func cache_whenOnlyIfCachedRequestDirective_withCachingDisabled_doesNotForceLocalCacheOnly() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // When
+        // `only-if-cached` addresses caches downstream of this client (a CDN or proxy) — with no
+        // `.cachePolicy(_:)` configured, this package's own on-disk cache was never opted into,
+        // so the directive must not force `EmptyCachedDataError` locally; the request should just
+        // go through normally.
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cachePolicy: [],
+            cacheStrategy: .returnCachedDataElseLoad,
+            cacheHeader: CacheHeader().onlyIfCached(true)
+        )
+
+        // Then
+        #expect(response.head.status.code == 200)
+    }
+
+    @Test
+    func cache_whenNoCacheRequestDirective_escalatesReturnCachedDataElseLoadToRevalidate() async throws {
+        let testState = try await TestState()
+        let staleETag = UUID()
+        let freshETag = UUID()
+        let cacheData = await mockCachedData(makeHeaders(eTag: staleETag))
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        // `.returnCachedDataElseLoad` alone would serve the stale cached entry without ever
+        // asking the server — `CacheHeader().cached(false)` (`no-cache`) must escalate this to
+        // revalidate, so the fresh ETag from the server wins.
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: freshETag),
+            cacheStrategy: .returnCachedDataElseLoad,
+            cacheHeader: CacheHeader().cached(false)
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let updatedCachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(updatedCachedData?.response != cacheData.response)
+        #expect(response.head != cacheData.response)
+    }
+
+    @Test
+    func cache_whenNoStoreRequestDirective_skipsCaching() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        // The response is cacheable (`public, max-age=...`), but `CacheHeader().stored(false)`
+        // (`no-store`) must still prevent it from being written to disk.
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cacheStrategy: .returnCachedDataElseLoad,
+            cacheHeader: CacheHeader().stored(false)
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let cachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(cachedData == nil)
+    }
 }
 
 extension CachedRequestTests {
@@ -570,7 +733,8 @@ extension CachedRequestTests {
 
     func mockCachedData(
         _ headers: [(String, String)] = [],
-        contentLengthOverride: Int? = nil
+        contentLengthOverride: Int? = nil,
+        policy: DataCache.Policy.Set = .all
     ) async -> CachedData {
         let data = try? JSONEncoder().encode(["receivedBytes": "0"])
 
@@ -586,7 +750,7 @@ extension CachedRequestTests {
                 ),
                 isKeepAlive: false
             ),
-            policy: .all,
+            policy: policy,
             data: data ?? Data()
         )
     }
@@ -634,7 +798,9 @@ extension CachedRequestTests {
         cachePolicy: DataCache.Policy.Set = .all,
         cacheStrategy: CacheStrategy,
         memoryCapacity: Int64 = .zero,
-        diskCapacity: Int64 = .zero
+        diskCapacity: Int64 = .zero,
+        encryptionKey: DataCache.EncryptionKey? = nil,
+        cacheHeader: CacheHeader? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
 
@@ -647,7 +813,8 @@ extension CachedRequestTests {
                 .cache(
                     memoryCapacity: memoryCapacity,
                     diskCapacity: diskCapacity,
-                    url: testState.dataCache.directoryURL
+                    url: testState.dataCache.directoryURL,
+                    encryptionKey: encryptionKey
                 )
 
             SecureConnection {
@@ -658,6 +825,10 @@ extension CachedRequestTests {
 
             BaseURL(testState.localServer.baseURL)
             Path(testState.uri)
+
+            if let cacheHeader {
+                cacheHeader
+            }
         }
         .result()
 
