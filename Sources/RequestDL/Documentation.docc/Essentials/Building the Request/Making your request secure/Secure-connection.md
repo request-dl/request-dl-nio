@@ -109,7 +109,7 @@ PrivateKey(privateFile1)
 
 ### PSK
 
-Pre-Shared Key (PSK) authentication uses symmetric keys shared between client and server. Configure using ``SSLPSKIdentityResolver``, secured via ``StoredObject`` for efficiency:
+Pre-Shared Key (PSK) authentication uses symmetric keys shared between client and server. Configure using `SSLPSKIdentityResolver`, secured via ``StoredObject`` for efficiency:
 ```swift
 struct GithubAPI: Property {
     @StoredObject var psk = GithubPSKResolver()
