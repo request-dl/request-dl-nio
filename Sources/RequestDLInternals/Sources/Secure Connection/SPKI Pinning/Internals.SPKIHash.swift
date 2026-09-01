@@ -1,8 +1,5 @@
 //
-//  Internals.SPKIHash.swift
-//  request-dl
-//
-//  Created by Brenno de Moura on 02/02/26.
+// See LICENSE for this package's licensing information.
 //
 
 import AsyncHTTPClient
