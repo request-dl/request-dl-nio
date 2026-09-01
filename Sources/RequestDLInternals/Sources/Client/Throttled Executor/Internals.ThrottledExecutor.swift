@@ -41,3 +41,19 @@ extension Internals {
         }
     }
 }
+
+// MARK: - Testing
+
+@_spi(Testing)
+extension Internals.ThrottledExecutor {
+
+    /// The semaphore backing this throttle, `nil` when no limit was configured.
+    ///
+    /// Same escape-hatch shape as `Internals.Client.connectionSemaphoreForTesting`, which this
+    /// backs: gated behind `@_spi(Testing)` on top of `package` so a test can wait for an exact
+    /// ``AsyncSemaphore/waitingCount`` instead of sleeping a fixed duration and hoping the right
+    /// number of requests reached the semaphore by then.
+    public var semaphoreForTesting: AsyncSemaphore? {
+        semaphore
+    }
+}

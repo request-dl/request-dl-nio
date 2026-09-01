@@ -20,7 +20,7 @@ As supported by SwiftNIO, we have the following definitions:
 
    An alternative form of authentication where the client and server share a symmetric key to proceed with the current request.
 
-> Warning: Any configuration involving TLS should be performed within the ``RequestDL/SecureConnection``. Otherwise, RequestDL will not be able to recognize the declared code.
+> Note: ``RequestDL/TrustRoots``, ``RequestDL/DefaultTrustRoots``, ``RequestDL/AdditionalTrustRoots``, ``RequestDL/Certificates``, ``RequestDL/PrivateKey``, and ``RequestDL/PSKIdentity`` can each be declared on their own — RequestDL creates the underlying secure connection configuration automatically the first time one of them is resolved. Wrap them in ``RequestDL/SecureConnection`` only when you also need to configure a setting that lives directly on it, such as the TLS version range or cipher suites (see "TLS settings" below).
 
 ### Trust
 
@@ -85,14 +85,33 @@ struct GithubAPI: Property {
 
     var body: some Property {
         // Other property specifications
-        SecureConnection {
-            PSKIdentity(psk)
-        }
+        PSKIdentity(psk)
     }
 }
 ```
 
 > Warning: You should exclusively choose either Trust/Client Authorization or PSK. Defining both in the same request can result in unexpected behavior.
+
+### TLS settings
+
+Some settings — the TLS version range, cipher suites, key logging, renegotiation support, and so on — only exist on ``RequestDL/SecureConnection`` itself, not on any of the properties above. Use it directly, the same way you'd use ``RequestDL/Session``:
+
+```swift
+SecureConnection()
+    .version(minimum: .v1_3)
+    .cipherSuites(.TLS_CHACHA20_POLY1305_SHA256)
+```
+
+You can still wrap other content in it when you want to configure both at once:
+
+```swift
+SecureConnection {
+    TrustRoots {
+        Certificate(caFile, format: .pem)
+    }
+}
+.version(minimum: .v1_3)
+```
 
 ### Optimizations
 

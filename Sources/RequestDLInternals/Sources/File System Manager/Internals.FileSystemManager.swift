@@ -27,13 +27,35 @@ extension Internals {
     /// host application uses NIO's shared pool for.
     package enum FileSystemManager {
 
+        // MARK: - Private static properties
+
+        private static let threadPool: NIOThreadPool = {
+            let threadPool = NIOThreadPool(numberOfThreads: Swift.max(16, System.coreCount * 4))
+            threadPool.start()
+            return threadPool
+        }()
+
         // MARK: - Internal static properties
 
         package static let shared: NIOFileSystem.FileSystem = {
-            let threadPool = NIOThreadPool(numberOfThreads: Swift.max(16, System.coreCount * 4))
-            threadPool.start()
-            return NIOFileSystem.FileSystem(threadPool: threadPool)
+            NIOFileSystem.FileSystem(threadPool: threadPool)
         }()
+
+        // MARK: - Internal static methods
+
+        /// Runs a blocking, non-`NIOFileSystem` file operation on the same pool every other
+        /// blocking file operation in `Internals` uses, rather than whichever Swift Concurrency
+        /// cooperative thread happens to call in here. See `FileStreamBuffer`'s doc for why that
+        /// distinction matters under `swift-testing`'s parallel execution.
+        ///
+        /// - Note: Exists for platform-specific calls `NIOFileSystem` has no notion of — Darwin's
+        /// file protection attributes, at the time this was added — that still touch the same
+        /// files this pool already owns.
+        package static func run<T: Sendable>(
+            _ body: @escaping @Sendable () throws -> T
+        ) async throws -> T {
+            try await threadPool.runIfActive(body)
+        }
     }
 
     /// The file system every blocking file operation in `Internals` goes through.

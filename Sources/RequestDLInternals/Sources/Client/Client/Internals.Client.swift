@@ -203,3 +203,25 @@ extension Internals {
         }
     }
 }
+
+// MARK: - Testing
+
+@_spi(Testing)
+extension Internals.Client {
+
+    /// The semaphore backing `maximumConcurrentConnections`, `nil` when the client was not
+    /// configured with a limit.
+    ///
+    /// Forwards to `throttledExecutor`'s own testing accessor -- the semaphore itself moved
+    /// there so `maximumConcurrentConnections` behaves identically across executors, but this
+    /// accessor's name and gating stay put so the tests reaching for it don't have to change.
+    /// Gated behind `@_spi(Testing)` on top of `package` so this reads as a deliberate escape
+    /// hatch and not something ordinary package code reaches for by accident. Exposed so a test
+    /// can wait for an exact ``AsyncSemaphore/waitingCount`` instead of sleeping a fixed duration
+    /// and hoping the right number of requests reached the semaphore by then — sleep-based
+    /// synchronization races under CI scheduler contention the same way `AsyncLock.Watchdog`
+    /// false positives do.
+    public var connectionSemaphoreForTesting: AsyncSemaphore? {
+        throttledExecutor.semaphoreForTesting
+    }
+}

@@ -16,6 +16,10 @@ import struct Foundation.Date
 import class Foundation.ProcessInfo
 #endif
 
+#if canImport(Darwin)
+import struct Foundation.FileProtectionType
+#endif
+
 /// A data cache that stores and retrieves data based on specified capacities and policies.
 public struct DataCache: Sendable, Equatable {
 
@@ -56,6 +60,18 @@ public struct DataCache: Sendable, Equatable {
 
         var diskStorage: DiskStorage {
             lock.withLock { _diskStorage }
+        }
+
+        #if canImport(Darwin)
+        var fileProtection: FileProtectionType? {
+            get { lock.withLock { _diskStorage.fileProtection } }
+            set { lock.withLock { _diskStorage.fileProtection = newValue } }
+        }
+        #endif
+
+        var encryptionKey: DataCache.EncryptionKey? {
+            get { lock.withLock { _diskStorage.encryptionKey } }
+            set { lock.withLock { _diskStorage.encryptionKey = newValue } }
         }
 
         /// Cache writes started and not yet finished.
@@ -204,6 +220,39 @@ public struct DataCache: Sendable, Equatable {
     public var diskCapacity: Int64 {
         get { storage.diskCapacity }
         nonmutating set { storage.diskCapacity = newValue }
+    }
+
+    #if canImport(Darwin)
+    ///
+    /// The Data Protection class applied to newly written disk cache files.
+    ///
+    /// `nil`, the default, leaves the system default protection class in place — the same
+    /// behavior as before this property existed. Setting it only affects cache entries written
+    /// from that point on; existing files on disk keep whatever class they already had.
+    ///
+    /// `.completeUntilFirstUserAuthentication` is the usual choice for a cache: it keeps entries
+    /// unreadable before the device's first unlock after boot, without the stricter classes'
+    /// risk of a background write or read failing outright while the device is locked.
+    ///
+    public var fileProtection: FileProtectionType? {
+        get { storage.fileProtection }
+        nonmutating set { storage.fileProtection = newValue }
+    }
+    #endif
+
+    ///
+    /// The key used to encrypt the disk tier at rest.
+    ///
+    /// `nil`, the default, leaves the disk tier unencrypted — the same behavior as before this
+    /// property existed. Setting it only affects cache entries written from that point on;
+    /// existing plaintext files on disk are left alone. Supplying a new key does not invalidate
+    /// entries written under a previous one: they simply fail to decrypt and are treated as
+    /// misses, re-encrypting under the current key the next time they're written. See
+    /// ``removeAll()`` for clearing the cache outright, e.g. after a suspected key compromise.
+    ///
+    public var encryptionKey: DataCache.EncryptionKey? {
+        get { storage.encryptionKey }
+        nonmutating set { storage.encryptionKey = newValue }
     }
 
     // MARK: - Internal properties

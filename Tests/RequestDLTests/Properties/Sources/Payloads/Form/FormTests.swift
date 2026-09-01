@@ -192,6 +192,51 @@ struct FormTests {
     }
 
     @Test
+    func form_whenInitDataWithHeadersFromHeaderGroup() async throws {
+        // Given
+        // Regression test: `HeaderGroup` used to wrap its resolved headers into an opaque leaf
+        // node, invisible to `Form`'s `search(for: HeaderNode.self)` over its per-part `headers`
+        // content, so every header composed through it here silently disappeared.
+        let name = "foo"
+        let filename = "bar.raw"
+        let data = await Data.randomData(length: 1_024)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    filename: filename,
+                    data: data,
+                    headers: {
+                        HeaderGroup {
+                            CustomHeader(name: "Accept-Language", value: "en-US")
+                        }
+                    }
+                )
+            }
+        )
+
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
+        let parsed = try await parser.parse()
+
+        // Then
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\"; filename=\"\(filename)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                        ("Accept-Language", "en-US"),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
+    }
+
+    @Test
     func form_whenCustomHeaderOverridesAGeneratedHeader_shouldKeepTheCallersValue() async throws {
         // Given
         let name = "foo"

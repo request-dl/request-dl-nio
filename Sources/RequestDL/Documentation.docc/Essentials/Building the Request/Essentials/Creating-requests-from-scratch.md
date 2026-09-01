@@ -212,10 +212,12 @@ Learn more in:
 
 - ``RequestDL/Session``
 - ``RequestDL/Proxy``
+- ``RequestDL/ProxyAuthorization``
 - ``RequestDL/SystemProxy``
 - ``RequestDL/DNSOverride``
 - ``RequestDL/URLOverride``
 - ``RequestDL/URLOverrideError``
+- ``RequestDL/NetworkAvailabilityError``
 
 ### Adding request timeout
 
