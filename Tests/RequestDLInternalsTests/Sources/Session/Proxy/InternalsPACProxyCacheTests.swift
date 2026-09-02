@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(Darwin) && canImport(CFNetwork)
 
@@ -14,6 +15,11 @@ import Network
 /// `Internals.PACProxyCache`, the layer between `Internals.SystemProxyResolver` and
 /// `Internals.PACEvaluator` that keeps a repeat request from re-fetching and re-evaluating the
 /// same PAC script every time.
+///
+/// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real threading
+/// and network I/O against a local listener, same rationale as `InternalsPACEvaluatorTests`'s own
+/// copy of this note.
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsPACProxyCacheTests {
 
     @Test

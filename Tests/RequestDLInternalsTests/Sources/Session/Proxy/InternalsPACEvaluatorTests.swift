@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(Darwin) && canImport(CFNetwork)
 
@@ -21,6 +22,16 @@ import Network
 /// `file://` was tried first and rejected: `CFNetworkExecuteProxyAutoConfigurationURL` fails
 /// every `file://` script with `kCFURLErrorUnsupportedURLScheme` (-1002) -- PAC fetching only
 /// speaks HTTP(S), the same as every browser's own PAC support.
+///
+/// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real threading
+/// (one dedicated `Thread` per evaluation, pumping its own `CFRunLoop`) plus real network I/O
+/// against a local listener, on the same simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift`
+/// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives -- confirmed
+/// directly: a run under severe simulator contention (every test in the job, including trivial
+/// synchronous ones, taking 80-160s instead of milliseconds) blew both this suite's own generous
+/// timing margins and, separately, crashed the whole job's process via the watchdog, taking every
+/// other in-flight test down with it -- the exact failure mode these two traits exist to prevent.
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsPACEvaluatorTests {
 
     @Test
@@ -158,6 +169,11 @@ struct InternalsPACEvaluatorTests {
 
         // When / Then -- bounded by the timeout below, not the run's own default (much longer),
         // proving the timeout is actually enforced rather than merely accepted as a parameter.
+        // 60s, not a tighter multiple of the 3s `timeout` itself: CI's Simulator runners are
+        // visibly slower under load than a local run -- confirmed directly, a run under severe
+        // contention took 82s here before this margin was widened. Still meaningfully bounded
+        // relative to `Internals.PACProxyCache`'s own much longer default timeout, so a genuine
+        // regression (the timeout parameter silently stops being honored) still fails this.
         let start = DispatchTime.now()
 
         await #expect(throws: (any Error).self) {
@@ -169,7 +185,7 @@ struct InternalsPACEvaluatorTests {
         }
 
         let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
-        #expect(elapsedSeconds < 15)
+        #expect(elapsedSeconds < 60)
     }
 }
 
