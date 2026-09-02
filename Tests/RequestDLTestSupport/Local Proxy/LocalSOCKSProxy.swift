@@ -72,7 +72,14 @@ struct LocalSOCKSProxy: Sendable {
 /// `.relaying(Channel)` in order, hand-parsing the binary SOCKS5 framing incrementally (unlike
 /// `LocalHTTPConnectProxy`'s line-oriented HTTP text, there is no delimiter to scan for -- each
 /// message's own length fields say how many more bytes are needed).
-private final class SOCKSHandler: ChannelInboundHandler {
+///
+/// `@unchecked` rather than provably `Sendable`: NIO guarantees every `ChannelHandler` callback
+/// for one channel runs on that channel's own `EventLoop`, one at a time, so `mode`/`buffer` are
+/// never actually touched concurrently. `startRelay(...)`'s `[weak self]` capture (needed since
+/// `ClientBootstrap(...).connect(...)`'s completion isn't guaranteed to land back on that same
+/// `EventLoop`) is itself what actually needs this -- the write to `mode` inside it is explicitly
+/// hopped onto `clientChannel.eventLoop` (this handler's own) before touching it.
+private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
 
@@ -157,12 +164,12 @@ private final class SOCKSHandler: ChannelInboundHandler {
             let methods = buffer.getBytes(at: buffer.readerIndex + 2, length: Int(methodCount)),
             methods.contains(0x00)
         else {
-            reply(context: context, bytes: [0x05, 0xFF], thenClose: true)
+            reply(channel: context.channel, bytes: [0x05, 0xFF], thenClose: true)
             return
         }
 
         buffer.moveReaderIndex(forwardBy: messageLength)
-        reply(context: context, bytes: [0x05, 0x00], thenClose: false)
+        reply(channel: context.channel, bytes: [0x05, 0x00], thenClose: false)
 
         mode = .awaitingRequest
         processBuffer(context: context)
@@ -199,7 +206,7 @@ private final class SOCKSHandler: ChannelInboundHandler {
             addressStart = base + 5
             addressLength = Int(domainLength)
         default:
-            failRequest(context: context, reply: 0x08)
+            failRequest(channel: context.channel, reply: 0x08)
             return
         }
 
@@ -219,7 +226,7 @@ private final class SOCKSHandler: ChannelInboundHandler {
             let portHighByte = buffer.getInteger(at: portStart, as: UInt8.self),
             let portLowByte = buffer.getInteger(at: portStart + 1, as: UInt8.self)
         else {
-            failRequest(context: context, reply: 0x07)
+            failRequest(channel: context.channel, reply: 0x07)
             return
         }
 
@@ -232,39 +239,46 @@ private final class SOCKSHandler: ChannelInboundHandler {
         let leftover = buffer.readableBytes > 0 ? buffer.readSlice(length: buffer.readableBytes) : nil
         buffer.clear()
 
-        startRelay(host: destinationHost, port: destinationPort, leftover: leftover, context: context)
+        startRelay(host: destinationHost, port: destinationPort, leftover: leftover, channel: context.channel)
     }
 
-    private func failRequest(context: ChannelHandlerContext, reply replyCode: UInt8) {
-        reply(context: context, bytes: [0x05, replyCode, 0x00, 0x01, 0, 0, 0, 0, 0, 0], thenClose: true)
+    private func failRequest(channel: Channel, reply replyCode: UInt8) {
+        reply(channel: channel, bytes: [0x05, replyCode, 0x00, 0x01, 0, 0, 0, 0, 0, 0], thenClose: true)
     }
 
-    private func reply(context: ChannelHandlerContext, bytes: [UInt8], thenClose: Bool) {
-        var out = context.channel.allocator.buffer(capacity: bytes.count)
+    // Raw `ByteBuffer`, not `wrapOutboundOut(out)`'s `NIOAny` -- `Channel.writeAndFlush` has a
+    // generic `Sendable`-constrained overload for exactly this (`ByteBuffer` is `Sendable`), where
+    // the `NIOAny`-typed overload is deprecated. Takes `channel` rather than `context` throughout
+    // this handler's private helpers -- `Channel`, unlike `ChannelHandlerContext`, is `Sendable`,
+    // so it's safe to pass into `startRelay(...)`'s `[weak self]` completion, which isn't
+    // guaranteed to already be running on this handler's own `EventLoop`.
+    private func reply(channel: Channel, bytes: [UInt8], thenClose: Bool) {
+        var out = channel.allocator.buffer(capacity: bytes.count)
         out.writeBytes(bytes)
 
-        context.writeAndFlush(wrapOutboundOut(out)).whenComplete { _ in
+        channel.writeAndFlush(out).whenComplete { _ in
             if thenClose {
-                context.close(promise: nil)
+                channel.close(promise: nil)
             }
         }
     }
 
     /// Dials `host:port`, answers the request with success (`05 00`), and flips `mode` to
     /// `.relaying` -- from here on `channelRead` forwards to `outboundChannel` directly. Mirrors
-    /// `LocalHTTPConnectProxy`'s own `startRelay(host:port:leftover:context:)` structurally; the
+    /// `LocalHTTPConnectProxy`'s own `startRelay(host:port:leftover:context:)` structurally (that
+    /// one keeps `context` -- it never needs to call a `context`-taking helper from inside the
+    /// `[weak self]` completion the way `failRequest`/`reply` here do, so it never hits the same
+    /// non-`Sendable`-capture warning `channel` fixes here); the
     /// bound address/port in the success reply are zeroed (`0.0.0.0:0`), which real SOCKS clients
     /// -- `URLSession` included, confirmed by this file's own round-trip tests actually passing --
     /// don't require to be meaningful.
-    private func startRelay(host: String, port: Int, leftover: ByteBuffer?, context: ChannelHandlerContext) {
-        let clientChannel = context.channel
-
+    private func startRelay(host: String, port: Int, leftover: ByteBuffer?, channel clientChannel: Channel) {
         ClientBootstrap(group: group).connect(host: host, port: port).whenComplete { [weak self] result in
             guard let self else { return }
 
             switch result {
             case .failure:
-                self.failRequest(context: context, reply: 0x05)
+                self.failRequest(channel: clientChannel, reply: 0x05)
 
             case .success(let outboundChannel):
                 outboundChannel.pipeline.addHandler(OutboundRelayHandler(to: clientChannel)).whenComplete {
@@ -279,7 +293,7 @@ private final class SOCKSHandler: ChannelInboundHandler {
                             self.mode = .relaying(outboundChannel)
 
                             self.reply(
-                                context: context,
+                                channel: clientChannel,
                                 bytes: [0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0],
                                 thenClose: false
                             )

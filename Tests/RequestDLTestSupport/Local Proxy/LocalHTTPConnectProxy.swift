@@ -111,7 +111,14 @@ final class ConnectAttemptCounter: @unchecked Sendable {
 /// until a full `CONNECT` request (terminated by a blank line) has arrived; once answered, flips
 /// to `.relaying` and every subsequent byte is forwarded to the dialed destination channel
 /// instead -- the same handler, the same pipeline position, throughout.
-private final class ConnectHandler: ChannelInboundHandler {
+///
+/// `@unchecked` rather than provably `Sendable`: NIO guarantees every `ChannelHandler` callback
+/// for one channel runs on that channel's own `EventLoop`, one at a time, so `mode`/`buffer` are
+/// never actually touched concurrently. `startRelay(...)`'s `[weak self]` capture (needed since
+/// `ClientBootstrap(...).connect(...)`'s completion isn't guaranteed to land back on that same
+/// `EventLoop`) is itself what actually needs this -- the write to `mode` inside it is explicitly
+/// hopped onto `clientChannel.eventLoop` (this handler's own) before touching it.
+private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
 
@@ -251,9 +258,16 @@ private final class ConnectHandler: ChannelInboundHandler {
         var out = context.channel.allocator.buffer(capacity: response.utf8.count)
         out.writeString(response)
 
-        context.writeAndFlush(wrapOutboundOut(out)).whenComplete { _ in
+        // Raw `ByteBuffer`, not `wrapOutboundOut(out)`'s `NIOAny` -- `Channel.writeAndFlush` has a
+        // generic `Sendable`-constrained overload for exactly this (`ByteBuffer` is `Sendable`),
+        // where the `NIOAny`-typed overload is deprecated. `channel`, not `context`, is what's
+        // safe to hold onto across `whenComplete` -- see `LocalServer.HTTPHandler`'s own comment
+        // on the same pattern.
+        let channel = context.channel
+
+        channel.writeAndFlush(out).whenComplete { _ in
             if !keepAlive {
-                context.close(promise: nil)
+                channel.close(promise: nil)
             }
         }
 
@@ -336,7 +350,10 @@ private final class ConnectHandler: ChannelInboundHandler {
 /// connection, and closes it once the destination goes away. Not `private` -- `LocalSOCKSProxy`
 /// reuses this verbatim for its own tunnel, the relay half being identical regardless of which
 /// proxy protocol negotiated it.
-final class OutboundRelayHandler: ChannelInboundHandler {
+///
+/// `@unchecked` rather than provably `Sendable`: `destination` is only ever read, never mutated,
+/// and every callback runs on this channel's own `EventLoop` per NIO's `ChannelHandler` contract.
+final class OutboundRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = ByteBuffer
 
     private let destination: Channel
