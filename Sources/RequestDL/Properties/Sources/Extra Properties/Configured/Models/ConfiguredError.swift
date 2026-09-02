@@ -30,8 +30,11 @@ public struct ConfiguredError: Error {
         case invalidCacheStrategy
 
         /// `secureConnection.privateKey.format` was specified but is neither `"pem"` nor
-        /// `"der"`, or `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
-        /// was specified but is none of `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`.
+        /// `"der"`, `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
+        /// was specified but is none of `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`,
+        /// `secureConnection.spkiPinning.pins` was specified but empty, or
+        /// `secureConnection.spkiPinning.policy` was specified but is neither `"strict"` nor
+        /// `"audit"`.
         case invalidSecureConnectionConfiguration
 
         /// `redirect.mode` was specified but is neither `"follow"` nor `"disallow"`.
