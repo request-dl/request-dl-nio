@@ -6,6 +6,12 @@ import AsyncHTTPClient
 import NIOCore
 import RequestDLInternals
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
+
 /// A structure representing the body of an HTTP request.
 /// This type encapsulates the data and settings for the request body,
 /// such as its size and chunking strategy.
@@ -21,6 +27,15 @@ public struct RequestBody: Sendable {
     /// The total size of the body data in bytes.
     public var totalSize: Int {
         _body.totalSize
+    }
+
+    /// The file this body already lives in, when nothing but reading it directly would be
+    /// needed to reproduce it exactly -- see `Internals.BodySequence.wholeFileURL`. Not public:
+    /// this exists for `Internals.URLSessionClient+RequestExecutingClient.swift` to skip a
+    /// redundant copy for a `Payload(url:)`-only body, not as API surface for callers of
+    /// `RequestBody` itself.
+    var wholeFileURL: URL? {
+        _body.wholeFileURL
     }
 
     // MARK: - Private properties

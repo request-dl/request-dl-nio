@@ -17,7 +17,12 @@ import class Foundation.JSONDecoder
 
 extension LocalServer {
 
-    final class HTTPHandler: ChannelInboundHandler {
+    /// `@unchecked` rather than provably `Sendable`: NIO guarantees every `ChannelHandler`
+    /// callback for one channel runs on that channel's own `EventLoop`, one at a time, so the
+    /// mutable state below is never actually touched concurrently -- the compiler just can't see
+    /// that guarantee through the `EventLoopFuture` callbacks in `channelReadComplete`, which is
+    /// what actually needs this.
+    final class HTTPHandler: ChannelInboundHandler, @unchecked Sendable {
 
         typealias InboundIn = HTTPServerRequestPart
         typealias OutboundOut = HTTPServerResponsePart
@@ -106,16 +111,27 @@ extension LocalServer {
                 headers: headers
             )
 
-            context.writeAndFlush(self.wrapOutboundOut(.head(head)))
+            // `channel`, not `context` itself, is what's safe to hold onto across these
+            // `EventLoopFuture` callbacks -- `Channel` is `Sendable`, `ChannelHandlerContext` isn't.
+            // Written as raw `HTTPServerResponsePart` values, not `self.wrapOutboundOut(...)`'s
+            // `NIOAny` -- `Channel.writeAndFlush` has a generic `Sendable`-constrained overload for
+            // exactly this (`HTTPServerResponsePart` is `Sendable`: `HTTPResponseHead` and `IOData`
+            // both are), where the `NIOAny`-typed overload is deprecated. Safe to skip the pipeline
+            // position `wrapOutboundOut`/`context` would preserve, since this handler is the only
+            // one ever installed on this channel's pipeline (see `LocalServer`'s
+            // `childChannelInitializer`).
+            let channel = context.channel
+
+            channel.writeAndFlush(HTTPServerResponsePart.head(head))
                 .flatMapWithEventLoop { _, eventLoop in
                     guard let data = response, self._method != .HEAD else {
                         return eventLoop.makeSucceededVoidFuture()
                     }
 
                     let ioData = IOData.byteBuffer(.init(data: data))
-                    return context.writeAndFlush(self.wrapOutboundOut(.body(ioData)))
+                    return channel.writeAndFlush(HTTPServerResponsePart.body(ioData))
                 }.flatMap {
-                    context.writeAndFlush(self.wrapOutboundOut(.end(nil)))
+                    channel.writeAndFlush(HTTPServerResponsePart.end(nil))
                 }.whenComplete { _ in
                     self._configuration = nil
                     self.isNewConnection = true
@@ -143,6 +159,13 @@ extension LocalServer {
 
             if let response {
                 jsonObject["response"] = response
+            }
+
+            // Lets a test prove what the client actually sent, not just what the server chose to
+            // send back -- e.g. confirming a cookie set by an earlier response was (or, under
+            // `.urlSession`'s no-jar normalization, was *not*) resent automatically.
+            if let cookie = _incomeHeaders?.first(name: "Cookie") {
+                jsonObject["receivedCookieHeader"] = .string(cookie)
             }
 
             let encoder = JSONEncoder()

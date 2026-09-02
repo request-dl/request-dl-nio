@@ -52,6 +52,11 @@ struct MockedTaskTests {
                     ("Accept", "application/json"),
                     ("Content-Type", "text/plain"),
                     ("Content-Length", String(data.count)),
+                    // `Payload` defaults the method to `"POST"` when nothing else sets one -- a
+                    // body attached to a request that would otherwise default to GET fails
+                    // outright on `.urlSession` -- so the mirrored `rdl-request-method` header
+                    // now reflects that resolved value.
+                    ("rdl-request-method", "POST"),
                 ])
         )
     }
@@ -109,6 +114,9 @@ struct MockedTaskTests {
                 == .init([
                     ("Content-Type", "application/octet-stream"),
                     ("Content-Length", String(data.count)),
+                    // See `mock_whenHeadersAndData()`'s identical note: `Payload` defaults the
+                    // method to `"POST"` when nothing else sets one.
+                    ("rdl-request-method", "POST"),
                 ])
         )
     }

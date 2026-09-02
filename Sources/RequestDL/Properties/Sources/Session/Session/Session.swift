@@ -166,11 +166,83 @@ public struct Session: Property {
     /// is silently ignored and the session falls back to plain SwiftNIO instead of failing or dropping the incompatible
     /// setting: whichever secure-connection settings were configured still apply in full, just over a different transport.
     ///
+    /// - Note: Deprecated in favor of ``preferredExecutor(_:)`` -- specifically
+    /// `.preferredExecutor(.nioTransportServices)`, which is wired into the same live decision
+    /// this flag drives. `enableNetworkFramework(true)` keeps working exactly as before: it's
+    /// treated as an *implicit* `preferredExecutor(.nioTransportServices)` whenever nothing else
+    /// already set a preference, so this deprecation doesn't silently change which transport an
+    /// existing caller gets. An explicit `preferredExecutor` (any case) still overrides that
+    /// implicit one. New code should call `preferredExecutor(.nioTransportServices)` directly
+    /// rather than lean on this shim.
+    ///
     /// - Parameter enabled: The flag to enable the Network framework
     /// - Returns: A modified property with Network framework enabled.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use .preferredExecutor(.nioTransportServices) instead. enableNetworkFramework(true) already resolves to exactly that internally, so existing behavior is unchanged -- this now exists only for source compatibility."
+    )
     public func enableNetworkFramework(_ enabled: Bool = true) -> Self {
         edit { $0.enableNetworkFramework = enabled }
+    }
+
+    ///
+    /// Prefers `executor` for this session's requests, among whichever executors the rest of its
+    /// configuration is already compatible with.
+    ///
+    /// This is a tiebreaker, not an override: it never forces an executor onto a configuration
+    /// that can't actually run on it. For example, preferring ``Session/Executor/nioTransportServices``
+    /// on a session that also sets `PSKIdentityResolver` (unsupported under Network.framework)
+    /// has no effect — that field already rules `.nioTransportServices` out on its own, so
+    /// resolution falls through to whatever is next in line. If you need a guarantee instead of a
+    /// hint — so an incompatible configuration fails loudly instead of silently landing somewhere
+    /// else — use ``requiredExecutor(_:)``.
+    ///
+    /// - Parameter executor: The executor to prefer when this session's configuration supports it.
+    /// - Returns: The modified `Session` instance with the executor preference configured.
+    ///
+    public func preferredExecutor(_ executor: Session.Executor) -> Self {
+        edit { $0.preferredExecutor = executor.build() }
+    }
+
+    ///
+    /// Pins this session to `executor`, failing the request rather than silently falling back
+    /// when the rest of its configuration can't actually run on it.
+    ///
+    /// Unlike ``preferredExecutor(_:)``, this is a guarantee: if any configured field is
+    /// unsupported under `executor` — a client certificate under `.nioTransportServices`, a
+    /// bearer-token proxy authorization under `.urlSession`, and so on — the request throws
+    /// ``ExecutorRequirementError``
+    /// instead of quietly running on a different executor than the one you pinned. Useful for
+    /// debugging, benchmarking a specific transport, or a deployment target where only one
+    /// executor is actually viable and a silent fallback would hide a real misconfiguration.
+    ///
+    /// Pinning to ``Session/Executor/urlSession`` with a client certificate configured
+    /// (``Certificate``/``PrivateKey`` on ``SecureConnection``) has one further requirement
+    /// ``ExecutorRequirementError`` can't check ahead of time: building that certificate into a
+    /// `URLSession`-presentable identity is a Keychain round-trip that needs the Keychain Sharing
+    /// capability, a one-time Xcode project setting. A request missing it throws
+    /// ``ClientIdentityError`` instead — see <doc:Using-a-Client-Certificate-with-URLSession>
+    /// for the full walkthrough. This also applies without pinning anything, since `.urlSession`
+    /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
+    /// the configuration supports it.
+    ///
+    /// ```swift
+    /// struct MyRequest: Property {
+    ///     var body: some Property {
+    ///         BaseURL("api.example.com")
+    ///         Session().requiredExecutor(.urlSession)
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter executor: The executor this session's configuration must be compatible with.
+    /// - Returns: The modified `Session` instance with the executor requirement configured.
+    ///
+    public func requiredExecutor(_ executor: Session.Executor) -> Self {
+        edit { $0.requiredExecutor = executor.build() }
     }
 
     ///

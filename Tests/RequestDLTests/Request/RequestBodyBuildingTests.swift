@@ -12,6 +12,8 @@ import Testing
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.URL
+import struct Foundation.UUID
 #endif
 
 struct RequestBodyBuildingTests {
@@ -95,5 +97,35 @@ struct RequestBodyBuildingTests {
 
         let resolvedData = await buffers.resolveData()
         #expect(resolvedData == [])
+    }
+
+    @Test
+    func requestBody_whenBackedByASingleUnreadFile_wholeFileURLReturnsThatFile() async throws {
+        // Given -- forwards straight to `Internals.BodySequence.wholeFileURL`; see
+        // `InternalsBodySequenceTests`/`InternalsFileBufferTests` for the underlying-buffer-level
+        // coverage of what "qualifies" means. This test only confirms `RequestBody` itself
+        // forwards it, since `Internals.URLSessionClient+RequestExecutingClient.swift` reads it
+        // off `RequestBody`, not `Internals.BodySequence`, directly.
+        let url =
+            temporaryDirectoryURL
+            .appendingPathComponent("requestBody.\(UUID())")
+            .appendingPathExtension("raw")
+        try await url.createPathIfNeeded()
+        defer { url.scheduleRemoval() }
+        try Data("Hello world".utf8).write(to: url)
+
+        let body = await RequestBody(buffers: [Internals.FileBuffer(url)])
+
+        // Then
+        #expect(body.wholeFileURL == url)
+    }
+
+    @Test
+    func requestBody_whenBackedByData_wholeFileURLReturnsNil() async throws {
+        // Given
+        let body = await RequestBody(buffers: [Internals.DataBuffer("Hello world")])
+
+        // Then
+        #expect(body.wholeFileURL == nil)
     }
 }

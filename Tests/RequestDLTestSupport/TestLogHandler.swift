@@ -4,6 +4,7 @@
 
 import Logging
 import NIOConcurrencyHelpers
+import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -23,7 +24,7 @@ final class TestLogHandler: LogHandler, @unchecked Sendable {
 
     private let onLogRecord: @Sendable (LogRecord) -> Void
 
-    private let lock = NIOLock()
+    private let lock = SwiftAsyncStream.Lock()
 
     private var _metadata: Logger.Metadata
     private var _logLevel: Logger.Level = .trace
