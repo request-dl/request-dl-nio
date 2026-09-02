@@ -21,6 +21,9 @@ import RequestDLInternals
 /// ```
 ///
 /// - Warning: Always deploy non-empty backup pins in production to avoid lockout during certificate rotation.
+///
+/// - Note: Incompatible with ``Session/enableNetworkFramework(_:)`` -- pinning is never dropped to honor that flag; the
+/// session instead falls back to plain SwiftNIO and keeps enforcing the pins.
 public struct SPKIPinning<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {

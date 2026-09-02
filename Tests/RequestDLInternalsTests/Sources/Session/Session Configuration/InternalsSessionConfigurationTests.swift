@@ -3,6 +3,7 @@
 //
 
 import AsyncHTTPClient
+import Crypto
 import NIOCore
 import Testing
 import Tracing
@@ -324,6 +325,51 @@ struct InternalsSessionConfigurationTests {
 
         // Then
         #expect(configuration.networkPathConstraints?.waitsForConnectivity == true)
+    }
+
+    @Test
+    func configuration_whenNetworkFrameworkNotEnabled_isCompatibleWithNetworkFrameworkIsFalse() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // Then -- `false` regardless of `secureConnection`, since the caller never asked for
+        // Network framework in the first place.
+        #expect(!configuration.isCompatibleWithNetworkFramework)
+    }
+
+    @Test
+    func configuration_whenNetworkFrameworkEnabledWithoutSecureConnection_isCompatibleWithNetworkFrameworkIsTrue()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        // When
+        configuration.enableNetworkFramework = true
+
+        // Then
+        #expect(configuration.isCompatibleWithNetworkFramework)
+    }
+
+    @Test
+    func configuration_whenNetworkFrameworkEnabledWithSPKIPinning_isCompatibleWithNetworkFrameworkIsFalse()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.tlsPins = [.init(source: .rawData(.init()), algorithm: SHA256.self)]
+
+        // When
+        configuration.enableNetworkFramework = true
+        configuration.secureConnection = secureConnection
+
+        // Then -- SPKI pinning silently overrides the Network framework request rather than
+        // failing outright or dropping the pins: AsyncHTTPClient's NIOTransportServices bridge
+        // never consults `SPKIPinningConfiguration`, so honoring `enableNetworkFramework` here
+        // would mean the pins stop being enforced without any signal to the caller.
+        #expect(!configuration.isCompatibleWithNetworkFramework)
+        #expect(secureConnection.tlsPins != nil)
     }
 
     @Test
