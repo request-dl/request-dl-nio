@@ -30,8 +30,11 @@ extension Internals {
         private static let lifetime: Int64 = 5 * 60 * 1_000_000_000
 
         /// Bounds one evaluation's fetch-and-execute time -- without this, an unreachable PAC
-        /// server would hang every request routed through it, not just the first.
-        private static let evaluationTimeout: Double = 10
+        /// server would hang every request routed through it, not just the first. 30s, not a
+        /// tighter bound: a PAC file is commonly hosted on a slow internal server reached over a
+        /// real (if sluggish) corporate network, and this only ever costs one request's worth of
+        /// latency per `lifetime` window thanks to the cache above it.
+        private static let evaluationTimeout: Double = 30
 
         // MARK: - Private properties
 
