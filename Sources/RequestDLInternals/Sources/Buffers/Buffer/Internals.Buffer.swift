@@ -458,6 +458,20 @@ extension Internals {
             moveReaderIndex(to: min(readerIndex, _writerIndex))
         }
 
+        /// Addresses `url` directly, bypassing `Stream.URL.make(from:)`.
+        ///
+        /// Every other constructor above starts from a `Foundation.URL`/`Internals.ByteURL` and
+        /// asks `Stream.URL.make(from:)` — a `static` factory with no channel to carry anything
+        /// beyond the address itself — to produce the concrete `Stream.URL`. That is a problem
+        /// for a `Stream.URL` that also needs per-instance context, such as
+        /// `Internals.EncryptedFileBufferURL`'s encryption key: there is no way to smuggle a key
+        /// through `make(from:)` without embedding it in the `Foundation.URL` itself, which must
+        /// never happen. This exists for exactly that case — a caller that already has a fully
+        /// formed `Stream.URL` in hand skips `make(from:)` entirely.
+        package init(addressing url: Stream.URL) async {
+            await self.init(storage: .init(url))
+        }
+
         private init(storage: Storage) async {
             self.init(storage: storage, writerIndex: await storage.writtenBytes)
         }

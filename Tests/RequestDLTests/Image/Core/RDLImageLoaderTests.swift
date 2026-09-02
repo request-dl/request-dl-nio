@@ -65,6 +65,52 @@ struct RDLImageLoaderTests {
     }
 
     @Test
+    func defaultDataCache_isSeparateFromDataCacheShared() async throws {
+        // Given/When
+        let loader = RDLImageLoader()
+
+        // Then: a default-constructed loader gets its own cache directory, so image bytes
+        // don't compete for space with, or get evicted by, unrelated HTTP responses the host
+        // app caches through `DataCache.shared`.
+        #expect(await loader.dataCache != DataCache.shared)
+    }
+
+    @Test
+    func defaultDataCache_hasDiskCachingEnabled() async throws {
+        // Given/When
+        let loader = RDLImageLoader()
+
+        // Then: disk caching is on by default — a zero capacity would silently make every
+        // cache write a no-op regardless of the policy `load(url:)` applies.
+        #expect(await loader.dataCache.diskCapacity > .zero)
+    }
+
+    @Test
+    func twoDefaultConstructedLoaders_shareTheSameCacheDirectory() async throws {
+        // Given/When
+        let first = RDLImageLoader()
+        let second = RDLImageLoader()
+
+        // Then: both resolve to the same suite name, so they end up backed by the same
+        // directory (and, in turn, the same underlying disk storage) rather than each silently
+        // fragmenting the cache.
+        #expect(await first.dataCache == second.dataCache)
+    }
+
+    @Test
+    func init_whenGivenACustomDataCache_usesItInsteadOfTheDefault() async throws {
+        // Given
+        let customDataCache = DataCache(diskCapacity: 1_024, suiteName: "custom-rdlimage-loader-test")
+
+        // When
+        let loader = RDLImageLoader(dataCache: customDataCache)
+
+        // Then
+        #expect(await loader.dataCache == customDataCache)
+        #expect(await loader.dataCache != RDLImageLoader().dataCache)
+    }
+
+    @Test
     func doesNotDedupeAcrossDifferentIDs() async throws {
         // Given
         let counter = Counter()

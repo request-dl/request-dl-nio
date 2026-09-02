@@ -10,12 +10,12 @@ import FoundationEssentials
 import class Foundation.Bundle
 #endif
 
-/// A structure representing additional trust roots as a property.
-public struct AdditionalTrustRoots<Content: Property>: Property {
+/// Configure the trusted roots certificates to validate the server using TLS.
+public struct TrustRoots<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
-        enum Source {
+        enum Source: Sendable {
             case file(String)
             case bytes([UInt8])
             case nodes([LeafNode<SecureConnectionNode>])
@@ -23,27 +23,25 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
 
         let source: Source
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
+            secureConnection.useDefaultTrustRoots = false
+
             switch source {
             case .file(let file):
-                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
-                additionalTrustRoots.append(.file(file))
-                secureConnection.additionalTrustRoots = additionalTrustRoots
+                secureConnection.trustRoots = .file(file)
             case .bytes(let bytes):
-                var additionalTrustRoots = secureConnection.additionalTrustRoots ?? []
-                additionalTrustRoots.append(.bytes(bytes))
-                secureConnection.additionalTrustRoots = additionalTrustRoots
+                secureConnection.trustRoots = .bytes(bytes)
             case .nodes(let nodes):
                 var collector = secureConnection.collector()
                 for node in nodes {
-                    node.passthrough(&collector)
+                    try node.passthrough(&collector)
                 }
-                secureConnection = collector(\.additionalTrustRoots)
+                secureConnection = collector(\.trustRoots)
             }
         }
     }
 
-    private enum Source {
+    private enum Source: Sendable {
         case file(String)
         case bytes([UInt8])
         case content(Content)
@@ -63,12 +61,12 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     // MARK: - Inits
 
     ///
-    /// Initializes a new instance of the AdditionalTrustRoots struct.
+    /// Instantiate using a group of ``RequestDL/Certificates`` that forms a hierarchy of trusted certificates.
     ///
     /// ```swift
     /// DataTask {
     ///    SecureConnection {
-    ///        AdditionalTrust {
+    ///        TrustRoots {
     ///            Certificate(rootPath, format: .der)
     ///            Certificate(secondPath, format: .pem)
     ///        }
@@ -77,15 +75,14 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     /// }
     /// ```
     ///
-    /// - Parameter content: A closure that returns the content of the AdditionalTrustRoots.
+    /// - Parameter content: A closure that returns the content of ``RequestDL/Certificate``.
     ///
     public init(@PropertyBuilder content: () -> Content) {
         source = .content(content())
     }
 
     ///
-    /// Initializes a new instance of the AdditionalTrustRoots struct with the specified file
-    /// in `PEM` format.
+    /// Initializes with the specified `PEM` file.
     ///
     /// - Parameter file: The path to the file.
     ///
@@ -94,8 +91,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
     }
 
     ///
-    /// Initializes a new instance of the AdditionalTrustRoots struct with the specified bytes
-    /// in `PEM` format.
+    /// Initializes with the specified bytes in `PEM` format.
     ///
     /// - Parameter bytes: An array of bytes.
     ///
@@ -105,8 +101,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
 
     #if canImport(Darwin)
     ///
-    /// Initializes a new instance of the AdditionalTrustRoots struct with the specified file in the specified bundle
-    /// in `PEM` format.
+    /// Initializes with the specified `PEM` file in some bundle.
     ///
     /// - Parameters:
     ///    - file: The path to the file.
@@ -124,7 +119,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
 
     /// This method is used internally and should not be called directly.
     public static func _makeProperty(
-        property: _GraphValue<AdditionalTrustRoots<Content>>,
+        property: _GraphValue<TrustRoots<Content>>,
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
@@ -146,7 +141,7 @@ public struct AdditionalTrustRoots<Content: Property>: Property {
             )
         case .content(let content):
             var inputs = inputs
-            inputs.environment.certificateProperty = .additionalTrust
+            inputs.environment.certificateProperty = .trust
 
             let outputs = try await Content._makeProperty(
                 property: property.detach(next: content),

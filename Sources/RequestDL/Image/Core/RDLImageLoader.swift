@@ -25,6 +25,14 @@ public actor RDLImageLoader {
     /// integrations by default.
     public static let shared = RDLImageLoader()
 
+    // MARK: - Public properties
+
+    /// The cache ``load(url:)`` stores downloaded image data in. Defaults to a dedicated
+    /// on-disk cache, separate from ``DataCache/shared``. Configure it directly — its
+    /// capacities, or, on Apple platforms, its `fileProtection` — or pass your own instance at
+    /// init to share a cache across loaders.
+    public let dataCache: DataCache
+
     // MARK: - Private properties
 
     /// In-flight downloads, keyed by the caller-supplied `id`.
@@ -36,11 +44,37 @@ public actor RDLImageLoader {
 
     // MARK: - Inits
 
-    /// Creates a new, independent loader with its own dedupe bookkeeping.
+    /// Creates a new, independent loader with its own dedupe bookkeeping and its own default
+    /// on-disk cache — see ``dataCache``.
     ///
     /// Most callers should use ``shared`` instead, so unrelated call sites requesting the same
     /// image still dedupe against each other.
-    public init() {}
+    ///
+    /// - Note: A separate overload from ``init(dataCache:)`` rather than one `dataCache`
+    /// parameter with a default value, so this stays the same `init()` symbol it always was —
+    /// giving it a default argument instead would change its signature and break binary
+    /// compatibility with anything already linked against it.
+    public init() {
+        self.init(
+            dataCache: DataCache(
+                // Sized for a meaningful number of typical thumbnail/avatar-sized images
+                // without growing unbounded; use `init(dataCache:)` for a different capacity.
+                diskCapacity: 50 * 1_024 * 1_024,
+                // Kept separate from `DataCache.shared`'s directory: without this, image bytes
+                // would compete for space with — and be subject to eviction by — whatever
+                // unrelated HTTP responses the host app also caches through the default cache.
+                suiteName: "com.request-dl-nio.RDLImage"
+            )
+        )
+    }
+
+    /// Creates a new, independent loader with its own dedupe bookkeeping, backed by `dataCache`
+    /// instead of the default one ``init()`` builds.
+    ///
+    /// - Parameter dataCache: The cache ``load(url:)`` uses. See ``dataCache``.
+    public init(dataCache: DataCache) {
+        self.dataCache = dataCache
+    }
 
     // MARK: - Public methods
 
@@ -83,14 +117,22 @@ public actor RDLImageLoader {
     /// Loads and decodes the image at `url`, deduplicating against any other concurrent load of
     /// the same URL.
     ///
+    /// Cached to disk by default, through ``dataCache``.
+    ///
     /// - Parameter url: The URL of the image.
     /// - Returns: The decoded image.
     /// - Throws: An error if the request fails or the response could not be decoded.
     ///
     public func load(url: URL) async throws -> PlatformImage {
-        try await load(
+        let dataCache = self.dataCache
+
+        return try await load(
             id: url.absoluteString,
-            task: DataTask { URLImageProperty(url: url) }
+            task: DataTask {
+                URLImageProperty(url: url)
+                    .cachePolicy(.disk)
+                    .cache(url: dataCache.directoryURL)
+            }
         )
     }
 

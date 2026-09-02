@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import NIOCore
 import RequestDLInternals
+import Tracing
 
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,
@@ -57,6 +58,11 @@ public struct RequestConfiguration: Sendable {
     /// The strategy to use for handling cached data. Defaults to `.ignoreCachedData`.
     public internal(set) var cacheStrategy: CacheStrategy
 
+    /// The `ServiceContext` to bind while this request executes. Defaults to `nil`, which leaves
+    /// whatever `ServiceContext.current` task-local is already ambient untouched — only set this
+    /// to explicitly override it for this request, independent of the calling task's own state.
+    public internal(set) var serviceContext: ServiceContext?
+
     // MARK: - Internal properties
 
     /// Only a bodyless GET is cacheable.
@@ -84,6 +90,7 @@ public struct RequestConfiguration: Sendable {
         self.readingMode = .length(1_024)
         self.cachePolicy = []
         self.cacheStrategy = .ignoreCachedData
+        self.serviceContext = nil
     }
 
     // MARK: - Internal methods
@@ -150,8 +157,40 @@ extension RequestConfiguration {
         var request = URLRequest(url: requestURL)
         request.httpMethod = method ?? "GET"
 
+        // Overrides `URLRequest`'s own default (`.useProtocolCachePolicy`), which -- independent
+        // of RequestDL's own `Internals.CacheControl`/`DataCache` -- lets URLSession's own
+        // `URLCache` answer from its own state before ever reaching the network. RequestDL owns
+        // caching entirely itself; a second, invisible cache layer underneath URLSession does
+        // nothing useful and only risks disagreeing with it.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
         for (name, value) in headers {
-            request.addValue(value, forHTTPHeaderField: name)
+            guard name.caseInsensitiveCompare("Cache-Control") == .orderedSame else {
+                request.addValue(value, forHTTPHeaderField: name)
+                continue
+            }
+
+            // `only-if-cached` is stripped from the wire header -- CFNetwork itself, underneath
+            // URLSession, honors this directive against its *own* cache before the request above
+            // ever applies: regardless of `request.cachePolicy`, a `Cache-Control:
+            // only-if-cached` request URLSession has nothing cached for fails outright with
+            // `NSURLErrorDomain` -2000 ("can't load from network"). `Internals.CacheControl`
+            // already resolved what this directive means for RequestDL's own cache before this
+            // request is ever built (see `effectiveCacheStrategy`) -- by the time execution
+            // reaches here, forwarding it verbatim would only hand the same decision to a second,
+            // stricter cache this package doesn't control and never asked to be consulted only
+            // conditionally in the first place.
+            let remaining =
+                value
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { $0.caseInsensitiveCompare("only-if-cached") != .orderedSame }
+
+            guard !remaining.isEmpty else {
+                continue
+            }
+
+            request.addValue(remaining.joined(separator: ", "), forHTTPHeaderField: name)
         }
 
         return request

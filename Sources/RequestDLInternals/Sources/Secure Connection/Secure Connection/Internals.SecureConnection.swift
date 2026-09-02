@@ -20,9 +20,9 @@ extension Internals {
         /// process, not just silently downgrade. The others listed below (`cipherSuiteValues`,
         /// `additionalTrustRoots`, `renegotiationSupport`, `signingSignatureAlgorithms`,
         /// `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`,
-        /// `pskIdentityResolver`) aren't rejected there at all — they're read from the built
-        /// `TLSConfiguration` and then never looked at again, so the connection would silently
-        /// negotiate without them rather than fail loudly.
+        /// `pskIdentityResolver`, `tlsPins`) aren't rejected there at all — they're read from the
+        /// built `TLSConfiguration` and then never looked at again, so the connection would
+        /// silently negotiate without them rather than fail loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return networkFrameworkIncompatibilityReasons().isEmpty
@@ -36,6 +36,8 @@ extension Internals {
         package var useDefaultTrustRoots: Bool = false
         package var trustRoots: TrustRoots?
         package var additionalTrustRoots: [AdditionalTrustRoots]?
+        package var tlsPinningPolicy: SPKIPinningPolicy?
+        package var tlsPins: [SPKIHash]?
         package var privateKey: PrivateKeySource?
         package var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         package var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
@@ -71,6 +73,7 @@ extension Internals {
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
             if additionalTrustRoots != nil { reasons.append(.additionalTrustRootsUnderNetworkFramework) }
+            if tlsPins != nil { reasons.append(.tlsPinning) }
             if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
             if signingSignatureAlgorithms != nil { reasons.append(.signingSignatureAlgorithms) }
             if verifySignatureAlgorithms != nil { reasons.append(.verifySignatureAlgorithms) }
@@ -85,10 +88,13 @@ extension Internals {
         /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
         /// `.noHostnameVerification` -- all four are reachable under URLSession via a Keychain
         /// round-trip and `SecTrust`/`SecPolicy` respectively, unlike under Network.framework
-        /// (see `networkFrameworkIncompatibilityReasons()` above). Whether the app actually
-        /// carries the Keychain Sharing entitlement the identity round-trip needs is a runtime
-        /// fact this static check cannot see; a missing entitlement surfaces at identity-build
-        /// time as its own runtime error, not as a reason in this list.
+        /// (see `networkFrameworkIncompatibilityReasons()` above). `tlsPins`, unlike those four,
+        /// *is* flagged here: SPKI pinning is currently wired only through
+        /// `SPKIPinningConfiguration`/`AsyncHTTPClient.SPKIHash`, which `Internals.URLSessionClient`
+        /// never consults -- its trust evaluation runs entirely through `SecTrust`/`SecPolicy`
+        /// instead. Whether the app actually carries the Keychain Sharing entitlement the identity
+        /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
+        /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
@@ -102,11 +108,12 @@ extension Internals {
             if keyLogger != nil { reasons.append(.keyLogger) }
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
+            if tlsPins != nil { reasons.append(.tlsPinning) }
 
             return reasons
         }
 
-        package func build() throws -> NIOSSL.TLSConfiguration {
+        package func build() throws -> Output {
             var tlsConfiguration = try makeTLSConfigurationByContext()
 
             if let minimumTLSVersion {
@@ -181,7 +188,10 @@ extension Internals {
                 }
             }
 
-            return tlsConfiguration
+            return try .init(
+                tlsConfiguration: tlsConfiguration,
+                tlsPinning: buildTLSPinning()
+            )
         }
 
         // MARK: - Private methods
@@ -200,6 +210,21 @@ extension Internals {
             }
 
             return tlsConfiguration
+        }
+
+        private func buildTLSPinning() throws -> SPKIPinningConfiguration? {
+            guard let tlsPins else {
+                return nil
+            }
+
+            let pins = try tlsPins.reduce(into: [AsyncHTTPClient.SPKIHash]()) {
+                try $1.resolve(&$0)
+            }
+
+            return .init(
+                pins: pins,
+                policy: tlsPinningPolicy ?? .strict
+            )
         }
     }
 }
@@ -230,6 +255,8 @@ extension Internals.SecureConnection: Equatable {
             && lhs.minimumTLSVersion == rhs.minimumTLSVersion
             && lhs.maximumTLSVersion == rhs.maximumTLSVersion
             && lhs.cipherSuiteValues == rhs.cipherSuiteValues
+            && lhs.tlsPins == rhs.tlsPins
+            && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
     }
 }
 
@@ -237,5 +264,6 @@ extension Internals.SecureConnection {
 
     package struct Output: Sendable {
         package let tlsConfiguration: TLSConfiguration
+        package let tlsPinning: SPKIPinningConfiguration?
     }
 }

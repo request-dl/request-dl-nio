@@ -38,7 +38,7 @@ extension Internals {
                 ]
             )
 
-            if requestConfiguration.cacheStrategy != .ignoreCachedData {
+            if effectiveCacheStrategy != .ignoreCachedData {
                 if let cachedData = await storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
                         client: client,
@@ -49,7 +49,7 @@ extension Internals {
                         logger?.log(level: .debug, "Cache hit - returning cached session task")
                         return .task(cachedSessionTask)
                     }
-                } else if case .useCachedDataOnly = requestConfiguration.cacheStrategy {
+                } else if case .useCachedDataOnly = effectiveCacheStrategy {
                     logger?.log(
                         level: .warning,
                         "No cached data available, but strategy is 'useCachedDataOnly' — returning error"
@@ -96,11 +96,59 @@ extension Internals {
             )
         }
 
+        /// The strategy actually applied, folding request-side ``CacheHeader`` directives on top
+        /// of ``RequestConfiguration/cacheStrategy``.
+        ///
+        /// - Important: Only ever escalates towards a more network-averse strategy, never
+        /// loosens what `.cacheStrategy(_:)` explicitly configured — order-independent by
+        /// construction, since it reads both inputs fresh rather than letting one `PropertyNode`
+        /// overwrite what another wrote.
+        private var effectiveCacheStrategy: CacheStrategy {
+            // Read straight off the outgoing `Cache-Control` request header — not a typed
+            // side-channel set by `CacheHeader`'s own `PropertyNode`. `HeaderGroup` (and
+            // `Proxy.connectHeaders`/`Form`'s per-part headers) reconstruct their subtree by
+            // searching for `LeafNode<HeaderNode>` specifically; a `CacheHeader` wrapped in
+            // anything but a plain `HeaderNode` becomes invisible to that search and gets
+            // silently dropped whenever it's nested inside one of those. Deriving from the
+            // already-serialized header sidesteps the node-graph representation entirely, so it
+            // keeps working no matter how the header got there — `CacheHeader`, a raw
+            // `Headers { "Cache-Control": ... }`, nested in a group, or anything else.
+            let requestDirectives = directives(requestConfiguration.headers["Cache-Control"] ?? [])
+                .map { $0.lowercased() }
+
+            // Gated on `isCacheEnabled`: `only-if-cached` addresses *any* cache in the request
+            // path (a CDN or proxy downstream), which is a distinct thing from this package's own
+            // on-disk cache. Escalating unconditionally would force `EmptyCachedDataError` on
+            // every request carrying the directive even when the developer never opted into
+            // local caching via `.cachePolicy(_:)` — turning a pure wire-level signal into an
+            // always-on local failure.
+            if requestDirectives.contains("only-if-cached"), requestConfiguration.isCacheEnabled {
+                return .useCachedDataOnly
+            }
+
+            let requiresRevalidation = requestDirectives.contains {
+                $0 == "no-cache" || $0.hasPrefix("no-cache=")
+            }
+
+            if requiresRevalidation, requestConfiguration.cacheStrategy == .returnCachedDataElseLoad {
+                return .reloadAndValidateCachedData
+            }
+
+            return requestConfiguration.cacheStrategy
+        }
+
+        /// Whether the outgoing request declares `no-store` (RFC 7234 §5.2.1.5) — this response
+        /// must not be persisted to this package's on-disk cache.
+        private var requestForbidsStoring: Bool {
+            directives(requestConfiguration.headers["Cache-Control"] ?? [])
+                .contains { $0.lowercased() == "no-store" }
+        }
+
         private func checkIfCachedDataStillValid(
             client: any RequestExecutingClient,
             cached cachedData: CachedData
         ) async -> SessionTask? {
-            switch requestConfiguration.cacheStrategy {
+            switch effectiveCacheStrategy {
             case .ignoreCachedData:
                 return nil
 
@@ -331,7 +379,10 @@ extension Internals {
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 let headHeaders = HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
-                guard !containsNoCache(headers: headHeaders["Cache-Control"] ?? []) else {
+                guard
+                    !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
+                    !requestForbidsStoring
+                else {
                     return nil
                 }
 
@@ -386,7 +437,7 @@ extension Internals {
                         )
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(String(describing: error))")
-                        await dataCache.remove(forKey: requestConfiguration.url)
+                        await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
                     }
                 }
 

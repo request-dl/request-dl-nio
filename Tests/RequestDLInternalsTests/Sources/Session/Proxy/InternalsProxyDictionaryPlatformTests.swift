@@ -8,6 +8,7 @@ import Testing
 
 import Foundation
 import Network
+import SwiftAsyncStream
 
 /// Cross-platform empirical check of whether `URLSession` honors
 /// `URLSessionConfiguration.connectionProxyDictionary`, on whatever Apple platform this test
@@ -145,7 +146,7 @@ struct InternalsProxyDictionaryPlatformTests {
 /// (`RequestDLTestSupport`, not a dependency of this target) so this file stays self-contained.
 private final class ConnectAttemptCounter: @unchecked Sendable {
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _count = 0
 
     var count: Int {
@@ -165,7 +166,7 @@ private final class ConnectAttemptCounter: @unchecked Sendable {
 /// exactly once) -- resumes on the first `.ready`/`.failed`, ignores every later call.
 private final class ContinuationBox: @unchecked Sendable {
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var continuation: CheckedContinuation<UInt16, Error>?
 
     init(_ continuation: CheckedContinuation<UInt16, Error>) {

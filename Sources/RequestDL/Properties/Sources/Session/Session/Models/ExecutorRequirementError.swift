@@ -28,6 +28,7 @@ public struct ExecutorRequirementError: Error, Sendable {
         case pskIdentityResolver
         case noHostnameVerificationUnderNetworkFramework
         case additionalTrustRootsUnderNetworkFramework
+        case tlsPinning
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
@@ -66,6 +67,8 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .noHostnameVerificationUnderNetworkFramework
             case .additionalTrustRootsUnderNetworkFramework:
                 self = .additionalTrustRootsUnderNetworkFramework
+            case .tlsPinning:
+                self = .tlsPinning
             case .dnsOverrideUnderURLSession:
                 self = .dnsOverrideUnderURLSession
             case .http1OnlyUnderURLSession:
@@ -144,6 +147,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "disabled hostname verification (unsupported under Network.framework)"
         case .additionalTrustRootsUnderNetworkFramework:
             return "additional trust roots (unsupported under Network.framework)"
+        case .tlsPinning:
+            return "SPKI certificate pinning"
         case .dnsOverrideUnderURLSession:
             return "a DNS override (unsupported under URLSession)"
         case .http1OnlyUnderURLSession:

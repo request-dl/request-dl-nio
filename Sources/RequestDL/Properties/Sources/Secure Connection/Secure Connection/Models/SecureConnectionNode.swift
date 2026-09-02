@@ -7,12 +7,12 @@ import RequestDLInternals
 
 protocol SecureConnectionCollectorPropertyNode: Sendable {
 
-    func make(_ collector: inout SecureConnectionNode.Collector)
+    func make(_ collector: inout SecureConnectionNode.Collector) throws
 }
 
 protocol SecureConnectionPropertyNode: Sendable {
 
-    func make(_ secureConnection: inout Internals.SecureConnection)
+    func make(_ secureConnection: inout Internals.SecureConnection) throws
 }
 
 struct SecureConnectionNode: PropertyNode {
@@ -107,12 +107,12 @@ struct SecureConnectionNode: PropertyNode {
 
         // MARK: - Internal methods
 
-        func callAsFunction(_ collector: inout Collector) {
+        func callAsFunction(_ collector: inout Collector) throws {
             switch source {
             case .node(let node):
-                node.make(&collector.secureConnection)
+                try node.make(&collector.secureConnection)
             case .collectorNode(let node):
-                node.make(&collector)
+                try node.make(&collector)
             }
         }
     }
@@ -152,18 +152,15 @@ struct SecureConnectionNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        guard let secureConnection = make.sessionConfiguration.secureConnection else {
-            #if DEBUG
-            Internals.Log.cantCreateCertificateOutsideSecureConnection().log(
-                level: .warning,
-                logger: logger
-            )
-            #endif
-            return
-        }
+        // Certificates, trust roots, TLS settings, and so on no longer require an enclosing
+        // `SecureConnection` to attach to: the base is created lazily, right here, the first
+        // time any of them is actually resolved. `SecureConnection` itself is just one more way
+        // to reach this same point (its own `Node` conforms to `SecureConnectionPropertyNode`
+        // too), not the only one.
+        let secureConnection = make.sessionConfiguration.secureConnection ?? .init()
 
         var collector = secureConnection.collector()
-        passthrough(&collector)
+        try passthrough(&collector)
         make.sessionConfiguration.secureConnection = collector(\.self)
     }
 }
