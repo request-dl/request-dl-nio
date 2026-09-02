@@ -24,12 +24,6 @@ Check out our comprehensive documentation to get all the necessary information t
 - [Building the request](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl/building-the-request)
 - [Executing the request](https://swiftpackageindex.com/request-dl/request-dl-nio/main/documentation/requestdl/executing-the-request)
 
-### Translations
-
-- [Portuguese](https://o-nnerb.github.io/request-dl-portuguese/documentation/requestdl)
-
-We would be delighted to have your help in translating our documentation into your preferred language! Simply open a Pull Request on our repository with the link to your translated version. We are looking forward to receiving your contribution!
-
 ## Installation
 
 RequestDL can be installed using Swift Package Manager. To include it in your project, add the following dependency to your Package.swift file:
