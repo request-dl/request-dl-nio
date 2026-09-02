@@ -48,7 +48,7 @@ extension Internals.URLSessionClient {
             _ session: URLSession,
             task: URLSessionTask,
             didReceive challenge: URLAuthenticationChallenge,
-            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+            completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
             guard challenge.protectionSpace.host == host else {
                 completionHandler(.performDefaultHandling, nil)

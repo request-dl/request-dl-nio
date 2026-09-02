@@ -735,7 +735,7 @@ extension Internals.URLSessionClient {
             _ session: URLSession,
             task: URLSessionTask,
             didReceive challenge: URLAuthenticationChallenge,
-            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+            completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
             if challenge.protectionSpace.isProxy(),
                 challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodHTTPBasic,
