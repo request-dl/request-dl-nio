@@ -911,7 +911,8 @@ struct ConfiguredTests {
         let reader = ConfigReader(
             provider: InMemoryProvider(values: [
                 "secureConnection.spkiPinning.pins": .init(
-                    .stringArray([UUID().uuidString]), isSecret: false
+                    .stringArray([UUID().uuidString]),
+                    isSecret: false
                 ),
                 "secureConnection.spkiPinning.policy": "lenient",
             ])
