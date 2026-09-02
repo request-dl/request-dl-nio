@@ -16,6 +16,13 @@ import Foundation
 /// `RequestExecutingClient`'s `.urlSession` conformance
 /// (`Internals.URLSessionClient+RequestExecutingClient.swift`, `RequestDLTests`) is built from.
 /// Exercised directly here, no `RawTask`/`RequestConfiguration` involved.
+///
+/// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real network I/O
+/// against a `LocalServer`, on the same simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift`
+/// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives -- see
+/// `RequestConfigurationURLSessionClientUploadTests`'s own copy of this note for the failure mode
+/// these two traits avoid.
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsURLSessionClientSessionTaskTests {
 
     @Test
