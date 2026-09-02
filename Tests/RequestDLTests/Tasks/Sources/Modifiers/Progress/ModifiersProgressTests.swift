@@ -275,7 +275,16 @@ struct ModifiersProgressTests {
 
             ReadingMode(length: length)
 
+            // Pinned to `.nio`: the assertion below expects upload progress to fire in exact
+            // `payloadChunkSize(64)` increments, which is `Internals.BodySequence`'s own
+            // NIO/streaming-body chunking guarantee, not a portable one -- URLSession's
+            // `uploadTask(with:from:)` (used for a body this small) reports the whole upload in a
+            // single `didSendBodyData` callback instead, since individual upload chunk sizes are
+            // executor-specific. The download chunk-boundary assertion further below stays
+            // executor-portable on purpose (it holds on `.urlSession` too) -- only the upload
+            // half of this test is backend-specific.
             Session.localServer
+                .requiredExecutor(.nio)
 
             SecureConnection {
                 TrustRoots {

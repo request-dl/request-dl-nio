@@ -55,6 +55,14 @@ struct DataTaskTests {
         #expect(result.response == output)
     }
 
+    /// Pinned to `.nio`: a real client-certificate handshake over `.urlSession` is a confirmed,
+    /// unconditional `withKnownIssue` on this SwiftPM test harness (no Keychain Sharing
+    /// entitlement on any platform -- see `RequestConfigurationURLSessionClientMTLSTests`'s type
+    /// doc comment, which already tracks this exact gap at the `Internals.URLSessionClient`
+    /// layer). Since `resolveExecutor()` decides which backend a real `DataTask` runs over,
+    /// this test would otherwise hit that same unconditional gap by default and fail for a
+    /// reason that has nothing to do with what it's actually verifying -- that mTLS client-cert
+    /// auth works end to end through the public `DataTask` API, which NIO already does reliably.
     @Test
     func dataTask_whenCAEnabled() async throws {
         // Given
@@ -87,6 +95,7 @@ struct DataTaskTests {
             Path(uri)
 
             Session.localServer
+                .requiredExecutor(.nio)
 
             SecureConnection {
                 TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
@@ -172,6 +181,84 @@ extension DataTaskTests {
             }
             .verification(.none)
             .version(minimum: .v1, maximum: .v1_2)
+        }
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.response == output)
+    }
+
+    /// `Session.requiredExecutor(_:)` must fail loudly at request time, not silently run on a
+    /// different executor -- this is `RawTask`'s own validation throwing `ExecutorRequirementError`,
+    /// exercised through the real public `DataTask` entry point rather than by calling
+    /// `Internals.Session.Configuration.requireExecutor(_:)` directly (already covered in
+    /// `InternalsSessionConfigurationExecutorTests`). No `LocalServer` needed -- the throw happens
+    /// before any client is built or network I/O starts.
+    @Test
+    func dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO() async throws {
+        // Given -- `additionalTrustRoots` is reachable under `.urlSession` but not under
+        // `.nioTransportServices`, so pinning the latter here is guaranteed to conflict.
+        let task = DataTask {
+            BaseURL("localhost")
+
+            Session()
+                .requiredExecutor(.nioTransportServices)
+
+            SecureConnection {
+                AdditionalTrustRoots("/dev/null")
+            }
+        }
+        .extractPayload()
+
+        // When / Then
+        await #expect(throws: ExecutorRequirementError.self) {
+            try await task.result()
+        }
+
+        do {
+            _ = try await task.result()
+            Issue.record("Not expecting success")
+        } catch let error as ExecutorRequirementError {
+            // Then -- actionable, not just "it throws": names the pinned executor, the
+            // conflicting field, and points at the escape hatch.
+            #expect(error.requiredExecutor == .nioTransportServices)
+            #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework])
+            #expect(error.description.contains(".requiredExecutor(.nioTransportServices)"))
+            #expect(error.description.contains(".preferredExecutor(_:)"))
+        }
+    }
+
+    /// Counterpart to the test above: a `requiredExecutor` the configuration *can* actually run
+    /// on must not throw -- proving the validation doesn't reject compatible configurations along
+    /// the way.
+    @Test
+    func dataTask_whenRequiredExecutorIsCompatible_doesNotThrowExecutorRequirementError() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        // When
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session.localServer
+                .requiredExecutor(.nio)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
         }
         .extractPayload()
         .result()

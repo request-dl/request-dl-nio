@@ -29,7 +29,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func callAsFunction(_ client: Internals.Client) async -> Output {
+        func callAsFunction(_ client: any RequestExecutingClient) async -> Output {
             logger?.log(
                 level: .debug,
                 "Evaluating cache for request",
@@ -145,7 +145,7 @@ extension Internals {
         }
 
         private func checkIfCachedDataStillValid(
-            client: Internals.Client,
+            client: any RequestExecutingClient,
             cached cachedData: CachedData
         ) async -> SessionTask? {
             switch effectiveCacheStrategy {
@@ -190,7 +190,7 @@ extension Internals {
 
             return SessionTask(
                 seed: .init {
-                    download.failed(HTTPClientError.cancelled)
+                    download.failed(Internals.TaskCancelledError())
                     download.close()
                 },
                 response: .init(
@@ -204,7 +204,7 @@ extension Internals {
         }
 
         private func validateCachedData(
-            client: Internals.Client,
+            client: any RequestExecutingClient,
             dataCache: DataCache,
             cached cachedData: CachedData,
             requestConfiguration: RequestConfiguration
@@ -242,7 +242,7 @@ extension Internals {
         }
 
         private func getUpdatedHeadersForCache(
-            client: Internals.Client,
+            client: any RequestExecutingClient,
             cached cachedData: CachedData
         ) async -> HTTPHeaders? {
             var requestConfiguration = requestConfiguration
@@ -266,13 +266,13 @@ extension Internals {
             )
 
             guard
-                let response = try? await client.execute(
-                    request: requestConfiguration.build(eventLoop: client.eventLoopGroup.any()),
+                let head = try? await client.revalidationHead(
+                    configuration: requestConfiguration,
                     logger: logger
-                ).response()
+                )
             else { return nil }
 
-            if response.status.code == 304 {
+            if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified) — reusing cached data")
                 return cachedData.response.headers
             }
@@ -282,19 +282,19 @@ extension Internals {
             // compared `nil` against `[]`, which is not equal, and every such response
             // invalidated a cache entry that was in fact unchanged.
             for name in ["Last-Modified", "ETag"] {
-                let fresh = response.headers[name]
+                let fresh = head.headerValues(named: name)
                 let cached = cachedData.response.headers[name] ?? []
 
                 guard fresh == cached else {
                     logger?.log(
                         level: .info,
-                        "Cache invalidated (status: \(response.status.code)) — will fetch fresh data"
+                        "Cache invalidated (status: \(head.status.code)) — will fetch fresh data"
                     )
                     return nil
                 }
             }
 
-            return .init(response.headers)
+            return HTTPHeaders(head.headers.map { ($0.name, $0.value) })
         }
 
         /// Sets a conditional request header from the values the cached response carries.

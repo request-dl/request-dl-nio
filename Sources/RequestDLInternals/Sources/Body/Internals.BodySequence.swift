@@ -4,6 +4,12 @@
 
 import NIOCore
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
+
 extension Internals {
 
     /// Cuts a list of buffers into fixed size chunks for the request body writer.
@@ -122,6 +128,20 @@ extension Internals {
 
         package var isEmpty: Bool {
             buffers.isEmpty
+        }
+
+        /// The file this whole body already lives in, when it's backed by exactly one buffer
+        /// that is itself an unread, non-temporary `Internals.FileBuffer` -- i.e. uploading
+        /// straight from that file would produce exactly these bytes, with nothing to drain or
+        /// copy first. `nil` for anything else: no buffers, more than one (multipart included),
+        /// a `DataBuffer`, or a `FileBuffer` that doesn't qualify -- see
+        /// `Internals.Buffer.wholeFileURL` for what "qualify" means.
+        package var wholeFileURL: URL? {
+            guard buffers.count == 1, let fileBuffer = buffers[0] as? Internals.FileBuffer else {
+                return nil
+            }
+
+            return fileBuffer.wholeFileURL
         }
 
         // MARK: - Private properties

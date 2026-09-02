@@ -430,4 +430,95 @@ extension InternalsSecureConnectionTests {
         // Then
         #expect(!secureConnection.isCompatibleWithNetworkFramework)
     }
+
+    @Test
+    func secureConnection_whenDefault_urlSessionIncompatibilityReasonsIsEmpty() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
+    }
+
+    /// Mirrors `secureConnection_whenNetworkFrameworkUnsupportedFieldSet_isIncompatible` above,
+    /// but for the URLSession-facing reason list -- deliberately a *different* field set, since
+    /// the two executors aren't a strict hierarchy of each other.
+    @Test(
+        arguments: [
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.signingSignatureAlgorithms = [.ecdsaSecp256R1Sha256]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.verifySignatureAlgorithms = [.ecdsaSecp256R1Sha256]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.sendCANameList = true
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.renegotiationSupport = .once
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.shutdownTimeout = .seconds(5)
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.pskHint = "hint"
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.cipherSuiteValues = [.TLS_AES_128_GCM_SHA256]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.cipherSuites = "DEFAULT"
+            },
+        ] as [@Sendable (inout Internals.SecureConnection) -> Void]
+    )
+    func secureConnection_whenURLSessionUnsupportedFieldSet_isIncompatible(
+        _ mutate: @Sendable (inout Internals.SecureConnection) -> Void
+    ) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+
+        // When
+        mutate(&secureConnection)
+
+        // Then
+        #expect(!secureConnection.urlSessionIncompatibilityReasons().isEmpty)
+    }
+
+    /// Executor compatibility is not a strict hierarchy, made concrete: these four fields are
+    /// excluded from `networkFrameworkIncompatibilityReasons()`'s counterpart list but reachable under
+    /// URLSession (via a Keychain round-trip for the identity fields, `SecTrust`/`SecPolicy` for
+    /// trust roots and hostname verification), so they must never appear in the URLSession
+    /// reason list.
+    @Test(
+        arguments: [
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.certificateVerification = .noHostnameVerification
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.additionalTrustRoots = [.file("/dev/null")]
+            },
+        ] as [@Sendable (inout Internals.SecureConnection) -> Void]
+    )
+    func secureConnection_whenURLSessionReachableFieldSet_remainsCompatible(
+        _ mutate: @Sendable (inout Internals.SecureConnection) -> Void
+    ) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+
+        // When
+        mutate(&secureConnection)
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
+    }
+
+    @Test
+    func secureConnection_whenKeyLoggerSet_urlSessionIncompatibilityReasonsContainsKeyLogger() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.keyLogger = KeyLogger { _ in }
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.keyLogger))
+    }
 }

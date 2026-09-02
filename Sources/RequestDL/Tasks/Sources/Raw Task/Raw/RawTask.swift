@@ -20,6 +20,17 @@ struct RawTask<Content: Property>: RequestTask {
             environment: environment
         ).build()
 
+        // Checked before anything else touches `resolved` -- a hard-pinned executor this
+        // configuration can't actually run on must fail loudly, not after paying for a
+        // logger/client/cache setup nobody will get to use.
+        if let requiredExecutor = resolved.session.configuration.requiredExecutor {
+            do {
+                try resolved.session.configuration.requireExecutor(requiredExecutor)
+            } catch let error as Internals.IncompatibleExecutorConfigurationError {
+                throw ExecutorRequirementError(error)
+            }
+        }
+
         if let constraints = resolved.session.configuration.networkPathConstraints {
             do {
                 try await Internals.NetworkPathGate.wait(for: constraints)
@@ -34,12 +45,35 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        let client: Internals.Client
+        // `resolvedClient()` -- not `client()` -- is what makes `preferredExecutor`/
+        // `requiredExecutor` (validated just above, for the hard-pin case) actually decide which
+        // backend this request runs over, instead of always the NIO one. `resolvedClient()`
+        // returns `Internals.ClientManager.Client` (an enum), not `any RequestExecutingClient`
+        // directly -- see that method's own doc comment for why -- so this is the one place that
+        // unwraps it into the existential everything below expects.
+        let client: any RequestExecutingClient
 
         do {
-            client = try await resolved.session.client()
+            switch try await resolved.session.resolvedClient() {
+            case .nio(let nioClient):
+                client = nioClient
+            #if canImport(Darwin)
+            case .urlSession(let urlSessionClient):
+                client = urlSessionClient
+            #endif
+            }
         } catch let error as Internals.SecureFileLoadError {
             throw SecureFileError(error)
+        } catch {
+            #if canImport(Darwin)
+            if let error = error as? Internals.URLSessionIdentityPolicy.ConfigurationError {
+                throw ClientIdentityError(error)
+            }
+            if let error = error as? Internals.RawBytesIdentityBuilder.Error {
+                throw ClientIdentityError(error)
+            }
+            #endif
+            throw error
         }
 
         let cacheControl = Internals.CacheControl(
@@ -63,22 +97,25 @@ struct RawTask<Content: Property>: RequestTask {
             case .task(let task):
                 return (task, nil)
             case .cache(let cache):
-                var request = try resolved.requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
+                // A `RequestConfiguration` copy, not a NIO-specific `HTTPClient.Request` -- the
+                // span context has to reach the wire for both `.nio` and `.urlSession`, and
+                // `client.execute(configuration:cache:logger:)` (`RequestExecutingClient`, not
+                // `Internals.Session.execute`) is what stays transport-agnostic. Every conformance
+                // builds its own transport request straight from `configuration.headers`, so
+                // injecting here reaches whichever backend `resolvedClient()` picked.
+                var configuration = resolved.requestConfiguration
+                let method = configuration.method ?? "GET"
 
                 let tracer = resolved.session.configuration.tracer
-                let span = tracer.startSpan(request.method.rawValue, ofKind: .client)
-                span.attributes["http.request.method"] = SpanAttribute.string(request.method.rawValue)
-                span.attributes["url.full"] = SpanAttribute.string(resolved.requestConfiguration.url)
+                let span = tracer.startSpan(method, ofKind: .client)
+                span.attributes["http.request.method"] = SpanAttribute.string(method)
+                span.attributes["url.full"] = SpanAttribute.string(configuration.url)
 
-                tracer.inject(span.context, into: &request.headers, using: HTTPHeadersInjector())
+                tracer.inject(span.context, into: &configuration.headers, using: HTTPHeadersInjector())
 
                 do {
-                    let task = try await resolved.session.execute(
-                        client: client,
-                        request: request,
-                        url: resolved.requestConfiguration.url,
-                        readingMode: resolved.requestConfiguration.readingMode,
-                        uploadingBytes: resolved.requestConfiguration.body?.totalSize ?? .zero,
+                    let task = try await client.execute(
+                        configuration: configuration,
                         cache: cache,
                         logger: logger
                     )
@@ -141,7 +178,7 @@ struct RawTask<Content: Property>: RequestTask {
 
 private struct HTTPHeadersInjector: Injector {
 
-    func inject(_ value: String, forKey key: String, into headers: inout NIOHTTP1.HTTPHeaders) {
+    func inject(_ value: String, forKey key: String, into headers: inout HTTPHeaders) {
         headers.add(name: key, value: value)
     }
 }
