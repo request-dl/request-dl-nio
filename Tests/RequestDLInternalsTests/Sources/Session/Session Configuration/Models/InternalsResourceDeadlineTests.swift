@@ -25,8 +25,12 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationFinishesBeforeDeadline_returnsItsResult() async throws {
-        // Given -- deadline generous relative to the operation.
-        let deadline = Internals.ResourceDeadline(nanoseconds: 2_000_000_000)
+        // Given -- deadline generous relative to the operation. 10s rather than a merely
+        // 200x-generous 2s: observed flaky on a contended CI runner (a heavily loaded shared
+        // macOS runner can starve this process for well over 2 real seconds even though
+        // `operation` itself only ever awaits a 10ms sleep), so this margin is sized against
+        // scheduler jitter under load, not against `operation`'s own duration.
+        let deadline = Internals.ResourceDeadline(nanoseconds: 10_000_000_000)
 
         // When
         let result = try await deadline.race {
@@ -147,8 +151,9 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationFinishesBeforeDeadline_neverCancelsGivenSeed() async throws {
-        // Given
-        let deadline = Internals.ResourceDeadline(nanoseconds: 2_000_000_000)
+        // Given -- see the identical note on `race_whenOperationFinishesBeforeDeadline_returnsItsResult`
+        // above: 10s margin, sized against CI scheduler jitter rather than `operation`'s own 10ms.
+        let deadline = Internals.ResourceDeadline(nanoseconds: 10_000_000_000)
 
         actor CancellationFlag {
             private(set) var wasCancelled = false
