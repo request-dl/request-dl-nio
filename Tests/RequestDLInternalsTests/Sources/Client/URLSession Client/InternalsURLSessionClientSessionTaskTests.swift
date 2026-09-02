@@ -220,8 +220,11 @@ struct InternalsURLSessionClientSessionTaskTests {
         }
         continuation.finish()
 
+        // Short, not the 60s default, so a real regression fails fast rather than hanging the
+        // suite -- 15s rather than 5s since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
+        // visibly slower under load than a local run or macOS's own (host-speed) job.
         var configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 5
+        configuration.timeoutIntervalForRequest = 15
         let client = try Internals.URLSessionClient(configuration: configuration)
 
         // When
@@ -273,8 +276,11 @@ struct InternalsURLSessionClientSessionTaskTests {
         continuation.yield(ByteBuffer(bytes: payload))
         continuation.finish()
 
+        // Short, not the 60s default, so a real regression fails fast rather than hanging the
+        // suite -- 15s rather than 5s since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
+        // visibly slower under load than a local run or macOS's own (host-speed) job.
         var configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 5
+        configuration.timeoutIntervalForRequest = 15
         let client = try Internals.URLSessionClient(configuration: configuration)
 
         // When

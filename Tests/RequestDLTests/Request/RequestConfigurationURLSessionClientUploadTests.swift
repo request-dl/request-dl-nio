@@ -50,12 +50,14 @@ import Security
 ///
 /// A short `timeoutIntervalForRequest` is kept on these tests -- harmless now that they pass, and
 /// cheap insurance against a future regression hanging the suite for the default 60s instead of
-/// failing fast.
+/// failing fast. 15s, not 5s: CI's iOS/iPadOS/watchOS/visionOS Simulator runners are visibly
+/// slower under load than a local run or macOS's own (host-speed) job in the same workflow --
+/// tight enough to still fail fast on a real regression, loose enough not to flake there.
 struct RequestConfigurationURLSessionClientUploadTests {
 
     private static var shortTimeoutConfiguration: URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 5
+        configuration.timeoutIntervalForRequest = 15
         return configuration
     }
 
