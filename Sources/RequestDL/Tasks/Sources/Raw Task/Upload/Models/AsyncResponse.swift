@@ -15,6 +15,7 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncResponse.Iterator
         fileprivate let onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)?
+        fileprivate let deadline: Internals.ResourceDeadline
 
         ///
         /// Returns the next element in the sequence, or nil if there are no more elements.
@@ -23,7 +24,19 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         ///
         mutating public func next() async throws -> Element? {
             do {
-                switch try await iterator.next() {
+                // `deadline.race(_:)` may run this closure as a real task-group child task, so it
+                // captures `iterator`'s *current value* immutably and owns a private mutable copy
+                // of it entirely within its own execution, rather than mutating the `var` this
+                // method itself owns from what could be a different task.
+                let startIterator = iterator
+                let (step, updatedIterator) = try await deadline.race(seed: seed) {
+                    var iterator = startIterator
+                    let step = try await iterator.next()
+                    return (step, iterator)
+                }
+                iterator = updatedIterator
+
+                switch step {
                 case .upload(let step):
                     return .upload(
                         UploadStep(
@@ -43,13 +56,18 @@ public struct AsyncResponse: Sendable, AsyncSequence {
                             head: .init(step.head),
                             bytes: AsyncBytes(
                                 seed: seed,
-                                bytes: step.bytes
+                                bytes: step.bytes,
+                                deadline: deadline
                             )
                         )
                     )
                 case .none:
                     return nil
                 }
+            } catch is Internals.ResourceTimeoutError {
+                let error = ResourceTimeoutError()
+                onResponseHead?(.failure(error))
+                throw error
             } catch {
                 onResponseHead?(.failure(error))
                 throw error
@@ -70,17 +88,20 @@ public struct AsyncResponse: Sendable, AsyncSequence {
     private let seed: Internals.TaskSeed
     private let response: Internals.AsyncResponse
     private let onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)?
+    private let deadline: Internals.ResourceDeadline
 
     // MARK: - Inits
 
     init(
         seed: Internals.TaskSeed,
         response: Internals.AsyncResponse,
-        onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)? = nil
+        onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)? = nil,
+        deadline: Internals.ResourceDeadline = .init(nanoseconds: nil)
     ) {
         self.seed = seed
         self.response = response
         self.onResponseHead = onResponseHead
+        self.deadline = deadline
     }
 
     // MARK: - Public methods
@@ -94,7 +115,8 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         Iterator(
             seed: seed,
             iterator: response.makeAsyncIterator(),
-            onResponseHead: onResponseHead
+            onResponseHead: onResponseHead,
+            deadline: deadline
         )
     }
 }
