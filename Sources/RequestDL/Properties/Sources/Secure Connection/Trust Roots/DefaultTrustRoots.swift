@@ -9,7 +9,7 @@ public struct DefaultTrustRoots: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection.trustRoots = nil
             secureConnection.useDefaultTrustRoots = true
         }

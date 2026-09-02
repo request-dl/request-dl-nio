@@ -7,9 +7,9 @@ import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 import RequestDLInternals
+import SwiftAsyncStream
 import SwiftAsyncTesting
 import Testing
-import SwiftAsyncStream
 
 @testable import RequestDL
 @testable import RequestDLTestSupport

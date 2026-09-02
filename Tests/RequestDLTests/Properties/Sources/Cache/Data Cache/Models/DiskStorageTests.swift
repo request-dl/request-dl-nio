@@ -68,7 +68,7 @@ struct DiskStorageTests {
             // Given: a first entry, written with plenty of room. The data file has to actually
             // exist on disk for the record to be discoverable later, so a byte is written and
             // the buffer closed.
-            var (firstBuffer, _) = await storage.allocateBuffer(
+            var (firstBuffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: firstResponse,
                 contentLength: 0,
@@ -81,7 +81,7 @@ struct DiskStorageTests {
 
             // When: a second entry is allocated with a capacity that only has room for itself
             // plus a sliver more — not enough to also keep the first entry around.
-            var (secondBuffer, _) = await storage.allocateBuffer(
+            var (secondBuffer, _, _) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
                 contentLength: 0,
@@ -105,7 +105,7 @@ struct DiskStorageTests {
 
             // Given: a real entry that is already over whatever capacity `freeSpace` is about
             // to be called with — a rescan would find it and evict it.
-            var (buffer, _) = await storage.allocateBuffer(
+            var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 0,
@@ -132,7 +132,7 @@ struct DiskStorageTests {
             let storage = DiskStorage(directory: directoryURL)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _) = await storage.allocateBuffer(
+            var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 0,
@@ -163,7 +163,7 @@ struct DiskStorageTests {
 
             // Given/When: the first entry in an empty directory, so usage after it is exactly
             // its own size.
-            let (_, firstUsage) = await storage.allocateBuffer(
+            let (_, firstUsage, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: firstResponse,
                 contentLength: 10,
@@ -177,7 +177,7 @@ struct DiskStorageTests {
             let secondResponse = makeCachedResponse(key: "k2")
             let secondResponseSize = Int64(try JSONEncoder().encode(secondResponse).count)
 
-            let (_, secondUsage) = await storage.allocateBuffer(
+            let (_, secondUsage, _) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
                 contentLength: 20,
@@ -282,7 +282,7 @@ struct DiskStorageTests {
             let plaintext = Data("this must never appear in cleartext on disk".utf8)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _) = await storage.allocateBuffer(
+            var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: Int64(plaintext.count),
@@ -314,7 +314,7 @@ struct DiskStorageTests {
             let plaintext = Data("round trips through the encrypted disk tier".utf8)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _) = await storage.allocateBuffer(
+            var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: Int64(plaintext.count),
@@ -337,7 +337,7 @@ struct DiskStorageTests {
 
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _) = await storage.allocateBuffer(
+            var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 5,
@@ -366,7 +366,7 @@ struct DiskStorageTests {
 
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _) = await storage.allocateBuffer(
+            var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 5,
@@ -405,7 +405,7 @@ struct DiskStorageTests {
             // What has to keep working is `Record.size`'s eviction accounting, a real stat of
             // whatever is actually on disk, so eviction still targets the oldest entry correctly
             // once that "actually on disk" is ciphertext-plus-framing rather than plaintext.
-            var (firstBuffer, _) = await storage.allocateBuffer(
+            var (firstBuffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: firstResponse,
                 contentLength: 0,
@@ -416,7 +416,7 @@ struct DiskStorageTests {
             try? await firstBuffer?.close()
             #expect(await storage["k1"] != nil)
 
-            var (secondBuffer, _) = await storage.allocateBuffer(
+            var (secondBuffer, _, _) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
                 contentLength: 0,
@@ -452,7 +452,7 @@ struct DiskStorageTests {
             let response = makeCachedResponse(key: "k1")
 
             // Given/When: a buffer is allocated but nothing has been written into it yet.
-            let (buffer, _) = await storage.allocateBuffer(
+            let (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 0,
@@ -498,7 +498,7 @@ struct DiskStorageTests {
 
             let response = makeCachedResponse(key: "k1")
 
-            let (buffer, _) = await storage.allocateBuffer(
+            let (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 0,

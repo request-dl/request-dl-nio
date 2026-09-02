@@ -437,7 +437,7 @@ extension Internals {
                         )
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(String(describing: error))")
-                        await dataCache.remove(forKey: requestConfiguration.url)
+                        await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
                     }
                 }
 

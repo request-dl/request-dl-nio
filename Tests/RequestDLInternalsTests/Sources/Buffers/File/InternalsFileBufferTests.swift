@@ -33,6 +33,12 @@ struct InternalsFileBufferTests {
             url = URL(fileURLWithPath: FilePath.temporaryDirectory.string, isDirectory: true)
                 .appendingPathComponent("FileBufferTests.\(UUID().uuidString).txt")
 
+            // On a freshly booted iOS Simulator, the system temporary directory isn't
+            // guaranteed to exist yet — unlike `Internals.FileBuffer`, `Data.write(to:)` below
+            // doesn't create its parent directory. Concurrently-running tests would otherwise
+            // race to be the first to create it, and everyone that lost the race would fail
+            // with "no such file or directory".
+            try await url.createPathIfNeeded()
             try await url.removeIfNeeded()
         }
 

@@ -180,7 +180,8 @@ extension RequestConfiguration {
             // reaches here, forwarding it verbatim would only hand the same decision to a second,
             // stricter cache this package doesn't control and never asked to be consulted only
             // conditionally in the first place.
-            let remaining = value
+            let remaining =
+                value
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { $0.caseInsensitiveCompare("only-if-cached") != .orderedSame }

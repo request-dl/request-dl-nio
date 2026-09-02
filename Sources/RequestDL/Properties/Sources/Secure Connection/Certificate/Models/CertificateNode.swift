@@ -28,7 +28,7 @@ struct CertificateNode: SecureConnectionCollectorPropertyNode {
 
     // MARK: - Internal methods
 
-    func make(_ collector: inout SecureConnectionNode.Collector) {
+    func make(_ collector: inout SecureConnectionNode.Collector) throws {
         switch property {
         case .chain:
             var certificateChain = collector.certificateChain ?? []
