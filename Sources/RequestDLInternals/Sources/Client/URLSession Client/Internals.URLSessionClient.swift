@@ -74,9 +74,16 @@ extension Internals {
             maximumConcurrentConnections: Int? = nil
         ) throws {
             var configuration = configuration
-            if let proxy {
-                configuration.connectionProxyDictionary = proxy.buildConnectionProxyDictionary()
-            }
+            // Explicitly `[:]`, not left untouched, when `proxy` is `nil` -- `URLSession` treats an
+            // unset `connectionProxyDictionary` as "inherit whatever macOS's Network preferences
+            // (or a device's Wi-Fi proxy config) currently say," unlike AsyncHTTPClient, which has
+            // no such discovery at all. Without this, a caller who declares neither `Proxy` nor
+            // `SystemProxy` -- the documented "system proxy is ignored unless opted into" contract
+            // `SystemProxy`'s own doc comment makes -- would silently pick up an ambient proxy
+            // anyway on `.urlSession`, but not on the NIO executor: the exact kind of
+            // executor-dependent behavior change this package works hard to avoid elsewhere (see
+            // `httpShouldSetCookies`/`httpCookieStorage` below, same rationale).
+            configuration.connectionProxyDictionary = proxy?.buildConnectionProxyDictionary() ?? [:]
 
             // Required normalization, not optional: URLSession persists cookies in a jar by
             // default, the NIO executor has none at all -- without

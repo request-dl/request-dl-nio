@@ -137,6 +137,29 @@ struct InternalsURLSessionClientProxyTests {
 
         try await proxy.shutdown()
     }
+
+    /// `URLSessionConfiguration.connectionProxyDictionary` left `nil` (its own default) means
+    /// "inherit whatever the OS's Network preferences currently say" -- `Internals.URLSessionClient`
+    /// must explicitly set it to `[:]` when no `Proxy`/resolved `SystemProxy` is configured, or the
+    /// documented "system proxy is ignored unless opted into" contract (`RequestDL.SystemProxy`'s
+    /// own doc comment) silently breaks on this executor while still holding on the NIO one.
+    ///
+    /// `URLSessionConfiguration` is a class, so the same instance passed in is what `init` mutates
+    /// -- inspecting it after construction directly observes what `Internals.URLSessionClient`
+    /// actually did, no need to reach into the private `URLSession` it built from it.
+    @Test
+    func init_whenNoProxyConfigured_explicitlyDisablesConnectionProxyDictionary() throws {
+        // Given
+        let configuration = URLSessionConfiguration.ephemeral
+        #expect(configuration.connectionProxyDictionary == nil)
+
+        // When
+        _ = try Internals.URLSessionClient(configuration: configuration)
+
+        // Then -- explicitly `[:]`, not still `nil`: a `nil ?? [:]` fallback in the assertion
+        // itself would pass either way, defeating the point of this test.
+        #expect(configuration.connectionProxyDictionary?.isEmpty == true)
+    }
 }
 
 /// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
