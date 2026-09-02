@@ -24,6 +24,10 @@ extension Internals {
         case pskIdentityResolver
         case noHostnameVerificationUnderNetworkFramework
         case additionalTrustRootsUnderNetworkFramework
+        /// SPKI pinning is wired only through `SPKIPinningConfiguration`/`AsyncHTTPClient.SPKIHash`,
+        /// which neither Network.framework's `getNWProtocolTLSOptions` bridge nor
+        /// `Internals.URLSessionClient`'s `SecTrust`-based trust evaluation ever consults.
+        case tlsPinning
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
