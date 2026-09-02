@@ -44,10 +44,12 @@ struct AsyncBytesEventsTests {
         }
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: "1", event: "greeting", data: "hello", retry: nil),
-            ServerSentEvent(id: "1", event: "message", data: "world", retry: 2000)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: "1", event: "greeting", data: "hello", retry: nil),
+                ServerSentEvent(id: "1", event: "message", data: "world", retry: 2000),
+            ]
+        )
     }
 
     @Test
@@ -75,8 +77,10 @@ struct AsyncBytesEventsTests {
         }
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
+            ]
+        )
     }
 }

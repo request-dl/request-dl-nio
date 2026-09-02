@@ -23,9 +23,11 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("event: greeting\ndata: hello\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "greeting", data: "hello", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "greeting", data: "hello", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -39,9 +41,11 @@ struct ServerSentEventParserTests {
 
         // Then
         #expect(first.isEmpty)
-        #expect(second == [
-            ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
-        ])
+        #expect(
+            second == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -55,9 +59,11 @@ struct ServerSentEventParserTests {
 
         // Then
         #expect(first.isEmpty)
-        #expect(second == [
-            ServerSentEvent(id: nil, event: "message", data: "hello\nworld", retry: nil)
-        ])
+        #expect(
+            second == [
+                ServerSentEvent(id: nil, event: "message", data: "hello\nworld", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -69,9 +75,11 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("data: line one\ndata: line two\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "line one\nline two", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "line one\nline two", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -83,9 +91,11 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data(": keep-alive\ndata: hello\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -110,12 +120,16 @@ struct ServerSentEventParserTests {
         let second = parser.feed(Data("data: world\n\n".utf8))
 
         // Then
-        #expect(first == [
-            ServerSentEvent(id: "1", event: "message", data: "hello", retry: nil)
-        ])
-        #expect(second == [
-            ServerSentEvent(id: "1", event: "message", data: "world", retry: nil)
-        ])
+        #expect(
+            first == [
+                ServerSentEvent(id: "1", event: "message", data: "hello", retry: nil)
+            ]
+        )
+        #expect(
+            second == [
+                ServerSentEvent(id: "1", event: "message", data: "world", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -127,9 +141,11 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("id: 1\u{0000}\ndata: hello\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -141,9 +157,11 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("retry: 3000\ndata: hello\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "hello", retry: 3000)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: 3000)
+            ]
+        )
     }
 
     @Test
@@ -155,13 +173,15 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("retry: soon\ndata: hello\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)
+            ]
+        )
     }
 
     @Test
-    func feed_whenFieldHasNoColon_shouldTreatItAsFieldNameWithEmptyValue()  {
+    func feed_whenFieldHasNoColon_shouldTreatItAsFieldNameWithEmptyValue() {
         // Given
         var parser = ServerSentEventParser()
 
@@ -169,9 +189,11 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("data\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "", retry: nil)
+            ]
+        )
     }
 
     @Test
@@ -183,10 +205,12 @@ struct ServerSentEventParserTests {
         let events = parser.feed(Data("data: first\n\ndata: second\n\n".utf8))
 
         // Then
-        #expect(events == [
-            ServerSentEvent(id: nil, event: "message", data: "first", retry: nil),
-            ServerSentEvent(id: nil, event: "message", data: "second", retry: nil)
-        ])
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "first", retry: nil),
+                ServerSentEvent(id: nil, event: "message", data: "second", retry: nil),
+            ]
+        )
     }
 
     @Test
