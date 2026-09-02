@@ -4,6 +4,7 @@
 
 #if canImport(Darwin)
 
+import Crypto
 import NIOSSL
 import Testing
 
@@ -120,6 +121,43 @@ struct BackgroundDownloadTaskTests {
                 Issue.record("Expected .incompleteClientIdentity, got \(error.reason)")
                 return
             }
+        }
+    }
+
+    /// `Insecure.SHA1` isn't one of `Internals.SPKIHash.KnownAlgorithm`'s three cases, so it pins
+    /// correctly live (see `InternalsServerTrustPolicyTests`) but can't be captured for a relaunch
+    /// -- exactly the same "works live, not here" split `result_whenClientCertificateIsBytesBacked...`
+    /// above exercises for mTLS.
+    @Test
+    func result_whenSPKIPinningUsesUnnamedAlgorithm_throwsUnsupportedConfigurationError() async throws {
+        // Given -- any digest of the right byte count for the algorithm; SPKIHash's own length
+        // validation, not a real match against a server certificate, is what this test needs.
+        let dummyDigest = Data(repeating: 0, count: Insecure.SHA1.Digest.byteCount)
+
+        let task = BackgroundDownloadTask(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
+        ) {
+            BaseURL("localhost")
+
+            SecureConnection {
+                SPKIPinning {
+                    SPKIHash(dummyDigest, algorithm: Insecure.SHA1.self)
+                }
+            }
+        }
+
+        // When / Then
+        do {
+            try await task.result()
+            Issue.record("Expected BackgroundDownloadUnsupportedConfigurationError")
+        } catch let error as BackgroundDownloadUnsupportedConfigurationError {
+            guard case .spkiPinningAlgorithmNotSupported = error.reason else {
+                Issue.record("Expected .spkiPinningAlgorithmNotSupported, got \(error.reason)")
+                return
+            }
+            #expect((error as any Error).localizedDescription == error.description)
+            #expect(error.description.contains("SHA-256"))
         }
     }
 }

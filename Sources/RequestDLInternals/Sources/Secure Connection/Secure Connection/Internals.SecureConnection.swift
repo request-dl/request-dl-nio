@@ -86,15 +86,17 @@ extension Internals {
         }
 
         /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
-        /// `.noHostnameVerification` -- all four are reachable under URLSession via a Keychain
-        /// round-trip and `SecTrust`/`SecPolicy` respectively, unlike under Network.framework
-        /// (see `networkFrameworkIncompatibilityReasons()` above). `tlsPins`, unlike those four,
-        /// *is* flagged here: SPKI pinning is currently wired only through
-        /// `SPKIPinningConfiguration`/`AsyncHTTPClient.SPKIHash`, which `Internals.URLSessionClient`
-        /// never consults -- its trust evaluation runs entirely through `SecTrust`/`SecPolicy`
-        /// instead. Whether the app actually carries the Keychain Sharing entitlement the identity
-        /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
-        /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
+        /// `.noHostnameVerification`/`tlsPins` -- all five are reachable under URLSession, via a
+        /// Keychain round-trip (`certificateChain`/`privateKey`) or `SecTrust`/`SecPolicy`
+        /// (everything else), unlike under Network.framework (see
+        /// `networkFrameworkIncompatibilityReasons()` above, where SPKI pinning stays
+        /// incompatible -- it's wired only through `SPKIPinningConfiguration`, which
+        /// AsyncHTTPClient's NIOTransportServices bridge never consults). `Internals.ServerTrustPolicy`
+        /// recomputes each pin's SPKI digest itself from the peer's leaf certificate rather than
+        /// going through `SPKIPinningConfiguration` at all. Whether the app actually carries the
+        /// Keychain Sharing entitlement the identity round-trip needs is a runtime fact this
+        /// static check cannot see; a missing entitlement surfaces at identity-build time as its
+        /// own runtime error, not as a reason in this list.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
@@ -108,7 +110,6 @@ extension Internals {
             if keyLogger != nil { reasons.append(.keyLogger) }
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
-            if tlsPins != nil { reasons.append(.tlsPinning) }
 
             return reasons
         }

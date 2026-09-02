@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import NIOSSL
 import RequestDLInternals
 import Testing
@@ -31,7 +32,7 @@ struct InternalsServerTrustPolicyTests {
         secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
 
         // When
-        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
 
         // Then
         #expect(descriptor.trustedRootCertificatesDER.count == 1)
@@ -44,7 +45,7 @@ struct InternalsServerTrustPolicyTests {
         let secureConnection = Internals.SecureConnection()
 
         // When
-        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
 
         // Then
         #expect(descriptor.trustedRootCertificatesDER.isEmpty)
@@ -65,7 +66,7 @@ struct InternalsServerTrustPolicyTests {
         secureConnection.certificateVerification = pair.0
 
         // When
-        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
 
         // Then
         #expect(descriptor.verification == pair.1)
@@ -83,10 +84,84 @@ struct InternalsServerTrustPolicyTests {
         ]
 
         // When
-        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
 
         // Then
         #expect(descriptor.trustedRootCertificatesDER.count == 2)
+    }
+
+    // MARK: - SPKI pinning
+
+    @Test
+    func resolve_whenSPKIPinningConfiguredWithKnownAlgorithm_capturesItInDescriptor() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: SHA256.self)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .audit
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.spkiPinning?.pins == [.init(algorithm: .sha256, digest: pin)])
+        #expect(descriptor.spkiPinning?.policy == .audit)
+    }
+
+    @Test
+    func resolve_whenNoSPKIPinningConfigured_descriptorHasNone() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.spkiPinning == nil)
+    }
+
+    /// `Internals.SPKIHash.KnownAlgorithm` only names SHA-256/384/512 -- anything else, like
+    /// `Insecure.SHA1` here, still works for live pinning (see
+    /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
+    /// below) but can't be captured into a `Descriptor`.
+    @Test
+    func descriptor_whenSPKIPinningUsesUnnamedAlgorithm_throwsUnpersistableAlgorithm() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: Insecure.SHA1.self)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: Insecure.SHA1.self)]
+
+        let policy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        // When / Then
+        #expect(throws: Internals.ServerTrustPolicy.DescriptorError.self) {
+            try policy.descriptor()
+        }
+    }
+
+    @Test
+    func descriptor_roundTripsSPKIPinningThroughInit() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: SHA256.self)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+
+        let original = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        // When
+        let encoded = try JSONEncoder().encode(original.descriptor())
+        let decoded = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: encoded)
+        let rebuilt = Internals.ServerTrustPolicy(descriptor: decoded)
+
+        // Then
+        #expect(try rebuilt.descriptor() == original.descriptor())
     }
 
     // MARK: - Descriptor round trip
@@ -105,12 +180,12 @@ struct InternalsServerTrustPolicyTests {
         // When -- exactly what survives a relaunch: the `Descriptor`, JSON round-tripped the same
         // way `BackgroundDownloads.Session` persists it on `taskDescription`, then rebuilt from
         // that alone.
-        let encoded = try JSONEncoder().encode(original.descriptor)
+        let encoded = try JSONEncoder().encode(original.descriptor())
         let decoded = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: encoded)
         let rebuilt = Internals.ServerTrustPolicy(descriptor: decoded)
 
         // Then
-        #expect(rebuilt.descriptor == original.descriptor)
+        #expect(try rebuilt.descriptor() == original.descriptor())
     }
 
     // MARK: - handle(challenge:completionHandler:) -- real handshake, rebuilt policy
@@ -137,7 +212,7 @@ struct InternalsServerTrustPolicyTests {
         secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
         secureConnection.certificateVerification = .fullVerification
 
-        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
 
         // Simulates a relaunch: the only thing carried forward is the `Descriptor` itself, JSON
         // round-tripped, exactly like `taskDescription`.
@@ -175,7 +250,7 @@ struct InternalsServerTrustPolicyTests {
         secureConnection.trustRoots = .file(unrelatedCertificate.certificateURL.absolutePath(percentEncoded: false))
         secureConnection.certificateVerification = .fullVerification
 
-        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
         let rebuiltPolicy = Internals.ServerTrustPolicy(descriptor: descriptor)
 
         let delegate = ForwardingChallengeDelegate(policy: rebuiltPolicy)
@@ -188,6 +263,176 @@ struct InternalsServerTrustPolicyTests {
         await #expect(throws: (any Error).self) {
             try await session.data(for: request)
         }
+    }
+
+    // MARK: - handle(challenge:completionHandler:) -- SPKI pinning, real handshake
+
+    @Test
+    func rebuiltPolicy_whenSPKIPinningMatchesServerCertificate_acceptsHandshake() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+
+        // Simulates a relaunch, same as the trust-roots tests above.
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+        let encoded = try JSONEncoder().encode(descriptor)
+        let decoded = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: encoded)
+        let rebuiltPolicy = Internals.ServerTrustPolicy(descriptor: decoded)
+
+        let delegate = ForwardingChallengeDelegate(policy: rebuiltPolicy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        let (data, response2) = try await session.data(for: request)
+
+        // Then
+        #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
+        let decodedBody = try HTTPResult<String>(data)
+        #expect(decodedBody.response == output)
+    }
+
+    @Test
+    func rebuiltPolicy_whenSPKIPinningDoesNotMatchUnderStrictPolicy_rejectsHandshake() async throws {
+        // Given -- trust roots anchor to the real server certificate (so plain chain validation
+        // passes), but the configured pin is some other certificate's SPKI, not the one
+        // `LocalServer` actually presents -- isolating the rejection to the pin check itself.
+        let server = Certificates().server()
+        let unrelatedCertificate = Certificates().client()
+        let wrongPin = try hashSPKI(from: unrelatedCertificate.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.cleanup(at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(wrongPin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+        let rebuiltPolicy = Internals.ServerTrustPolicy(descriptor: descriptor)
+
+        let delegate = ForwardingChallengeDelegate(policy: rebuiltPolicy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When / Then
+        await #expect(throws: (any Error).self) {
+            try await session.data(for: request)
+        }
+    }
+
+    @Test
+    func rebuiltPolicy_whenSPKIPinningDoesNotMatchUnderAuditPolicy_stillAcceptsHandshake() async throws {
+        // Given -- same mismatch as the strict-policy test above, but `.audit` is meant to warn
+        // rather than block, mirroring what `SPKIPinningConfiguration` already does on the
+        // NIOSSL/AsyncHTTPClient side.
+        let server = Certificates().server()
+        let unrelatedCertificate = Certificates().client()
+        let wrongPin = try hashSPKI(from: unrelatedCertificate.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(wrongPin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .audit
+
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+        let rebuiltPolicy = Internals.ServerTrustPolicy(descriptor: descriptor)
+
+        let delegate = ForwardingChallengeDelegate(policy: rebuiltPolicy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        let (data, response2) = try await session.data(for: request)
+
+        // Then
+        #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
+        let decodedBody = try HTTPResult<String>(data)
+        #expect(decodedBody.response == output)
+    }
+
+    /// `Internals.SPKIHash.KnownAlgorithm` (SHA-256/384/512) only gates what a `Descriptor` can
+    /// carry across a `BackgroundDownloadTask` relaunch -- a live, in-process
+    /// `Internals.ServerTrustPolicy` (`URLSessionClient`'s own case, never persisted) pins
+    /// correctly with any `Crypto.HashFunction`.
+    @Test
+    func liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: Insecure.SHA1.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: Insecure.SHA1.self)]
+        secureConnection.tlsPinningPolicy = .strict
+
+        let policy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        let delegate = ForwardingChallengeDelegate(policy: policy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        let (data, response2) = try await session.data(for: request)
+
+        // Then
+        #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
+        let decodedBody = try HTTPResult<String>(data)
+        #expect(decodedBody.response == output)
+    }
+}
+
+extension InternalsServerTrustPolicyTests {
+
+    /// Mirrors `SPKIPinningTests.hashSPKI(from:)` -- the exact same SPKI-DER-then-hash pipeline
+    /// `Internals.SPKIHash`/`Internals.ServerTrustPolicy` use, generalized over the hash algorithm
+    /// so `descriptor_whenSPKIPinningUsesUnnamedAlgorithm_throwsUnpersistableAlgorithm` and
+    /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
+    /// can exercise an algorithm outside `Internals.SPKIHash.KnownAlgorithm`.
+    func hashSPKI<Algorithm: HashFunction>(from url: URL, algorithm: Algorithm.Type) throws -> Data {
+        let certificate = try NIOSSLCertificate.fromPEMFile(url.absolutePath(percentEncoded: false))[0]
+        let bytes = try certificate.extractPublicKey().toSPKIBytes()
+        return Data(algorithm.hash(data: Data(bytes)))
     }
 }
 

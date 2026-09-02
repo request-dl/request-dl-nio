@@ -73,7 +73,7 @@ public struct BackgroundDownloadTask<Content: Property> {
     /// use ``BackgroundDownloads/onEvent`` to observe how it turns out.
     ///
     /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
-    ///   client certificate this executor can't rebuild after a relaunch (see its own
+    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch (see its own
     ///   documentation for the specific cases), or any error `content` itself throws while being
     ///   resolved into a request (an invalid URL, a certificate file that can't be read, etc.) --
     ///   the same errors any other task can throw at this stage.
@@ -83,8 +83,13 @@ public struct BackgroundDownloadTask<Content: Property> {
             environment: RequestEnvironmentValues.current
         ).build()
 
-        let serverTrust = try resolved.session.configuration.secureConnection.map {
-            try Internals.ServerTrustPolicy.resolve(from: $0).descriptor
+        let serverTrust: Internals.ServerTrustPolicy.Descriptor?
+        do {
+            serverTrust = try resolved.session.configuration.secureConnection.map {
+                try Internals.ServerTrustPolicy.resolve(from: $0).descriptor()
+            }
+        } catch let error as Internals.ServerTrustPolicy.DescriptorError {
+            throw BackgroundDownloadUnsupportedConfigurationError(error)
         }
 
         let clientIdentity: Internals.ClientIdentityDescriptor?

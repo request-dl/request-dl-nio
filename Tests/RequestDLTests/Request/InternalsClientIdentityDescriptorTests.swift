@@ -195,7 +195,7 @@ struct InternalsClientIdentityDescriptorTests {
         let clientIdentityDescriptor = try #require(
             try Internals.ClientIdentityDescriptor.resolve(from: secureConnection)
         )
-        let serverTrustDescriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor
+        let serverTrustDescriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
 
         // Simulates a relaunch: the only things carried forward are the two `Descriptor`s, JSON
         // round-tripped, exactly like `taskDescription`.
