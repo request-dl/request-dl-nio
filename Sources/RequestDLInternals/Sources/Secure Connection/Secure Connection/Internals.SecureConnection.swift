@@ -30,6 +30,7 @@ extension Internals {
                 && keyLogger == nil
                 && certificateVerification != .noHostnameVerification
                 && cipherSuites == nil
+                && tlsPins == nil
                 && cipherSuiteValues == nil
                 && additionalTrustRoots == nil
                 && renegotiationSupport == nil
@@ -49,6 +50,8 @@ extension Internals {
         package var useDefaultTrustRoots: Bool = false
         package var trustRoots: TrustRoots?
         package var additionalTrustRoots: [AdditionalTrustRoots]?
+        package var tlsPinningPolicy: SPKIPinningPolicy?
+        package var tlsPins: [SPKIHash]?
         package var privateKey: PrivateKeySource?
         package var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         package var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
@@ -70,7 +73,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        package func build() throws -> NIOSSL.TLSConfiguration {
+        package func build() throws -> Output {
             var tlsConfiguration = try makeTLSConfigurationByContext()
 
             if let minimumTLSVersion {
@@ -145,7 +148,10 @@ extension Internals {
                 }
             }
 
-            return tlsConfiguration
+            return try .init(
+                tlsConfiguration: tlsConfiguration,
+                tlsPinning: buildTLSPinning()
+            )
         }
 
         // MARK: - Private methods
@@ -164,6 +170,21 @@ extension Internals {
             }
 
             return tlsConfiguration
+        }
+
+        private func buildTLSPinning() throws -> SPKIPinningConfiguration? {
+            guard let tlsPins else {
+                return nil
+            }
+
+            let pins = try tlsPins.reduce(into: [AsyncHTTPClient.SPKIHash]()) {
+                try $1.resolve(&$0)
+            }
+
+            return .init(
+                pins: pins,
+                policy: tlsPinningPolicy ?? .strict
+            )
         }
     }
 }
@@ -194,6 +215,8 @@ extension Internals.SecureConnection: Equatable {
             && lhs.minimumTLSVersion == rhs.minimumTLSVersion
             && lhs.maximumTLSVersion == rhs.maximumTLSVersion
             && lhs.cipherSuiteValues == rhs.cipherSuiteValues
+            && lhs.tlsPins == rhs.tlsPins
+            && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
     }
 }
 
@@ -201,5 +224,6 @@ extension Internals.SecureConnection {
 
     package struct Output: Sendable {
         package let tlsConfiguration: TLSConfiguration
+        package let tlsPinning: SPKIPinningConfiguration?
     }
 }

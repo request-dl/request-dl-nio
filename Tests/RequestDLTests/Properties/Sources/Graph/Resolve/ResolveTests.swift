@@ -249,6 +249,8 @@ extension ResolveTests {
                                     useDefaultTrustRoots = false,
                                     trustRoots = nil,
                                     additionalTrustRoots = nil,
+                                    tlsPinningPolicy = nil,
+                                    tlsPins = nil,
                                     privateKey = nil,
                                     signingSignatureAlgorithms = nil,
                                     verifySignatureAlgorithms = nil,

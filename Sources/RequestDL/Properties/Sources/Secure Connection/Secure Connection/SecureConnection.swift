@@ -34,12 +34,12 @@ public struct SecureConnection<Content: Property>: Property {
         // etc.) are not tracked field-by-field the way `trustRoots`/`certificateChain`/
         // `additionalTrustRoots` are, so nesting still replaces the whole base — only how that
         // replacement becomes reachable when nested has changed here, not what it does.
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection = self.secureConnection
 
             for node in nodes {
                 var collector = secureConnection.collector()
-                node.passthrough(&collector)
+                try node.passthrough(&collector)
                 secureConnection = collector(\.self)
             }
         }
