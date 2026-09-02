@@ -66,9 +66,25 @@ extension Internals {
             guard let deadlineUptimeNanoseconds else {
                 return try await operation()
             }
+
+            // A deadline that's already passed before `operation` even starts must not race it --
+            // `Task.sleep(nanoseconds: 0)` below still goes through a real scheduler hop, so a fast
+            // enough `operation` (a loopback request under `.urlSession`, say) can win that race
+            // and complete anyway, silently keeping a budget that was already spent. Checked here,
+            // synchronously, so "already elapsed" is deterministic instead of a coin flip between
+            // two child tasks' relative scheduling.
+            guard DispatchTime.now().uptimeNanoseconds < deadlineUptimeNanoseconds else {
+                seed?()
+                throw ResourceTimeoutError()
+            }
             #else
             guard let instant else {
                 return try await operation()
+            }
+
+            guard ContinuousClock.now < instant else {
+                seed?()
+                throw ResourceTimeoutError()
             }
             #endif
 
