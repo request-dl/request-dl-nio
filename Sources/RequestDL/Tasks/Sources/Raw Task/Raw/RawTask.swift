@@ -14,7 +14,7 @@ struct RawTask<Content: Property>: RequestTask {
 
     // MARK: - Internal methods
 
-    func result() async throws -> AsyncResponse {
+    func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
         let resolved = try await Resolve(
             root: content,
             environment: environment

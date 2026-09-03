@@ -46,16 +46,11 @@ public struct DataTask<Content: Property>: RequestTask {
 
     // MARK: - Public methods
 
-    ///
-    /// Returns a task result that encapsulates the response data.
-    ///
-    /// - Returns: A ``TaskResult`` with `Data` as  its`payload`.
-    ///
-    /// - Throws: An error of type `Error` that indicates an issue with the request or response.
-    ///
-    public func result() async throws -> TaskResult<Data> {
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> TaskResult<Data> {
         try await task
             .collectData()
-            .result()
+            ._result(environment: environment)
     }
 }

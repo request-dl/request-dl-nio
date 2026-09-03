@@ -16,6 +16,6 @@ extension Property {
 
     func bodyException() -> Never {
         Internals.Log.accessingNeverBody(self)
-            .preconditionFailure(logger: RequestEnvironmentValues.current.logger)
+            .preconditionFailure(logger: PropertyResolutionLogger.current)
     }
 }

@@ -28,15 +28,10 @@ public struct AnyTask<Element: Sendable>: RequestTask {
 
     // MARK: - Public methods
 
-    ///
-    /// Returns the result of the wrapped task.
-    ///
-    /// - Returns: The result of the wrapped task.
-    ///
-    /// - Throws: If the wrapped task throws an error.
-    ///
-    public func result() async throws -> Element {
-        try await task.result()
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> Element {
+        try await task._result(environment: environment)
     }
 }
 

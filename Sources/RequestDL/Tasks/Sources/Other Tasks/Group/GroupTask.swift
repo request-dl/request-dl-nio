@@ -44,21 +44,15 @@ where Data.Element: Hashable & Sendable, Data: Sendable {
 
     // MARK: - Public methods
 
-    ///
-    ///  Retrieves the results of the task group that encapsulates the results of each individual task.
-    ///
-    ///  - Returns: A ``GroupResult`` object that combines the result of each individual task by `ID`.
-    ///  - Throws: An error if the operation failed for any reason.
-    ///
-    public func result() async throws -> GroupResult<Data.Element, Content.Element> {
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> GroupResult<Data.Element, Content.Element> {
         await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
             for element in data {
                 group.addTask {
                     do {
-                        return try await RequestEnvironmentValues.$current.withValue(environment) {
-                            let task = transform(element)
-                            return (element, .success(try await task.result()))
-                        }
+                        let task = transform(element)
+                        return (element, .success(try await task._result(environment: environment)))
                     } catch {
                         return (element, .failure(error))
                     }

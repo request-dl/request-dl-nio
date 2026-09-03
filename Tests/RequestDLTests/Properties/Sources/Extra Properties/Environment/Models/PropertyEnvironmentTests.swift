@@ -15,7 +15,7 @@ struct PropertyEnvironmentTests {
     @Test
     func wrappedValue_whenNeverUpdatedThroughAGraph_fallsBackToEnvironmentDefault() {
         // Given
-        let wrapper = PropertyEnvironment(\.propertyEnvironmentTestsInteger)
+        let wrapper = RequestEnvironment(\.propertyEnvironmentTestsInteger)
 
         // Then
         // `update(_:)` — the only thing that ever populates the wrapper's own storage — is

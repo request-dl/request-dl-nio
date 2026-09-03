@@ -147,10 +147,12 @@ struct Resolve<Root: Property>: Sendable {
     }
 
     private func outputs() async throws -> _PropertyOutputs {
-        try await _Root._makeProperty(
-            property: root,
-            inputs: inputs()
-        )
+        try await PropertyResolutionLogger.$current.withValue(environment.logger) {
+            try await _Root._makeProperty(
+                property: root,
+                inputs: inputs()
+            )
+        }
     }
 }
 
