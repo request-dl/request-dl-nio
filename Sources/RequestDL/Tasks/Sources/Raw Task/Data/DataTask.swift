@@ -64,4 +64,31 @@ public struct DataTask<Content: Property>: RequestTask {
     public func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {
         try await task.description(descriptor)
     }
+
+    ///
+    /// Resolves this task's request through `descriptor`, hands the output to `onDescribe`, then
+    /// performs the request for real -- two separate passes, exactly as calling
+    /// ``description(_:)`` followed by ``result()`` would.
+    ///
+    /// - Parameters:
+    ///   - descriptor: The ``TaskDescriptor`` that produces the description.
+    ///   - enabled: When `false`, skips the descriptor pass entirely (`onDescribe` is not
+    ///   called) and goes straight to performing the request -- useful to disable the extra
+    ///   resolve pass in production without removing the call site.
+    ///   - onDescribe: Called with the descriptor's output once it's ready.
+    /// - Returns: This task's actual result, exactly as ``result()`` would produce it.
+    /// - Throws: An error thrown while producing the description, or while performing the
+    /// request itself.
+    ///
+    public func description<Descriptor: TaskDescriptor>(
+        _ descriptor: Descriptor,
+        enabled: Bool = true,
+        onDescribe: @escaping @Sendable (Descriptor.Output) -> Void
+    ) async throws -> Element {
+        if enabled {
+            onDescribe(try await description(descriptor))
+        }
+
+        return try await result()
+    }
 }

@@ -22,6 +22,20 @@ import struct Foundation.Data
 /// .description(.cURL)
 /// ```
 ///
+/// To log the command line right alongside the request that actually runs it, use the
+/// `onDescribe`-taking overload instead -- it produces the description, hands it to the
+/// closure, then performs the request for real:
+///
+/// ```swift
+/// let data = try await DataTask {
+///     BaseURL("example.com")
+///     Payload(data: someData)
+/// }
+/// .description(.cURL) { command in
+///     print(command)
+/// }
+/// ```
+///
 /// `-H`/URL/method/a plain body all come straight from ``TaskDescriptorContext/requestConfiguration``
 /// — nothing is lost reading those back after resolution. `-u` is recovered by decoding a `Basic`
 /// `Authorization` header back to `user:pass`. `-F` is the one thing that couldn't be
