@@ -46,7 +46,9 @@ where Data.Element: Hashable & Sendable, Data: Sendable {
 
     /// This method is used internally and should not be called directly.
     @_spi(Private)
-    public func _result(environment: RequestEnvironmentValues) async throws -> GroupResult<Data.Element, Content.Element> {
+    public func _result(
+        environment: RequestEnvironmentValues
+    ) async throws -> GroupResult<Data.Element, Content.Element> {
         await withTaskGroup(of: (Data.Element, Result<Content.Element, Error>).self) { group in
             for element in data {
                 group.addTask {
