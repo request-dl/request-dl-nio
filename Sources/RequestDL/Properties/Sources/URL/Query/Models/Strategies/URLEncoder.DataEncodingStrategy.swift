@@ -16,12 +16,6 @@ extension URLEncoder {
         /// Encodes the data as a Base64-encoded string. This is the default.
         case base64
 
-        /// Defers to `Data`'s own `Encodable` conformance, which is itself a Base64-encoded
-        /// string -- so this produces byte-for-byte the same output as ``base64``. Exists for
-        /// parity with Alamofire's `DataEncoding.deferredToData`, which is the same alias there
-        /// for the same reason.
-        case deferredToData
-
         /// Encodes the data using a custom closure that takes a `Data` and an `Encoder` as input
         /// parameters and throws an error.
         case custom(@Sendable (Data, Encoder) throws -> Void)
@@ -30,7 +24,7 @@ extension URLEncoder {
 
         func encode(_ data: Data, in encoder: URLEncoder.Encoder) throws {
             switch self {
-            case .base64, .deferredToData:
+            case .base64:
                 try encodeBase64(data, in: encoder)
             case .custom(let closure):
                 try closure(data, encoder)

@@ -710,27 +710,6 @@ struct URLEncoderTests {
     }
 
     @Test
-    func encoder_whenDataWithDeferredToData() async throws {
-        let urlEncoder = URLEncoder()
-        // Given
-        let key = "foo"
-        let value = await Data.randomData(length: 64)
-
-        urlEncoder.dataEncodingStrategy = .deferredToData
-
-        // When
-        let sut = try urlEncoder.encode(value, forKey: key)
-
-        // Then
-        let expectedValue =
-            value
-            .base64EncodedString()
-            .addingRFC3986PercentEncoding()
-
-        #expect(sut == "\(key)=\(expectedValue)")
-    }
-
-    @Test
     func encoder_whenDataWithCustom() async throws {
         let urlEncoder = URLEncoder()
         // Given
