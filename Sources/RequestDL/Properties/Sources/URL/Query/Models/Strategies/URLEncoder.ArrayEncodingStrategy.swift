@@ -12,7 +12,6 @@ extension URLEncoder {
 
         /// Encodes the index as a fixed, empty pair of square brackets, e.g. `[]`, the same for
         /// every element -- unlike ``subscripted``, the brackets never carry the actual index.
-        /// Matches Alamofire's `ArrayEncoding.brackets`, its own default.
         case brackets
 
         /// Encodes the index in square brackets, e.g. `[0]`.
