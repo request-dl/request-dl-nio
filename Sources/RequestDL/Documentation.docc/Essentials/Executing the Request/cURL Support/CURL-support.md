@@ -55,6 +55,8 @@ let command = try await DataTask {
 
 ### Supported flags
 
+Request-level — these shape the `RequestDL/RequestConfiguration` itself:
+
 - `-X` / `--request`
 - `-H` / `--header` (repeatable)
 - `-d` / `--data` / `--data-raw` / `--data-binary`
@@ -63,13 +65,23 @@ let command = try await DataTask {
 - `--url`, or a bare trailing URL
 - `-G` / `--get` — moves accumulated `-d` data onto the URL as a query string instead of a body
 
-A small set of flags that only shape curl's own CLI output — `-s`/`--silent`, `-S`/`--show-error`, `-v`/`--verbose`, `-i`/`--include`, `-#`/`--progress-bar`, `-o`/`--output`, `-w`/`--write-out` — is accepted and ignored, since none of them affect the request or response.
+Session-level — these configure the same `Session`-level settings a declared `@PropertyBuilder` tree would reach through ``RequestDL/Session``/``RequestDL/SecureConnection``/``RequestDL/Proxy``:
+
+- `-L` / `--location` (with `--max-redirs`) — follows redirects, up to 50 by default
+- `-k` / `--insecure` — disables certificate verification
+- `-x` / `--proxy` — `[scheme://][user[:password]@]host[:port]`; a `socks*` scheme maps to a SOCKS proxy, anything else to HTTP; defaults to port 1080
+- `--resolve HOST:PORT:ADDRESS` — overrides DNS resolution for `HOST` (the port is validated but not carried through — the override applies to every port on that host)
+- `--compressed` — enables (unbounded) response decompression
+- `--cacert <path>` — a custom CA bundle to verify the server against, in place of the default trust store
+- `--cert <path>` / `-E <path>` (with `--key <path>`) — a client certificate (and its private key) for mTLS; both are read as PEM
+
+`-L` and `--compressed` don't just add an opt-in: whenever *any* session-level flag is present, the produced description also **explicitly disables** redirects and decompression unless `-L`/`--compressed` say otherwise — this package normally follows redirects and (on Apple platforms) auto-decompresses by default, the opposite of curl's own defaults, so matching curl faithfully means actively turning both off, not just leaving this package's defaults in place. A command using none of these session-level flags is unaffected by this and behaves exactly as before they existed.
+
+`--resolve` (`dnsOverride`) is incompatible with the `.urlSession` executor — a command using it only runs under `.nio`/`.nioTransportServices`.
 
 ### What isn't supported, and why
 
-Everything else — `-L`/`--location`, `--compressed`, `-k`/`--insecure`, cookie jars, TLS/proxy flags, `--resolve`, HTTP/3, and non-`http(s)` schemes — throws ``RequestDL/CURLParsingError`` rather than being silently accepted. These aren't just unimplemented conveniences: silently accepting one of them would make the request actually performed diverge from what the command says.
-
-`-L` in particular is a direction mismatch rather than a gap: this package already follows redirects by default on both transports (curl does not, unless `-L` is given), so a curl command *without* `-L` would need `CURLTask` to actively turn redirect-following off to match — session-level configuration a single command string has no way to express today.
+Everything else — cookie jars, `--cert-type`/`--key-type` (PEM is assumed), `--proxy-user`, HTTP/3, and non-`http(s)` schemes — throws ``RequestDL/CURLParsingError`` rather than being silently accepted. These aren't just unimplemented conveniences: silently accepting one of them would make the request actually performed diverge from what the command says.
 
 ## Topics
 

@@ -58,8 +58,7 @@ enum CURLTokenizer {
                 index += 1
 
                 while index < characters.endIndex, characters[index] != "\"" {
-                    if
-                        characters[index] == "\\",
+                    if characters[index] == "\\",
                         index + 1 < characters.endIndex,
                         "\"\\$`".contains(characters[index + 1])
                     {
@@ -170,7 +169,7 @@ enum CURLTokenizer {
             case "x":
                 let hexStart = index + 2
                 let hexEnd = min(hexStart + 2, characters.endIndex)
-                let hex = String(characters[hexStart ..< hexEnd])
+                let hex = String(characters[hexStart..<hexEnd])
 
                 if let byte = UInt8(hex, radix: 16), !hex.isEmpty {
                     current.append(Character(UnicodeScalar(byte)))

@@ -63,7 +63,7 @@ extension String {
         var remainder = Substring(self)
 
         while let range = remainder.range(of: target) {
-            result += remainder[remainder.startIndex ..< range.lowerBound]
+            result += remainder[remainder.startIndex..<range.lowerBound]
             result += replacement
             remainder = remainder[range.upperBound...]
         }

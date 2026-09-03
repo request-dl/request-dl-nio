@@ -22,20 +22,26 @@ import struct Foundation.Data
 ///
 /// Only a documented subset of curl's flags is understood — `-X`/`--request`, `-H`/`--header`
 /// (repeatable), `-d`/`--data`/`--data-raw`/`--data-binary`, `-F`/`--form` (repeatable),
-/// `-u`/`--user`, `--url` (or a bare trailing URL), and `-G`/`--get`. A small set of flags that
-/// only shape curl's own CLI output — `-s`/`--silent`, `-S`/`--show-error`, `-v`/`--verbose`,
-/// `-i`/`--include`, `-#`/`--progress-bar`, `-o`/`--output`, `-w`/`--write-out` — is accepted and
-/// ignored outright, since none of them affect the request or response in any way.
+/// `-u`/`--user`, `--url` (or a bare trailing URL), `-G`/`--get`, `-L`/`--location` (with
+/// `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`, `--resolve`, `--compressed`, `--cacert`,
+/// and `--cert`/`-E`/`--key`. A small set of flags that only shape curl's own CLI output —
+/// `-s`/`--silent`, `-S`/`--show-error`, `-v`/`--verbose`, `-i`/`--include`, `-#`/`--progress-bar`,
+/// `-o`/`--output`, `-w`/`--write-out` — is accepted and ignored outright, since none of them
+/// affect the request or response.
 ///
-/// Everything else — `-L`/`--location`, `--compressed`, `-k`/`--insecure`, cookie jars,
-/// TLS/proxy flags, and so on — throws ``CURLParsingError`` rather than being silently ignored.
-/// These aren't merely unimplemented: silently accepting them would change what the request
-/// actually does compared to what the pasted command says. `-L` in particular is not a "not yet
-/// supported" gap so much as a direction mismatch — this package already follows redirects by
-/// default on both transports (curl does not, unless `-L` is given), so a curl command *without*
-/// `-L` would need `CURLTask` to actively turn redirect-following off to match, which needs
-/// session-level configuration `CURLTask` has no way to express from a single command string
-/// today.
+/// Everything else — cookie jars, `--cert-type`/`--key-type` (PEM is assumed), `--resolve` under
+/// a pinned `.urlSession` executor, HTTP/3, non-`http(s)` schemes, and so on — throws
+/// ``CURLParsingError`` rather than being silently ignored. These aren't merely unimplemented:
+/// silently accepting one of them would change what the request actually does compared to what
+/// the pasted command says.
+///
+/// `-L` in particular restores curl's own default rather than only adding an opt-in: this
+/// package normally follows redirects by default on both transports, which curl does not unless
+/// `-L` is given, so a curl command *without* `-L` executed through `CURLTask` explicitly
+/// disables redirect-following to match — not merely "leaves it as the package default." The
+/// same applies to `--compressed` and decompression. `--resolve` (`Internals.Session
+/// .Configuration.dnsOverride`) is incompatible with the `.urlSession` executor, so a command
+/// using it will only run under `.nio`/`.nioTransportServices`.
 ///
 /// The command is parsed straight into a ``RequestConfiguration`` rather than through
 /// `@PropertyBuilder` — there is nothing to declare a `Property` tree from until the string is
@@ -69,10 +75,13 @@ public struct CURLTask: RequestTask {
     /// itself.
     ///
     public func result() async throws -> TaskResult<Data> {
-        let configuration = try await CURLCommandParser.parse(command)
+        let parsed = try await CURLCommandParser.parseCommand(command)
 
         return try await RawTask(
-            content: RawRequestConfigurationProperty(configuration: configuration)
+            content: RawRequestConfigurationProperty(
+                configuration: parsed.requestConfiguration,
+                sessionConfigurationEdit: parsed.sessionConfigurationEdit
+            )
         )
         .collectData()
         .result()

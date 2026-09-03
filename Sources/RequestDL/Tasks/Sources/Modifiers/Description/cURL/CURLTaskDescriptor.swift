@@ -64,8 +64,7 @@ public struct CURLTaskDescriptor: TaskDescriptor {
                 continue
             }
 
-            if
-                name.caseInsensitiveCompare("Authorization") == .orderedSame,
+            if name.caseInsensitiveCompare("Authorization") == .orderedSame,
                 let credentialBytes = basicCredentialBytes(from: value)
             {
                 basicCredentialsFragment = "-u " + curlShellQuote(credentialBytes)

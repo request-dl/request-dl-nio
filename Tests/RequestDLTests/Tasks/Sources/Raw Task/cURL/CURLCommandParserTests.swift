@@ -3,6 +3,8 @@
 //
 
 import NIOCore
+import NIOSSL
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -240,34 +242,236 @@ struct CURLCommandParserTests {
     func unsupportedFlagThrows() async throws {
         // Given / When / Then
         await #expect(throws: CURLParsingError.self) {
-            try await CURLCommandParser.parse("curl -k https://example.com")
+            try await CURLCommandParser.parse("curl -b /path/to/cookies.txt https://example.com")
         }
 
         do {
-            _ = try await CURLCommandParser.parse("curl -k https://example.com")
+            _ = try await CURLCommandParser.parse("curl -b /path/to/cookies.txt https://example.com")
             Issue.record("Not expecting success")
         } catch let error as CURLParsingError {
             #expect(error.context == .unsupportedFlag)
-            #expect(error.token == "-k")
+            #expect(error.token == "-b")
         }
     }
 
-    /// `-L` changes real behavior (this package already follows redirects by default, unlike
-    /// curl) and must keep throwing rather than being folded into the no-op allowlist below.
+    // MARK: - Session-level flags (-L, -k, -x, --resolve, --compressed, --cacert, --cert/-E, --key)
+
     @Test
-    func locationFlagStillThrows() async throws {
+    func noSessionLevelFlagsMeansNoSessionConfigurationEdit() async throws {
+        // Given / When
+        let command = try await CURLCommandParser.parseCommand("curl https://example.com")
+
+        // Then -- a command using only the request-level subset must not touch
+        // `Make.sessionConfiguration` in any way, same as before these flags existed.
+        #expect(command.sessionConfigurationEdit == nil)
+    }
+
+    @Test
+    func withoutLocationFlagRedirectsAreExplicitlyDisallowed() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand("curl -k https://example.com")
+
+        // When -- any session-level flag (here just `-k`) makes the edit apply curl's own
+        // default for redirects too, not just leave this package's own (opposite) default in
+        // place.
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.redirectConfiguration == .disallow)
+    }
+
+    @Test
+    func locationFlagFollowsRedirectsUpToFiftyByDefault() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand("curl -L https://example.com")
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.redirectConfiguration == .follow(max: 50, allowCycles: false))
+    }
+
+    @Test
+    func locationFlagWithMaxRedirsUsesThatCount() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl -L --max-redirs 3 https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.redirectConfiguration == .follow(max: 3, allowCycles: false))
+    }
+
+    @Test
+    func insecureFlagDisablesCertificateVerification() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand("curl -k https://example.com")
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then -- `.some(.none)`, not plain `.none`: the field is `CertificateVerification?`,
+        // and `CertificateVerification` itself has a `.none` case, so unqualified `.none` here
+        // would be inferred as `Optional.none` (nil) and pass vacuously whether or not the
+        // production code actually set anything -- exactly the bug this test exists to catch.
+        #expect(sessionConfiguration.secureConnection?.certificateVerification == .some(.none))
+    }
+
+    @Test
+    func cacertFlagSetsTrustRoots() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl --cacert /path/to/ca.pem https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.secureConnection?.trustRoots == .file("/path/to/ca.pem"))
+    }
+
+    @Test
+    func certAndKeyFlagsSetClientIdentity() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl --cert /path/to/client.pem --key /path/to/client.key https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.secureConnection?.certificateChain == .file("/path/to/client.pem"))
+        #expect(
+            sessionConfiguration.secureConnection?.privateKey
+                == .privateKey(Internals.PrivateKey("/path/to/client.key", format: .pem))
+        )
+    }
+
+    @Test
+    func shortFormCertFlagIsAcceptedAsAnAliasForCert() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl -E /path/to/client.pem https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.secureConnection?.certificateChain == .file("/path/to/client.pem"))
+    }
+
+    @Test
+    func proxyFlagWithSchemeCredentialsAndPort() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl -x http://john:secret@proxy.example.com:8080 https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        let proxy = try #require(sessionConfiguration.proxy)
+        #expect(proxy.host == "proxy.example.com")
+        #expect(proxy.port == 8080)
+        #expect(proxy.connectionProtocol == .http)
+        #expect(proxy.authorization == .basic(username: "john", password: "secret"))
+    }
+
+    @Test
+    func proxyFlagWithSocksSchemeAndNoPortDefaultsTo1080() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl -x socks5://proxy.example.com https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        let proxy = try #require(sessionConfiguration.proxy)
+        #expect(proxy.host == "proxy.example.com")
+        #expect(proxy.port == 1080)
+        #expect(proxy.connectionProtocol == .socks)
+        #expect(proxy.authorization == nil)
+    }
+
+    @Test
+    func resolveFlagOverridesDNSForTheGivenHost() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl --resolve example.com:443:127.0.0.1 https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then -- the port is validated but not carried into `dnsOverride`, which has no port
+        // dimension.
+        #expect(sessionConfiguration.dnsOverride == ["example.com": "127.0.0.1"])
+    }
+
+    @Test
+    func malformedResolveFlagThrows() async throws {
         // Given / When / Then
         await #expect(throws: CURLParsingError.self) {
-            try await CURLCommandParser.parse("curl -L https://example.com")
+            try await CURLCommandParser.parse("curl --resolve example.com https://example.com")
         }
     }
 
     @Test
-    func compressedFlagStillThrows() async throws {
-        // Given / When / Then
-        await #expect(throws: CURLParsingError.self) {
-            try await CURLCommandParser.parse("curl --compressed https://example.com")
-        }
+    func withoutCompressedFlagDecompressionIsExplicitlyDisabled() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand("curl -k https://example.com")
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.decompression == .disabled)
+    }
+
+    @Test
+    func compressedFlagEnablesUnboundedDecompression() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand("curl --compressed https://example.com")
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.decompression == .enabled(.none))
     }
 
     // MARK: - No-op CLI-output-only flags
