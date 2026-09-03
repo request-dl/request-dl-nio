@@ -19,6 +19,11 @@ struct ContentCodingTests {
     }
 
     @Test
+    func brotliRawValue() {
+        #expect(ContentCoding.brotli == "br")
+    }
+
+    @Test
     func identityRawValue() {
         #expect(ContentCoding.identity == "identity")
     }
@@ -31,10 +36,10 @@ struct ContentCodingTests {
     @Test
     func initAcceptsAnyStringProtocol() {
         // Given
-        let substring = "br gzip".split(separator: " ").first!
+        let substring = "zstd gzip".split(separator: " ").first!
 
         // Then
-        #expect(ContentCoding(substring) == "br")
+        #expect(ContentCoding(substring) == "zstd")
     }
 
     @Test

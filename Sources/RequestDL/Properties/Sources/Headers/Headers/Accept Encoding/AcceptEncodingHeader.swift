@@ -14,10 +14,10 @@ import RequestDLInternals
 /// // "gzip;q=1.0, deflate;q=0.9"
 /// ```
 ///
-/// > Important: There is no default value. Only advertise a coding this package's session can
-/// actually decompress — see ``ContentCoding`` for why `.brotli` is not offered, and
-/// ``RequestDL/Session`` for enabling response decompression in the first place, which is off
-/// by default.
+/// > Important: There is no default value. Only advertise a coding something in the pipeline
+/// can actually decompress — either this package's own response decompression (see
+/// ``RequestDL/Session``, off by default and limited to `gzip`/`deflate`), or, for ``ContentCoding/brotli``,
+/// a decoder the caller runs itself against the raw response body.
 public struct AcceptEncodingHeader: Property {
 
     // MARK: - Public properties

@@ -11,11 +11,12 @@
 /// > Important: If the desired coding is not included in the predefined static properties, use
 /// a string literal to initialize an instance of `ContentCoding`.
 ///
-/// > Note: There is no `.brotli` static property. This package's response decompression
-/// (`Internals.Decompression`, over `AsyncHTTPClient`'s `NIOHTTPCompression`) only implements
-/// `gzip` and `deflate` — there is no Brotli support yet. Advertising it here would let a
-/// compliant server pick it and leave the response undecodable. `ContentCoding("br")` still
-/// works from a string literal, for a caller with its own way of decoding the response.
+/// > Note: This package's built-in response decompression (`Internals.Decompression`, over
+/// `AsyncHTTPClient`'s `NIOHTTPCompression`) only implements `gzip` and `deflate` — there is no
+/// Brotli support in NIO yet. Advertising ``brotli`` here does not need it: it only tells the
+/// server that a Brotli-encoded response is acceptable, and it is up to the caller to decode
+/// it — for example by disabling automatic decompression and reading the raw
+/// `Content-Encoding: br` body themselves.
 public struct ContentCoding: Sendable, Hashable {
 
     // MARK: - Public static properties
@@ -25,6 +26,13 @@ public struct ContentCoding: Sendable, Hashable {
 
     /// The `deflate` content coding.
     public static let deflate: ContentCoding = "deflate"
+
+    /// The `br` (Brotli) content coding.
+    ///
+    /// - Important: Neither `AsyncHTTPClient` nor `swift-nio-extras` decompresses Brotli, so
+    /// this package never does it automatically. Only advertise it if the caller decodes the
+    /// response body itself.
+    public static let brotli: ContentCoding = "br"
 
     /// The `identity` content coding, i.e. no compression.
     public static let identity: ContentCoding = "identity"

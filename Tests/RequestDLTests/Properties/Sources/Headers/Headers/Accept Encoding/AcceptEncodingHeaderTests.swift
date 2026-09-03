@@ -39,6 +39,23 @@ struct AcceptEncodingHeaderTests {
     }
 
     @Test
+    func brotliCanBeAdvertisedForACallerSuppliedDecoder() async throws {
+        // Given
+        let resolved = try await resolve(
+            TestProperty {
+                AcceptEncodingHeader(.brotli, .gzip, .deflate)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.headers["Accept-Encoding"] == [
+                "br;q=1.0, gzip;q=0.9, deflate;q=0.8"
+            ]
+        )
+    }
+
+    @Test
     func weightNeverDropsBelowTheFloor() async throws {
         // Given
         let codings = (0...10).map { ContentCoding("c\($0)") }
