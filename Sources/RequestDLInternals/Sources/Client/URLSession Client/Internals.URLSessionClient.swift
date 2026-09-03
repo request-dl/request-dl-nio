@@ -73,7 +73,7 @@ extension Internals {
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil
         ) throws {
-            var configuration = configuration
+            let configuration = configuration
             // Explicitly `[:]`, not left untouched, when `proxy` is `nil` -- `URLSession` treats an
             // unset `connectionProxyDictionary` as "inherit whatever macOS's Network preferences
             // (or a device's Wi-Fi proxy config) currently say," unlike AsyncHTTPClient, which has
