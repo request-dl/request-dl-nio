@@ -233,7 +233,7 @@ struct InternalsURLSessionClientSessionTaskTests {
         // directly, a genuine NSURLErrorTimedOut still surfaced on RequestConfigurationURLSessionClientUploadTests
         // (the same real-upload/timeout shape as this suite) at a 15s margin under severe
         // contention.
-        var configuration = URLSessionConfiguration.ephemeral
+        let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         let client = try Internals.URLSessionClient(configuration: configuration)
 
@@ -292,7 +292,7 @@ struct InternalsURLSessionClientSessionTaskTests {
         // directly, a genuine NSURLErrorTimedOut still surfaced on RequestConfigurationURLSessionClientUploadTests
         // (the same real-upload/timeout shape as this suite) at a 15s margin under severe
         // contention.
-        var configuration = URLSessionConfiguration.ephemeral
+        let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         let client = try Internals.URLSessionClient(configuration: configuration)
 
