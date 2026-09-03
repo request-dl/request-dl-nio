@@ -16,16 +16,11 @@ public struct InterceptedRequestTask<Interceptor: RequestTaskInterceptor>: Reque
 
     // MARK: - Public methods
 
-    ///
-    /// Returns the result of the task.
-    ///
-    /// - Throws: An error of type `Error` if the task could not be completed.
-    ///
-    /// - Returns: An object of type `Element` with the result of the task.
-    ///
-    public func result() async throws -> Element {
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> Element {
         do {
-            let result = try await task.result()
+            let result = try await task._result(environment: environment)
             interceptor.output(.success(result))
             return result
         } catch {

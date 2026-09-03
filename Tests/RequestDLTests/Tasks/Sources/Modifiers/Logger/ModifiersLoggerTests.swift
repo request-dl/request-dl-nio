@@ -11,7 +11,7 @@ import Testing
 struct ModifiersLoggerTests {
 
     private struct LogCaptureProperty: Property {
-        @PropertyEnvironment(\.logger) var logger
+        @RequestEnvironment(\.logger) var logger
 
         let closure: @Sendable (Logger?) -> Void
 

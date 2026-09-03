@@ -66,15 +66,11 @@ public struct DownloadTask<Content: Property>: RequestTask {
 
     // MARK: - Public methods
 
-    ///
-    /// Returns a task result that encapsulates the response async bytes.
-    ///
-    /// - Returns: A ``TaskResult`` with ``AsyncBytes`` as its `payload`.
-    /// - Throws: An error of type `Error` that indicates an issue with the request or response.
-    ///
-    public func result() async throws -> TaskResult<AsyncBytes> {
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> TaskResult<AsyncBytes> {
         try await task
             .collectBytes()
-            .result()
+            ._result(environment: environment)
     }
 }

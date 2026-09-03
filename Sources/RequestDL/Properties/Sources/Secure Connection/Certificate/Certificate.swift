@@ -57,7 +57,7 @@ public struct Certificate: Property {
                 Internals.Log.cantOpenCertificateFile(
                     resourceName,
                     bundle
-                ).preconditionFailure(logger: RequestEnvironmentValues.current.logger)
+                ).preconditionFailure(logger: PropertyResolutionLogger.current)
             }
 
             return resourceURL.absolutePath(percentEncoded: false)

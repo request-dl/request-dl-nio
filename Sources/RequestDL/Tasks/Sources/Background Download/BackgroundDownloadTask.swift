@@ -80,7 +80,7 @@ public struct BackgroundDownloadTask<Content: Property> {
     public func result() async throws {
         let resolved = try await Resolve(
             root: content,
-            environment: RequestEnvironmentValues.current
+            environment: RequestEnvironmentValues()
         ).build()
 
         let serverTrust: Internals.ServerTrustPolicy.Descriptor?

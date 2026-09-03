@@ -5,7 +5,7 @@
 import Foundation
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 
 #if canImport(UIKit) || canImport(AppKit)
 struct RDLImageLoaderTests {

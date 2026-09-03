@@ -107,13 +107,9 @@ public struct MockedTask: RequestTask {
 
     // MARK: - Public methods
 
-    ///
-    /// Executes the mocked task and returns the mocked ``RequestDL/AsyncResponse``.
-    ///
-    /// - Returns: An ``RequestDL/AsyncResponse`` containing the mock data.
-    /// - Throws: Any `Error` that may occur in the process.
-    ///
-    public func result() async throws -> AsyncResponse {
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
         try await payload.result(environment)
     }
 }

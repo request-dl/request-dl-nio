@@ -592,11 +592,12 @@ struct CachedRequestTests {
         _ = try await Logger.withTesting(
             level: .trace,
             recorded: { recordBox.append($0) },
-            perform: {
+            perform: { logger in
                 try await performCacheRequest(
                     testState: testState,
                     headers: makeHeaders(),
-                    cacheStrategy: .returnCachedDataElseLoad
+                    cacheStrategy: .returnCachedDataElseLoad,
+                    logger: logger
                 )
             }
         )
@@ -801,7 +802,8 @@ extension CachedRequestTests {
         memoryCapacity: Int64 = .zero,
         diskCapacity: Int64 = .zero,
         encryptionKey: DataCache.EncryptionKey? = nil,
-        cacheHeader: CacheHeader? = nil
+        cacheHeader: CacheHeader? = nil,
+        logger: Logger? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
 
@@ -831,6 +833,7 @@ extension CachedRequestTests {
                 cacheHeader
             }
         }
+        .environment(\.logger, logger)
         .result()
 
         return output
