@@ -228,10 +228,13 @@ struct InternalsURLSessionClientSessionTaskTests {
         continuation.finish()
 
         // Short, not the 60s default, so a real regression fails fast rather than hanging the
-        // suite -- 15s rather than 5s since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
-        // visibly slower under load than a local run or macOS's own (host-speed) job.
+        // suite -- 30s, not tighter, since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
+        // visibly slower under load than a local run or macOS's own (host-speed) job: confirmed
+        // directly, a genuine NSURLErrorTimedOut still surfaced on RequestConfigurationURLSessionClientUploadTests
+        // (the same real-upload/timeout shape as this suite) at a 15s margin under severe
+        // contention.
         var configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForRequest = 30
         let client = try Internals.URLSessionClient(configuration: configuration)
 
         // When
@@ -284,10 +287,13 @@ struct InternalsURLSessionClientSessionTaskTests {
         continuation.finish()
 
         // Short, not the 60s default, so a real regression fails fast rather than hanging the
-        // suite -- 15s rather than 5s since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
-        // visibly slower under load than a local run or macOS's own (host-speed) job.
+        // suite -- 30s, not tighter, since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
+        // visibly slower under load than a local run or macOS's own (host-speed) job: confirmed
+        // directly, a genuine NSURLErrorTimedOut still surfaced on RequestConfigurationURLSessionClientUploadTests
+        // (the same real-upload/timeout shape as this suite) at a 15s margin under severe
+        // contention.
         var configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForRequest = 30
         let client = try Internals.URLSessionClient(configuration: configuration)
 
         // When

@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+import AsyncHTTPClient
 import Configuration
+import Crypto
 import NIOSSL
 
 /// A property that derives declarative request properties from an external configuration source.
@@ -66,11 +68,16 @@ import NIOSSL
 ///   respectively — none of these require nesting inside a `SecureConnection`, so each is included
 ///   independently); `secureConnection.privateKey` (scoped: `.file` required, `.format`
 ///   (`"pem"`/`"der"`, default `"pem"`), `.password` optional, treated as secret) passed to
-///   ``PrivateKey``; and `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
+///   ``PrivateKey``; `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
 ///   (`"1.0"`/`"1.1"`/`"1.2"`/`"1.3"`), passed to ``SecureConnection/version(minimum:)``/
 ///   ``SecureConnection/version(maximum:)`` — these two, unlike the rest, do require a
 ///   `SecureConnection` wrapper, since they configure `SecureConnection` itself rather than a
-///   certificate.
+///   certificate; and `secureConnection.spkiPinning` (scoped, optional, present only when
+///   `secureConnection.spkiPinning.pins` is set), passed to ``SPKIPinning``/``SPKIHash``. Reads
+///   `secureConnection.spkiPinning.pins` (string array, required, non-empty — each entry a
+///   Base64-encoded SHA-256 SPKI digest) and `secureConnection.spkiPinning.policy` (`"strict"` or
+///   `"audit"`, default `"strict"`). Only SHA-256 pins are supported through `Configured`; use
+///   ``SPKIHash/init(_:algorithm:)`` directly for SHA-384/SHA-512 pins.
 /// - `redirect` (scoped, optional): passed to ``Session``. Reads `redirect.mode` (`"follow"` or
 ///   `"disallow"`; absent entirely, the key contributes nothing rather than assuming either).
 ///   `"follow"` additionally reads `redirect.maxRedirects` (int, default `5`) and
@@ -97,8 +104,9 @@ import NIOSSL
 ///   proxy, if `cachePolicy`/`cacheStrategy` is specified but is none of the recognized values, if
 ///   `secureConnection.privateKey.format` is specified but is neither `"pem"` nor `"der"`, if
 ///   `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion` is specified but is
-///   none of the recognized values, or if `redirect.mode` is specified but is neither `"follow"`
-///   nor `"disallow"`.
+///   none of the recognized values, if `secureConnection.spkiPinning.pins` is specified but empty
+///   or `secureConnection.spkiPinning.policy` is specified but is neither `"strict"` nor `"audit"`,
+///   or if `redirect.mode` is specified but is neither `"follow"` nor `"disallow"`.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 public struct Configured: Property {
 
@@ -185,6 +193,10 @@ public struct Configured: Property {
                 Certificates(certificatesFile)
             }
 
+            if let spkiPinning = try Self.spkiPinning(secureConnectionReader.scoped(to: "spkiPinning")) {
+                spkiPinning
+            }
+
             if let privateKey = try Self.privateKey(secureConnectionReader.scoped(to: "privateKey")) {
                 privateKey
             }
@@ -241,6 +253,37 @@ public struct Configured: Property {
             return Session().disableRedirect()
         default:
             throw ConfiguredError(context: .invalidRedirectConfiguration)
+        }
+    }
+
+    private static func spkiPinning(
+        _ reader: ConfigReader
+    ) throws -> SPKIPinning<PropertyForEach<[String], String, SPKIHash<SHA256>>>? {
+        guard let pins = reader.stringArray(forKey: "pins") else {
+            return nil
+        }
+
+        guard !pins.isEmpty else {
+            throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
+        }
+
+        let policy = try Self.spkiPinningPolicy(reader.string(forKey: "policy", default: "strict"))
+
+        return SPKIPinning(policy: policy) {
+            PropertyForEach(pins, id: \.self) {
+                SPKIHash($0)
+            }
+        }
+    }
+
+    private static func spkiPinningPolicy(_ value: String) throws -> SPKIPinningPolicy {
+        switch value {
+        case "strict":
+            return .strict
+        case "audit":
+            return .audit
+        default:
+            throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
         }
     }
 
