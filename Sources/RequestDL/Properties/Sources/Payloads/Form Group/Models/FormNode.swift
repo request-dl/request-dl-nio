@@ -15,24 +15,33 @@ struct FormNode: PropertyNode {
     let chunkSize: Int?
     let items: [FormItem]
 
+    /// Captured from `inputs.environment.descriptorFormFields` at `_makeProperty` time by
+    /// whichever `Property` builds this node (`Form`, `FormGroup`) -- not read from inside
+    /// `make()` itself, since `PropertyNode.make(_:)` has no `environment` of its own to read.
+    let descriptorFormFields: DescriptorFormFieldBox?
+
     // MARK: - Inits
 
     init(
         chunkSize: Int?,
-        item: FormItem
+        item: FormItem,
+        descriptorFormFields: DescriptorFormFieldBox?
     ) {
         self.init(
             chunkSize: chunkSize,
-            items: [item]
+            items: [item],
+            descriptorFormFields: descriptorFormFields
         )
     }
 
     init(
         chunkSize: Int?,
-        items: [FormItem]
+        items: [FormItem],
+        descriptorFormFields: DescriptorFormFieldBox?
     ) {
         self.chunkSize = chunkSize
         self.items = items
+        self.descriptorFormFields = descriptorFormFields
     }
 
     // MARK: - Internal methods
@@ -65,7 +74,7 @@ struct FormNode: PropertyNode {
         // name/filename/content-type/bytes — still right here, one item at a time — before
         // `constructor()` below flattens everything into one multipart byte stream with a
         // boundary, at which point that structure is gone.
-        if let descriptorFormFields = RequestEnvironmentValues.current.descriptorFormFields {
+        if let descriptorFormFields {
             for output in outputs {
                 descriptorFormFields.fields.append(
                     FormFieldDescriptor(

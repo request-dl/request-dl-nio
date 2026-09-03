@@ -413,7 +413,8 @@ public struct Form<Headers: Property>: Property {
                     charset: inputs.environment.charset,
                     urlEncoder: inputs.environment.urlEncoder,
                     factory: property.factory
-                )
+                ),
+                descriptorFormFields: inputs.environment.descriptorFormFields
             )
         )
     }

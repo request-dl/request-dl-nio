@@ -70,7 +70,8 @@ public struct FormGroup<Content: Property>: Property {
                 // `flatMap`, not `reduce([], +)`. The latter allocates a new array per node and
                 // copies everything accumulated so far into it, which is quadratic in the
                 // number of parts. Same fix already applied in `PayloadInput`.
-                items: nodes.flatMap(\.items)
+                items: nodes.flatMap(\.items),
+                descriptorFormFields: inputs.environment.descriptorFormFields
             )
         )
     }

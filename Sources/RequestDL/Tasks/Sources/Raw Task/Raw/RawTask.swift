@@ -194,21 +194,24 @@ extension RawTask {
 
     /// Resolves `content` and hands the result to `descriptor`, without executing a request.
     ///
-    /// Rebinds `RequestEnvironmentValues.current` around `Resolve(...).partiallyBuild()` so that
-    /// `FormNode` — the only node that needs to know a description pass is running, since it's
-    /// the only place per-field structure would otherwise be lost to multipart flattening — can
-    /// see `descriptorFormFields` from inside its own `make()`. `partiallyBuild()`, unlike
-    /// `build()`, never constructs an `Internals.Session` or resolves a client, which is exactly
-    /// right here: nothing about producing a description touches the network.
+    /// Not part of the `_result(environment:)` chain — like `RequestTask.result()`'s own default
+    /// (`_result(environment: RequestEnvironmentValues())`), this is an entry point, not
+    /// something nested inside another task's `.environment()`. `descriptorFormFields` is set on
+    /// that fresh environment and threaded through `Resolve.init(root:environment:)` into
+    /// `_PropertyInputs.environment`, which is how `FormNode` — the only node that needs to know
+    /// a description pass is running, since it's the only place per-field structure would
+    /// otherwise be lost to multipart flattening — receives it: captured by `Form`/`FormGroup`'s
+    /// own `_makeProperty` at construction time, not read from inside `make()` itself (nodes have
+    /// no `environment` of their own to read there). `partiallyBuild()`, unlike `build()`, never
+    /// constructs an `Internals.Session` or resolves a client, which is exactly right here:
+    /// nothing about producing a description touches the network.
     func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {
         let formFieldBox = DescriptorFormFieldBox()
 
-        var updatedEnvironment = environment
-        updatedEnvironment.descriptorFormFields = formFieldBox
+        var environment = RequestEnvironmentValues()
+        environment.descriptorFormFields = formFieldBox
 
-        let (_, make) = try await RequestEnvironmentValues.$current.withValue(updatedEnvironment) {
-            try await Resolve(root: content, environment: updatedEnvironment).partiallyBuild()
-        }
+        let (_, make) = try await Resolve(root: content, environment: environment).partiallyBuild()
 
         return try await descriptor.describe(
             TaskDescriptorContext(
