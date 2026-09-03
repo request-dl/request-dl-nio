@@ -422,6 +422,29 @@ struct URLEncoderTests {
     }
 
     @Test
+    func encoder_whenArrayWithBrackets() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+
+        let key = "foo"
+        let value = ["a", "ab", "abc", "abcd"]
+
+        urlEncoder.arrayEncodingStrategy = .brackets
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        #expect(
+            sut
+                == value.map {
+                    let key = "\(key)[]".addingRFC3986PercentEncoding()
+                    return "\(key)=\($0)"
+                }.joined(separator: "&")
+        )
+    }
+
+    @Test
     func encoder_whenArrayWithSubscripted() throws {
         let urlEncoder = URLEncoder()
         // Given
