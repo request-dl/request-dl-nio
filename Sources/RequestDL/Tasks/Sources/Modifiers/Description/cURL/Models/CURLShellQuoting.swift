@@ -25,7 +25,7 @@ func curlShellQuote(_ bytes: some Sequence<UInt8>) -> String {
     }
 
     let string = String(decoding: bytes, as: UTF8.self)
-    return "'" + string.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    return "'" + string.escapingSingleQuotes() + "'"
 }
 
 func curlShellQuote(_ string: String) -> String {
@@ -51,24 +51,23 @@ private func hex(_ byte: UInt8) -> String {
 
 extension String {
 
-    /// - Note: Written out by hand rather than reaching for Foundation's
-    /// `replacingOccurrences(of:with:)` — this file otherwise needs nothing beyond `Data`, which
-    /// `FoundationEssentials` already provides.
-    fileprivate func replacingOccurrences(of target: String, with replacement: String) -> String {
-        guard !target.isEmpty else {
-            return self
-        }
-
+    /// - Note: A single-`Character` scan, not Foundation's `replacingOccurrences(of:with:)` (this
+    /// file otherwise needs nothing beyond `Data`, which `FoundationEssentials` already provides)
+    /// and not the stdlib's own `replacing(_:with:)`/`firstRange(of:)` either — both are gated to
+    /// macOS 13/iOS 16, newer than this package's macOS 12/iOS 15 minimum. The only caller ever
+    /// escapes one character (`'`), so there's no need for a general substring search at all.
+    fileprivate func escapingSingleQuotes() -> String {
         var result = ""
-        var remainder = Substring(self)
+        result.reserveCapacity(count)
 
-        while let range = remainder.range(of: target) {
-            result += remainder[remainder.startIndex..<range.lowerBound]
-            result += replacement
-            remainder = remainder[range.upperBound...]
+        for character in self {
+            if character == "'" {
+                result += "'\\''"
+            } else {
+                result.append(character)
+            }
         }
 
-        result += remainder
         return result
     }
 }

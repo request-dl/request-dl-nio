@@ -51,20 +51,23 @@ public struct CURLTaskDescriptor: TaskDescriptor {
         var basicCredentialsFragment: String?
 
         for (name, value) in configuration.headers {
+            // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)` — this file otherwise
+            // needs nothing beyond `Data`/`NIOCore`, which `FoundationEssentials` already covers.
+
             // curl computes this itself; passing it by hand risks disagreeing with what curl
             // actually sends.
-            if name.caseInsensitiveCompare("Content-Length") == .orderedSame {
+            if name.lowercased() == "content-length" {
                 continue
             }
 
             // curl derives its own `Content-Type` (with its own multipart boundary) from `-F`
             // flags — the one captured here still carries the boundary from the body this
             // description pass isn't using, which would be actively misleading to print.
-            if hasFormFields, name.caseInsensitiveCompare("Content-Type") == .orderedSame {
+            if hasFormFields, name.lowercased() == "content-type" {
                 continue
             }
 
-            if name.caseInsensitiveCompare("Authorization") == .orderedSame,
+            if name.lowercased() == "authorization",
                 let credentialBytes = basicCredentialBytes(from: value)
             {
                 basicCredentialsFragment = "-u " + curlShellQuote(credentialBytes)

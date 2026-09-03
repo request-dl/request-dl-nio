@@ -92,7 +92,9 @@ enum CURLCommandParser {
                 let (name, headerValue) = try splitOnce(try value(for: token), separator: ":")
                 configuration.headers.add(name: name, value: headerValue)
 
-                if name.caseInsensitiveCompare("Content-Type") == .orderedSame {
+                // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)` -- unavailable
+                // under `FoundationEssentials`/Linux.
+                if name.lowercased() == "content-type" {
                     hasExplicitContentType = true
                 }
 
@@ -304,13 +306,21 @@ enum CURLCommandParser {
         var remainder = Substring(value)
         var connectionProtocol: Internals.Proxy.ConnectionProtocol = .http
 
-        if let schemeRange = remainder.range(of: "://") {
+        // Neither `range(of:)` (Foundation, unavailable under `FoundationEssentials`/Linux) nor
+        // `firstRange(of:)` (stdlib, but gated to macOS 13/iOS 16 -- newer than this package's
+        // macOS 12/iOS 15 minimum; see `URLOverrideEndpoint.init?(baseURL:)` for the same
+        // constraint). A scheme, when present, is always at the very start, so the first `:`
+        // followed by `//` is unambiguous -- an earlier `:` inside `user:pass@host:port` (no
+        // scheme) is never followed by `//`, so `hasPrefix("//")` alone tells the two apart.
+        if let colonIndex = remainder.firstIndex(of: ":"),
+            remainder[remainder.index(after: colonIndex)...].hasPrefix("//")
+        {
             connectionProtocol =
-                remainder[remainder.startIndex..<schemeRange.lowerBound]
+                remainder[remainder.startIndex..<colonIndex]
                     .lowercased()
                     .hasPrefix("socks") ? .socks : .http
 
-            remainder = remainder[schemeRange.upperBound...]
+            remainder = remainder[remainder.index(colonIndex, offsetBy: 3)...]
         }
 
         var authorization: Internals.Proxy.Authorization?
