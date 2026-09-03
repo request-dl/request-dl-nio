@@ -35,7 +35,7 @@ jobs:
     # draft state, so this has to be a job-level condition, not a trigger filter. Push events
     # (main) have no `pull_request` payload at all, hence the `event_name` guard first.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    uses: request-dl/.github/.github/workflows/swift-ci.yaml@main
+    uses: request-dl/.github/.github/workflows/swift-ci.yaml@claude/apple-tests-crash-watch-timeouts-1de062
     with:
       name: request-dl
       product-name: RequestDL
@@ -65,6 +65,13 @@ jobs:
       apple-coverage-enabled: true
       apple-tests-max-parallelization-width: '2'
       apple-tests-parallel-testing-worker-count: '2'
+      # 30 (the workflow's own default) was observed getting hit by a legitimately still-running
+      # tvOS leg -- not a hang, just a slow day on a contended Simulator runner -- which the job
+      # timeout then cut off mid-suite with no test report at all. 45 gives real headroom for that
+      # without masking an actual hang: apple-tests-crash-watch-enabled/-grace-minutes (workflow
+      # defaults: on, 12 minutes) already fail a genuinely stuck run well before 45 minutes,
+      # independently of this budget.
+      apple-tests-timeout-minutes: 45
 
       # Step 4 – Third Party
       enable-third-party-tests: true
