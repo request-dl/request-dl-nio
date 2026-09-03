@@ -202,6 +202,63 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
+    /// Companion to `DataTaskTests.dataTask_whenResourceTimeoutAlreadyElapsed_throwsResourceTimeoutError`:
+    /// that one proves `Timeout(.resource)` throws `ResourceTimeoutError` at all, but with a
+    /// deadline so short it has already elapsed before the request even reaches the network --
+    /// it says nothing about whether the deadline actually tears down a connection that's
+    /// genuinely still running, nor which executor it ran that proof against (`Session.localServer`
+    /// carries no executor preference, so it only happens to resolve to `.urlSession` by Darwin's
+    /// own default -- see `dataTask_whenNoExecutorPreferenceSet_actuallyDispatchesOverURLSessionOnDarwin`
+    /// above).
+    ///
+    /// This pins `.urlSession` explicitly, so this regression coverage can't silently go stale
+    /// if that default ever changes, and reuses `withPartialResponseServer` -- headers plus a
+    /// small body, then silence forever -- so the deadline has to fire against a connection
+    /// that's demonstrably still open, the same technique
+    /// `downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingURLSessionClient`
+    /// above uses to prove cancellation for real instead of merely asserting an error type.
+    @Test
+    func dataTask_whenResourceTimeoutFiresMidFlightUnderRequiredURLSession_cancelsTheUnderlyingURLSessionTaskAndThrows()
+        async throws
+    {
+        try await withPartialResponseServer { port in
+            // Given
+            let content = TestProperty {
+                BaseURL(.http, host: "127.0.0.1:\(port)")
+
+                Session("com.requestdl.tests.7b5-resource-timeout.\(UUID())")
+                    .requiredExecutor(.urlSession)
+                Timeout(.milliseconds(200), for: .resource)
+            }
+
+            let resolved = try await resolve(content)
+
+            guard case .urlSession(let client) = try await resolved.session.resolvedClient() else {
+                Issue.record("Expected .urlSession")
+                return
+            }
+
+            #expect(!client.isRunning)
+
+            // When / Then -- the server never finishes the body, so this can only complete by the
+            // deadline actually firing.
+            await #expect(throws: ResourceTimeoutError.self) {
+                _ = try await DataTask { content }.extractPayload().result()
+            }
+
+            // Then -- not just an error thrown at the caller: the live `URLSessionTask` behind it
+            // actually got torn down. `didCompleteWithError:` releases state asynchronously, so
+            // poll briefly rather than asserting immediately.
+            var stillRunning = client.isRunning
+            for _ in 0..<50 where stillRunning {
+                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
+                stillRunning = client.isRunning
+            }
+
+            #expect(!stillRunning)
+        }
+    }
+
     /// Confirms the identity-building failure a real mTLS `DataTask` hits under `.urlSession` on
     /// this SwiftPM test harness (no Keychain Sharing entitlement -- see
     /// `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment) surfaces through the
