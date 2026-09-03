@@ -11,6 +11,11 @@
 /// - ``RequestDL/Modifiers/AcceptOnlyStatusCode``
 /// - ``RequestDL/InvalidStatusCodeError``
 ///
+/// ### Validating the content type
+///
+/// - ``RequestDL/Modifiers/AcceptOnlyContentType``
+/// - ``RequestDL/UnacceptableContentTypeError``
+///
 /// ### Performing action at specific status code
 ///
 /// - ``RequestDL/Modifiers/OnStatusCode``
