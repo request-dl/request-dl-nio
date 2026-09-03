@@ -10,6 +10,11 @@ extension URLEncoder {
         /// Uses no index in the encoding. This is the default.
         case droppingIndex
 
+        /// Encodes the index as a fixed, empty pair of square brackets, e.g. `[]`, the same for
+        /// every element -- unlike ``subscripted``, the brackets never carry the actual index.
+        /// Matches Alamofire's `ArrayEncoding.brackets`, its own default.
+        case brackets
+
         /// Encodes the index in square brackets, e.g. `[0]`.
         case subscripted
 
@@ -26,6 +31,8 @@ extension URLEncoder {
             switch self {
             case .droppingIndex:
                 try encodeDroppingIndex(index, in: encoder)
+            case .brackets:
+                try encodeBrackets(index, in: encoder)
             case .subscripted:
                 try encodeSubscripted(index, in: encoder)
             case .accessMember:
@@ -40,6 +47,11 @@ extension URLEncoder {
         private func encodeDroppingIndex(_ index: Int, in encoder: URLEncoder.Encoder) throws {
             var container = encoder.keyContainer()
             try container.encode("")
+        }
+
+        private func encodeBrackets(_ index: Int, in encoder: URLEncoder.Encoder) throws {
+            var container = encoder.keyContainer()
+            try container.encode("[]")
         }
 
         private func encodeSubscripted(_ index: Int, in encoder: URLEncoder.Encoder) throws {

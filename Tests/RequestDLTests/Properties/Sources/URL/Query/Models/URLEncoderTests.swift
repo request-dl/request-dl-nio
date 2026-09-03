@@ -422,6 +422,29 @@ struct URLEncoderTests {
     }
 
     @Test
+    func encoder_whenArrayWithBrackets() throws {
+        let urlEncoder = URLEncoder()
+        // Given
+
+        let key = "foo"
+        let value = ["a", "ab", "abc", "abcd"]
+
+        urlEncoder.arrayEncodingStrategy = .brackets
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        #expect(
+            sut
+                == value.map {
+                    let key = "\(key)[]".addingRFC3986PercentEncoding()
+                    return "\(key)=\($0)"
+                }.joined(separator: "&")
+        )
+    }
+
+    @Test
     func encoder_whenArrayWithSubscripted() throws {
         let urlEncoder = URLEncoder()
         // Given
@@ -673,6 +696,27 @@ struct URLEncoderTests {
         // Given
         let key = "foo"
         let value = await Data.randomData(length: 64)
+
+        // When
+        let sut = try urlEncoder.encode(value, forKey: key)
+
+        // Then
+        let expectedValue =
+            value
+            .base64EncodedString()
+            .addingRFC3986PercentEncoding()
+
+        #expect(sut == "\(key)=\(expectedValue)")
+    }
+
+    @Test
+    func encoder_whenDataWithDeferredToData() async throws {
+        let urlEncoder = URLEncoder()
+        // Given
+        let key = "foo"
+        let value = await Data.randomData(length: 64)
+
+        urlEncoder.dataEncodingStrategy = .deferredToData
 
         // When
         let sut = try urlEncoder.encode(value, forKey: key)
