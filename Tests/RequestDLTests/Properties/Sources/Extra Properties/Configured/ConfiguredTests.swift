@@ -3,6 +3,7 @@
 //
 
 import Configuration
+import Crypto
 import NIOSSL
 import RequestDLInternals
 import Testing
@@ -822,6 +823,110 @@ struct ConfiguredTests {
 
         // Then
         #expect(resolved.session.configuration.secureConnection?.certificateChain == .file(file))
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionSPKIPinningDefaultsToStrictPolicy() async throws {
+        // Given
+        let pin1 = UUID().uuidString
+        let pin2 = UUID().uuidString
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.spkiPinning.pins": .init(.stringArray([pin1, pin2]), isSecret: false)
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        let secureConnection = try #require(resolved.session.configuration.secureConnection)
+        #expect(secureConnection.tlsPinningPolicy == .strict)
+        #expect(
+            secureConnection.tlsPins
+                == [pin1, pin2].map {
+                    .init(source: .base64String($0), algorithm: SHA256.self)
+                }
+        )
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionSPKIPinningWithAuditPolicy() async throws {
+        // Given
+        let pin = UUID().uuidString
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.spkiPinning.pins": .init(.stringArray([pin]), isSecret: false),
+                "secureConnection.spkiPinning.policy": "audit",
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        let secureConnection = try #require(resolved.session.configuration.secureConnection)
+        #expect(secureConnection.tlsPinningPolicy == .audit)
+        #expect(
+            secureConnection.tlsPins
+                == [.init(source: .base64String(pin), algorithm: SHA256.self)]
+        )
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func emptySPKIPinningPinsThrows() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.spkiPinning.pins": .init(.stringArray([]), isSecret: false)
+            ])
+        )
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func invalidSPKIPinningPolicyThrows() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.spkiPinning.pins": .init(
+                    .stringArray([UUID().uuidString]),
+                    isSecret: false
+                ),
+                "secureConnection.spkiPinning.policy": "lenient",
+            ])
+        )
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
     }
 
     @Test
