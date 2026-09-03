@@ -14,7 +14,7 @@ struct RawTask<Content: Property>: RequestTask {
 
     // MARK: - Internal methods
 
-    func result() async throws -> AsyncResponse {
+    func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
         let resolved = try await Resolve(
             root: content,
             environment: environment
@@ -30,6 +30,8 @@ struct RawTask<Content: Property>: RequestTask {
                 throw ExecutorRequirementError(error)
             }
         }
+
+        let deadline = Internals.ResourceDeadline(nanoseconds: resolved.session.configuration.timeout.resource)
 
         if let constraints = resolved.session.configuration.networkPathConstraints {
             do {
@@ -92,6 +94,11 @@ struct RawTask<Content: Property>: RequestTask {
         // within the caller's own task, sidesteps that.
         //
         // A cache hit (the `.task` case below) never reaches the network, so it isn't traced.
+        //
+        // `@Sendable` because `Internals.ResourceDeadline.race(seed:_:)` below runs it as a real
+        // task-group child task when `Timeout(.resource)` is configured, not just called inline
+        // in this task -- otherwise the race is a plain `await` with no isolation change at all.
+        @Sendable
         func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
             switch await cacheControl(client) {
             case .task(let task):
@@ -160,18 +167,25 @@ struct RawTask<Content: Property>: RequestTask {
         // already carries. The span started above reads this same task-local, so both the explicit
         // and the ambient case are picked up correctly here -- there's no `EventLoop` hop between the
         // bind and the read.
-        if let serviceContext = resolved.requestConfiguration.serviceContext {
-            (sessionTask, onResponseHead) = try await ServiceContext.$current.withValue(serviceContext) {
-                try await executeSessionTask()
+        do {
+            if let serviceContext = resolved.requestConfiguration.serviceContext {
+                (sessionTask, onResponseHead) = try await deadline.race {
+                    try await ServiceContext.$current.withValue(serviceContext) {
+                        try await executeSessionTask()
+                    }
+                }
+            } else {
+                (sessionTask, onResponseHead) = try await deadline.race(executeSessionTask)
             }
-        } else {
-            (sessionTask, onResponseHead) = try await executeSessionTask()
+        } catch is Internals.ResourceTimeoutError {
+            throw ResourceTimeoutError()
         }
 
         return AsyncResponse(
             seed: sessionTask.seed,
             response: sessionTask.response,
-            onResponseHead: onResponseHead
+            onResponseHead: onResponseHead,
+            deadline: deadline
         )
     }
 }

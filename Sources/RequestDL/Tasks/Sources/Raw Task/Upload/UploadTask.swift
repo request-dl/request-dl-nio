@@ -50,15 +50,10 @@ public struct UploadTask<Content: Property>: RequestTask {
 
     // MARK: - Public methods
 
-    ///
-    /// Returns the asynchronous response for a request.
-    ///
-    /// - Returns: An ``AsyncResponse`` sequence of request upload and download steps.
-    ///
-    /// - Throws: An error of type `Error` that indicates an issue with the request or response.
-    ///
-    public func result() async throws -> AsyncResponse {
-        try await task.result()
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
+        try await task._result(environment: environment)
     }
 
     ///

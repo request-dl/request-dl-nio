@@ -69,7 +69,7 @@ struct AsyncResponseCollectTests {
         _ = try await Logger.withTesting(
             level: .trace,
             recorded: { recordBox.append($0) },
-            perform: {
+            perform: { logger in
                 try await UploadTask {
                     BaseURL(localServer.baseURL)
                     Path(testState.uri)
@@ -85,6 +85,7 @@ struct AsyncResponseCollectTests {
                 }
                 .collectData()
                 .extractPayload()
+                .environment(\.logger, logger)
                 .result()
             }
         )

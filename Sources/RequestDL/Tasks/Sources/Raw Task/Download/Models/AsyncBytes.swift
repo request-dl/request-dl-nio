@@ -20,6 +20,7 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
         fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncBytes.AsyncIterator
+        fileprivate let deadline: Internals.ResourceDeadline
 
         ///
         /// Returns the next element in the sequence, or nil if there are no more elements.
@@ -27,7 +28,20 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
         /// - Returns: The next element in the sequence.
         ///
         public mutating func next() async throws -> Data? {
-            try await iterator.next()
+            // See `AsyncResponse.Iterator.next()` for why `iterator` is captured immutably here
+            // and re-assigned afterward, rather than mutated directly inside the raced closure.
+            let startIterator = iterator
+            do {
+                let (element, updatedIterator) = try await deadline.race(seed: seed) {
+                    var iterator = startIterator
+                    let element = try await iterator.next()
+                    return (element, iterator)
+                }
+                iterator = updatedIterator
+                return element
+            } catch is Internals.ResourceTimeoutError {
+                throw ResourceTimeoutError()
+            }
         }
     }
 
@@ -55,15 +69,18 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
     private let seed: Internals.TaskSeed
     fileprivate let bytes: Internals.AsyncBytes
+    private let deadline: Internals.ResourceDeadline
 
     // MARK: - Inits
 
     init(
         seed: Internals.TaskSeed,
-        bytes: Internals.AsyncBytes
+        bytes: Internals.AsyncBytes,
+        deadline: Internals.ResourceDeadline = .init(nanoseconds: nil)
     ) {
         self.seed = seed
         self.bytes = bytes
+        self.deadline = deadline
     }
 
     // MARK: - Public methods
@@ -76,7 +93,25 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
     public func makeAsyncIterator() -> AsyncIterator {
         .init(
             seed: seed,
-            iterator: bytes.makeAsyncIterator()
+            iterator: bytes.makeAsyncIterator(),
+            deadline: deadline
         )
+    }
+}
+
+// MARK: - Equatable, Hashable
+
+extension AsyncBytes {
+
+    // `deadline` deliberately left out -- it's incidental race metadata, not part of what
+    // identifies one `AsyncBytes` stream, the same way it was identified by `seed`/`bytes` alone
+    // before `.resource` timeouts existed.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.seed == rhs.seed && lhs.bytes == rhs.bytes
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(seed)
+        hasher.combine(bytes)
     }
 }

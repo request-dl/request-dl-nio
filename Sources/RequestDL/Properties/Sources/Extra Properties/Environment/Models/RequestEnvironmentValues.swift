@@ -5,7 +5,7 @@
 import Logging
 
 /// ``RequestEnvironmentValues`` is a type that contains all of the environment values
-/// for a property hierarchy. It is accessible via a subscript on a property's ``PropertyEnvironment`` wrapper.
+/// for a property hierarchy. It is accessible via a subscript on a property's ``RequestEnvironment`` wrapper.
 public struct RequestEnvironmentValues: Sendable {
 
     fileprivate struct Entry: Sendable, CustomDebugStringConvertible {
@@ -16,9 +16,6 @@ public struct RequestEnvironmentValues: Sendable {
             "\(keyStringLiteral()): \(String(reflecting: value))"
         }
     }
-
-    @TaskLocal
-    static var current = RequestEnvironmentValues()
 
     // MARK: - Private properties
 

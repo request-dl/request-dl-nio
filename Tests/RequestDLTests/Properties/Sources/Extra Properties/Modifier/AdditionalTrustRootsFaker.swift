@@ -113,7 +113,7 @@ extension PropertyModifierTests {
 
     struct PathModifier: PropertyModifier {
 
-        @PropertyEnvironment(\.path) var path
+        @RequestEnvironment(\.path) var path
 
         func body(content: Content) -> some Property {
             content
