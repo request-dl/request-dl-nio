@@ -9,6 +9,8 @@ struct FormItem: Sendable {
 
     struct Output {
 
+        let name: String
+        let filename: String?
         let headers: HTTPHeaders
         let buffer: Internals.AnyBuffer
     }
@@ -62,6 +64,8 @@ struct FormItem: Sendable {
         switch output.source {
         case .buffer(let buffer):
             return .init(
+                name: name,
+                filename: filename,
                 headers: makeHeader(buffer, for: output.contentType),
                 buffer: buffer
             )
@@ -71,6 +75,8 @@ struct FormItem: Sendable {
             let buffer = await Internals.DataBuffer(data)
 
             return .init(
+                name: name,
+                filename: filename,
                 headers: makeHeader(buffer, for: output.contentType),
                 buffer: buffer
             )

@@ -60,4 +60,15 @@ public struct UploadTask<Content: Property>: RequestTask {
     public func result() async throws -> AsyncResponse {
         try await task.result()
     }
+
+    ///
+    /// Resolves this task's request and hands it to `descriptor`, without performing it.
+    ///
+    /// - Parameter descriptor: The ``TaskDescriptor`` that produces the description.
+    /// - Returns: The descriptor's output — a curl command line for ``CURLTaskDescriptor/cURL``.
+    /// - Throws: An error thrown while resolving the request, or by the descriptor itself.
+    ///
+    public func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {
+        try await task.description(descriptor)
+    }
 }

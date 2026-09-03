@@ -4,7 +4,14 @@
 
 import RequestDLInternals
 
-/// Assembles a list of form items into the buffers of a `multipart/form-data` body.
+/// Assembles already-computed form item outputs into the buffers of a `multipart/form-data`
+/// body.
+///
+/// Takes `[FormItem.Output]`, not `[FormItem]` — running a `FormItem`'s `PayloadFactory` is the
+/// caller's job, once, before constructing this. A caller that also needs each field's own
+/// name/filename/content-type/bytes for something else (`FormNode`'s `TaskDescriptor` capture,
+/// `CURLCommandParser`'s `-F` handling) runs the same outputs through both without paying for the
+/// factory twice.
 struct FormGroupBuilder: Sendable {
 
     // MARK: - Internal properties
@@ -15,7 +22,7 @@ struct FormGroupBuilder: Sendable {
     /// negligible. It is not checked against the content, and cannot practically be.
     let boundary: String
 
-    let items: [FormItem]
+    let outputs: [FormItem.Output]
 
     // MARK: - Private properties
 
@@ -29,13 +36,13 @@ struct FormGroupBuilder: Sendable {
 
     // MARK: - Inits
 
-    init(_ items: [FormItem]) {
-        self.init(Self.makeBoundary(), items: items)
+    init(_ outputs: [FormItem.Output]) {
+        self.init(Self.makeBoundary(), outputs: outputs)
     }
 
-    fileprivate init(_ boundary: String, items: [FormItem]) {
+    fileprivate init(_ boundary: String, outputs: [FormItem.Output]) {
         self.boundary = boundary
-        self.items = items
+        self.outputs = outputs
     }
 
     // MARK: - Private static methods
@@ -54,16 +61,17 @@ struct FormGroupBuilder: Sendable {
 
     /// Produces the body, in order: a delimiter, headers and content per part, then the closing
     /// delimiter.
-    func callAsFunction() async throws -> [Internals.AnyBuffer] {
+    func callAsFunction() async -> [Internals.AnyBuffer] {
         var buffers = [Internals.AnyBuffer]()
 
-        for item in items {
+        for output in outputs {
             let delimiter = await Internals.DataBuffer("--\(boundary)\(eol)".utf8)
-            let content = try await buildBuffer(item)
+            let headers = await buildHeadersBuffer(output.headers)
             let separator = await Internals.DataBuffer(eol.utf8)
 
             buffers.append(delimiter)
-            buffers.append(contentsOf: content)
+            buffers.append(headers)
+            buffers.append(output.buffer)
             buffers.append(separator)
         }
 
@@ -75,13 +83,6 @@ struct FormGroupBuilder: Sendable {
     }
 
     // MARK: - Private methods
-
-    private func buildBuffer(_ item: FormItem) async throws -> [Internals.AnyBuffer] {
-        let output = try await item()
-        let headers = await buildHeadersBuffer(output.headers)
-
-        return [headers, output.buffer]
-    }
 
     /// The part headers, terminated by the blank line that separates them from the content.
     private func buildHeadersBuffer(_ headers: HTTPHeaders) async -> Internals.AnyBuffer {

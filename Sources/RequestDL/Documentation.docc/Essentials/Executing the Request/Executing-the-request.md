@@ -25,3 +25,7 @@ Discover the possibilities to execute your request and manipulate the received d
 ### Distributed tracing
 
 - <doc:Distributed-tracing>
+
+### cURL support
+
+- <doc:CURL-support>
