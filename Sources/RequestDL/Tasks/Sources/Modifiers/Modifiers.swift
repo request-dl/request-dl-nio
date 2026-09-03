@@ -23,6 +23,7 @@
 /// ### Handling the response
 ///
 /// - ``RequestDL/Modifiers/Decode``
+/// - ``RequestDL/Modifiers/DecodeIfPresent``
 /// - ``RequestDL/Modifiers/ExtractPayload``
 /// - ``RequestDL/Modifiers/KeyPath``
 ///
