@@ -562,7 +562,7 @@ struct InternalsSessionConfigurationExecutorTests {
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedAndCompatible_doesNotThrow() async throws {
         // Given
-        var configuration = Internals.Session.Configuration()
+        let configuration = Internals.Session.Configuration()
 
         // When / Then
         try configuration.requireExecutor(.nioTransportServices)
