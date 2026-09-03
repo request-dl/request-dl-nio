@@ -177,4 +177,49 @@ struct TaskDescriptorTests {
         #expect(!wasCalled.value)
         #expect(result.response == output)
     }
+
+    /// Unlike plain `description(_:)` -- only ever defined directly on `DataTask`/`DownloadTask`/
+    /// `UploadTask` -- `description(_:enabled:onDescribe:)` is a `RequestTask` extension that
+    /// queues its hook on the environment. That's what lets it sit anywhere in a chain, not just
+    /// at the very top: here it runs after `.extractPayload()` has already changed `Element` from
+    /// `TaskResult<Data>` to plain `Data`.
+    @Test
+    func onDescribeWorksAfterAnotherModifierInTheChain() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        let certificate = Certificates().server()
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let capturedDescription = Box<(url: String, method: String?)?>(nil)
+
+        // When
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session.localServer
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+        }
+        .extractPayload()
+        .description(URLAndMethodDescriptor()) { description in
+            capturedDescription.set(description)
+        }
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(capturedDescription.value?.url == "https://" + localServer.baseURL + uri)
+        #expect(result.response == output)
+    }
 }

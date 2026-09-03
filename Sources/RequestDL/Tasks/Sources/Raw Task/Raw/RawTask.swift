@@ -20,6 +20,19 @@ struct RawTask<Content: Property>: RequestTask {
             environment: environment
         ).build()
 
+        // Hands the exact configuration this request is about to send to every
+        // `description(_:enabled:onDescribe:)` hook queued on `environment` -- before anything
+        // downstream gets a chance to fail, so a hook still sees the resolved request even if the
+        // executor check or the request itself doesn't go through.
+        for hook in environment.taskDescriptorContextHooks {
+            try await hook(
+                TaskDescriptorContext(
+                    requestConfiguration: resolved.requestConfiguration,
+                    formFields: environment.descriptorFormFields?.fields ?? []
+                )
+            )
+        }
+
         // Checked before anything else touches `resolved` -- a hard-pinned executor this
         // configuration can't actually run on must fail loudly, not after paying for a
         // logger/client/cache setup nobody will get to use.

@@ -27,7 +27,7 @@ import struct Foundation.Data
 ///
 /// > Note: The ``Property`` instance used by ``DataTask`` contains information about the request such as its URL, headers,
 /// body and etc.
-public struct DataTask<Content: Property>: RequestTask, DescribableRequestTask {
+public struct DataTask<Content: Property>: RequestTask {
 
     // MARK: - Private properties
 
@@ -63,33 +63,5 @@ public struct DataTask<Content: Property>: RequestTask, DescribableRequestTask {
     ///
     public func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {
         try await task.description(descriptor)
-    }
-
-    ///
-    /// Returns a task that, once performed, resolves this request through `descriptor`, hands
-    /// the output to `onDescribe`, then performs the request for real -- two separate passes,
-    /// exactly as calling ``description(_:)`` followed by ``result()`` would. Nothing runs until
-    /// the returned task is: it composes lazily, the same way ``modifier(_:)`` does.
-    ///
-    /// - Parameters:
-    ///   - descriptor: The ``TaskDescriptor`` that produces the description.
-    ///   - enabled: When `false`, skips the descriptor pass entirely (`onDescribe` is not
-    ///   called) and goes straight to performing the request -- useful to disable the extra
-    ///   resolve pass in production without removing the call site.
-    ///   - onDescribe: Called with the descriptor's output once it's ready.
-    /// - Returns: A task that produces this task's actual result, exactly as ``result()`` would.
-    ///
-    public func description<Descriptor: TaskDescriptor>(
-        _ descriptor: Descriptor,
-        enabled: Bool = true,
-        onDescribe: @escaping @Sendable (Descriptor.Output) -> Void
-    ) -> AnyTask<Element> {
-        DescribingRequestTask(
-            task: self,
-            descriptor: descriptor,
-            enabled: enabled,
-            onDescribe: onDescribe
-        )
-        .eraseToAnyTask()
     }
 }
