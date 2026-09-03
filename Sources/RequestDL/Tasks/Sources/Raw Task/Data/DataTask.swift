@@ -27,7 +27,7 @@ import struct Foundation.Data
 ///
 /// > Note: The ``Property`` instance used by ``DataTask`` contains information about the request such as its URL, headers,
 /// body and etc.
-public struct DataTask<Content: Property>: RequestTask {
+public struct DataTask<Content: Property>: RequestTask, DescribableRequestTask {
 
     // MARK: - Private properties
 
@@ -66,9 +66,10 @@ public struct DataTask<Content: Property>: RequestTask {
     }
 
     ///
-    /// Resolves this task's request through `descriptor`, hands the output to `onDescribe`, then
-    /// performs the request for real -- two separate passes, exactly as calling
-    /// ``description(_:)`` followed by ``result()`` would.
+    /// Returns a task that, once performed, resolves this request through `descriptor`, hands
+    /// the output to `onDescribe`, then performs the request for real -- two separate passes,
+    /// exactly as calling ``description(_:)`` followed by ``result()`` would. Nothing runs until
+    /// the returned task is: it composes lazily, the same way ``modifier(_:)`` does.
     ///
     /// - Parameters:
     ///   - descriptor: The ``TaskDescriptor`` that produces the description.
@@ -76,19 +77,19 @@ public struct DataTask<Content: Property>: RequestTask {
     ///   called) and goes straight to performing the request -- useful to disable the extra
     ///   resolve pass in production without removing the call site.
     ///   - onDescribe: Called with the descriptor's output once it's ready.
-    /// - Returns: This task's actual result, exactly as ``result()`` would produce it.
-    /// - Throws: An error thrown while producing the description, or while performing the
-    /// request itself.
+    /// - Returns: A task that produces this task's actual result, exactly as ``result()`` would.
     ///
     public func description<Descriptor: TaskDescriptor>(
         _ descriptor: Descriptor,
         enabled: Bool = true,
         onDescribe: @escaping @Sendable (Descriptor.Output) -> Void
-    ) async throws -> Element {
-        if enabled {
-            onDescribe(try await description(descriptor))
-        }
-
-        return try await result()
+    ) -> AnyTask<Element> {
+        DescribingRequestTask(
+            task: self,
+            descriptor: descriptor,
+            enabled: enabled,
+            onDescribe: onDescribe
+        )
+        .eraseToAnyTask()
     }
 }

@@ -23,8 +23,8 @@ import struct Foundation.Data
 /// ```
 ///
 /// To log the command line right alongside the request that actually runs it, use the
-/// `onDescribe`-taking overload instead -- it produces the description, hands it to the
-/// closure, then performs the request for real:
+/// `onDescribe`-taking overload instead -- it returns a task that, once performed, produces the
+/// description, hands it to the closure, then performs the request for real:
 ///
 /// ```swift
 /// let data = try await DataTask {
@@ -34,6 +34,7 @@ import struct Foundation.Data
 /// .description(.cURL) { command in
 ///     print(command)
 /// }
+/// .result()
 /// ```
 ///
 /// `-H`/URL/method/a plain body all come straight from ``TaskDescriptorContext/requestConfiguration``

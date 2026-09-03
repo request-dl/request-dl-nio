@@ -112,7 +112,7 @@ struct TaskDescriptorTests {
         let capturedDescription = Box<(url: String, method: String?)?>(nil)
 
         // When
-        let taskResult = try await DataTask {
+        let task = DataTask {
             BaseURL(localServer.baseURL)
             Path(uri)
 
@@ -126,6 +126,11 @@ struct TaskDescriptorTests {
             capturedDescription.set(description)
         }
 
+        // Then -- composing the task runs nothing by itself; `onDescribe` only fires once the
+        // task is actually performed, the same way a `RequestTaskModifier` defers its `body(_:)`.
+        #expect(capturedDescription.value == nil)
+
+        let taskResult = try await task.result()
         let result = try HTTPResult<String>(taskResult.payload)
 
         // Then -- `onDescribe` ran with the resolved request, and the real request also went
@@ -164,6 +169,7 @@ struct TaskDescriptorTests {
         .description(URLAndMethodDescriptor(), enabled: false) { _ in
             wasCalled.set(true)
         }
+        .result()
 
         let result = try HTTPResult<String>(taskResult.payload)
 
