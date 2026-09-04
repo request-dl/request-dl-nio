@@ -14,10 +14,10 @@ struct DigestAuthenticationTests {
         let credential = DigestCredential()
 
         let property = DigestAuthentication(
-            credential,
             username: "Mufasa",
             password: "Circle of Life"
         )
+        .environment(\.digestCredential, credential)
 
         // When
         let resolved = try await resolve(TestProperty(property))
@@ -38,11 +38,11 @@ struct DigestAuthenticationTests {
         )
 
         let property = DigestAuthentication(
-            credential,
             username: "Mufasa",
             password: "Circle of Life",
             method: .get
         )
+        .environment(\.digestCredential, credential)
 
         // When
         let resolved = try await resolve(
@@ -77,7 +77,8 @@ struct DigestAuthenticationTests {
 
             let resolved = try await resolve(
                 TestProperty(
-                    DigestAuthentication(credential, username: "user", password: password)
+                    DigestAuthentication(username: "user", password: password)
+                        .environment(\.digestCredential, credential)
                 )
             )
 

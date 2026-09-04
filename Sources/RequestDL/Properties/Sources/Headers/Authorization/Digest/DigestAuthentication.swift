@@ -2,23 +2,23 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Sets the `Authorization` header for HTTP Digest access authentication (RFC 7616), once its
-/// `credential` has a challenge to answer.
+/// Sets the `Authorization` header for HTTP Digest access authentication (RFC 7616), once the
+/// current ``DigestCredential`` has a challenge to answer.
 ///
 /// Pairs with ``RequestTask/digestAuthentication(_:maxAttempts:)``, which parses the server's
-/// `WWW-Authenticate: Digest` challenge on a `401` and retries -- this property alone only ever
-/// *uses* a challenge already stored on `credential`; it never fetches one itself. See
-/// ``DigestCredential``'s own doc comment for the shared-state contract between the two.
+/// `WWW-Authenticate: Digest` challenge on a `401`, stores it on a `DigestCredential`, and
+/// retries -- this property alone only ever *uses* a challenge already stored there; it never
+/// fetches one itself. The credential itself is never passed explicitly: it flows down through
+/// the environment the same way ``URLEncoder`` does, from whichever
+/// ``RequestTask/digestAuthentication(_:maxAttempts:)`` this request is under.
 ///
 /// ```swift
-/// let credential = DigestCredential()
-///
 /// try await DataTask {
 ///     BaseURL("example.com")
 ///     Path("secure")
-///     DigestAuthentication(credential, username: "user", password: "pass")
+///     DigestAuthentication(username: "user", password: "pass")
 /// }
-/// .digestAuthentication(credential)
+/// .digestAuthentication()
 /// .result()
 /// ```
 ///
@@ -74,7 +74,8 @@ public struct DigestAuthentication: Property {
 
     // MARK: - Private properties
 
-    private let credential: DigestCredential
+    @RequestEnvironment(\.digestCredential) private var credential: DigestCredential
+
     private let username: String
     private let password: String
     private let method: HTTPMethod
@@ -82,11 +83,9 @@ public struct DigestAuthentication: Property {
     // MARK: - Inits
 
     ///
-    /// Initializes with the shared credential and the request's own username/password/method.
+    /// Initializes with the request's own username/password/method.
     ///
     /// - Parameters:
-    ///    - credential: Shared with ``RequestTask/digestAuthentication(_:maxAttempts:)``. See
-    ///    ``DigestCredential``.
     ///    - username: The username to authenticate with.
     ///    - password: The password to authenticate with.
     ///    - method: The request's own HTTP method -- must match whatever ``RequestMethod`` (or
@@ -94,12 +93,10 @@ public struct DigestAuthentication: Property {
     ///    response. Defaults to `.get`.
     ///
     public init(
-        _ credential: DigestCredential,
         username: String,
         password: String,
         method: HTTPMethod = .get
     ) {
-        self.credential = credential
         self.username = username
         self.password = password
         self.method = method
@@ -113,6 +110,16 @@ public struct DigestAuthentication: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
+
+        // A leaf property with a hand-written `_makeProperty` doesn't go through `Property`'s
+        // own default implementation, which is what runs `GraphOperation` (namespace,
+        // environment, stored object) for every composite property automatically -- without
+        // this, `@RequestEnvironment(\.digestCredential)` above would never see anything set via
+        // `.environment(\.digestCredential, ...)`/`Modifiers.DigestAuthentication` and would
+        // silently fall back to `DigestCredentialEnvironmentKey`'s own shared default.
+        var inputs = inputs
+        GraphOperation(property)(&inputs)
+
         return .leaf(
             Node(
                 credential: property.credential,

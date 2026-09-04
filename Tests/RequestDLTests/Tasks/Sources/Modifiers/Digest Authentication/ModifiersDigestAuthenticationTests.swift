@@ -37,7 +37,7 @@ struct ModifiersDigestAuthenticationTests {
         // When
         let result = try await MockedTask {
             BaseURL("localhost")
-            DigestAuthentication(credential, username: "user", password: "pass")
+            DigestAuthentication(username: "user", password: "pass")
         }
         .collectData()
         .flatMap { result -> TaskResult<Data> in
@@ -60,6 +60,37 @@ struct ModifiersDigestAuthenticationTests {
     }
 
     @Test
+    func digestAuthentication_whenNoCredentialPassed_stillRetriesAndSucceeds() async throws {
+        // Given -- no DigestCredential constructed or passed anywhere; `.digestAuthentication()`
+        // must create and thread its own through the environment for `DigestAuthentication` to
+        // pick up.
+        let attempts = InlineProperty(wrappedValue: 0)
+
+        // When
+        let result = try await MockedTask {
+            BaseURL("localhost")
+            DigestAuthentication(username: "user", password: "pass")
+        }
+        .collectData()
+        .flatMap { result -> TaskResult<Data> in
+            attempts.wrappedValue += 1
+
+            guard attempts.wrappedValue > 1 else {
+                return TaskResult(head: head(status: 401, wwwAuthenticate: Self.challengeHeader), payload: Data())
+            }
+
+            return TaskResult(head: head(status: 200), payload: Data("ok".utf8))
+        }
+        .digestAuthentication()
+        .result()
+
+        // Then
+        #expect(attempts.wrappedValue == 2)
+        #expect(result.payload == Data("ok".utf8))
+        #expect(result.head.status.code == 200)
+    }
+
+    @Test
     func digestAuthentication_whenMaxAttemptsIsOne_doesNotRetry() async throws {
         // Given
         let credential = DigestCredential()
@@ -68,7 +99,7 @@ struct ModifiersDigestAuthenticationTests {
         // When
         let result = try await MockedTask {
             BaseURL("localhost")
-            DigestAuthentication(credential, username: "user", password: "pass")
+            DigestAuthentication(username: "user", password: "pass")
         }
         .collectData()
         .flatMap { _ -> TaskResult<Data> in

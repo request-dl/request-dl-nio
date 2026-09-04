@@ -6,19 +6,21 @@ import SwiftAsyncStream
 
 /// Shared state between ``DigestAuthentication`` (which builds the `Authorization` header) and
 /// ``RequestTask/digestAuthentication(_:maxAttempts:)`` (which parses the server's challenge and
-/// drives the retry). Create one instance and pass it to both.
+/// drives the retry). ``RequestTask/digestAuthentication(_:maxAttempts:)`` creates one by default
+/// and threads it through the environment, so most callers never construct one directly:
 ///
 /// ```swift
-/// let credential = DigestCredential()
-///
 /// try await DataTask {
 ///     BaseURL("example.com")
 ///     Path("secure")
-///     DigestAuthentication(credential, username: "user", password: "pass")
+///     DigestAuthentication(username: "user", password: "pass")
 /// }
-/// .digestAuthentication(credential)
+/// .digestAuthentication()
 /// .result()
 /// ```
+///
+/// Construct one yourself only to reuse it explicitly across separate requests, passing it to
+/// ``RequestTask/digestAuthentication(_:maxAttempts:)`` in place of its default.
 ///
 /// - Important: Reused across every request made with it -- the same instance carries the
 /// server's nonce from one request into the next, matching how a real Digest client is expected
