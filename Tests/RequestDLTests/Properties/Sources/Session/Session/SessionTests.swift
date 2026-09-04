@@ -235,6 +235,54 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenRedirectStrategy_shouldBeValid() async throws {
+        // Given
+        struct DummyStrategy: RedirectStrategy {
+            func redirectDecision(for context: RedirectContext) throws -> RedirectDecision {
+                .doNotFollow
+            }
+        }
+
+        let property = Session()
+            .redirectStrategy(DummyStrategy())
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
+            Issue.record("Redirect Configuration is nil")
+            return
+        }
+
+        guard case .strategy = redirectConfiguration else {
+            Issue.record("Expected .strategy, got \(redirectConfiguration)")
+            return
+        }
+    }
+
+    @Test
+    func session_whenOnRedirect_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .onRedirect { _ in .doNotFollow }
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
+            Issue.record("Redirect Configuration is nil")
+            return
+        }
+
+        guard case .strategy = redirectConfiguration else {
+            Issue.record("Expected .strategy, got \(redirectConfiguration)")
+            return
+        }
+    }
+
+    @Test
     func session_whenDecompressionDisabled_shouldBeValid() async throws {
         // Given
         let property = Session()

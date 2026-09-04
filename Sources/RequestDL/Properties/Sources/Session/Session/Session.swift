@@ -292,6 +292,32 @@ public struct Session: Property {
     }
 
     ///
+    /// Hands every redirect-eligible response to `strategy`, which decides whether -- and how --
+    /// to follow it, instead of the fixed count/cycle limit ``enableRedirectFollow(max:allowCycles:)``
+    /// applies. See ``RedirectStrategy``.
+    ///
+    /// - Parameter strategy: The strategy that decides each redirect.
+    /// - Returns: The modified `Session` instance with the redirect strategy configured.
+    ///
+    public func redirectStrategy(_ strategy: some RedirectStrategy) -> Self {
+        edit { $0.redirectConfiguration = .strategy(InternalsRedirectStrategyAdapter(strategy: strategy)) }
+    }
+
+    ///
+    /// Convenience over ``redirectStrategy(_:)`` for a policy that doesn't need its own type:
+    /// every redirect-eligible response is handed to `handler`, which decides whether -- and how
+    /// -- to follow it. See ``RedirectContext`` for what `handler` receives.
+    ///
+    /// - Parameter handler: The closure that decides each redirect.
+    /// - Returns: The modified `Session` instance with the redirect strategy configured.
+    ///
+    public func onRedirect(
+        _ handler: @escaping @Sendable (RedirectContext) throws -> RedirectDecision
+    ) -> Self {
+        redirectStrategy(ClosureRedirectStrategy(handler: handler))
+    }
+
+    ///
     /// Disables decompression for the session.
     ///
     /// - Returns: The modified `Session` instance with decompression disabled.

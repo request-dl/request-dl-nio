@@ -154,7 +154,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
-                initialURL: request.url?.absoluteString ?? "",
+                initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
                 forwarding: delegate
@@ -227,7 +227,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
-                initialURL: request.url?.absoluteString ?? "",
+                initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
                 forwarding: delegate,
@@ -300,7 +300,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
-                initialURL: request.url?.absoluteString ?? "",
+                initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
                 forwarding: delegate,
@@ -431,7 +431,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
-                initialURL: request.url?.absoluteString ?? "",
+                initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
                 forwarding: delegate,
@@ -629,6 +629,15 @@ extension Internals.URLSessionClient {
         /// All visited URLs, starting with the request's own -- mirrors `RedirectState.visited`.
         private var _visited: [String]
         private var _redirectError: Error?
+        /// The most recently sent request, updated on every followed redirect. Together with
+        /// `_history`, lets `.strategy` mode reconstruct the same per-redirect context the NIO
+        /// executor builds from its own `HTTPClientRequestResponse` history.
+        private var _lastRequest: URLRequest
+        private var _history: [Internals.RedirectHistoryEntry] = []
+        /// Redirects followed under `.strategy` mode specifically -- independent of `_history`,
+        /// which accumulates regardless of mode, mirroring the NIO adapter's own
+        /// `customRedirectCount` (incremented only when `.strategy` chooses `.follow`).
+        private var _strategyRedirectCount = 0
         /// Response accumulation for the streamed-upload path only -- the buffered path never
         /// touches these, since `session.data(for:delegate:)` does its own accumulation
         /// regardless of what extra `URLSessionDataDelegate` methods this class implements.
@@ -668,7 +677,7 @@ extension Internals.URLSessionClient {
 
         init(
             redirectConfiguration: Internals.RedirectConfiguration,
-            initialURL: String,
+            initialRequest: URLRequest,
             proxyAuthorization: Internals.Proxy.Authorization?,
             tls tlsDelegate: TLSDelegate?,
             forwarding delegate: URLSessionTaskDelegate?,
@@ -683,7 +692,8 @@ extension Internals.URLSessionClient {
             self.onUploadProgress = onUploadProgress
             self.downloadBuffer = downloadBuffer
             self.onDownloadComplete = onDownloadComplete
-            self._visited = [initialURL]
+            self._lastRequest = initialRequest
+            self._visited = [initialRequest.url?.absoluteString ?? ""]
             self._responseData = Data()
         }
 
@@ -702,6 +712,13 @@ extension Internals.URLSessionClient {
         /// `completionHandler(nil)`, same as AsyncHTTPClient handing back the 3xx response
         /// untouched when `redirectHandler` is `nil` -- not a `redirectError`, since declining to
         /// follow is not itself a failure.
+        ///
+        /// Both `.follow` and `.strategy` strip `Authorization`/`Cookie`/`Origin`/
+        /// `Proxy-Authorization` from `request` when it no longer shares the previously sent
+        /// request's origin (scheme, host, and port) -- `URLSession` does not do this on its own,
+        /// unlike the NIO executor's `followingRedirect`/`transformRequestForRedirect`, which this
+        /// mirrors so a redirect leaking credentials to a different host fails the same way under
+        /// either transport.
         func urlSession(
             _ session: URLSession,
             task: URLSessionTask,
@@ -709,33 +726,109 @@ extension Internals.URLSessionClient {
             newRequest request: URLRequest,
             completionHandler: @escaping (URLRequest?) -> Void
         ) {
-            guard case .follow(let max, let allowCycles) = redirectConfiguration else {
+            switch redirectConfiguration {
+            case .disallow:
                 completionHandler(nil)
-                return
-            }
 
-            let redirectURL = request.url?.absoluteString ?? ""
+            case .follow(let max, let allowCycles):
+                let redirectURL = request.url?.absoluteString ?? ""
 
-            let outcome: Result<Void, Error> = lock.withLock {
-                guard _visited.count <= max else {
-                    return .failure(Internals.URLSessionClient.RedirectLimitReachedError())
+                let outcome: Result<Void, Error> = lock.withLock {
+                    guard _visited.count <= max else {
+                        return .failure(Internals.URLSessionClient.RedirectLimitReachedError())
+                    }
+
+                    guard allowCycles || !_visited.contains(redirectURL) else {
+                        return .failure(Internals.URLSessionClient.RedirectCycleDetectedError())
+                    }
+
+                    _visited.append(redirectURL)
+                    return .success(())
                 }
 
-                guard allowCycles || !_visited.contains(redirectURL) else {
-                    return .failure(Internals.URLSessionClient.RedirectCycleDetectedError())
+                switch outcome {
+                case .success:
+                    let sanitizedRequest = sanitizedForRedirect(request)
+                    // `historyEntry(for:)` takes `lock` itself to read `_lastRequest` -- must
+                    // resolve it before entering this block, not inside it, or it deadlocks
+                    // `Lock`, which is not reentrant.
+                    let entry = historyEntry(for: response)
+                    lock.withLock {
+                        _history.append(entry)
+                        _lastRequest = sanitizedRequest
+                    }
+                    completionHandler(sanitizedRequest)
+                case .failure(let error):
+                    lock.withLock { _redirectError = error }
+                    completionHandler(nil)
                 }
 
-                _visited.append(redirectURL)
-                return .success(())
+            case .strategy(let strategy):
+                let sanitizedRequest = sanitizedForRedirect(request)
+                let entry = historyEntry(for: response)
+
+                let context = lock.withLock { () -> Internals.RedirectContext in
+                    _history.append(entry)
+                    return Internals.RedirectContext(
+                        redirectRequest: .init(sanitizedRequest),
+                        response: .init(response),
+                        history: _history,
+                        redirectCount: _strategyRedirectCount
+                    )
+                }
+
+                let decision: Internals.RedirectDecision
+                do {
+                    decision = try strategy.redirectDecision(for: context)
+                } catch {
+                    lock.withLock { _redirectError = error }
+                    completionHandler(nil)
+                    return
+                }
+
+                switch decision {
+                case .doNotFollow:
+                    completionHandler(nil)
+                case .follow(let redirectRequest):
+                    let newRequest = sanitizedRequest.applyingRedirectDecision(redirectRequest)
+                    lock.withLock {
+                        _lastRequest = newRequest
+                        _strategyRedirectCount += 1
+                    }
+                    completionHandler(newRequest)
+                }
+            }
+        }
+
+        // MARK: - Private methods
+
+        /// The request that produced `response`, per `_lastRequest` -- i.e. the request one hop
+        /// before `request` in `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
+        private func historyEntry(for response: HTTPURLResponse) -> Internals.RedirectHistoryEntry {
+            lock.withLock {
+                .init(request: .init(_lastRequest), response: .init(response))
+            }
+        }
+
+        /// Strips `Authorization`/`Cookie`/`Origin`/`Proxy-Authorization` from `request` when it
+        /// no longer shares `_lastRequest`'s origin. See the doc comment on
+        /// `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
+        private func sanitizedForRedirect(_ request: URLRequest) -> URLRequest {
+            let previousURL = lock.withLock { _lastRequest.url }
+
+            guard
+                let previousURL,
+                let newURL = request.url,
+                !previousURL.hasTheSameOrigin(as: newURL)
+            else {
+                return request
             }
 
-            switch outcome {
-            case .success:
-                completionHandler(request)
-            case .failure(let error):
-                lock.withLock { _redirectError = error }
-                completionHandler(nil)
+            var sanitized = request
+            for header in ["Origin", "Cookie", "Authorization", "Proxy-Authorization"] {
+                sanitized.setValue(nil, forHTTPHeaderField: header)
             }
+            return sanitized
         }
 
         func urlSession(
