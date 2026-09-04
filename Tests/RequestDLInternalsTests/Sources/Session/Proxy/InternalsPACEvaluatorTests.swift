@@ -23,15 +23,20 @@ import Network
 /// every `file://` script with `kCFURLErrorUnsupportedURLScheme` (-1002) -- PAC fetching only
 /// speaks HTTP(S), the same as every browser's own PAC support.
 ///
-/// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real threading
-/// (one dedicated `Thread` per evaluation, pumping its own `CFRunLoop`) plus real network I/O
-/// against a local listener, on the same simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift`
-/// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives -- confirmed
-/// directly: a run under severe simulator contention (every test in the job, including trivial
-/// synchronous ones, taking 80-160s instead of milliseconds) blew both this suite's own generous
-/// timing margins and, separately, crashed the whole job's process via the watchdog, taking every
-/// other in-flight test down with it -- the exact failure mode these two traits exist to prevent.
-@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+/// `.serialized`: every test here spins up a real dedicated `Thread` plus real network I/O
+/// against a local listener -- running them concurrently with each other adds self-inflicted
+/// contention on top of whatever the rest of the job is already under, the same class of problem
+/// `RequestConfigurationURLSessionClientUploadTests` (request-dl-nio#327) traced part of its own
+/// CI timeouts back to; every other suite here doing comparable real I/O (`SessionExecutionTests`,
+/// `DataCacheTests`, `CachedRequestTests`) already serializes for the same reason.
+/// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: on the same
+/// simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift` documents as prone to
+/// scheduler-contention `AsyncLock.Watchdog` false positives -- confirmed directly: a run under
+/// severe simulator contention (every test in the job, including trivial synchronous ones, taking
+/// 80-160s instead of milliseconds) blew both this suite's own generous timing margins and,
+/// separately, crashed the whole job's process via the watchdog, taking every other in-flight test
+/// down with it -- the exact failure mode these two traits exist to prevent.
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsPACEvaluatorTests {
 
     @Test

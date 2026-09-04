@@ -6,6 +6,28 @@ import Testing
 
 @testable import RequestDLInternals
 
+/// Margin the `race_whenOperationFinishesBeforeDeadline_*` tests give the deadline over
+/// `operation`'s own ~10ms sleep, sized against scheduler jitter rather than `operation`'s
+/// duration.
+///
+/// 10s already wasn't hypothetical headroom -- it replaced a 2s margin that flaked once already.
+/// It still wasn't enough: CI's iOS/iPadOS/tvOS/watchOS/visionOS *Simulator* runners (unlike
+/// macOS/Mac Catalyst, which run at host speed, or Linux/Android, which don't run this suite
+/// under a simulator at all) have been directly observed stalling this same 10ms operation for
+/// 35-64 real seconds under contention -- confirmed from the raw `xcodebuild` log of failing CI
+/// runs, where the whole suite (1000+ tests) still finished in under two minutes and named this
+/// exact test as one of only a handful of real failures, not a hang or crash. 120s gives headroom
+/// over the worst observed stall (64s) with room to spare, while every non-simulator platform
+/// keeps the original tight 10s -- loosening it there would only slow down catching a genuine
+/// regression on runners that were never the problem.
+private let raceMarginNanoseconds: Int64 = {
+    #if (os(iOS) && !targetEnvironment(macCatalyst)) || os(tvOS) || os(watchOS) || os(visionOS)
+    return 120_000_000_000
+    #else
+    return 10_000_000_000
+    #endif
+}()
+
 struct InternalsResourceDeadlineTests {
 
     @Test
@@ -25,12 +47,9 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationFinishesBeforeDeadline_returnsItsResult() async throws {
-        // Given -- deadline generous relative to the operation. 10s rather than a merely
-        // 200x-generous 2s: observed flaky on a contended CI runner (a heavily loaded shared
-        // macOS runner can starve this process for well over 2 real seconds even though
-        // `operation` itself only ever awaits a 10ms sleep), so this margin is sized against
-        // scheduler jitter under load, not against `operation`'s own duration.
-        let deadline = Internals.ResourceDeadline(nanoseconds: 10_000_000_000)
+        // Given -- see `raceMarginNanoseconds`'s doc comment for why this is wider on Simulator
+        // platforms than on host-speed ones.
+        let deadline = Internals.ResourceDeadline(nanoseconds: raceMarginNanoseconds)
 
         // When
         let result = try await deadline.race {
@@ -151,9 +170,8 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationFinishesBeforeDeadline_neverCancelsGivenSeed() async throws {
-        // Given -- see the identical note on `race_whenOperationFinishesBeforeDeadline_returnsItsResult`
-        // above: 10s margin, sized against CI scheduler jitter rather than `operation`'s own 10ms.
-        let deadline = Internals.ResourceDeadline(nanoseconds: 10_000_000_000)
+        // Given -- see `raceMarginNanoseconds`'s doc comment above.
+        let deadline = Internals.ResourceDeadline(nanoseconds: raceMarginNanoseconds)
 
         actor CancellationFlag {
             private(set) var wasCancelled = false
