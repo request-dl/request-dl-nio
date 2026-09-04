@@ -181,6 +181,9 @@ Learn more in:
 ### Working with authentication
 
 - ``RequestDL/Authorization``
+- ``RequestDL/DigestAuthentication``
+- ``RequestDL/DigestCredential``
+- ``RequestDL/RequestTask/digestAuthentication(_:maxAttempts:)``
 
 ### Meet the headers
 
