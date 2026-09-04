@@ -6,6 +6,7 @@ import Crypto
 import NIOCore
 import NIOFileSystem
 import RequestDLInternals
+import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -137,8 +138,116 @@ struct DiskStorage: Sendable {
         }
     }
 
+    /// A directory-wide, in-process index from cache key to the record directory that holds
+    /// it — the fast path `record(forKey:)` uses instead of listing every entry in
+    /// `directory` on every lookup.
+    ///
+    /// Built lazily, from the same full scan `records()` already did on every call before
+    /// this existed, but now paid once per `DiskStorage` value's lifetime instead of once per
+    /// lookup: the O(n) cost this whole type exists to avoid stays exactly what it was for the
+    /// first read, and disappears for every read after that.
+    ///
+    /// Concurrent first reads share that one scan rather than each starting their own — this
+    /// matters most exactly where it would otherwise hurt most, a burst of concurrent lookups
+    /// (e.g. a list of images loading at once) hitting an unpopulated index together.
+    ///
+    /// - Important: This index only tracks writes and removals made through *this* value's
+    /// own methods. A location written by a different `DiskStorage`/process sharing the same
+    /// directory (e.g. via `suiteName`) is invisible to it until the next full scan — the same
+    /// staleness `Storage._diskUsageEstimate` already tolerates for eviction accounting. A
+    /// lookup that misses the index falls through to a genuine cache miss rather than a wrong
+    /// answer; it never serves stale *content*, only an occasional unnecessary miss.
+    private final class Index: @unchecked Sendable {
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        private var locationsByKey: [String: URL] = [:]
+        private var isLoaded = false
+        private var loadTask: Task<Void, Never>?
+
+        // MARK: - Internal methods
+
+        /// Runs `scan` once, ever, merging its results underneath anything a write or removal
+        /// already recorded ahead of it. Concurrent callers before the first completion all
+        /// await the same in-flight scan instead of each starting their own.
+        ///
+        /// Once loaded, this is a single lock/bool check with no `Task` involved — the
+        /// steady-state cost of every lookup after the first has to stay negligible for
+        /// indexing to be worth doing at all.
+        func ensureLoaded(scan: @escaping @Sendable () async -> [Record]) async {
+            if lock.withLock({ isLoaded }) {
+                return
+            }
+
+            let task: Task<Void, Never> = lock.withLock {
+                if isLoaded {
+                    return Task {}
+                }
+
+                if let loadTask {
+                    return loadTask
+                }
+
+                let newTask = Task {
+                    let scanned = await scan()
+
+                    lock.withLock {
+                        // A `removeAll()` (or another populate) that finished first already
+                        // says everything there is to say — applying a scan snapshot taken
+                        // before it would resurrect entries it just deleted.
+                        guard !isLoaded else { return }
+
+                        for record in scanned where locationsByKey[record.key] == nil {
+                            locationsByKey[record.key] = record.url
+                        }
+
+                        isLoaded = true
+                    }
+                }
+
+                loadTask = newTask
+                return newTask
+            }
+
+            await task.value
+        }
+
+        func location(for key: String) -> URL? {
+            lock.withLock { locationsByKey[key] }
+        }
+
+        func set(_ key: String, location url: URL) {
+            lock.withLock { locationsByKey[key] = url }
+        }
+
+        /// Removes the mapping for `key` only if it still points at `url`.
+        ///
+        /// Guards against a slower removal of a stale or superseded directory clobbering a
+        /// newer write that already replaced it in the index — the two can race whenever a
+        /// duplicate directory for the same key gets cleaned up after a fresher write already
+        /// pointed the index elsewhere.
+        func remove(_ key: String, ifLocation url: URL) {
+            lock.withLock {
+                if locationsByKey[key] == url {
+                    locationsByKey[key] = nil
+                }
+            }
+        }
+
+        func removeAll() {
+            lock.withLock {
+                locationsByKey = [:]
+                isLoaded = true
+                loadTask = nil
+            }
+        }
+    }
+
     // MARK: - Private properties
     private let directory: URL
+    private let index = Index()
 
     // MARK: - Internal properties
 
@@ -306,6 +415,7 @@ struct DiskStorage: Sendable {
         _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
+        index.remove(key, ifLocation: record.url)
     }
 
     func removeAll() async {
@@ -313,11 +423,16 @@ struct DiskStorage: Sendable {
     }
 
     func removeAll(since date: Date) async {
+        // Sequenced ahead of the scan below so a first-ever population landing after this
+        // finishes can never re-add an entry this call is about to delete.
+        await index.ensureLoaded { await self.records() }
+
         let recordsToCheck = await records()
         for record in recordsToCheck where record.date <= date {
             _ = try? await Internals.fileSystem.removeItem(
                 at: record.url.filePath
             )
+            index.remove(record.key, ifLocation: record.url)
         }
     }
 
@@ -357,15 +472,23 @@ struct DiskStorage: Sendable {
             #if canImport(Darwin)
             await applyFileProtection(toResponseRecordAt: newRecord.responseURL)
             #endif
+
+            index.set(key, location: newRecord.url)
         } catch {
             _ = try? await Internals.fileSystem.removeItem(
                 at: newRecord.url.filePath
             )
+            index.remove(key, ifLocation: newRecord.url)
         }
 
         _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
+        // A no-op when the `do` branch above already repointed `key` at `newRecord.url`; clears
+        // it when the move failed and there is nothing left on disk for this key at all — see
+        // the comment on `Record.init(directory:key:at:)` for why a failed revalidation loses
+        // the entry outright rather than leaving `record`'s directory in place.
+        index.remove(key, ifLocation: record.url)
     }
 
     /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
@@ -414,6 +537,7 @@ struct DiskStorage: Sendable {
         #endif
 
         let buffer = await dataBuffer(for: record)
+        index.set(key, location: record.url)
         return (buffer, usageAfterEviction + writableBytes, record.url)
     }
 
@@ -463,12 +587,17 @@ struct DiskStorage: Sendable {
             return knownUsage
         }
 
+        // Sequenced ahead of the scan below so a first-ever population landing after this
+        // finishes can never re-add an entry this call is about to delete.
+        await index.ensureLoaded { await self.records() }
+
         var entries = await records()
 
         if maximumCapacity == .zero {
             for entry in entries {
                 _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
+            index.removeAll()
             return .zero
         }
 
@@ -489,6 +618,7 @@ struct DiskStorage: Sendable {
             _ = try? await Internals.fileSystem.removeItem(
                 at: entry.url.filePath
             )
+            index.remove(entry.key, ifLocation: entry.url)
             totalSize -= size
         }
 
@@ -627,13 +757,39 @@ struct DiskStorage: Sendable {
     private func record(_ key: String, createdAt date: Date? = nil) async -> Record? {
         switch date {
         case .none:
-            let allRecords = await records()
-            return allRecords.first { $0.key == key }
+            return await record(forKey: key)
         case .some(let date):
             return await Record(directory: directory, key: key, at: date)
         }
     }
 
+    /// Finds the existing record for `key` through `index` — one targeted stat pair instead
+    /// of a full directory scan. See `Index`'s doc for what keeps this in sync with writes and
+    /// removals, and what it deliberately doesn't cover.
+    private func record(forKey key: String) async -> Record? {
+        await index.ensureLoaded { await self.records() }
+
+        guard let url = index.location(for: key) else {
+            return nil
+        }
+
+        guard let record = await Record(url) else {
+            // The directory the index pointed to turned out to be gone or unreadable — stale,
+            // so drop it, guarded so a newer write that already replaced this mapping isn't
+            // clobbered by a check that started against the old one.
+            index.remove(key, ifLocation: url)
+            return nil
+        }
+
+        return record
+    }
+
+    /// The full, live directory scan `index` exists to keep off the read path. Still the
+    /// source of truth for anything that has to see every entry regardless of what `index`
+    /// currently knows — `freeSpace`'s eviction accounting and `removeAll(since:)` call this
+    /// directly rather than through `index`, so a duplicate directory from a lost write race
+    /// (two concurrent writers for the same key) stays visible and gets swept up like any other
+    /// entry instead of going untracked once `index` moves on to the newer one.
     private func records() async -> [Record] {
         let dirPath = directory.filePath
         var foundRecords: [Record] = []
