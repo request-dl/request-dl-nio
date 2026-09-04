@@ -44,6 +44,10 @@
 ///
 /// - ``RequestDL/Modifiers/Logger``
 ///
+/// ### Answering an HTTP Digest challenge
+///
+/// - ``RequestDL/Modifiers/DigestAuthentication``
+///
 /// ### The task environment **(Alpha)**
 ///
 /// - ``RequestDL/RequestEnvironment``
