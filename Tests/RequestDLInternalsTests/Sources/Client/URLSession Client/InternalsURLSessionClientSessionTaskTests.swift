@@ -227,14 +227,10 @@ struct InternalsURLSessionClientSessionTaskTests {
         }
         continuation.finish()
 
-        // Short, not the 60s default, so a real regression fails fast rather than hanging the
-        // suite -- 30s, not tighter, since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
-        // visibly slower under load than a local run or macOS's own (host-speed) job: confirmed
-        // directly, a genuine NSURLErrorTimedOut still surfaced on RequestConfigurationURLSessionClientUploadTests
-        // (the same real-upload/timeout shape as this suite) at a 15s margin under severe
-        // contention.
+        // See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`)
+        // for why this margin is wider on Apple Simulator platforms than elsewhere.
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForRequest = simulatorAffectedURLSessionRequestTimeout
         let client = try Internals.URLSessionClient(configuration: configuration)
 
         // When
@@ -286,14 +282,10 @@ struct InternalsURLSessionClientSessionTaskTests {
         continuation.yield(ByteBuffer(bytes: payload))
         continuation.finish()
 
-        // Short, not the 60s default, so a real regression fails fast rather than hanging the
-        // suite -- 30s, not tighter, since CI's iOS/iPadOS/watchOS/visionOS Simulator runners are
-        // visibly slower under load than a local run or macOS's own (host-speed) job: confirmed
-        // directly, a genuine NSURLErrorTimedOut still surfaced on RequestConfigurationURLSessionClientUploadTests
-        // (the same real-upload/timeout shape as this suite) at a 15s margin under severe
-        // contention.
+        // See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`)
+        // for why this margin is wider on Apple Simulator platforms than elsewhere.
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForRequest = simulatorAffectedURLSessionRequestTimeout
         let client = try Internals.URLSessionClient(configuration: configuration)
 
         // When
