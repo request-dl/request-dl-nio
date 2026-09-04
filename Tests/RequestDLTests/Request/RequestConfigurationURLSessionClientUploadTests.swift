@@ -48,27 +48,29 @@ import Security
 /// of a file that's already exactly right) -- is exercised by
 /// `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`.
 ///
-/// A short `timeoutIntervalForRequest` is kept on these tests -- harmless now that they pass, and
-/// cheap insurance against a future regression hanging the suite for the default 60s instead of
-/// failing fast. 30s, not tighter: CI's iOS/iPadOS/watchOS/visionOS Simulator runners are visibly
-/// slower under load than a local run or macOS's own (host-speed) job in the same workflow --
-/// confirmed directly, a genuine `NSURLErrorTimedOut` still surfaced here at a 15s margin under
-/// severe contention across two separate platforms in the same CI run. Still tight enough to fail
-/// fast on a real regression, loose enough not to flake under normal contention.
+/// See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`) for why
+/// `shortTimeoutConfiguration`'s margin is wider on Apple Simulator platforms than elsewhere, and
+/// why it's kept short at all rather than the 60s default.
 ///
-/// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real network I/O
-/// against a `LocalServer`, on the same simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift`
-/// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives -- without
-/// these, a stall elsewhere in the same job (this suite adding to the unthrottled concurrent load)
-/// can trip a watchdog fatally and crash the whole test process mid-run, taking every other
-/// in-flight test down with it, rather than surfacing as this suite's own (real, informative)
-/// timeout.
-@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+/// `.serialized`: this suite's three tests all do real network I/O against a `LocalServer`, and
+/// unlike every other real-I/O suite here (`SessionExecutionTests`, `DataCacheTests`,
+/// `CachedRequestTests`, all already `.serialized`) this one ran its own tests concurrently with
+/// each other -- real, informative `NSURLErrorTimedOut` failures directly observed on CI Simulator
+/// runners in `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`
+/// (request-dl-nio#327) tracked back partly to this suite adding to its *own* concurrent load, on
+/// top of whatever contention the rest of the job was already under. `.concurrent(
+/// watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real network I/O on the same
+/// simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift` documents as prone to
+/// scheduler-contention `AsyncLock.Watchdog` false positives -- without these, a stall elsewhere
+/// in the same job (this suite adding to the unthrottled concurrent load) can trip a watchdog
+/// fatally and crash the whole test process mid-run, taking every other in-flight test down with
+/// it, rather than surfacing as this suite's own (real, informative) timeout.
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct RequestConfigurationURLSessionClientUploadTests {
 
     private static var shortTimeoutConfiguration: URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForRequest = simulatorAffectedURLSessionRequestTimeout
         return configuration
     }
 
