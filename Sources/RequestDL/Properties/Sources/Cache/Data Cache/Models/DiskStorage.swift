@@ -142,21 +142,26 @@ struct DiskStorage: Sendable {
     /// it — the fast path `record(forKey:)` uses instead of listing every entry in
     /// `directory` on every lookup.
     ///
-    /// Built lazily, from the same full scan `records()` already did on every call before
-    /// this existed, but now paid once per `DiskStorage` value's lifetime instead of once per
-    /// lookup: the O(n) cost this whole type exists to avoid stays exactly what it was for the
-    /// first read, and disappears for every read after that.
-    ///
-    /// Concurrent first reads share that one scan rather than each starting their own — this
-    /// matters most exactly where it would otherwise hurt most, a burst of concurrent lookups
-    /// (e.g. a list of images loading at once) hitting an unpopulated index together.
+    /// A HIT is trusted immediately, with no disk access at all: once a write records a
+    /// location for a key, only an explicit, guarded removal ever clears it. A MISS never is.
+    /// `dir.listContents()` racing a burst of very recent creates can come back incomplete —
+    /// the same class of transient filesystem flake `Record.init?`'s own retry loop already
+    /// tolerates for a single file, just one layer up, at the directory-listing level, where
+    /// there is nothing to retry against within one scan. Trusting a first scan's absence
+    /// forever would turn that transient gap into a permanent false miss, silently: the
+    /// scan-per-lookup this index replaces was self-healing by accident, since the very next
+    /// lookup simply rescanned and found what the last one missed. So a miss here always
+    /// re-scans before answering — sharing that scan across concurrent callers who miss at the
+    /// same time (e.g. a list of images loading at once, before any of them is cached yet)
+    /// rather than each starting their own, and always merging forward rather than caching a
+    /// negative result.
     ///
     /// - Important: This index only tracks writes and removals made through *this* value's
     /// own methods. A location written by a different `DiskStorage`/process sharing the same
-    /// directory (e.g. via `suiteName`) is invisible to it until the next full scan — the same
+    /// directory (e.g. via `suiteName`) is invisible to it until the next scan — the same
     /// staleness `Storage._diskUsageEstimate` already tolerates for eviction accounting. A
-    /// lookup that misses the index falls through to a genuine cache miss rather than a wrong
-    /// answer; it never serves stale *content*, only an occasional unnecessary miss.
+    /// lookup that misses falls through to a live scan rather than a wrong answer; it never
+    /// serves stale *content*, only an occasional avoidable one.
     private final class Index: @unchecked Sendable {
 
         // MARK: - Private properties
@@ -164,58 +169,43 @@ struct DiskStorage: Sendable {
         private let lock = Lock()
 
         private var locationsByKey: [String: URL] = [:]
-        private var isLoaded = false
-        private var loadTask: Task<Void, Never>?
+        private var refreshTask: Task<Void, Never>?
 
         // MARK: - Internal methods
 
-        /// Runs `scan` once, ever, merging its results underneath anything a write or removal
-        /// already recorded ahead of it. Concurrent callers before the first completion all
-        /// await the same in-flight scan instead of each starting their own.
-        ///
-        /// Once loaded, this is a single lock/bool check with no `Task` involved — the
-        /// steady-state cost of every lookup after the first has to stay negligible for
-        /// indexing to be worth doing at all.
-        func ensureLoaded(scan: @escaping @Sendable () async -> [Record]) async {
-            if lock.withLock({ isLoaded }) {
-                return
+        /// Looks up `key`, kicking off — or joining — a rescan first if it isn't already known.
+        func location(for key: String, scan: @escaping @Sendable () async -> [Record]) async -> URL? {
+            if let hit = lock.withLock({ locationsByKey[key] }) {
+                return hit
             }
 
             let task: Task<Void, Never> = lock.withLock {
-                if isLoaded {
-                    return Task {}
-                }
-
-                if let loadTask {
-                    return loadTask
+                if let refreshTask {
+                    return refreshTask
                 }
 
                 let newTask = Task {
                     let scanned = await scan()
 
                     lock.withLock {
-                        // A `removeAll()` (or another populate) that finished first already
-                        // says everything there is to say — applying a scan snapshot taken
-                        // before it would resurrect entries it just deleted.
-                        guard !isLoaded else { return }
-
+                        // Only fills gaps. A write or removal that landed after this scan
+                        // started already knows more than a snapshot taken before it did —
+                        // this must not overwrite that with stale information.
                         for record in scanned where locationsByKey[record.key] == nil {
                             locationsByKey[record.key] = record.url
                         }
 
-                        isLoaded = true
+                        refreshTask = nil
                     }
                 }
 
-                loadTask = newTask
+                refreshTask = newTask
                 return newTask
             }
 
             await task.value
-        }
 
-        func location(for key: String) -> URL? {
-            lock.withLock { locationsByKey[key] }
+            return lock.withLock { locationsByKey[key] }
         }
 
         func set(_ key: String, location url: URL) {
@@ -239,8 +229,6 @@ struct DiskStorage: Sendable {
         func removeAll() {
             lock.withLock {
                 locationsByKey = [:]
-                isLoaded = true
-                loadTask = nil
             }
         }
     }
@@ -423,10 +411,6 @@ struct DiskStorage: Sendable {
     }
 
     func removeAll(since date: Date) async {
-        // Sequenced ahead of the scan below so a first-ever population landing after this
-        // finishes can never re-add an entry this call is about to delete.
-        await index.ensureLoaded { await self.records() }
-
         let recordsToCheck = await records()
         for record in recordsToCheck where record.date <= date {
             _ = try? await Internals.fileSystem.removeItem(
@@ -586,10 +570,6 @@ struct DiskStorage: Sendable {
         if let knownUsage, knownUsage <= maximumCapacity {
             return knownUsage
         }
-
-        // Sequenced ahead of the scan below so a first-ever population landing after this
-        // finishes can never re-add an entry this call is about to delete.
-        await index.ensureLoaded { await self.records() }
 
         var entries = await records()
 
@@ -767,9 +747,7 @@ struct DiskStorage: Sendable {
     /// of a full directory scan. See `Index`'s doc for what keeps this in sync with writes and
     /// removals, and what it deliberately doesn't cover.
     private func record(forKey key: String) async -> Record? {
-        await index.ensureLoaded { await self.records() }
-
-        guard let url = index.location(for: key) else {
+        guard let url = await index.location(for: key, scan: { await self.records() }) else {
             return nil
         }
 
