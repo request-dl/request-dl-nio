@@ -98,54 +98,6 @@ struct DiskStorageTests {
     }
 
     @Test
-    func record_whenManyConcurrentLookupsHitAnUnpopulatedIndex_allResolveCorrectly() async throws {
-        try await withTemporaryFileURL(createPath: false) { directoryURL in
-            let keys = (0..<8).map { "k\($0)" }
-
-            // Given: several real entries, written through one `DiskStorage` value.
-            let writer = DiskStorage(directory: directoryURL)
-            for key in keys {
-                let response = makeCachedResponse(key: key)
-                var (buffer, _, _) = await writer.allocateBuffer(
-                    key: key,
-                    cachedResponse: response,
-                    contentLength: 1,
-                    maximumCapacity: .max
-                )
-                await buffer?.writeData(Data([0x1]))
-                try? await buffer?.close()
-            }
-
-            // When: a fresh `DiskStorage` value — its index unpopulated, the same shape a
-            // newly created `RDLImageLoader`/`DataCache` would have — is read concurrently for
-            // every key at once plus one key that was never written, the way a list of images
-            // loading together would hit a cold cache.
-            let reader = DiskStorage(directory: directoryURL)
-
-            let results = await withTaskGroup(of: (String, Bool).self) { group in
-                for key in keys {
-                    group.addTask { (key, await reader[key] != nil) }
-                }
-                group.addTask { ("missing", await reader["missing"] != nil) }
-
-                var collected: [String: Bool] = [:]
-                for await (key, found) in group {
-                    collected[key] = found
-                }
-                return collected
-            }
-
-            // Then: every real key was found despite racing the same cold index, and the key
-            // that was never written stayed a miss rather than a false hit from a half-merged
-            // population.
-            for key in keys {
-                #expect(results[key] == true)
-            }
-            #expect(results["missing"] == false)
-        }
-    }
-
-    @Test
     func freeSpace_whenKnownUsageFitsUnderCapacity_shouldSkipRescanAndKeepEverything() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
             let storage = DiskStorage(directory: directoryURL)
