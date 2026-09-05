@@ -217,6 +217,13 @@ struct RawTask<Content: Property>: RequestTask {
         logger: Internals.TaskLogger?
     ) async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
         var configuration = resolved.requestConfiguration
+
+        try await configuration.applyCompression(
+            resolved.session.configuration.compression,
+            onDuplicateHeader: resolved.session.configuration.compressionDuplicateHeaderBehavior,
+            shouldCompressBodyData: resolved.session.configuration.shouldCompressBodyData
+        )
+
         let tracer = resolved.session.configuration.tracer
         let span = startRequestSpan(tracer: tracer, configuration: &configuration)
 

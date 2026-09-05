@@ -31,4 +31,14 @@ extension Internals.Compression {
             }
         }
     }
+
+    /// What to do when the request already carries a `Content-Encoding` header before
+    /// compression would set its own. Mirrors `Session.DuplicateHeaderBehavior`, which is the
+    /// public type this one is built from.
+    package enum DuplicateHeaderBehavior: Sendable, Hashable {
+
+        case error
+        case replace
+        case skip
+    }
 }
