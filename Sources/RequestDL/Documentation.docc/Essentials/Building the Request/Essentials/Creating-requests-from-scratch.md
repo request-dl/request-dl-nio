@@ -222,6 +222,14 @@ Learn more in:
 - ``RequestDL/URLOverrideError``
 - ``RequestDL/NetworkAvailabilityError``
 
+### Customizing redirect handling
+
+- ``RequestDL/RedirectStrategy``
+- ``RequestDL/RedirectContext``
+- ``RequestDL/RedirectRequest``
+- ``RequestDL/RedirectHistoryEntry``
+- ``RequestDL/RedirectDecision``
+
 ### Adding request timeout
 
 - ``RequestDL/Timeout``
