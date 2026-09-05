@@ -184,6 +184,21 @@ extension Internals {
                 logger: logger
             )
 
+            // A pre-flight rejection (`HTTPClient.Task.failedTask`, e.g. for
+            // `.invalidRedirectConfiguration`/`.alreadyShutdown`) resolves `unsafeTask`'s own
+            // response without ever calling `delegate`, so `head`/`upload`/`download` would
+            // otherwise never close and `response` would hang forever. Observing the task here
+            // and forwarding any such failure closes that gap; it is a no-op whenever the
+            // delegate was actually driven, since `failIfNotStarted` only acts while it is still
+            // untouched.
+            _Concurrency.Task {
+                do {
+                    _ = try await unsafeTask.response()
+                } catch {
+                    delegate.failIfNotStarted(error)
+                }
+            }
+
             return SessionTask(
                 seed: unsafeTask(),
                 response: response
