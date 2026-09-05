@@ -343,6 +343,73 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenCompressionDefault_shouldUseErrorDuplicateHeaderBehavior() async throws {
+        // Given
+        let property = Session()
+            .compression(.gzip)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compressionDuplicateHeaderBehavior == .error)
+    }
+
+    @Test
+    func session_whenCompressionDefault_shouldAlwaysCompress() async throws {
+        // Given
+        let property = Session()
+            .compression(.gzip)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.shouldCompressBodyData == nil)
+    }
+
+    @Test
+    func session_whenCompressionShouldCompressBodyDataSet_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .compression(.gzip, shouldCompressBodyData: { $0 > 100 * 1_024 })
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        let shouldCompressBodyData = try #require(resolved.session.configuration.shouldCompressBodyData)
+        #expect(shouldCompressBodyData(100 * 1_024) == false)
+        #expect(shouldCompressBodyData(100 * 1_024 + 1) == true)
+    }
+
+    @Test
+    func session_whenCompressionOnDuplicateHeaderReplace_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .compression(.gzip, onDuplicateHeader: .replace)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compressionDuplicateHeaderBehavior == .replace)
+    }
+
+    @Test
+    func session_whenCompressionOnDuplicateHeaderSkip_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .compression(.gzip, onDuplicateHeader: .skip)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.compressionDuplicateHeaderBehavior == .skip)
+    }
+
+    @Test
     func session_whenPreferredExecutor_shouldBeValid() async throws {
         // Given
         let property = Session()

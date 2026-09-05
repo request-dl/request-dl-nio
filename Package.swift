@@ -83,6 +83,7 @@ let package = Package(
                 .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),

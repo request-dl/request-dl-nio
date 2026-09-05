@@ -20,11 +20,19 @@ import struct Foundation.URL
 /// Executes `requestConfiguration` through `session` with caching bypassed, mirroring the
 /// cache-then-execute orchestration `RawTask.result()` performs -- this file drives
 /// `Internals.Session` directly (no `Property` tree to resolve), so it takes over just the
-/// `client()` + `execute(client:request:...)` half of that pipeline.
+/// `applyCompression(_:onDuplicateHeader:)` + `client()` + `execute(client:request:...)` half of
+/// that pipeline (`RawTask.executeTraced` is the other caller of the first of those).
 private func execute(
     session: Internals.Session,
     requestConfiguration: RequestConfiguration
 ) async throws -> AsyncResponse {
+    var requestConfiguration = requestConfiguration
+    try await requestConfiguration.applyCompression(
+        session.configuration.compression,
+        onDuplicateHeader: session.configuration.compressionDuplicateHeaderBehavior,
+        shouldCompressBodyData: session.configuration.shouldCompressBodyData
+    )
+
     let client = try await session.client()
     let request = try requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
 

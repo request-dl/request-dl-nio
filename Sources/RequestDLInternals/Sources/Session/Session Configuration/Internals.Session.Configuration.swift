@@ -4,8 +4,6 @@
 
 import AsyncHTTPClient
 import NIOCore
-import NIOHTTP1
-import NIOHTTPCompression
 import Tracing
 
 extension Internals.Session {
@@ -51,6 +49,25 @@ extension Internals.Session {
         #endif
 
         package var compression: Internals.Compression = .disabled
+
+        /// What `RequestConfiguration.applyCompression(_:onDuplicateHeader:)` does when the
+        /// request already carries a `Content-Encoding` header before `compression` would set
+        /// its own. Kept as a separate field, rather than folded into `Internals.Compression
+        /// .enabled`'s associated value, so existing `compression == .enabled(algorithm)` call
+        /// sites (session pooling's cache key included) don't have to change shape for a setting
+        /// that only matters once compression is already known to be on.
+        package var compressionDuplicateHeaderBehavior: Internals.Compression.DuplicateHeaderBehavior = .error
+
+        /// Gates `compression` on the outgoing body's byte count -- `nil` (the default) always
+        /// compresses when `compression` is enabled. Mirrors Alamofire's `DeflateRequestCompressor
+        /// .shouldCompressBodyData`, whose own doc recommends this: compressing a body that's
+        /// already small, or already compressed (e.g. an image), wastes CPU for no wire-size win.
+        ///
+        /// Takes the byte count rather than the body itself -- `RequestBody.totalSize` is already
+        /// known without draining the body, so a caller that skips compression here never pays to
+        /// materialize it first. Excluded from `Equatable`/`Hashable`, same reasoning as `tracer`.
+        package var shouldCompressBodyData: (@Sendable (Int) -> Bool)?
+
         package var dnsOverride: [String: String] = [:]
 
         /// Renamed from the old `networkFrameworkWaitForConnectivity` -- no longer a straight
@@ -109,26 +126,6 @@ extension Internals.Session {
             // Always suppressed here, regardless of `tracer` above -- see the doc comment on that
             // property for why `async-http-client`'s own built-in tracing is never engaged.
             configuration.tracing.tracer = NoOpTracer()
-
-            if case .enabled(let algorithm) = compression {
-                let encoding = algorithm.build()
-
-                // `NIOHTTPRequestCompressor` is deliberately not `Sendable` (mutable per-connection
-                // compression state), so it can only be added via the synchronous pipeline API, which
-                // requires running on the channel's own event loop. AsyncHTTPClient doesn't guarantee
-                // this debug initializer runs there, hence the explicit `submit`.
-                configuration.http1_1ConnectionDebugInitializer = { channel in
-                    channel.eventLoop.submit {
-                        let sync = channel.pipeline.syncOperations
-                        let requestEncoderContext = try sync.context(handlerType: HTTPRequestEncoder.self)
-
-                        try sync.addHandler(
-                            NIOHTTPRequestCompressor(encoding: encoding),
-                            position: .after(requestEncoderContext.handler)
-                        )
-                    }
-                }
-            }
 
             return configuration
         }
@@ -211,6 +208,7 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.ignoreUncleanSSLShutdown == rhs.ignoreUncleanSSLShutdown
             && lhs.decompression == rhs.decompression
             && lhs.compression == rhs.compression
+            && lhs.compressionDuplicateHeaderBehavior == rhs.compressionDuplicateHeaderBehavior
             && lhs.dnsOverride == rhs.dnsOverride
             && lhs.waitsForConnectivity == rhs.waitsForConnectivity
             && lhs.allowsCellularAccess == rhs.allowsCellularAccess
@@ -346,13 +344,19 @@ extension Internals.Session.Configuration {
     ///
     /// Only `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has
     /// no distinct connect-phase timeout to receive `timeout.connect`. Every other field this
-    /// configuration could carry that has no `URLSessionConfiguration` counterpart (`connectionPool`,
-    /// `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`, `compression`) is either
-    /// NIO/NIOTS-specific with nothing to translate to, or -- for the fields that matter, like
-    /// `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
+    /// configuration could carry that has no `URLSessionConfiguration` counterpart
+    /// (`connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is
+    /// either NIO/NIOTS-specific with nothing to translate to, or -- for the fields that matter,
+    /// like `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
     /// `decompression == .disabled` -- already excluded from resolving to `.urlSession` at all by
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
+    ///
+    /// `compression` is deliberately absent from both lists: it no longer needs a
+    /// `URLSessionConfiguration` counterpart at all. `RequestConfiguration
+    /// .applyCompression(_:onDuplicateHeader:)` compresses `RequestBody` itself, once, before
+    /// either this method or `RequestConfiguration.build(eventLoop:)` ever runs -- every executor
+    /// receives an already-compressed body, so there is nothing left for this method to translate.
     func buildURLSessionConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
 
