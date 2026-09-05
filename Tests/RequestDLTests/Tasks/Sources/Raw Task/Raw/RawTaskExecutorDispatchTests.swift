@@ -16,6 +16,7 @@ import Testing
 import FoundationEssentials
 #else
 import struct Foundation.UUID
+import struct Foundation.Data
 #endif
 
 /// `RawTask.result()` dispatches through `Internals.Session.resolvedClient()` (backed by
@@ -122,6 +123,66 @@ struct RawTaskExecutorDispatchTests {
 
         guard case .nio = try await resolved.session.resolvedClient() else {
             Issue.record("Expected the DataTask call above to have dispatched over .nio")
+            return
+        }
+    }
+
+    /// Regression coverage for the gap `Session.compression(_:)` used to have: its
+    /// `NIOHTTPRequestCompressor` was spliced into the `.nio` executor's own connection pipeline
+    /// (`Internals.Session.Configuration.build()`), which `.urlSession` never runs through --
+    /// `compression` wasn't even listed in `urlSessionIncompatibilityReasons()`, so a session
+    /// pinned (or, on Darwin, defaulted) to `.urlSession` silently sent the body uncompressed,
+    /// no error anywhere. `RequestConfiguration.applyCompression(_:onDuplicateHeader:)` now
+    /// compresses `RequestBody` itself, once, before either executor ever sees it -- this proves
+    /// that fix through the real, public `DataTask` API, pinned to `.urlSession` explicitly so
+    /// there is no ambiguity about which executor actually sent the request.
+    @Test
+    func dataTask_whenCompressionEnabledOverURLSession_sendsCompressedBody() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+        let output = "Hello World"
+
+        // Highly compressible: a single repeated byte, so gzip shrinks it drastically.
+        let payload = Data(String(repeating: "a", count: 100_000).utf8)
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.7b3-dispatch.\(UUID())")
+                .requiredExecutor(.urlSession)
+                .compression(.gzip)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            Payload(data: payload)
+        }
+
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+
+        // Then
+        let result = try HTTPResult<String>(data)
+        #expect(result.response == output)
+
+        // The server only ever sees the wire bytes it read, so a `receivedBytes` well below the
+        // original payload size is proof the request body actually went out gzip-compressed --
+        // over `.urlSession`, not just over `.nio`.
+        #expect(result.receivedBytes < payload.count / 2)
+
+        let resolved = try await resolve(content)
+
+        guard case .urlSession = try await resolved.session.resolvedClient() else {
+            Issue.record("Expected the DataTask call above to have dispatched over .urlSession")
             return
         }
     }

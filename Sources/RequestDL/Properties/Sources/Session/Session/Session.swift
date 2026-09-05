@@ -311,17 +311,38 @@ public struct Session: Property {
     }
 
     ///
-    /// Compresses the outgoing request body before it's sent over the wire, setting the
-    /// `Content-Encoding` header accordingly.
+    /// Compresses the outgoing request body before it's sent, setting the `Content-Encoding`
+    /// header accordingly.
     ///
     /// This is independent of which `Payload` source produced the body (`Data`/`JSON`/`String`/
-    /// `File`/`Form`) and only applies to connections negotiated as HTTP/1.1.
+    /// `File`/`Form`) and of which ``Session/Executor`` the request resolves to -- the body is
+    /// compressed once, up front, rather than on the wire, so `.urlSession`/`.nioTransportServices`/
+    /// `.nio` and every negotiated HTTP version all see the same already-compressed bytes.
     ///
-    /// - Parameter algorithm: The algorithm used to compress the request body.
+    /// Compression is only worth its CPU cost for bodies that are both sizable and not already
+    /// compressed (a large JSON payload, say, but not an image) -- use `shouldCompressBodyData`
+    /// to gate it on the body's byte count, the same threshold Alamofire's own
+    /// `DeflateRequestCompressor.shouldCompressBodyData` recommends. Left `nil`, every request
+    /// with a body is compressed whenever `compression` is enabled, regardless of size.
+    ///
+    /// - Parameters:
+    ///   - algorithm: The algorithm used to compress the request body.
+    ///   - behavior: What to do if the request already carries a `Content-Encoding` header.
+    ///   Defaults to ``DuplicateHeaderBehavior/error``.
+    ///   - shouldCompressBodyData: Given the outgoing body's byte count, decides whether to
+    ///   compress it. Defaults to `nil`, which always compresses.
     /// - Returns: The modified `Session` instance with request-body compression configured.
     ///
-    public func compression(_ algorithm: CompressionAlgorithm) -> Self {
-        edit { $0.compression = .enabled(algorithm.build()) }
+    public func compression(
+        _ algorithm: CompressionAlgorithm,
+        onDuplicateHeader behavior: DuplicateHeaderBehavior = .error,
+        shouldCompressBodyData: (@Sendable (Int) -> Bool)? = nil
+    ) -> Self {
+        edit {
+            $0.compression = .enabled(algorithm.build())
+            $0.compressionDuplicateHeaderBehavior = behavior.build()
+            $0.shouldCompressBodyData = shouldCompressBodyData
+        }
     }
 
     ///
