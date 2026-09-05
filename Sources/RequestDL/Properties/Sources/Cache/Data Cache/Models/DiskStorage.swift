@@ -6,6 +6,7 @@ import Crypto
 import NIOCore
 import NIOFileSystem
 import RequestDLInternals
+import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -137,8 +138,104 @@ struct DiskStorage: Sendable {
         }
     }
 
+    /// A directory-wide, in-process index from cache key to the record directory that holds
+    /// it — the fast path `record(forKey:)` uses instead of listing every entry in
+    /// `directory` on every lookup.
+    ///
+    /// A HIT is trusted immediately, with no disk access at all: once a write records a
+    /// location for a key, only an explicit, guarded removal ever clears it. A MISS never is.
+    /// `dir.listContents()` racing a burst of very recent creates can come back incomplete —
+    /// the same class of transient filesystem flake `Record.init?`'s own retry loop already
+    /// tolerates for a single file, just one layer up, at the directory-listing level, where
+    /// there is nothing to retry against within one scan. Trusting a first scan's absence
+    /// forever would turn that transient gap into a permanent false miss, silently: the
+    /// scan-per-lookup this index replaces was self-healing by accident, since the very next
+    /// lookup simply rescanned and found what the last one missed. So a miss here always
+    /// re-scans before answering — sharing that scan across concurrent callers who miss at the
+    /// same time (e.g. a list of images loading at once, before any of them is cached yet)
+    /// rather than each starting their own, and always merging forward rather than caching a
+    /// negative result.
+    ///
+    /// - Important: This index only tracks writes and removals made through *this* value's
+    /// own methods. A location written by a different `DiskStorage`/process sharing the same
+    /// directory (e.g. via `suiteName`) is invisible to it until the next scan — the same
+    /// staleness `Storage._diskUsageEstimate` already tolerates for eviction accounting. A
+    /// lookup that misses falls through to a live scan rather than a wrong answer; it never
+    /// serves stale *content*, only an occasional avoidable one.
+    private final class Index: @unchecked Sendable {
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        private var locationsByKey: [String: URL] = [:]
+        private var refreshTask: Task<Void, Never>?
+
+        // MARK: - Internal methods
+
+        /// Looks up `key`, kicking off — or joining — a rescan first if it isn't already known.
+        func location(for key: String, scan: @escaping @Sendable () async -> [Record]) async -> URL? {
+            if let hit = lock.withLock({ locationsByKey[key] }) {
+                return hit
+            }
+
+            let task: Task<Void, Never> = lock.withLock {
+                if let refreshTask {
+                    return refreshTask
+                }
+
+                let newTask = Task {
+                    let scanned = await scan()
+
+                    lock.withLock {
+                        // Only fills gaps. A write or removal that landed after this scan
+                        // started already knows more than a snapshot taken before it did —
+                        // this must not overwrite that with stale information.
+                        for record in scanned where locationsByKey[record.key] == nil {
+                            locationsByKey[record.key] = record.url
+                        }
+
+                        refreshTask = nil
+                    }
+                }
+
+                refreshTask = newTask
+                return newTask
+            }
+
+            await task.value
+
+            return lock.withLock { locationsByKey[key] }
+        }
+
+        func set(_ key: String, location url: URL) {
+            lock.withLock { locationsByKey[key] = url }
+        }
+
+        /// Removes the mapping for `key` only if it still points at `url`.
+        ///
+        /// Guards against a slower removal of a stale or superseded directory clobbering a
+        /// newer write that already replaced it in the index — the two can race whenever a
+        /// duplicate directory for the same key gets cleaned up after a fresher write already
+        /// pointed the index elsewhere.
+        func remove(_ key: String, ifLocation url: URL) {
+            lock.withLock {
+                if locationsByKey[key] == url {
+                    locationsByKey[key] = nil
+                }
+            }
+        }
+
+        func removeAll() {
+            lock.withLock {
+                locationsByKey = [:]
+            }
+        }
+    }
+
     // MARK: - Private properties
     private let directory: URL
+    private let index = Index()
 
     // MARK: - Internal properties
 
@@ -306,6 +403,7 @@ struct DiskStorage: Sendable {
         _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
+        index.remove(key, ifLocation: record.url)
     }
 
     func removeAll() async {
@@ -318,6 +416,7 @@ struct DiskStorage: Sendable {
             _ = try? await Internals.fileSystem.removeItem(
                 at: record.url.filePath
             )
+            index.remove(record.key, ifLocation: record.url)
         }
     }
 
@@ -357,15 +456,23 @@ struct DiskStorage: Sendable {
             #if canImport(Darwin)
             await applyFileProtection(toResponseRecordAt: newRecord.responseURL)
             #endif
+
+            index.set(key, location: newRecord.url)
         } catch {
             _ = try? await Internals.fileSystem.removeItem(
                 at: newRecord.url.filePath
             )
+            index.remove(key, ifLocation: newRecord.url)
         }
 
         _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
+        // A no-op when the `do` branch above already repointed `key` at `newRecord.url`; clears
+        // it when the move failed and there is nothing left on disk for this key at all — see
+        // the comment on `Record.init(directory:key:at:)` for why a failed revalidation loses
+        // the entry outright rather than leaving `record`'s directory in place.
+        index.remove(key, ifLocation: record.url)
     }
 
     /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
@@ -414,6 +521,7 @@ struct DiskStorage: Sendable {
         #endif
 
         let buffer = await dataBuffer(for: record)
+        index.set(key, location: record.url)
         return (buffer, usageAfterEviction + writableBytes, record.url)
     }
 
@@ -469,6 +577,7 @@ struct DiskStorage: Sendable {
             for entry in entries {
                 _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
+            index.removeAll()
             return .zero
         }
 
@@ -489,6 +598,7 @@ struct DiskStorage: Sendable {
             _ = try? await Internals.fileSystem.removeItem(
                 at: entry.url.filePath
             )
+            index.remove(entry.key, ifLocation: entry.url)
             totalSize -= size
         }
 
@@ -627,13 +737,37 @@ struct DiskStorage: Sendable {
     private func record(_ key: String, createdAt date: Date? = nil) async -> Record? {
         switch date {
         case .none:
-            let allRecords = await records()
-            return allRecords.first { $0.key == key }
+            return await record(forKey: key)
         case .some(let date):
             return await Record(directory: directory, key: key, at: date)
         }
     }
 
+    /// Finds the existing record for `key` through `index` — one targeted stat pair instead
+    /// of a full directory scan. See `Index`'s doc for what keeps this in sync with writes and
+    /// removals, and what it deliberately doesn't cover.
+    private func record(forKey key: String) async -> Record? {
+        guard let url = await index.location(for: key, scan: { await self.records() }) else {
+            return nil
+        }
+
+        guard let record = await Record(url) else {
+            // The directory the index pointed to turned out to be gone or unreadable — stale,
+            // so drop it, guarded so a newer write that already replaced this mapping isn't
+            // clobbered by a check that started against the old one.
+            index.remove(key, ifLocation: url)
+            return nil
+        }
+
+        return record
+    }
+
+    /// The full, live directory scan `index` exists to keep off the read path. Still the
+    /// source of truth for anything that has to see every entry regardless of what `index`
+    /// currently knows — `freeSpace`'s eviction accounting and `removeAll(since:)` call this
+    /// directly rather than through `index`, so a duplicate directory from a lost write race
+    /// (two concurrent writers for the same key) stays visible and gets swept up like any other
+    /// entry instead of going untracked once `index` moves on to the newer one.
     private func records() async -> [Record] {
         let dirPath = directory.filePath
         var foundRecords: [Record] = []
