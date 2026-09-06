@@ -98,6 +98,44 @@ struct DiskStorageTests {
     }
 
     @Test
+    func record_whenReadThroughAFreshInstanceShortlyAfterAnotherWroteAnEntry_isFoundThroughAColdScan() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            // Given: an entry written through one `DiskStorage` value — standing in for a
+            // different process (e.g. a Share Extension writing to a cache directory shared
+            // via `suiteName`) that wrote this entry and is already gone by the time anything
+            // reads it. Within a single process this pairing can't happen — the same
+            // directory always resolves to the same `Storage`/index through
+            // `DataCache.Manager` — but nothing enforces that across processes, and that's
+            // exactly the gap `index` can't see across (see its doc).
+            let writer = DiskStorage(directory: directoryURL)
+            let response = makeCachedResponse(key: "k1")
+
+            var (buffer, _, _) = await writer.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 1,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+
+            // When: a second, freshly constructed `DiskStorage` value — its index unpopulated,
+            // sharing no state at all with `writer` — reads that key concurrently alongside a
+            // lookup for a key that was never written anywhere.
+            let reader = DiskStorage(directory: directoryURL)
+
+            async let found = reader["k1"]
+            async let missing = reader["missing"]
+
+            // Then: the entry the other value wrote is discovered through a cold scan, and
+            // the key that genuinely doesn't exist stays a miss rather than a false hit from
+            // a half-merged scan.
+            #expect(await found != nil)
+            #expect(await missing == nil)
+        }
+    }
+
+    @Test
     func freeSpace_whenKnownUsageFitsUnderCapacity_shouldSkipRescanAndKeepEverything() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
             let storage = DiskStorage(directory: directoryURL)
@@ -252,6 +290,36 @@ struct DiskStorageTests {
 
             // Then
             #expect(await storage[key] == nil)
+        }
+    }
+
+    @Test
+    func record_whenIndexPointsAtADirectoryRemovedOutOfBand_selfHealsAndReturnsNil() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+            let response = makeCachedResponse(key: "k1")
+
+            var (buffer, _, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 1,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+
+            // Given: the entry is indexed — a lookup finds it without any directory scan.
+            #expect(await storage["k1"] != nil)
+
+            // When: something outside `DiskStorage`'s own API removes the record directory
+            // the index still points to — e.g. another process sharing this directory (via
+            // `suiteName`) clearing entries it doesn't know this instance has indexed.
+            let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
+            try await FileSystem.shared.removeItem(at: recordURL.filePath)
+
+            // Then: the stale mapping fails validation and is dropped instead of being served
+            // — or, worse, retried against forever on every future lookup for this key.
+            #expect(await storage["k1"] == nil)
         }
     }
 
