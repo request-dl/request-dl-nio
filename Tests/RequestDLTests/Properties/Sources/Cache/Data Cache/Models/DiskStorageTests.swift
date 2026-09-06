@@ -293,6 +293,36 @@ struct DiskStorageTests {
         }
     }
 
+    @Test
+    func record_whenIndexPointsAtADirectoryRemovedOutOfBand_selfHealsAndReturnsNil() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+            let response = makeCachedResponse(key: "k1")
+
+            var (buffer, _, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 1,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+
+            // Given: the entry is indexed — a lookup finds it without any directory scan.
+            #expect(await storage["k1"] != nil)
+
+            // When: something outside `DiskStorage`'s own API removes the record directory
+            // the index still points to — e.g. another process sharing this directory (via
+            // `suiteName`) clearing entries it doesn't know this instance has indexed.
+            let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
+            try await FileSystem.shared.removeItem(at: recordURL.filePath)
+
+            // Then: the stale mapping fails validation and is dropped instead of being served
+            // — or, worse, retried against forever on every future lookup for this key.
+            #expect(await storage["k1"] == nil)
+        }
+    }
+
     /// The one `.cached` record directory under `directoryURL` — cross-platform, unlike
     /// `recordDirectoryURL(in:)` below, since encryption (unlike `fileProtection`) is not
     /// Darwin-only.
