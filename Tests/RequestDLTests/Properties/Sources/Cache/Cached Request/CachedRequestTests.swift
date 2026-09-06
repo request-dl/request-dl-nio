@@ -137,7 +137,12 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
         let testState = try await TestState()
-        let cacheData = await mockCachedData(makeHeaders())
+        // A wide `max-age`, not the two seconds `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge`
+        // waits past. This test never sleeps, so its window only has to outlast the actual
+        // request/response round trip below — on a loaded CI simulator that alone can exceed a
+        // couple of seconds, which was flaking this test even though the cache itself was still
+        // perfectly valid.
+        let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
@@ -248,7 +253,10 @@ struct CachedRequestTests {
     @Test
     func cache_whenReturnCachedDataElseLoadWithValidCache() async throws {
         let testState = try await TestState()
-        let cacheData = await mockCachedData(makeHeaders())
+        // A wide `max-age` — this test never sleeps, so its window only has to outlast the
+        // actual request/response round trip below, not a fixed couple of seconds. See the
+        // identical reasoning on `cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge`.
+        let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
@@ -282,8 +290,10 @@ struct CachedRequestTests {
         // (see the discussion this feature came out of), so a `.all`-policy entry would let a
         // memory hit shadow the disk read entirely and this test would pass regardless of
         // whether the encrypted disk path works at all. Disk-only forces the read this test
-        // actually cares about.
-        let cacheData = await mockCachedData(makeHeaders(), policy: .disk)
+        // actually cares about — which also means it has no memory-tier fast path to fall back
+        // on, so a wide `max-age` matters here too: see the reasoning on
+        // `cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge`.
+        let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600), policy: .disk)
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When: seeded through the real encrypted disk tier — `setCachedData` routes through
@@ -761,6 +771,7 @@ extension CachedRequestTests {
         eTag: UUID? = nil,
         noCache: Bool = false,
         maxAge: Bool = true,
+        maxAgeSeconds: Int = 2,
         expiresOffsetSeconds: Double = 2
     ) -> [(String, String)] {
         if noCache {
@@ -774,16 +785,16 @@ extension CachedRequestTests {
         }
 
         let now = Date()
-        let maxAgeSeconds = 2
 
         if maxAge {
+            // A separate parameter from `expiresOffsetSeconds`, but both exist for the same
+            // reason: the "still valid" tests need a window wide enough to outlast the actual
+            // request/response round trip (TLS handshake to the local server, cache lookup, and
+            // everything in between) on a loaded CI simulator, not just the fixed two seconds
+            // `waitCacheExpiration()` sleeps past for the "already expired" ones — which is what
+            // the default here still matches.
             headers.append(("Cache-Control", "public, max-age=\(maxAgeSeconds)"))
         } else {
-            // A separate offset from `maxAgeSeconds`: the "still valid" `Expires` tests need a
-            // window wide enough to outlast the actual request/response round trip (TLS
-            // handshake to the local server, cache lookup, and everything in between), not just
-            // the fixed two seconds `waitCacheExpiration()` sleeps past for the "already
-            // expired" ones.
             let date = now.addingTimeInterval(expiresOffsetSeconds)
 
             headers.append(("Cache-Control", "public"))
