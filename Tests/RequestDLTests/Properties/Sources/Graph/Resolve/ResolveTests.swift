@@ -123,7 +123,8 @@ extension ResolveTests {
                         key = Accept,
                         value = application/json,
                         strategy = .adding,
-                        separator = nil
+                        separator = nil,
+                        isDefaultUserAgent = false
                     }
                 },
                 LeafNode<HeaderNode> {
@@ -133,7 +134,8 @@ extension ResolveTests {
                         strategy = .adding,
                         separator = Optional<String> {
                             some = ,
-                        }
+                        },
+                        isDefaultUserAgent = false
                     }
                 },
                 LeafNode<Node> {
@@ -187,7 +189,8 @@ extension ResolveTests {
                             key = Accept,
                             value = application/json,
                             strategy = .adding,
-                            separator = nil
+                            separator = nil,
+                            isDefaultUserAgent = false
                         }
                     },
                     LeafNode<HeaderNode> {
@@ -197,7 +200,8 @@ extension ResolveTests {
                             strategy = .adding,
                             separator = Optional<String> {
                                 some = ,
-                            }
+                            },
+                            isDefaultUserAgent = false
                         }
                     }
                 },

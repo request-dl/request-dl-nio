@@ -208,11 +208,6 @@ struct ModifiersProgressTests {
 
         localServer.insert(response, at: testState.uri)
 
-        let expectingData = try HTTPResult(
-            receivedBytes: .zero,
-            response: message
-        ).encode()
-
         // When
         let data = try await UploadTask {
             BaseURL(localServer.baseURL)
@@ -235,8 +230,11 @@ struct ModifiersProgressTests {
 
         let result = try HTTPResult<String>(data)
 
-        // Then
-        #expect(expectingData.count == data.count)
+        // Then -- decoded-content equality, not a byte-count comparison against a hand-built
+        // envelope: the server's JSON response can grow additional optional fields over time
+        // (e.g. `receivedUserAgentHeader`), which would throw off a raw size comparison without
+        // actually reflecting anything wrong with the response itself.
+        #expect(result.response == message)
         #expect(downloadMonitor.totalSize == data.count)
         #expect(result.receivedBytes == .zero)
 
