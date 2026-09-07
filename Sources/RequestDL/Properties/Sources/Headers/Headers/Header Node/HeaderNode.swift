@@ -76,6 +76,26 @@ struct HeaderNode: PropertyNode {
         "host", "origin", "referer", "authorization", "content-type", "content-length",
     ]
 
+    /// Header names whose combined value RFC 9110/9111 define as a comma-separated list --
+    /// `,` (plus optional whitespace) is the *only* separator any spec sanctions for folding
+    /// multiple field lines into one, regardless of what `.headerSeparator(_:)` a caller passes.
+    ///
+    /// This isn't a matter of taste: `;` in particular already means something inside these
+    /// headers' own grammar. `Accept`/`Accept-Charset`/`Accept-Encoding`/`Accept-Language` use it
+    /// to attach a `q` parameter to the *previous* element (`text/html;q=0.9`) -- joining two
+    /// instances with `.headerSeparator(";")` produces `text/html;q=0.9;application/json`, which
+    /// a compliant `#(media-range)` parser reads as `application/json` being an (invalid)
+    /// parameter of `text/html`, not a second accepted type. `Cache-Control`'s directive list
+    /// (`1#cache-directive`, RFC 9111 §5.2) has no comparable internal use of `;`, but still
+    /// parses as one opaque, meaningless directive if joined with anything but `,`.
+    ///
+    /// Only for headers RequestDL itself defines the semantics of. `CustomHeader` is deliberately
+    /// left alone -- for an arbitrary, non-standard header name, whatever separator its own
+    /// backend expects (if any) isn't something RequestDL can know or second-guess.
+    private static let commaSeparatedNames: Set<String> = [
+        "accept", "accept-charset", "accept-encoding", "accept-language", "cache-control",
+    ]
+
     // MARK: - Private methods
 
     private func callAsFunction(_ headers: inout HTTPHeaders) {
@@ -91,8 +111,9 @@ struct HeaderNode: PropertyNode {
         switch strategy {
         case .adding:
             if let separator {
+                let effectiveSeparator = Self.commaSeparatedNames.contains(key.lowercased()) ? "," : separator
                 let currentValue = (headers[key] ?? [])
-                let inlineValue = (currentValue + [value]).joined(separator: separator)
+                let inlineValue = (currentValue + [value]).joined(separator: effectiveSeparator)
                 headers.set(name: key, value: inlineValue)
             } else {
                 headers.add(name: key, value: value)
