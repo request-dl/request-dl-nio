@@ -35,6 +35,16 @@ public struct UserAgentHeader: Property {
 
     private let value: String
 
+    /// Whether this is RequestDL's own built-in default (the empty ``init()``), as opposed to a
+    /// caller-supplied value from ``init(_:)``.
+    ///
+    /// Threaded through to ``HeaderNode`` so the `.urlSession` executor can later drop this
+    /// header and let URLSession report its own native `CFNetwork`/`Darwin` value instead of
+    /// RequestDL's neutral one — see `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`.
+    /// Only the untouched default may be dropped this way; anything the caller wrote must reach
+    /// the wire as given.
+    private let isDefault: Bool
+
     // MARK: - Inits
 
     ///
@@ -44,11 +54,13 @@ public struct UserAgentHeader: Property {
     ///
     public init<S: StringProtocol>(_ userAgent: S) {
         self.value = String(userAgent)
+        self.isDefault = false
     }
 
     /// Initialize the `User-Agent` with **APP\_NAME/APP\_VERSION SYS\_NAME/SYS\_VERSION** value.
     public init() {
         value = ProcessInfo.processInfo.userAgent
+        isDefault = true
     }
 
     // MARK: - Public static methods
@@ -64,7 +76,8 @@ public struct UserAgentHeader: Property {
                 key: "User-Agent",
                 value: property.value.trimming(where: \.isWhitespace),
                 strategy: inputs.environment.headerStrategy,
-                separator: " "
+                separator: " ",
+                isDefaultUserAgent: property.isDefault
             )
         )
     }

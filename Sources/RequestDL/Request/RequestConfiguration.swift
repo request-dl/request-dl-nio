@@ -78,6 +78,21 @@ public struct RequestConfiguration: Sendable {
 
     var readingMode: Internals.DownloadStep.ReadingMode
 
+    /// `true` only when the `User-Agent` currently in ``headers`` is exactly RequestDL's own
+    /// untouched default (``UserAgentHeader/init()``) — no other `User-Agent` node has written
+    /// to it since. Kept up to date by `markUserAgentWritten(isDefault:)` as `HeaderNode`s fold
+    /// into this configuration.
+    ///
+    /// Lets `.urlSession` drop the header and defer to URLSession's own native
+    /// `CFNetwork`/`Darwin` report — see `dropDefaultUserAgentForNativeReporting()` — without
+    /// ever touching a value the caller actually asked for.
+    private(set) var hasDefaultUserAgent = false
+
+    /// Whether any `User-Agent` node has folded in yet. Once true, a second write — default or
+    /// not — means the header is no longer purely RequestDL's untouched default, so
+    /// `hasDefaultUserAgent` latches to `false` for the rest of resolution.
+    private var didWriteUserAgent = false
+
     // MARK: - Inits
 
     init() {
@@ -94,6 +109,32 @@ public struct RequestConfiguration: Sendable {
     }
 
     // MARK: - Internal methods
+
+    /// Records that a `User-Agent` `HeaderNode` folded into ``headers``, updating
+    /// ``hasDefaultUserAgent`` accordingly. Called once per `User-Agent` node, in tree order.
+    mutating func markUserAgentWritten(isDefault: Bool) {
+        hasDefaultUserAgent = !didWriteUserAgent && isDefault
+        didWriteUserAgent = true
+    }
+
+    /// Removes RequestDL's own default `User-Agent`, when present untouched, so the executor
+    /// that actually sends this request can report itself instead.
+    ///
+    /// Only ever call this for the `.urlSession` executor: URLSession synthesizes its own
+    /// accurate `AppName/version Darwin/version CFNetwork/version` header whenever a request
+    /// carries none at all, and RequestDL's neutral default would otherwise suppress that native
+    /// report. NIO and NIOTransportServices never synthesize a `User-Agent` of their own, so
+    /// dropping it there would just send the request with none — worse than RequestDL's
+    /// transport-agnostic default, not more honest. A no-op whenever the caller supplied their
+    /// own value: only the untouched default is eligible.
+    mutating func dropDefaultUserAgentForNativeReporting() {
+        guard hasDefaultUserAgent else {
+            return
+        }
+
+        headers.remove(name: "User-Agent")
+        hasDefaultUserAgent = false
+    }
 
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``RequestBody/connect(writer:body:eventLoop:)``.

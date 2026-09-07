@@ -168,6 +168,10 @@ extension LocalServer {
                 jsonObject["receivedCookieHeader"] = .string(cookie)
             }
 
+            if let userAgent = _incomeHeaders?.first(name: "User-Agent") {
+                jsonObject["receivedUserAgentHeader"] = .string(userAgent)
+            }
+
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
             return try? encoder.encode(jsonObject)

@@ -21,6 +21,12 @@ struct HTTPResult<Response: Codable>: Codable, Equatable where Response: Equatab
     /// inline default is never decoded by the synthesized `init(from:)` at all -- it would stay
     /// `nil` even when the JSON has the key. See `LocalServer.HTTPHandler.responseData()`.
     var receivedCookieHeader: String? = nil
+
+    /// The `User-Agent` header value `LocalServer` actually received on this request, if any --
+    /// same additive shape as ``receivedCookieHeader`` above. Lets a test prove what actually
+    /// reached the wire: RequestDL's own neutral default, a caller-supplied value untouched, or
+    /// -- once dropped under `.urlSession` -- URLSession's own native `CFNetwork`/`Darwin` report.
+    var receivedUserAgentHeader: String? = nil
 }
 
 extension HTTPResult {

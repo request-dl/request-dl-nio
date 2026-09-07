@@ -11,6 +11,14 @@ struct HeaderNode: PropertyNode {
     let strategy: HeaderStrategy
     let separator: String?
 
+    /// Whether this node is RequestDL's own untouched default `User-Agent`
+    /// (``UserAgentHeader/init()``), as opposed to a caller-supplied value.
+    ///
+    /// `false` for every header other than the default `User-Agent`. See
+    /// `RequestConfiguration.hasDefaultUserAgent` for how this is folded across every `User-Agent`
+    /// node in the tree.
+    let isDefaultUserAgent: Bool
+
     var makeHeadersClosure: @Sendable (inout HTTPHeaders) -> Void {
         { self(&$0) }
     }
@@ -21,18 +29,24 @@ struct HeaderNode: PropertyNode {
         key: String,
         value: String,
         strategy: HeaderStrategy,
-        separator: String?
+        separator: String?,
+        isDefaultUserAgent: Bool = false
     ) {
         self.key = key
         self.value = value
         self.strategy = strategy
         self.separator = separator
+        self.isDefaultUserAgent = isDefaultUserAgent
     }
 
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
         self(&make.requestConfiguration.headers)
+
+        if key.caseInsensitiveCompare("User-Agent") == .orderedSame {
+            make.requestConfiguration.markUserAgentWritten(isDefault: isDefaultUserAgent)
+        }
     }
 
     // MARK: - Private methods
@@ -69,6 +83,7 @@ extension HeaderNode: CustomReflectable {
                 (label: "value", value: value),
                 (label: "strategy", value: strategy),
                 (label: "separator", value: separator as Any),
+                (label: "isDefaultUserAgent", value: isDefaultUserAgent),
             ]
         )
     }
