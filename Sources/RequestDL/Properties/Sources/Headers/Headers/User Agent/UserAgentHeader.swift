@@ -45,6 +45,13 @@ public struct UserAgentHeader: Property {
     /// the wire as given.
     private let isDefault: Bool
 
+    /// `ProcessInfo.processInfo.userAgent` bundle/version/OS lookups and string interpolation,
+    /// computed once per process rather than on every ``init()`` call -- none of its inputs
+    /// change while the process is running, and `init()` runs again every time a request's
+    /// property tree is rebuilt (`_makeProperty` is called once per resolve), not once per app
+    /// launch.
+    private static let defaultValue = ProcessInfo.processInfo.userAgent
+
     // MARK: - Inits
 
     ///
@@ -59,7 +66,7 @@ public struct UserAgentHeader: Property {
 
     /// Initialize the `User-Agent` with **APP\_NAME/APP\_VERSION SYS\_NAME/SYS\_VERSION** value.
     public init() {
-        value = ProcessInfo.processInfo.userAgent
+        value = Self.defaultValue
         isDefault = true
     }
 
