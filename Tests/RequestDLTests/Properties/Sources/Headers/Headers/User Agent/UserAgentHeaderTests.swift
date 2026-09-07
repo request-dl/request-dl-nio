@@ -142,6 +142,33 @@ struct UserAgentHeaderTests {
     }
 
     @Test
+    func hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing() async throws {
+        // Given -- a plain `CustomHeader`, not `UserAgentHeader(_:)`, and lowercased, unlike
+        // `UserAgentHeader`'s own hardcoded "User-Agent" key.
+        let resolved = try await resolve(
+            TestProperty {
+                HeaderGroup {
+                    UserAgentHeader()
+                    CustomHeader(name: "user-agent", value: "ABC")
+                }
+                .headerStrategy(.adding)
+            }
+        )
+
+        // Then -- `HeaderNode.make(_:)` matches "User-Agent" case-insensitively, so this still
+        // counts as a second write and disqualifies the marker, exactly like combining with
+        // another `UserAgentHeader(_:)` does above.
+        #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
+
+        // `CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s own
+        // hardcoded `" "` -- so this is stored as two separate values on one logical entry, not
+        // joined into a single string the way `UserAgentHeader(_:)` combining is. See
+        // `RawTaskExecutorDispatchTests.dataTask_withDefaultUserAgentCombinedWithDifferentlyCasedCustomHeaderOverURLSession_mergesBothOntoTheWire`
+        // for how `URLRequest` itself coalesces this into one comma-joined header on the wire.
+        #expect(resolved.requestConfiguration.headers["User-Agent"] == [ProcessInfo.processInfo.userAgent, "ABC"])
+    }
+
+    @Test
     func dropDefaultUserAgentForNativeReporting_removesOnlyTheUntouchedDefault() async throws {
         // Given
         var withDefault = try await resolve(

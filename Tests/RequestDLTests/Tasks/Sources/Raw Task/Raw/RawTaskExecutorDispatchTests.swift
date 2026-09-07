@@ -305,6 +305,52 @@ struct RawTaskExecutorDispatchTests {
         #expect(result.receivedUserAgentHeader == ProcessInfo.processInfo.userAgent)
     }
 
+    /// Regression coverage for combining RequestDL's default with a plain `CustomHeader(name:
+    /// "user-agent", ...)`, not `UserAgentHeader(_:)`. `HeaderNode.make(_:)` matches "User-Agent"
+    /// case-insensitively, so this still disqualifies `hasDefaultUserAgent` -- see
+    /// `UserAgentHeaderTests.hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing`
+    /// for that check at the graph-resolve level, where the two values are still stored
+    /// separately (`CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s
+    /// own hardcoded `" "`). This proves what actually reaches the wire once `URLRequest` gets
+    /// involved: `buildURLRequestWithoutBody()` calls `addValue(_:forHTTPHeaderField:)` once per
+    /// stored value, and `URLRequest` itself -- confirmed against a live instance, not assumed --
+    /// coalesces same-name fields (case-insensitively) into one comma-joined header, no space.
+    @Test
+    func dataTask_withDefaultUserAgentCombinedWithDifferentlyCasedCustomHeaderOverURLSession_mergesBothOntoTheWire() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: "Hello World")
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.useragent-urlsession-merge.\(UUID())")
+                .requiredExecutor(.urlSession)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            UserAgentHeader()
+            CustomHeader(name: "user-agent", value: "ABC")
+        }
+
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+        let result = try HTTPResult<String>(data)
+
+        // Then -- neither value was dropped (a second write already disqualified
+        // `hasDefaultUserAgent`), and both landed on the wire merged into one header.
+        #expect(result.receivedUserAgentHeader == "\(ProcessInfo.processInfo.userAgent),ABC")
+    }
+
     /// Cancellation, validated for real. `Internals.TaskSeed` (transport-agnostic) cancels when
     /// the response is *dropped*, not when the
     /// awaiting `_Concurrency.Task` is marked cancelled -- nothing in the iteration path
