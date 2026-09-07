@@ -24,15 +24,15 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.101.3"
+            from: "2.102.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.34.3"
+            from: "1.35.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.37.2"
+            from: "2.37.4"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
@@ -69,7 +69,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-crypto.git",
-            from: "4.5.1"
+            from: "4.5.2"
         ),
     ],
     targets: [
