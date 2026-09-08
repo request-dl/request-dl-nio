@@ -44,7 +44,10 @@ struct HeaderNode: PropertyNode {
     func make(_ make: inout Make) async throws {
         self(&make.requestConfiguration.headers)
 
-        if key.caseInsensitiveCompare("User-Agent") == .orderedSame {
+        // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)` -- unavailable outside
+        // Darwin (FoundationEssentials/Linux/Android), and this path runs for every executor,
+        // not just `.urlSession`.
+        if key.lowercased() == "user-agent" {
             make.requestConfiguration.markUserAgentWritten(isDefault: isDefaultUserAgent)
         }
     }
