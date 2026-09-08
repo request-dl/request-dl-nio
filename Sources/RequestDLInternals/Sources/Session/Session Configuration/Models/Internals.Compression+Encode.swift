@@ -27,13 +27,13 @@ extension Internals {
     /// write-all/read-all round trip.
     ///
     /// Reusing the handler itself -- rather than binding `CNIOExtrasZlib` directly, which isn't a
-    /// public product of `swift-nio-extras` -- keeps this byte-for-byte identical to what the old
-    /// connection-pipeline-only implementation produced.
+    /// public product of `swift-nio-extras` -- keeps this byte-for-byte identical to what
+    /// `NIOHTTPRequestCompressor` running in a live connection pipeline would produce.
     ///
     /// - Important: `EmbeddedChannel`/`EmbeddedEventLoop` require every call to happen on the
-    /// exact OS thread that created them -- fine for the old one-shot, non-async usage, but this
-    /// type is now driven from `Internals.CompressingByteSequence.AsyncIterator.next()`, which
-    /// resumes after each `await sourceIterator.next()` on whatever thread Swift Concurrency's
+    /// exact OS thread that created them. This type is driven from
+    /// `Internals.CompressingByteSequence.AsyncIterator.next()`, which resumes after each `await
+    /// sourceIterator.next()` on whatever thread Swift Concurrency's
     /// cooperative pool happens to pick, not necessarily the one that created this stream. Every
     /// touch of `channel` is therefore routed through `eventLoop` -- one real, persistent-thread
     /// loop captured once at `init` -- so `channel` is always created and always operated on that

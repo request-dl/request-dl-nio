@@ -7,11 +7,10 @@ import NIOHTTPCompression
 
 extension Internals {
 
-    /// Namespace only -- compression no longer lives on `Internals.Session.Configuration` (it's
-    /// per-request/environment-driven now, via `RequestConfiguration`, not session-pooled), so
-    /// there's no `.disabled`/`.enabled` state to carry here anymore. `Algorithm` and
-    /// `DuplicateHeaderBehavior` stay nested under this name purely to avoid churning every
-    /// existing reference to `Internals.Compression.Algorithm`/`.DuplicateHeaderBehavior`.
+    /// Namespace only -- compression is per-request/environment-driven, carried on
+    /// `RequestConfiguration` rather than pooled on the session, so there's no `.disabled`/
+    /// `.enabled` state to carry here. `Algorithm` and `DuplicateHeaderBehavior` stay nested
+    /// under this name to group them with the rest of the compression-related types below.
     package enum Compression: Sendable {}
 }
 

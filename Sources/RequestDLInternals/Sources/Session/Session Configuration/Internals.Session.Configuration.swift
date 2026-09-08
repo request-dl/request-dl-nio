@@ -356,11 +356,11 @@ extension Internals.Session.Configuration {
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
     ///
-    /// Compression isn't even a field on this type anymore -- it's environment/`Payload`-driven,
-    /// carried on `RequestConfiguration` instead, not pooled per session. `RequestConfiguration
-    /// .applyCompression()` compresses `RequestBody` itself, once, before either this method or
-    /// `RequestConfiguration.build(eventLoop:)` ever runs -- every executor receives an
-    /// already-compressed body, so there is nothing left for this method to translate.
+    /// Compression is environment/`Payload`-driven, carried on `RequestConfiguration` rather than
+    /// pooled per session, so there's no field on this type for it to translate.
+    /// `RequestConfiguration.applyCompression()` compresses `RequestBody` itself, once, before
+    /// either this method or `RequestConfiguration.build(eventLoop:)` ever runs -- every executor
+    /// receives an already-compressed body, so there is nothing left for this method to translate.
     func buildURLSessionConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
 

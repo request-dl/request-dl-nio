@@ -13,10 +13,10 @@ extension RequestConfiguration {
     /// Runs once, here, before this configuration ever reaches `build(eventLoop:)` (the `.nio`
     /// path) or `buildURLRequest()`/the streamed-upload path (the `.urlSession` path) --
     /// `RequestBody` backs the outgoing body identically for both, so wrapping it at this layer,
-    /// instead of at the wire layer the way this package used to (a `NIOHTTPRequestCompressor`
-    /// spliced into the `.nio` executor's connection pipeline, which only ever ran for HTTP/1.1
-    /// and was entirely invisible to `.urlSession`), makes compression behave identically on
-    /// every executor and every negotiated HTTP version.
+    /// rather than at the wire layer, makes compression behave identically on every executor and
+    /// every negotiated HTTP version. A wire-layer implementation would instead need a codec
+    /// spliced into each executor's own connection pipeline separately, and `.urlSession`'s
+    /// pipeline isn't something this package controls at all.
     ///
     /// A no-op when there's no body, the body is empty, no `Compressor` is configured, or
     /// `shouldCompressBodyData` declines this body's size -- the common case, so callers that
