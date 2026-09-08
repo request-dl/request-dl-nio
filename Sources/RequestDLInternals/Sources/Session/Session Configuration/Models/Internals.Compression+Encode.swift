@@ -76,20 +76,29 @@ extension Internals {
             }
 
             deinit {
-                guard channel != nil else {
-                    return
-                }
-
                 guard !eventLoop.inEventLoop else {
                     channel = nil
                     return
                 }
 
-                let handle: UnmanagedChannelHandle
-                do {
-                    let channel = channel!
+                // `handle` is built inside this `if let` (rather than a function-scope `guard
+                // let`) so `channel`'s local, unwrapped binding goes out of scope -- releasing
+                // its own reference -- right here, before `eventLoop.submit` below ever runs.
+                // That leaves the `Unmanaged` retain as the *only* remaining reference, so
+                // releasing it on `eventLoop`'s thread is what actually triggers deallocation.
+                // A function-scope binding would instead stay alive until `deinit` itself
+                // returns, releasing its own reference back on whatever thread triggered this
+                // deinit in the first place -- silently reintroducing the exact bug this exists
+                // to avoid.
+                var handle: UnmanagedChannelHandle?
+
+                if let channel {
                     self.channel = nil
                     handle = UnmanagedChannelHandle(pointer: Unmanaged.passRetained(channel).toOpaque())
+                }
+
+                guard let handle else {
+                    return
                 }
 
                 try? eventLoop.submit {
@@ -97,6 +106,12 @@ extension Internals {
                 }.wait()
             }
         }
+
+        /// Thrown by `callAsFunction(compressing:)`/`finish()` if `box.channel` is already `nil`
+        /// -- reachable only if one of them is called again after `finish()` already ran, which
+        /// violates `CompressorStream`'s contract (a single `finish()`, last). Guards the caller
+        /// mistake without a force unwrap, rather than asserting it can never happen.
+        private struct ChannelAlreadyFinishedError: Error {}
 
         /// Wraps the raw pointer `Box.deinit` hands across the `eventLoop.submit` boundary --
         /// `UnsafeMutableRawPointer` itself isn't `Sendable` (pointers don't promise anything
@@ -134,7 +149,10 @@ extension Internals {
 
         package func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer {
             try box.eventLoop.submit { [box] in
-                let channel = box.channel!
+                guard let channel = box.channel else {
+                    throw ChannelAlreadyFinishedError()
+                }
+
                 try channel.writeOutbound(HTTPClientRequestPart.body(.byteBuffer(bytes)))
                 return try Self.drain(channel)
             }.wait()
@@ -142,7 +160,10 @@ extension Internals {
 
         package func finish() throws -> ByteBuffer {
             try box.eventLoop.submit { [box] in
-                let channel = box.channel!
+                guard let channel = box.channel else {
+                    throw ChannelAlreadyFinishedError()
+                }
+
                 try channel.writeOutbound(HTTPClientRequestPart.end(nil))
                 let result = try Self.drain(channel)
                 _ = try? channel.finish()

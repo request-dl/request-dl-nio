@@ -44,12 +44,15 @@ extension Internals {
                     return nil
                 }
 
-                if stream == nil {
-                    stream = try algorithm()
-                }
+                // Pulled into a local, non-`Optional` binding for the rest of this call, and
+                // written back below -- `CompressorStream`'s `callAsFunction`/`finish` are
+                // `mutating`, so calling them through `self.stream` directly would need force
+                // unwrapping it on every use instead of just once, here, right after creating it.
+                var stream = try self.stream ?? algorithm()
+                defer { self.stream = stream }
 
                 while let chunk = try await sourceIterator.next() {
-                    let compressed = try stream!(compressing: chunk)
+                    let compressed = try stream(compressing: chunk)
 
                     if compressed.readableBytes > .zero {
                         return compressed
@@ -57,7 +60,7 @@ extension Internals {
                 }
 
                 isFinished = true
-                let tail = try stream!.finish()
+                let tail = try stream.finish()
                 return tail.readableBytes > .zero ? tail : nil
             }
         }
