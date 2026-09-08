@@ -15,6 +15,7 @@ extension Internals {
             package let logger: Internals.TaskLogger?
             package let uploadingBytes: Int
             package let upload: AsyncStream<Int>.AsyncIterator?
+            package let decompressionDispatch: Internals.ManualDecompressionDispatch
             package let download:
                 (
                     head: Internals.AsyncStream<Internals.ResponseHead>,
@@ -29,6 +30,7 @@ extension Internals {
                         logger: logger,
                         uploadingBytes: uploadingBytes,
                         upload: upload,
+                        decompressionDispatch: decompressionDispatch,
                         download: download
                     )
 
@@ -54,10 +56,11 @@ extension Internals {
                     logger: logger,
                     uploadingBytes: uploadingBytes,
                     upload: nil,
+                    decompressionDispatch: decompressionDispatch,
                     download: nil
                 )
 
-                return lastHead.map { head in
+                return try lastHead.map { head in
                     let totalSize = head.headerValues(named: "Content-Length")
                         .lazy
                         .flatMap { $0.split(separator: ",") }
@@ -65,13 +68,15 @@ extension Internals {
                         .compactMap { Int($0) }
                         .max()
 
+                    let resolvedStream = try decompressionDispatch.resolvedStream(for: head, source: data)
+
                     return .download(
                         DownloadStep(
                             head: head,
                             bytes: AsyncBytes(
                                 logger: logger,
                                 totalSize: totalSize ?? .zero,
-                                stream: data
+                                stream: resolvedStream
                             )
                         )
                     )
@@ -89,6 +94,7 @@ extension Internals {
 
         private let uploadingBytes: Int
         private let upload: Internals.AsyncStream<Int>
+        private let decompressionDispatch: Internals.ManualDecompressionDispatch
         private let head: Internals.AsyncStream<Internals.ResponseHead>
         private let download: Internals.AsyncStream<Internals.DataBuffer>
 
@@ -98,12 +104,14 @@ extension Internals {
             logger: Internals.TaskLogger?,
             uploadingBytes: Int,
             upload: Internals.AsyncStream<Int>,
+            decompressionDispatch: Internals.ManualDecompressionDispatch,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             download: Internals.AsyncStream<Internals.DataBuffer>
         ) {
             self.logger = logger
             self.uploadingBytes = uploadingBytes
             self.upload = upload
+            self.decompressionDispatch = decompressionDispatch
             self.head = head
             self.download = download
         }
@@ -115,6 +123,7 @@ extension Internals {
                 logger: logger,
                 uploadingBytes: uploadingBytes,
                 upload: upload.makeAsyncIterator(),
+                decompressionDispatch: decompressionDispatch,
                 download: (head, download)
             )
         }

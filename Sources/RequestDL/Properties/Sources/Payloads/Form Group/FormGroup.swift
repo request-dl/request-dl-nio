@@ -71,7 +71,10 @@ public struct FormGroup<Content: Property>: Property {
                 // copies everything accumulated so far into it, which is quadratic in the
                 // number of parts. Same fix already applied in `PayloadInput`.
                 items: nodes.flatMap(\.items),
-                descriptorFormFields: inputs.environment.descriptorFormFields
+                descriptorFormFields: inputs.environment.descriptorFormFields,
+                compression: inputs.environment.compression,
+                compressionDuplicateHeaderBehavior: inputs.environment.compressionDuplicateHeaderBehavior,
+                shouldCompressBodyData: inputs.environment.shouldCompressBodyData
             )
         )
     }

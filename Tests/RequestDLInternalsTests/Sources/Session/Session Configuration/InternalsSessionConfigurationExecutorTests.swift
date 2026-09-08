@@ -10,11 +10,25 @@ import Testing
 
 struct InternalsSessionConfigurationExecutorTests {
 
+    /// A stand-in for `BrotliURLSessionOnlyAlgorithm` -- that concrete type lives in `RequestDL`,
+    /// which this target doesn't depend on, so `Internals.Session.Configuration
+    /// .nonURLSessionExecutorIncompatibilityReasons()` is exercised here against any
+    /// `Internals.DecompressionAlgorithm` answering `requiresURLSession: true`, matching how
+    /// `InternalsDecompressionAlgorithmAdapter` (in `RequestDL`) actually produces that answer --
+    /// via `algorithm is BrotliURLSessionOnlyAlgorithm`, not a public protocol requirement.
+    private struct MockURLSessionOnlyAlgorithm: Internals.DecompressionAlgorithm {
+        var contentEncodingValue: String { "br" }
+        var requiresURLSession: Bool { true }
+        func callAsFunction() throws -> any Internals.DecompressorStream {
+            fatalError("not exercised")
+        }
+    }
+
     @Test
     func configuration_whenNothingSet_urlSessionIncompatibilityReasonsIsEmpty() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // Then
         #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
@@ -24,7 +38,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenDNSOverrideSet_containsReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.dnsOverride = ["example.com": "127.0.0.1"]
@@ -37,7 +51,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenHTTP1OnlySet_containsReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.httpVersion = .http1Only
@@ -50,7 +64,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenAutomaticHTTPVersionSet_doesNotContainReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.httpVersion = .automatic
@@ -63,7 +77,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenProxyConnectHeadersSet_containsReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         var connectHeaders = HTTPHeaders()
         connectHeaders.add(name: "X-Proxy-Token", value: "abc123")
@@ -85,7 +99,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenHTTPProxyWithoutConnectHeaders_doesNotContainReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.proxy = Internals.Proxy(
@@ -109,7 +123,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenSOCKSProxySet_doesNotContainReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.proxy = Internals.Proxy(
@@ -129,7 +143,7 @@ struct InternalsSessionConfigurationExecutorTests {
         // `.basic`/`.basicRawCredentials`, which map onto the proxy authentication challenge
         // delegate cleanly.
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.proxy = Internals.Proxy(
@@ -147,7 +161,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func configuration_whenProxyBasicAuthorizationSet_doesNotContainReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         configuration.proxy = Internals.Proxy(
@@ -162,15 +176,17 @@ struct InternalsSessionConfigurationExecutorTests {
     }
 
     @Test
-    func configuration_whenDecompressionDisabled_containsReason() async throws {
+    func configuration_whenDecompressionDisabled_doesNotContainReason() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
 
         // When
         configuration.decompression = .disabled
 
-        // Then
-        #expect(configuration.urlSessionIncompatibilityReasons().contains(.decompressionDisabledUnderURLSession))
+        // Then -- `.disabled` gets real parity with NIO on `.urlSession` now, via
+        // `Accept-Encoding: identity` at request-build time, so it no longer disqualifies the
+        // executor the way it used to.
+        #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
     }
 
     @Test
@@ -179,17 +195,17 @@ struct InternalsSessionConfigurationExecutorTests {
         var configuration = Internals.Session.Configuration()
 
         // When
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // Then
-        #expect(!configuration.urlSessionIncompatibilityReasons().contains(.decompressionDisabledUnderURLSession))
+        #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
     }
 
     @Test
     func configuration_whenSecureConnectionIncompatible_reasonsPropagate() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.pskHint = "hint"
@@ -207,7 +223,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNothingSet_resolvesToURLSessionOnDarwin() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When
         let sut = configuration.resolveExecutor()
@@ -224,7 +240,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenIncompatibleWithURLSessionOnly_resolvesToNIOTransportServicesOnDarwin() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         // When -- fine under NIOTransportServices, unsupported under URLSession (bucket D)
         configuration.httpVersion = .http1Only
@@ -247,7 +263,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenIncompatibleWithBothURLSessionAndNIOTransportServices_resolvesToNIO() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.httpVersion = .http1Only
 
         var secureConnection = Internals.SecureConnection()
@@ -265,7 +281,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin() async throws {
         // Given -- reachable under URLSession, unlike under NIOTransportServices
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.additionalTrustRoots = [.file("/dev/null")]
@@ -289,7 +305,7 @@ struct InternalsSessionConfigurationExecutorTests {
         // Given -- compatible with both `.urlSession` and `.nioTransportServices`, so the
         // preference is what breaks the tie rather than falling to the default priority order.
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .nioTransportServices
 
         // When
@@ -307,7 +323,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNIOPreferred_resolvesToNIORegardlessOfOtherCompatibility() async throws {
         // Given -- compatible with everything, yet `.nio` is explicitly preferred.
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .nio
 
         // When
@@ -324,7 +340,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNIOTransportServicesPreferredButIncompatible_fallsBackToURLSession() async throws {
         // Given -- reachable under URLSession, unreachable under NIOTransportServices
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .nioTransportServices
 
         var secureConnection = Internals.SecureConnection()
@@ -346,7 +362,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenURLSessionPreferredButIncompatible_fallsBackToNIOTransportServices() async throws {
         // Given -- unreachable under URLSession (bucket D), unaffected under NIOTransportServices
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .urlSession
         configuration.httpVersion = .http1Only
 
@@ -378,7 +394,7 @@ struct InternalsSessionConfigurationExecutorTests {
         // Given -- compatible with `.urlSession` too, so the implicit preference is what breaks
         // the tie rather than `.urlSession`'s own default priority.
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.enableNetworkFramework = true
 
         // When
@@ -399,7 +415,7 @@ struct InternalsSessionConfigurationExecutorTests {
         // Given -- an explicit `preferredExecutor` (any case) always outranks the implicit one
         // `enableNetworkFramework` contributes.
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.enableNetworkFramework = true
         configuration.preferredExecutor = .urlSession
 
@@ -422,7 +438,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNetworkFrameworkEnabledButIncompatible_fallsThroughToURLSession() async throws {
         // Given -- reachable under URLSession, unreachable under NIOTransportServices
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.enableNetworkFramework = true
 
         var secureConnection = Internals.SecureConnection()
@@ -455,7 +471,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNIORequired_resolvesToNIORegardlessOfPreferredExecutorOrCompatibility() async throws {
         // Given -- compatible with `.urlSession`, and even prefers it, yet `.nio` is required.
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .urlSession
         configuration.requiredExecutor = .nio
 
@@ -471,7 +487,7 @@ struct InternalsSessionConfigurationExecutorTests {
         // Given -- `requiredExecutor` is trusted unconditionally, on every platform (see the
         // "without prior validation" test below for why that's fine in practice even here).
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .nio
         configuration.requiredExecutor = .urlSession
 
@@ -497,7 +513,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenRequiredExecutorSetWithoutPriorValidation_isTrustedAnywayOnEveryPlatform() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.httpVersion = .http1Only
         configuration.requiredExecutor = .urlSession
 
@@ -530,7 +546,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func requireExecutor_whenURLSessionPinnedAndCompatible_doesNotThrow() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.additionalTrustRoots = [.file("/dev/null")]
@@ -544,7 +560,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func requireExecutor_whenURLSessionPinnedAndIncompatible_throwsWithExactReasons() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.decompression = .enabled(.none)
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.dnsOverride = ["example.com": "127.0.0.1"]
         configuration.httpVersion = .http1Only
 
@@ -586,5 +602,119 @@ struct InternalsSessionConfigurationExecutorTests {
             #expect(error.requiredExecutor == .nioTransportServices)
             #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework])
         }
+    }
+
+    // MARK: - nonURLSessionExecutorIncompatibilityReasons() / early rejection
+
+    @Test
+    func configuration_whenNoURLSessionOnlyAlgorithmConfigured_nonURLSessionReasonsIsEmpty() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // Then
+        #expect(configuration.nonURLSessionExecutorIncompatibilityReasons().isEmpty)
+    }
+
+    @Test
+    func configuration_whenURLSessionOnlyAlgorithmConfigured_containsReason() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
+
+        // Then
+        #expect(configuration.nonURLSessionExecutorIncompatibilityReasons() == [.decompressionRequiresURLSession])
+    }
+
+    @Test
+    func requireExecutor_whenNIOPinnedAndURLSessionOnlyAlgorithmConfigured_throws() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
+
+        // When
+        do {
+            try configuration.requireExecutor(.nio)
+            Issue.record("Not expecting success")
+        } catch let error as Internals.IncompatibleExecutorConfigurationError {
+            // Then
+            #expect(error.requiredExecutor == .nio)
+            #expect(error.reasons == [.decompressionRequiresURLSession])
+        }
+    }
+
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedAndURLSessionOnlyAlgorithmConfigured_throws() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
+
+        // When
+        do {
+            try configuration.requireExecutor(.nioTransportServices)
+            Issue.record("Not expecting success")
+        } catch let error as Internals.IncompatibleExecutorConfigurationError {
+            // Then
+            #expect(error.requiredExecutor == .nioTransportServices)
+            #expect(error.reasons == [.decompressionRequiresURLSession])
+        }
+    }
+
+    @Test
+    func requireExecutor_whenURLSessionPinnedAndURLSessionOnlyAlgorithmConfigured_doesNotThrow() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
+
+        // When / Then -- the one executor such an algorithm actually requires is, naturally,
+        // still fine with it.
+        try configuration.requireExecutor(.urlSession)
+    }
+
+    /// The soft/automatic-resolution counterpart to the hard-pin tests above: with nothing else
+    /// making `.urlSession` or `.nioTransportServices` incompatible, resolution should still just
+    /// pick `.urlSession`, same as any other compatible configuration.
+    @Test
+    func resolveExecutor_whenURLSessionOnlyAlgorithmConfiguredAndURLSessionOtherwiseCompatible_resolvesToURLSession()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .urlSession)
+        #endif
+    }
+
+    /// Automatic resolution deliberately *degrades* here instead of failing, unlike the
+    /// `requireExecutor(_:)` hard-pin tests above: there was no explicit instruction to honor, so
+    /// forcing `.urlSession` itself incompatible (`dnsOverride`) still resolves to whatever the
+    /// normal fallback order would have picked anyway (`.nioTransportServices` here, since
+    /// nothing makes that incompatible either) rather than throwing -- the request goes ahead,
+    /// and the existing manual-dispatch machinery only ever reports a problem if a `br` response
+    /// actually arrives, same as any other `Content-Encoding` this package can't decode. See
+    /// `resolveExecutor()`'s own doc comment.
+    @Test
+    func resolveExecutor_whenURLSessionOnlyAlgorithmConfiguredAndURLSessionAlsoIncompatible_bypassesToNormalFallback()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
+        configuration.dnsOverride = ["example.com": "127.0.0.1"]
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
     }
 }

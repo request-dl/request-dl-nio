@@ -50,7 +50,7 @@ struct InternalsExecutorIncompatibilityReasonTests {
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
             .proxyBearerAuthorizationUnderURLSession,
-            .decompressionDisabledUnderURLSession,
+            .decompressionRequiresURLSession,
         ]
 
         // Then

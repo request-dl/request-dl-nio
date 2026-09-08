@@ -21,6 +21,7 @@ extension Internals.URLSessionClient: RequestExecutingClient {
 
     package func execute(
         configuration: RequestConfiguration,
+        decompression: Internals.Decompression,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
         logger: Internals.TaskLogger?
     ) async throws -> SessionTask {
@@ -30,6 +31,7 @@ extension Internals.URLSessionClient: RequestExecutingClient {
                 streaming: body,
                 readingMode: configuration.readingMode,
                 uploadingBytes: body.totalSize,
+                decompression: decompression,
                 cache: cache,
                 logger: logger,
                 existingUploadFile: body.wholeFileURL
@@ -40,6 +42,7 @@ extension Internals.URLSessionClient: RequestExecutingClient {
             request: try configuration.buildURLRequestWithoutBody(),
             readingMode: configuration.readingMode,
             uploadingBytes: .zero,
+            decompression: decompression,
             cache: cache,
             logger: logger
         )

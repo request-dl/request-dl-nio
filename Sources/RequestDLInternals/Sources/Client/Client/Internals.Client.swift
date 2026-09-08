@@ -154,12 +154,27 @@ extension Internals {
             url: String,
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
+            decompression: Internals.Decompression,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: TaskLogger?
         ) async throws -> SessionTask {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let download = await Internals.DownloadBuffer(readingMode: readingMode)
+
+            // No all-or-nothing constraint on this executor, unlike `.urlSession`:
+            // `NIOHTTPResponseDecompressor` strips `Content-Encoding` once it decodes gzip/deflate
+            // (configured separately, once, via `Internals.Session.Configuration.build()`), so
+            // dispatch is always safe to enable alongside it -- it only ever sees whatever that
+            // handler left untouched.
+            let decompressionDispatch: Internals.ManualDecompressionDispatch = {
+                switch decompression {
+                case .disabled:
+                    return .skip
+                case .enabled(let algorithms, _):
+                    return .dispatch(algorithms: algorithms)
+                }
+            }()
 
             let delegate = Internals.ClientResponseReceiver(
                 url: url,
@@ -174,6 +189,7 @@ extension Internals {
                 logger: logger,
                 uploadingBytes: uploadingBytes,
                 upload: upload,
+                decompressionDispatch: decompressionDispatch,
                 head: head,
                 download: download.stream
             )

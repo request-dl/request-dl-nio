@@ -257,7 +257,16 @@ enum CURLCommandParser {
                 ? .follow(max: maxRedirects ?? 50, allowCycles: false)
                 : .disallow
 
-            sessionConfiguration.decompression = isCompressed ? .enabled(.none) : .disabled
+            sessionConfiguration.decompression =
+                isCompressed
+                ? .enabled(
+                    algorithms: [
+                        InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm()),
+                        InternalsDecompressionAlgorithmAdapter(algorithm: DeflateAlgorithm()),
+                    ],
+                    limit: .none
+                )
+                : .disabled
 
             if isInsecure || caCertPath != nil || certPath != nil || keyPath != nil {
                 var secureConnection = sessionConfiguration.secureConnection ?? .init()

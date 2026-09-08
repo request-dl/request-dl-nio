@@ -14,6 +14,7 @@ extension Internals.Client: RequestExecutingClient {
 
     package func execute(
         configuration: RequestConfiguration,
+        decompression: Internals.Decompression,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
         logger: Internals.TaskLogger?
     ) async throws -> SessionTask {
@@ -22,6 +23,7 @@ extension Internals.Client: RequestExecutingClient {
             url: configuration.url,
             readingMode: configuration.readingMode,
             uploadingBytes: configuration.body?.totalSize ?? .zero,
+            decompression: decompression,
             cache: cache,
             logger: logger
         )

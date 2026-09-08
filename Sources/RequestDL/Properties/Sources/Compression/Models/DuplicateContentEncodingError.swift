@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// An error thrown by ``Session/compression(_:onDuplicateHeader:)`` when the request already
-/// carries a `Content-Encoding` header and ``Session/DuplicateHeaderBehavior`` is left at its
-/// default, ``Session/DuplicateHeaderBehavior/error``.
+/// An error thrown by ``Property/compression(_:onDuplicateHeader:shouldCompressBodyData:)`` when
+/// the request already carries a `Content-Encoding` header and ``CompressionDuplicateHeaderBehavior``
+/// is left at its default, ``CompressionDuplicateHeaderBehavior/error``.
 public struct DuplicateContentEncodingError: Error, Sendable {
 
     /// The `Content-Encoding` value the request already carried.

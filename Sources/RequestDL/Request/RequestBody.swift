@@ -17,16 +17,43 @@ import struct Foundation.URL
 /// such as its size and chunking strategy.
 public struct RequestBody: Sendable {
 
+    /// Which known list of buffers backs this body, versus which one is compressed on the fly as
+    /// the transport pulls from it. Kept as an enum on `RequestBody` itself, not a wrapper type,
+    /// so every existing `RequestBody`-typed call site (`RequestConfiguration.body`, `Payload`/
+    /// `Form` construction) keeps working unchanged regardless of which backing a given instance
+    /// actually has.
+    private enum Backing: Sendable {
+        case fixed(Internals.BodySequence)
+        case compressing(Internals.CompressingByteSequence<Internals.BodySequence>)
+    }
+
     // MARK: - Public properties
 
-    /// The size of each chunk used for streaming the body data.
+    /// The size of each chunk used for streaming the body data. `.zero` for a compressing body --
+    /// chunking is the compressor's own business there, not a fixed size decided upfront.
     public var chunkSize: Int {
-        _body.chunkSize
+        switch backing {
+        case .fixed(let body):
+            return body.chunkSize
+        case .compressing:
+            return .zero
+        }
     }
 
     /// The total size of the body data in bytes.
+    ///
+    /// - Important: For a compressing body, this reports the *original*, pre-compression size --
+    /// a best-effort upper-bound progress estimate, not the actual wire size, which isn't known
+    /// until the whole body has streamed through. A progress reader dividing by this value sees
+    /// its percentage approach completion a little before the upload actually finishes, rather
+    /// than dividing by an unknown value or a stale zero.
     public var totalSize: Int {
-        _body.totalSize
+        switch backing {
+        case .fixed(let body):
+            return body.totalSize
+        case .compressing(let sequence):
+            return sequence.source.totalSize
+        }
     }
 
     /// The file this body already lives in, when nothing but reading it directly would be
@@ -34,13 +61,34 @@ public struct RequestBody: Sendable {
     /// this exists for `Internals.URLSessionClient+RequestExecutingClient.swift` to skip a
     /// redundant copy for a `Payload(url:)`-only body, not as API surface for callers of
     /// `RequestBody` itself.
+    ///
+    /// Always `nil` for a compressing body: uploading straight from the original file would skip
+    /// compression entirely, which defeats the point of configuring it.
     var wholeFileURL: URL? {
-        _body.wholeFileURL
+        switch backing {
+        case .fixed(let body):
+            return body.wholeFileURL
+        case .compressing:
+            return nil
+        }
+    }
+
+    /// The size to declare on the wire -- `nil` switches both executors to unknown-length,
+    /// chunked-transfer upload. Distinct from the public ``totalSize``, which for a compressing
+    /// body reports the *original* size as a progress estimate, never the (not-yet-known) wire
+    /// size a `Content-Length`/declared-length upload would need to be exactly right.
+    var knownWireSize: Int? {
+        switch backing {
+        case .fixed(let body):
+            return body.totalSize
+        case .compressing:
+            return nil
+        }
     }
 
     // MARK: - Private properties
 
-    private let _body: Internals.BodySequence
+    private let backing: Backing
 
     // MARK: - Inits
 
@@ -48,20 +96,41 @@ public struct RequestBody: Sendable {
         chunkSize: Int? = nil,
         buffers: [Internals.AnyBuffer]
     ) {
-        _body = .init(
-            chunkSize: chunkSize,
-            buffers: buffers
+        backing = .fixed(
+            Internals.BodySequence(
+                chunkSize: chunkSize,
+                buffers: buffers
+            )
         )
+    }
+
+    private init(backing: Backing) {
+        self.backing = backing
     }
 
     // MARK: - Internal methods
 
-    /// - Parameter eventLoop: Hosts the task that drives the body. See ``connect(writer:body:eventLoop:)``.
+    /// Wraps this body so each chunk is compressed as it's pulled by the transport -- see
+    /// `Internals.CompressingByteSequence`'s own doc comment for why that's worth doing over
+    /// draining the whole body into memory before compression starts.
+    func compressed(with algorithm: any Internals.CompressionAlgorithm) -> RequestBody {
+        switch backing {
+        case .fixed(let body):
+            return RequestBody(backing: .compressing(.init(source: body, algorithm: algorithm)))
+        case .compressing:
+            // `RequestConfiguration.applyCompression()` only ever calls this once, on a freshly
+            // assembled body -- reached only if some future caller compresses twice.
+            return self
+        }
+    }
+
+    /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
+    /// ``connect(writer:body:eventLoop:)``.
     func build(eventLoop: EventLoop) -> HTTPClient.Body {
-        .stream(length: _body.totalSize) {
+        .stream(length: knownWireSize) {
             Self.connect(
                 writer: $0,
-                body: _body,
+                body: self,
                 eventLoop: eventLoop
             )
         }
@@ -93,7 +162,7 @@ public struct RequestBody: Sendable {
     /// - Note: An empty body produces no iterations, so it needs no special case.
     private static func connect(
         writer: HTTPClient.Body.StreamWriter,
-        body: Internals.BodySequence,
+        body: RequestBody,
         eventLoop: EventLoop
     ) -> EventLoopFuture<Void> {
         eventLoop.makeFutureWithTask {
@@ -102,7 +171,7 @@ public struct RequestBody: Sendable {
                 body: body
             ).makeAsyncIterator()
 
-            while let next = await iterator.next() {
+            while let next = try await iterator.next() {
                 try await next.get()
             }
         }
@@ -117,15 +186,33 @@ extension RequestBody: AsyncSequence {
     ///
     public struct AsyncIterator: AsyncIteratorProtocol {
 
-        fileprivate var iterator: Internals.BodySequence.AsyncIterator
+        fileprivate enum Backing {
+            case fixed(Internals.BodySequence.AsyncIterator)
+            case compressing(Internals.CompressingByteSequence<Internals.BodySequence>.AsyncIterator)
+        }
+
+        fileprivate var backing: Backing
 
         ///
         /// Advances to the next element in the sequence of buffer chunks.
         ///
         /// - Returns: The next `ByteBuffer` in the sequence, or `nil` if there are no more elements.
+        /// - Throws: Whatever a configured ``Compressor``'s ``CompressorStream`` throws, for a
+        /// compressing body -- a fixed body never throws, but shares this signature so callers
+        /// don't need to know which kind of `RequestBody` they were handed.
         ///
-        public mutating func next() async -> NIOCore.ByteBuffer? {
-            await iterator.next()
+        public mutating func next() async throws -> NIOCore.ByteBuffer? {
+            switch backing {
+            case .fixed(var iterator):
+                let element = await iterator.next()
+                backing = .fixed(iterator)
+                return element
+
+            case .compressing(var iterator):
+                let element = try await iterator.next()
+                backing = .compressing(iterator)
+                return element
+            }
         }
     }
 
@@ -135,6 +222,11 @@ extension RequestBody: AsyncSequence {
     /// - Returns: An instance of `RequestBody.Iterator`.
     ///
     public func makeAsyncIterator() -> AsyncIterator {
-        AsyncIterator(iterator: _body.makeAsyncIterator())
+        switch backing {
+        case .fixed(let body):
+            return AsyncIterator(backing: .fixed(body.makeAsyncIterator()))
+        case .compressing(let sequence):
+            return AsyncIterator(backing: .compressing(sequence.makeAsyncIterator()))
+        }
     }
 }

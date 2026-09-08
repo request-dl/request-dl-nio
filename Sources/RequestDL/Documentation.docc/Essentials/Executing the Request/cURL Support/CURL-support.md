@@ -75,7 +75,7 @@ Session-level — these configure the same `Session`-level settings a declared `
 - `--cacert <path>` — a custom CA bundle to verify the server against, in place of the default trust store
 - `--cert <path>` / `-E <path>` (with `--key <path>`) — a client certificate (and its private key) for mTLS; both are read as PEM
 
-`-L` and `--compressed` don't just add an opt-in: whenever *any* session-level flag is present, the produced description also **explicitly disables** redirects and decompression unless `-L`/`--compressed` say otherwise — this package normally follows redirects and (on Apple platforms) auto-decompresses by default, the opposite of curl's own defaults, so matching curl faithfully means actively turning both off, not just leaving this package's defaults in place. A command using none of these session-level flags is unaffected by this and behaves exactly as before they existed.
+`-L` and `--compressed` don't just add an opt-in: whenever *any* session-level flag is present, the produced description also **explicitly disables** redirects and decompression unless `-L`/`--compressed` say otherwise — this package normally follows redirects by default, the opposite of curl's own default, so matching curl faithfully means actively turning that off, not just leaving this package's defaults in place. Decompression is off by default on every platform now, matching curl's own default already, so `--compressed`'s absence needs no equivalent override there. A command using none of these session-level flags is unaffected by this and behaves exactly as before they existed.
 
 `--resolve` (`dnsOverride`) is incompatible with the `.urlSession` executor — a command using it only runs under `.nio`/`.nioTransportServices`.
 

@@ -36,37 +36,14 @@ extension Internals.Session {
         /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
         package var tracer: any Tracer = NoOpTracer()
 
-        /// Defaults to unbounded auto-decompression on Apple platforms, matching URLSession's own
-        /// behavior there — URLSession always decodes `Content-Encoding` transparently with no
-        /// limit, and no way to turn it off. Matching that by default keeps this setting from
-        /// silently diverging depending on which executor a request happens to run on. Off by
-        /// default elsewhere, where URLSession isn't a runtime option and NIOHTTPCompression's
-        /// zip-bomb guard has no counterpart to match against anyway.
-        #if canImport(Darwin)
-        package var decompression: Internals.Decompression = .enabled(.none)
-        #else
+        /// Off by default on every platform -- decompression is opt-in, matching the fact that
+        /// the risky posture is decompressing unbounded, not leaving compressed bytes alone. This
+        /// used to differ on Apple platforms, matching URLSession's own forced, unconditional
+        /// auto-decompression there -- that divergence only existed because there was no way to
+        /// turn URLSession's transparent decoding off. `requiresManualURLSessionHandling` below
+        /// now takes over `Accept-Encoding` (`identity`) to get real `.disabled` parity on
+        /// `.urlSession` too, so the two platforms no longer need different defaults.
         package var decompression: Internals.Decompression = .disabled
-        #endif
-
-        package var compression: Internals.Compression = .disabled
-
-        /// What `RequestConfiguration.applyCompression(_:onDuplicateHeader:)` does when the
-        /// request already carries a `Content-Encoding` header before `compression` would set
-        /// its own. Kept as a separate field, rather than folded into `Internals.Compression
-        /// .enabled`'s associated value, so existing `compression == .enabled(algorithm)` call
-        /// sites (session pooling's cache key included) don't have to change shape for a setting
-        /// that only matters once compression is already known to be on.
-        package var compressionDuplicateHeaderBehavior: Internals.Compression.DuplicateHeaderBehavior = .error
-
-        /// Gates `compression` on the outgoing body's byte count -- `nil` (the default) always
-        /// compresses when `compression` is enabled. Mirrors Alamofire's `DeflateRequestCompressor
-        /// .shouldCompressBodyData`, whose own doc recommends this: compressing a body that's
-        /// already small, or already compressed (e.g. an image), wastes CPU for no wire-size win.
-        ///
-        /// Takes the byte count rather than the body itself -- `RequestBody.totalSize` is already
-        /// known without draining the body, so a caller that skips compression here never pays to
-        /// materialize it first. Excluded from `Equatable`/`Hashable`, same reasoning as `tracer`.
-        package var shouldCompressBodyData: (@Sendable (Int) -> Bool)?
 
         package var dnsOverride: [String: String] = [:]
 
@@ -166,11 +143,28 @@ extension Internals.Session.Configuration {
             }
         }
 
-        if case .disabled = decompression {
-            reasons.append(.decompressionDisabledUnderURLSession)
+        return reasons
+    }
+
+    /// The mirror image of `urlSessionIncompatibilityReasons()`: fields that keep a configuration
+    /// off `.nio`/`.nioTransportServices` instead of off `.urlSession`. Today just a
+    /// `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`, or a
+    /// third-party one answering the same way) -- neither NIO-backed executor goes through
+    /// CFNetwork, and `NIOHTTPCompression` has no decoder for whatever such an algorithm stands
+    /// in for, so there is no fallback of any kind for them to reach.
+    ///
+    /// - Important: Only consulted by `requireExecutor(_:)`, deliberately not by
+    /// `resolveExecutor()` -- see that method's own doc comment for why automatic resolution
+    /// tolerates this instead of failing over it.
+    package func nonURLSessionExecutorIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
+        guard
+            case .enabled(let algorithms, _) = decompression,
+            algorithms.contains(where: \.requiresURLSession)
+        else {
+            return []
         }
 
-        return reasons
+        return [.decompressionRequiresURLSession]
     }
 
     /// `nil` when none of the four network-availability knobs were touched, so `RawTask.result()`
@@ -207,8 +201,6 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.proxy == rhs.proxy
             && lhs.ignoreUncleanSSLShutdown == rhs.ignoreUncleanSSLShutdown
             && lhs.decompression == rhs.decompression
-            && lhs.compression == rhs.compression
-            && lhs.compressionDuplicateHeaderBehavior == rhs.compressionDuplicateHeaderBehavior
             && lhs.dnsOverride == rhs.dnsOverride
             && lhs.waitsForConnectivity == rhs.waitsForConnectivity
             && lhs.allowsCellularAccess == rhs.allowsCellularAccess
@@ -259,6 +251,18 @@ extension Internals.Session.Configuration {
     /// over for anyone calling only `enableNetworkFramework(true)` -- a transport switch neither
     /// this flag's existing callers nor its own doc comment ever signed up for. An explicit
     /// `preferredExecutor` (any case, including `.urlSession`) still wins over this implicit one.
+    ///
+    /// - Important: A `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`)
+    /// is deliberately **not** checked here. Automatic resolution has no explicit instruction to
+    /// honor, so it degrades gracefully instead of failing a request outright over an algorithm
+    /// that may never even be exercised (the response might never actually come back `br`-encoded
+    /// at all) -- worst case, `.nio`/`.nioTransportServices` gets picked and the existing
+    /// manual-dispatch machinery reports the mismatch only if and when a `br` response actually
+    /// arrives, exactly as it already does for every other unresolvable `Content-Encoding`.
+    /// `requireExecutor(_:)` is the one that enforces this eagerly -- an explicit
+    /// `.requiredExecutor(_:)` pin is a deliberate instruction, and honoring it silently despite a
+    /// guaranteed failure would be the same silent-degradation bug class #289 already fixed for
+    /// every other field here.
     package func resolveExecutor() -> Internals.Executor {
         if let requiredExecutor {
             return requiredExecutor
@@ -273,8 +277,8 @@ extension Internals.Session.Configuration {
         // `effectivePreferredExecutor` only ever reorders among the candidates the two checks
         // above already say are compatible -- it is never consulted on its own, and never
         // returned without the matching compatibility check passing first. `.nio` needs no such
-        // check: it is the universal fallback (`requireExecutor(_:)` never produces reasons for
-        // it either).
+        // check: it is the universal fallback (see this method's own `- Important` note above for
+        // the one field that's still allowed to fail later rather than block that fallback here).
         switch effectivePreferredExecutor {
         case .urlSession where isURLSessionCompatible:
             return .urlSession
@@ -310,9 +314,9 @@ extension Internals.Session.Configuration {
         case .urlSession:
             reasons = urlSessionIncompatibilityReasons()
         case .nioTransportServices:
-            reasons = secureConnection?.networkFrameworkIncompatibilityReasons() ?? []
+            reasons = (secureConnection?.networkFrameworkIncompatibilityReasons() ?? []) + nonURLSessionExecutorIncompatibilityReasons()
         case .nio:
-            reasons = []
+            reasons = nonURLSessionExecutorIncompatibilityReasons()
         }
 
         guard reasons.isEmpty else {
@@ -352,11 +356,11 @@ extension Internals.Session.Configuration {
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
     ///
-    /// `compression` is deliberately absent from both lists: it no longer needs a
-    /// `URLSessionConfiguration` counterpart at all. `RequestConfiguration
-    /// .applyCompression(_:onDuplicateHeader:)` compresses `RequestBody` itself, once, before
-    /// either this method or `RequestConfiguration.build(eventLoop:)` ever runs -- every executor
-    /// receives an already-compressed body, so there is nothing left for this method to translate.
+    /// Compression isn't even a field on this type anymore -- it's environment/`Payload`-driven,
+    /// carried on `RequestConfiguration` instead, not pooled per session. `RequestConfiguration
+    /// .applyCompression()` compresses `RequestBody` itself, once, before either this method or
+    /// `RequestConfiguration.build(eventLoop:)` ever runs -- every executor receives an
+    /// already-compressed body, so there is nothing left for this method to translate.
     func buildURLSessionConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
 

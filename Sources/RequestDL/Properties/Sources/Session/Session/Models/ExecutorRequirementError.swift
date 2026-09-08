@@ -33,7 +33,7 @@ public struct ExecutorRequirementError: Error, Sendable {
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
-        case decompressionDisabledUnderURLSession
+        case decompressionRequiresURLSession
 
         // MARK: - Inits
 
@@ -77,8 +77,8 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .proxyConnectHeadersUnderURLSession
             case .proxyBearerAuthorizationUnderURLSession:
                 self = .proxyBearerAuthorizationUnderURLSession
-            case .decompressionDisabledUnderURLSession:
-                self = .decompressionDisabledUnderURLSession
+            case .decompressionRequiresURLSession:
+                self = .decompressionRequiresURLSession
             }
         }
     }
@@ -157,8 +157,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "custom proxy CONNECT headers (unsupported under URLSession)"
         case .proxyBearerAuthorizationUnderURLSession:
             return "a bearer-token proxy authorization (unsupported under URLSession)"
-        case .decompressionDisabledUnderURLSession:
-            return "explicitly disabled decompression (unsupported under URLSession)"
+        case .decompressionRequiresURLSession:
+            return "a decompression algorithm that only works under URLSession (unsupported under NIO/NIOTransportServices)"
         }
     }
 }
