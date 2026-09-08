@@ -36,5 +36,13 @@ extension Internals {
         /// proxy authentication challenge delegate regardless of platform.
         case proxyBearerAuthorizationUnderURLSession
         case decompressionDisabledUnderURLSession
+        /// `URLSessionConfiguration` has no maximum-TLS-version API, and unlike
+        /// `minimumTLSVersion` (achievable under URLSession via an ATS `NSExceptionMinimumTLSVersion`
+        /// entry in Info.plist), there is no App Transport Security key for a maximum either --
+        /// so this has no reachable equivalent under URLSession at all.
+        case maximumTLSVersionUnderURLSession
+        /// `URLSession` negotiates ALPN automatically and Info.plist has no key to override the
+        /// protocol list it offers, so this has no reachable equivalent under URLSession at all.
+        case applicationProtocolsUnderURLSession
     }
 }

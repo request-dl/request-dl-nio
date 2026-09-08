@@ -34,6 +34,8 @@ public struct ExecutorRequirementError: Error, Sendable {
         case proxyConnectHeadersUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
         case decompressionDisabledUnderURLSession
+        case maximumTLSVersionUnderURLSession
+        case applicationProtocolsUnderURLSession
 
         // MARK: - Inits
 
@@ -79,6 +81,10 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .proxyBearerAuthorizationUnderURLSession
             case .decompressionDisabledUnderURLSession:
                 self = .decompressionDisabledUnderURLSession
+            case .maximumTLSVersionUnderURLSession:
+                self = .maximumTLSVersionUnderURLSession
+            case .applicationProtocolsUnderURLSession:
+                self = .applicationProtocolsUnderURLSession
             }
         }
     }
@@ -159,6 +165,10 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "a bearer-token proxy authorization (unsupported under URLSession)"
         case .decompressionDisabledUnderURLSession:
             return "explicitly disabled decompression (unsupported under URLSession)"
+        case .maximumTLSVersionUnderURLSession:
+            return "a maximum TLS version (unsupported under URLSession)"
+        case .applicationProtocolsUnderURLSession:
+            return "an ALPN application protocol list (unsupported under URLSession)"
         }
     }
 }

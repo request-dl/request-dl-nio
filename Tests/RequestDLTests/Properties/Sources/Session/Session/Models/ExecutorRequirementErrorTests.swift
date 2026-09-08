@@ -64,6 +64,8 @@ struct ExecutorRequirementErrorTests {
             .proxyConnectHeadersUnderURLSession,
             .proxyBearerAuthorizationUnderURLSession,
             .decompressionDisabledUnderURLSession,
+            .maximumTLSVersionUnderURLSession,
+            .applicationProtocolsUnderURLSession,
         ]
     )
     func reason_whenEveryInternalCaseMapped_hasNonEmptyDescription(

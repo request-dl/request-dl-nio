@@ -3,6 +3,7 @@
 //
 
 import NIOHTTP1
+import NIOSSL
 import Testing
 
 @testable import RequestDLInternals
@@ -269,6 +270,54 @@ struct InternalsSessionConfigurationExecutorTests {
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .urlSession)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    /// Mirrors `resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin` above,
+    /// but for a field that has *no* URLSession-reachable equivalent (no ATS `Info.plist` key for
+    /// a maximum TLS version), so it must fall back away from `.urlSession` instead.
+    @Test
+    func resolveExecutor_whenMaximumTLSVersionSet_resolvesToNIOTransportServicesOnDarwin() async throws {
+        // Given -- fine under NIOTransportServices, unsupported under URLSession
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(.none)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = .tlsv12
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    /// `minimumTLSVersion` is the deliberate exception: it has a real equivalent under URLSession
+    /// (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so -- unlike
+    /// `maximumTLSVersion` above -- it must never force a fallback away from `.urlSession`.
+    @Test
+    func resolveExecutor_whenMinimumTLSVersionSet_resolvesToURLSessionOnDarwin() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(.none)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.minimumTLSVersion = .tlsv12
         configuration.secureConnection = secureConnection
 
         // When
