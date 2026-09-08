@@ -109,6 +109,7 @@ struct AsyncResponseCollectTests {
             logger: nil,
             uploadingBytes: .zero,
             upload: .empty(),
+            decompressionDispatch: .skip,
             head: .empty(),
             download: .empty()
         )
@@ -127,6 +128,7 @@ struct AsyncResponseCollectTests {
             logger: nil,
             uploadingBytes: .zero,
             upload: .empty(),
+            decompressionDispatch: .skip,
             head: .empty(),
             download: .empty()
         )

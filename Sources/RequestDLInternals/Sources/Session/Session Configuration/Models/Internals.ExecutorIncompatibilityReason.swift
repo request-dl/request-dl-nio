@@ -35,6 +35,11 @@ extension Internals {
         /// identity/certificates), so `.bearer` proxy authorization is unanswerable through the
         /// proxy authentication challenge delegate regardless of platform.
         case proxyBearerAuthorizationUnderURLSession
-        case decompressionDisabledUnderURLSession
+        /// The mirror image of the `UnderURLSession` cases above: a configured
+        /// `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`, or a
+        /// third-party one answering the same way) rules out `.nio`/`.nioTransportServices`
+        /// instead of `.urlSession` -- neither goes through CFNetwork, and `NIOHTTPCompression`
+        /// has no decoder for whatever such an algorithm stands in for.
+        case decompressionRequiresURLSession
     }
 }

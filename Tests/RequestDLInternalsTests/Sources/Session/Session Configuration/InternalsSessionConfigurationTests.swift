@@ -201,7 +201,7 @@ struct InternalsSessionConfigurationTests {
         // Given
         var configuration = Internals.Session.Configuration()
 
-        let decompression = Internals.Decompression.enabled(.size(16))
+        let decompression = Internals.Decompression.enabled(algorithms: [], limit: .size(16))
 
         // When
         configuration.decompression = decompression
@@ -428,11 +428,10 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.timeout.connect == nil)
         #expect(builtConfiguration.timeout.read == nil)
         #expect(builtConfiguration.proxy == nil)
-        #if canImport(Darwin)
-        let expectedDecompression = HTTPClient.Decompression.enabled(limit: .none)
-        #else
+        // Off by default on every platform now -- decompression is opt-in, and `.disabled` gets
+        // real parity with `.urlSession` via `Accept-Encoding: identity`, so the two platforms no
+        // longer need different defaults.
         let expectedDecompression = HTTPClient.Decompression.disabled
-        #endif
 
         #expect(
             String(

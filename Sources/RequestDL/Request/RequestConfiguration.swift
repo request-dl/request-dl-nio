@@ -93,6 +93,16 @@ public struct RequestConfiguration: Sendable {
     /// `hasDefaultUserAgent` latches to `false` for the rest of resolution.
     private var didWriteUserAgent = false
 
+    /// Captured from `inputs.environment.compression` at `_makeProperty` time by whichever
+    /// `Property` builds the node that produces ``body`` (`Payload`, `Form`, `FormGroup`) -- not
+    /// read from inside a node's own `make(_:)`, since `PropertyNode.make(_:)` has no
+    /// `environment` of its own to read. `nil` when no `Property.compression(_:onDuplicateHeader
+    /// :shouldCompressBodyData:)` is in scope, or when nothing in the tree ever produces a body
+    /// for it to apply to.
+    var compression: (any Internals.CompressionAlgorithm)?
+    var compressionDuplicateHeaderBehavior: Internals.Compression.DuplicateHeaderBehavior = .error
+    var shouldCompressBodyData: (@Sendable (Int) -> Bool)?
+
     // MARK: - Inits
 
     init() {
@@ -173,7 +183,7 @@ extension RequestConfiguration {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for await buffer in body {
+            for try await buffer in body {
                 data.append(contentsOf: buffer.readableBytesView)
             }
 

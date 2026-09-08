@@ -159,13 +159,17 @@ struct RawTaskExecutorDispatchTests {
 
             Session("com.requestdl.tests.7b3-dispatch.\(UUID())")
                 .requiredExecutor(.urlSession)
-                .compression(.gzip)
 
             SecureConnection {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
 
+            // `.compression(_:)` is environment-driven, like `.payloadEncoder(_:)` -- it has to
+            // be attached to (or above) the `Payload` it should affect, not to an unrelated
+            // sibling like `Session` above, whose own `.environment(_:_:)` mutation never
+            // reaches anything outside its own subtree.
             Payload(data: payload)
+                .compression(.gzip)
         }
 
         // When

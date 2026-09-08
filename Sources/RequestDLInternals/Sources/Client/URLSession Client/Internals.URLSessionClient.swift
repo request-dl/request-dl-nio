@@ -341,6 +341,7 @@ extension Internals {
             request: URLRequest,
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
+            decompression: Internals.Decompression,
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil
@@ -349,6 +350,7 @@ extension Internals {
                 request: request,
                 readingMode: readingMode,
                 uploadingBytes: uploadingBytes,
+                decompression: decompression,
                 cache: cache,
                 logger: logger,
                 forwarding: delegate,
@@ -373,6 +375,7 @@ extension Internals {
             streaming body: Body,
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
+            decompression: Internals.Decompression,
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
@@ -382,6 +385,7 @@ extension Internals {
                 request: request,
                 readingMode: readingMode,
                 uploadingBytes: uploadingBytes,
+                decompression: decompression,
                 cache: cache,
                 logger: logger,
                 forwarding: delegate,
@@ -404,6 +408,7 @@ extension Internals {
             request: URLRequest,
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
+            decompression: Internals.Decompression,
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?,
             forwarding delegate: URLSessionTaskDelegate?,
@@ -411,6 +416,32 @@ extension Internals {
         ) async throws -> SessionTask {
             let release = await throttledExecutor.acquire()
             let operation = operationQueue.operation()
+
+            // CFNetwork's transparent `Content-Encoding` decoding can only be switched off by
+            // taking over `Accept-Encoding` ourselves -- and doing so suppresses it entirely, for
+            // every encoding, not just the one added. So this is all-or-nothing: either every
+            // configured algorithm is one CFNetwork already decodes natively and this stays
+            // quiet, or `Accept-Encoding` is set here and this package decodes everything in the
+            // list itself, manually, including the natives. `.disabled` reaches the same
+            // `identity` override -- see `Internals.Decompression.requiresManualURLSessionHandling`.
+            let decompressionDispatch: Internals.ManualDecompressionDispatch
+            var request = request
+
+            switch decompression {
+            case .disabled:
+                request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+                decompressionDispatch = .skip
+
+            case .enabled(let algorithms, _) where decompression.requiresManualURLSessionHandling:
+                request.setValue(
+                    algorithms.map(\.contentEncodingValue).joined(separator: ", "),
+                    forHTTPHeaderField: "Accept-Encoding"
+                )
+                decompressionDispatch = .dispatch(algorithms: algorithms)
+
+            case .enabled:
+                decompressionDispatch = .skip
+            }
 
             let uploadBody: Internals.URLSessionUploadFile.Materialized?
             do {
@@ -494,6 +525,7 @@ extension Internals {
                 logger: logger,
                 uploadingBytes: uploadingBytes,
                 upload: upload,
+                decompressionDispatch: decompressionDispatch,
                 head: head,
                 download: downloadBuffer.stream
             )

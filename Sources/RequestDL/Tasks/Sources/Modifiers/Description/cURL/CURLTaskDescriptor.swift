@@ -104,7 +104,7 @@ public struct CURLTaskDescriptor: TaskDescriptor {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for await buffer in body {
+            for try await buffer in body {
                 data.append(contentsOf: buffer.readableBytesView)
             }
 

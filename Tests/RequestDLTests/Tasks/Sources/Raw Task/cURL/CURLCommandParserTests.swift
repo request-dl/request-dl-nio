@@ -471,7 +471,16 @@ struct CURLCommandParserTests {
         edit(&sessionConfiguration)
 
         // Then
-        #expect(sessionConfiguration.decompression == .enabled(.none))
+        #expect(
+            sessionConfiguration.decompression
+                == .enabled(
+                    algorithms: [
+                        InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm()),
+                        InternalsDecompressionAlgorithmAdapter(algorithm: DeflateAlgorithm()),
+                    ],
+                    limit: .none
+                )
+        )
     }
 
     // MARK: - No-op CLI-output-only flags
@@ -598,7 +607,7 @@ extension CURLCommandParserTests {
     private func drain(_ body: RequestBody) async throws -> Data {
         var data = Data()
 
-        for await buffer in body {
+        for try await buffer in body {
             data.append(contentsOf: buffer.readableBytesView)
         }
 

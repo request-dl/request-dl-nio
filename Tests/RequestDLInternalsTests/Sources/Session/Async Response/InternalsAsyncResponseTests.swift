@@ -149,6 +149,7 @@ extension InternalsAsyncResponseTests {
             logger: nil,
             uploadingBytes: uploadingBytes,
             upload: upload,
+            decompressionDispatch: .skip,
             head: head,
             download: download
         )

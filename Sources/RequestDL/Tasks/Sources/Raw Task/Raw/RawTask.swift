@@ -239,11 +239,7 @@ struct RawTask<Content: Property>: RequestTask {
             configuration.dropDefaultUserAgentForNativeReporting()
         }
 
-        try await configuration.applyCompression(
-            resolved.session.configuration.compression,
-            onDuplicateHeader: resolved.session.configuration.compressionDuplicateHeaderBehavior,
-            shouldCompressBodyData: resolved.session.configuration.shouldCompressBodyData
-        )
+        try configuration.applyCompression()
 
         let tracer = resolved.session.configuration.tracer
         let span = startRequestSpan(tracer: tracer, configuration: &configuration)
@@ -251,6 +247,7 @@ struct RawTask<Content: Property>: RequestTask {
         do {
             let task = try await client.execute(
                 configuration: configuration,
+                decompression: resolved.session.configuration.decompression,
                 cache: cache,
                 logger: logger
             )

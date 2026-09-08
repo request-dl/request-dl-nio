@@ -327,47 +327,48 @@ public struct Session: Property {
     }
 
     ///
-    /// Configures the decompression limit for the session.
+    /// Configures which `Content-Encoding`s this session can decode, replacing whatever was
+    /// configured before.
     ///
-    /// - Parameter decompressionLimit: The decompression limit to set.
-    /// - Returns: The modified `Session` instance with the decompression limit configured.
+    /// ``Decompressor/gzip``/``Decompressor/deflate``/``Decompressor/brotliURLSessionOnly`` are
+    /// placeholders for what the OS (`.urlSession`) or `async-http-client`
+    /// (`.nio`/`.nioTransportServices`) already decode natively -- RequestDL never reimplements
+    /// them, and in the common case where `algorithms` contains only those, nothing in this
+    /// package ever touches the response bytes at all.
     ///
-    public func decompressionLimit(_ decompressionLimit: DecompressionLimit) -> Self {
-        edit { $0.decompression = .enabled(decompressionLimit.build()) }
-    }
-
+    /// A genuinely custom `Decompressor` changes that on `.urlSession`: CFNetwork's transparent
+    /// decoding can only be switched off entirely, for every encoding at once, by taking over
+    /// `Accept-Encoding` ourselves -- so as soon as `algorithms` contains anything beyond the
+    /// three natives, this session sets `Accept-Encoding` itself (every configured algorithm,
+    /// listed) and decodes all of it manually, including gzip/deflate if they're in the same
+    /// list. `.nio`/`.nioTransportServices` have no such constraint: `async-http-client`'s own
+    /// gzip/deflate handling strips `Content-Encoding` once it decodes, so it can stay on
+    /// alongside manual dispatch for whatever it leaves untouched.
     ///
-    /// Compresses the outgoing request body before it's sent, setting the `Content-Encoding`
-    /// header accordingly.
-    ///
-    /// This is independent of which `Payload` source produced the body (`Data`/`JSON`/`String`/
-    /// `File`/`Form`) and of which ``Session/Executor`` the request resolves to -- the body is
-    /// compressed once, up front, rather than on the wire, so `.urlSession`/`.nioTransportServices`/
-    /// `.nio` and every negotiated HTTP version all see the same already-compressed bytes.
-    ///
-    /// Compression is only worth its CPU cost for bodies that are both sizable and not already
-    /// compressed (a large JSON payload, say, but not an image) -- use `shouldCompressBodyData`
-    /// to gate it on the body's byte count, the same threshold Alamofire's own
-    /// `DeflateRequestCompressor.shouldCompressBodyData` recommends. Left `nil`, every request
-    /// with a body is compressed whenever `compression` is enabled, regardless of size.
+    /// A response whose `Content-Encoding` matches none of `algorithms` throws
+    /// ``UnsupportedContentEncodingError`` -- only reachable once this session has already taken
+    /// over decoding itself, per the paragraph above.
     ///
     /// - Parameters:
-    ///   - algorithm: The algorithm used to compress the request body.
-    ///   - behavior: What to do if the request already carries a `Content-Encoding` header.
-    ///   Defaults to ``DuplicateHeaderBehavior/error``.
-    ///   - shouldCompressBodyData: Given the outgoing body's byte count, decides whether to
-    ///   compress it. Defaults to `nil`, which always compresses.
-    /// - Returns: The modified `Session` instance with request-body compression configured.
+    ///   - algorithms: The decompressors this session accepts. Passing `[]` is equivalent to
+    ///   ``disableDecompression()``.
+    ///   - limit: Bounds `.nio`/`.nioTransportServices`' own native gzip/deflate decoding against
+    ///   a decompression bomb. Has no effect on `.urlSession`, which exposes no such control, and
+    ///   no effect on manually-dispatched algorithms, which are responsible for their own limits.
+    /// - Returns: The modified `Session` instance with these decompression algorithms configured.
     ///
-    public func compression(
-        _ algorithm: CompressionAlgorithm,
-        onDuplicateHeader behavior: DuplicateHeaderBehavior = .error,
-        shouldCompressBodyData: (@Sendable (Int) -> Bool)? = nil
+    public func decompressionAlgorithms(
+        _ algorithms: [any Decompressor],
+        limit: DecompressionLimit = .none
     ) -> Self {
         edit {
-            $0.compression = .enabled(algorithm.build())
-            $0.compressionDuplicateHeaderBehavior = behavior.build()
-            $0.shouldCompressBodyData = shouldCompressBodyData
+            $0.decompression =
+                algorithms.isEmpty
+                ? .disabled
+                : .enabled(
+                    algorithms: algorithms.map(InternalsDecompressionAlgorithmAdapter.init),
+                    limit: limit.build()
+                )
         }
     }
 

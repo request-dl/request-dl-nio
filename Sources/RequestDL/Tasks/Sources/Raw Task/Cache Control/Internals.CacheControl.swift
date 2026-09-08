@@ -79,6 +79,7 @@ extension Internals {
                     logger: logger,
                     uploadingBytes: .zero,
                     upload: .empty(),
+                    decompressionDispatch: .skip,
                     head: .throwing(EmptyCachedDataError()),
                     download: .empty()
                 )
@@ -197,6 +198,7 @@ extension Internals {
                     logger: logger,
                     uploadingBytes: .zero,
                     upload: .empty(),
+                    decompressionDispatch: .skip,
                     head: .constant(cachedData.cachedResponse.response),
                     download: download.stream
                 )

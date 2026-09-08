@@ -14,6 +14,12 @@ struct PayloadNode: PropertyNode {
     let chunkSize: Int?
     let payloadEncoder: (any PayloadEncoder)?
 
+    /// Captured from `inputs.environment` at `_makeProperty` time -- see `RequestConfiguration
+    /// .compression`'s own doc comment for why this can't be read from inside `make(_:)` itself.
+    let compression: (any Compressor)?
+    let compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior
+    let shouldCompressBodyData: (@Sendable (Int) -> Bool)?
+
     // MARK: - Internal methods
 
     /// Runs the factory and installs the result, either as a query string or as a body.
@@ -106,6 +112,12 @@ struct PayloadNode: PropertyNode {
         }
 
         make.requestConfiguration.body = body
+
+        if let compression {
+            make.requestConfiguration.compression = InternalsCompressionAlgorithmAdapter(algorithm: compression)
+            make.requestConfiguration.compressionDuplicateHeaderBehavior = compressionDuplicateHeaderBehavior.build()
+            make.requestConfiguration.shouldCompressBodyData = shouldCompressBodyData
+        }
     }
 
     private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {

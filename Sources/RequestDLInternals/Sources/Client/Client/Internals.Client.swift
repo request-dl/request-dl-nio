@@ -154,12 +154,37 @@ extension Internals {
             url: String,
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
+            decompression: Internals.Decompression,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: TaskLogger?
         ) async throws -> SessionTask {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let download = await Internals.DownloadBuffer(readingMode: readingMode)
+
+            // No all-or-nothing constraint on this executor, unlike `.urlSession`: manual
+            // dispatch only has to activate for algorithms `NIOHTTPResponseDecompressor` (added
+            // separately, once, via `Internals.Session.Configuration.build()`) doesn't already
+            // handle -- gzip/deflate can stay skipped alongside it, rather than every configured
+            // algorithm always going through manual dispatch regardless.
+            //
+            // - Important: `NIOHTTPResponseDecompressor` decodes the body but does *not* strip
+            // `Content-Encoding` from the response head (confirmed against the vendored
+            // `swift-nio-extras` source this package actually ships) -- the same caveat already
+            // documented for CFNetwork's own transparent decoding under `.urlSession`. Dispatch
+            // must therefore bypass by *type* (`isNativelyDecodedByNIO`), the same structural
+            // check `Internals.URLSessionClient` uses, not by checking whether the header is
+            // still present -- it always is, natively decoded or not.
+            let decompressionDispatch: Internals.ManualDecompressionDispatch = {
+                switch decompression {
+                case .disabled:
+                    return .skip
+                case .enabled(let algorithms, _) where !algorithms.allSatisfy(\.isNativelyDecodedByNIO):
+                    return .dispatch(algorithms: algorithms)
+                case .enabled:
+                    return .skip
+                }
+            }()
 
             let delegate = Internals.ClientResponseReceiver(
                 url: url,
@@ -174,6 +199,7 @@ extension Internals {
                 logger: logger,
                 uploadingBytes: uploadingBytes,
                 upload: upload,
+                decompressionDispatch: decompressionDispatch,
                 head: head,
                 download: download.stream
             )

@@ -414,7 +414,10 @@ public struct Form<Headers: Property>: Property {
                     urlEncoder: inputs.environment.urlEncoder,
                     factory: property.factory
                 ),
-                descriptorFormFields: inputs.environment.descriptorFormFields
+                descriptorFormFields: inputs.environment.descriptorFormFields,
+                compression: inputs.environment.compression,
+                compressionDuplicateHeaderBehavior: inputs.environment.compressionDuplicateHeaderBehavior,
+                shouldCompressBodyData: inputs.environment.shouldCompressBodyData
             )
         )
     }

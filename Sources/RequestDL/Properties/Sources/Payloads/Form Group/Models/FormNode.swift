@@ -20,28 +20,46 @@ struct FormNode: PropertyNode {
     /// `make()` itself, since `PropertyNode.make(_:)` has no `environment` of its own to read.
     let descriptorFormFields: DescriptorFormFieldBox?
 
+    /// Same capture-at-`_makeProperty`-time reasoning as `descriptorFormFields` -- see
+    /// `PayloadNode`'s identical fields.
+    let compression: (any Compressor)?
+    let compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior
+    let shouldCompressBodyData: (@Sendable (Int) -> Bool)?
+
     // MARK: - Inits
 
     init(
         chunkSize: Int?,
         item: FormItem,
-        descriptorFormFields: DescriptorFormFieldBox?
+        descriptorFormFields: DescriptorFormFieldBox?,
+        compression: (any Compressor)?,
+        compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior,
+        shouldCompressBodyData: (@Sendable (Int) -> Bool)?
     ) {
         self.init(
             chunkSize: chunkSize,
             items: [item],
-            descriptorFormFields: descriptorFormFields
+            descriptorFormFields: descriptorFormFields,
+            compression: compression,
+            compressionDuplicateHeaderBehavior: compressionDuplicateHeaderBehavior,
+            shouldCompressBodyData: shouldCompressBodyData
         )
     }
 
     init(
         chunkSize: Int?,
         items: [FormItem],
-        descriptorFormFields: DescriptorFormFieldBox?
+        descriptorFormFields: DescriptorFormFieldBox?,
+        compression: (any Compressor)?,
+        compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior,
+        shouldCompressBodyData: (@Sendable (Int) -> Bool)?
     ) {
         self.chunkSize = chunkSize
         self.items = items
         self.descriptorFormFields = descriptorFormFields
+        self.compression = compression
+        self.compressionDuplicateHeaderBehavior = compressionDuplicateHeaderBehavior
+        self.shouldCompressBodyData = shouldCompressBodyData
     }
 
     // MARK: - Internal methods
@@ -107,6 +125,12 @@ struct FormNode: PropertyNode {
         )
 
         make.requestConfiguration.body = body
+
+        if let compression {
+            make.requestConfiguration.compression = InternalsCompressionAlgorithmAdapter(algorithm: compression)
+            make.requestConfiguration.compressionDuplicateHeaderBehavior = compressionDuplicateHeaderBehavior.build()
+            make.requestConfiguration.shouldCompressBodyData = shouldCompressBodyData
+        }
     }
 
     // MARK: - Private methods

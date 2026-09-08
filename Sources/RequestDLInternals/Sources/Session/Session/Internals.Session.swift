@@ -66,6 +66,7 @@ extension Internals {
             url: String,
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
+            decompression: Internals.Decompression = .disabled,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?
         ) async throws -> SessionTask {
@@ -74,6 +75,7 @@ extension Internals {
                 url: url,
                 readingMode: readingMode,
                 uploadingBytes: uploadingBytes,
+                decompression: decompression,
                 cache: cache,
                 logger: logger
             )

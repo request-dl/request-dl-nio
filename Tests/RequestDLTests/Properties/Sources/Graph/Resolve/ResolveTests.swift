@@ -23,7 +23,7 @@ struct ResolveTests {
             Timeout(60)
 
             Session()
-                .decompressionLimit(.ratio(500))
+                .decompressionAlgorithms([.gzip], limit: .ratio(500))
         }
 
         // When

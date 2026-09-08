@@ -303,159 +303,83 @@ struct SessionTests {
     }
 
     @Test
-    func session_whenDecompressionLimit_shouldBeValid() async throws {
+    func session_whenDecompressionAlgorithms_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.ratio(5_000)
         let property = Session()
-            .decompressionLimit(decompressionLimit)
+            .decompressionAlgorithms([.gzip, .deflate], limit: decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [
+                        InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm()),
+                        InternalsDecompressionAlgorithmAdapter(algorithm: DeflateAlgorithm()),
+                    ],
+                    limit: decompressionLimit.build()
+                )
         )
     }
 
     @Test
-    func session_whenDecompressionLimitNone_shouldBeValid() async throws {
+    func session_whenDecompressionAlgorithmsLimitNone_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.none
         let property = Session()
-            .decompressionLimit(decompressionLimit)
+            .decompressionAlgorithms([.gzip], limit: decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm())],
+                    limit: decompressionLimit.build()
+                )
         )
     }
 
     @Test
-    func session_whenDecompressionLimitSize_shouldBeValid() async throws {
+    func session_whenDecompressionAlgorithmsLimitSize_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.size(1_024)
         let property = Session()
-            .decompressionLimit(decompressionLimit)
+            .decompressionAlgorithms([.gzip], limit: decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm())],
+                    limit: decompressionLimit.build()
+                )
         )
     }
 
     @Test
-    func session_whenCompressionDefault_shouldBeDisabled() async throws {
+    func session_whenDecompressionAlgorithmsEmpty_isDisabled() async throws {
         // Given
         let property = Session()
+            .decompressionAlgorithms([])
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(resolved.session.configuration.compression == .disabled)
+        #expect(resolved.session.configuration.decompression == .disabled)
     }
 
-    @Test
-    func session_whenCompressionGzip_shouldBeValid() async throws {
-        // Given
-        let algorithm = Session.CompressionAlgorithm.gzip
-        let property = Session()
-            .compression(algorithm)
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
-    }
-
-    @Test
-    func session_whenCompressionDeflate_shouldBeValid() async throws {
-        // Given
-        let algorithm = Session.CompressionAlgorithm.deflate
-        let property = Session()
-            .compression(algorithm)
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
-    }
-
-    @Test
-    func session_whenCompressionDefault_shouldUseErrorDuplicateHeaderBehavior() async throws {
-        // Given
-        let property = Session()
-            .compression(.gzip)
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.compressionDuplicateHeaderBehavior == .error)
-    }
-
-    @Test
-    func session_whenCompressionDefault_shouldAlwaysCompress() async throws {
-        // Given
-        let property = Session()
-            .compression(.gzip)
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.shouldCompressBodyData == nil)
-    }
-
-    @Test
-    func session_whenCompressionShouldCompressBodyDataSet_shouldBeValid() async throws {
-        // Given
-        let property = Session()
-            .compression(.gzip, shouldCompressBodyData: { $0 > 100 * 1_024 })
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        let shouldCompressBodyData = try #require(resolved.session.configuration.shouldCompressBodyData)
-        #expect(shouldCompressBodyData(100 * 1_024) == false)
-        #expect(shouldCompressBodyData(100 * 1_024 + 1) == true)
-    }
-
-    @Test
-    func session_whenCompressionOnDuplicateHeaderReplace_shouldBeValid() async throws {
-        // Given
-        let property = Session()
-            .compression(.gzip, onDuplicateHeader: .replace)
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.compressionDuplicateHeaderBehavior == .replace)
-    }
-
-    @Test
-    func session_whenCompressionOnDuplicateHeaderSkip_shouldBeValid() async throws {
-        // Given
-        let property = Session()
-            .compression(.gzip, onDuplicateHeader: .skip)
-
-        // When
-        let resolved = try await resolve(TestProperty { property })
-
-        // Then
-        #expect(resolved.session.configuration.compressionDuplicateHeaderBehavior == .skip)
-    }
+    // Compression moved off `Session` entirely -- see `CompressionEnvironmentTests` for its
+    // coverage now that it's environment/`Payload`-driven instead.
 
     @Test
     func session_whenPreferredExecutor_shouldBeValid() async throws {
@@ -531,7 +455,7 @@ struct SessionTests {
         // Given
         let property = TestProperty {
             Session()
-                .decompressionLimit(.size(200))
+                .decompressionAlgorithms([.gzip], limit: .size(200))
             Session()
                 .waitsForConnectivity(true)
         }
@@ -540,7 +464,13 @@ struct SessionTests {
         let resolved = try await resolve(property)
 
         // Then
-        #expect(resolved.session.configuration.decompression == .enabled(.size(200)))
+        #expect(
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm())],
+                    limit: .size(200)
+                )
+        )
         #expect(resolved.session.configuration.waitsForConnectivity == true)
     }
 }

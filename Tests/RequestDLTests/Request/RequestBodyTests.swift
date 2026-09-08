@@ -31,7 +31,7 @@ struct RequestBodyTests {
         // When
         var collected = [UInt8]()
 
-        for await chunk in body {
+        for try await chunk in body {
             collected += Array(chunk.readableBytesView)
         }
 

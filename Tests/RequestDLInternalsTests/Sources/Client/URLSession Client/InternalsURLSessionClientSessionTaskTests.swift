@@ -47,6 +47,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             request: URLRequest(url: url),
             readingMode: .length(length),
             uploadingBytes: .zero,
+            decompression: .disabled,
             cache: nil,
             logger: nil,
             delegate: AcceptAnyServerTrustDelegate()
@@ -104,6 +105,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             request: URLRequest(url: url),
             readingMode: .length(2_048),
             uploadingBytes: .zero,
+            decompression: .disabled,
             cache: { _ in cacheStream },
             logger: nil,
             delegate: AcceptAnyServerTrustDelegate()
@@ -162,6 +164,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             request: URLRequest(url: url),
             readingMode: .length(1_024),
             uploadingBytes: .zero,
+            decompression: .disabled,
             cache: nil,
             logger: nil,
             delegate: AcceptAnyServerTrustDelegate()
@@ -239,6 +242,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             streaming: stream,
             readingMode: .length(1_024),
             uploadingBytes: payload.count,
+            decompression: .disabled,
             cache: nil,
             logger: nil,
             delegate: AcceptAnyServerTrustDelegate()
@@ -294,6 +298,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             streaming: stream,
             readingMode: .length(1_024),
             uploadingBytes: payload.count,
+            decompression: .disabled,
             cache: nil,
             logger: nil,
             delegate: AcceptAnyServerTrustDelegate()
