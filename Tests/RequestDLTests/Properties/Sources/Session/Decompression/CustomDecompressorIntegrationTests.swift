@@ -167,7 +167,9 @@ struct CustomDecompressorIntegrationTests {
     }
 
     @Test
-    func decompressionAlgorithms_whenServerSendsUnconfiguredEncoding_throwsUnsupportedContentEncodingError() async throws {
+    func decompressionAlgorithms_whenServerSendsUnconfiguredEncoding_throwsUnsupportedContentEncodingError()
+        async throws
+    {
         // Given
         let server = try RawHTTPServer()
         let body = Array("irrelevant".utf8)
@@ -201,7 +203,9 @@ struct CustomDecompressorIntegrationTests {
     /// API: pinning `.nio` while it's configured must fail before ever touching the network,
     /// rather than only once a `br` response actually arrived.
     @Test
-    func decompressionAlgorithms_whenBrotliURLSessionOnlyConfiguredAndNIORequired_throwsExecutorRequirementError() async throws {
+    func decompressionAlgorithms_whenBrotliURLSessionOnlyConfiguredAndNIORequired_throwsExecutorRequirementError()
+        async throws
+    {
         // Given -- a port nothing is listening on: if this reached the network at all, it would
         // fail with a connection error instead, not this one.
         await #expect(throws: ExecutorRequirementError.self) {

@@ -314,7 +314,9 @@ extension Internals.Session.Configuration {
         case .urlSession:
             reasons = urlSessionIncompatibilityReasons()
         case .nioTransportServices:
-            reasons = (secureConnection?.networkFrameworkIncompatibilityReasons() ?? []) + nonURLSessionExecutorIncompatibilityReasons()
+            reasons =
+                (secureConnection?.networkFrameworkIncompatibilityReasons() ?? [])
+                + nonURLSessionExecutorIncompatibilityReasons()
         case .nio:
             reasons = nonURLSessionExecutorIncompatibilityReasons()
         }

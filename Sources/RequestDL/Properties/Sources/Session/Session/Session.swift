@@ -330,10 +330,11 @@ public struct Session: Property {
     /// Configures which `Content-Encoding`s this session can decode, replacing whatever was
     /// configured before.
     ///
-    /// ``gzip``/``deflate``/``brotliURLSessionOnly`` are placeholders for what the OS
-    /// (`.urlSession`) or `async-http-client` (`.nio`/`.nioTransportServices`) already decode
-    /// natively -- RequestDL never reimplements them, and in the common case where `algorithms`
-    /// contains only those, nothing in this package ever touches the response bytes at all.
+    /// ``Decompressor/gzip``/``Decompressor/deflate``/``Decompressor/brotliURLSessionOnly`` are
+    /// placeholders for what the OS (`.urlSession`) or `async-http-client`
+    /// (`.nio`/`.nioTransportServices`) already decode natively -- RequestDL never reimplements
+    /// them, and in the common case where `algorithms` contains only those, nothing in this
+    /// package ever touches the response bytes at all.
     ///
     /// A genuinely custom `Decompressor` changes that on `.urlSession`: CFNetwork's transparent
     /// decoding can only be switched off entirely, for every encoding at once, by taking over

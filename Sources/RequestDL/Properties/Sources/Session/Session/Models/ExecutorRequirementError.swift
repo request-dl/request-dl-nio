@@ -158,7 +158,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .proxyBearerAuthorizationUnderURLSession:
             return "a bearer-token proxy authorization (unsupported under URLSession)"
         case .decompressionRequiresURLSession:
-            return "a decompression algorithm that only works under URLSession (unsupported under NIO/NIOTransportServices)"
+            return
+                "a decompression algorithm that only works under URLSession (unsupported under NIO/NIOTransportServices)"
         }
     }
 }

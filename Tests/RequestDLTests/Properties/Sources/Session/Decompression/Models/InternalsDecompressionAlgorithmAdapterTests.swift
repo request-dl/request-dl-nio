@@ -66,7 +66,10 @@ struct InternalsDecompressionAlgorithmAdapterTests {
     func isNativelyDecodedByNIO_whenBrotliURLSessionOnlyAlgorithm_isFalse() {
         // `NIOHTTPCompression` has no brotli decoder at all, native or otherwise -- unlike
         // `isNativelyDecodedByURLSession`, brotli is never natively decoded here.
-        #expect(!InternalsDecompressionAlgorithmAdapter(algorithm: BrotliURLSessionOnlyAlgorithm()).isNativelyDecodedByNIO)
+        #expect(
+            !InternalsDecompressionAlgorithmAdapter(algorithm: BrotliURLSessionOnlyAlgorithm())
+                .isNativelyDecodedByNIO
+        )
     }
 
     @Test(arguments: ["gzip", "deflate", "br", "zstd"])
