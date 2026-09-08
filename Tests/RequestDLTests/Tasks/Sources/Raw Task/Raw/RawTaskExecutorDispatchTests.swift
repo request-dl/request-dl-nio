@@ -17,6 +17,7 @@ import FoundationEssentials
 #else
 import struct Foundation.UUID
 import struct Foundation.Data
+import class Foundation.ProcessInfo
 #endif
 
 /// `RawTask.result()` dispatches through `Internals.Session.resolvedClient()` (backed by
@@ -185,6 +186,169 @@ struct RawTaskExecutorDispatchTests {
             Issue.record("Expected the DataTask call above to have dispatched over .urlSession")
             return
         }
+    }
+
+    /// Regression coverage for the design decision that `.urlSession` should drop RequestDL's own
+    /// default `User-Agent` and let URLSession synthesize its native `AppName/version
+    /// Darwin/version CFNetwork/version` report instead of RequestDL's neutral one, since claiming
+    /// that format under a different executor (`.nio`) would misrepresent a network stack that
+    /// never actually ran the request. See `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`.
+    @Test
+    func dataTask_withDefaultUserAgentOverURLSession_defersToURLSessionsNativeReport() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: "Hello World")
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.useragent-urlsession.\(UUID())")
+                .requiredExecutor(.urlSession)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            UserAgentHeader()
+        }
+
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+        let result = try HTTPResult<String>(data)
+
+        // Then -- URLSession synthesizes its own accurate report once RequestDL's own default is
+        // dropped, so the server sees *something*, just not RequestDL's neutral
+        // `AppID/version OS/version` string.
+        let receivedUserAgent = try #require(result.receivedUserAgentHeader)
+        #expect(receivedUserAgent != ProcessInfo.processInfo.userAgent)
+    }
+
+    /// Companion to the test above: a caller-supplied `User-Agent` is never RequestDL's untouched
+    /// default, so `dropDefaultUserAgentForNativeReporting()` must leave it alone even under
+    /// `.urlSession`.
+    @Test
+    func dataTask_withCustomUserAgentOverURLSession_reachesTheWireUntouched() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+        let customUserAgent = "CustomAgent/1.0.0"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: "Hello World")
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.useragent-urlsession.\(UUID())")
+                .requiredExecutor(.urlSession)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            UserAgentHeader(customUserAgent)
+        }
+
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.receivedUserAgentHeader == customUserAgent)
+    }
+
+    /// Companion to both tests above: NIO never synthesizes its own `User-Agent`, so dropping
+    /// RequestDL's default there -- the way `.urlSession` does -- would just send the request
+    /// with none. RequestDL's neutral default must survive under `.nio`.
+    @Test
+    func dataTask_withDefaultUserAgentOverNIO_keepsRequestDLsNeutralDefault() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: "Hello World")
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.useragent-nio.\(UUID())")
+                .requiredExecutor(.nio)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            UserAgentHeader()
+        }
+
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.receivedUserAgentHeader == ProcessInfo.processInfo.userAgent)
+    }
+
+    /// Regression coverage for combining RequestDL's default with a plain `CustomHeader(name:
+    /// "user-agent", ...)`, not `UserAgentHeader(_:)`. `HeaderNode.make(_:)` matches "User-Agent"
+    /// case-insensitively, so this still disqualifies `hasDefaultUserAgent` -- see
+    /// `UserAgentHeaderTests.hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing`
+    /// for that check at the graph-resolve level, where the two values are still stored
+    /// separately (`CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s
+    /// own hardcoded `" "`). This proves what actually reaches the wire once `URLRequest` gets
+    /// involved: `buildURLRequestWithoutBody()` calls `addValue(_:forHTTPHeaderField:)` once per
+    /// stored value, and `URLRequest` itself -- confirmed against a live instance, not assumed --
+    /// coalesces same-name fields (case-insensitively) into one comma-joined header, no space.
+    @Test
+    func dataTask_defaultUserAgentCollidesWithCustomHeaderOverURLSession_mergesOntoTheWire() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let certificate = Certificates().server()
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: "Hello World")
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let content = TestProperty {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session("com.requestdl.tests.useragent-urlsession-merge.\(UUID())")
+                .requiredExecutor(.urlSession)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            UserAgentHeader()
+            CustomHeader(name: "user-agent", value: "ABC")
+        }
+
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+        let result = try HTTPResult<String>(data)
+
+        // Then -- neither value was dropped (a second write already disqualified
+        // `hasDefaultUserAgent`), and both landed on the wire merged into one header.
+        #expect(result.receivedUserAgentHeader == "\(ProcessInfo.processInfo.userAgent),ABC")
     }
 
     /// Cancellation, validated for real. `Internals.TaskSeed` (transport-agnostic) cancels when

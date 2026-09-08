@@ -81,6 +81,116 @@ struct UserAgentHeaderTests {
     }
 
     @Test
+    func hasDefaultUserAgent_whenUsingDefaultValue() async throws {
+        // Given
+        let property = TestProperty {
+            UserAgentHeader()
+        }
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(resolved.requestConfiguration.hasDefaultUserAgent)
+    }
+
+    @Test
+    func hasDefaultUserAgent_whenValueIsCustom() async throws {
+        // Given
+        let property = TestProperty {
+            UserAgentHeader("CustomAgent")
+        }
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
+    }
+
+    @Test
+    func hasDefaultUserAgent_whenNoValueIsSet() async throws {
+        // Given
+        let property = TestProperty(EmptyProperty())
+
+        // When
+        let resolved = try await resolve(property)
+
+        // Then
+        #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
+    }
+
+    @Test
+    func hasDefaultUserAgent_whenDefaultIsCombinedWithCustomAgent() async throws {
+        // Given
+        let userAgent = "CustomAgent"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                HeaderGroup {
+                    UserAgentHeader()
+                    UserAgentHeader(userAgent)
+                }
+                .headerStrategy(.adding)
+            }
+        )
+
+        // Then -- once a custom value is folded in too, the header is no longer purely
+        // RequestDL's untouched default, so it must not be reported as such.
+        #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
+    }
+
+    @Test
+    func hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing() async throws {
+        // Given -- a plain `CustomHeader`, not `UserAgentHeader(_:)`, and lowercased, unlike
+        // `UserAgentHeader`'s own hardcoded "User-Agent" key.
+        let resolved = try await resolve(
+            TestProperty {
+                HeaderGroup {
+                    UserAgentHeader()
+                    CustomHeader(name: "user-agent", value: "ABC")
+                }
+                .headerStrategy(.adding)
+            }
+        )
+
+        // Then -- `HeaderNode.make(_:)` matches "User-Agent" case-insensitively, so this still
+        // counts as a second write and disqualifies the marker, exactly like combining with
+        // another `UserAgentHeader(_:)` does above.
+        #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
+
+        // `CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s own
+        // hardcoded `" "` -- so this is stored as two separate values on one logical entry, not
+        // joined into a single string the way `UserAgentHeader(_:)` combining is. See
+        // `RawTaskExecutorDispatchTests.dataTask_defaultUserAgentCollidesWithCustomHeaderOverURLSession_mergesOntoTheWire`
+        // for how `URLRequest` itself coalesces this into one comma-joined header on the wire.
+        #expect(resolved.requestConfiguration.headers["User-Agent"] == [ProcessInfo.processInfo.userAgent, "ABC"])
+    }
+
+    @Test
+    func dropDefaultUserAgentForNativeReporting_removesOnlyTheUntouchedDefault() async throws {
+        // Given
+        var withDefault = try await resolve(
+            TestProperty { UserAgentHeader() }
+        ).requestConfiguration
+
+        var withCustom = try await resolve(
+            TestProperty { UserAgentHeader("CustomAgent") }
+        ).requestConfiguration
+
+        // When
+        withDefault.dropDefaultUserAgentForNativeReporting()
+        withCustom.dropDefaultUserAgentForNativeReporting()
+
+        // Then -- URLSession synthesizes its own accurate User-Agent only when the request
+        // carries none, so the untouched default is removed to let it do that, while a value
+        // the caller actually asked for must reach the wire untouched.
+        #expect(withDefault.headers["User-Agent"] == nil)
+        #expect(withCustom.headers["User-Agent"] == ["CustomAgent"])
+    }
+
+    @Test
     func neverBody() async throws {
         // Given
         let property = UserAgentHeader("CustomAgent/1.0.0")

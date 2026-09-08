@@ -43,7 +43,7 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        let client = try await resolveClient(resolved: resolved)
+        let (client, isURLSessionExecutor) = try await resolveClient(resolved: resolved)
 
         let cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,
@@ -54,6 +54,7 @@ struct RawTask<Content: Property>: RequestTask {
         let (sessionTask, onResponseHead) = try await runSession(
             resolved: resolved,
             client: client,
+            isURLSessionExecutor: isURLSessionExecutor,
             cacheControl: cacheControl,
             logger: logger,
             deadline: deadline
@@ -117,14 +118,24 @@ struct RawTask<Content: Property>: RequestTask {
     /// one. `resolvedClient()` returns `Internals.ClientManager.Client` (an enum), not
     /// `any RequestExecutingClient` directly -- see that method's own doc comment for why -- so
     /// this is the one place that unwraps it into the existential everything below expects.
-    private func resolveClient(resolved: Resolved) async throws -> any RequestExecutingClient {
+    ///
+    /// Also the one place that knows, concretely, which case was picked -- surfaced as
+    /// `isURLSessionExecutor` so `executeTraced` can decide whether to drop RequestDL's default
+    /// `User-Agent` in favor of URLSession's own native one (see
+    /// `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`). `.nioTransportServices`
+    /// never reaches its own case here -- `Internals.ClientManager.Client` only distinguishes
+    /// `.nio`/`.urlSession`, folding NIOTransportServices into `.nio` since both share the same
+    /// `RequestExecutingClient` conformance and differ only in which `EventLoopGroup` backs them.
+    private func resolveClient(
+        resolved: Resolved
+    ) async throws -> (client: any RequestExecutingClient, isURLSessionExecutor: Bool) {
         do {
             switch try await resolved.session.resolvedClient() {
             case .nio(let nioClient):
-                return nioClient
+                return (nioClient, false)
             #if canImport(Darwin)
             case .urlSession(let urlSessionClient):
-                return urlSessionClient
+                return (urlSessionClient, true)
             #endif
             }
         } catch let error as Internals.SecureFileLoadError {
@@ -152,12 +163,13 @@ struct RawTask<Content: Property>: RequestTask {
     ///
     /// Only rebinds the task-local when `RequestServiceContext` was actually declared -- leaving
     /// it untouched otherwise preserves whatever `ServiceContext.current` the caller's own task
-    /// already carries. `executeTraced(resolved:client:cache:logger:)` starts its span reading
-    /// this same task-local, so both the explicit and the ambient case are picked up correctly
-    /// here -- there's no `EventLoop` hop between the bind and the read.
+    /// already carries. `executeTraced(resolved:client:isURLSessionExecutor:cache:logger:)` starts
+    /// its span reading this same task-local, so both the explicit and the ambient case are picked
+    /// up correctly here -- there's no `EventLoop` hop between the bind and the read.
     private func runSession(
         resolved: Resolved,
         client: any RequestExecutingClient,
+        isURLSessionExecutor: Bool,
         cacheControl: Internals.CacheControl,
         logger: Internals.TaskLogger?,
         deadline: Internals.ResourceDeadline
@@ -176,6 +188,7 @@ struct RawTask<Content: Property>: RequestTask {
                 return try await Self.executeTraced(
                     resolved: resolved,
                     client: client,
+                    isURLSessionExecutor: isURLSessionExecutor,
                     cache: cache,
                     logger: logger
                 )
@@ -213,10 +226,18 @@ struct RawTask<Content: Property>: RequestTask {
     private static func executeTraced(
         resolved: Resolved,
         client: any RequestExecutingClient,
+        isURLSessionExecutor: Bool,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
         logger: Internals.TaskLogger?
     ) async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
         var configuration = resolved.requestConfiguration
+
+        // Only `.urlSession` gets its default `User-Agent` dropped -- see
+        // `dropDefaultUserAgentForNativeReporting()`'s own doc comment for why NIO and
+        // NIOTransportServices keep RequestDL's neutral default instead.
+        if isURLSessionExecutor {
+            configuration.dropDefaultUserAgentForNativeReporting()
+        }
 
         try await configuration.applyCompression(
             resolved.session.configuration.compression,

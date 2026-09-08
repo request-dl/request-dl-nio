@@ -72,6 +72,16 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
     ///
     /// Initializes a new `HeaderGroup` with a dictionary of headers.
     ///
+    /// - Important: `Dictionary` iteration order is unspecified and can vary between runs of the
+    /// same process. This is invisible for keys that are actually distinct headers, but if the
+    /// dictionary happens to carry two keys that only differ by case (e.g. `"User-Agent"` and
+    /// `"user-agent"` -- distinct dictionary keys to Swift, since `String` equality is
+    /// case-sensitive, but the same header once resolved, since header names are compared
+    /// case-insensitively per RFC 9110), which one wins -- or the order they combine in under
+    /// ``HeaderStrategy/adding`` -- is not guaranteed to be the same across runs. Use
+    /// ``init(content:)`` with an explicit, ordered list of ``CustomHeader``s instead when that
+    /// matters.
+    ///
     /// - Parameter dictionary: A dictionary containing header properties.
     ///
     public init(_ dictionary: [String: Any]) {

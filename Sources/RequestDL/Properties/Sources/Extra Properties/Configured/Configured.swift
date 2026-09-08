@@ -77,7 +77,7 @@ import NIOSSL
 ///   `secureConnection.spkiPinning.pins` (string array, required, non-empty — each entry a
 ///   Base64-encoded SHA-256 SPKI digest) and `secureConnection.spkiPinning.policy` (`"strict"` or
 ///   `"audit"`, default `"strict"`). Only SHA-256 pins are supported through `Configured`; use
-///   ``SPKIHash/init(_:algorithm:)`` directly for SHA-384/SHA-512 pins.
+///   ``SPKIHash/init(_:algorithm:)-(S,_)`` directly for SHA-384/SHA-512 pins.
 /// - `redirect` (scoped, optional): passed to ``Session``. Reads `redirect.mode` (`"follow"` or
 ///   `"disallow"`; absent entirely, the key contributes nothing rather than assuming either).
 ///   `"follow"` additionally reads `redirect.maxRedirects` (int, default `5`) and

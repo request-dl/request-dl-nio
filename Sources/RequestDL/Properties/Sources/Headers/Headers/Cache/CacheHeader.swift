@@ -63,11 +63,14 @@ public struct CacheHeader: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let separator = inputs.environment.headerSeparator ?? ","
-
+        // Cache-Control's directive list (RFC 9111 §5.2, `1#cache-directive`) is comma-delimited
+        // by definition -- hardcoded here rather than deferring to `.headerSeparator(_:)`, the
+        // same way `HeaderNode`'s own `commaSeparatedNames` forces this header's *cross-instance*
+        // combining to "," regardless of what the environment configures. Anything else joined
+        // in would parse as one opaque, meaningless directive instead of a recognizable list.
         let value = property.pointer()
             .makeContents()
-            .joined(separator: separator)
+            .joined(separator: ",")
 
         if value.isEmpty {
             return .empty
@@ -78,7 +81,7 @@ public struct CacheHeader: Property {
                 key: "Cache-Control",
                 value: value,
                 strategy: inputs.environment.headerStrategy,
-                separator: separator
+                separator: ","
             )
         )
     }
