@@ -5,7 +5,7 @@
 /// Produces a description of a resolved request without performing it.
 ///
 /// ``DataTask``, ``DownloadTask``, and ``UploadTask`` each expose a generic
-/// ``RequestTask/description(_:)`` that resolves their `Property` content the same way
+/// ``DataTask/description(_:)`` that resolves their `Property` content the same way
 /// ``RequestTask/result()`` would, then hands the outcome to a `TaskDescriptor` instead of
 /// executing the request over the network.
 ///
