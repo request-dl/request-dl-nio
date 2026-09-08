@@ -9,6 +9,7 @@ on:
       - 'Tests/**'
       - '.swift-format'
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     paths:
       - 'Package.swift'
@@ -16,6 +17,7 @@ on:
       - 'Tests/**'
       - '.swift-format'
       - '.github/workflows/swift-ci.yaml'
+  workflow_dispatch: {}
 
 # Cancel any in-progress or queued run for the same ref when a new run is
 # triggered (e.g. new push), so stale xcodebuild/swift test processes don't
