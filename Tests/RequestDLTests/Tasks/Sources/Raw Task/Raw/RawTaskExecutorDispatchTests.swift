@@ -316,7 +316,7 @@ struct RawTaskExecutorDispatchTests {
     /// stored value, and `URLRequest` itself -- confirmed against a live instance, not assumed --
     /// coalesces same-name fields (case-insensitively) into one comma-joined header, no space.
     @Test
-    func dataTask_withDefaultUserAgentCombinedWithDifferentlyCasedCustomHeaderOverURLSession_mergesBothOntoTheWire() async throws {
+    func dataTask_defaultUserAgentCollidesWithCustomHeaderOverURLSession_mergesOntoTheWire() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
         let uri = "/" + UUID().uuidString

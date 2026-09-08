@@ -163,7 +163,7 @@ struct UserAgentHeaderTests {
         // `CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s own
         // hardcoded `" "` -- so this is stored as two separate values on one logical entry, not
         // joined into a single string the way `UserAgentHeader(_:)` combining is. See
-        // `RawTaskExecutorDispatchTests.dataTask_withDefaultUserAgentCombinedWithDifferentlyCasedCustomHeaderOverURLSession_mergesBothOntoTheWire`
+        // `RawTaskExecutorDispatchTests.dataTask_defaultUserAgentCollidesWithCustomHeaderOverURLSession_mergesOntoTheWire`
         // for how `URLRequest` itself coalesces this into one comma-joined header on the wire.
         #expect(resolved.requestConfiguration.headers["User-Agent"] == [ProcessInfo.processInfo.userAgent, "ABC"])
     }
