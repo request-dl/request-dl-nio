@@ -68,7 +68,7 @@ private struct InternalsDecompressorStreamAdapter: Internals.DecompressorStream 
     // MARK: - Internal methods
 
     mutating func callAsFunction(decompressing bytes: ByteBuffer) throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream.callAsFunction(decompressing: Array(bytes.readableBytesView)))
+        ByteBuffer(bytes: try stream(decompressing: Array(bytes.readableBytesView)))
     }
 
     mutating func finish() throws -> ByteBuffer {

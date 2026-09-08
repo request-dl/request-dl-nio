@@ -49,7 +49,7 @@ extension Internals {
                 }
 
                 while let chunk = try await sourceIterator.next() {
-                    let compressed = try stream!.callAsFunction(compressing: chunk)
+                    let compressed = try stream!(compressing: chunk)
 
                     if compressed.readableBytes > .zero {
                         return compressed

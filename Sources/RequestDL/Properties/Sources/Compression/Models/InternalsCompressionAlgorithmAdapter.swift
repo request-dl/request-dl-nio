@@ -41,7 +41,7 @@ private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
     // MARK: - Internal methods
 
     mutating func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream.callAsFunction(compressing: Array(bytes.readableBytesView)))
+        ByteBuffer(bytes: try stream(compressing: Array(bytes.readableBytesView)))
     }
 
     mutating func finish() throws -> ByteBuffer {
