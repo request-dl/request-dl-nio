@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Dispatch
 import Testing
 
 @testable import RequestDL
@@ -84,7 +85,16 @@ struct CustomDecompressorIntegrationTests {
         private let listenSocket: Int32
 
         init() throws {
-            let rawSocket = socket(AF_INET, SOCK_STREAM, 0)
+            // `SOCK_STREAM` is a plain `Int32` constant on Darwin, but Glibc types it as
+            // `__socket_type` (a `RawRepresentable` enum with a `UInt32` `rawValue`) -- `socket`
+            // itself expects `Int32` either way.
+            #if canImport(Darwin)
+            let socketType = SOCK_STREAM
+            #else
+            let socketType = Int32(SOCK_STREAM.rawValue)
+            #endif
+
+            let rawSocket = socket(AF_INET, socketType, 0)
             precondition(rawSocket >= 0, "failed to create socket")
 
             var reuse: Int32 = 1
@@ -116,9 +126,14 @@ struct CustomDecompressorIntegrationTests {
         }
 
         /// Serves exactly one request/response on a background thread, then closes.
+        ///
+        /// - Note: `DispatchQueue`, not `Thread` -- `Thread` lives in full `Foundation`, not
+        /// `FoundationEssentials`, which is all that's guaranteed to `import` here (see the
+        /// file-level `#if canImport(FoundationEssentials)` above). `Dispatch` is portable
+        /// either way.
         func respondOnce(headers: String, body: [UInt8]) {
             let listenSocket = listenSocket
-            Thread.detachNewThread {
+            DispatchQueue.global(qos: .userInitiated).async {
                 let client = accept(listenSocket, nil, nil)
                 guard client >= 0 else { return }
                 defer { close(client) }
