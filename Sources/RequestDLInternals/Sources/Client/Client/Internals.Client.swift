@@ -162,17 +162,27 @@ extension Internals {
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let download = await Internals.DownloadBuffer(readingMode: readingMode)
 
-            // No all-or-nothing constraint on this executor, unlike `.urlSession`:
-            // `NIOHTTPResponseDecompressor` strips `Content-Encoding` once it decodes gzip/deflate
-            // (configured separately, once, via `Internals.Session.Configuration.build()`), so
-            // dispatch is always safe to enable alongside it -- it only ever sees whatever that
-            // handler left untouched.
+            // No all-or-nothing constraint on this executor, unlike `.urlSession`: manual
+            // dispatch only has to activate for algorithms `NIOHTTPResponseDecompressor` (added
+            // separately, once, via `Internals.Session.Configuration.build()`) doesn't already
+            // handle -- gzip/deflate can stay skipped alongside it, rather than every configured
+            // algorithm always going through manual dispatch regardless.
+            //
+            // - Important: `NIOHTTPResponseDecompressor` decodes the body but does *not* strip
+            // `Content-Encoding` from the response head (confirmed against the vendored
+            // `swift-nio-extras` source this package actually ships) -- the same caveat already
+            // documented for CFNetwork's own transparent decoding under `.urlSession`. Dispatch
+            // must therefore bypass by *type* (`isNativelyDecodedByNIO`), the same structural
+            // check `Internals.URLSessionClient` uses, not by checking whether the header is
+            // still present -- it always is, natively decoded or not.
             let decompressionDispatch: Internals.ManualDecompressionDispatch = {
                 switch decompression {
                 case .disabled:
                     return .skip
-                case .enabled(let algorithms, _):
+                case .enabled(let algorithms, _) where !algorithms.allSatisfy(\.isNativelyDecodedByNIO):
                     return .dispatch(algorithms: algorithms)
+                case .enabled:
+                    return .skip
                 }
             }()
 

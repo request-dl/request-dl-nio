@@ -152,6 +152,89 @@ struct CustomDecompressorIntegrationTests {
         }
     }
 
+    /// Real gzip-compressed bytes, via the same `GzipAlgorithm` `Compressor` a real upload would
+    /// use -- not a fixture, so this stays correct if the codec's own output ever changes shape.
+    private static func gzipCompress(_ string: String) throws -> [UInt8] {
+        let compressor: any Compressor = GzipAlgorithm()
+        var stream = try compressor()
+        var output = try stream(compressing: Array(string.utf8))
+        output += try stream.finish()
+        return output
+    }
+
+    @Test
+    func decompressionAlgorithms_whenOnlyNativeAlgorithmConfigured_bypassesManualDispatchUnderURLSession()
+        async throws
+    {
+        // Given -- `.gzip` alone never forces `.urlSession` to take over `Accept-Encoding` (see
+        // `isNativelyDecodedByURLSession`), unlike the other tests in this file that mix in a
+        // custom algorithm. This exercises `Internals.URLSessionClient.executeSessionTask`'s
+        // plain `.enabled` (bypass) branch specifically -- CFNetwork decodes the response
+        // entirely on its own, with `decompressionDispatch` never becoming `.dispatch`. No
+        // executor is forced here -- `.urlSession` is what this session resolves to by default.
+        let server = try RawHTTPServer()
+        let original = String(repeating: "hello native gzip, no custom algorithm in the mix. ", count: 200)
+        let encoded = try Self.gzipCompress(original)
+
+        let headers = """
+            HTTP/1.1 200 OK\r
+            Content-Encoding: gzip\r
+            Content-Length: \(encoded.count)\r
+            Connection: close\r
+            \r
+
+            """
+        server.respondOnce(headers: headers, body: encoded)
+
+        // When
+        let data = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Session().decompressionAlgorithms([.gzip])
+        }
+        .extractPayload()
+        .result()
+
+        // Then
+        #expect(String(data: data, encoding: .utf8) == original)
+    }
+
+    @Test
+    func decompressionAlgorithms_whenOnlyNativeAlgorithmConfigured_bypassesManualDispatchUnderNIO() async throws {
+        // Given -- the `.nio` counterpart to the test above, regression coverage for a real bug:
+        // unlike `.urlSession`, `NIOHTTPResponseDecompressor` has no all-or-nothing
+        // `Accept-Encoding` constraint to work around, so `Internals.Client.execute` dispatched
+        // manually for every configured algorithm unconditionally, on the assumption that
+        // `NIOHTTPResponseDecompressor` strips `Content-Encoding` once it decodes. It doesn't
+        // (confirmed against the vendored `swift-nio-extras` source) -- so a response compressed
+        // with a genuinely native-only algorithm like `.gzip` reached manual dispatch anyway and
+        // threw `NativeOnlyAlgorithmError`, exactly like a real caller configuring only `.gzip`
+        // under `.nio` would have hit on every request.
+        let server = try RawHTTPServer()
+        let original = String(repeating: "hello native gzip under NIO, no custom algorithm. ", count: 200)
+        let encoded = try Self.gzipCompress(original)
+
+        let headers = """
+            HTTP/1.1 200 OK\r
+            Content-Encoding: gzip\r
+            Content-Length: \(encoded.count)\r
+            Connection: close\r
+            \r
+
+            """
+        server.respondOnce(headers: headers, body: encoded)
+
+        // When
+        let data = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Session().decompressionAlgorithms([.gzip]).requiredExecutor(.nio)
+        }
+        .extractPayload()
+        .result()
+
+        // Then
+        #expect(String(data: data, encoding: .utf8) == original)
+    }
+
     @Test
     func decompressionAlgorithms_whenServerSendsMatchingCustomEncoding_decodesCorrectly() async throws {
         // Given
