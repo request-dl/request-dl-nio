@@ -73,7 +73,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-certificates.git",
-            from: "1.0.0"
+            from: "1.20.0"
         ),
     ],
     targets: [
