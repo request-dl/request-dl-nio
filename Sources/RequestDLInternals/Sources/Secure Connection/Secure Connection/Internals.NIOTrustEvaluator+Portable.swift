@@ -104,13 +104,55 @@ extension Internals.NIOTrustEvaluator {
         )
     }
 
-    /// A minimal version of NIOSSL's own `LinuxCABundle.swift` search heuristic (file-based paths
-    /// only -- covers Ubuntu/Debian/Arch/Alpine and Fedora) -- kept in sync with NIOSSL's own list
-    /// so pinning on top of the system default trust store resolves the same roots NIOSSL's
-    /// default path would have used.
+    #if os(Android)
+    /// Mirrors NIOSSL's own `AndroidCABundle.swift` search heuristic -- Android ships its trust
+    /// store as a directory of individual PEM certificates, not a single bundle file the way
+    /// Linux/FreeBSD do, so `systemDefaultCertificateStore()` below reads every entry in whichever
+    /// of these is found instead of parsing one path as a single PEM bundle.
+    private static let systemCABundleDirectorySearchPaths = [
+        "/apex/com.android.conscrypt/cacerts",  // Android 14+
+        "/system/etc/security/cacerts",  // < Android 14
+    ]
+
+    private static func systemDefaultCertificateStore() throws -> CertificateStore {
+        // `contentsOfDirectory(atPath:)` itself is the existence/is-a-directory check -- it
+        // throws for a path that's missing, a plain file, or unreadable, so the first path that
+        // doesn't throw is the match, same "first candidate wins" shape as the file-based branch
+        // below.
+        for directory in systemCABundleDirectorySearchPaths {
+            guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory) else {
+                continue
+            }
+
+            var store = CertificateStore()
+            for entry in entries {
+                guard let certificates = try? NIOSSLCertificate.fromPEMFile(directory + "/" + entry) else {
+                    continue
+                }
+                for certificate in certificates {
+                    if let x509Certificate = try? Certificate(derEncoded: certificate.toDERBytes()) {
+                        store.append(x509Certificate)
+                    }
+                }
+            }
+            return store
+        }
+
+        return CertificateStore()
+    }
+    #else
+    /// A minimal version of NIOSSL's own `LinuxCABundle.swift`/`FreeBSDCABundle.swift` search
+    /// heuristics (file-based paths only) -- kept in sync with NIOSSL's own lists so pinning on
+    /// top of the system default trust store resolves the same roots NIOSSL's default path would
+    /// have used. Windows and WASI have no entry here because NIOSSL's own
+    /// `platformDefaultConfiguration` doesn't load a default trust store on either platform either
+    /// -- there's no NIOSSL-native behavior left to mirror.
     private static let systemCABundleFileSearchPaths = [
-        "/etc/ssl/certs/ca-certificates.crt",
-        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/etc/ssl/certs/ca-certificates.crt",  // Ubuntu, Debian, Arch, Alpine (Linux)
+        "/etc/pki/tls/certs/ca-bundle.crt",  // Fedora (Linux)
+        "/usr/local/etc/ssl/cert.pem",  // openssl / ca_root_nss (FreeBSD)
+        "/etc/ssl/cert.pem",  // base system, FreeBSD 14+
+        "/usr/local/share/certs/ca-root-nss.crt",  // ca_root_nss port bundle (FreeBSD)
     ]
 
     private static func systemDefaultCertificateStore() throws -> CertificateStore {
@@ -130,6 +172,7 @@ extension Internals.NIOTrustEvaluator {
 
         return store
     }
+    #endif
 }
 
 #endif
