@@ -212,14 +212,14 @@ extension Internals {
             var trustedRootCertificates: [SecCertificate] = []
 
             if let trustRoots = secureConnection.trustRoots {
-                trustedRootCertificates += try certificates(from: trustRoots).map {
+                trustedRootCertificates += try trustRoots.resolvedCertificates().map {
                     try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
                 }
             }
 
             if let additionalTrustRoots = secureConnection.additionalTrustRoots {
                 for additionalTrustRoot in additionalTrustRoots {
-                    trustedRootCertificates += try certificates(from: additionalTrustRoot).map {
+                    trustedRootCertificates += try additionalTrustRoot.resolvedCertificates().map {
                         try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
                     }
                 }
@@ -313,10 +313,13 @@ extension Internals {
                 return
             }
 
-            let pinsMatched =
-                Self.leafSPKIDERBytes(of: serverTrust).map { leafSPKIDERBytes in
-                    spkiPins.contains { $0.matches(leafSPKIDERBytes) }
-                } ?? false
+            // Checked against every certificate in the chain, not just the leaf: OWASP's pinning
+            // guidance recommends always deploying a backup pin so rotation doesn't lock clients
+            // out, and the common way to do that is pinning an intermediate CA alongside (or
+            // instead of) the leaf, which rotates far more often.
+            let pinsMatched = Self.chainSPKIDERBytes(of: serverTrust).contains { spkiDERBytes in
+                spkiPins.contains { $0.matches(spkiDERBytes) }
+            }
 
             if pinsMatched || !spkiPinningIsStrict {
                 // `.audit` behaves exactly like AsyncHTTPClient's own SPKI pinning policy: a
@@ -331,35 +334,24 @@ extension Internals {
 
         // MARK: - Private methods
 
-        /// The leaf certificate's SPKI (SubjectPublicKeyInfo) structure, DER-encoded -- what an
-        /// `Internals.SPKIHash` pin's digest is computed over. Reuses NIOSSL's own
-        /// `NIOSSLPublicKey.toSPKIBytes()` on the leaf's DER bytes rather than reconstructing the
-        /// SPKI ASN.1 wrapper from a bare `SecKey` export by hand, so a pin configured once
-        /// produces the identical digest regardless of which executor (`URLSession` here, plain
-        /// NIO/NIOTransportServices elsewhere) ends up carrying the connection. `nil` on any
-        /// failure along the way (no certificates in the trust, DER that doesn't round-trip
-        /// through NIOSSL, a public key NIOSSL can't export) -- treated the same as "pin
-        /// mismatch" by the caller, since none of these are expected to happen for a trust that
-        /// `SecTrustEvaluateWithError` already accepted moments earlier.
-        private static func leafSPKIDERBytes(of trust: SecTrust) -> Data? {
-            guard
-                let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
-                let leaf = chain.first
-            else {
-                return nil
+        /// Every certificate's SPKI (SubjectPublicKeyInfo) structure in the chain, DER-encoded --
+        /// what an `Internals.SPKIHash` pin's digest is computed over, checked against leaf and
+        /// intermediates alike. Reuses NIOSSL's own `NIOSSLPublicKey.toSPKIBytes()` on each
+        /// certificate's DER bytes rather than reconstructing the SPKI ASN.1 wrapper from a bare
+        /// `SecKey` export by hand, so a pin configured once produces the identical digest
+        /// regardless of which executor (`URLSession` here, plain NIO/NIOTransportServices
+        /// elsewhere) ends up carrying the connection. Certificates that don't round-trip through
+        /// NIOSSL are dropped rather than failing the whole chain -- not expected in practice for
+        /// a trust that `SecTrustEvaluateWithError` already accepted moments earlier.
+        private static func chainSPKIDERBytes(of trust: SecTrust) -> [Data] {
+            guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate] else {
+                return []
             }
 
-            let derBytes = [UInt8](SecCertificateCopyData(leaf) as Data)
-
-            guard
-                let certificate = try? NIOSSLCertificate(bytes: derBytes, format: .der),
-                let publicKey = try? certificate.extractPublicKey(),
-                let spkiBytes = try? publicKey.toSPKIBytes()
-            else {
-                return nil
+            return chain.compactMap { certificate in
+                let derBytes = [UInt8](SecCertificateCopyData(certificate) as Data)
+                return (try? NIOSSLCertificate(bytes: derBytes, format: .der))?.spkiDERBytes()
             }
-
-            return Data(spkiBytes)
         }
 
         private static func digest(_ data: Data, algorithm: Internals.SPKIHash.KnownAlgorithm) -> Data {
@@ -370,29 +362,6 @@ extension Internals {
             }
         }
 
-        private static func certificates(from trustRoots: Internals.TrustRoots) throws -> [NIOSSLCertificate] {
-            switch trustRoots {
-            case .file(let file):
-                return try Internals.Certificate(file, format: .pem).build()
-            case .bytes(let bytes):
-                return try Internals.Certificate(bytes, format: .pem).build()
-            case .certificates(let certificates):
-                return try certificates.flatMap { try $0.build() }
-            }
-        }
-
-        private static func certificates(
-            from additionalTrustRoots: Internals.AdditionalTrustRoots
-        ) throws -> [NIOSSLCertificate] {
-            switch additionalTrustRoots {
-            case .file(let file):
-                return try Internals.Certificate(file, format: .pem).build()
-            case .bytes(let bytes):
-                return try Internals.Certificate(bytes, format: .pem).build()
-            case .certificates(let certificates):
-                return try certificates.flatMap { try $0.build() }
-            }
-        }
     }
 }
 

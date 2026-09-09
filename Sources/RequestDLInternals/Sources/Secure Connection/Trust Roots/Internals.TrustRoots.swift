@@ -47,5 +47,19 @@ extension Internals {
                 )
             }
         }
+
+        /// The flat list of `NIOSSLCertificate`s this configuration resolves to -- what a trust
+        /// evaluator needs to set as anchors, as opposed to `build()`'s `NIOSSLTrustRoots`, which
+        /// stays a `.file` reference rather than reading it eagerly.
+        package func resolvedCertificates() throws -> [NIOSSLCertificate] {
+            switch self {
+            case .file(let file):
+                return try Internals.Certificate(file, format: .pem).build()
+            case .bytes(let bytes):
+                return try Internals.Certificate(bytes, format: .pem).build()
+            case .certificates(let certificates):
+                return try certificates.flatMap { try $0.build() }
+            }
+        }
     }
 }

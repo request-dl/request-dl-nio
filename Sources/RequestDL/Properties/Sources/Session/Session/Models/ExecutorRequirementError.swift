@@ -14,8 +14,6 @@ public struct ExecutorRequirementError: Error, Sendable {
 
     /// One configuration field that keeps a session off the required executor.
     public enum Reason: Sendable, Hashable {
-        case certificateChain
-        case privateKey
         case keyLogger
         case cipherSuites
         case cipherSuiteValues
@@ -28,7 +26,6 @@ public struct ExecutorRequirementError: Error, Sendable {
         case pskIdentityResolver
         case noHostnameVerificationUnderNetworkFramework
         case additionalTrustRootsUnderNetworkFramework
-        case tlsPinning
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
@@ -39,10 +36,6 @@ public struct ExecutorRequirementError: Error, Sendable {
 
         init(_ reason: Internals.ExecutorIncompatibilityReason) {
             switch reason {
-            case .certificateChain:
-                self = .certificateChain
-            case .privateKey:
-                self = .privateKey
             case .keyLogger:
                 self = .keyLogger
             case .cipherSuites:
@@ -67,8 +60,6 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .noHostnameVerificationUnderNetworkFramework
             case .additionalTrustRootsUnderNetworkFramework:
                 self = .additionalTrustRootsUnderNetworkFramework
-            case .tlsPinning:
-                self = .tlsPinning
             case .dnsOverrideUnderURLSession:
                 self = .dnsOverrideUnderURLSession
             case .http1OnlyUnderURLSession:
@@ -119,10 +110,6 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .certificateChain:
-            return "a client certificate chain"
-        case .privateKey:
-            return "a client private key"
         case .keyLogger:
             return "a TLS key logger"
         case .cipherSuites:
@@ -146,9 +133,7 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .noHostnameVerificationUnderNetworkFramework:
             return "disabled hostname verification (unsupported under Network.framework)"
         case .additionalTrustRootsUnderNetworkFramework:
-            return "additional trust roots (unsupported under Network.framework)"
-        case .tlsPinning:
-            return "SPKI certificate pinning"
+            return "additional trust roots without also configuring SPKI pinning (unsupported under Network.framework)"
         case .dnsOverrideUnderURLSession:
             return "a DNS override (unsupported under URLSession)"
         case .http1OnlyUnderURLSession:

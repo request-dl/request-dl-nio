@@ -11,8 +11,8 @@ struct InternalsExecutorIncompatibilityReasonTests {
     @Test
     func reason_whenEquals() {
         // Given
-        let lhs = Internals.ExecutorIncompatibilityReason.certificateChain
-        let rhs = Internals.ExecutorIncompatibilityReason.certificateChain
+        let lhs = Internals.ExecutorIncompatibilityReason.keyLogger
+        let rhs = Internals.ExecutorIncompatibilityReason.keyLogger
 
         // Then
         #expect(lhs == rhs)
@@ -21,8 +21,8 @@ struct InternalsExecutorIncompatibilityReasonTests {
     @Test
     func reason_whenNotEquals() {
         // Given
-        let lhs = Internals.ExecutorIncompatibilityReason.certificateChain
-        let rhs = Internals.ExecutorIncompatibilityReason.privateKey
+        let lhs = Internals.ExecutorIncompatibilityReason.keyLogger
+        let rhs = Internals.ExecutorIncompatibilityReason.cipherSuites
 
         // Then
         #expect(lhs != rhs)
@@ -32,8 +32,6 @@ struct InternalsExecutorIncompatibilityReasonTests {
     func reason_whenHashable() {
         // Given
         let cases: Set<Internals.ExecutorIncompatibilityReason> = [
-            .certificateChain,
-            .privateKey,
             .keyLogger,
             .cipherSuites,
             .cipherSuiteValues,
@@ -54,6 +52,6 @@ struct InternalsExecutorIncompatibilityReasonTests {
         ]
 
         // Then
-        #expect(cases.count == 19)
+        #expect(cases.count == 17)
     }
 }

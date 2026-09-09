@@ -10,12 +10,13 @@
 #if canImport(Darwin)
 
 import CryptoKit
+import NIOSSL
 import Security
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
+import Foundation
 #endif
 
 extension Internals {
@@ -72,6 +73,59 @@ extension Internals {
         package struct Handle {
             package let identity: SecIdentity
             fileprivate let label: String
+        }
+
+        // MARK: - Identity sources (CertificateChain/PrivateKeySource -> raw DER bytes)
+        //
+        // Shared by every executor that needs a `SecIdentity` built from an
+        // `Internals.SecureConnection`'s `certificateChain`/`privateKey` -- `.urlSession`
+        // (`Internals.URLSessionIdentityPolicy`) and `.nio` under Network.framework
+        // (`Internals.SecureConnection.makeLocalIdentityForNetworkFramework()`) alike.
+
+        /// The leaf certificate (index 0) plus any intermediates, as DER bytes.
+        /// `Internals.CertificateChain.build()` always resolves to `.certificate` sources
+        /// regardless of how it was configured (bytes, file, or pre-built certificates), so this
+        /// never hits its own `preconditionFailure`.
+        package static func certificateDERs(from certificateChain: Internals.CertificateChain) throws -> [Data] {
+            try certificateChain.build().map { source in
+                guard case .certificate(let certificate) = source else {
+                    preconditionFailure(
+                        "Internals.CertificateChain.build() unexpectedly produced a non-certificate source"
+                    )
+                }
+                return Data(try certificate.toDERBytes())
+            }
+        }
+
+        /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
+        /// down to DER. A password-protected key is rejected outright, since there is no public
+        /// API to export a decrypted key back out to DER once NIOSSL has parsed it.
+        package static func privateKeyDER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
+            switch privateKeySource {
+            case .privateKey(let privateKey):
+                guard privateKey.password == nil else {
+                    throw Error.unsupportedKeyFormat("password-protected key")
+                }
+
+                let rawBytes: Data
+                switch privateKey.source {
+                case .bytes(let bytes):
+                    rawBytes = Data(bytes)
+                case .file(let file):
+                    do {
+                        rawBytes = try Data(contentsOf: URL(fileURLWithPath: file))
+                    } catch {
+                        throw SecureFileLoadError(resource: .privateKey, path: file, underlying: error)
+                    }
+                }
+
+                switch privateKey.format {
+                case .der:
+                    return rawBytes
+                case .pem:
+                    return try Self.privateKeyDER(fromPEM: rawBytes)
+                }
+            }
         }
 
         // MARK: - Certificate (DER bytes -> SecCertificate, no Keychain involved)

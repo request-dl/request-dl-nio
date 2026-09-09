@@ -352,7 +352,7 @@ struct InternalsSessionConfigurationTests {
     }
 
     @Test
-    func configuration_whenNetworkFrameworkEnabledWithSPKIPinning_isCompatibleWithNetworkFrameworkIsFalse()
+    func configuration_whenNetworkFrameworkEnabledWithSPKIPinning_isCompatibleWithNetworkFrameworkIsTrue()
         async throws
     {
         // Given
@@ -364,11 +364,17 @@ struct InternalsSessionConfigurationTests {
         configuration.enableNetworkFramework = true
         configuration.secureConnection = secureConnection
 
-        // Then -- SPKI pinning silently overrides the Network framework request rather than
-        // failing outright or dropping the pins: AsyncHTTPClient's NIOTransportServices bridge
-        // never consults `SPKIPinningConfiguration`, so honoring `enableNetworkFramework` here
-        // would mean the pins stop being enforced without any signal to the caller.
-        #expect(!configuration.isCompatibleWithNetworkFramework)
+        // Then -- SPKI pinning is enforced under Network.framework too, via
+        // `Internals.NIOTrustEvaluator`/`HTTPClient.Configuration.tlsCustomVerificationNetworkFramework`
+        // (AsyncHTTPClient's fork, 1.38.0+), so it no longer needs to steer a session off that
+        // executor the way it did when pinning only worked through the NIOSSL backend. Network.framework
+        // doesn't exist at all off Darwin, so `isCompatibleWithNetworkFramework` itself stays
+        // unconditionally `false` there regardless of reasons -- checked directly on Darwin, and via
+        // the platform-independent reasons list everywhere else.
+        #if canImport(Darwin)
+        #expect(configuration.isCompatibleWithNetworkFramework)
+        #endif
+        #expect(secureConnection.networkFrameworkIncompatibilityReasons().isEmpty)
         #expect(secureConnection.tlsPins != nil)
     }
 

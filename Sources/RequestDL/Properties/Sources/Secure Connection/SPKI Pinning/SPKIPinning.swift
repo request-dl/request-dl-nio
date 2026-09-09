@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import RequestDLInternals
 
 /// SPKI-based certificate pinning configuration for secure connections.
@@ -31,7 +30,7 @@ public struct SPKIPinning<Content: Property>: Property {
         let nodes: [LeafNode<SPKIHashNode>]
 
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
-            secureConnection.tlsPinningPolicy = policy
+            secureConnection.tlsPinningPolicy = policy.build()
             secureConnection.tlsPins = nodes.map(\.hash)
         }
     }

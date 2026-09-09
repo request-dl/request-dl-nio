@@ -84,7 +84,6 @@ extension Internals.Session {
 
             var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
-                tlsPinning: secureConnectionOutput?.tlsPinning,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
                 connectionPool: connectionPool,
@@ -92,6 +91,13 @@ extension Internals.Session {
                 decompression: decompression.build(),
                 tracing: .init()
             )
+
+            configuration.tlsCustomVerification = secureConnectionOutput?.tlsCustomVerification
+            #if canImport(Darwin)
+            configuration.tlsCustomVerificationNetworkFramework =
+                secureConnectionOutput?.tlsCustomVerificationNetworkFramework
+            configuration.tlsLocalIdentityNetworkFramework = secureConnectionOutput?.tlsLocalIdentityNetworkFramework
+            #endif
 
             configuration.dnsOverride = dnsOverride
             configuration.enableMultipath = (multipathServiceType != .none)

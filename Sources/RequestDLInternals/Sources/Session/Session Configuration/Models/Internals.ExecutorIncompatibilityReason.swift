@@ -10,8 +10,6 @@ extension Internals {
     /// not another -- the `*IncompatibilityReasons()` functions decide which of these apply for
     /// which executor.
     package enum ExecutorIncompatibilityReason: Sendable, Hashable {
-        case certificateChain
-        case privateKey
         case keyLogger
         case cipherSuites
         case cipherSuiteValues
@@ -23,11 +21,10 @@ extension Internals {
         case pskHint
         case pskIdentityResolver
         case noHostnameVerificationUnderNetworkFramework
+        /// Only a problem when SPKI pinning (`.tlsPinning`) *isn't* also active -- when it is,
+        /// `Internals.NIOTrustEvaluator` reads `additionalTrustRoots` itself as part of building
+        /// its own custom verification, on both the NIOSSL and Network.framework backends.
         case additionalTrustRootsUnderNetworkFramework
-        /// SPKI pinning is wired only through `SPKIPinningConfiguration`/`AsyncHTTPClient.SPKIHash`,
-        /// which neither Network.framework's `getNWProtocolTLSOptions` bridge nor
-        /// `Internals.URLSessionClient`'s `SecTrust`-based trust evaluation ever consults.
-        case tlsPinning
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
