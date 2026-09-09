@@ -122,21 +122,13 @@ extension Internals {
             }
         }
 
-        // MARK: - Private types
-
-        /// One pin, normalized to a same-process matcher regardless of whether it came from a
-        /// live `Internals.SPKIHash` (`resolve(from:)`) or a rebuilt `Descriptor.SPKIPinning.Pin`
-        /// (`init(descriptor:)`) -- `handle(challenge:)` doesn't need to know which.
-        private struct ResolvedSPKIPin: @unchecked Sendable {
-            let matches: @Sendable (Data) -> Bool
-        }
-
         // MARK: - Private properties
 
-        private let trustedRootCertificates: [SecCertificate]
+        /// The trust-root/SPKI pin decision itself, shared with `Internals.NIOTrustEvaluator` --
+        /// this type only owns what's specific to a `URLAuthenticationChallenge`: the `.none`
+        /// bypass, and `Descriptor` persistence for `BackgroundDownloadTask`.
+        private let evaluation: Internals.DarwinTrustEvaluation
         private let certificateVerification: NIOSSL.CertificateVerification
-        private let spkiPins: [ResolvedSPKIPin]
-        private let spkiPinningIsStrict: Bool
         private let spkiPinningDescriptor: Descriptor.SPKIPinning?
 
         // MARK: - Inits
@@ -144,14 +136,16 @@ extension Internals {
         private init(
             trustedRootCertificates: [SecCertificate],
             certificateVerification: NIOSSL.CertificateVerification,
-            spkiPins: [ResolvedSPKIPin],
+            spkiPins: [Internals.ResolvedSPKIPin],
             spkiPinningIsStrict: Bool,
             spkiPinningDescriptor: Descriptor.SPKIPinning?
         ) {
-            self.trustedRootCertificates = trustedRootCertificates
+            self.evaluation = Internals.DarwinTrustEvaluation(
+                trustRootCertificates: trustedRootCertificates,
+                pins: spkiPins,
+                isStrict: spkiPinningIsStrict
+            )
             self.certificateVerification = certificateVerification
-            self.spkiPins = spkiPins
-            self.spkiPinningIsStrict = spkiPinningIsStrict
             self.spkiPinningDescriptor = spkiPinningDescriptor
         }
 
@@ -168,7 +162,7 @@ extension Internals {
                 },
                 certificateVerification: descriptor.verification.nioSSLValue,
                 spkiPins: (descriptor.spkiPinning?.pins ?? []).map { pin in
-                    ResolvedSPKIPin { spkiDERBytes in
+                    Internals.ResolvedSPKIPin { spkiDERBytes in
                         Self.digest(spkiDERBytes, algorithm: pin.algorithm) == pin.digest
                     }
                 },
@@ -185,7 +179,7 @@ extension Internals {
         /// - Throws: ``DescriptorError/unpersistableAlgorithm`` if `resolve(from:)` was given SPKI
         /// pins built with a `Crypto.HashFunction` other than SHA-256/384/512.
         package func descriptor() throws -> Descriptor {
-            if spkiPinningDescriptor == nil, !spkiPins.isEmpty {
+            if spkiPinningDescriptor == nil, !evaluation.pins.isEmpty {
                 // Only reachable via `resolve(from:)`, whose SPKI pins never populated
                 // `spkiPinningDescriptor` because at least one used an unnameable algorithm --
                 // `init(descriptor:)` always sets `spkiPinningDescriptor` when `spkiPins` is
@@ -194,7 +188,7 @@ extension Internals {
             }
 
             return Descriptor(
-                trustedRootCertificatesDER: trustedRootCertificates.map { SecCertificateCopyData($0) as Data },
+                trustedRootCertificatesDER: evaluation.trustRootCertificates.map { SecCertificateCopyData($0) as Data },
                 verification: Descriptor.Verification(certificateVerification),
                 spkiPinning: spkiPinningDescriptor
             )
@@ -236,7 +230,7 @@ extension Internals {
             }
 
             let spkiPins = resolvedPins.map { resolved in
-                ResolvedSPKIPin { spkiDERBytes in
+                Internals.ResolvedSPKIPin { spkiDERBytes in
                     (try? resolved.pin.matchesSPKI(spkiDERBytes)) ?? false
                 }
             }
@@ -290,15 +284,10 @@ extension Internals {
                 return
             }
 
-            if certificateVerification == .noHostnameVerification {
-                let policy = SecPolicyCreateSSL(true, nil)
-                _ = SecTrustSetPolicies(serverTrust, policy as CFTypeRef)
-            }
-
-            if !trustedRootCertificates.isEmpty {
-                _ = SecTrustSetAnchorCertificates(serverTrust, trustedRootCertificates as CFArray)
-                _ = SecTrustSetAnchorCertificatesOnly(serverTrust, true)
-            }
+            evaluation.prepare(
+                serverTrust,
+                skipsHostnameVerification: certificateVerification == .noHostnameVerification
+            )
 
             var evaluationError: CFError?
             let isTrusted = SecTrustEvaluateWithError(serverTrust, &evaluationError)
@@ -308,24 +297,11 @@ extension Internals {
                 return
             }
 
-            guard !spkiPins.isEmpty else {
-                completionHandler(.useCredential, URLCredential(trust: serverTrust))
-                return
-            }
-
-            // Checked against every certificate in the chain, not just the leaf: OWASP's pinning
-            // guidance recommends always deploying a backup pin so rotation doesn't lock clients
-            // out, and the common way to do that is pinning an intermediate CA alongside (or
-            // instead of) the leaf, which rotates far more often.
-            let pinsMatched = Self.chainSPKIDERBytes(of: serverTrust).contains { spkiDERBytes in
-                spkiPins.contains { $0.matches(spkiDERBytes) }
-            }
-
-            if pinsMatched || !spkiPinningIsStrict {
-                // `.audit` behaves exactly like AsyncHTTPClient's own SPKI pinning policy: a
-                // mismatch (or, here, a leaf the SPKI bytes couldn't even be extracted from) is
-                // still accepted, on the assumption this is a deliberate debugging/migration
-                // window rather than production traffic.
+            // `.audit` behaves exactly like AsyncHTTPClient's own former SPKI pinning policy: a
+            // mismatch (or a leaf the SPKI bytes couldn't even be extracted from) is still
+            // accepted, on the assumption this is a deliberate debugging/migration window rather
+            // than production traffic.
+            if evaluation.passes(chain: serverTrust) {
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
             } else {
                 completionHandler(.cancelAuthenticationChallenge, nil)
@@ -333,26 +309,6 @@ extension Internals {
         }
 
         // MARK: - Private methods
-
-        /// Every certificate's SPKI (SubjectPublicKeyInfo) structure in the chain, DER-encoded --
-        /// what an `Internals.SPKIHash` pin's digest is computed over, checked against leaf and
-        /// intermediates alike. Reuses NIOSSL's own `NIOSSLPublicKey.toSPKIBytes()` on each
-        /// certificate's DER bytes rather than reconstructing the SPKI ASN.1 wrapper from a bare
-        /// `SecKey` export by hand, so a pin configured once produces the identical digest
-        /// regardless of which executor (`URLSession` here, plain NIO/NIOTransportServices
-        /// elsewhere) ends up carrying the connection. Certificates that don't round-trip through
-        /// NIOSSL are dropped rather than failing the whole chain -- not expected in practice for
-        /// a trust that `SecTrustEvaluateWithError` already accepted moments earlier.
-        private static func chainSPKIDERBytes(of trust: SecTrust) -> [Data] {
-            guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate] else {
-                return []
-            }
-
-            return chain.compactMap { certificate in
-                let derBytes = [UInt8](SecCertificateCopyData(certificate) as Data)
-                return (try? NIOSSLCertificate(bytes: derBytes, format: .der))?.spkiDERBytes()
-            }
-        }
 
         private static func digest(_ data: Data, algorithm: Internals.SPKIHash.KnownAlgorithm) -> Data {
             switch algorithm {

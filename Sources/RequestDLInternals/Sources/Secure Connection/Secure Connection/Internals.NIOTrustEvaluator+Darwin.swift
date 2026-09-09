@@ -18,15 +18,13 @@ import Foundation
 extension Internals.NIOTrustEvaluator {
 
     /// Same shape of validation as `Internals.ServerTrustPolicy.handle(challenge:)`, minus the
-    /// `URLAuthenticationChallenge` wrapping: evaluate against the OS trust store (so Certificate
-    /// Transparency, revocation, and the continuously-updated root set all keep applying exactly as
-    /// they already do for `.urlSession`), then -- when `pins` isn't empty -- check every
-    /// certificate in the chain, leaf and intermediates alike, against the configured pins too. A
-    /// chain-validation failure always rejects, regardless of policy; a pin mismatch only rejects
-    /// under `.strict`, matching `ServerTrustPolicy`'s existing semantics (and AsyncHTTPClient's
-    /// own former SPKI pinning policy) exactly. An empty `pins` means this evaluator exists only
-    /// to feed `trustRootCertificates` into the OS trust store's anchor set (`additionalTrustRoots`
-    /// with no SPKI pinning) -- chain validity is the whole check then, nothing more to enforce.
+    /// `URLAuthenticationChallenge` wrapping -- both now delegate the actual trust-root/SPKI pin
+    /// decision to the shared `Internals.DarwinTrustEvaluation`, and only own what genuinely
+    /// differs between them: this evaluator can't call `SecTrustEvaluate(WithError|AsyncWithError)`
+    /// synchronously the way `ServerTrustPolicy` does on `.urlSession`'s own delegate queue --
+    /// evaluation can perform network I/O (OCSP), and blocking the NIO event loop that invokes
+    /// these closures would stall every other connection sharing it -- so it always dispatches onto
+    /// its own dedicated queue first.
     static func makeDarwinEvaluator(
         pins: [Internals.SPKIHash],
         isStrict: Bool,
@@ -39,39 +37,29 @@ extension Internals.NIOTrustEvaluator {
             }
         }
 
+        let resolvedPins = pins.map { pin in
+            Internals.ResolvedSPKIPin { spkiDERBytes in
+                (try? pin.matchesSPKI(spkiDERBytes)) ?? false
+            }
+        }
+
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: secTrustRoots,
+            pins: resolvedPins,
+            isStrict: isStrict
+        )
+
         // `SecTrustEvaluateAsyncWithError` must be called from -- and calls back on -- the same
-        // queue. This must not run on the NIO event loop thread that invokes these closures: the
-        // evaluation can perform network I/O (OCSP), and blocking the event loop would stall every
-        // other connection sharing it.
+        // queue.
         let queue = DispatchQueue(label: "RequestDL.NIOTrustEvaluator")
 
         @Sendable
-        func matchesAnyPin(chain: [SecCertificate]) -> Bool {
-            let chainSPKIDERBytes: [Data] = chain.compactMap { certificate in
-                let derBytes = [UInt8](SecCertificateCopyData(certificate) as Data)
-                return (try? NIOSSLCertificate(bytes: derBytes, format: .der))?.spkiDERBytes()
-            }
-            return chainSPKIDERBytes.contains { spkiDERBytes in
-                pins.contains { (try? $0.matchesSPKI(spkiDERBytes)) ?? false }
-            }
-        }
-
-        // `pins.isEmpty` means this evaluator was installed for `additionalTrustRoots` alone (see
-        // `resolve(from:)`) -- there's nothing configured to pin against, so chain validity by
-        // itself is the whole check. Without this, `matchesAnyPin` would always be `false` for an
-        // empty pin set and `isStrict` would default to `true`, rejecting every connection
-        // regardless of how trustworthy the chain actually is.
-        @Sendable
-        func passesPinCheck(chain: [SecCertificate]) -> Bool {
-            pins.isEmpty || matchesAnyPin(chain: chain) || !isStrict
-        }
-
-        @Sendable
-        func evaluate(trust: SecTrust, completion: @escaping @Sendable (Bool) -> Void) {
-            if !secTrustRoots.isEmpty {
-                SecTrustSetAnchorCertificates(trust, secTrustRoots as CFArray)
-                SecTrustSetAnchorCertificatesOnly(trust, true)
-            }
+        func evaluate(
+            trust: SecTrust,
+            skipsHostnameVerification: Bool,
+            completion: @escaping @Sendable (Bool) -> Void
+        ) {
+            evaluation.prepare(trust, skipsHostnameVerification: skipsHostnameVerification)
 
             queue.async {
                 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
@@ -80,15 +68,13 @@ extension Internals.NIOTrustEvaluator {
                             completion(false)
                             return
                         }
-                        let chain = (SecTrustCopyCertificateChain(trust) as? [SecCertificate]) ?? []
-                        completion(passesPinCheck(chain: chain))
+                        completion(evaluation.passes(chain: trust))
                     }
                 } else {
                     SecTrustEvaluateAsync(trust, queue) { _, result in
                         switch result {
                         case .proceed, .unspecified:
-                            let chain = (SecTrustCopyCertificateChain(trust) as? [SecCertificate]) ?? []
-                            completion(passesPinCheck(chain: chain))
+                            completion(evaluation.passes(chain: trust))
                         default:
                             completion(false)
                         }
@@ -114,7 +100,10 @@ extension Internals.NIOTrustEvaluator {
                 // A plain X.509 policy, deliberately without a hostname -- hostname/SNI matching
                 // stays NIOSSL's own separate gate (tied purely to `certificateVerification`,
                 // independent of this callback being installed), so this evaluator only needs to
-                // own chain-of-trust validation.
+                // own chain-of-trust validation. Never affected by `skipsHostnameVerification`:
+                // there's no live hostname context on this from-scratch `SecTrust` for
+                // `DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`'s policy swap to
+                // apply to in the first place.
                 let status = SecTrustCreateWithCertificates(
                     secCertificates as CFArray,
                     SecPolicyCreateBasicX509(),
@@ -126,24 +115,12 @@ extension Internals.NIOTrustEvaluator {
                     return
                 }
 
-                evaluate(trust: trust) { verified in
+                evaluate(trust: trust, skipsHostnameVerification: false) { verified in
                     promise.succeed(verified ? .certificateVerified : .failed)
                 }
             },
             tlsCustomVerificationNetworkFramework: { trust, complete in
-                // Network.framework already attaches its own SNI-aware policy to this `SecTrust`
-                // before handing it here -- left untouched by default, so hostname validation
-                // keeps applying exactly as it would without this callback installed. Only when
-                // `.noHostnameVerification` was actually configured is that policy swapped out for
-                // a plain X.509 one (chain-of-trust only, no hostname), mirroring what the
-                // NIOSSL-facing closure above already builds from scratch -- there's no other way
-                // to get Network.framework to skip hostname matching, since (unlike NIOSSL) it has
-                // no separate knob for that: this custom callback is the only lever, and it either
-                // keeps or replaces the whole policy wholesale, chain validation included.
-                if skipsHostnameVerification {
-                    SecTrustSetPolicies(trust, SecPolicyCreateBasicX509())
-                }
-                evaluate(trust: trust, completion: complete)
+                evaluate(trust: trust, skipsHostnameVerification: skipsHostnameVerification, completion: complete)
             }
         )
     }

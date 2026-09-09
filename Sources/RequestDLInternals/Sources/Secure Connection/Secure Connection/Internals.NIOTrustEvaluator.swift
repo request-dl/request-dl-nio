@@ -31,10 +31,11 @@ extension Internals {
     /// native way to see `additionalTrustRoots` at all, and no simple flag to skip hostname
     /// matching the way NIOSSL's `certificateVerification` does (see `Internals.SecureConnection`'s
     /// own doc comment on `isCompatibleWithNetworkFramework`) -- both gaps only close through this
-    /// evaluator's `tlsCustomVerificationNetworkFramework`. `evaluate(trust:completion:)`
-    /// (`+Darwin.swift`) treats an empty pin set as "nothing to pin," passing on chain validity
-    /// alone rather than failing closed the way it would for a genuine, configured-but-unmatched
-    /// pin; `makeDarwinEvaluator`'s `skipsHostnameVerification` separately controls whether the
+    /// evaluator's `tlsCustomVerificationNetworkFramework`. The actual accept/reject decision is
+    /// `Internals.DarwinTrustEvaluation`'s, shared with `Internals.ServerTrustPolicy`
+    /// (`.urlSession`) rather than reimplemented here: an empty pin set means "nothing to pin,"
+    /// passing on chain validity alone rather than failing closed the way it would for a genuine,
+    /// configured-but-unmatched pin; `skipsHostnameVerification` separately controls whether the
     /// chain check itself considers the hostname at all.
     package struct NIOTrustEvaluator: Sendable {
 
