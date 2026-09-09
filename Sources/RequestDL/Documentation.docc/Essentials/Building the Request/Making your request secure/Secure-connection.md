@@ -180,3 +180,8 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 - ``RequestDL/CertificateVerification``
 - ``RequestDL/SignatureAlgorithm``
 - ``RequestDL/RenegotiationSupport``
+- ``RequestDL/RevocationPolicy``
+
+### Trust decision observability
+- ``RequestDL/TrustDecisionObserver``
+- ``RequestDL/TrustDecision``
