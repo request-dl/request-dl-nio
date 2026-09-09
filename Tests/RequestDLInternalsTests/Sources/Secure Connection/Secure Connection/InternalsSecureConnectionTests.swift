@@ -558,4 +558,35 @@ extension InternalsSecureConnectionTests {
         // Then
         #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.keyLogger))
     }
+
+    /// Regression coverage: `build()` used to call `makeLocalIdentityForNetworkFramework()` -- a
+    /// Keychain round-trip -- unconditionally on Darwin whenever both `certificateChain`/
+    /// `privateKey` were configured, even for a caller that was never going to run over
+    /// Network.framework at all. That meant configuring mTLS for `.urlSession`/
+    /// `.nioTransportServices` silently broke a `.nio`-pinned request too, on any process without
+    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness) -- see
+    /// `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)` specifically
+    /// to avoid this and used to hit it anyway.
+    @Test
+    func secureConnection_whenMTLSConfiguredButNetworkFrameworkNotNeeded_skipsKeychainIdentityBuild() async throws {
+        // Given
+        let client = Certificates().client()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+
+        // When
+        let sut = try secureConnection.build(isCompatibleWithNetworkFramework: false)
+
+        // Then -- completes without ever attempting the Keychain round-trip, even on a machine
+        // with no Keychain Sharing entitlement at all. `tlsConfiguration.certificateChain` still
+        // carries the mTLS cert, proving `build()` did real work rather than short-circuiting.
+        #expect(!sut.tlsConfiguration.certificateChain.isEmpty)
+        #if canImport(Darwin)
+        #expect(sut.localIdentityHandle == nil)
+        #endif
+    }
 }

@@ -79,8 +79,17 @@ extension Internals.Session {
 
         // MARK: - Internal methods
 
-        package func build() throws -> Output {
-            let secureConnectionOutput = try secureConnection?.build()
+        /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
+        /// actually run over Network.framework (`.nioTransportServices`) -- forwarded to
+        /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
+        /// worth paying for the mTLS identity's Keychain round-trip at all. Defaults to `true` so
+        /// every caller that doesn't yet know which executor won (every test call site, plus any
+        /// future caller) keeps the original always-build behavior; `Internals.ClientManager` is
+        /// the one caller that does know, and passes its actual answer.
+        package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
+            let secureConnectionOutput = try secureConnection?.build(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
 
             var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,

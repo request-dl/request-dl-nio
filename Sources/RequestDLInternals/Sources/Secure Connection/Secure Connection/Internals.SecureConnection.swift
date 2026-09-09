@@ -117,7 +117,15 @@ extension Internals {
             return reasons
         }
 
-        package func build() throws -> Output {
+        /// - Parameter isCompatibleWithNetworkFramework: Whether the caller is actually going to
+        /// run this over Network.framework. When `false`, skips `makeLocalIdentityForNetworkFramework()`
+        /// entirely rather than performing its Keychain round-trip only to hand back a handle
+        /// nothing will use -- e.g. a `.nio` (plain-socket) client has no use for a Network.framework
+        /// identity, and shouldn't need Keychain Sharing entitlement (or a working Keychain at
+        /// all) just because `certificateChain`/`privateKey` happen to be configured for some
+        /// other executor's mTLS. Defaults to `true`, matching this method's original unconditional
+        /// behavior, for callers that don't know or don't care which executor will consume this.
+        package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
             var tlsConfiguration = try makeTLSConfigurationByContext()
 
             if let minimumTLSVersion {
@@ -195,11 +203,11 @@ extension Internals {
             let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
 
             #if canImport(Darwin)
-            return try .init(
+            return .init(
                 tlsConfiguration: tlsConfiguration,
                 tlsCustomVerification: trustEvaluator?.tlsCustomVerification,
                 tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
-                localIdentityHandle: try makeLocalIdentityForNetworkFramework()
+                localIdentityHandle: isCompatibleWithNetworkFramework ? try makeLocalIdentityForNetworkFramework() : nil
             )
             #else
             return .init(
