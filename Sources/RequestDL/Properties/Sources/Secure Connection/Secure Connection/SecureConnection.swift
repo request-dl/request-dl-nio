@@ -166,6 +166,14 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the key log object for the secure connection.
     ///
+    /// - Important: Reachable under ``Session/Executor/nio`` only -- this is a **permanent**
+    /// limitation of the underlying platforms, not a gap awaiting a fix. Neither Network.framework
+    /// nor `URLSession` exposes any public API for observing per-session TLS secrets, so
+    /// ``Session/requiredExecutor(_:)``/``Session/preferredExecutor(_:)`` steer a session with a
+    /// key logger configured away from both ``Session/Executor/nioTransportServices`` and
+    /// ``Session/Executor/urlSession`` -- letting that combination reach the OS layer at all would
+    /// crash the process outright under Network.framework.
+    ///
     /// - Parameter keyLogger: The `SSLKeyLogger` object.
     /// - Returns: A modified `SecureConnection` with the key logger set.
     public func keyLogger(_ keyLogger: SSLKeyLogger) -> Self {
