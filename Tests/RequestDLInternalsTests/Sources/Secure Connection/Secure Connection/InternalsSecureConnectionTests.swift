@@ -592,4 +592,37 @@ extension InternalsSecureConnectionTests {
         #expect(sut.localIdentityHandle == nil)
         #endif
     }
+
+    /// Regression coverage for a crash: `TLSConfiguration.getNWProtocolTLSOptions()`
+    /// (AsyncHTTPClient's NIOTransportServices bridge) `preconditionFailure`s the instant
+    /// `certificateChain`/`privateKey` is non-empty, unconditionally -- so leaving either set,
+    /// even alongside a correctly-built `localIdentityHandle`, would crash the process the moment
+    /// this configuration actually ran over `.nioTransportServices`. `build()` bundles that
+    /// `TLSConfiguration` and the Network.framework identity into one throwing call, so this can't
+    /// inspect the former without the latter's Keychain round-trip also succeeding -- a known gap
+    /// on this bare SwiftPM test harness (see `InternalsClientIdentityDescriptorTests`) unrelated
+    /// to what's actually being checked here, hence the `withKnownIssue` wrapper.
+    @Test
+    func secureConnection_whenMTLSConfiguredAndNetworkFrameworkNeeded_omitsRawCertificateChainFromTLSConfiguration()
+        async throws
+    {
+        // Given
+        let client = Certificates().client()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+
+        // When / Then
+        await withKnownIssue(
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform -- see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+        ) {
+            let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
+
+            #expect(sut.tlsConfiguration.certificateChain.isEmpty)
+            #expect(sut.tlsConfiguration.privateKey == nil)
+        }
+    }
 }

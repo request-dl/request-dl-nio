@@ -117,15 +117,30 @@ extension Internals {
         }
 
         /// - Parameter isCompatibleWithNetworkFramework: Whether the caller is actually going to
-        /// run this over Network.framework. When `false`, skips `makeLocalIdentityForNetworkFramework()`
-        /// entirely rather than performing its Keychain round-trip only to hand back a handle
-        /// nothing will use -- e.g. a `.nio` (plain-socket) client has no use for a Network.framework
-        /// identity, and shouldn't need Keychain Sharing entitlement (or a working Keychain at
-        /// all) just because `certificateChain`/`privateKey` happen to be configured for some
-        /// other executor's mTLS. Defaults to `true`, matching this method's original unconditional
-        /// behavior, for callers that don't know or don't care which executor will consume this.
+        /// run this over Network.framework. Cuts both ways:
+        ///
+        ///   - When `false`, skips `makeLocalIdentityForNetworkFramework()` entirely rather than
+        ///     performing its Keychain round-trip only to hand back a handle nothing will use --
+        ///     e.g. a `.nio` (plain-socket) client has no use for a Network.framework identity, and
+        ///     shouldn't need Keychain Sharing entitlement (or a working Keychain at all) just
+        ///     because `certificateChain`/`privateKey` happen to be configured for some other
+        ///     executor's mTLS.
+        ///   - When `true`, `makeTLSConfigurationByContext()` below leaves `certificateChain`/
+        ///     `privateKey` off the returned `TLSConfiguration` entirely -- mTLS travels through
+        ///     `tlsLocalIdentityNetworkFramework`/`localIdentityHandle` for Network.framework
+        ///     instead, and leaving both set on the same `TLSConfiguration` this build also hands
+        ///     to `HTTPClient.Configuration` is fatal, not just redundant: AsyncHTTPClient's
+        ///     NIOTransportServices bridge (`TLSConfiguration.getNWProtocolTLSOptions()`)
+        ///     `preconditionFailure`s the instant either is non-empty, unconditionally, regardless
+        ///     of whether a local identity was also supplied.
+        ///
+        /// Defaults to `true`, matching this method's original unconditional behavior for the
+        /// identity-building half, for callers that don't know or don't care which executor will
+        /// consume this.
         package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
-            var tlsConfiguration = try makeTLSConfigurationByContext()
+            var tlsConfiguration = try makeTLSConfigurationByContext(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
 
             if let minimumTLSVersion {
                 tlsConfiguration.minimumTLSVersion = minimumTLSVersion
@@ -225,17 +240,27 @@ extension Internals {
 
         // MARK: - Private methods
 
-        private func makeTLSConfigurationByContext() throws -> NIOSSL.TLSConfiguration {
+        /// - Parameter isCompatibleWithNetworkFramework: See `build(isCompatibleWithNetworkFramework:)`'s
+        /// own doc comment -- when `true`, `certificateChain`/`privateKey` are deliberately left off
+        /// the returned `TLSConfiguration`. mTLS still travels through
+        /// `tlsLocalIdentityNetworkFramework`/`localIdentityHandle` (`makeLocalIdentityForNetworkFramework()`)
+        /// for Network.framework; setting these two *as well*, on the same `TLSConfiguration`
+        /// AsyncHTTPClient's NIOTransportServices bridge also reads, would crash there outright.
+        private func makeTLSConfigurationByContext(
+            isCompatibleWithNetworkFramework: Bool
+        ) throws -> NIOSSL.TLSConfiguration {
             var tlsConfiguration: TLSConfiguration
 
             tlsConfiguration = .makeClientConfiguration()
 
-            if let certificateChain {
-                tlsConfiguration.certificateChain = try certificateChain.build()
-            }
+            if !isCompatibleWithNetworkFramework {
+                if let certificateChain {
+                    tlsConfiguration.certificateChain = try certificateChain.build()
+                }
 
-            if let privateKey {
-                tlsConfiguration.privateKey = try privateKey.build()
+                if let privateKey {
+                    tlsConfiguration.privateKey = try privateKey.build()
+                }
             }
 
             return tlsConfiguration

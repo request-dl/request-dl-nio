@@ -383,10 +383,40 @@ extension Internals.Session.Configuration {
 
 #if canImport(Darwin)
 
+import NIOSSL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
+#endif
+
+#if canImport(Network)
+import Network
+#endif
+
+#if canImport(Network)
+extension NIOSSL.TLSVersion {
+
+    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion`'s type -- present unconditionally on every platform
+    /// this package targets (iOS 13/macOS 10.15, both below this package's own deployment
+    /// floor), so there's no availability branch to take here the way AsyncHTTPClient's own
+    /// NIOTransportServices bridge still needs for its pre-iOS-13 `SSLProtocol` fallback.
+    ///
+    /// - Note: `.TLSv10`/`.TLSv11` are deprecated (macOS 12+) but not unavailable -- mirrored
+    /// here anyway, deliberately: a caller who explicitly asked NIOSSL for TLS 1.0/1.1 (interop
+    /// with a legacy server, say) gets the same answer under `.urlSession`, not a silent upgrade
+    /// to whatever Apple currently recommends instead.
+    var urlSessionProtocolVersion: tls_protocol_version_t {
+        switch self {
+        case .tlsv1: return .TLSv10
+        case .tlsv11: return .TLSv11
+        case .tlsv12: return .TLSv12
+        case .tlsv13: return .TLSv13
+        }
+    }
+}
 #endif
 
 extension Internals.Session.Configuration {
@@ -399,12 +429,15 @@ extension Internals.Session.Configuration {
     /// `Internals.ClientManager` pools and later shuts down. Cookies are additionally disabled
     /// unconditionally in `Internals.URLSessionClient.init` itself regardless of what this builds.
     ///
-    /// Only `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has
-    /// no distinct connect-phase timeout to receive `timeout.connect`. Every other field this
-    /// configuration could carry that has no `URLSessionConfiguration` counterpart
-    /// (`connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is
-    /// either NIO/NIOTS-specific with nothing to translate to, or -- for the fields that matter,
-    /// like `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
+    /// `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has no
+    /// distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
+    /// `minimumTLSVersion`/`maximumTLSVersion` map onto `tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion` -- the one other `SecureConnection` field with a
+    /// direct `URLSessionConfiguration` counterpart. Every other field this configuration could
+    /// carry that has no `URLSessionConfiguration` counterpart (`connectionPool`,
+    /// `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific
+    /// with nothing to translate to, or -- for the fields that matter, like
+    /// `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
     /// `decompression == .disabled` -- already excluded from resolving to `.urlSession` at all by
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
@@ -435,6 +468,16 @@ extension Internals.Session.Configuration {
         if let read = timeout.read {
             configuration.timeoutIntervalForRequest = TimeInterval(read) / 1_000_000_000
         }
+
+        #if canImport(Network)
+        if let minimumTLSVersion = secureConnection?.minimumTLSVersion {
+            configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.urlSessionProtocolVersion
+        }
+
+        if let maximumTLSVersion = secureConnection?.maximumTLSVersion {
+            configuration.tlsMaximumSupportedProtocolVersion = maximumTLSVersion.urlSessionProtocolVersion
+        }
+        #endif
 
         return configuration
     }

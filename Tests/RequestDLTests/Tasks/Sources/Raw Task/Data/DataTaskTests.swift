@@ -182,6 +182,72 @@ struct DataTaskTests {
         #expect(result.response == output)
     }
 
+    /// Regression coverage for the crash `Internals.SecureConnection.build(isCompatibleWithNetworkFramework:)`
+    /// fixed: `certificateChain`/`privateKey` used to always land on the same `TLSConfiguration`
+    /// AsyncHTTPClient's NIOTransportServices bridge also reads, which `preconditionFailure`s the
+    /// instant either is non-empty -- regardless of the Network.framework-native identity also
+    /// being supplied correctly via `tlsLocalIdentityNetworkFramework`. Reachable in practice via
+    /// `enableNetworkFramework(true)`/`preferredExecutor(.nioTransportServices)`/this test's own
+    /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured -- nothing in
+    /// `networkFrameworkIncompatibilityReasons()` ever stood in the way, since mTLS is genuinely
+    /// supported there, just through a different channel.
+    ///
+    /// Wrapped in the same unconditional `withKnownIssue` as `dataTask_whenCAEnabled` above (no
+    /// Keychain Sharing entitlement on this SwiftPM test harness): what this specifically proves,
+    /// independent of whether the Keychain round-trip itself succeeds here, is that reaching this
+    /// codepath no longer crashes the process.
+    @Test
+    func dataTask_whenCAEnabledUnderNIOTransportServices() async throws {
+        // Given
+        let server = Certificates().server()
+        let client = Certificates().client()
+
+        let uri = "/" + UUID().uuidString
+
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8896,
+                option: .client(client)
+            )
+        )
+
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: output
+        )
+
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        // When / Then
+        await withKnownIssue(
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform -- see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+        ) {
+            let data = try await DataTask {
+                BaseURL(localServer.baseURL)
+                Path(uri)
+
+                Session.localServer
+                    .requiredExecutor(.nioTransportServices)
+
+                SecureConnection {
+                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                }
+                .verification(.fullVerification)
+            }
+            .extractPayload()
+            .result()
+
+            let result = try HTTPResult<String>(data)
+            #expect(result.response == output)
+        }
+    }
+
     /// Regression coverage for the gap `Internals.NIOTrustEvaluator` closed: `additionalTrustRoots`
     /// alone, with no SPKI pinning, used to be silently ignored under Network.framework --
     /// `localServer`'s certificate is signed by a private test CA the system default trust store

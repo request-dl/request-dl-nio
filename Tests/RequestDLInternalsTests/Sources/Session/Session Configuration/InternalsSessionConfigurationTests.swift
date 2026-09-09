@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import Crypto
 import NIOCore
+import NIOSSL
 import Testing
 import Tracing
 
@@ -15,6 +16,17 @@ import Tracing
 import FoundationEssentials
 #else
 import struct Foundation.UUID
+#endif
+
+#if canImport(Network)
+import Network
+#endif
+
+#if canImport(Darwin)
+// `URLSessionConfiguration` isn't part of the narrow `import struct Foundation.UUID` this file
+// otherwise gets by with -- needed only by the Darwin-gated `buildURLSessionConfiguration()`
+// tests below.
+import Foundation
 #endif
 
 struct InternalsSessionConfigurationTests {
@@ -450,6 +462,52 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.httpVersion == .automatic)
         #expect(!builtConfiguration.enableMultipath)
     }
+
+    #if canImport(Darwin)
+    /// Regression coverage: `minimumTLSVersion`/`maximumTLSVersion` used to be silently dropped
+    /// under `.urlSession` -- no `URLSessionConfiguration` counterpart was ever set, despite both
+    /// being genuinely reachable via `tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion` (public API since iOS 13/macOS 10.15, both already
+    /// below this package's own deployment floor).
+    @Test
+    func configuration_whenSecureConnectionSetsTLSVersionRange_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.minimumTLSVersion = .tlsv12
+        secureConnection.maximumTLSVersion = .tlsv13
+        configuration.secureConnection = secureConnection
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.tlsMinimumSupportedProtocolVersion == .TLSv12)
+        #expect(urlSessionConfiguration.tlsMaximumSupportedProtocolVersion == .TLSv13)
+    }
+
+    @Test
+    func configuration_whenSecureConnectionOmitsTLSVersionRange_urlSessionConfigurationKeepsSystemDefault()
+        async throws
+    {
+        // Given -- absence must stay absence, not get forced to some RequestDL-chosen floor
+        let configuration = Internals.Session.Configuration()
+        let defaultConfiguration = URLSessionConfiguration.ephemeral
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(
+            urlSessionConfiguration.tlsMinimumSupportedProtocolVersion
+                == defaultConfiguration.tlsMinimumSupportedProtocolVersion
+        )
+        #expect(
+            urlSessionConfiguration.tlsMaximumSupportedProtocolVersion
+                == defaultConfiguration.tlsMaximumSupportedProtocolVersion
+        )
+    }
+    #endif
 }
 
 private struct RecordingTracer: Tracer, Sendable {
