@@ -431,7 +431,7 @@ extension InternalsSecureConnectionTests {
     }
 
     /// mTLS (`certificateChain`/`privateKey`), SPKI pinning (`tlsPins`), `additionalTrustRoots`,
-    /// and `.noHostnameVerification` all reach Network.framework now: mTLS through
+    /// and `.noHostnameVerification` all reach Network.framework: mTLS through
     /// `tlsLocalIdentityNetworkFramework`, and the other three through
     /// `Internals.NIOTrustEvaluator` installing `tlsCustomVerificationNetworkFramework` on its own,
     /// independently of whether SPKI pinning is also configured -- `skipsHostnameVerification`
