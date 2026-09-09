@@ -164,13 +164,15 @@ extension Internals {
             spkiPins: [Internals.ResolvedSPKIPin],
             spkiPinningIsStrict: Bool,
             spkiPinningDescriptor: Descriptor.SPKIPinning?,
-            revocationPolicy: Internals.RevocationPolicy?
+            revocationPolicy: Internals.RevocationPolicy?,
+            observer: (any TrustDecisionObserver)?
         ) {
             self.evaluation = Internals.DarwinTrustEvaluation(
                 trustRootCertificates: trustedRootCertificates,
                 pins: spkiPins,
                 isStrict: spkiPinningIsStrict,
-                revocationPolicy: revocationPolicy
+                revocationPolicy: revocationPolicy,
+                observer: observer
             )
             self.certificateVerification = certificateVerification
             self.spkiPinningDescriptor = spkiPinningDescriptor
@@ -182,6 +184,9 @@ extension Internals {
         /// else), so this is not expected to happen in practice, and failing the whole challenge
         /// over one bad anchor would be a worse outcome than trusting one fewer root than
         /// intended.
+        ///
+        /// - Note: Never carries a ``TrustDecisionObserver`` -- `Descriptor` is `Codable`-only, and
+        /// an observer is a live object reference with nothing left to reference after a relaunch.
         package convenience init(descriptor: Descriptor) {
             self.init(
                 trustedRootCertificates: descriptor.trustedRootCertificatesDER.compactMap {
@@ -195,7 +200,8 @@ extension Internals {
                 },
                 spkiPinningIsStrict: descriptor.spkiPinning?.policy == .strict,
                 spkiPinningDescriptor: descriptor.spkiPinning,
-                revocationPolicy: descriptor.revocationPolicy?.value
+                revocationPolicy: descriptor.revocationPolicy?.value,
+                observer: nil
             )
         }
 
@@ -287,7 +293,8 @@ extension Internals {
                 spkiPins: spkiPins,
                 spkiPinningIsStrict: isStrict,
                 spkiPinningDescriptor: spkiPinningDescriptor,
-                revocationPolicy: secureConnection.revocationPolicy
+                revocationPolicy: secureConnection.revocationPolicy,
+                observer: secureConnection.trustDecisionObserver
             )
         }
 
@@ -322,16 +329,11 @@ extension Internals {
             var evaluationError: CFError?
             let isTrusted = SecTrustEvaluateWithError(serverTrust, &evaluationError)
 
-            guard isTrusted else {
-                completionHandler(.cancelAuthenticationChallenge, nil)
-                return
-            }
-
             // `.audit` behaves exactly like AsyncHTTPClient's own former SPKI pinning policy: a
             // mismatch (or a leaf the SPKI bytes couldn't even be extracted from) is still
             // accepted, on the assumption this is a deliberate debugging/migration window rather
             // than production traffic.
-            if evaluation.passes(chain: serverTrust) {
+            if evaluation.evaluate(chain: serverTrust, chainIsTrusted: isTrusted) {
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
             } else {
                 completionHandler(.cancelAuthenticationChallenge, nil)

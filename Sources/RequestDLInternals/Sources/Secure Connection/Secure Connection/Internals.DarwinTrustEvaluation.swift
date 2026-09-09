@@ -40,8 +40,8 @@ extension Internals {
 
     /// Shared, `SecTrust`-based trust-root + SPKI pin logic. `prepare(_:skipsHostnameVerification:)`
     /// must run before the caller's own `SecTrustEvaluate(WithError|AsyncWithError)` call;
-    /// `passes(chain:)` is the accept/reject decision once that call already reported the chain
-    /// itself as trusted.
+    /// `evaluate(chain:chainIsTrusted:)` is the accept/reject decision, folding in that call's own
+    /// chain-validity result.
     package struct DarwinTrustEvaluation: Sendable {
 
         // MARK: - Internal properties
@@ -50,6 +50,7 @@ extension Internals {
         package let pins: [ResolvedSPKIPin]
         package let isStrict: Bool
         package let revocationPolicy: Internals.RevocationPolicy?
+        package let observer: (any TrustDecisionObserver)?
 
         // MARK: - Inits
 
@@ -57,12 +58,14 @@ extension Internals {
             trustRootCertificates: [SecCertificate],
             pins: [ResolvedSPKIPin],
             isStrict: Bool,
-            revocationPolicy: Internals.RevocationPolicy? = nil
+            revocationPolicy: Internals.RevocationPolicy? = nil,
+            observer: (any TrustDecisionObserver)? = nil
         ) {
             self.trustRootCertificates = trustRootCertificates
             self.pins = pins
             self.isStrict = isStrict
             self.revocationPolicy = revocationPolicy
+            self.observer = observer
         }
 
         // MARK: - Internal methods
@@ -113,14 +116,23 @@ extension Internals {
             }
         }
 
+        /// The accept/reject decision, given `chainIsTrusted` -- the caller's own
+        /// `SecTrustEvaluate(WithError|AsyncWithError)` result for `trust`. Notifies `observer`,
+        /// when configured, with the outcome either way, before returning it.
+        ///
         /// `pins.isEmpty` means nothing is configured to pin against -- chain validity by itself
-        /// (already confirmed by the caller's own `SecTrustEvaluate...` call before this runs) is
-        /// the whole check then. Otherwise every certificate in `trust`'s chain is checked, leaf
+        /// is the whole check then. Otherwise every certificate in `trust`'s chain is checked, leaf
         /// and intermediates alike -- OWASP's recommended backup-pin practice, pinning an
         /// intermediate CA (which rotates far less often than the leaf) alongside or instead of it
         /// -- and a mismatch only rejects under `isStrict`.
-        package func passes(chain trust: SecTrust) -> Bool {
+        package func evaluate(chain trust: SecTrust, chainIsTrusted: Bool) -> Bool {
+            guard chainIsTrusted else {
+                observer?(TrustDecision(isTrusted: false, pinsMatched: nil))
+                return false
+            }
+
             guard !pins.isEmpty else {
+                observer?(TrustDecision(isTrusted: true, pinsMatched: nil))
                 return true
             }
 
@@ -128,7 +140,9 @@ extension Internals {
                 pins.contains { $0.matches(spkiDERBytes) }
             }
 
-            return matched || !isStrict
+            let accepted = matched || !isStrict
+            observer?(TrustDecision(isTrusted: accepted, pinsMatched: matched))
+            return accepted
         }
 
         // MARK: - Private methods

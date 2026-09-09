@@ -26,7 +26,8 @@ extension Internals.NIOTrustEvaluator {
     static func makePortableEvaluator(
         pins: [Internals.SPKIHash],
         isStrict: Bool,
-        trustRootCertificates: [NIOSSLCertificate]
+        trustRootCertificates: [NIOSSLCertificate],
+        observer: (any TrustDecisionObserver)?
     ) throws -> Internals.NIOTrustEvaluator {
         // A `let`, fully resolved before the closure below captures it -- a `var` captured across
         // both this `@Sendable` closure and the `Task` nested inside it doesn't satisfy Swift 6
@@ -88,11 +89,14 @@ extension Internals.NIOTrustEvaluator {
                             let spkiDERBytes = Data(serializer.serializedBytes)
                             return pins.contains { (try? $0.matchesSPKI(spkiDERBytes)) ?? false }
                         }
-                        promise.succeed((matched || !isStrict) ? .certificateVerified : .failed)
+                        let accepted = matched || !isStrict
+                        observer?(TrustDecision(isTrusted: accepted, pinsMatched: matched))
+                        promise.succeed(accepted ? .certificateVerified : .failed)
 
                     case .couldNotValidate:
                         // The chain itself doesn't validate -- always rejects, `.audit` only ever
                         // relaxes a pin mismatch, never a broken chain.
+                        observer?(TrustDecision(isTrusted: false, pinsMatched: nil))
                         promise.succeed(.failed)
                     }
                 }

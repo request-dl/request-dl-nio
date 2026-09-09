@@ -243,6 +243,18 @@ public struct SecureConnection<Content: Property>: Property {
         edit { $0.secureConnection.revocationPolicy = policy.build() }
     }
 
+    /// Sets an observer that's notified of each TLS trust-evaluation decision this secure
+    /// connection makes -- for observability or security-audit logging, purely informational.
+    ///
+    /// - Important: See ``TrustDecisionObserver``'s own doc comment for exactly when this fires
+    /// under each executor -- it's not every connection.
+    ///
+    /// - Parameter observer: The observer to notify of each trust decision.
+    /// - Returns: A modified `SecureConnection` with the trust decision observer set.
+    public func trustDecisionObserver(_ observer: TrustDecisionObserver) -> Self {
+        edit { $0.secureConnection.trustDecisionObserver = observer }
+    }
+
     /// Sets the application protocols for the secure connection.
     ///
     /// - Parameter protocols: The application protocols to use.

@@ -30,7 +30,8 @@ extension Internals.NIOTrustEvaluator {
         isStrict: Bool,
         trustRootCertificates: [NIOSSLCertificate],
         skipsHostnameVerification: Bool,
-        revocationPolicy: Internals.RevocationPolicy?
+        revocationPolicy: Internals.RevocationPolicy?,
+        observer: (any TrustDecisionObserver)?
     ) throws -> Internals.NIOTrustEvaluator {
         let secTrustRoots: [SecCertificate] = trustRootCertificates.compactMap { certificate in
             (try? certificate.toDERBytes()).flatMap {
@@ -48,7 +49,8 @@ extension Internals.NIOTrustEvaluator {
             trustRootCertificates: secTrustRoots,
             pins: resolvedPins,
             isStrict: isStrict,
-            revocationPolicy: revocationPolicy
+            revocationPolicy: revocationPolicy,
+            observer: observer
         )
 
         // `SecTrustEvaluateAsyncWithError` must be called from -- and calls back on -- the same
@@ -66,19 +68,15 @@ extension Internals.NIOTrustEvaluator {
             queue.async {
                 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
                     SecTrustEvaluateAsyncWithError(trust, queue) { _, isTrusted, _ in
-                        guard isTrusted else {
-                            completion(false)
-                            return
-                        }
-                        completion(evaluation.passes(chain: trust))
+                        completion(evaluation.evaluate(chain: trust, chainIsTrusted: isTrusted))
                     }
                 } else {
                     SecTrustEvaluateAsync(trust, queue) { _, result in
                         switch result {
                         case .proceed, .unspecified:
-                            completion(evaluation.passes(chain: trust))
+                            completion(evaluation.evaluate(chain: trust, chainIsTrusted: true))
                         default:
-                            completion(false)
+                            completion(evaluation.evaluate(chain: trust, chainIsTrusted: false))
                         }
                     }
                 }

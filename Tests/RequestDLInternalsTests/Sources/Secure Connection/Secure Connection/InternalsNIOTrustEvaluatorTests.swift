@@ -45,6 +45,21 @@ struct InternalsNIOTrustEvaluatorTests {
         // Then
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
     }
+
+    private final class NoOpTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
+        func callAsFunction(_ decision: TrustDecision) {}
+    }
+
+    @Test
+    func resolve_whenOnlyObserverConfigured_installsEvaluator() throws {
+        // Given -- the observer alone is a reason to install custom verification on Darwin, even
+        // with every other trigger left at its default.
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustDecisionObserver = NoOpTrustDecisionObserver()
+
+        // Then
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
     #endif
 
     @Test

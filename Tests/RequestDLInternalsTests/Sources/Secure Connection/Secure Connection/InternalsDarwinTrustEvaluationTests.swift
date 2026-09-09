@@ -17,7 +17,7 @@ import struct Foundation.Data
 struct InternalsDarwinTrustEvaluationTests {
 
     @Test
-    func passes_whenNoPinsConfigured_isAlwaysTrue() throws {
+    func evaluate_whenNoPinsConfigured_isAlwaysTrue() throws {
         // Given -- nothing to pin against, so chain validity (already confirmed by the caller's
         // own SecTrustEvaluate... call before this runs) is the whole check.
         let evaluation = Internals.DarwinTrustEvaluation(trustRootCertificates: [], pins: [], isStrict: true)
@@ -31,11 +31,29 @@ struct InternalsDarwinTrustEvaluationTests {
         let sut = try #require(status == errSecSuccess ? trust : nil)
 
         // When / Then
-        #expect(evaluation.passes(chain: sut))
+        #expect(evaluation.evaluate(chain: sut, chainIsTrusted: true))
     }
 
     @Test
-    func passes_whenPinMismatchUnderStrictPolicy_isFalse() throws {
+    func evaluate_whenChainNotTrusted_isFalseRegardlessOfPins() throws {
+        // Given -- the caller's own `SecTrustEvaluate...` already rejected the chain; no pin
+        // configuration should be able to override that.
+        let evaluation = Internals.DarwinTrustEvaluation(trustRootCertificates: [], pins: [], isStrict: false)
+
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(
+            try Self.selfSignedCertificate(Certificates(.der).server()) as CFArray,
+            SecPolicyCreateBasicX509(),
+            &trust
+        )
+        let sut = try #require(status == errSecSuccess ? trust : nil)
+
+        // When / Then
+        #expect(!evaluation.evaluate(chain: sut, chainIsTrusted: false))
+    }
+
+    @Test
+    func evaluate_whenPinMismatchUnderStrictPolicy_isFalse() throws {
         // Given
         let unrelatedPin = Internals.ResolvedSPKIPin { _ in false }
         let evaluation = Internals.DarwinTrustEvaluation(
@@ -53,11 +71,11 @@ struct InternalsDarwinTrustEvaluationTests {
         let sut = try #require(status == errSecSuccess ? trust : nil)
 
         // When / Then
-        #expect(!evaluation.passes(chain: sut))
+        #expect(!evaluation.evaluate(chain: sut, chainIsTrusted: true))
     }
 
     @Test
-    func passes_whenPinMismatchUnderAuditPolicy_isTrue() throws {
+    func evaluate_whenPinMismatchUnderAuditPolicy_isTrue() throws {
         // Given -- `.audit` only ever relaxes a pin mismatch, matching `ServerTrustPolicy`'s own
         // longstanding semantics.
         let unrelatedPin = Internals.ResolvedSPKIPin { _ in false }
@@ -76,7 +94,63 @@ struct InternalsDarwinTrustEvaluationTests {
         let sut = try #require(status == errSecSuccess ? trust : nil)
 
         // When / Then
-        #expect(evaluation.passes(chain: sut))
+        #expect(evaluation.evaluate(chain: sut, chainIsTrusted: true))
+    }
+
+    @Test
+    func evaluate_notifiesObserverWithTheSameOutcomeAndPinMatchState() throws {
+        // Given -- the observer must see exactly the accept/reject decision (and pin-match state)
+        // `evaluate(chain:chainIsTrusted:)` itself returns, not some separately recomputed value.
+        let unrelatedPin = Internals.ResolvedSPKIPin { _ in false }
+        let observer = RecordingTrustDecisionObserver()
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: [],
+            pins: [unrelatedPin],
+            isStrict: true,
+            observer: observer
+        )
+
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(
+            try Self.selfSignedCertificate(Certificates(.der).server()) as CFArray,
+            SecPolicyCreateBasicX509(),
+            &trust
+        )
+        let sut = try #require(status == errSecSuccess ? trust : nil)
+
+        // When
+        let accepted = evaluation.evaluate(chain: sut, chainIsTrusted: true)
+
+        // Then
+        #expect(observer.decisions.count == 1)
+        #expect(observer.decisions.first?.isTrusted == accepted)
+        #expect(observer.decisions.first?.pinsMatched == false)
+    }
+
+    @Test
+    func evaluate_whenChainNotTrusted_notifiesObserverWithNilPinsMatched() throws {
+        // Given -- a broken chain never gets far enough to consult pins at all.
+        let observer = RecordingTrustDecisionObserver()
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: [],
+            pins: [Internals.ResolvedSPKIPin { _ in true }],
+            isStrict: true,
+            observer: observer
+        )
+
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(
+            try Self.selfSignedCertificate(Certificates(.der).server()) as CFArray,
+            SecPolicyCreateBasicX509(),
+            &trust
+        )
+        let sut = try #require(status == errSecSuccess ? trust : nil)
+
+        // When
+        _ = evaluation.evaluate(chain: sut, chainIsTrusted: false)
+
+        // Then
+        #expect(observer.decisions == [TrustDecision(isTrusted: false, pinsMatched: nil)])
     }
 
     /// Regression coverage for the correctness fix folded into the `NIOTrustEvaluator`/
@@ -156,5 +230,16 @@ struct InternalsDarwinTrustEvaluationTests {
     private static func selfSignedCertificate(_ resource: CertificateResource) throws -> [SecCertificate] {
         let der = try Data(contentsOf: resource.certificateURL)
         return [try #require(SecCertificateCreateWithData(nil, der as CFData))]
+    }
+}
+
+/// A test double recording every ``TrustDecision`` it's notified of, in order. `@unchecked
+/// Sendable` is safe here -- every test in this file calls `evaluate(chain:chainIsTrusted:)`
+/// synchronously, from a single thread, never concurrently.
+private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
+    private(set) var decisions: [TrustDecision] = []
+
+    func callAsFunction(_ decision: TrustDecision) {
+        decisions.append(decision)
     }
 }
