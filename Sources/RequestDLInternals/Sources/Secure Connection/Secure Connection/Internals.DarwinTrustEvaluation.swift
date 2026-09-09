@@ -78,11 +78,11 @@ extension Internals {
         /// policy (still checks the server-auth `extendedKeyUsage` and everything else a
         /// certificate presented for TLS server auth normally must satisfy), just without the
         /// hostname match. Deliberately *not* `SecPolicyCreateBasicX509()` -- that's a bare X.509
-        /// chain-of-trust policy with no purpose/EKU checks at all, which is what
-        /// `NIOTrustEvaluator`'s Network.framework closure used before this type existed: a wider
-        /// relaxation than `.noHostnameVerification` ever asked for. `ServerTrustPolicy` already
-        /// used the correct, narrower policy for `.urlSession`; unifying on it here is a real (if
-        /// small) tightening for `.nioTransportServices`, not just a refactor.
+        /// chain-of-trust policy with no purpose/EKU checks at all, a wider relaxation than
+        /// `.noHostnameVerification` ever asked for: it would accept a certificate lacking the
+        /// server-auth `extendedKeyUsage` that `SecPolicyCreateSSL(true, nil)` correctly rejects
+        /// (see `InternalsDarwinTrustEvaluationTests`'s
+        /// `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`).
         ///
         /// `revocationPolicy`, when set, is appended to whichever policy array results from the
         /// above -- `SecTrustCopyPolicies` reads `trust`'s current array first (its default SSL/

@@ -18,7 +18,7 @@ import Foundation
 extension Internals.NIOTrustEvaluator {
 
     /// Same shape of validation as `Internals.ServerTrustPolicy.handle(challenge:)`, minus the
-    /// `URLAuthenticationChallenge` wrapping -- both now delegate the actual trust-root/SPKI pin
+    /// `URLAuthenticationChallenge` wrapping -- both delegate the actual trust-root/SPKI pin
     /// decision to the shared `Internals.DarwinTrustEvaluation`, and only own what genuinely
     /// differs between them: this evaluator can't call `SecTrustEvaluate(WithError|AsyncWithError)`
     /// synchronously the way `ServerTrustPolicy` does on `.urlSession`'s own delegate queue --

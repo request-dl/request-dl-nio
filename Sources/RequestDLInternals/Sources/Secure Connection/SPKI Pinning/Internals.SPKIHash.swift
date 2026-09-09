@@ -13,8 +13,7 @@ import struct Foundation.Data
 extension Internals {
 
     /// Thrown by `SPKIHash.resolvedDigest()` when the configured source doesn't decode to a
-    /// digest of the length `Algorithm.Digest.byteCount` expects -- same validation
-    /// `AsyncHTTPClient.SPKIHash` used to perform before this type stopped borrowing it.
+    /// digest of the length `Algorithm.Digest.byteCount` expects.
     package struct SPKIHashError: Swift.Error, CustomStringConvertible, Sendable {
         package var description: String {
             "Invalid SPKI hash: the configured digest is not valid base64, or its length doesn't match the hash algorithm's digest size."
