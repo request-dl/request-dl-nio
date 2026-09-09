@@ -31,7 +31,7 @@ struct InternalsProxyTests {
             authorization: nil
         )
 
-        let resolved = try configuration.build()
+        let resolved = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(resolved.proxy?.host == host)
@@ -55,7 +55,7 @@ struct InternalsProxyTests {
             authorization: .basicRawCredentials(credentials)
         )
 
-        let resolved = try configuration.build()
+        let resolved = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(resolved.proxy?.host == host)
@@ -79,7 +79,7 @@ struct InternalsProxyTests {
             authorization: nil
         )
 
-        let resolved = try configuration.build()
+        let resolved = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(resolved.proxy?.host == host)
@@ -107,7 +107,7 @@ struct InternalsProxyTests {
             connectHeaders: connectHeaders
         )
 
-        let resolved = try configuration.build()
+        let resolved = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(resolved.proxy?.connectHeaders["X-Proxy-Token"] == ["first", "second"])

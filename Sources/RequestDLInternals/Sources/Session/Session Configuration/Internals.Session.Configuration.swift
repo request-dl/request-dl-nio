@@ -79,7 +79,7 @@ extension Internals.Session {
 
         // MARK: - Internal methods
 
-        package func build() throws -> HTTPClient.Configuration {
+        package func build() throws -> Output {
             let secureConnectionOutput = try secureConnection?.build()
 
             var configuration = HTTPClient.Configuration.init(
@@ -96,7 +96,7 @@ extension Internals.Session {
             #if canImport(Darwin)
             configuration.tlsCustomVerificationNetworkFramework =
                 secureConnectionOutput?.tlsCustomVerificationNetworkFramework
-            configuration.tlsLocalIdentityNetworkFramework = secureConnectionOutput?.tlsLocalIdentityNetworkFramework
+            configuration.tlsLocalIdentityNetworkFramework = secureConnectionOutput?.localIdentityHandle?.identity
             #endif
 
             configuration.dnsOverride = dnsOverride
@@ -110,8 +110,44 @@ extension Internals.Session {
             // property for why `async-http-client`'s own built-in tracing is never engaged.
             configuration.tracing.tracer = NoOpTracer()
 
-            return configuration
+            #if canImport(Darwin)
+            return Output(
+                httpClientConfiguration: configuration,
+                localIdentityHandle: secureConnectionOutput?.localIdentityHandle
+            )
+            #else
+            return Output(httpClientConfiguration: configuration)
+            #endif
         }
+    }
+}
+
+extension Internals.Session.Configuration {
+
+    /// `build()`'s result: the `HTTPClient.Configuration` to hand `AsyncHTTPClient.HTTPClient`,
+    /// plus (on Darwin) the mTLS identity's `RawBytesIdentityBuilder.Handle`, if any -- kept
+    /// alongside the configuration rather than folded into it because whoever constructs the
+    /// actual `HTTPClient` needs both: the configuration to build it with, and the handle to hold
+    /// onto for as long as that client lives, so it can remove the identity's Keychain items once
+    /// the client itself goes away. See `Internals.Client.deinit`.
+    package struct Output: Sendable {
+        package let httpClientConfiguration: HTTPClient.Configuration
+
+        #if canImport(Darwin)
+        package let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?
+
+        package init(
+            httpClientConfiguration: HTTPClient.Configuration,
+            localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle? = nil
+        ) {
+            self.httpClientConfiguration = httpClientConfiguration
+            self.localIdentityHandle = localIdentityHandle
+        }
+        #else
+        package init(httpClientConfiguration: HTTPClient.Configuration) {
+            self.httpClientConfiguration = httpClientConfiguration
+        }
+        #endif
     }
 }
 

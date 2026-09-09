@@ -28,7 +28,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.secureConnection = secureConnection
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(
@@ -47,7 +47,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.redirectConfiguration = redirectConfiguration
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(
@@ -76,7 +76,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.timeout = timeout
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.timeout.connect == .nanoseconds(connect))
@@ -93,7 +93,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.connectionPool = connectionPool
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.connectionPool == connectionPool)
@@ -114,7 +114,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -140,7 +140,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -165,7 +165,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -188,7 +188,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -206,7 +206,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.decompression = decompression
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(
@@ -229,7 +229,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.httpVersion = version
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.httpVersion == version.build())
@@ -249,7 +249,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.multipathServiceType = multipathServiceType
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.enableMultipath)
@@ -261,7 +261,7 @@ struct InternalsSessionConfigurationTests {
         let configuration = Internals.Session.Configuration()
 
         // When
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(!builtConfiguration.enableMultipath)
@@ -398,7 +398,7 @@ struct InternalsSessionConfigurationTests {
         configuration.tracer = RecordingTracer()
 
         // When
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then -- `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
         // lifecycle itself (see the doc comment on `Configuration.tracer`).
@@ -412,14 +412,14 @@ struct InternalsSessionConfigurationTests {
 
         // Then
         #expect((configuration.tracer as? NoOpTracer) != nil)
-        #expect((try configuration.build().tracing.tracer as? NoOpTracer) != nil)
+        #expect((try configuration.build().httpClientConfiguration.tracing.tracer as? NoOpTracer) != nil)
     }
 
     @Test
     func configuration_whenInit_shouldBeDefault() async throws {
         // When
         let configuration = Internals.Session.Configuration()
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.tlsConfiguration == nil)

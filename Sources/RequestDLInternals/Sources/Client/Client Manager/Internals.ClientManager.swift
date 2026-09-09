@@ -300,11 +300,21 @@ extension Internals {
             eventLoopGroup: EventLoopGroup,
             sessionConfiguration: Internals.Session.Configuration
         ) throws -> Internals.Client {
+            let output = try sessionConfiguration.build()
+            #if canImport(Darwin)
             let client = Internals.Client(
                 eventLoopGroupProvider: .shared(eventLoopGroup),
-                configuration: try sessionConfiguration.build(),
+                configuration: output.httpClientConfiguration,
+                localIdentityHandle: output.localIdentityHandle,
                 maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
             )
+            #else
+            let client = Internals.Client(
+                eventLoopGroupProvider: .shared(eventLoopGroup),
+                configuration: output.httpClientConfiguration,
+                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            )
+            #endif
 
             tableLock.withLock {
                 var items = _table[id] ?? []

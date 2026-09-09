@@ -52,12 +52,41 @@ extension Internals {
         /// request is asked to execute until it completes, is cancelled, or is released.
         private let throttledExecutor: Internals.ThrottledExecutor
 
+        #if canImport(Darwin)
+        /// The mTLS client identity's Keychain-item handle, when `SecureConnection.certificateChain`/
+        /// `.privateKey` were configured for a Network.framework connection -- held for as long as
+        /// this `Client` (and so this client's underlying `HTTPClient`) is alive, and released in
+        /// `deinit`, mirroring `Internals.URLSessionIdentityPolicy`'s own identity lifecycle exactly.
+        private let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?
+        #endif
+
         // MARK: - Unsafe properties
 
         private var _isClosed: Bool
 
         // MARK: - Inits
 
+        // Swift doesn't reliably parse a parameter conditionally included in the middle of a
+        // parameter list (as opposed to a whole declaration), so this is two complete inits
+        // rather than one with a `#if`-guarded parameter.
+        #if canImport(Darwin)
+        package init(
+            eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
+            configuration: HTTPClient.Configuration,
+            localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle? = nil,
+            maximumConcurrentConnections: Int? = nil
+        ) {
+            _isClosed = false
+            _client = .init(
+                eventLoopGroupProvider: eventLoopGroupProvider,
+                configuration: configuration
+            )
+            throttledExecutor = Internals.ThrottledExecutor(
+                maximumConcurrentConnections: maximumConcurrentConnections
+            )
+            self.localIdentityHandle = localIdentityHandle
+        }
+        #else
         package init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
@@ -72,8 +101,18 @@ extension Internals {
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
         }
+        #endif
 
         deinit {
+            // Removing the mTLS identity's Keychain items (if any) doesn't depend on whether the
+            // client was already closed -- unlike shutting down `_client` below, doing this twice
+            // isn't an error, and there's no other owner racing to do it first.
+            #if canImport(Darwin)
+            if let localIdentityHandle {
+                RawBytesIdentityBuilder.remove(localIdentityHandle)
+            }
+            #endif
+
             // Shutting down from here is a last resort, so it is guarded by the same flag the
             // explicit path sets. Without the guard this shut down a client the manager had
             // already closed, and the second call is an error nobody was positioned to see.

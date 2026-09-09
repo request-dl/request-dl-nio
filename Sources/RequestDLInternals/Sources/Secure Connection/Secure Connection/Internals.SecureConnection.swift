@@ -199,7 +199,7 @@ extension Internals {
                 tlsConfiguration: tlsConfiguration,
                 tlsCustomVerification: trustEvaluator?.tlsCustomVerification,
                 tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
-                tlsLocalIdentityNetworkFramework: try makeLocalIdentityForNetworkFramework()
+                localIdentityHandle: try makeLocalIdentityForNetworkFramework()
             )
             #else
             return .init(
@@ -228,19 +228,16 @@ extension Internals {
         }
 
         #if canImport(Darwin)
-        /// Builds the `SecIdentity` for `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework`
-        /// (mTLS under Network.framework) when both `certificateChain` and `privateKey` are
-        /// configured -- the same Keychain round-trip `Internals.URLSessionIdentityPolicy` already
-        /// uses for `.urlSession`, via the shared `RawBytesIdentityBuilder` entry points.
+        /// Builds the `RawBytesIdentityBuilder.Handle` for mTLS under Network.framework when both
+        /// `certificateChain` and `privateKey` are configured -- the same Keychain round-trip
+        /// `Internals.URLSessionIdentityPolicy` already uses for `.urlSession`, via the shared
+        /// `RawBytesIdentityBuilder` entry points.
         ///
-        /// - Note: Unlike `URLSessionIdentityPolicy`, this doesn't hold on to the returned
-        /// `RawBytesIdentityBuilder.Handle` to remove it again later -- there's no natural place in
-        /// `.nio`'s client lifecycle to call `RawBytesIdentityBuilder.remove(_:)` from (see
-        /// `Internals.Client`'s `deinit`, which only shuts down the underlying `HTTPClient`).
-        /// `makeIdentity`'s Keychain items are labeled deterministically from the certificate's own
-        /// bytes and tolerate being re-added, so this leaves at most one item behind per distinct
-        /// client identity a process configures, rather than growing unbounded.
-        private func makeLocalIdentityForNetworkFramework() throws -> SecIdentity? {
+        /// Returns the whole `Handle`, not just its `.identity` -- `Internals.Client` holds onto it
+        /// and calls `RawBytesIdentityBuilder.remove(_:)` from its own `deinit`, mirroring
+        /// `URLSessionIdentityPolicy`'s lifecycle exactly, just one layer further down the chain
+        /// (`Output` -> `Internals.Session.Configuration.Output` -> `Internals.Client`).
+        private func makeLocalIdentityForNetworkFramework() throws -> Internals.RawBytesIdentityBuilder.Handle? {
             switch (certificateChain, privateKey) {
             case (nil, nil):
                 return nil
@@ -257,7 +254,7 @@ extension Internals {
                 return try RawBytesIdentityBuilder.makeIdentity(
                     certificateDER: leaf,
                     privateKeyDER: privateKeyDER
-                ).identity
+                )
 
             case (.some, nil), (nil, .some):
                 throw Internals.URLSessionIdentityPolicy.ConfigurationError.incompleteClientIdentity
@@ -315,9 +312,12 @@ extension Internals.SecureConnection {
         package let tlsCustomVerificationNetworkFramework:
             (@Sendable (SecTrust, @escaping @Sendable (Bool) -> Void) -> Void)?
 
-        /// Installs on `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework` when both
-        /// `certificateChain` and `privateKey` are configured (mTLS).
-        package let tlsLocalIdentityNetworkFramework: SecIdentity?
+        /// The Keychain-backed identity for mTLS under Network.framework, when both
+        /// `certificateChain` and `privateKey` are configured -- carries `.identity` for
+        /// `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework` *and* the Keychain-item
+        /// label needed to remove it again, since whoever ends up owning this identity's lifetime
+        /// (`Internals.Client`, currently) needs both.
+        package let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?
         #endif
     }
 }
