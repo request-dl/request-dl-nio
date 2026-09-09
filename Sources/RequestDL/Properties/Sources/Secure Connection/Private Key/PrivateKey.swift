@@ -18,7 +18,7 @@ public struct PrivateKey: Property {
 
         let source: Source
 
-        func make(_ secureConnection: inout Internals.SecureConnection) {
+        func make(_ secureConnection: inout Internals.SecureConnection) throws {
             switch source {
             case .privateKey(let privateKey):
                 secureConnection.privateKey = .privateKey(privateKey)

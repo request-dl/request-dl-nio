@@ -78,6 +78,10 @@ try await DataTask {
 - [x] [Swift Concurrency](<doc:Swift-concurrency>);
 - [x] [Combine support](<doc:Exploring-combine>) (Apple platforms only);
 - [x] [Image loading for SwiftUI, UIKit, AppKit and watchOS](<doc:Loading-images>) (Apple platforms only);
+- [x] [Downloading in the background](<doc:Downloading-in-the-Background>) (Apple platforms only);
+- [x] [Distributed tracing](<doc:Distributed-tracing>);
+- [x] [Configuration-driven requests](<doc:Configuration-driven-requests>) (via swift-configuration);
+- [x] [cURL support](<doc:CURL-support>) — parse a curl command into a request, or describe a request as one;
 
 We are excited to expand this list with many other features. Start by making your contribution in [Discussions](https://github.com/orgs/request-dl/discussions) or by opening a PR (Pull Request).
 
@@ -96,3 +100,5 @@ We are excited to expand this list with many other features. Start by making you
 ### Advanced
 
 - <doc:Request-Customization>
+- <doc:Using-a-Client-Certificate-with-URLSession>
+- <doc:Downloading-in-the-Background>

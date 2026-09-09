@@ -20,14 +20,10 @@ public struct ModifiedRequestTask<Modifier: RequestTaskModifier>: RequestTask {
 
     // MARK: - Public properties
 
-    ///
-    /// Returns the result of the task.
-    ///
-    /// - Throws: An error of type `Error` if the task could not be completed.
-    ///
-    /// - Returns: An object of type `Element` with the result of the task.
-    ///
-    public func result() async throws -> Element {
-        try await modifier.body(task)
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> Element {
+        let scoped = Modifier.Content(task.task, environment: environment)
+        return try await modifier.body(scoped)
     }
 }

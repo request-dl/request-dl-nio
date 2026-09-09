@@ -17,7 +17,7 @@ extension Internals.ClientManager {
         // MARK: - Internal properties
 
         package let sessionConfiguration: Internals.Session.Configuration
-        package let client: Internals.Client
+        package let client: Internals.ClientManager.Client
 
         #if canImport(Darwin)
         /// Monotonic. See ``Internals/ClientManager/cleanupIfNeeded()`` for why this is not a
@@ -31,7 +31,7 @@ extension Internals.ClientManager {
 
         package static func createNew(
             sessionConfiguration: Internals.Session.Configuration,
-            client: Internals.Client
+            client: Internals.ClientManager.Client
         ) -> Internals.ClientManager.Item {
             .init(
                 sessionConfiguration: sessionConfiguration,

@@ -15,7 +15,7 @@ struct EnvironmentTests {
 
     struct IntegerReceiver: Property {
 
-        @PropertyEnvironment(\.integer) var integer
+        @RequestEnvironment(\.integer) var integer
         let value: @Sendable (Int) -> Void
 
         var body: EmptyProperty {

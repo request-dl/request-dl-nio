@@ -150,7 +150,7 @@ extension ContentType {
     }
 
     /// The media type, without parameters, normalised for comparison.
-    private var mediaType: String {
+    var mediaType: String {
         rawValue
             .prefix { $0 != ";" }
             .filter { $0 != " " }
@@ -166,5 +166,36 @@ extension ContentType {
                     .lowercased()
                     .hasPrefix("charset=")
             }
+    }
+}
+
+// MARK: - Matching
+
+extension ContentType {
+
+    /// Whether `other`'s media type is accepted by this one, treating `self` as the accepted
+    /// side and honoring the `*/*` and `type/*` wildcards, per RFC 9110's media-range rules.
+    ///
+    /// Parameters (e.g. `charset`) are ignored on both sides, same as ``mediaType``.
+    func matches(_ other: ContentType) -> Bool {
+        let accepted = mediaType
+        let candidate = other.mediaType
+
+        if accepted == "*/*" || accepted == candidate {
+            return true
+        }
+
+        let acceptedParts = accepted.split(separator: "/", maxSplits: 1)
+        let candidateParts = candidate.split(separator: "/", maxSplits: 1)
+
+        guard
+            acceptedParts.count == 2,
+            candidateParts.count == 2,
+            acceptedParts[1] == "*"
+        else {
+            return false
+        }
+
+        return acceptedParts[0] == candidateParts[0]
     }
 }

@@ -19,20 +19,20 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/swift-server/async-http-client",
-            from: "1.36.0"
+            url: "https://github.com/request-dl/async-http-client",
+            from: "1.37.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.101.3"
+            from: "2.102.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.34.3"
+            from: "1.35.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.37.2"
+            from: "2.37.4"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
@@ -48,7 +48,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "2.0.7"
+            from: "2.1.4"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
@@ -57,6 +57,19 @@ let package = Package(
         .package(
             url: "https://github.com/apple/swift-system",
             from: "1.8.1"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-distributed-tracing",
+            from: "1.4.1"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-configuration",
+            from: "1.2.0",
+            traits: []
+        ),
+        .package(
+            url: "https://github.com/apple/swift-crypto.git",
+            from: "4.5.2"
         ),
     ],
     targets: [
@@ -70,12 +83,15 @@ let package = Package(
                 .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),
@@ -98,6 +114,9 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Configuration", package: "swift-configuration"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),
@@ -128,6 +147,8 @@ let package = Package(
                 "RequestDLInternals",
                 "RequestDLTestSupport",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "Configuration", package: "swift-configuration"),
+                .product(name: "SwiftAsyncTesting", package: "swift-async-stream"),
             ],
             resources: [.process("Resources")]
         ),
@@ -137,6 +158,8 @@ let package = Package(
             dependencies: [
                 "RequestDLInternals",
                 "RequestDLTestSupport",
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "SwiftAsyncTesting", package: "swift-async-stream"),
             ],
             path: "Tests/RequestDLInternalsTests",
             resources: [.process("Resources")]

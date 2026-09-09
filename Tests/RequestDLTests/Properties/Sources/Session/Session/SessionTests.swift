@@ -6,6 +6,7 @@ import AsyncHTTPClient
 import NIOPosix
 import RequestDLInternals
 import Testing
+import Tracing
 
 @testable import RequestDL
 
@@ -27,11 +28,16 @@ struct SessionTests {
         #expect(sut.timeout.connect == configuration.timeout.connect)
         #expect(sut.timeout.read == configuration.timeout.read)
         #expect(sut.proxy == configuration.proxy)
-        #expect(sut.ignoreUncleanSSLShutdown == configuration.ignoreUncleanSSLShutdown)
         #expect(
             String(describing: sut.decompression) == String(describing: configuration.decompression)
         )
         #expect(sut.connectionPool == configuration.connectionPool)
+        #expect(sut.allowsCellularAccess == nil)
+        #expect(sut.allowsExpensiveNetworkAccess == nil)
+        #expect(sut.allowsConstrainedNetworkAccess == nil)
+        #expect(sut.waitsForConnectivity == nil)
+        #expect(sut.multipathServiceType == .none)
+        #expect(sut.networkPathConstraints == nil)
     }
 
     @Test
@@ -83,9 +89,67 @@ struct SessionTests {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(
-            try resolved.session.configuration.build().networkFrameworkWaitForConnectivity == waitsForConnectivity
-        )
+        #expect(resolved.session.configuration.waitsForConnectivity == waitsForConnectivity)
+    }
+
+    @Test
+    func session_whenAllowsCellularAccess_shouldBeValid() async throws {
+        // Given
+        let allowsCellularAccess = false
+
+        let property = Session()
+            .allowsCellularAccess(allowsCellularAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsCellularAccess == allowsCellularAccess)
+    }
+
+    @Test
+    func session_whenAllowsExpensiveNetworkAccess_shouldBeValid() async throws {
+        // Given
+        let allowsExpensiveNetworkAccess = false
+
+        let property = Session()
+            .allowsExpensiveNetworkAccess(allowsExpensiveNetworkAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsExpensiveNetworkAccess == allowsExpensiveNetworkAccess)
+    }
+
+    @Test
+    func session_whenAllowsConstrainedNetworkAccess_shouldBeValid() async throws {
+        // Given
+        let allowsConstrainedNetworkAccess = false
+
+        let property = Session()
+            .allowsConstrainedNetworkAccess(allowsConstrainedNetworkAccess)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.allowsConstrainedNetworkAccess == allowsConstrainedNetworkAccess)
+    }
+
+    @Test
+    func session_whenMultipathServiceType_shouldBeValid() async throws {
+        // Given
+        let multipathServiceType = Session.MultipathServiceType.handover
+
+        let property = Session()
+            .multipathServiceType(multipathServiceType)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.multipathServiceType == multipathServiceType.build())
     }
 
     @Test
@@ -171,6 +235,54 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenRedirectStrategy_shouldBeValid() async throws {
+        // Given
+        struct DummyStrategy: RedirectStrategy {
+            func redirectDecision(for context: RedirectContext) throws -> RedirectDecision {
+                .doNotFollow
+            }
+        }
+
+        let property = Session()
+            .redirectStrategy(DummyStrategy())
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
+            Issue.record("Redirect Configuration is nil")
+            return
+        }
+
+        guard case .strategy = redirectConfiguration else {
+            Issue.record("Expected .strategy, got \(redirectConfiguration)")
+            return
+        }
+    }
+
+    @Test
+    func session_whenOnRedirect_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .onRedirect { _ in .doNotFollow }
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        guard let redirectConfiguration = resolved.session.configuration.redirectConfiguration else {
+            Issue.record("Redirect Configuration is nil")
+            return
+        }
+
+        guard case .strategy = redirectConfiguration else {
+            Issue.record("Expected .strategy, got \(redirectConfiguration)")
+            return
+        }
+    }
+
+    @Test
     func session_whenDecompressionDisabled_shouldBeValid() async throws {
         // Given
         let property = Session()
@@ -191,91 +303,142 @@ struct SessionTests {
     }
 
     @Test
-    func session_whenDecompressionLimit_shouldBeValid() async throws {
+    func session_whenDecompressionAlgorithms_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.ratio(5_000)
         let property = Session()
-            .decompressionLimit(decompressionLimit)
+            .decompressionAlgorithms([.gzip, .deflate], limit: decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [
+                        InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm()),
+                        InternalsDecompressionAlgorithmAdapter(algorithm: DeflateAlgorithm()),
+                    ],
+                    limit: decompressionLimit.build()
+                )
         )
     }
 
     @Test
-    func session_whenDecompressionLimitNone_shouldBeValid() async throws {
+    func session_whenDecompressionAlgorithmsLimitNone_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.none
         let property = Session()
-            .decompressionLimit(decompressionLimit)
+            .decompressionAlgorithms([.gzip], limit: decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm())],
+                    limit: decompressionLimit.build()
+                )
         )
     }
 
     @Test
-    func session_whenDecompressionLimitSize_shouldBeValid() async throws {
+    func session_whenDecompressionAlgorithmsLimitSize_shouldBeValid() async throws {
         // Given
         let decompressionLimit = Session.DecompressionLimit.size(1_024)
         let property = Session()
-            .decompressionLimit(decompressionLimit)
+            .decompressionAlgorithms([.gzip], limit: decompressionLimit)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
         #expect(
-            resolved.session.configuration.decompression == .enabled(decompressionLimit.build())
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm())],
+                    limit: decompressionLimit.build()
+                )
         )
     }
 
     @Test
-    func session_whenCompressionDefault_shouldBeDisabled() async throws {
+    func session_whenDecompressionAlgorithmsEmpty_isDisabled() async throws {
         // Given
         let property = Session()
+            .decompressionAlgorithms([])
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(resolved.session.configuration.compression == .disabled)
+        #expect(resolved.session.configuration.decompression == .disabled)
+    }
+
+    // Compression moved off `Session` entirely -- see `CompressionEnvironmentTests` for its
+    // coverage now that it's environment/`Payload`-driven instead.
+
+    @Test
+    func session_whenPreferredExecutor_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .preferredExecutor(.nioTransportServices)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.preferredExecutor == .nioTransportServices)
+        #expect(resolved.session.configuration.requiredExecutor == nil)
     }
 
     @Test
-    func session_whenCompressionGzip_shouldBeValid() async throws {
+    func session_whenRequiredExecutor_shouldBeValid() async throws {
         // Given
-        let algorithm = Session.CompressionAlgorithm.gzip
         let property = Session()
-            .compression(algorithm)
+            .requiredExecutor(.urlSession)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
+        #expect(resolved.session.configuration.requiredExecutor == .urlSession)
+        #expect(resolved.session.configuration.preferredExecutor == nil)
     }
 
     @Test
-    func session_whenCompressionDeflate_shouldBeValid() async throws {
+    func session_whenTracerDefault_shouldBeNoOp() async throws {
         // Given
-        let algorithm = Session.CompressionAlgorithm.deflate
         let property = Session()
-            .compression(algorithm)
 
         // When
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(resolved.session.configuration.compression == .enabled(algorithm.build()))
+        #expect((resolved.session.configuration.tracer as? NoOpTracer) != nil)
+    }
+
+    @Test
+    func session_whenTracerSet_shouldBeValid() async throws {
+        // Given
+        let tracer = RecordingTracer()
+
+        let property = Session()
+            .tracer(tracer)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect((resolved.session.configuration.tracer as? RecordingTracer) != nil)
+
+        // `async-http-client`'s own built-in tracing is always suppressed -- RequestDL owns the
+        // span lifecycle itself, in `RawTask.result()`, using `resolved.session.configuration
+        // .tracer` directly.
+        #expect(try (resolved.session.configuration.build().tracing.tracer as? NoOpTracer) != nil)
     }
 
     @Test
@@ -292,7 +455,7 @@ struct SessionTests {
         // Given
         let property = TestProperty {
             Session()
-                .decompressionLimit(.size(200))
+                .decompressionAlgorithms([.gzip], limit: .size(200))
             Session()
                 .waitsForConnectivity(true)
         }
@@ -301,7 +464,36 @@ struct SessionTests {
         let resolved = try await resolve(property)
 
         // Then
-        #expect(resolved.session.configuration.decompression == .enabled(.size(200)))
-        #expect(resolved.session.configuration.networkFrameworkWaitForConnectivity == true)
+        #expect(
+            resolved.session.configuration.decompression
+                == .enabled(
+                    algorithms: [InternalsDecompressionAlgorithmAdapter(algorithm: GzipAlgorithm())],
+                    limit: .size(200)
+                )
+        )
+        #expect(resolved.session.configuration.waitsForConnectivity == true)
     }
+}
+
+private struct RecordingTracer: Tracer, Sendable {
+
+    func startSpan<Instant: TracerInstant>(
+        _ operationName: String,
+        context: @autoclosure () -> ServiceContext,
+        ofKind kind: SpanKind,
+        at instant: @autoclosure () -> Instant,
+        function: String,
+        file fileID: String,
+        line: UInt
+    ) -> NoOpTracer.NoOpSpan {
+        NoOpTracer.NoOpSpan(context: context())
+    }
+
+    func forceFlush() {}
+
+    func inject<Carrier, Inject>(_ context: ServiceContext, into carrier: inout Carrier, using injector: Inject)
+    where Inject: Injector, Carrier == Inject.Carrier {}
+
+    func extract<Carrier, Extract>(_ carrier: Carrier, into context: inout ServiceContext, using extractor: Extract)
+    where Extract: Extractor, Carrier == Extract.Carrier {}
 }

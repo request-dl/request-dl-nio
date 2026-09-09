@@ -2,9 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+@_spi(Testing) import SwiftAsyncStream
+import SwiftAsyncTesting
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
 @testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
@@ -13,6 +15,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsFileStreamBufferTests {
 
     @Test
@@ -20,10 +23,22 @@ struct InternalsFileStreamBufferTests {
         try await withTemporaryFileURL("stream.bin") { url in
             let stream = try await Internals.FileStreamBuffer(writingTo: .init(url))
 
+            // Holding the lock first, then waiting for the task to actually queue behind it,
+            // makes "cancelled before it runs" deterministic instead of a race between
+            // `task.cancel()` and the task getting scheduled — under CI scheduler contention,
+            // a freshly created task can start and finish before the creating task even reaches
+            // `cancel()`. `AsyncLock` guarantees a cancelled waiter still takes its turn and
+            // runs `writeData`'s loop, which checks `Task.checkCancellation()` before doing
+            // anything else — see `Internals.FileStreamBuffer.writeData`.
+            await stream.lockForTesting.lock()
+
             let task = _Concurrency.Task<Void, Error> {
                 try await stream.writeData(Data("Hello world".utf8))
             }
+            try await stream.lockForTesting.waitForPendingOperations(1, timeout: 5)
+
             task.cancel()
+            stream.lockForTesting.unlock()
 
             await #expect(throws: CancellationError.self) {
                 try await task.value
@@ -41,10 +56,16 @@ struct InternalsFileStreamBufferTests {
 
             let stream = try await Internals.FileStreamBuffer(readingFrom: .init(url))
 
+            // Same reasoning as the writeData test above.
+            await stream.lockForTesting.lock()
+
             let task = _Concurrency.Task<Data?, Error> {
                 try await stream.readData(length: UInt64(data.count))
             }
+            try await stream.lockForTesting.waitForPendingOperations(1, timeout: 5)
+
             task.cancel()
+            stream.lockForTesting.unlock()
 
             await #expect(throws: CancellationError.self) {
                 try await task.value

@@ -25,11 +25,9 @@ extension Modifiers {
         /// - Returns: The result of the original task.
         ///
         public func body(_ task: Content) async throws -> Input {
-            var environment = RequestEnvironmentValues.current
+            var environment = task.environment
             update(&environment)
-            return try await RequestEnvironmentValues.$current.withValue(environment) {
-                try await task.result()
-            }
+            return try await task._result(environment: environment)
         }
     }
 }
@@ -53,12 +51,5 @@ extension RequestTask {
                 $0[keyPath: keyPath] = value
             }
         )
-    }
-}
-
-extension RequestTask {
-
-    var environment: RequestEnvironmentValues {
-        RequestEnvironmentValues.current
     }
 }

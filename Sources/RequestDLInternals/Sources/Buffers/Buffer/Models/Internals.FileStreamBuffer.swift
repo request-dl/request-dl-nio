@@ -217,3 +217,21 @@ extension Internals {
         }
     }
 }
+
+// MARK: - Testing
+
+@_spi(Testing)
+extension Internals.FileStreamBuffer {
+
+    /// The lock serializing every seek/read/write/close.
+    ///
+    /// Named apart from the private `lock` it exposes, and gated behind `@_spi(Testing)` on top
+    /// of `package`, so this reads as a deliberate escape hatch and not something ordinary
+    /// package code reaches for by accident. Exposed so a test can wait for a task to actually
+    /// be queued behind the lock (via `AsyncLock.waitForPendingOperations(_:timeout:)`) before
+    /// cancelling it, rather than creating the task and hoping cancellation wins a race against
+    /// it starting — under CI scheduler contention, it does not always.
+    public var lockForTesting: AsyncLock {
+        lock
+    }
+}

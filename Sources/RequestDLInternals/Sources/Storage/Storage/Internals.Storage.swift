@@ -11,6 +11,23 @@ import FoundationEssentials
 #if canImport(Darwin)
 import struct Foundation.DispatchTime
 #endif
+import class Foundation.ProcessInfo
+#endif
+
+#if DEBUG
+/// TEMP DIAGNOSTIC (remove after investigation): traces `Internals.Storage` cache hits/misses
+/// to chase an intermittent `StoredObject`-identity flake in `PropertyReaderTests`. Silent
+/// unless `REQUESTDL_STORAGE_DEBUG` is set in the environment, and compiled out entirely in
+/// release builds.
+private let isStorageDebugLoggingEnabled = ProcessInfo.processInfo.environment["REQUESTDL_STORAGE_DEBUG"] != nil
+
+private func storageDebugLog(_ message: @autoclosure () -> String) {
+    guard isStorageDebugLoggingEnabled else {
+        return
+    }
+
+    print(message())
+}
 #endif
 
 extension Internals {
@@ -85,7 +102,7 @@ extension Internals {
         }
 
         package func getValue<Value: Sendable>(_ type: Value.Type, forKey key: AnyHashable) -> Value? {
-            lock.withLock {
+            lock.withLock { () -> Value? in
                 guard let register = _table[key] else {
                     return nil
                 }
@@ -103,11 +120,17 @@ extension Internals {
                 // lifetime. That made the sweep interval a correctness parameter; it should
                 // only be a memory one.
                 guard isValid else {
+                    #if DEBUG
+                    storageDebugLog("[Internals.Storage DEBUG] EXPIRE ttl key=\(key) tableCount=\(_table.count)")
+                    #endif
                     _table[key] = nil
                     return nil
                 }
 
                 guard let value = register.value as? Value else {
+                    #if DEBUG
+                    storageDebugLog("[Internals.Storage DEBUG] TYPE MISMATCH key=\(key) tableCount=\(_table.count)")
+                    #endif
                     return nil
                 }
 
@@ -136,6 +159,10 @@ extension Internals {
                     _table[key] = .init(value: existing)
                     return existing
                 }
+
+                #if DEBUG
+                storageDebugLog("[Internals.Storage DEBUG] CREATE key=\(key) tableCount=\(_table.count + 1)")
+                #endif
 
                 _table[key] = .init(value: value)
                 _evictIfNeeded()
@@ -216,6 +243,9 @@ extension Internals {
                 .prefix(excess)
 
             for (key, _) in oldest {
+                #if DEBUG
+                storageDebugLog("[Internals.Storage DEBUG] EVICT capacity key=\(key) tableCountBefore=\(_table.count)")
+                #endif
                 _table[key] = nil
             }
         }

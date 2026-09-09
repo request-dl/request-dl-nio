@@ -63,11 +63,14 @@ public struct CacheHeader: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
-        let separator = inputs.environment.headerSeparator ?? ","
-
+        // Cache-Control's directive list (RFC 9111 §5.2, `1#cache-directive`) is comma-delimited
+        // by definition -- hardcoded here rather than deferring to `.headerSeparator(_:)`, the
+        // same way `HeaderNode`'s own `commaSeparatedNames` forces this header's *cross-instance*
+        // combining to "," regardless of what the environment configures. Anything else joined
+        // in would parse as one opaque, meaningless directive instead of a recognizable list.
         let value = property.pointer()
             .makeContents()
-            .joined(separator: separator)
+            .joined(separator: ",")
 
         if value.isEmpty {
             return .empty
@@ -78,7 +81,7 @@ public struct CacheHeader: Property {
                 key: "Cache-Control",
                 value: value,
                 strategy: inputs.environment.headerStrategy,
-                separator: separator
+                separator: ","
             )
         )
     }
@@ -125,6 +128,12 @@ public struct CacheHeader: Property {
     /// - flag: The value to be set.
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use '.cacheStrategy(.useCachedDataOnly)' instead. 'only-if-cached' addresses caches downstream of this client (a CDN or proxy); this package's own on-disk cache is controlled separately by 'CacheStrategy'."
+    )
     public func onlyIfCached(_ flag: Bool) -> Self {
         edit { $0.isOnlyIfCached = flag }
     }
@@ -136,6 +145,12 @@ public struct CacheHeader: Property {
     /// - flag: The value to be set.
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'public'/'private' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func `public`(_ flag: Bool) -> Self {
         edit { $0.isPublic = flag }
     }
@@ -158,6 +173,12 @@ public struct CacheHeader: Property {
     /// - seconds: The value to be set.
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'s-maxage' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func sharedMaxAge(_ seconds: Int) -> Self {
         edit { $0.sharedMaxAge = seconds }
     }
@@ -180,6 +201,12 @@ public struct CacheHeader: Property {
     /// - seconds: The value to be set.
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'stale-while-revalidate' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func staleWhileRevalidate(_ seconds: Int) -> Self {
         edit { $0.staleWhileRevalidate = seconds }
     }
@@ -190,6 +217,12 @@ public struct CacheHeader: Property {
     /// - Parameter seconds: The value to be set.
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'stale-if-error' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func staleIfError(_ seconds: Int) -> Self {
         edit { $0.staleIfError = seconds }
     }
@@ -199,6 +232,12 @@ public struct CacheHeader: Property {
     ///
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'must-revalidate' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func mustRevalidate() -> Self {
         edit { $0.needsRevalidate = true }
     }
@@ -208,6 +247,12 @@ public struct CacheHeader: Property {
     ///
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'proxy-revalidate' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func proxyRevalidate() -> Self {
         edit { $0.needsProxyRevalidate = true }
     }
@@ -218,6 +263,12 @@ public struct CacheHeader: Property {
     ///
     /// - Returns: The modified Cache object.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "'immutable' is a response-only Cache-Control directive; setting it on a request has no defined meaning per RFC 7234."
+    )
     public func immutable() -> Self {
         edit { $0.isImmutable = true }
     }

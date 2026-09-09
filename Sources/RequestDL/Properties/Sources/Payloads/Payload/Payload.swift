@@ -239,7 +239,10 @@ public struct Payload: Property {
                 charset: inputs.environment.charset,
                 urlEncoder: inputs.environment.urlEncoder,
                 chunkSize: inputs.environment.payloadChunkSize,
-                payloadEncoder: inputs.environment.payloadEncoder
+                payloadEncoder: inputs.environment.payloadEncoder,
+                compression: inputs.environment.compression,
+                compressionDuplicateHeaderBehavior: inputs.environment.compressionDuplicateHeaderBehavior,
+                shouldCompressBodyData: inputs.environment.shouldCompressBodyData
             )
         )
     }

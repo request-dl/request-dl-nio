@@ -322,6 +322,30 @@ struct PrivateKeyTests {
     #endif
 
     @Test
+    func privateKey_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
+        // Given
+        // Regression test: `PrivateKey` used to require an enclosing `SecureConnection`. The
+        // base `Internals.SecureConnection` is now created lazily the first time it's needed.
+        let resource = Certificates(.pem).client()
+        let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.PrivateKey(bytes, format: .pem)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.privateKey
+                == .privateKey(
+                    Internals.PrivateKey(bytes, format: .pem)
+                )
+        )
+    }
+
+    @Test
     func certificate_whenAccessBody_shouldBeNever() async throws {
         // Given
         let resource = Certificates(.pem).client()

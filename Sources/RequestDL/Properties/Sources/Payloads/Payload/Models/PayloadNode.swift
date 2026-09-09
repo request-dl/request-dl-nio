@@ -14,6 +14,12 @@ struct PayloadNode: PropertyNode {
     let chunkSize: Int?
     let payloadEncoder: (any PayloadEncoder)?
 
+    /// Captured from `inputs.environment` at `_makeProperty` time -- see `RequestConfiguration
+    /// .compression`'s own doc comment for why this can't be read from inside `make(_:)` itself.
+    let compression: (any Compressor)?
+    let compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior
+    let shouldCompressBodyData: (@Sendable (Int) -> Bool)?
+
     // MARK: - Internal methods
 
     /// Runs the factory and installs the result, either as a query string or as a body.
@@ -76,6 +82,16 @@ struct PayloadNode: PropertyNode {
         output: PayloadOutput,
         make: inout Make
     ) {
+        // Only fills in a default, never overrides an explicit `RequestMethod` -- whichever
+        // node runs first wins, since `RequestMethod`'s own node assigns unconditionally. A
+        // body attached to whatever method ends up unset otherwise falls through to `"GET"` at
+        // request-build time, which AsyncHTTPClient tolerates silently but URLSession/CFNetwork
+        // does not: a GET carrying a body fails outright (`NSURLErrorDataLengthExceedsMaximum`,
+        // confirmed against a real server, not LocalServer- or beta-OS-specific).
+        if make.requestConfiguration.method == nil {
+            make.requestConfiguration.method = "POST"
+        }
+
         make.requestConfiguration.headers.set(
             name: "Content-Type",
             value: String(output.contentType)
@@ -96,6 +112,12 @@ struct PayloadNode: PropertyNode {
         }
 
         make.requestConfiguration.body = body
+
+        if let compression {
+            make.requestConfiguration.compression = InternalsCompressionAlgorithmAdapter(algorithm: compression)
+            make.requestConfiguration.compressionDuplicateHeaderBehavior = compressionDuplicateHeaderBehavior.build()
+            make.requestConfiguration.shouldCompressBodyData = shouldCompressBodyData
+        }
     }
 
     private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {

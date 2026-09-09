@@ -11,7 +11,9 @@ extension Timeout {
     ///
     /// 1. `connect`: The connect timeout case. The default value is 30s.
     /// 2. `read`: The read timeout case.
-    /// 3. `all`: Defines the same timeout interval for both connect and read.
+    /// 3. `resource`: A total end-to-end deadline, covering connection, redirects, and the entire body transfer.
+    /// 4. `all`: Defines the same timeout interval for both connect and read -- deliberately excludes `resource`,
+    ///    since it means something different (a ceiling on the *whole* request) than the other two.
     ///
     /// In the example below, a request is made to the Google's website with the timeout for all types.
     ///
@@ -32,6 +34,17 @@ extension Timeout {
         /// The timeout interval for resource which determinate how long
         /// to wait the resource to be transferred.
         public static let read = Source(rawValue: 1 << 1)
+
+        /// A total end-to-end deadline for the request, mirroring
+        /// `URLSessionConfiguration.timeoutIntervalForResource`: covers connecting, following any
+        /// redirects, and streaming the entire response body, all as one budget. Enforced by
+        /// RequestDL itself -- neither AsyncHTTPClient's `Timeout` nor `URLSessionConfiguration`'s
+        /// own per-phase timeouts offer a single knob for this.
+        ///
+        /// Not included in ``all``: unlike `connect`/`read`, this isn't a per-phase timeout, so
+        /// bundling it into `.all` would silently give every existing `.all` caller a
+        /// resource-wide deadline they never asked for.
+        public static let resource = Source(rawValue: 1 << 2)
 
         /// Defines same timeout interval for `request` and `resource`
         public static let all: Self = [.connect, .read]

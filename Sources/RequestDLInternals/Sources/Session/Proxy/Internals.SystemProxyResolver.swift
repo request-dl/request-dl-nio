@@ -24,18 +24,19 @@ extension Internals {
     /// `AsyncHTTPClient` has no discovery of its own: its proxy is explicit configuration and
     /// nothing else. `URLSession` goes through CFNetwork, which reads the system settings, and
     /// that difference is why an interception proxy such as Proxyman or Charles captures one
-    /// and not the other.
-    ///
-    /// - Note: Proxy auto configuration is deliberately not evaluated. See ``resolve(_:)``.
+    /// and not the other. Both executors go through this same resolver -- including proxy
+    /// auto-configuration (PAC) scripts, evaluated via `Internals.PACEvaluator`/
+    /// `Internals.PACProxyCache` -- so `SystemProxy()` behaves identically regardless of which
+    /// executor a session resolves to.
     package enum SystemProxyResolver {
 
         /// The proxy the system would use to reach `url`, or `nil` for a direct connection.
-        package static func proxy(forURL url: String) -> Internals.Proxy? {
+        package static func proxy(forURL url: String) async -> Internals.Proxy? {
             guard let url = URL(string: url) else {
                 return nil
             }
 
-            return resolve(url)
+            return await resolve(url)
         }
     }
 }
@@ -47,13 +48,7 @@ extension Internals.SystemProxyResolver {
     /// - Note: `CFNetworkCopyProxiesForURL` already applies the exception list, per interface
     /// settings and the enable flags, so the result is the answer for this URL specifically
     /// rather than the raw settings dictionary.
-    ///
-    /// Auto configuration entries are skipped. Resolving a PAC script means either driving
-    /// `CFNetworkExecuteProxyAutoConfigurationURL` through a run loop, or fetching the script
-    /// and evaluating it, and both bring a cache and a fetch timeout along with them. Skipping
-    /// them means a PAC only network falls back to a direct connection, which is the same thing
-    /// that happens today.
-    private static func resolve(_ url: URL) -> Internals.Proxy? {
+    private static func resolve(_ url: URL) async -> Internals.Proxy? {
         guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() else {
             return nil
         }
@@ -62,6 +57,37 @@ extension Internals.SystemProxyResolver {
             CFNetworkCopyProxiesForURL(url as CFURL, settings)
             .takeRetainedValue() as? [[String: Any]] ?? []
 
+        switch firstResolution(in: proxies) {
+        case .none, .direct:
+            return nil
+
+        case .proxy(let proxy):
+            return proxy
+
+        case .autoConfiguration(let scriptURL):
+            return await Internals.PACProxyCache.shared.proxy(forScriptURL: scriptURL, targetURL: url)
+        }
+    }
+
+    /// What one entry in a CFNetwork proxy-list dictionary resolves to -- shared between the
+    /// direct `CFNetworkCopyProxiesForURL` result here and a PAC script's own evaluated result
+    /// (`Internals.PACEvaluator`), since both use the identical dictionary shape.
+    package enum Resolution: Sendable, Equatable {
+        /// An explicit "go direct" for this URL (`kCFProxyTypeNone`).
+        case direct
+        /// A directly usable proxy (`kCFProxyTypeHTTP`/`kCFProxyTypeHTTPS`/`kCFProxyTypeSOCKS`).
+        case proxy(Internals.Proxy)
+        /// A PAC script still needs to be fetched and evaluated
+        /// (`kCFProxyTypeAutoConfigurationURL`) before a proxy (or direct connection) is known.
+        /// Never itself produced by evaluating a PAC script -- CFNetwork's own guarantee that a
+        /// script cannot chain to another PAC file.
+        case autoConfiguration(URL)
+    }
+
+    /// Walks `proxies` and returns the first entry this package recognizes -- `.direct` ends the
+    /// search outright (later entries are fallbacks for a failed proxy, not alternatives), an
+    /// unrecognized or unparseable entry is skipped in favor of the next one.
+    package static func firstResolution(in proxies: [[String: Any]]) -> Resolution? {
         for proxy in proxies {
             guard let type = proxy[kCFProxyTypeKey as String] as? String else {
                 continue
@@ -69,18 +95,21 @@ extension Internals.SystemProxyResolver {
 
             switch type {
             case kCFProxyTypeNone as CFString:
-                // An explicit "go direct" for this URL. Later entries are fallbacks for a
-                // failed proxy, not alternatives, so this ends the search.
-                return nil
+                return .direct
 
             case kCFProxyTypeHTTP as CFString, kCFProxyTypeHTTPS as CFString:
                 if let resolved = makeProxy(proxy, connection: .http) {
-                    return resolved
+                    return .proxy(resolved)
                 }
 
             case kCFProxyTypeSOCKS as CFString:
                 if let resolved = makeProxy(proxy, connection: .socks) {
-                    return resolved
+                    return .proxy(resolved)
+                }
+
+            case kCFProxyTypeAutoConfigurationURL as CFString:
+                if let scriptURL = proxy[kCFProxyAutoConfigurationURLKey as String] as? URL {
+                    return .autoConfiguration(scriptURL)
                 }
 
             default:
@@ -89,6 +118,16 @@ extension Internals.SystemProxyResolver {
         }
 
         return nil
+    }
+
+    /// `Internals.PACEvaluator`'s own entry point: reduces a PAC script's evaluated proxy list
+    /// straight to the first usable `Internals.Proxy`, discarding `.direct`/unresolved the same
+    /// way `resolve(_:)` above does for its own `nil` case.
+    package static func firstUsableProxy(in proxies: [[String: Any]]) -> Internals.Proxy? {
+        guard case .proxy(let proxy) = firstResolution(in: proxies) else {
+            return nil
+        }
+        return proxy
     }
 
     private static func makeProxy(
@@ -127,7 +166,7 @@ extension Internals.SystemProxyResolver {
 
     /// The conventional environment variables, which is what "the system proxy" means outside
     /// of Apple platforms.
-    private static func resolve(_ url: URL) -> Internals.Proxy? {
+    private static func resolve(_ url: URL) async -> Internals.Proxy? {
         let environment = ProcessInfo.processInfo.environment
 
         guard let host = url.host else {

@@ -76,4 +76,40 @@ extension Character {
             return false
         }
     }
+
+    /// Whether this character may appear in an HTTP `token`, per RFC 9110 §5.6.2.
+    ///
+    /// Used to keep the `User-Agent` header's `product` value well-formed: a `token` cannot be
+    /// quoted or percent-encoded like the rest of a header value, so a disallowed character
+    /// (a space in a process name, say) has to be substituted rather than escaped.
+    package var isRFC9110TokenAllowed: Bool {
+        guard let ascii = asciiValue else {
+            return false
+        }
+
+        switch ascii {
+        case 48...57,  // 0-9
+            65...90,  // A-Z
+            97...122,  // a-z
+            33,  // !
+            35,  // #
+            36,  // $
+            37,  // %
+            38,  // &
+            39,  // '
+            42,  // *
+            43,  // +
+            45,  // -
+            46,  // .
+            94,  // ^
+            95,  // _
+            96,  // `
+            124,  // |
+            126:  // ~
+            return true
+
+        default:
+            return false
+        }
+    }
 }

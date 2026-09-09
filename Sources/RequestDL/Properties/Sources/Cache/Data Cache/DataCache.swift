@@ -16,6 +16,10 @@ import struct Foundation.Date
 import class Foundation.ProcessInfo
 #endif
 
+#if canImport(Darwin)
+import struct Foundation.FileProtectionType
+#endif
+
 /// A data cache that stores and retrieves data based on specified capacities and policies.
 public struct DataCache: Sendable, Equatable {
 
@@ -56,6 +60,18 @@ public struct DataCache: Sendable, Equatable {
 
         var diskStorage: DiskStorage {
             lock.withLock { _diskStorage }
+        }
+
+        #if canImport(Darwin)
+        var fileProtection: FileProtectionType? {
+            get { lock.withLock { _diskStorage.fileProtection } }
+            set { lock.withLock { _diskStorage.fileProtection = newValue } }
+        }
+        #endif
+
+        var encryptionKey: DataCache.EncryptionKey? {
+            get { lock.withLock { _diskStorage.encryptionKey } }
+            set { lock.withLock { _diskStorage.encryptionKey = newValue } }
         }
 
         /// Cache writes started and not yet finished.
@@ -153,12 +169,12 @@ public struct DataCache: Sendable, Equatable {
             key: String,
             cachedResponse: CachedResponse,
             contentLength: Int64
-        ) async -> Internals.AnyBuffer? {
+        ) async -> (buffer: Internals.AnyBuffer?, recordURL: URL?) {
             let (diskStorage, maximumCapacity, knownUsage) = lock.withLock {
                 (_diskStorage, _diskCapacity, _diskUsageEstimate)
             }
 
-            let (buffer, usage) = await diskStorage.allocateBuffer(
+            let (buffer, usage, recordURL) = await diskStorage.allocateBuffer(
                 key: key,
                 cachedResponse: cachedResponse,
                 contentLength: contentLength,
@@ -170,7 +186,7 @@ public struct DataCache: Sendable, Equatable {
                 lock.withLock { _diskUsageEstimate = usage }
             }
 
-            return buffer
+            return (buffer, recordURL)
         }
 
         // MARK: - Init
@@ -204,6 +220,39 @@ public struct DataCache: Sendable, Equatable {
     public var diskCapacity: Int64 {
         get { storage.diskCapacity }
         nonmutating set { storage.diskCapacity = newValue }
+    }
+
+    #if canImport(Darwin)
+    ///
+    /// The Data Protection class applied to newly written disk cache files.
+    ///
+    /// `nil`, the default, leaves the system default protection class in place — the same
+    /// behavior as before this property existed. Setting it only affects cache entries written
+    /// from that point on; existing files on disk keep whatever class they already had.
+    ///
+    /// `.completeUntilFirstUserAuthentication` is the usual choice for a cache: it keeps entries
+    /// unreadable before the device's first unlock after boot, without the stricter classes'
+    /// risk of a background write or read failing outright while the device is locked.
+    ///
+    public var fileProtection: FileProtectionType? {
+        get { storage.fileProtection }
+        nonmutating set { storage.fileProtection = newValue }
+    }
+    #endif
+
+    ///
+    /// The key used to encrypt the disk tier at rest.
+    ///
+    /// `nil`, the default, leaves the disk tier unencrypted — the same behavior as before this
+    /// property existed. Setting it only affects cache entries written from that point on;
+    /// existing plaintext files on disk are left alone. Supplying a new key does not invalidate
+    /// entries written under a previous one: they simply fail to decrypt and are treated as
+    /// misses, re-encrypting under the current key the next time they're written. See
+    /// ``removeAll()`` for clearing the cache outright, e.g. after a suspected key compromise.
+    ///
+    public var encryptionKey: DataCache.EncryptionKey? {
+        get { storage.encryptionKey }
+        nonmutating set { storage.encryptionKey = newValue }
     }
 
     // MARK: - Internal properties
@@ -493,6 +542,7 @@ public struct DataCache: Sendable, Equatable {
 
         var memoryBuffer: Internals.AnyBuffer?
         var diskBuffer: Internals.AnyBuffer?
+        var diskRecordURL: URL?
 
         if cachedResponse.policy.contains(.memory) {
             // Two steps, and they have to be two.
@@ -526,7 +576,7 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if cachedResponse.policy.contains(.disk) {
-            diskBuffer = await storage.allocateDiskBuffer(
+            (diskBuffer, diskRecordURL) = await storage.allocateDiskBuffer(
                 key: key,
                 cachedResponse: cachedResponse,
                 contentLength: contentLength
@@ -535,8 +585,33 @@ public struct DataCache: Sendable, Equatable {
 
         return .init(
             memoryBuffer: memoryBuffer,
-            diskBuffer: diskBuffer
+            diskBuffer: diskBuffer,
+            diskRecordURL: diskRecordURL
         )
+    }
+
+    /// Discards a cache write that started via ``allocateBuffer(key:cachedResponse:contentLength:)``
+    /// but never finished — its body stream was cancelled, errored, or otherwise gave up before
+    /// writing through `buffer` completed.
+    ///
+    /// - Important: Not the same thing as ``remove(forKey:)``. That method looks entries up by
+    /// key through `DiskStorage.record(_:)`, which requires a disk entry's `response.record`
+    /// *and* `data.record` to already both be on disk before it can even be found — exactly the
+    /// gate a write that never finished can't pass. Called there, it would silently do nothing,
+    /// leaving the half-written directory behind: invisible to every future read for the same
+    /// reason, yet still costing each of them a multi-second retry budget for `data.record`
+    /// permanently missing. This method instead targets `buffer.diskRecordURL` — the exact
+    /// directory captured at allocation time — so it finds and deletes precisely the write that
+    /// failed, without searching by key and risking an unrelated, still in-progress write to the
+    /// same key from a concurrent request.
+    func discardFailedWrite(_ buffer: Buffer, forKey key: String) async {
+        let key = base64EncodedKey(key)
+
+        storage.withMemoryStorage { $0.remove(key) }
+
+        if let diskRecordURL = buffer.diskRecordURL {
+            await storage.diskStorage.removeRecord(at: diskRecordURL)
+        }
     }
 
     /// Runs a cache write and keeps track of it, so `waitUntilIdle()` can join it later.

@@ -85,7 +85,10 @@ extension Internals {
             // MARK: - Private properties
 
             private let lock = AsyncLock(watchdog: watchdog)
-            private let url: Stream.URL
+            /// `fileprivate`, not `private` -- `Internals.Buffer.wholeFileURL` (below, `Stream ==
+            /// Internals.FileStreamBuffer` only) reads this directly rather than adding an async
+            /// round trip through this actor-less class for a value that never changes after init.
+            fileprivate let url: Stream.URL
 
             // MARK: - Unsafe properties
 
@@ -455,6 +458,20 @@ extension Internals {
             moveReaderIndex(to: min(readerIndex, _writerIndex))
         }
 
+        /// Addresses `url` directly, bypassing `Stream.URL.make(from:)`.
+        ///
+        /// Every other constructor above starts from a `Foundation.URL`/`Internals.ByteURL` and
+        /// asks `Stream.URL.make(from:)` — a `static` factory with no channel to carry anything
+        /// beyond the address itself — to produce the concrete `Stream.URL`. That is a problem
+        /// for a `Stream.URL` that also needs per-instance context, such as
+        /// `Internals.EncryptedFileBufferURL`'s encryption key: there is no way to smuggle a key
+        /// through `make(from:)` without embedding it in the `Foundation.URL` itself, which must
+        /// never happen. This exists for exactly that case — a caller that already has a fully
+        /// formed `Stream.URL` in hand skips `make(from:)` entirely.
+        package init(addressing url: Stream.URL) async {
+            await self.init(storage: .init(url))
+        }
+
         private init(storage: Storage) async {
             self.init(storage: storage, writerIndex: await storage.writtenBytes)
         }
@@ -512,6 +529,34 @@ extension Internals.Buffer where Stream == Internals.ByteStreamBuffer {
         )
     }
 
+}
+
+// MARK: - Direct file access
+
+extension Internals.Buffer where Stream == Internals.FileStreamBuffer {
+
+    /// The file this buffer addresses, when uploading straight from it would read exactly the
+    /// bytes this buffer would -- i.e. this cursor hasn't read anything yet, and the file isn't
+    /// one this package created for its own scratch use (a caller that later removes it, or that
+    /// the deallocating `Storage` above would itself clean up, could otherwise disappear out from
+    /// under whoever took this URL and held onto it past this buffer's own lifetime).
+    ///
+    /// `nil` for anything that fails either check: something has already read from this cursor
+    /// (a stale answer here would upload less than the file actually has, or -- if this cursor
+    /// were later rewound -- silently more), or the file is temporary (this package's own, not
+    /// guaranteed to outlive whatever asked for its `URL`).
+    ///
+    /// - Important: Trusts `readableBytes` as already accurate for the file's current on-disk
+    /// size, the same trust `Internals.BodySequence.totalSize` already places in it elsewhere --
+    /// this does not re-stat the file to confirm nothing has grown or shrunk it since this buffer
+    /// was built.
+    package var wholeFileURL: URL? {
+        guard readerIndex == .zero, !storage.url.isTemporary else {
+            return nil
+        }
+
+        return storage.url.absoluteURL()
+    }
 }
 
 // MARK: - Reading

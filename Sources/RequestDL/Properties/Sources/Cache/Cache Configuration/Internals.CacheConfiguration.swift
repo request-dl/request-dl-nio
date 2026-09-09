@@ -31,6 +31,7 @@ extension Internals {
         var memoryCapacity: Int64?
         var diskCapacity: Int64?
         var directory: Directory?
+        var encryptionKey: DataCache.EncryptionKey?
 
         // MARK: - Inits
 
@@ -61,6 +62,7 @@ extension Internals {
 
             dataCache.memoryCapacity = Self.resolve(memoryCapacity, default: dataCache.memoryCapacity)
             dataCache.diskCapacity = Self.resolve(diskCapacity, default: dataCache.diskCapacity)
+            dataCache.encryptionKey = encryptionKey
 
             return dataCache
         }

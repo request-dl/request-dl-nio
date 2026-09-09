@@ -117,6 +117,37 @@ struct AdditionalTrustRootsTests {
     }
 
     @Test
+    func additional_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
+        // Given
+        // Regression test: `AdditionalTrustRoots` used to require an enclosing
+        // `SecureConnection`. The base `Internals.SecureConnection` is now created lazily the
+        // first time it's needed.
+        let server = Certificates().server()
+        let client = Certificates().client()
+
+        let data = try [client, server]
+            .map { try Data(contentsOf: $0.certificateURL) }
+            .reduce(Data(), +)
+
+        let bytes = Array(data)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.AdditionalTrustRoots(bytes)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.additionalTrustRoots
+                == .init(
+                    [.bytes(bytes)]
+                )
+        )
+    }
+
+    @Test
     func trustRoots_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.AdditionalTrustRoots {

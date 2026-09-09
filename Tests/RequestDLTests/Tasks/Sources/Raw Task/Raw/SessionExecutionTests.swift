@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDL
@@ -19,11 +20,18 @@ import struct Foundation.URL
 /// Executes `requestConfiguration` through `session` with caching bypassed, mirroring the
 /// cache-then-execute orchestration `RawTask.result()` performs -- this file drives
 /// `Internals.Session` directly (no `Property` tree to resolve), so it takes over just the
-/// `client()` + `execute(client:request:...)` half of that pipeline.
+/// `applyCompression()` + `client()` + `execute(client:request:...)` half of that pipeline
+/// (`RawTask.executeTraced` is the other caller of the first of those). Compression itself is no
+/// longer read off `session.configuration` -- it's already captured on `requestConfiguration`
+/// (via `Property.compression(_:onDuplicateHeader:shouldCompressBodyData:)`) by the time this
+/// runs, same as `RawTask.executeTraced` sees it.
 private func execute(
     session: Internals.Session,
     requestConfiguration: RequestConfiguration
 ) async throws -> AsyncResponse {
+    var requestConfiguration = requestConfiguration
+    try requestConfiguration.applyCompression()
+
     let client = try await session.client()
     let request = try requestConfiguration.build(eventLoop: client.eventLoopGroup.any())
 
@@ -45,7 +53,7 @@ private func execute(
 // response; swift-testing runs `@Test`s in a suite concurrently by default, and the upload
 // starves the group's threads until the others hit `connectTimeout`. `.serialized` keeps this
 // suite's tests from overlapping, which the connection-pool tuning below alone didn't fix.
-@Suite(.serialized)
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct SessionExecutionTests {
 
     final class TestState: Sendable {
@@ -292,6 +300,7 @@ struct SessionExecutionTests {
         requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
         requestConfiguration.method = "POST"
         requestConfiguration.body = await RequestBody(buffers: [Internals.DataBuffer(payload)])
+        requestConfiguration.compression = InternalsCompressionAlgorithmAdapter(algorithm: GzipAlgorithm())
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.trustRoots = .certificates([
@@ -300,7 +309,6 @@ struct SessionExecutionTests {
 
         var configuration = testingSession.configuration
         configuration.secureConnection = secureConnection
-        configuration.compression = .enabled(.gzip)
 
         let session = Internals.Session(
             provider: testingSession.provider,

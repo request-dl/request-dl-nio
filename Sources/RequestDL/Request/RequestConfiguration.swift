@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import NIOCore
 import RequestDLInternals
+import Tracing
 
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,
@@ -57,6 +58,11 @@ public struct RequestConfiguration: Sendable {
     /// The strategy to use for handling cached data. Defaults to `.ignoreCachedData`.
     public internal(set) var cacheStrategy: CacheStrategy
 
+    /// The `ServiceContext` to bind while this request executes. Defaults to `nil`, which leaves
+    /// whatever `ServiceContext.current` task-local is already ambient untouched — only set this
+    /// to explicitly override it for this request, independent of the calling task's own state.
+    public internal(set) var serviceContext: ServiceContext?
+
     // MARK: - Internal properties
 
     /// Only a bodyless GET is cacheable.
@@ -72,6 +78,31 @@ public struct RequestConfiguration: Sendable {
 
     var readingMode: Internals.DownloadStep.ReadingMode
 
+    /// `true` only when the `User-Agent` currently in ``headers`` is exactly RequestDL's own
+    /// untouched default (``UserAgentHeader/init()``) — no other `User-Agent` node has written
+    /// to it since. Kept up to date by `markUserAgentWritten(isDefault:)` as `HeaderNode`s fold
+    /// into this configuration.
+    ///
+    /// Lets `.urlSession` drop the header and defer to URLSession's own native
+    /// `CFNetwork`/`Darwin` report — see `dropDefaultUserAgentForNativeReporting()` — without
+    /// ever touching a value the caller actually asked for.
+    private(set) var hasDefaultUserAgent = false
+
+    /// Whether any `User-Agent` node has folded in yet. Once true, a second write — default or
+    /// not — means the header is no longer purely RequestDL's untouched default, so
+    /// `hasDefaultUserAgent` latches to `false` for the rest of resolution.
+    private var didWriteUserAgent = false
+
+    /// Captured from `inputs.environment.compression` at `_makeProperty` time by whichever
+    /// `Property` builds the node that produces ``body`` (`Payload`, `Form`, `FormGroup`) -- not
+    /// read from inside a node's own `make(_:)`, since `PropertyNode.make(_:)` has no
+    /// `environment` of its own to read. `nil` when no `Property.compression(_:onDuplicateHeader
+    /// :shouldCompressBodyData:)` is in scope, or when nothing in the tree ever produces a body
+    /// for it to apply to.
+    var compression: (any Internals.CompressionAlgorithm)?
+    var compressionDuplicateHeaderBehavior: Internals.Compression.DuplicateHeaderBehavior = .error
+    var shouldCompressBodyData: (@Sendable (Int) -> Bool)?
+
     // MARK: - Inits
 
     init() {
@@ -84,9 +115,36 @@ public struct RequestConfiguration: Sendable {
         self.readingMode = .length(1_024)
         self.cachePolicy = []
         self.cacheStrategy = .ignoreCachedData
+        self.serviceContext = nil
     }
 
     // MARK: - Internal methods
+
+    /// Records that a `User-Agent` `HeaderNode` folded into ``headers``, updating
+    /// ``hasDefaultUserAgent`` accordingly. Called once per `User-Agent` node, in tree order.
+    mutating func markUserAgentWritten(isDefault: Bool) {
+        hasDefaultUserAgent = !didWriteUserAgent && isDefault
+        didWriteUserAgent = true
+    }
+
+    /// Removes RequestDL's own default `User-Agent`, when present untouched, so the executor
+    /// that actually sends this request can report itself instead.
+    ///
+    /// Only ever call this for the `.urlSession` executor: URLSession synthesizes its own
+    /// accurate `AppName/version Darwin/version CFNetwork/version` header whenever a request
+    /// carries none at all, and RequestDL's neutral default would otherwise suppress that native
+    /// report. NIO and NIOTransportServices never synthesize a `User-Agent` of their own, so
+    /// dropping it there would just send the request with none — worse than RequestDL's
+    /// transport-agnostic default, not more honest. A no-op whenever the caller supplied their
+    /// own value: only the untouched default is eligible.
+    mutating func dropDefaultUserAgentForNativeReporting() {
+        guard hasDefaultUserAgent else {
+            return
+        }
+
+        headers.remove(name: "User-Agent")
+        hasDefaultUserAgent = false
+    }
 
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``RequestBody/connect(writer:body:eventLoop:)``.
@@ -99,6 +157,104 @@ public struct RequestConfiguration: Sendable {
         )
     }
 }
+
+#if canImport(Darwin)
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+extension RequestConfiguration {
+
+    /// `URLSession` counterpart to `build(eventLoop:)` -- needs no `EventLoop`, since it drains
+    /// `RequestBody` through its `AsyncSequence` conformance rather than the
+    /// `EventLoopFuture`-driven streaming path `build(eventLoop:)` uses.
+    ///
+    /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See
+    /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart, which drains `body`
+    /// itself -- into memory too, for anything under
+    /// `Internals.URLSessionUploadFile.inMemoryThreshold`, or a temporary file for anything larger.
+    func buildURLRequest() async throws -> URLRequest {
+        var request = try buildURLRequestWithoutBody()
+
+        if let body {
+            var data = Data()
+            data.reserveCapacity(body.totalSize)
+
+            for try await buffer in body {
+                data.append(contentsOf: buffer.readableBytesView)
+            }
+
+            request.httpBody = data
+        }
+
+        return request
+    }
+
+    /// URL/method/headers only -- deliberately never touches `body`. Pairs with
+    /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`, which
+    /// drives `body` itself -- via `uploadTask(with:from:)` or `uploadTask(with:fromFile:)`
+    /// depending on size, see `Internals.URLSessionUploadFile`; both
+    /// ignore whatever `httpBody`/`httpBodyStream` the request carries, so setting either here
+    /// would be dead weight the caller has to know to not rely on rather than something actually
+    /// used.
+    func buildURLRequestWithoutBody() throws -> URLRequest {
+        guard let requestURL = URL(string: url) else {
+            throw InvalidRequestURLError(url: url)
+        }
+
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = method ?? "GET"
+
+        // Overrides `URLRequest`'s own default (`.useProtocolCachePolicy`), which -- independent
+        // of RequestDL's own `Internals.CacheControl`/`DataCache` -- lets URLSession's own
+        // `URLCache` answer from its own state before ever reaching the network. RequestDL owns
+        // caching entirely itself; a second, invisible cache layer underneath URLSession does
+        // nothing useful and only risks disagreeing with it.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        for (name, value) in headers {
+            guard name.caseInsensitiveCompare("Cache-Control") == .orderedSame else {
+                request.addValue(value, forHTTPHeaderField: name)
+                continue
+            }
+
+            // `only-if-cached` is stripped from the wire header -- CFNetwork itself, underneath
+            // URLSession, honors this directive against its *own* cache before the request above
+            // ever applies: regardless of `request.cachePolicy`, a `Cache-Control:
+            // only-if-cached` request URLSession has nothing cached for fails outright with
+            // `NSURLErrorDomain` -2000 ("can't load from network"). `Internals.CacheControl`
+            // already resolved what this directive means for RequestDL's own cache before this
+            // request is ever built (see `effectiveCacheStrategy`) -- by the time execution
+            // reaches here, forwarding it verbatim would only hand the same decision to a second,
+            // stricter cache this package doesn't control and never asked to be consulted only
+            // conditionally in the first place.
+            let remaining =
+                value
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { $0.caseInsensitiveCompare("only-if-cached") != .orderedSame }
+
+            guard !remaining.isEmpty else {
+                continue
+            }
+
+            request.addValue(remaining.joined(separator: ", "), forHTTPHeaderField: name)
+        }
+
+        return request
+    }
+}
+
+/// `url` failed to parse as a `Foundation.URL` -- mirrors `build(eventLoop:)`'s own failure mode,
+/// where `HTTPClient.Request`'s URL parser rejects the same kind of malformed string.
+struct InvalidRequestURLError: Error, Sendable {
+    let url: String
+}
+
+#endif
 
 // MARK: - String extension
 

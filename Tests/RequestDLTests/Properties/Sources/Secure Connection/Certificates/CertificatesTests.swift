@@ -138,6 +138,33 @@ struct CertificatesTests {
     }
 
     @Test
+    func certificates_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
+        // Given
+        // Regression test: `Certificates` used to require an enclosing `SecureConnection`. The
+        // base `Internals.SecureConnection` is now created lazily the first time it's needed.
+        let server = Certificates().server()
+        let client = Certificates().client()
+
+        let data = try [client, server]
+            .map { try Data(contentsOf: $0.certificateURL) }
+            .reduce(Data(), +)
+
+        let bytes = Array(data)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.Certificates(bytes)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.certificateChain == .bytes(bytes)
+        )
+    }
+
+    @Test
     func certificates_whenAccessBody_shouldBeNever() async throws {
         // Given
         let sut = RequestDL.Certificates {

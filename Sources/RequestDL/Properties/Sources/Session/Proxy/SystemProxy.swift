@@ -25,8 +25,11 @@
 /// > Note: An explicit ``Proxy`` takes precedence. Declaring both leaves the explicit one in
 /// effect.
 ///
-/// > Note: Proxy auto configuration, a PAC script, is not evaluated. A network that only offers
-/// one resolves to a direct connection.
+/// > Note: Proxy auto configuration (a PAC script) is evaluated -- fetched and run as JavaScript
+/// against the request's URL, exactly like a browser would -- with results cached briefly per
+/// script/URL pair so a burst of requests to the same host doesn't re-fetch and re-evaluate the
+/// same script for each one. A PAC script that's unreachable, or fails to evaluate, resolves to a
+/// direct connection rather than failing the request.
 public struct SystemProxy: Property {
 
     private struct Node: PropertyNode {

@@ -17,3 +17,7 @@ Explore the various types and configurations available to make your request.
 ### Working with cache
 
 - <doc:Cache-support>
+
+### Configuration-driven requests
+
+- <doc:Configuration-driven-requests>

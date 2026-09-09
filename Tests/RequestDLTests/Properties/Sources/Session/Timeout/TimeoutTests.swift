@@ -41,6 +41,24 @@ struct TimeoutTests {
     }
 
     @Test
+    func timeout_whenResourceSourceConfigured_setsResourceField() async throws {
+        // Given
+        let timeout = UnitTime.seconds(120)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Timeout(timeout, for: .resource)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.timeout.resource == timeout.nanoseconds)
+        #expect(resolved.session.configuration.timeout.connect == nil)
+        #expect(resolved.session.configuration.timeout.read == nil)
+    }
+
+    @Test
     func allTimeout() async throws {
         // Given
         let requestTimeout = Timeout.Source.all

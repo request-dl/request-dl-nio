@@ -50,14 +50,20 @@ public struct UploadTask<Content: Property>: RequestTask {
 
     // MARK: - Public methods
 
+    /// This method is used internally and should not be called directly.
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
+        try await task._result(environment: environment)
+    }
+
     ///
-    /// Returns the asynchronous response for a request.
+    /// Resolves this task's request and hands it to `descriptor`, without performing it.
     ///
-    /// - Returns: An ``AsyncResponse`` sequence of request upload and download steps.
+    /// - Parameter descriptor: The ``TaskDescriptor`` that produces the description.
+    /// - Returns: The descriptor's output — a curl command line for ``CURLTaskDescriptor/cURL``.
+    /// - Throws: An error thrown while resolving the request, or by the descriptor itself.
     ///
-    /// - Throws: An error of type `Error` that indicates an issue with the request or response.
-    ///
-    public func result() async throws -> AsyncResponse {
-        try await task.result()
+    public func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {
+        try await task.description(descriptor)
     }
 }

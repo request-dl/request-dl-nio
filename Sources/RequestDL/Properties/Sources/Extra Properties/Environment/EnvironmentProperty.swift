@@ -40,7 +40,7 @@ extension Property {
     ///
     /// - Parameters:
     ///   - keyPath: The `WritableKeyPath` of the ``RequestEnvironmentValues`` to set the `value` for.
-    ///   - value: The `Value` to set for the ``PropertyEnvironment``.
+    ///   - value: The `Value` to set for the ``RequestEnvironment``.
     ///
     /// - Returns: A modified `Property` with the new ``RequestEnvironmentValues`` set.
     ///

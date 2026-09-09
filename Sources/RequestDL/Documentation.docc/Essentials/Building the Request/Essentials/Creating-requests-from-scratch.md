@@ -181,6 +181,9 @@ Learn more in:
 ### Working with authentication
 
 - ``RequestDL/Authorization``
+- ``RequestDL/DigestAuthentication``
+- ``RequestDL/DigestCredential``
+- ``RequestDL/RequestTask/digestAuthentication(_:maxAttempts:)``
 
 ### Meet the headers
 
@@ -212,10 +215,20 @@ Learn more in:
 
 - ``RequestDL/Session``
 - ``RequestDL/Proxy``
+- ``RequestDL/ProxyAuthorization``
 - ``RequestDL/SystemProxy``
 - ``RequestDL/DNSOverride``
 - ``RequestDL/URLOverride``
 - ``RequestDL/URLOverrideError``
+- ``RequestDL/NetworkAvailabilityError``
+
+### Customizing redirect handling
+
+- ``RequestDL/RedirectStrategy``
+- ``RequestDL/RedirectContext``
+- ``RequestDL/RedirectRequest``
+- ``RequestDL/RedirectHistoryEntry``
+- ``RequestDL/RedirectDecision``
 
 ### Adding request timeout
 

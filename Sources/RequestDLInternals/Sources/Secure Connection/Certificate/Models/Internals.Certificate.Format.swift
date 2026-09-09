@@ -6,7 +6,7 @@ import NIOSSL
 
 extension Internals.Certificate {
 
-    package enum Format: Sendable, Hashable {
+    package enum Format: Sendable, Hashable, Codable {
 
         case der
         case pem

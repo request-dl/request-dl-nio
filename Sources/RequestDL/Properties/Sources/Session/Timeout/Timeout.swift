@@ -2,7 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// `Timeout` is a struct that defines the request timeout for a connect and read.
+/// `Timeout` is a struct that defines the request timeout for a connect, read, or the whole
+/// resource end to end (see ``Timeout/Source/resource``).
 ///
 /// To create an instance of `Timeout`, initialize it with the time interval and which source to be limited.
 ///
@@ -37,6 +38,10 @@ public struct Timeout: Property {
 
             if source.contains(.read) {
                 make.sessionConfiguration.timeout.read = timeout.nanoseconds
+            }
+
+            if source.contains(.resource) {
+                make.sessionConfiguration.timeout.resource = timeout.nanoseconds
             }
         }
     }

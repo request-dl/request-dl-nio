@@ -2,9 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import NIOCore
 import NIOFileSystem
 import RequestDLInternals
+import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -15,6 +17,12 @@ import struct Foundation.Date
 import struct Foundation.Data
 import class Foundation.JSONDecoder
 import class Foundation.JSONEncoder
+#endif
+
+#if canImport(Darwin)
+import class Foundation.FileManager
+import struct Foundation.FileAttributeKey
+import struct Foundation.FileProtectionType
 #endif
 
 struct DiskStorage: Sendable {
@@ -130,8 +138,119 @@ struct DiskStorage: Sendable {
         }
     }
 
+    /// A directory-wide, in-process index from cache key to the record directory that holds
+    /// it — the fast path `record(forKey:)` uses instead of listing every entry in
+    /// `directory` on every lookup.
+    ///
+    /// A HIT is trusted immediately, with no disk access at all: once a write records a
+    /// location for a key, only an explicit, guarded removal ever clears it. A MISS never is.
+    /// `dir.listContents()` racing a burst of very recent creates can come back incomplete —
+    /// the same class of transient filesystem flake `Record.init?`'s own retry loop already
+    /// tolerates for a single file, just one layer up, at the directory-listing level, where
+    /// there is nothing to retry against within one scan. Trusting a first scan's absence
+    /// forever would turn that transient gap into a permanent false miss, silently: the
+    /// scan-per-lookup this index replaces was self-healing by accident, since the very next
+    /// lookup simply rescanned and found what the last one missed. So a miss here always
+    /// re-scans before answering — sharing that scan across concurrent callers who miss at the
+    /// same time (e.g. a list of images loading at once, before any of them is cached yet)
+    /// rather than each starting their own, and always merging forward rather than caching a
+    /// negative result.
+    ///
+    /// - Important: This index only tracks writes and removals made through *this* value's
+    /// own methods. A location written by a different `DiskStorage`/process sharing the same
+    /// directory (e.g. via `suiteName`) is invisible to it until the next scan — the same
+    /// staleness `Storage._diskUsageEstimate` already tolerates for eviction accounting. A
+    /// lookup that misses falls through to a live scan rather than a wrong answer; it never
+    /// serves stale *content*, only an occasional avoidable one.
+    private final class Index: @unchecked Sendable {
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+
+        private var locationsByKey: [String: URL] = [:]
+        private var refreshTask: Task<Void, Never>?
+
+        // MARK: - Internal methods
+
+        /// Looks up `key`, kicking off — or joining — a rescan first if it isn't already known.
+        func location(for key: String, scan: @escaping @Sendable () async -> [Record]) async -> URL? {
+            if let hit = lock.withLock({ locationsByKey[key] }) {
+                return hit
+            }
+
+            let task: Task<Void, Never> = lock.withLock {
+                if let refreshTask {
+                    return refreshTask
+                }
+
+                let newTask = Task {
+                    let scanned = await scan()
+
+                    lock.withLock {
+                        // Only fills gaps. A write or removal that landed after this scan
+                        // started already knows more than a snapshot taken before it did —
+                        // this must not overwrite that with stale information.
+                        for record in scanned where locationsByKey[record.key] == nil {
+                            locationsByKey[record.key] = record.url
+                        }
+
+                        refreshTask = nil
+                    }
+                }
+
+                refreshTask = newTask
+                return newTask
+            }
+
+            await task.value
+
+            return lock.withLock { locationsByKey[key] }
+        }
+
+        func set(_ key: String, location url: URL) {
+            lock.withLock { locationsByKey[key] = url }
+        }
+
+        /// Removes the mapping for `key` only if it still points at `url`.
+        ///
+        /// Guards against a slower removal of a stale or superseded directory clobbering a
+        /// newer write that already replaced it in the index — the two can race whenever a
+        /// duplicate directory for the same key gets cleaned up after a fresher write already
+        /// pointed the index elsewhere.
+        func remove(_ key: String, ifLocation url: URL) {
+            lock.withLock {
+                if locationsByKey[key] == url {
+                    locationsByKey[key] = nil
+                }
+            }
+        }
+
+        func removeAll() {
+            lock.withLock {
+                locationsByKey = [:]
+            }
+        }
+    }
+
     // MARK: - Private properties
     private let directory: URL
+    private let index = Index()
+
+    // MARK: - Internal properties
+
+    /// The Data Protection class newly written cache files are given, on platforms that support
+    /// it. `nil` (the default) leaves the system default in place, matching this type's
+    /// behavior before this property existed.
+    #if canImport(Darwin)
+    var fileProtection: FileProtectionType?
+    #endif
+
+    /// The key `response.record` and `data.record` are encrypted with, on platforms and disk
+    /// tiers this type controls. `nil` (the default) leaves both files in plaintext, matching
+    /// this type's behavior before this property existed. Cross-platform, unlike
+    /// `fileProtection`: `swift-crypto` needs no OS-specific support.
+    var encryptionKey: DataCache.EncryptionKey?
 
     // MARK: - Inits
     init(directory: URL) {
@@ -157,7 +276,7 @@ struct DiskStorage: Sendable {
 
             return await .init(
                 cachedResponse: cachedResponse,
-                buffer: Internals.FileBuffer(record.dataURL)
+                buffer: dataBuffer(for: record)
             )
         }
     }
@@ -201,10 +320,42 @@ struct DiskStorage: Sendable {
             return nil
         }
 
-        return buffer.getData(
-            at: buffer.readerIndex,
-            length: buffer.readableBytes
-        ) ?? Data()
+        let raw =
+            buffer.getData(
+                at: buffer.readerIndex,
+                length: buffer.readableBytes
+            ) ?? Data()
+
+        guard let encryptionKey else {
+            return raw
+        }
+
+        // Wrong/rotated key, and a corrupted or tampered file, both fail here — `try?` turns
+        // either into a miss, matching every other fault-tolerance path in this type.
+        guard
+            let sealedBox = try? AES.GCM.SealedBox(combined: raw),
+            let opened = try? AES.GCM.open(sealedBox, using: encryptionKey.symmetricKey)
+        else {
+            return nil
+        }
+
+        return opened
+    }
+
+    /// The buffer `data.record` is read through or written into — plain when no key is
+    /// configured, chunk-encrypted otherwise. Both satisfy `Internals.AnyBuffer`, so nothing
+    /// above this call site needs to know which one it got.
+    private func dataBuffer(for record: Record) async -> Internals.AnyBuffer {
+        guard let encryptionKey else {
+            return await Internals.FileBuffer(record.dataURL)
+        }
+
+        let url = Internals.EncryptedFileBufferURL(
+            inner: .init(record.dataURL),
+            key: encryptionKey.symmetricKey
+        )
+
+        return await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
     }
 
     // MARK: - Private static methods
@@ -217,15 +368,21 @@ struct DiskStorage: Sendable {
     /// existence was (or is about to be) confirmed, where a fresh miss is that flake, not a
     /// genuine absence.
     ///
-    /// - Note: 50 attempts, 10ms apart — a 500ms budget. The previous 5×2ms (10ms total) was
-    /// sized for a quiet machine; under the parallel test load this runs under in CI, the
-    /// transient window this retries past can outlast that easily, which is what turned
-    /// `diskStorage_whenFreeingSpaceBelowTotalUsage_shouldEvictOnlyTheOldestEntries` flaky. The
-    /// happy path still returns on the first attempt; this only changes how long a genuinely
-    /// slow stat gets before being treated as a real miss.
+    /// - Note: 300 attempts, 50ms apart — a 15s budget. The 500ms budget before this (50×10ms,
+    /// itself already raised once from an original 5×2ms sized for a quiet machine) still
+    /// wasn't enough to keep
+    /// `diskStorage_whenFreeingSpaceBelowTotalUsage_shouldEvictOnlyTheOldestEntries` from
+    /// flaking: CI's Apple simulator runners have been observed stalling the entire test
+    /// process for 15-27s under scheduler contention (see the request-dl-nio CI-flakiness
+    /// investigation into `AsyncLock.Watchdog` false positives — the same underlying
+    /// contention, just surfacing here as a missed stat instead of a held lock), which a
+    /// 500ms budget cannot outlast no matter how the delay is split up. 15s matches
+    /// `AsyncLock.Watchdog`'s own threshold for the same reason. The happy path still returns
+    /// on the first attempt; this only changes how long a genuinely slow stat gets before being
+    /// treated as a real miss.
     private static func retryingUntilSuccess<T>(
-        attempts: Int = 50,
-        retryDelay: UInt64 = 10_000_000,
+        attempts: Int = 300,
+        retryDelay: UInt64 = 50_000_000,
         _ operation: () async -> T?
     ) async -> T? {
         for attempt in 0..<attempts {
@@ -246,6 +403,7 @@ struct DiskStorage: Sendable {
         _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
+        index.remove(key, ifLocation: record.url)
     }
 
     func removeAll() async {
@@ -258,6 +416,7 @@ struct DiskStorage: Sendable {
             _ = try? await Internals.fileSystem.removeItem(
                 at: record.url.filePath
             )
+            index.remove(record.key, ifLocation: record.url)
         }
     }
 
@@ -289,51 +448,96 @@ struct DiskStorage: Sendable {
             try await Internals.fileSystem.moveItem(at: oldDataPath, to: newDataPath)
 
             try await writeAndClose(response, to: newRecord.responseURL)
+
+            // `newDataPath` carries whatever protection class it already had across the move
+            // above — renaming within the same volume does not touch a file's contents or its
+            // extended attributes. Only the freshly (re)written response record needs it applied
+            // again here.
+            #if canImport(Darwin)
+            await applyFileProtection(toResponseRecordAt: newRecord.responseURL)
+            #endif
+
+            index.set(key, location: newRecord.url)
         } catch {
             _ = try? await Internals.fileSystem.removeItem(
                 at: newRecord.url.filePath
             )
+            index.remove(key, ifLocation: newRecord.url)
         }
 
         _ = try? await Internals.fileSystem.removeItem(
             at: record.url.filePath
         )
+        // A no-op when the `do` branch above already repointed `key` at `newRecord.url`; clears
+        // it when the move failed and there is nothing left on disk for this key at all — see
+        // the comment on `Record.init(directory:key:at:)` for why a failed revalidation loses
+        // the entry outright rather than leaving `record`'s directory in place.
+        index.remove(key, ifLocation: record.url)
     }
 
     /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
     /// decide whether `freeSpace` can skip its directory rescan below. See that method's doc
     /// for the safety argument — passing a stale or absent estimate never risks correctness,
     /// only an avoidable rescan.
-    /// - Returns: The buffer to write through, and disk usage immediately after this write
-    /// (`nil` when the write didn't happen, e.g. the entry doesn't fit at all), for the caller
-    /// to keep as its next `knownUsage`.
+    /// - Returns: The buffer to write through, disk usage immediately after this write (`nil`
+    /// when the write didn't happen, e.g. the entry doesn't fit at all) for the caller to keep
+    /// as its next `knownUsage`, and the exact directory this call created on disk (`nil`
+    /// exactly when `buffer` is), for the caller to hand back to ``removeRecord(at:)`` if the
+    /// write it's about to do through `buffer` ends up never finishing.
     func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
         contentLength: Int64,
         maximumCapacity: Int64,
         knownUsage: Int64? = nil
-    ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?) {
-        guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil) }
+    ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?, recordURL: URL?) {
+        guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil, nil) }
 
         let writableBytes = Int64(response.count) + contentLength
-        guard writableBytes <= maximumCapacity else { return (nil, nil) }
+        guard writableBytes <= maximumCapacity else { return (nil, nil, nil) }
 
         let usageAfterEviction = await freeSpace(
             maximumCapacity - writableBytes,
             knownUsage: knownUsage
         )
 
-        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil) }
+        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil, nil) }
 
         do {
             try await writeAndClose(response, to: record.responseURL)
         } catch {
-            return (nil, nil)
+            // The directory itself was already created above (`Record.init(directory:key:at:)`
+            // creates it unconditionally). Left behind, it would be indistinguishable from the
+            // orphan `removeRecord(at:)` exists to clean up elsewhere — except nobody has a
+            // reason to call that for a write that never even got a buffer back. Deleting it
+            // here, while its exact URL is still in hand, is cheaper and more certain than
+            // hoping a later cleanup pass finds it by name.
+            await removeRecord(at: record.url)
+            return (nil, nil, nil)
         }
 
-        let buffer = await Internals.FileBuffer(record.dataURL)
-        return (buffer, usageAfterEviction + writableBytes)
+        #if canImport(Darwin)
+        await applyFileProtection(to: record)
+        #endif
+
+        let buffer = await dataBuffer(for: record)
+        index.set(key, location: record.url)
+        return (buffer, usageAfterEviction + writableBytes, record.url)
+    }
+
+    /// Deletes exactly the record directory at `url`, bypassing `record(_:)`'s completeness
+    /// gate entirely.
+    ///
+    /// That gate — both `response.record` and `data.record` present — is correct for every
+    /// read path (`subscript`, `updateCached`, eviction), which must never serve or reason
+    /// about a write that never finished. But it also means those lookups can never be used to
+    /// find and delete such a write's own leftover directory: an entry missing `data.record` is
+    /// invisible to them by design. This exists for the one caller that already knows exactly
+    /// which directory to remove without needing to look it up — the `URL` `allocateBuffer`
+    /// itself just handed back — so cleaning up a cancelled or errored cache write never has to
+    /// go searching for what it already knows.
+    func removeRecord(at url: URL) async {
+        _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
     }
 
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
@@ -373,6 +577,7 @@ struct DiskStorage: Sendable {
             for entry in entries {
                 _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
+            index.removeAll()
             return .zero
         }
 
@@ -393,6 +598,7 @@ struct DiskStorage: Sendable {
             _ = try? await Internals.fileSystem.removeItem(
                 at: entry.url.filePath
             )
+            index.remove(entry.key, ifLocation: entry.url)
             totalSize -= size
         }
 
@@ -430,14 +636,36 @@ struct DiskStorage: Sendable {
     /// propagated: reporting a failure to close over a failure to write would point at the
     /// wrong half of the problem, and the two call sites already have their own recovery for a
     /// write that failed.
+    /// Guards the `combined` unwrap in `writeAndClose` below — reachable only if a future change
+    /// starts passing an explicit non-default nonce to `AES.GCM.seal`, which `.combined` cannot
+    /// represent. Never expected to actually throw today.
+    private struct SealFailureError: Error {}
+
     private func writeAndClose(_ data: Data, to url: URL) async throws {
+        let payload: Data
+
+        if let encryptionKey {
+            // `.combined` bundles a fresh random nonce with the ciphertext and tag in one blob —
+            // self-describing, no extra framing needed for a file this small (`response.record`
+            // is metadata/headers, never the response body). `nil` only when a non-default nonce
+            // size was used, which never happens here (no explicit nonce is passed) — guarded
+            // rather than force-unwrapped so a future change can't silently start writing
+            // plaintext under this branch; it throws instead, same as any other write failure.
+            guard let combined = try AES.GCM.seal(data, using: encryptionKey.symmetricKey).combined else {
+                throw SealFailureError()
+            }
+            payload = combined
+        } else {
+            payload = data
+        }
+
         let handle = try await Internals.fileSystem.openFile(
             forWritingAt: url.filePath,
             options: .newFile(replaceExisting: true)
         )
 
         do {
-            try await handle.write(contentsOf: data, toAbsoluteOffset: .zero)
+            try await handle.write(contentsOf: payload, toAbsoluteOffset: .zero)
             try await handle.close()
         } catch {
             try? await handle.close()
@@ -445,16 +673,101 @@ struct DiskStorage: Sendable {
         }
     }
 
+    #if canImport(Darwin)
+    /// Applies `fileProtection` to a freshly written record's `response.record`, and
+    /// pre-creates its `data.record` under the same class before anything is streamed into it.
+    ///
+    /// - Note: `data.record` does not exist yet at this point — `Internals.FileBuffer` opens it
+    /// lazily, on the first byte written through it, which can happen an arbitrary amount of
+    /// time after this call returns and has no single moment this type controls to apply the
+    /// class retroactively. Pre-creating an empty file here, with the class already set, means
+    /// the later lazy open (`.modifyFile(createIfNecessary: true, ...)`) just finds it already
+    /// there and writes into it — the same outcome as if the whole file had been created with
+    /// the class from the start.
+    private func applyFileProtection(to record: Record) async {
+        guard let fileProtection else { return }
+
+        #if targetEnvironment(simulator)
+        // Every Apple Simulator backs its file system with the host Mac's plain APFS volume,
+        // not the per-class, hardware-derived encryption real devices use — a protection class
+        // set here has no effect and does not even round-trip back through
+        // `FileManager.attributesOfItem`. Skipping outright avoids paying for syscalls that can
+        // never do anything, on the same shared thread pool every other blocking file op in
+        // `Internals` already contends for. `data.record` is left for `Internals.FileBuffer` to
+        // create lazily, exactly as it would with `fileProtection` unset.
+        return
+        #else
+        let responsePath = record.responseURL.path
+        let dataPath = record.dataURL.path
+
+        try? await Internals.FileSystemManager.run {
+            let attributes: [FileAttributeKey: Any] = [.protectionKey: fileProtection]
+
+            try? FileManager.default.setAttributes(attributes, ofItemAtPath: responsePath)
+
+            if !FileManager.default.fileExists(atPath: dataPath) {
+                FileManager.default.createFile(atPath: dataPath, contents: nil, attributes: attributes)
+            }
+        }
+        #endif
+    }
+
+    /// Applies `fileProtection` to a `response.record` that already exists on disk — the
+    /// revalidation rewrite in `updateCached`, where (unlike `allocateBuffer`) there is no
+    /// `data.record` left to pre-create: it was moved forward from the old record as-is, class
+    /// and all.
+    private func applyFileProtection(toResponseRecordAt url: URL) async {
+        guard let fileProtection else { return }
+
+        #if targetEnvironment(simulator)
+        // See the identical guard in `applyFileProtection(to:)` above: a protection class has
+        // no effect, and does not even round-trip back through `FileManager.attributesOfItem`,
+        // in any Apple Simulator.
+        return
+        #else
+        let path = url.path
+
+        try? await Internals.FileSystemManager.run {
+            try? FileManager.default.setAttributes([.protectionKey: fileProtection], ofItemAtPath: path)
+        }
+        #endif
+    }
+    #endif
+
     private func record(_ key: String, createdAt date: Date? = nil) async -> Record? {
         switch date {
         case .none:
-            let allRecords = await records()
-            return allRecords.first { $0.key == key }
+            return await record(forKey: key)
         case .some(let date):
             return await Record(directory: directory, key: key, at: date)
         }
     }
 
+    /// Finds the existing record for `key` through `index` — one targeted stat pair instead
+    /// of a full directory scan. See `Index`'s doc for what keeps this in sync with writes and
+    /// removals, and what it deliberately doesn't cover.
+    private func record(forKey key: String) async -> Record? {
+        guard let url = await index.location(for: key, scan: { await self.records() }) else {
+            return nil
+        }
+
+        guard let record = await Record(url) else {
+            // The directory the index pointed to turned out to be gone or unreadable — stale,
+            // so drop it, guarded so a newer write that already replaced this mapping isn't
+            // clobbered by a check that started against the old one.
+            index.remove(key, ifLocation: url)
+            return nil
+        }
+
+        return record
+    }
+
+    /// The full, live directory scan `index` exists to keep off the read path. Still the
+    /// source of truth for anything that has to see every entry regardless of what `index`
+    /// currently knows — `freeSpace`'s eviction accounting and `removeAll(since:)` call this
+    /// directly rather than through `index`, so a duplicate directory from a lost write race
+    /// (two concurrent writers for the same key) stays visible and gets swept up like any other
+    /// entry instead of going untracked once `index` moves on to the newer one.
     private func records() async -> [Record] {
         let dirPath = directory.filePath
         var foundRecords: [Record] = []

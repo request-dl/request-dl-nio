@@ -5,10 +5,14 @@
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
+@_spi(Testing) import SwiftAsyncStream
+import SwiftAsyncTesting
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
+@testable import RequestDLTestSupport
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsClientConcurrencyLimitTests {
 
     @Test
@@ -23,6 +27,7 @@ struct InternalsClientConcurrencyLimitTests {
 
             let startedCounter = StartedCounter()
             let requestCount = 5
+            let releaseSignal = AsyncSignal()
 
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 for _ in 0..<requestCount {
@@ -31,25 +36,30 @@ struct InternalsClientConcurrencyLimitTests {
                         let task = await client.execute(request: request, logger: nil)
                         await startedCounter.increment()
 
-                        // Holds the permit long enough for the assertion below to observe it,
+                        // Holds the permit until the assertion below has observed the queue,
                         // then releases it the same way `InternalsUnsafeTaskTests` does: cancel
                         // the awaiting task, which drives `UnsafeTask`'s cancel path and, with
                         // it, the semaphore signal.
                         let responseTask = _Concurrency.Task { try? await task.response() }
-                        try? await _Concurrency.Task.sleep(nanoseconds: 400_000_000)
+                        try? await releaseSignal.wait()
                         responseTask.cancel()
                         _ = await responseTask.value
                     }
                 }
 
-                // Long enough for the first wave to acquire its permits, short enough that the
-                // second wave — gated behind the 400ms hold above — has not started yet.
-                try await _Concurrency.Task.sleep(nanoseconds: 150_000_000)
+                // Deterministic rather than sleep-based: waits until exactly
+                // `requestCount - 2` requests are queued behind the semaphore, which can only
+                // happen once the other 2 have already acquired a permit — i.e. once the
+                // concurrency limit is actually in effect, not after a guessed wall-clock
+                // delay that a loaded CI runner can blow through.
+                try await client.connectionSemaphoreForTesting?.waitForWaiters(requestCount - 2, timeout: 5)
 
-                // Then: only as many requests as the configured limit have actually reached
-                // `_client.execute`; the rest are still suspended on the semaphore.
-                #expect(await startedCounter.value == 2)
+                // Then: only as many requests as the configured limit have actually acquired a
+                // permit; the rest are still queued on the semaphore.
+                #expect(client.connectionSemaphoreForTesting?.waitingCount == requestCount - 2)
+                #expect(client.connectionSemaphoreForTesting?.availablePermits == 0)
 
+                releaseSignal.signal()
                 try await taskGroup.waitForAll()
             }
 

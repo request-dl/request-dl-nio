@@ -29,7 +29,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        func callAsFunction(_ client: Internals.Client) async -> Output {
+        func callAsFunction(_ client: any RequestExecutingClient) async -> Output {
             logger?.log(
                 level: .debug,
                 "Evaluating cache for request",
@@ -38,7 +38,7 @@ extension Internals {
                 ]
             )
 
-            if requestConfiguration.cacheStrategy != .ignoreCachedData {
+            if effectiveCacheStrategy != .ignoreCachedData {
                 if let cachedData = await storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
                         client: client,
@@ -49,7 +49,7 @@ extension Internals {
                         logger?.log(level: .debug, "Cache hit - returning cached session task")
                         return .task(cachedSessionTask)
                     }
-                } else if case .useCachedDataOnly = requestConfiguration.cacheStrategy {
+                } else if case .useCachedDataOnly = effectiveCacheStrategy {
                     logger?.log(
                         level: .warning,
                         "No cached data available, but strategy is 'useCachedDataOnly' — returning error"
@@ -79,6 +79,7 @@ extension Internals {
                     logger: logger,
                     uploadingBytes: .zero,
                     upload: .empty(),
+                    decompressionDispatch: .skip,
                     head: .throwing(EmptyCachedDataError()),
                     download: .empty()
                 )
@@ -96,11 +97,59 @@ extension Internals {
             )
         }
 
+        /// The strategy actually applied, folding request-side ``CacheHeader`` directives on top
+        /// of ``RequestConfiguration/cacheStrategy``.
+        ///
+        /// - Important: Only ever escalates towards a more network-averse strategy, never
+        /// loosens what `.cacheStrategy(_:)` explicitly configured — order-independent by
+        /// construction, since it reads both inputs fresh rather than letting one `PropertyNode`
+        /// overwrite what another wrote.
+        private var effectiveCacheStrategy: CacheStrategy {
+            // Read straight off the outgoing `Cache-Control` request header — not a typed
+            // side-channel set by `CacheHeader`'s own `PropertyNode`. `HeaderGroup` (and
+            // `Proxy.connectHeaders`/`Form`'s per-part headers) reconstruct their subtree by
+            // searching for `LeafNode<HeaderNode>` specifically; a `CacheHeader` wrapped in
+            // anything but a plain `HeaderNode` becomes invisible to that search and gets
+            // silently dropped whenever it's nested inside one of those. Deriving from the
+            // already-serialized header sidesteps the node-graph representation entirely, so it
+            // keeps working no matter how the header got there — `CacheHeader`, a raw
+            // `Headers { "Cache-Control": ... }`, nested in a group, or anything else.
+            let requestDirectives = directives(requestConfiguration.headers["Cache-Control"] ?? [])
+                .map { $0.lowercased() }
+
+            // Gated on `isCacheEnabled`: `only-if-cached` addresses *any* cache in the request
+            // path (a CDN or proxy downstream), which is a distinct thing from this package's own
+            // on-disk cache. Escalating unconditionally would force `EmptyCachedDataError` on
+            // every request carrying the directive even when the developer never opted into
+            // local caching via `.cachePolicy(_:)` — turning a pure wire-level signal into an
+            // always-on local failure.
+            if requestDirectives.contains("only-if-cached"), requestConfiguration.isCacheEnabled {
+                return .useCachedDataOnly
+            }
+
+            let requiresRevalidation = requestDirectives.contains {
+                $0 == "no-cache" || $0.hasPrefix("no-cache=")
+            }
+
+            if requiresRevalidation, requestConfiguration.cacheStrategy == .returnCachedDataElseLoad {
+                return .reloadAndValidateCachedData
+            }
+
+            return requestConfiguration.cacheStrategy
+        }
+
+        /// Whether the outgoing request declares `no-store` (RFC 7234 §5.2.1.5) — this response
+        /// must not be persisted to this package's on-disk cache.
+        private var requestForbidsStoring: Bool {
+            directives(requestConfiguration.headers["Cache-Control"] ?? [])
+                .contains { $0.lowercased() == "no-store" }
+        }
+
         private func checkIfCachedDataStillValid(
-            client: Internals.Client,
+            client: any RequestExecutingClient,
             cached cachedData: CachedData
         ) async -> SessionTask? {
-            switch requestConfiguration.cacheStrategy {
+            switch effectiveCacheStrategy {
             case .ignoreCachedData:
                 return nil
 
@@ -142,13 +191,14 @@ extension Internals {
 
             return SessionTask(
                 seed: .init {
-                    download.failed(HTTPClientError.cancelled)
+                    download.failed(Internals.TaskCancelledError())
                     download.close()
                 },
                 response: .init(
                     logger: logger,
                     uploadingBytes: .zero,
                     upload: .empty(),
+                    decompressionDispatch: .skip,
                     head: .constant(cachedData.cachedResponse.response),
                     download: download.stream
                 )
@@ -156,7 +206,7 @@ extension Internals {
         }
 
         private func validateCachedData(
-            client: Internals.Client,
+            client: any RequestExecutingClient,
             dataCache: DataCache,
             cached cachedData: CachedData,
             requestConfiguration: RequestConfiguration
@@ -194,7 +244,7 @@ extension Internals {
         }
 
         private func getUpdatedHeadersForCache(
-            client: Internals.Client,
+            client: any RequestExecutingClient,
             cached cachedData: CachedData
         ) async -> HTTPHeaders? {
             var requestConfiguration = requestConfiguration
@@ -218,13 +268,13 @@ extension Internals {
             )
 
             guard
-                let response = try? await client.execute(
-                    request: requestConfiguration.build(eventLoop: client.eventLoopGroup.any()),
+                let head = try? await client.revalidationHead(
+                    configuration: requestConfiguration,
                     logger: logger
-                ).response()
+                )
             else { return nil }
 
-            if response.status.code == 304 {
+            if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified) — reusing cached data")
                 return cachedData.response.headers
             }
@@ -234,19 +284,19 @@ extension Internals {
             // compared `nil` against `[]`, which is not equal, and every such response
             // invalidated a cache entry that was in fact unchanged.
             for name in ["Last-Modified", "ETag"] {
-                let fresh = response.headers[name]
+                let fresh = head.headerValues(named: name)
                 let cached = cachedData.response.headers[name] ?? []
 
                 guard fresh == cached else {
                     logger?.log(
                         level: .info,
-                        "Cache invalidated (status: \(response.status.code)) — will fetch fresh data"
+                        "Cache invalidated (status: \(head.status.code)) — will fetch fresh data"
                     )
                     return nil
                 }
             }
 
-            return .init(response.headers)
+            return HTTPHeaders(head.headers.map { ($0.name, $0.value) })
         }
 
         /// Sets a conditional request header from the values the cached response carries.
@@ -331,7 +381,10 @@ extension Internals {
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 let headHeaders = HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
-                guard !containsNoCache(headers: headHeaders["Cache-Control"] ?? []) else {
+                guard
+                    !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
+                    !requestForbidsStoring
+                else {
                     return nil
                 }
 
@@ -386,7 +439,7 @@ extension Internals {
                         )
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(String(describing: error))")
-                        await dataCache.remove(forKey: requestConfiguration.url)
+                        await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
                     }
                 }
 

@@ -19,11 +19,15 @@ extension ProcessInfo {
     /// The bundle identifier where there is a bundle, the process name everywhere else. Used
     /// for the `User-Agent` and to name the on-disk cache directory, so it wants to be the same
     /// string across launches of the same program, not globally unique.
+    ///
+    /// - Note: `processName` is sanitized to a valid RFC 9110 `token` — unlike a bundle
+    /// identifier, it is not guaranteed to already be one (it may contain spaces or other
+    /// characters a shell or OS allows in an executable name).
     package var applicationIdentifier: String {
         #if canImport(Darwin)
-        return Bundle.main.bundleIdentifier ?? processName
+        return Bundle.main.bundleIdentifier ?? processName.sanitizedAsRFC9110Token
         #else
-        return processName
+        return processName.sanitizedAsRFC9110Token
         #endif
     }
 

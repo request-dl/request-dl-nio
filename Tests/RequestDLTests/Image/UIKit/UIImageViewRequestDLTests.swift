@@ -6,7 +6,7 @@ import Foundation
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 
 #if canImport(UIKit) && !os(watchOS)
 import UIKit

@@ -29,7 +29,7 @@ struct Resolve<Root: Property>: Sendable {
 
         let session = Internals.Session(
             provider: make.provider ?? .shared,
-            configuration: sessionConfiguration(for: make)
+            configuration: await sessionConfiguration(for: make)
         )
 
         return Resolved(
@@ -78,7 +78,7 @@ struct Resolve<Root: Property>: Sendable {
     ///
     /// The resolved proxy lands in the configuration, so the client cache partitions by it the
     /// same way it does for an explicit one.
-    private func sessionConfiguration(for make: Make) -> Internals.Session.Configuration {
+    private func sessionConfiguration(for make: Make) async -> Internals.Session.Configuration {
         guard make.resolvesSystemProxy, make.sessionConfiguration.proxy == nil else {
             // An explicit `Proxy` wins. Declaring both leaves the explicit one in effect.
             return make.sessionConfiguration
@@ -86,7 +86,7 @@ struct Resolve<Root: Property>: Sendable {
 
         var configuration = make.sessionConfiguration
 
-        configuration.proxy = Internals.SystemProxyResolver.proxy(
+        configuration.proxy = await Internals.SystemProxyResolver.proxy(
             forURL: make.requestConfiguration.url
         )
 
@@ -147,10 +147,12 @@ struct Resolve<Root: Property>: Sendable {
     }
 
     private func outputs() async throws -> _PropertyOutputs {
-        try await _Root._makeProperty(
-            property: root,
-            inputs: inputs()
-        )
+        try await PropertyResolutionLogger.$current.withValue(environment.logger) {
+            try await _Root._makeProperty(
+                property: root,
+                inputs: inputs()
+            )
+        }
     }
 }
 

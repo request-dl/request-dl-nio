@@ -13,6 +13,7 @@ import Testing
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.URL
 #endif
 
 struct InternalsBodySequenceTests {
@@ -201,6 +202,58 @@ struct InternalsBodySequenceTests {
         // Then
         #expect(capturedAssertions.wrappedValue.isEmpty)
         #expect(chunks.resolveData().reduce(Data(), +) == data)
+    }
+
+    @Test
+    func bodySequence_whenSingleUnreadFileBuffer_wholeFileURLReturnsThatFile() async throws {
+        // Given
+        let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        try Data("Hello world".utf8).write(to: fileURL)
+
+        let bodySequence = await makeBodySequence([Internals.FileBuffer(fileURL)])
+
+        // Then
+        #expect(bodySequence.wholeFileURL == fileURL)
+    }
+
+    @Test
+    func bodySequence_whenSingleDataBuffer_wholeFileURLReturnsNil() async throws {
+        // Given
+        let bodySequence = await makeBodySequence([Internals.DataBuffer(Data("a".utf8))])
+
+        // Then
+        #expect(bodySequence.wholeFileURL == nil)
+    }
+
+    @Test
+    func bodySequence_whenMultipleBuffersIncludingAFile_wholeFileURLReturnsNil() async throws {
+        // Given -- mirrors the multipart shape `bodySequence_whenReadingConcurrently...` above
+        // builds: a real request body is never *only* the file once there's more than one part.
+        let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        try Data("part3".utf8).write(to: fileURL)
+
+        let bodySequence = await makeBodySequence([
+            Internals.DataBuffer(Data("part1".utf8)),
+            Internals.FileBuffer(fileURL),
+        ])
+
+        // Then
+        #expect(bodySequence.wholeFileURL == nil)
+    }
+
+    @Test
+    func bodySequence_whenEmpty_wholeFileURLReturnsNil() async throws {
+        // Given
+        let bodySequence = makeBodySequence([])
+
+        // Then
+        #expect(bodySequence.wholeFileURL == nil)
     }
 }
 

@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if DEBUG
+import SwiftAsyncStream
+#endif
+
 extension Internals.Override {
 
     #if DEBUG
@@ -13,9 +17,28 @@ extension Internals.Override {
 
         package typealias Closure = @Sendable (String, StaticString, UInt) -> Void
 
+        /// `nil` — rather than defaulting straight to `Swift.assertionFailure` — so
+        /// ``assertionFailure(_:file:line:)`` can tell "no task explicitly replaced this" apart
+        /// from "replaced with something," and fall back to ``global`` in the former case only.
         @TaskLocal
-        fileprivate static var closure: Closure = {
-            Swift.assertionFailure($0, file: $1, line: $2)
+        fileprivate static var closure: Closure?
+
+        /// Process-wide replacement, checked when no task-local one is active.
+        ///
+        /// Exists for callers `Task.detached` away from whichever task installed a
+        /// replacement — ``AsyncLock/Watchdog`` reports from a detached task, which does not
+        /// inherit task-local values, so ``replace(with:perform:)`` can never reach it. A test
+        /// target installs this once, process-wide, instead. A task-local replacement still
+        /// takes precedence when both are active, since it names a more specific scope.
+        private static let globalLock = Lock()
+        nonisolated(unsafe) private static var _global: Closure?
+
+        package static func installGlobally(_ closure: @escaping Closure) {
+            globalLock.withLockVoid { _global = closure }
+        }
+
+        fileprivate static var global: Closure? {
+            globalLock.withLock { _global }
         }
 
         package static func replace<T: Sendable>(
@@ -39,7 +62,10 @@ extension Internals.Override {
         line: UInt = #line
     ) {
         #if DEBUG
-        AssertionFailure.closure(message(), file, line)
+        let resolved =
+            AssertionFailure.closure ?? AssertionFailure.global
+            ?? { Swift.assertionFailure($0, file: $1, line: $2) }
+        resolved(message(), file, line)
         #else
         Swift.assertionFailure(
             message(),

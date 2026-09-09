@@ -42,6 +42,6 @@ extension IdentifiedGraphValue {
         // Was a `preconditionFailure`. This guards structural coherence of the graph, not
         // memory safety, so it belongs in development rather than in a user's app.
         Internals.Log.unexpectedGraphPathway()
-            .assertionFailure(logger: RequestEnvironmentValues.current.logger)
+            .assertionFailure(logger: PropertyResolutionLogger.current)
     }
 }

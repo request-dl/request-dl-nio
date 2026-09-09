@@ -15,17 +15,6 @@
 /// ```
 public struct HeaderGroup<Content: Property>: Property {
 
-    private struct Node: PropertyNode {
-
-        let nodes: [LeafNode<HeaderNode>]
-
-        func make(_ make: inout Make) async throws {
-            for node in nodes {
-                try await node.make(&make)
-            }
-        }
-    }
-
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -62,7 +51,19 @@ public struct HeaderGroup<Content: Property>: Property {
             inputs: inputs
         )
 
-        return .leaf(Node(nodes: outputs.node.search(for: HeaderNode.self)))
+        // Kept as individual `LeafNode<HeaderNode>` children rather than collapsed into one
+        // opaque wrapper node: consumers that search the resolved graph for `HeaderNode`
+        // directly — `Proxy`'s `connectHeaders`, `Form`'s per-part headers — need each header
+        // to still be structurally discoverable. A single combined leaf hid them from that
+        // search entirely, silently dropping every header composed through `HeaderGroup` in
+        // those contexts.
+        var children = ChildrenNode()
+
+        for header in outputs.node.search(for: HeaderNode.self) {
+            children.append(header)
+        }
+
+        return .children(children)
     }
 }
 
@@ -70,6 +71,16 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
 
     ///
     /// Initializes a new `HeaderGroup` with a dictionary of headers.
+    ///
+    /// - Important: `Dictionary` iteration order is unspecified and can vary between runs of the
+    /// same process. This is invisible for keys that are actually distinct headers, but if the
+    /// dictionary happens to carry two keys that only differ by case (e.g. `"User-Agent"` and
+    /// `"user-agent"` -- distinct dictionary keys to Swift, since `String` equality is
+    /// case-sensitive, but the same header once resolved, since header names are compared
+    /// case-insensitively per RFC 9110), which one wins -- or the order they combine in under
+    /// ``HeaderStrategy/adding`` -- is not guaranteed to be the same across runs. Use
+    /// ``init(content:)`` with an explicit, ordered list of ``CustomHeader``s instead when that
+    /// matters.
     ///
     /// - Parameter dictionary: A dictionary containing header properties.
     ///

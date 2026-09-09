@@ -63,8 +63,90 @@ extension Internals {
             provider: SessionProvider,
             sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.Client {
-            let options = SessionProviderOptions(
+            try await _nioClient(
+                provider: provider,
+                sessionConfiguration: sessionConfiguration,
                 isCompatibleWithNetworkFramework: sessionConfiguration.isCompatibleWithNetworkFramework
+            )
+        }
+
+        /// Executor-aware counterpart to `client(provider:sessionConfiguration:)` -- resolves
+        /// `sessionConfiguration.resolveExecutor()` and actually builds/caches the client that
+        /// decision points to, rather than only deciding in the abstract. Covers both axes:
+        /// `.urlSession` vs. not, and -- within the `.nio` branch -- plain NIO vs.
+        /// NIOTransportServices, so `preferredExecutor(.nioTransportServices)`/
+        /// `requiredExecutor(.nioTransportServices)` actually decide which event loop group a real
+        /// request gets, not just `enableNetworkFramework`.
+        ///
+        /// Shares this manager's own `_table` with the NIO-only `client(provider:sessionConfiguration:)`
+        /// above -- a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for
+        /// the same provider (see `_createNewURLSessionClient`'s `id`), so the two can never
+        /// collide or be handed back for each other. Likewise, `_nioClient`'s own `isCompatibleWithNetworkFramework`
+        /// parameter -- not `sessionConfiguration.isCompatibleWithNetworkFramework` -- is what
+        /// keys a NIOTransportServices entry apart from a plain-NIO one here
+        /// (`SessionProvider.uniqueIdentifier(with:)`'s `"NTW."` prefix reads that parameter, not
+        /// `enableNetworkFramework` directly), so an executor-resolved and a flag-resolved client
+        /// for the same provider can only ever collide if they'd have made the identical choice
+        /// anyway.
+        package func resolvedClient(
+            provider: SessionProvider,
+            sessionConfiguration: Internals.Session.Configuration
+        ) async throws -> Internals.ClientManager.Client {
+            #if canImport(Darwin)
+            let executor = sessionConfiguration.resolveExecutor()
+
+            guard executor == .urlSession else {
+                return .nio(
+                    try await _nioClient(
+                        provider: provider,
+                        sessionConfiguration: sessionConfiguration,
+                        isCompatibleWithNetworkFramework: executor == .nioTransportServices
+                    )
+                )
+            }
+
+            let sessionProviderID =
+                "URLSession."
+                + provider.uniqueIdentifier(
+                    with: SessionProviderOptions(isCompatibleWithNetworkFramework: false)
+                )
+
+            return try await lock.withLock {
+                try Task.checkCancellation()
+
+                if let item = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                }),
+                    case .urlSession = item
+                {
+                    return item
+                }
+
+                return .urlSession(
+                    try _createNewURLSessionClient(
+                        id: sessionProviderID,
+                        sessionConfiguration: sessionConfiguration
+                    )
+                )
+            }
+            #else
+            return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
+            #endif
+        }
+
+        // MARK: - Private methods
+
+        /// Shared body for `client(provider:sessionConfiguration:)` and `resolvedClient(provider:sessionConfiguration:)`'s
+        /// `.nio`/`.nioTransportServices` branch -- the two differ only in *how* they decide
+        /// `isCompatibleWithNetworkFramework` (the `enableNetworkFramework` flag directly, vs.
+        /// `resolveExecutor()`'s own answer), never in what happens once that's decided.
+        private func _nioClient(
+            provider: SessionProvider,
+            sessionConfiguration: Internals.Session.Configuration,
+            isCompatibleWithNetworkFramework: Bool
+        ) async throws -> Internals.Client {
+            let options = SessionProviderOptions(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
             )
 
             let sessionProviderID = provider.uniqueIdentifier(with: options)
@@ -78,8 +160,8 @@ extension Internals {
 
                 // `withLock` rather than a manual lock and unlock pair with a return in the
                 // middle of it, which balances today and stops balancing on the next edit.
-                if let client = tableLock.withLock({
-                    _reusableClient(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                if case .nio(let client) = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
                 }) {
                     return client
                 }
@@ -96,8 +178,6 @@ extension Internals {
                 )
             }
         }
-
-        // MARK: - Private methods
 
         private func scheduleCleanup() {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
@@ -170,10 +250,15 @@ extension Internals {
         // MARK: - Unsafe methods
 
         /// - Warning: Lockless. The caller must be holding ``tableLock``.
-        private func _reusableClient(
+        ///
+        /// Returns the cached `Internals.ClientManager.Client` regardless of which backend it
+        /// wraps -- shared by both `client(provider:sessionConfiguration:)` (NIO-only, unwraps
+        /// `.nio`) and `resolvedClient(provider:sessionConfiguration:)` (unwraps `.urlSession`),
+        /// so the age/reuse logic below is written once rather than duplicated per backend.
+        private func _reusableItem(
             id: String,
             sessionConfiguration: Internals.Session.Configuration
-        ) -> Internals.Client? {
+        ) -> Internals.ClientManager.Client? {
             let now = {
                 #if canImport(Darwin)
                 DispatchTime.now().uptimeNanoseconds
@@ -227,7 +312,7 @@ extension Internals {
                 items.append(
                     .createNew(
                         sessionConfiguration: sessionConfiguration,
-                        client: client
+                        client: .nio(client)
                     )
                 )
 
@@ -236,5 +321,41 @@ extension Internals {
 
             return client
         }
+
+        #if canImport(Darwin)
+        /// - Warning: Lockless with respect to ``tableLock``, which it takes itself.
+        ///
+        /// `id` is expected to already carry `resolvedClient(provider:sessionConfiguration:)`'s
+        /// `"URLSession."` prefix, keeping this entry apart from any `.nio` one the same provider
+        /// might also have cached under its bare (or `"NTW."`-prefixed) id.
+        private func _createNewURLSessionClient(
+            id: String,
+            sessionConfiguration: Internals.Session.Configuration
+        ) throws -> Internals.URLSessionClient {
+            let client = try Internals.URLSessionClient(
+                configuration: sessionConfiguration.buildURLSessionConfiguration(),
+                secureConnection: sessionConfiguration.secureConnection,
+                redirectConfiguration: sessionConfiguration.redirectConfiguration
+                    ?? .follow(max: 5, allowCycles: false),
+                proxy: sessionConfiguration.proxy,
+                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            )
+
+            tableLock.withLock {
+                var items = _table[id] ?? []
+
+                items.append(
+                    .createNew(
+                        sessionConfiguration: sessionConfiguration,
+                        client: .urlSession(client)
+                    )
+                )
+
+                _table[id] = items
+            }
+
+            return client
+        }
+        #endif
     }
 }

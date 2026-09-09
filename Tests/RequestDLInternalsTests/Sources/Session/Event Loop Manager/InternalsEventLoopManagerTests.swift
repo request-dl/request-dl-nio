@@ -4,10 +4,13 @@
 
 import NIOCore
 import NIOPosix
+import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsEventLoopManagerTests {
 
     struct CustomProvider: SessionProvider {

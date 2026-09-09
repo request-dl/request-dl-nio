@@ -150,6 +150,10 @@ struct OfflineError: Error {}
 let task = MockedTask(throwing: OfflineError(), delay: .seconds(1))
 ```
 
+### BackgroundDownloadTask
+
+Every task above runs and reports back in the same process. ``RequestDL/BackgroundDownloadTask`` is different on purpose: it schedules a download that keeps running even if your app is suspended or terminated, using `URLSession`'s background transfer support, and does not conform to ``RequestDL/RequestTask``. See <doc:Downloading-in-the-Background> for how to schedule one and observe when it finishes.
+
 ## Topics
 
 ### The basics
@@ -194,3 +198,7 @@ let task = MockedTask(throwing: OfflineError(), delay: .seconds(1))
 ### Testing and debugging
 
 - ``RequestDL/MockedTask``
+
+### Downloading in the background
+
+- <doc:Downloading-in-the-Background>
