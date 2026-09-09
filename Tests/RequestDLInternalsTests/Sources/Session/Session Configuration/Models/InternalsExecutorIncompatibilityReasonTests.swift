@@ -43,7 +43,6 @@ struct InternalsExecutorIncompatibilityReasonTests {
             .pskHint,
             .pskIdentityResolver,
             .noHostnameVerificationUnderNetworkFramework,
-            .additionalTrustRootsUnderNetworkFramework,
             .dnsOverrideUnderURLSession,
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
@@ -52,6 +51,6 @@ struct InternalsExecutorIncompatibilityReasonTests {
         ]
 
         // Then
-        #expect(cases.count == 17)
+        #expect(cases.count == 16)
     }
 }

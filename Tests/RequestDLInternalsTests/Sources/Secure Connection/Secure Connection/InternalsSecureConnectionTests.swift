@@ -385,20 +385,17 @@ extension InternalsSecureConnectionTests {
 
     /// Regression coverage for the fields AsyncHTTPClient's NIOTransportServices bridge either
     /// traps on (`keyLogger`, `.noHostnameVerification` -- unless a custom verification callback
-    /// is also installed, which none of these cases do) or silently drops (everything else here,
-    /// when SPKI pinning isn't also configured -- see `additionalTrustRootsUnderNetworkFramework`'s
-    /// doc comment) when running on Network.framework. Each one must flip
-    /// `isCompatibleWithNetworkFramework` to `false` so the caller falls back to plain NIO instead
-    /// of crashing or losing the setting without any signal. `certificateChain`/`privateKey`
-    /// (mTLS) and `tlsPins` (SPKI pinning) are deliberately *not* in this list any more -- see
+    /// is also installed, which none of these cases do) or silently drops (everything else here --
+    /// they're read from the built `TLSConfiguration` and then never looked at again) when running
+    /// on Network.framework. Each one must flip `isCompatibleWithNetworkFramework` to `false` so
+    /// the caller falls back to plain NIO instead of crashing or losing the setting without any
+    /// signal. `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning), and
+    /// `additionalTrustRoots` are deliberately *not* in this list -- see
     /// `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
     @Test(
         arguments: [
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.certificateVerification = .noHostnameVerification
-            },
-            { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.additionalTrustRoots = [.file("/dev/null")]
             },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.renegotiationSupport = .once
@@ -436,11 +433,13 @@ extension InternalsSecureConnectionTests {
         #expect(!secureConnection.isCompatibleWithNetworkFramework)
     }
 
-    /// mTLS (`certificateChain`/`privateKey`) and SPKI pinning (`tlsPins`) both reach
-    /// Network.framework now, through `tlsLocalIdentityNetworkFramework` and
-    /// `tlsCustomVerificationNetworkFramework` respectively (AsyncHTTPClient fork, 1.38.0+) --
-    /// mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible` below, but for
-    /// the Network.framework-facing reason list.
+    /// mTLS (`certificateChain`/`privateKey`), SPKI pinning (`tlsPins`), and `additionalTrustRoots`
+    /// all reach Network.framework now: the first two through `tlsLocalIdentityNetworkFramework`
+    /// and `tlsCustomVerificationNetworkFramework` respectively (AsyncHTTPClient fork, 1.38.0+),
+    /// the last through `Internals.NIOTrustEvaluator` installing that same
+    /// `tlsCustomVerificationNetworkFramework` hook on its own, independently of whether SPKI
+    /// pinning is also configured -- mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible`
+    /// below, but for the Network.framework-facing reason list.
     @Test(
         arguments: [
             { (secureConnection: inout Internals.SecureConnection) in
@@ -449,6 +448,9 @@ extension InternalsSecureConnectionTests {
             },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.tlsPins = [.init(source: .rawData(.init()), algorithm: SHA256.self)]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.additionalTrustRoots = [.file("/dev/null")]
             },
         ] as [@Sendable (inout Internals.SecureConnection) -> Void]
     )

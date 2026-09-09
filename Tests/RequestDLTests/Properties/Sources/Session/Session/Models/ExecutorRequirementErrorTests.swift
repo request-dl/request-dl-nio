@@ -14,7 +14,7 @@ struct ExecutorRequirementErrorTests {
         // Given
         let internalError = Internals.IncompatibleExecutorConfigurationError(
             requiredExecutor: .nioTransportServices,
-            reasons: [.additionalTrustRootsUnderNetworkFramework, .keyLogger]
+            reasons: [.dnsOverrideUnderURLSession, .keyLogger]
         )
 
         // When
@@ -22,7 +22,7 @@ struct ExecutorRequirementErrorTests {
 
         // Then
         #expect(error.requiredExecutor == .nioTransportServices)
-        #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework, .keyLogger])
+        #expect(error.reasons == [.dnsOverrideUnderURLSession, .keyLogger])
     }
 
     @Test
@@ -56,7 +56,6 @@ struct ExecutorRequirementErrorTests {
             .pskHint,
             .pskIdentityResolver,
             .noHostnameVerificationUnderNetworkFramework,
-            .additionalTrustRootsUnderNetworkFramework,
             .dnsOverrideUnderURLSession,
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
@@ -78,5 +77,16 @@ struct ExecutorRequirementErrorTests {
 
         // Then
         #expect(!reason.description.isEmpty)
+    }
+
+    @Test
+    func reason_additionalTrustRootsUnderNetworkFramework_hasNonEmptyDescription() async throws {
+        // Given -- kept for source compatibility even though RequestDLInternals no longer
+        // produces this case (see its own doc comment); not reachable through
+        // `reason_whenEveryInternalCaseMapped_hasNonEmptyDescription` above since there's no
+        // longer an `Internals.ExecutorIncompatibilityReason` counterpart to map from.
+
+        // Then
+        #expect(!ExecutorRequirementError.Reason.additionalTrustRootsUnderNetworkFramework.description.isEmpty)
     }
 }

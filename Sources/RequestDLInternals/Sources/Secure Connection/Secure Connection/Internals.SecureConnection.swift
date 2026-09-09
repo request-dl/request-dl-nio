@@ -15,20 +15,24 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`)
-        /// and `tlsPins` (SPKI pinning, via `tlsCustomVerificationNetworkFramework`) both reach
-        /// Network.framework now, through the two trust/identity hooks
-        /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()` install. What's
-        /// left genuinely unreachable there: `keyLogger` (no Network.framework equivalent at all)
-        /// and `.noHostnameVerification` (traps via `precondition` unless a custom verification
-        /// callback is also installed -- see `getNWProtocolTLSOptions`). `additionalTrustRoots`
-        /// only reaches Network.framework's *native* trust-root handling when SPKI pinning isn't
-        /// also configured; when it is, `Internals.NIOTrustEvaluator` reads it directly instead.
-        /// The rest (`cipherSuiteValues`, `renegotiationSupport`, `signingSignatureAlgorithms`,
-        /// `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`,
-        /// `pskIdentityResolver`) aren't rejected there at all — they're read from the built
-        /// `TLSConfiguration` and then never looked at again, so the connection would silently
-        /// negotiate without them rather than fail loudly.
+        /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`),
+        /// `tlsPins` (SPKI pinning), and `additionalTrustRoots` all reach Network.framework now,
+        /// through the two trust/identity hooks `Internals.NIOTrustEvaluator`/
+        /// `makeLocalIdentityForNetworkFramework()` install. `additionalTrustRoots` has no native
+        /// Network.framework counterpart at all (unlike `trustRoots`, which `getNWProtocolTLSOptions`
+        /// does carry over) -- `Internals.NIOTrustEvaluator` is what makes it work there, installing
+        /// `tlsCustomVerificationNetworkFramework` whenever `additionalTrustRoots` is configured,
+        /// independently of whether SPKI pinning is also active (`build()`'s NIOSSL-facing
+        /// `tlsCustomVerification` stays gated to pins only, since NIOSSL already honors
+        /// `additionalTrustRoots` natively via `TLSConfiguration` and doesn't need the assist).
+        /// What's left genuinely unreachable under Network.framework: `keyLogger` (no
+        /// Network.framework equivalent at all) and `.noHostnameVerification` (traps via
+        /// `precondition` unless a custom verification callback is also installed -- see
+        /// `getNWProtocolTLSOptions`). The rest (`cipherSuiteValues`, `renegotiationSupport`,
+        /// `signingSignatureAlgorithms`, `verifySignatureAlgorithms`, `sendCANameList`,
+        /// `shutdownTimeout`, `pskHint`, `pskIdentityResolver`) aren't rejected there at all —
+        /// they're read from the built `TLSConfiguration` and then never looked at again, so the
+        /// connection would silently negotiate without them rather than fail loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return networkFrameworkIncompatibilityReasons().isEmpty
@@ -76,9 +80,6 @@ extension Internals {
             }
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
-            if additionalTrustRoots != nil, tlsPins == nil {
-                reasons.append(.additionalTrustRootsUnderNetworkFramework)
-            }
             if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
             if signingSignatureAlgorithms != nil { reasons.append(.signingSignatureAlgorithms) }
             if verifySignatureAlgorithms != nil { reasons.append(.verifySignatureAlgorithms) }
@@ -202,17 +203,24 @@ extension Internals {
 
             let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
 
+            // NIOSSL already honors `additionalTrustRoots` natively, via the plain
+            // `tlsConfiguration.additionalTrustRoots` assignment above -- unlike
+            // `tlsCustomVerificationNetworkFramework` below, its custom-verification callback
+            // stays reserved for what it can't do on its own (SPKI pinning), so a
+            // `trustEvaluator` built only for `additionalTrustRoots` never gets attached here.
+            let hasPins = !(tlsPins ?? []).isEmpty
+
             #if canImport(Darwin)
             return .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsCustomVerification: trustEvaluator?.tlsCustomVerification,
+                tlsCustomVerification: hasPins ? trustEvaluator?.tlsCustomVerification : nil,
                 tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
                 localIdentityHandle: isCompatibleWithNetworkFramework ? try makeLocalIdentityForNetworkFramework() : nil
             )
             #else
             return .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsCustomVerification: trustEvaluator?.tlsCustomVerification
+                tlsCustomVerification: hasPins ? trustEvaluator?.tlsCustomVerification : nil
             )
             #endif
         }

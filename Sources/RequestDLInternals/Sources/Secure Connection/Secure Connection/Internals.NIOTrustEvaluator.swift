@@ -20,11 +20,19 @@ import Security
 extension Internals {
 
     /// Resolves an `Internals.SecureConnection`'s trust roots and SPKI pins into the callbacks
-    /// `.nio` needs. `resolve(from:)` returns `nil` whenever no SPKI pins are configured, so the
-    /// caller can skip installing any custom verification at all -- the TLS backend's own native
-    /// trust-root handling (NIOSSL's BoringSSL/Security.framework-backed default on Darwin, plain
-    /// BoringSSL against the OS CA bundle on Linux) stays completely untouched, at no added cost,
-    /// for the common case of not pinning.
+    /// `.nio` needs. Off Darwin, `resolve(from:)` returns `nil` whenever no SPKI pins are
+    /// configured, so the caller can skip installing any custom verification at all -- NIOSSL's
+    /// own native trust-root handling (plain BoringSSL against the OS CA bundle, already honoring
+    /// `TLSConfiguration.additionalTrustRoots` on its own) stays completely untouched, at no added
+    /// cost, for the common case of not pinning.
+    ///
+    /// On Darwin, `resolve(from:)` *also* triggers on `additionalTrustRoots` alone, with no pins:
+    /// unlike NIOSSL, Network.framework has no native way to see `additionalTrustRoots` at all
+    /// (see `Internals.SecureConnection`'s own doc comment on `isCompatibleWithNetworkFramework`),
+    /// so closing that gap needs this evaluator's `tlsCustomVerificationNetworkFramework` even
+    /// with an empty pin set -- `evaluate(trust:completion:)` (`+Darwin.swift`) treats an empty
+    /// pin set as "nothing to pin," passing on chain validity alone rather than failing closed the
+    /// way it would for a genuine, configured-but-unmatched pin.
     package struct NIOTrustEvaluator: Sendable {
 
         /// Installs on `HTTPClient.Configuration.tlsCustomVerification` -- the NIOSSL backend,
@@ -40,9 +48,18 @@ extension Internals {
         #endif
 
         package static func resolve(from secureConnection: Internals.SecureConnection) throws -> NIOTrustEvaluator? {
-            guard let tlsPins = secureConnection.tlsPins, !tlsPins.isEmpty else {
+            let tlsPins = secureConnection.tlsPins ?? []
+            let hasAdditionalTrustRoots = !(secureConnection.additionalTrustRoots ?? []).isEmpty
+
+            #if canImport(Darwin)
+            guard !tlsPins.isEmpty || hasAdditionalTrustRoots else {
                 return nil
             }
+            #else
+            guard !tlsPins.isEmpty else {
+                return nil
+            }
+            #endif
 
             let isStrict = (secureConnection.tlsPinningPolicy ?? .strict) == .strict
 

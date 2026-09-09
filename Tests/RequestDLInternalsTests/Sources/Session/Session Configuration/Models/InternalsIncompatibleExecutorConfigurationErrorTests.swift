@@ -13,12 +13,12 @@ struct InternalsIncompatibleExecutorConfigurationErrorTests {
         // Given
         let error = Internals.IncompatibleExecutorConfigurationError(
             requiredExecutor: .nioTransportServices,
-            reasons: [.additionalTrustRootsUnderNetworkFramework, .keyLogger]
+            reasons: [.dnsOverrideUnderURLSession, .keyLogger]
         )
 
         // Then
         #expect(error.requiredExecutor == .nioTransportServices)
-        #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework, .keyLogger])
+        #expect(error.reasons == [.dnsOverrideUnderURLSession, .keyLogger])
     }
 
     @Test

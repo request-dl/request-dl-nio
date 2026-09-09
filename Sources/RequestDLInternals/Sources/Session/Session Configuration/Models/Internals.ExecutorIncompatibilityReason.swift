@@ -21,10 +21,6 @@ extension Internals {
         case pskHint
         case pskIdentityResolver
         case noHostnameVerificationUnderNetworkFramework
-        /// Only a problem when SPKI pinning (`.tlsPinning`) *isn't* also active -- when it is,
-        /// `Internals.NIOTrustEvaluator` reads `additionalTrustRoots` itself as part of building
-        /// its own custom verification, on both the NIOSSL and Network.framework backends.
-        case additionalTrustRootsUnderNetworkFramework
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession

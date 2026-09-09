@@ -25,6 +25,10 @@ public struct ExecutorRequirementError: Error, Sendable {
         case pskHint
         case pskIdentityResolver
         case noHostnameVerificationUnderNetworkFramework
+        /// No longer produced: `additionalTrustRoots` alone (no SPKI pinning) is reachable under
+        /// Network.framework now, via `Internals.NIOTrustEvaluator`. Kept, rather than removed, for
+        /// source compatibility with any exhaustive `switch` over `Reason` written before this
+        /// case stopped being thrown.
         case additionalTrustRootsUnderNetworkFramework
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
@@ -58,8 +62,6 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .pskIdentityResolver
             case .noHostnameVerificationUnderNetworkFramework:
                 self = .noHostnameVerificationUnderNetworkFramework
-            case .additionalTrustRootsUnderNetworkFramework:
-                self = .additionalTrustRootsUnderNetworkFramework
             case .dnsOverrideUnderURLSession:
                 self = .dnsOverrideUnderURLSession
             case .http1OnlyUnderURLSession:
@@ -133,6 +135,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .noHostnameVerificationUnderNetworkFramework:
             return "disabled hostname verification (unsupported under Network.framework)"
         case .additionalTrustRootsUnderNetworkFramework:
+            // Unreachable -- see this case's own doc comment. Kept only so `description` stays
+            // exhaustive without a `default:` swallowing future genuinely-new cases by accident.
             return "additional trust roots without also configuring SPKI pinning (unsupported under Network.framework)"
         case .dnsOverrideUnderURLSession:
             return "a DNS override (unsupported under URLSession)"

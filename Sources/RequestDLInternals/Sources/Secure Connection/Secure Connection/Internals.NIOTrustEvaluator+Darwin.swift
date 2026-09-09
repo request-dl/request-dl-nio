@@ -20,11 +20,13 @@ extension Internals.NIOTrustEvaluator {
     /// Same shape of validation as `Internals.ServerTrustPolicy.handle(challenge:)`, minus the
     /// `URLAuthenticationChallenge` wrapping: evaluate against the OS trust store (so Certificate
     /// Transparency, revocation, and the continuously-updated root set all keep applying exactly as
-    /// they already do for `.urlSession`), then check every certificate in the chain -- leaf and
-    /// intermediates alike -- against the configured pins. A chain-validation failure always
-    /// rejects, regardless of policy; a pin mismatch only rejects under `.strict`, matching
-    /// `ServerTrustPolicy`'s existing semantics (and AsyncHTTPClient's own former SPKI pinning
-    /// policy) exactly.
+    /// they already do for `.urlSession`), then -- when `pins` isn't empty -- check every
+    /// certificate in the chain, leaf and intermediates alike, against the configured pins too. A
+    /// chain-validation failure always rejects, regardless of policy; a pin mismatch only rejects
+    /// under `.strict`, matching `ServerTrustPolicy`'s existing semantics (and AsyncHTTPClient's
+    /// own former SPKI pinning policy) exactly. An empty `pins` means this evaluator exists only
+    /// to feed `trustRootCertificates` into the OS trust store's anchor set (`additionalTrustRoots`
+    /// with no SPKI pinning) -- chain validity is the whole check then, nothing more to enforce.
     static func makeDarwinEvaluator(
         pins: [Internals.SPKIHash],
         isStrict: Bool,
@@ -53,6 +55,16 @@ extension Internals.NIOTrustEvaluator {
             }
         }
 
+        // `pins.isEmpty` means this evaluator was installed for `additionalTrustRoots` alone (see
+        // `resolve(from:)`) -- there's nothing configured to pin against, so chain validity by
+        // itself is the whole check. Without this, `matchesAnyPin` would always be `false` for an
+        // empty pin set and `isStrict` would default to `true`, rejecting every connection
+        // regardless of how trustworthy the chain actually is.
+        @Sendable
+        func passesPinCheck(chain: [SecCertificate]) -> Bool {
+            pins.isEmpty || matchesAnyPin(chain: chain) || !isStrict
+        }
+
         @Sendable
         func evaluate(trust: SecTrust, completion: @escaping @Sendable (Bool) -> Void) {
             if !secTrustRoots.isEmpty {
@@ -68,14 +80,14 @@ extension Internals.NIOTrustEvaluator {
                             return
                         }
                         let chain = (SecTrustCopyCertificateChain(trust) as? [SecCertificate]) ?? []
-                        completion(matchesAnyPin(chain: chain) || !isStrict)
+                        completion(passesPinCheck(chain: chain))
                     }
                 } else {
                     SecTrustEvaluateAsync(trust, queue) { _, result in
                         switch result {
                         case .proceed, .unspecified:
                             let chain = (SecTrustCopyCertificateChain(trust) as? [SecCertificate]) ?? []
-                            completion(matchesAnyPin(chain: chain) || !isStrict)
+                            completion(passesPinCheck(chain: chain))
                         default:
                             completion(false)
                         }

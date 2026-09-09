@@ -181,6 +181,59 @@ struct DataTaskTests {
         // Then
         #expect(result.response == output)
     }
+
+    /// Regression coverage for the gap `Internals.NIOTrustEvaluator` closed: `additionalTrustRoots`
+    /// alone, with no SPKI pinning, used to be silently ignored under Network.framework --
+    /// `localServer`'s certificate is signed by a private test CA the system default trust store
+    /// has never heard of (see `dataTask_whenCAEnabled` above), so this handshake only succeeds if
+    /// `AdditionalTrustRoots` genuinely reached Network.framework's own trust evaluation, not just
+    /// NIOSSL's `.nio` backend.
+    @Test
+    func dataTask_whenAdditionalTrustRootsSetAndNIOTransportServicesRequired_completesHandshakeWithoutSPKIPinning()
+        async throws
+    {
+        // Given
+        let server = Certificates().server()
+        let uri = "/" + UUID().uuidString
+
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8893,
+                option: .none
+            )
+        )
+
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(
+            jsonObject: output
+        )
+
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        // When
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session.localServer
+                .requiredExecutor(.nioTransportServices)
+
+            SecureConnection {
+                AdditionalTrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+            }
+        }
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.response == output)
+    }
 }
 
 extension DataTaskTests {
@@ -268,17 +321,17 @@ extension DataTaskTests {
     /// before any client is built or network I/O starts.
     @Test
     func dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO() async throws {
-        // Given -- `additionalTrustRoots` is reachable under `.urlSession` but not under
-        // `.nioTransportServices`, so pinning the latter here is guaranteed to conflict.
+        // Given -- disabled hostname verification traps unconditionally under Network.framework
+        // (no custom verification callback installed here to work around it), so pinning
+        // `.nioTransportServices` is guaranteed to conflict.
         let task = DataTask {
             BaseURL("localhost")
 
             Session()
                 .requiredExecutor(.nioTransportServices)
 
-            SecureConnection {
-                AdditionalTrustRoots("/dev/null")
-            }
+            SecureConnection {}
+                .verification(.noHostnameVerification)
         }
         .extractPayload()
 
@@ -294,7 +347,7 @@ extension DataTaskTests {
             // Then -- actionable, not just "it throws": names the pinned executor, the
             // conflicting field, and points at the escape hatch.
             #expect(error.requiredExecutor == .nioTransportServices)
-            #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework])
+            #expect(error.reasons == [.noHostnameVerificationUnderNetworkFramework])
             #expect(error.description.contains(".requiredExecutor(.nioTransportServices)"))
             #expect(error.description.contains(".preferredExecutor(_:)"))
         }
