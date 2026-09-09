@@ -19,12 +19,16 @@ import Testing
 struct InternalsNIOTrustEvaluatorTests {
 
     @Test
-    func resolve_whenNoPinsConfigured_returnsNil() throws {
-        // Given
+    func resolve_whenNothingConfigured_returnsNil() throws {
+        // Given -- SPKI pinning is the trigger this file's own chain-validation tests exercise,
+        // but it's not the only one: on Darwin, `additionalTrustRoots`/`.noHostnameVerification`
+        // alone also install this evaluator (see `InternalsSecureConnectionTests`'s
+        // `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` for that).
+        // With none of the three configured at all, though, no custom verification is installed,
+        // so the TLS backend's own native trust-root handling stays untouched.
         let secureConnection = Internals.SecureConnection()
 
-        // Then -- no custom verification installed at all when pinning isn't configured, so the
-        // TLS backend's own native trust-root handling stays untouched.
+        // Then
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) == nil)
     }
 

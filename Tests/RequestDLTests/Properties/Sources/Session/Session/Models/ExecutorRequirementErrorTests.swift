@@ -77,25 +77,4 @@ struct ExecutorRequirementErrorTests {
         // Then
         #expect(!reason.description.isEmpty)
     }
-
-    @Test
-    func reason_additionalTrustRootsUnderNetworkFramework_hasNonEmptyDescription() async throws {
-        // Given -- kept for source compatibility even though RequestDLInternals no longer
-        // produces this case (see its own doc comment); not reachable through
-        // `reason_whenEveryInternalCaseMapped_hasNonEmptyDescription` above since there's no
-        // longer an `Internals.ExecutorIncompatibilityReason` counterpart to map from.
-
-        // Then
-        #expect(!ExecutorRequirementError.Reason.additionalTrustRootsUnderNetworkFramework.description.isEmpty)
-    }
-
-    @Test
-    func reason_noHostnameVerificationUnderNetworkFramework_hasNonEmptyDescription() async throws {
-        // Given -- same situation as `additionalTrustRootsUnderNetworkFramework` above: kept for
-        // source compatibility, no longer produced, no longer reachable through the parameterized
-        // test above.
-
-        // Then
-        #expect(!ExecutorRequirementError.Reason.noHostnameVerificationUnderNetworkFramework.description.isEmpty)
-    }
 }

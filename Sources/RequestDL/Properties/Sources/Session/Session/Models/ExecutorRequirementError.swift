@@ -24,16 +24,6 @@ public struct ExecutorRequirementError: Error, Sendable {
         case shutdownTimeout
         case pskHint
         case pskIdentityResolver
-        /// No longer produced: disabled hostname verification is reachable under Network.framework
-        /// now, via `Internals.NIOTrustEvaluator` swapping in a hostname-less trust policy. Kept,
-        /// rather than removed, for source compatibility with any exhaustive `switch` over `Reason`
-        /// written before this case stopped being thrown.
-        case noHostnameVerificationUnderNetworkFramework
-        /// No longer produced: `additionalTrustRoots` alone (no SPKI pinning) is reachable under
-        /// Network.framework now, via `Internals.NIOTrustEvaluator`. Kept, rather than removed, for
-        /// source compatibility with any exhaustive `switch` over `Reason` written before this
-        /// case stopped being thrown.
-        case additionalTrustRootsUnderNetworkFramework
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
@@ -134,14 +124,6 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "a PSK hint"
         case .pskIdentityResolver:
             return "a PSK identity resolver"
-        case .noHostnameVerificationUnderNetworkFramework:
-            // Unreachable -- see this case's own doc comment. Kept only so `description` stays
-            // exhaustive without a `default:` swallowing future genuinely-new cases by accident.
-            return "disabled hostname verification (unsupported under Network.framework)"
-        case .additionalTrustRootsUnderNetworkFramework:
-            // Unreachable -- see this case's own doc comment. Kept only so `description` stays
-            // exhaustive without a `default:` swallowing future genuinely-new cases by accident.
-            return "additional trust roots without also configuring SPKI pinning (unsupported under Network.framework)"
         case .dnsOverrideUnderURLSession:
             return "a DNS override (unsupported under URLSession)"
         case .http1OnlyUnderURLSession:
