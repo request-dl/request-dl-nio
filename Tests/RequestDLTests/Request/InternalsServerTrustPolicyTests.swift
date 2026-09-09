@@ -90,6 +90,50 @@ struct InternalsServerTrustPolicyTests {
         #expect(descriptor.trustedRootCertificatesDER.count == 2)
     }
 
+    // MARK: - Revocation policy
+
+    @Test
+    func resolve_whenRevocationPolicyConfigured_capturesInDescriptor() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .strict
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.revocationPolicy == .strict)
+    }
+
+    @Test
+    func resolve_whenNoRevocationPolicyConfigured_descriptorHasNone() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.revocationPolicy == nil)
+    }
+
+    @Test
+    func descriptor_roundTripsRevocationPolicyThroughInit() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .disabled
+
+        let original = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        // When
+        let encoded = try JSONEncoder().encode(original.descriptor())
+        let decoded = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: encoded)
+        let rebuilt = Internals.ServerTrustPolicy(descriptor: decoded)
+
+        // Then
+        #expect(try rebuilt.descriptor() == original.descriptor())
+    }
+
     // MARK: - SPKI pinning
 
     @Test

@@ -230,6 +230,19 @@ public struct SecureConnection<Content: Property>: Property {
         edit { $0.secureConnection.certificateVerification = verification.build() }
     }
 
+    /// Sets the revocation-checking policy for the secure connection.
+    ///
+    /// - Important: Reachable on Apple platforms only (``Session/Executor/nio``,
+    /// ``Session/Executor/nioTransportServices``, ``Session/Executor/urlSession``) -- NIOSSL/
+    /// BoringSSL implements no revocation checking of its own, so this has no effect at all on
+    /// Linux.
+    ///
+    /// - Parameter policy: The revocation-checking policy to use.
+    /// - Returns: A modified `SecureConnection` with the revocation policy set.
+    public func revocationPolicy(_ policy: RevocationPolicy) -> Self {
+        edit { $0.secureConnection.revocationPolicy = policy.build() }
+    }
+
     /// Sets the application protocols for the secure connection.
     ///
     /// - Parameter protocols: The application protocols to use.

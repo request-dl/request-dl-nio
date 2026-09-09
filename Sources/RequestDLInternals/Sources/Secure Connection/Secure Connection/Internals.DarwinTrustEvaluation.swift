@@ -49,30 +49,62 @@ extension Internals {
         package let trustRootCertificates: [SecCertificate]
         package let pins: [ResolvedSPKIPin]
         package let isStrict: Bool
+        package let revocationPolicy: Internals.RevocationPolicy?
 
         // MARK: - Inits
 
-        package init(trustRootCertificates: [SecCertificate], pins: [ResolvedSPKIPin], isStrict: Bool) {
+        package init(
+            trustRootCertificates: [SecCertificate],
+            pins: [ResolvedSPKIPin],
+            isStrict: Bool,
+            revocationPolicy: Internals.RevocationPolicy? = nil
+        ) {
             self.trustRootCertificates = trustRootCertificates
             self.pins = pins
             self.isStrict = isStrict
+            self.revocationPolicy = revocationPolicy
         }
 
         // MARK: - Internal methods
 
-        /// Anchors `trust` on `trustRootCertificates` (when any are configured), and -- only when
-        /// `skipsHostnameVerification` -- replaces `trust`'s policy with `SecPolicyCreateSSL(true,
-        /// nil)`: a real SSL server policy (still checks the server-auth `extendedKeyUsage` and
-        /// everything else a certificate presented for TLS server auth normally must satisfy), just
-        /// without the hostname match. Deliberately *not* `SecPolicyCreateBasicX509()` -- that's a
-        /// bare X.509 chain-of-trust policy with no purpose/EKU checks at all, which is what
+        /// Anchors `trust` on `trustRootCertificates` (when any are configured); replaces or
+        /// augments `trust`'s policy array whenever `skipsHostnameVerification` and/or
+        /// `revocationPolicy` ask for it.
+        ///
+        /// `skipsHostnameVerification` swaps in `SecPolicyCreateSSL(true, nil)`: a real SSL server
+        /// policy (still checks the server-auth `extendedKeyUsage` and everything else a
+        /// certificate presented for TLS server auth normally must satisfy), just without the
+        /// hostname match. Deliberately *not* `SecPolicyCreateBasicX509()` -- that's a bare X.509
+        /// chain-of-trust policy with no purpose/EKU checks at all, which is what
         /// `NIOTrustEvaluator`'s Network.framework closure used before this type existed: a wider
         /// relaxation than `.noHostnameVerification` ever asked for. `ServerTrustPolicy` already
         /// used the correct, narrower policy for `.urlSession`; unifying on it here is a real (if
         /// small) tightening for `.nioTransportServices`, not just a refactor.
+        ///
+        /// `revocationPolicy`, when set, is appended to whichever policy array results from the
+        /// above -- `SecTrustCopyPolicies` reads `trust`'s current array first (its default SSL/
+        /// X.509 policy, when `skipsHostnameVerification` didn't just replace it) rather than
+        /// dropping it, since `SecTrustSetPolicies` replaces the whole array rather than appending
+        /// to it.
         package func prepare(_ trust: SecTrust, skipsHostnameVerification: Bool) {
-            if skipsHostnameVerification {
-                SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, nil))
+            if skipsHostnameVerification || revocationPolicy != nil {
+                var policies: [SecPolicy]
+
+                if skipsHostnameVerification {
+                    policies = [SecPolicyCreateSSL(true, nil)]
+                } else {
+                    var currentPolicies: CFArray?
+                    policies =
+                        SecTrustCopyPolicies(trust, &currentPolicies) == errSecSuccess
+                        ? (currentPolicies as? [SecPolicy] ?? [])
+                        : []
+                }
+
+                if let revocationPolicy {
+                    policies.append(revocationPolicy.secPolicy)
+                }
+
+                SecTrustSetPolicies(trust, policies as CFArray)
             }
 
             if !trustRootCertificates.isEmpty {

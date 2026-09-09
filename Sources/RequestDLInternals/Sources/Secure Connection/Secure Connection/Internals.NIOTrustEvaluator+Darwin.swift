@@ -29,7 +29,8 @@ extension Internals.NIOTrustEvaluator {
         pins: [Internals.SPKIHash],
         isStrict: Bool,
         trustRootCertificates: [NIOSSLCertificate],
-        skipsHostnameVerification: Bool
+        skipsHostnameVerification: Bool,
+        revocationPolicy: Internals.RevocationPolicy?
     ) throws -> Internals.NIOTrustEvaluator {
         let secTrustRoots: [SecCertificate] = trustRootCertificates.compactMap { certificate in
             (try? certificate.toDERBytes()).flatMap {
@@ -46,7 +47,8 @@ extension Internals.NIOTrustEvaluator {
         let evaluation = Internals.DarwinTrustEvaluation(
             trustRootCertificates: secTrustRoots,
             pins: resolvedPins,
-            isStrict: isStrict
+            isStrict: isStrict,
+            revocationPolicy: revocationPolicy
         )
 
         // `SecTrustEvaluateAsyncWithError` must be called from -- and calls back on -- the same

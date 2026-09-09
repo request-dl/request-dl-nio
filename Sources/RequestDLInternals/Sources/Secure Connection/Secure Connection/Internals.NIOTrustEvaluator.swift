@@ -57,8 +57,10 @@ extension Internals {
 
             #if canImport(Darwin)
             let skipsHostnameVerification = secureConnection.certificateVerification == .noHostnameVerification
+            let revocationPolicy = secureConnection.revocationPolicy
 
-            guard !tlsPins.isEmpty || hasAdditionalTrustRoots || skipsHostnameVerification else {
+            guard !tlsPins.isEmpty || hasAdditionalTrustRoots || skipsHostnameVerification || revocationPolicy != nil
+            else {
                 return nil
             }
             #else
@@ -84,7 +86,8 @@ extension Internals {
                 pins: tlsPins,
                 isStrict: isStrict,
                 trustRootCertificates: trustRootCertificates,
-                skipsHostnameVerification: skipsHostnameVerification
+                skipsHostnameVerification: skipsHostnameVerification,
+                revocationPolicy: revocationPolicy
             )
             #else
             return try Self.makePortableEvaluator(

@@ -114,6 +114,43 @@ struct InternalsDarwinTrustEvaluationTests {
         #expect(!isTrusted)
     }
 
+    /// Regression coverage for `prepare(_:skipsHostnameVerification:)`'s revocation-policy
+    /// composition: `SecTrustSetPolicies` replaces a trust's whole policy array rather than
+    /// appending to it, so appending a revocation policy without first reading the trust's
+    /// existing array back via `SecTrustCopyPolicies` would silently drop the base SSL/X.509
+    /// policy `SecTrustCreateWithCertificates` installed it with -- this asserts the array grows
+    /// by exactly one rather than being replaced outright.
+    @Test
+    func prepare_whenRevocationPolicyConfiguredWithoutSkippingHostnameVerification_appendsToExistingPolicies() throws {
+        // Given
+        let certificate = try Self.selfSignedCertificate(Certificates(.der).server())
+
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(certificate as CFArray, SecPolicyCreateBasicX509(), &trust)
+        let sut = try #require(status == errSecSuccess ? trust : nil)
+
+        var policiesBefore: CFArray?
+        _ = SecTrustCopyPolicies(sut, &policiesBefore)
+        let countBefore = (policiesBefore as? [SecPolicy])?.count ?? 0
+
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: [],
+            pins: [],
+            isStrict: true,
+            revocationPolicy: .strict
+        )
+
+        // When
+        evaluation.prepare(sut, skipsHostnameVerification: false)
+
+        // Then
+        var policiesAfter: CFArray?
+        _ = SecTrustCopyPolicies(sut, &policiesAfter)
+        let countAfter = (policiesAfter as? [SecPolicy])?.count ?? 0
+
+        #expect(countAfter == countBefore + 1)
+    }
+
     // MARK: - Private methods
 
     private static func selfSignedCertificate(_ resource: CertificateResource) throws -> [SecCertificate] {

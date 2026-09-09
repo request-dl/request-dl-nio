@@ -32,6 +32,21 @@ struct InternalsNIOTrustEvaluatorTests {
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) == nil)
     }
 
+    #if canImport(Darwin)
+    @Test
+    func resolve_whenOnlyRevocationPolicyConfigured_installsEvaluator() throws {
+        // Given -- NIOSSL/BoringSSL implements no revocation checking of its own, so this only
+        // ever installs the custom-verification evaluator on Darwin, the same way
+        // `additionalTrustRoots`/`.noHostnameVerification` alone do (see
+        // `resolve_whenNothingConfigured_returnsNil` above).
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .strict
+
+        // Then
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+    #endif
+
     @Test
     func tlsCustomVerification_whenPinningLeaf_acceptsChain() async throws {
         try await assertVerification(pinningBase64: Self.leafSPKIPinBase64, expectVerified: true)

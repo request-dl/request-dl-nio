@@ -49,6 +49,7 @@ extension Internals {
         package var additionalTrustRoots: [AdditionalTrustRoots]?
         package var tlsPinningPolicy: Internals.SPKIPinningPolicy?
         package var tlsPins: [SPKIHash]?
+        package var revocationPolicy: Internals.RevocationPolicy?
         package var privateKey: PrivateKeySource?
         package var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         package var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
@@ -331,6 +332,7 @@ extension Internals.SecureConnection: Equatable {
             && lhs.cipherSuiteValues == rhs.cipherSuiteValues
             && lhs.tlsPins == rhs.tlsPins
             && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
+            && lhs.revocationPolicy == rhs.revocationPolicy
     }
 }
 

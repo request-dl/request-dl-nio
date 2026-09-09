@@ -33,6 +33,7 @@ extension Internals {
             package let trustedRootCertificatesDER: [Data]
             package let verification: Verification
             package let spkiPinning: SPKIPinning?
+            package let revocationPolicy: Revocation?
 
             package enum Verification: String, Codable, Equatable, Sendable {
                 case none
@@ -57,6 +58,28 @@ extension Internals {
                     case .none: return .none
                     case .fullVerification: return .fullVerification
                     case .noHostnameVerification: return .noHostnameVerification
+                    }
+                }
+            }
+
+            /// Mirrors `Internals.RevocationPolicy`'s two cases -- a separate `Codable` enum
+            /// rather than making that type itself `Codable`, the same way `SPKIPinning.Policy`
+            /// mirrors `Internals.SPKIPinningPolicy` instead of reusing it.
+            package enum Revocation: String, Codable, Equatable, Sendable {
+                case strict
+                case disabled
+
+                package init(_ revocationPolicy: Internals.RevocationPolicy) {
+                    switch revocationPolicy {
+                    case .strict: self = .strict
+                    case .disabled: self = .disabled
+                    }
+                }
+
+                package var value: Internals.RevocationPolicy {
+                    switch self {
+                    case .strict: return .strict
+                    case .disabled: return .disabled
                     }
                 }
             }
@@ -96,11 +119,13 @@ extension Internals {
             package init(
                 trustedRootCertificatesDER: [Data],
                 verification: Verification,
-                spkiPinning: SPKIPinning? = nil
+                spkiPinning: SPKIPinning? = nil,
+                revocationPolicy: Revocation? = nil
             ) {
                 self.trustedRootCertificatesDER = trustedRootCertificatesDER
                 self.verification = verification
                 self.spkiPinning = spkiPinning
+                self.revocationPolicy = revocationPolicy
             }
         }
 
@@ -138,12 +163,14 @@ extension Internals {
             certificateVerification: NIOSSL.CertificateVerification,
             spkiPins: [Internals.ResolvedSPKIPin],
             spkiPinningIsStrict: Bool,
-            spkiPinningDescriptor: Descriptor.SPKIPinning?
+            spkiPinningDescriptor: Descriptor.SPKIPinning?,
+            revocationPolicy: Internals.RevocationPolicy?
         ) {
             self.evaluation = Internals.DarwinTrustEvaluation(
                 trustRootCertificates: trustedRootCertificates,
                 pins: spkiPins,
-                isStrict: spkiPinningIsStrict
+                isStrict: spkiPinningIsStrict,
+                revocationPolicy: revocationPolicy
             )
             self.certificateVerification = certificateVerification
             self.spkiPinningDescriptor = spkiPinningDescriptor
@@ -167,7 +194,8 @@ extension Internals {
                     }
                 },
                 spkiPinningIsStrict: descriptor.spkiPinning?.policy == .strict,
-                spkiPinningDescriptor: descriptor.spkiPinning
+                spkiPinningDescriptor: descriptor.spkiPinning,
+                revocationPolicy: descriptor.revocationPolicy?.value
             )
         }
 
@@ -190,7 +218,8 @@ extension Internals {
             return Descriptor(
                 trustedRootCertificatesDER: evaluation.trustRootCertificates.map { SecCertificateCopyData($0) as Data },
                 verification: Descriptor.Verification(certificateVerification),
-                spkiPinning: spkiPinningDescriptor
+                spkiPinning: spkiPinningDescriptor,
+                revocationPolicy: evaluation.revocationPolicy.map(Descriptor.Revocation.init)
             )
         }
 
@@ -257,7 +286,8 @@ extension Internals {
                 certificateVerification: secureConnection.certificateVerification ?? .fullVerification,
                 spkiPins: spkiPins,
                 spkiPinningIsStrict: isStrict,
-                spkiPinningDescriptor: spkiPinningDescriptor
+                spkiPinningDescriptor: spkiPinningDescriptor,
+                revocationPolicy: secureConnection.revocationPolicy
             )
         }
 
