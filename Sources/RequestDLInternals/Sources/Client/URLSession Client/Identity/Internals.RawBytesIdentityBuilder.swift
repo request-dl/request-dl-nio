@@ -12,6 +12,7 @@
 import CryptoKit
 import NIOSSL
 import Security
+import _CryptoExtras
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -45,7 +46,11 @@ extension Internals {
                         URLSession executor: RSA (PKCS#1 "-----BEGIN RSA PRIVATE KEY-----" or \
                         PKCS#8 "-----BEGIN PRIVATE KEY-----") and EC P-256/P-384/P-521 (SEC1 \
                         "-----BEGIN EC PRIVATE KEY-----" or PKCS#8 \
-                        "-----BEGIN PRIVATE KEY-----").
+                        "-----BEGIN PRIVATE KEY-----"), unencrypted. A password-protected key is \
+                        only supported for traditional PKCS#1 RSA PEM \
+                        ("-----BEGIN RSA PRIVATE KEY-----" with "Proc-Type"/"DEK-Info" headers) -- \
+                        not PKCS#8's "-----BEGIN ENCRYPTED PRIVATE KEY-----", and not any \
+                        password-protected EC key.
                         """
                 case .secKeyCreationFailed(let message):
                     return "SecKeyCreateWithData failed: \(message)."
@@ -98,15 +103,19 @@ extension Internals {
         }
 
         /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
-        /// down to DER. A password-protected key is rejected outright, since there is no public
-        /// API to export a decrypted key back out to DER once NIOSSL has parsed it.
+        /// down to DER -- or, when a password is set, decrypts it first. Only traditional PKCS#1
+        /// RSA PEM (`-----BEGIN RSA PRIVATE KEY-----` with `Proc-Type`/`DEK-Info` headers) can
+        /// actually be decrypted here, via `_RSA.Signing.PrivateKey(encryptedPEMRepresentation:
+        /// passphraseCallback:)` -- the only encrypted-key entry point anywhere in this package's
+        /// dependency graph. `swift-certificates` has none at all (its own private-key parsing
+        /// only understands unencrypted PKCS#8 `PrivateKeyInfo`, for its own CSR/cert-signing
+        /// needs). PKCS#8's `EncryptedPrivateKeyInfo` and every encrypted EC key (P-256/P-384/
+        /// P-521 -- `Crypto`'s own types have no passphrase-protected PEM import at all) still
+        /// throw `Error/unsupportedKeyFormat(_:)`, same as a `.der`-sourced password-protected key
+        /// (BoringSSL's own decryption call here only takes a PEM string, never raw DER).
         package static func privateKeyDER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
             switch privateKeySource {
             case .privateKey(let privateKey):
-                guard privateKey.password == nil else {
-                    throw Error.unsupportedKeyFormat("password-protected key")
-                }
-
                 let rawBytes: Data
                 switch privateKey.source {
                 case .bytes(let bytes):
@@ -119,12 +128,44 @@ extension Internals {
                     }
                 }
 
+                if let password = privateKey.password {
+                    guard privateKey.format == .pem else {
+                        throw Error.unsupportedKeyFormat("password-protected key in DER format")
+                    }
+                    return try Self.decryptedRSAPrivateKeyDER(fromEncryptedPEM: rawBytes, password: password)
+                }
+
                 switch privateKey.format {
                 case .der:
                     return rawBytes
                 case .pem:
                     return try Self.privateKeyDER(fromPEM: rawBytes)
                 }
+            }
+        }
+
+        /// Decrypts a password-protected traditional PKCS#1 RSA PEM key via BoringSSL
+        /// (`_RSA.Signing.PrivateKey(encryptedPEMRepresentation:passphraseCallback:)`, from
+        /// `_CryptoExtras`) and returns its plain DER -- ready for `secKey(fromDER:)`'s own
+        /// PKCS#1/PKCS#8 cascade exactly like any other RSA key. Fails closed on anything that
+        /// entry point can't parse: a wrong passphrase, an EC key, or a PKCS#8-encrypted one.
+        private static func decryptedRSAPrivateKeyDER(
+            fromEncryptedPEM pemData: Data,
+            password: NIOSSLSecureBytes
+        ) throws -> Data {
+            guard let pemString = String(data: pemData, encoding: .utf8) else {
+                throw Error.unsupportedKeyFormat("non-UTF8 input")
+            }
+
+            do {
+                let key = try _RSA.Signing.PrivateKey(encryptedPEMRepresentation: pemString) { setPassphrase in
+                    setPassphrase(Array(password))
+                }
+                return key.derRepresentation
+            } catch {
+                throw Error.unsupportedKeyFormat(
+                    "password-protected key that isn't a decryptable traditional PKCS#1 RSA PEM key"
+                )
             }
         }
 

@@ -90,6 +90,15 @@ public struct PrivateKey: Property {
     /// Creates a private key from a file with the specified format, and allows for providing a
     /// `NIOSSLSecureBytes` password..
     ///
+    /// - Important: Reachable under ``Session/Executor/nio`` unconditionally. Under
+    /// ``Session/Executor/urlSession``/``Session/Executor/nioTransportServices``, only a
+    /// traditional PKCS#1 RSA PEM key (`format: .pem`, `"-----BEGIN RSA PRIVATE KEY-----"` with
+    /// `Proc-Type`/`DEK-Info` headers) can actually be decrypted -- both executors need mTLS
+    /// identity as a Keychain `SecIdentity`, which needs the key already decrypted, and no
+    /// decryption entry point in this package's dependencies covers PKCS#8-encrypted or EC
+    /// (P-256/P-384/P-521) keys. A password-protected key outside that shape throws when the
+    /// session actually resolves to one of those two executors.
+    ///
     /// - Parameters:
     ///   - file: The path to the file containing the private key.
     ///   - format: The format of the private key file. Default is `.pem`.
@@ -112,6 +121,11 @@ public struct PrivateKey: Property {
 
     /// Creates a private key from bytes with the specified format, and allows for providing a
     /// `NIOSSLSecureBytes` password.
+    ///
+    /// - Important: See the `file:format:password:` initializer's own doc comment for exactly
+    /// which password-protected key shapes are reachable under
+    /// ``Session/Executor/urlSession``/``Session/Executor/nioTransportServices`` -- it's not
+    /// every format ``Certificate/Format`` otherwise accepts.
     ///
     /// - Parameters:
     ///   - bytes: The bytes representing the private key.
