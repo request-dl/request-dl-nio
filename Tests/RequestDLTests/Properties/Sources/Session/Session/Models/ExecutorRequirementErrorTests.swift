@@ -55,7 +55,6 @@ struct ExecutorRequirementErrorTests {
             .shutdownTimeout,
             .pskHint,
             .pskIdentityResolver,
-            .noHostnameVerificationUnderNetworkFramework,
             .dnsOverrideUnderURLSession,
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
@@ -88,5 +87,15 @@ struct ExecutorRequirementErrorTests {
 
         // Then
         #expect(!ExecutorRequirementError.Reason.additionalTrustRootsUnderNetworkFramework.description.isEmpty)
+    }
+
+    @Test
+    func reason_noHostnameVerificationUnderNetworkFramework_hasNonEmptyDescription() async throws {
+        // Given -- same situation as `additionalTrustRootsUnderNetworkFramework` above: kept for
+        // source compatibility, no longer produced, no longer reachable through the parameterized
+        // test above.
+
+        // Then
+        #expect(!ExecutorRequirementError.Reason.noHostnameVerificationUnderNetworkFramework.description.isEmpty)
     }
 }

@@ -30,7 +30,8 @@ extension Internals.NIOTrustEvaluator {
     static func makeDarwinEvaluator(
         pins: [Internals.SPKIHash],
         isStrict: Bool,
-        trustRootCertificates: [NIOSSLCertificate]
+        trustRootCertificates: [NIOSSLCertificate],
+        skipsHostnameVerification: Bool
     ) throws -> Internals.NIOTrustEvaluator {
         let secTrustRoots: [SecCertificate] = trustRootCertificates.compactMap { certificate in
             (try? certificate.toDERBytes()).flatMap {
@@ -131,8 +132,17 @@ extension Internals.NIOTrustEvaluator {
             },
             tlsCustomVerificationNetworkFramework: { trust, complete in
                 // Network.framework already attaches its own SNI-aware policy to this `SecTrust`
-                // before handing it here -- left untouched, so hostname validation keeps applying
-                // exactly as it would without this callback installed.
+                // before handing it here -- left untouched by default, so hostname validation
+                // keeps applying exactly as it would without this callback installed. Only when
+                // `.noHostnameVerification` was actually configured is that policy swapped out for
+                // a plain X.509 one (chain-of-trust only, no hostname), mirroring what the
+                // NIOSSL-facing closure above already builds from scratch -- there's no other way
+                // to get Network.framework to skip hostname matching, since (unlike NIOSSL) it has
+                // no separate knob for that: this custom callback is the only lever, and it either
+                // keeps or replaces the whole policy wholesale, chain validation included.
+                if skipsHostnameVerification {
+                    SecTrustSetPolicies(trust, SecPolicyCreateBasicX509())
+                }
                 evaluate(trust: trust, completion: complete)
             }
         )

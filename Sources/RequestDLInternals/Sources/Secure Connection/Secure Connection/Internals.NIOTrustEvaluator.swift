@@ -26,13 +26,16 @@ extension Internals {
     /// `TLSConfiguration.additionalTrustRoots` on its own) stays completely untouched, at no added
     /// cost, for the common case of not pinning.
     ///
-    /// On Darwin, `resolve(from:)` *also* triggers on `additionalTrustRoots` alone, with no pins:
-    /// unlike NIOSSL, Network.framework has no native way to see `additionalTrustRoots` at all
-    /// (see `Internals.SecureConnection`'s own doc comment on `isCompatibleWithNetworkFramework`),
-    /// so closing that gap needs this evaluator's `tlsCustomVerificationNetworkFramework` even
-    /// with an empty pin set -- `evaluate(trust:completion:)` (`+Darwin.swift`) treats an empty
-    /// pin set as "nothing to pin," passing on chain validity alone rather than failing closed the
-    /// way it would for a genuine, configured-but-unmatched pin.
+    /// On Darwin, `resolve(from:)` *also* triggers on `additionalTrustRoots` and/or
+    /// `.noHostnameVerification` alone, with no pins: unlike NIOSSL, Network.framework has no
+    /// native way to see `additionalTrustRoots` at all, and no simple flag to skip hostname
+    /// matching the way NIOSSL's `certificateVerification` does (see `Internals.SecureConnection`'s
+    /// own doc comment on `isCompatibleWithNetworkFramework`) -- both gaps only close through this
+    /// evaluator's `tlsCustomVerificationNetworkFramework`. `evaluate(trust:completion:)`
+    /// (`+Darwin.swift`) treats an empty pin set as "nothing to pin," passing on chain validity
+    /// alone rather than failing closed the way it would for a genuine, configured-but-unmatched
+    /// pin; `makeDarwinEvaluator`'s `skipsHostnameVerification` separately controls whether the
+    /// chain check itself considers the hostname at all.
     package struct NIOTrustEvaluator: Sendable {
 
         /// Installs on `HTTPClient.Configuration.tlsCustomVerification` -- the NIOSSL backend,
@@ -52,7 +55,9 @@ extension Internals {
             let hasAdditionalTrustRoots = !(secureConnection.additionalTrustRoots ?? []).isEmpty
 
             #if canImport(Darwin)
-            guard !tlsPins.isEmpty || hasAdditionalTrustRoots else {
+            let skipsHostnameVerification = secureConnection.certificateVerification == .noHostnameVerification
+
+            guard !tlsPins.isEmpty || hasAdditionalTrustRoots || skipsHostnameVerification else {
                 return nil
             }
             #else
@@ -77,7 +82,8 @@ extension Internals {
             return try Self.makeDarwinEvaluator(
                 pins: tlsPins,
                 isStrict: isStrict,
-                trustRootCertificates: trustRootCertificates
+                trustRootCertificates: trustRootCertificates,
+                skipsHostnameVerification: skipsHostnameVerification
             )
             #else
             return try Self.makePortableEvaluator(

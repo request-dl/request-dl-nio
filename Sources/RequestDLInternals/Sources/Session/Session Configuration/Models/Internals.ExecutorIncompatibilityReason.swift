@@ -20,7 +20,6 @@ extension Internals {
         case shutdownTimeout
         case pskHint
         case pskIdentityResolver
-        case noHostnameVerificationUnderNetworkFramework
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession

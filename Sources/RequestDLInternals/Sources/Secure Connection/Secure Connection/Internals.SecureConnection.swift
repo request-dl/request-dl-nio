@@ -16,23 +16,24 @@ extension Internals {
         // MARK: - Internal properties
 
         /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`),
-        /// `tlsPins` (SPKI pinning), and `additionalTrustRoots` all reach Network.framework now,
-        /// through the two trust/identity hooks `Internals.NIOTrustEvaluator`/
-        /// `makeLocalIdentityForNetworkFramework()` install. `additionalTrustRoots` has no native
-        /// Network.framework counterpart at all (unlike `trustRoots`, which `getNWProtocolTLSOptions`
-        /// does carry over) -- `Internals.NIOTrustEvaluator` is what makes it work there, installing
-        /// `tlsCustomVerificationNetworkFramework` whenever `additionalTrustRoots` is configured,
-        /// independently of whether SPKI pinning is also active (`build()`'s NIOSSL-facing
-        /// `tlsCustomVerification` stays gated to pins only, since NIOSSL already honors
-        /// `additionalTrustRoots` natively via `TLSConfiguration` and doesn't need the assist).
-        /// What's left genuinely unreachable under Network.framework: `keyLogger` (no
-        /// Network.framework equivalent at all) and `.noHostnameVerification` (traps via
-        /// `precondition` unless a custom verification callback is also installed -- see
-        /// `getNWProtocolTLSOptions`). The rest (`cipherSuiteValues`, `renegotiationSupport`,
-        /// `signingSignatureAlgorithms`, `verifySignatureAlgorithms`, `sendCANameList`,
-        /// `shutdownTimeout`, `pskHint`, `pskIdentityResolver`) aren't rejected there at all —
-        /// they're read from the built `TLSConfiguration` and then never looked at again, so the
-        /// connection would silently negotiate without them rather than fail loudly.
+        /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, and `.noHostnameVerification` all reach
+        /// Network.framework now, through the two trust/identity hooks `Internals.NIOTrustEvaluator`/
+        /// `makeLocalIdentityForNetworkFramework()` install. Neither `additionalTrustRoots` nor
+        /// `.noHostnameVerification` has a native Network.framework counterpart (unlike `trustRoots`,
+        /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own `certificateVerification`
+        /// flag) -- `Internals.NIOTrustEvaluator` is what makes both work there, installing
+        /// `tlsCustomVerificationNetworkFramework` whenever either is configured, independently of
+        /// whether SPKI pinning is also active, and swapping in a hostname-less policy on the
+        /// `SecTrust` it's handed only when `.noHostnameVerification` was actually asked for
+        /// (`makeDarwinEvaluator`'s `skipsHostnameVerification`). `build()`'s NIOSSL-facing
+        /// `tlsCustomVerification` stays gated to pins only, since NIOSSL already honors both
+        /// `additionalTrustRoots` and `.noHostnameVerification` natively via `TLSConfiguration` and
+        /// doesn't need the assist. What's left genuinely unreachable under Network.framework:
+        /// `keyLogger` (no Network.framework equivalent at all). The rest (`cipherSuiteValues`,
+        /// `renegotiationSupport`, `signingSignatureAlgorithms`, `verifySignatureAlgorithms`,
+        /// `sendCANameList`, `shutdownTimeout`, `pskHint`, `pskIdentityResolver`) aren't rejected
+        /// there at all — they're read from the built `TLSConfiguration` and then never looked at
+        /// again, so the connection would silently negotiate without them rather than fail loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return networkFrameworkIncompatibilityReasons().isEmpty
@@ -75,9 +76,6 @@ extension Internals {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
             if keyLogger != nil { reasons.append(.keyLogger) }
-            if certificateVerification == .noHostnameVerification {
-                reasons.append(.noHostnameVerificationUnderNetworkFramework)
-            }
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
             if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
@@ -96,11 +94,11 @@ extension Internals {
         /// Keychain round-trip (`certificateChain`/`privateKey`) or `SecTrust`/`SecPolicy`
         /// (everything else). They're also all reachable under Network.framework now (see
         /// `networkFrameworkIncompatibilityReasons()` above) via `Internals.NIOTrustEvaluator`/
-        /// `makeLocalIdentityForNetworkFramework()`, so this list and that one agree on every field
-        /// except `.noHostnameVerification` and `keyLogger`, which stay Network.framework-specific
-        /// gaps. Whether the app actually carries the Keychain Sharing entitlement the identity
-        /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
-        /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
+        /// `makeLocalIdentityForNetworkFramework()`, so this list and that one now agree on every
+        /// field except `keyLogger`, the one still-genuine Network.framework-specific gap. Whether
+        /// the app actually carries the Keychain Sharing entitlement the identity round-trip needs
+        /// is a runtime fact this static check cannot see; a missing entitlement surfaces at
+        /// identity-build time as its own runtime error, not as a reason in this list.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 

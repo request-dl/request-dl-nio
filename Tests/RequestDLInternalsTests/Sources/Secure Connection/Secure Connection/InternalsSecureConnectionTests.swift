@@ -384,19 +384,16 @@ extension InternalsSecureConnectionTests {
     }
 
     /// Regression coverage for the fields AsyncHTTPClient's NIOTransportServices bridge either
-    /// traps on (`keyLogger`, `.noHostnameVerification` -- unless a custom verification callback
-    /// is also installed, which none of these cases do) or silently drops (everything else here --
-    /// they're read from the built `TLSConfiguration` and then never looked at again) when running
-    /// on Network.framework. Each one must flip `isCompatibleWithNetworkFramework` to `false` so
-    /// the caller falls back to plain NIO instead of crashing or losing the setting without any
-    /// signal. `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning), and
-    /// `additionalTrustRoots` are deliberately *not* in this list -- see
-    /// `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
+    /// traps on (`keyLogger`, with no custom verification callback able to work around it -- unlike
+    /// `.noHostnameVerification`, see the doc comment below) or silently drops (everything else
+    /// here -- they're read from the built `TLSConfiguration` and then never looked at again) when
+    /// running on Network.framework. Each one must flip `isCompatibleWithNetworkFramework` to
+    /// `false` so the caller falls back to plain NIO instead of crashing or losing the setting
+    /// without any signal. `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning),
+    /// `additionalTrustRoots`, and `.noHostnameVerification` are deliberately *not* in this list --
+    /// see `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
     @Test(
         arguments: [
-            { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.certificateVerification = .noHostnameVerification
-            },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.renegotiationSupport = .once
             },
@@ -433,12 +430,13 @@ extension InternalsSecureConnectionTests {
         #expect(!secureConnection.isCompatibleWithNetworkFramework)
     }
 
-    /// mTLS (`certificateChain`/`privateKey`), SPKI pinning (`tlsPins`), and `additionalTrustRoots`
-    /// all reach Network.framework now: the first two through `tlsLocalIdentityNetworkFramework`
-    /// and `tlsCustomVerificationNetworkFramework` respectively (AsyncHTTPClient fork, 1.38.0+),
-    /// the last through `Internals.NIOTrustEvaluator` installing that same
-    /// `tlsCustomVerificationNetworkFramework` hook on its own, independently of whether SPKI
-    /// pinning is also configured -- mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible`
+    /// mTLS (`certificateChain`/`privateKey`), SPKI pinning (`tlsPins`), `additionalTrustRoots`,
+    /// and `.noHostnameVerification` all reach Network.framework now: mTLS through
+    /// `tlsLocalIdentityNetworkFramework`, and the other three through
+    /// `Internals.NIOTrustEvaluator` installing `tlsCustomVerificationNetworkFramework` on its own,
+    /// independently of whether SPKI pinning is also configured -- `skipsHostnameVerification`
+    /// additionally swaps in a hostname-less trust policy for the `.noHostnameVerification` case
+    /// specifically. Mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible`
     /// below, but for the Network.framework-facing reason list.
     @Test(
         arguments: [
@@ -451,6 +449,9 @@ extension InternalsSecureConnectionTests {
             },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.additionalTrustRoots = [.file("/dev/null")]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.certificateVerification = .noHostnameVerification
             },
         ] as [@Sendable (inout Internals.SecureConnection) -> Void]
     )
