@@ -159,9 +159,11 @@ struct InternalsDarwinTrustEvaluationTests {
     /// server-auth `extendedKeyUsage`, just without the hostname match, rather than
     /// `SecPolicyCreateBasicX509()` (a bare chain-of-trust policy with no purpose/EKU checks at
     /// all), which is what `NIOTrustEvaluator`'s Network.framework closure used to build before
-    /// this type existed. The fixtures' "client" certificate is self-signed with
-    /// `extendedKeyUsage=clientAuth` only (no `serverAuth`): exactly the shape a bare X.509
-    /// policy would still accept but a real SSL server policy correctly rejects.
+    /// this type existed.
+    ///
+    /// The fixtures' "client" certificate is self-signed with `extendedKeyUsage=clientAuth` only
+    /// (no `serverAuth`): exactly the shape a bare X.509 policy would still accept but a real SSL
+    /// server policy correctly rejects.
     @Test
     func prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage() throws {
         // Given

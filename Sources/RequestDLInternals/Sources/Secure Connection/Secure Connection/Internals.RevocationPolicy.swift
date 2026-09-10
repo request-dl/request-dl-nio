@@ -8,10 +8,12 @@ extension Internals {
     /// layered on top of `SecTrust`'s own default check, which already runs automatically on
     /// every evaluation, but only on a best-effort basis: a revocation responder that can't be
     /// reached doesn't fail the handshake. NIOSSL/BoringSSL implements no revocation checking of
-    /// its own, so this has no effect at all off Darwin. `Internals.NIOTrustEvaluator.resolve(
-    /// from:)` only installs the custom verification this rides on when `canImport(Darwin)`, and
-    /// `Internals.DarwinTrustEvaluation` is what both `.urlSession` (`ServerTrustPolicy`) and
-    /// `.nio`/`.nioTransportServices` (`NIOTrustEvaluator`) share it through.
+    /// its own, so this has no effect at all off Darwin.
+    ///
+    /// `Internals.NIOTrustEvaluator.resolve(from:)` only installs the custom verification this
+    /// rides on when `canImport(Darwin)`, and `Internals.DarwinTrustEvaluation` is what both
+    /// `.urlSession` (`ServerTrustPolicy`) and `.nio`/`.nioTransportServices` (`NIOTrustEvaluator`)
+    /// share it through.
     package enum RevocationPolicy: Sendable, Hashable {
 
         /// Requires a definitive, verified positive response from OCSP or CRL before trusting the

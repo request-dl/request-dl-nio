@@ -20,11 +20,13 @@ extension Internals.NIOTrustEvaluator {
     /// Same shape of validation as `Internals.ServerTrustPolicy.handle(challenge:)`, minus the
     /// `URLAuthenticationChallenge` wrapping. Both delegate the actual trust-root/SPKI pin
     /// decision to the shared `Internals.DarwinTrustEvaluation`, and only own what genuinely
-    /// differs between them: this evaluator can't call `SecTrustEvaluate(WithError|AsyncWithError)`
-    /// synchronously the way `ServerTrustPolicy` does on `.urlSession`'s own delegate queue,
-    /// since evaluation can perform network I/O (OCSP), and blocking the NIO event loop that
-    /// invokes these closures would stall every other connection sharing it. So it always
-    /// dispatches onto its own dedicated queue first.
+    /// differs between them.
+    ///
+    /// This evaluator can't call `SecTrustEvaluate(WithError|AsyncWithError)` synchronously the
+    /// way `ServerTrustPolicy` does on `.urlSession`'s own delegate queue, since evaluation can
+    /// perform network I/O (OCSP), and blocking the NIO event loop that invokes these closures
+    /// would stall every other connection sharing it. So it always dispatches onto its own
+    /// dedicated queue first.
     static func makeDarwinEvaluator(
         pins: [Internals.SPKIHash],
         isStrict: Bool,

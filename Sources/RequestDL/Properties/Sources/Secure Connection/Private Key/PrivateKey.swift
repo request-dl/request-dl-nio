@@ -94,6 +94,7 @@ public struct PrivateKey: Property {
     /// decrypts the key itself, straight from this password. Under
     /// ``Session/Executor/urlSession``/``Session/Executor/nioTransportServices``, mTLS needs a
     /// Keychain `SecIdentity`, which needs the key material already decrypted to build one.
+    ///
     /// This package can decrypt a traditional PKCS#1 RSA PEM key itself to get there
     /// (`format: .pem`, `"-----BEGIN RSA PRIVATE KEY-----"` with `Proc-Type`/`DEK-Info` headers),
     /// but has no decryption path at all for a PKCS#8-encrypted key or any EC key (P-256/P-384/

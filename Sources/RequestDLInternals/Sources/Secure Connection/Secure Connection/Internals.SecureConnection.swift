@@ -26,18 +26,22 @@ extension Internals {
         /// `tlsCustomVerificationNetworkFramework` whenever any one is configured, independently of
         /// whether SPKI pinning is also active, and swaps in a hostname-less policy and/or a
         /// revocation policy on the `SecTrust` it's handed only when those are actually configured
-        /// (`Internals.DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`). `build()`'s
-        /// NIOSSL-facing `tlsCustomVerification` stays gated to pins only, since NIOSSL already
-        /// honors both `additionalTrustRoots` and `.noHostnameVerification` natively via
+        /// (`Internals.DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`).
+        ///
+        /// `build()`'s NIOSSL-facing `tlsCustomVerification` stays gated to pins only, since NIOSSL
+        /// already honors both `additionalTrustRoots` and `.noHostnameVerification` natively via
         /// `TLSConfiguration` and doesn't need the assist for those two. `revocationPolicy` and
         /// `trustDecisionObserver`, though, still route through it on `.nio` as well, since
         /// NIOSSL/BoringSSL has no revocation checking or trust-decision hook of its own at all.
+        ///
         /// What's genuinely unreachable under Network.framework is `keyLogger` (no
-        /// Network.framework equivalent at all). The rest (`cipherSuiteValues`,
-        /// `renegotiationSupport`, `signingSignatureAlgorithms`, `verifySignatureAlgorithms`,
-        /// `sendCANameList`, `shutdownTimeout`, `pskHint`, `pskIdentityResolver`) aren't rejected
-        /// there at all; they're read from the built `TLSConfiguration` and then never looked at
-        /// again, so the connection silently negotiates without them rather than failing loudly.
+        /// Network.framework equivalent at all).
+        ///
+        /// The rest (`cipherSuiteValues`, `renegotiationSupport`, `signingSignatureAlgorithms`,
+        /// `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`,
+        /// `pskIdentityResolver`) aren't rejected there at all; they're read from the built
+        /// `TLSConfiguration` and then never looked at again, so the connection silently negotiates
+        /// without them rather than failing loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return networkFrameworkIncompatibilityReasons().isEmpty
@@ -102,10 +106,11 @@ extension Internals {
         /// under Network.framework (see `networkFrameworkIncompatibilityReasons()` above) via
         /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`, so this list and
         /// that one agree on every field except `keyLogger`, the one genuine
-        /// Network.framework-specific gap. Whether the app actually carries the Keychain Sharing
-        /// entitlement the identity round-trip needs is a runtime fact this static check cannot
-        /// see; a missing entitlement surfaces at identity-build time as its own runtime error, not
-        /// as a reason in this list.
+        /// Network.framework-specific gap.
+        ///
+        /// Whether the app actually carries the Keychain Sharing entitlement the identity
+        /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
+        /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 

@@ -77,11 +77,13 @@ extension Internals {
         /// `skipsHostnameVerification` swaps in `SecPolicyCreateSSL(true, nil)`: a real SSL server
         /// policy (still checks the server-auth `extendedKeyUsage` and everything else a
         /// certificate presented for TLS server auth normally must satisfy), just without the
-        /// hostname match. Deliberately *not* `SecPolicyCreateBasicX509()`, a bare X.509
-        /// chain-of-trust policy with no purpose/EKU checks at all: that would be a wider
-        /// relaxation than `.noHostnameVerification` ever asked for, accepting a certificate
-        /// lacking the server-auth `extendedKeyUsage` that `SecPolicyCreateSSL(true, nil)`
-        /// correctly rejects (see `InternalsDarwinTrustEvaluationTests`'s
+        /// hostname match.
+        ///
+        /// Deliberately *not* `SecPolicyCreateBasicX509()`, a bare X.509 chain-of-trust policy
+        /// with no purpose/EKU checks at all: that would be a wider relaxation than
+        /// `.noHostnameVerification` ever asked for, accepting a certificate lacking the
+        /// server-auth `extendedKeyUsage` that `SecPolicyCreateSSL(true, nil)` correctly rejects
+        /// (see `InternalsDarwinTrustEvaluationTests`'s
         /// `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`).
         ///
         /// `revocationPolicy`, when set, is appended to whichever policy array results from the
@@ -153,6 +155,7 @@ extension Internals {
         /// reconstructing the SPKI ASN.1 wrapper from a bare `SecKey` export by hand, so a pin
         /// configured once produces the identical digest regardless of which executor
         /// (`.urlSession`, `.nio`, `.nioTransportServices`) ends up carrying the connection.
+        ///
         /// Certificates that don't round-trip through NIOSSL are dropped rather than failing the
         /// whole chain; that isn't expected in practice for a trust `SecTrustEvaluate...` already
         /// accepted moments earlier.

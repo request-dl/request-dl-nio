@@ -390,11 +390,12 @@ struct InternalsSessionConfigurationExecutorTests {
     /// A preference the configuration can't actually satisfy is not an override. Resolution must
     /// fall through to whatever the default priority order would have picked among the
     /// compatible candidates, not honor the preference anyway. Here, that's all the way to `.nio`,
-    /// since the field used also rules out `.urlSession`. There's no longer a field that rules
-    /// out only `.nioTransportServices` while sparing `.urlSession`: `additionalTrustRoots` and
-    /// `.noHostnameVerification` were the last two, and `Internals.NIOTrustEvaluator` closed both
-    /// gaps (see the `..._resolvesToItOverURLSession` tests above). Every remaining incompatible
-    /// field rejects both executors identically (see
+    /// since the field used also rules out `.urlSession`.
+    ///
+    /// There's no longer a field that rules out only `.nioTransportServices` while sparing
+    /// `.urlSession`: `additionalTrustRoots` and `.noHostnameVerification` were the last two, and
+    /// `Internals.NIOTrustEvaluator` closed both gaps (see the `..._resolvesToItOverURLSession`
+    /// tests above). Every remaining incompatible field rejects both executors identically (see
     /// `resolveExecutor_whenIncompatibleWithBothURLSessionAndNIOTransportServices_resolvesToNIO`).
     @Test
     func resolveExecutor_whenNIOTransportServicesPreferredButIncompatible_fallsBackToNIO() async throws {

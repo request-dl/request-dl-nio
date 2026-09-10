@@ -168,7 +168,8 @@ public struct SecureConnection<Content: Property>: Property {
     ///
     /// - Important: Reachable under ``Session/Executor/nio`` only. This is a **permanent**
     /// limitation of the underlying platforms, not a gap awaiting a fix. Neither Network.framework
-    /// nor `URLSession` exposes any public API for observing per-session TLS secrets, so
+    /// nor `URLSession` exposes any public API for observing per-session TLS secrets.
+    ///
     /// ``Session/requiredExecutor(_:)``/``Session/preferredExecutor(_:)`` steer a session with a
     /// key logger configured away from both ``Session/Executor/nioTransportServices`` and
     /// ``Session/Executor/urlSession``. Letting that combination reach the OS layer at all would

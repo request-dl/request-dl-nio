@@ -110,7 +110,9 @@ extension Internals {
         /// passphraseCallback:)`, the only encrypted-key entry point anywhere in this package's
         /// dependency graph. `swift-certificates` has none at all (its own private-key parsing
         /// only understands unencrypted PKCS#8 `PrivateKeyInfo`, for its own CSR/cert-signing
-        /// needs). PKCS#8's `EncryptedPrivateKeyInfo` and every encrypted EC key (P-256/P-384/
+        /// needs).
+        ///
+        /// PKCS#8's `EncryptedPrivateKeyInfo` and every encrypted EC key (P-256/P-384/
         /// P-521, since `Crypto`'s own types have no passphrase-protected PEM import at all) still
         /// throw `Error/unsupportedKeyFormat(_:)`, same as a `.der`-sourced password-protected key:
         /// BoringSSL's own decryption call here only takes a PEM string, never raw DER.

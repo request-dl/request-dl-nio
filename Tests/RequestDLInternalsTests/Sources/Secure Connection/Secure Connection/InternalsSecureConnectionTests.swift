@@ -387,11 +387,13 @@ extension InternalsSecureConnectionTests {
     /// traps on (`keyLogger`, with no custom verification callback able to work around it, unlike
     /// `.noHostnameVerification`, see the doc comment below) or silently drops (everything else
     /// here; they're read from the built `TLSConfiguration` and then never looked at again) when
-    /// running on Network.framework. Each one must flip `isCompatibleWithNetworkFramework` to
-    /// `false` so the caller falls back to plain NIO instead of crashing or losing the setting
-    /// without any signal. `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning),
-    /// `additionalTrustRoots`, and `.noHostnameVerification` are deliberately *not* in this list;
-    /// see `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
+    /// running on Network.framework.
+    ///
+    /// Each one must flip `isCompatibleWithNetworkFramework` to `false` so the caller falls back
+    /// to plain NIO instead of crashing or losing the setting without any signal.
+    /// `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning), `additionalTrustRoots`,
+    /// and `.noHostnameVerification` are deliberately *not* in this list; see
+    /// `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
     @Test(
         arguments: [
             { (secureConnection: inout Internals.SecureConnection) in
@@ -436,8 +438,10 @@ extension InternalsSecureConnectionTests {
     /// `Internals.NIOTrustEvaluator` installing `tlsCustomVerificationNetworkFramework` on its own,
     /// independently of whether SPKI pinning is also configured. `skipsHostnameVerification`
     /// additionally swaps in a hostname-less trust policy for the `.noHostnameVerification` case
-    /// specifically. Mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible`
-    /// below, but for the Network.framework-facing reason list.
+    /// specifically.
+    ///
+    /// Mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible` below, but for
+    /// the Network.framework-facing reason list.
     @Test(
         arguments: [
             { (secureConnection: inout Internals.SecureConnection) in
@@ -567,9 +571,10 @@ extension InternalsSecureConnectionTests {
     /// `privateKey` were configured, even for a caller that was never going to run over
     /// Network.framework at all. That meant configuring mTLS for `.urlSession`/
     /// `.nioTransportServices` silently broke a `.nio`-pinned request too, on any process without
-    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness). See
-    /// `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)` specifically
-    /// to avoid this and used to hit it anyway.
+    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness).
+    ///
+    /// See `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)`
+    /// specifically to avoid this and used to hit it anyway.
     @Test
     func secureConnection_whenMTLSConfiguredButNetworkFrameworkNotNeeded_skipsKeychainIdentityBuild() async throws {
         // Given
@@ -597,11 +602,13 @@ extension InternalsSecureConnectionTests {
     /// (AsyncHTTPClient's NIOTransportServices bridge) `preconditionFailure`s the instant
     /// `certificateChain`/`privateKey` is non-empty, unconditionally, so leaving either set,
     /// even alongside a correctly-built `localIdentityHandle`, would crash the process the moment
-    /// this configuration actually ran over `.nioTransportServices`. `build()` bundles that
-    /// `TLSConfiguration` and the Network.framework identity into one throwing call, so this can't
-    /// inspect the former without the latter's Keychain round-trip also succeeding, a known gap
-    /// on this bare SwiftPM test harness (see `InternalsClientIdentityDescriptorTests`) unrelated
-    /// to what's actually being checked here, hence the `withKnownIssue` wrapper.
+    /// this configuration actually ran over `.nioTransportServices`.
+    ///
+    /// `build()` bundles that `TLSConfiguration` and the Network.framework identity into one
+    /// throwing call, so this can't inspect the former without the latter's Keychain round-trip
+    /// also succeeding, a known gap on this bare SwiftPM test harness (see
+    /// `InternalsClientIdentityDescriptorTests`) unrelated to what's actually being checked here,
+    /// hence the `withKnownIssue` wrapper.
     @Test
     func secureConnection_whenMTLSConfiguredAndNetworkFrameworkNeeded_omitsRawCertificateChainFromTLSConfiguration()
         async throws

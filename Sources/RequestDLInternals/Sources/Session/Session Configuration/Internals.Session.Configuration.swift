@@ -82,10 +82,12 @@ extension Internals.Session {
         /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
         /// actually run over Network.framework (`.nioTransportServices`). Forwarded to
         /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
-        /// worth paying for the mTLS identity's Keychain round-trip at all. Defaults to `true` so
-        /// every caller that doesn't yet know which executor won (every test call site, plus any
-        /// future caller) keeps the original always-build behavior; `Internals.ClientManager` is
-        /// the one caller that does know, and passes its actual answer.
+        /// worth paying for the mTLS identity's Keychain round-trip at all.
+        ///
+        /// Defaults to `true` so every caller that doesn't yet know which executor won (every
+        /// test call site, plus any future caller) keeps the original always-build behavior;
+        /// `Internals.ClientManager` is the one caller that does know, and passes its actual
+        /// answer.
         package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
             let secureConnectionOutput = try secureConnection?.build(
                 isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
@@ -433,12 +435,14 @@ extension Internals.Session.Configuration {
     /// distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
     /// `minimumTLSVersion`/`maximumTLSVersion` map onto `tlsMinimumSupportedProtocolVersion`/
     /// `tlsMaximumSupportedProtocolVersion`, the one other `SecureConnection` field with a
-    /// direct `URLSessionConfiguration` counterpart. Every other field this configuration could
-    /// carry that has no `URLSessionConfiguration` counterpart (`connectionPool`,
-    /// `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific
-    /// with nothing to translate to, or, for the fields that matter, like
-    /// `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
-    /// `decompression == .disabled`, already excluded from resolving to `.urlSession` at all by
+    /// direct `URLSessionConfiguration` counterpart.
+    ///
+    /// Every other field this configuration could carry that has no `URLSessionConfiguration`
+    /// counterpart (`connectionPool`, `ignoreUncleanSSLShutdown`,
+    /// `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific with nothing to
+    /// translate to, or, for the fields that matter, like `dnsOverride`/`httpVersion ==
+    /// .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/`decompression == .disabled`,
+    /// already excluded from resolving to `.urlSession` at all by
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
     ///

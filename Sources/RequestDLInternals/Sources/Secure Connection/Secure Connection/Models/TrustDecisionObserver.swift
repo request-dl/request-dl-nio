@@ -10,9 +10,10 @@
 /// logic rather than the TLS backend's native path. Under `.urlSession`, that's every
 /// server-trust challenge; under `.nio`/`.nioTransportServices`, only when something else already
 /// requires it (SPKI pinning, `verification(_:)` set to skip hostname verification,
-/// `revocationPolicy(_:)` on Apple platforms, additional trust roots, ...). A plain connection
-/// with none of those configured resolves through NIOSSL's own native trust-root handling, which
-/// this observer never sees.
+/// `revocationPolicy(_:)` on Apple platforms, additional trust roots, ...).
+///
+/// A plain connection with none of those configured resolves through NIOSSL's own native
+/// trust-root handling, which this observer never sees.
 public protocol TrustDecisionObserver: Sendable, AnyObject {
 
     ///

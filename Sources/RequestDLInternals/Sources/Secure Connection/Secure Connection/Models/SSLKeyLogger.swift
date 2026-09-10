@@ -11,12 +11,13 @@ import NIOCore
 ///
 /// - Important: Reachable under `.nio` only. This is a **permanent** limitation, not a gap
 /// awaiting a fix. Neither Network.framework nor `URLSession` exposes any public API for
-/// observing per-session TLS secrets; a session with a key logger configured that also resolves
-/// to `.nioTransportServices` crashes the process outright
-/// (`TLSConfiguration.keyLogCallback` `preconditionFailure`s in AsyncHTTPClient's own
-/// NIOTransportServices bridge), which is exactly why `resolveExecutor()`/`requireExecutor(_:)`
-/// steer away from both non-`.nio` executors whenever this is set, rather than letting that
-/// reach the OS layer at all.
+/// observing per-session TLS secrets.
+///
+/// A session with a key logger configured that also resolves to `.nioTransportServices` crashes
+/// the process outright (`TLSConfiguration.keyLogCallback` `preconditionFailure`s in
+/// AsyncHTTPClient's own NIOTransportServices bridge), which is exactly why
+/// `resolveExecutor()`/`requireExecutor(_:)` steer away from both non-`.nio` executors whenever
+/// this is set, rather than letting that reach the OS layer at all.
 public protocol SSLKeyLogger: Sendable, AnyObject {
 
     ///
