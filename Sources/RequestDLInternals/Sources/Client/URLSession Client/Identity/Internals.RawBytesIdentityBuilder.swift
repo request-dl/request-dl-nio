@@ -5,7 +5,7 @@
 // Promoted from the URLSession Executor Spike (formerly
 // `Tests/RequestDLTests/URLSession Executor Spike/RawBytesIdentityBuilder.swift`) for
 // request-dl-nio#287. Supports RSA (PKCS#1 or PKCS#8) and EC P-256/P-384/P-521 (SEC1 or
-// PKCS#8) private keys, unencrypted -- plus password-protected traditional PKCS#1 RSA PEM
+// PKCS#8) private keys, unencrypted, plus password-protected traditional PKCS#1 RSA PEM
 // keys specifically, decrypted via `_CryptoExtras` (see `privateKeyDER(from:)`).
 
 #if canImport(Darwin)
@@ -84,7 +84,7 @@ extension Internals {
         // MARK: - Identity sources (CertificateChain/PrivateKeySource -> raw DER bytes)
         //
         // Shared by every executor that needs a `SecIdentity` built from an
-        // `Internals.SecureConnection`'s `certificateChain`/`privateKey` -- `.urlSession`
+        // `Internals.SecureConnection`'s `certificateChain`/`privateKey`: `.urlSession`
         // (`Internals.URLSessionIdentityPolicy`) and `.nio` under Network.framework
         // (`Internals.SecureConnection.makeLocalIdentityForNetworkFramework()`) alike.
 

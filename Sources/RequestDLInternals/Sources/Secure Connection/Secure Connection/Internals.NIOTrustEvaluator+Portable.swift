@@ -29,7 +29,7 @@ extension Internals.NIOTrustEvaluator {
         trustRootCertificates: [NIOSSLCertificate],
         observer: (any TrustDecisionObserver)?
     ) throws -> Internals.NIOTrustEvaluator {
-        // A `let`, fully resolved before the closure below captures it -- a `var` captured across
+        // A `let`, fully resolved before the closure below captures it. A `var` captured across
         // both this `@Sendable` closure and the `Task` nested inside it doesn't satisfy Swift 6
         // concurrency checking, even though nothing ever mutates it again after this point.
         let rootStore: CertificateStore = {
@@ -40,7 +40,7 @@ extension Internals.NIOTrustEvaluator {
                 }
             }
 
-            // No explicit trust roots configured -- fall back to the same distro CA bundle
+            // No explicit trust roots configured; fall back to the same distro CA bundle
             // NIOSSL's own `.default` trust roots would have loaded, so pinning on top of the
             // system default still validates against the system default, not an empty root set.
             if trustRootCertificates.isEmpty {
@@ -94,7 +94,7 @@ extension Internals.NIOTrustEvaluator {
                         promise.succeed(accepted ? .certificateVerified : .failed)
 
                     case .couldNotValidate:
-                        // The chain itself doesn't validate -- always rejects, `.audit` only ever
+                        // The chain itself doesn't validate; always rejects, `.audit` only ever
                         // relaxes a pin mismatch, never a broken chain.
                         observer?(TrustDecision(isTrusted: false, pinsMatched: nil))
                         promise.succeed(.failed)
@@ -115,7 +115,7 @@ extension Internals.NIOTrustEvaluator {
     ]
 
     private static func systemDefaultCertificateStore() throws -> CertificateStore {
-        // `contentsOfDirectory(atPath:)` itself is the existence/is-a-directory check -- it
+        // `contentsOfDirectory(atPath:)` itself is the existence/is-a-directory check; it
         // throws for a path that's missing, a plain file, or unreadable, so the first path that
         // doesn't throw is the match, same "first candidate wins" shape as the file-based branch
         // below.

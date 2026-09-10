@@ -224,7 +224,7 @@ extension Internals {
             let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
 
             // NIOSSL already honors `additionalTrustRoots` natively, via the plain
-            // `tlsConfiguration.additionalTrustRoots` assignment above -- unlike
+            // `tlsConfiguration.additionalTrustRoots` assignment above. Unlike
             // `tlsCustomVerificationNetworkFramework` below, its custom-verification callback
             // stays reserved for what it can't do on its own (SPKI pinning), so a
             // `trustEvaluator` built only for `additionalTrustRoots` never gets attached here.

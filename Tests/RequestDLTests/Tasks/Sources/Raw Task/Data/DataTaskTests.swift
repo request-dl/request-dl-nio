@@ -249,7 +249,7 @@ struct DataTaskTests {
     }
 
     /// Regression coverage for the gap `Internals.NIOTrustEvaluator` closed: `additionalTrustRoots`
-    /// alone, with no SPKI pinning, used to be silently ignored under Network.framework --
+    /// alone, with no SPKI pinning, used to be silently ignored under Network.framework.
     /// `localServer`'s certificate is signed by a private test CA the system default trust store
     /// has never heard of (see `dataTask_whenCAEnabled` above), so this handshake only succeeds if
     /// `AdditionalTrustRoots` genuinely reached Network.framework's own trust evaluation, not just
@@ -486,7 +486,7 @@ extension DataTaskTests {
     /// before any client is built or network I/O starts.
     @Test
     func dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO() async throws {
-        // Given -- a custom cipher suite has no Network.framework equivalent at all (silently
+        // Given: a custom cipher suite has no Network.framework equivalent at all (silently
         // dropped rather than trapped, but still flagged incompatible so it isn't lost without a
         // signal), so pinning `.nioTransportServices` is guaranteed to conflict.
         let task = DataTask {

@@ -24,7 +24,7 @@ import Network
 
 #if canImport(Darwin)
 // `URLSessionConfiguration` isn't part of the narrow `import struct Foundation.UUID` this file
-// otherwise gets by with -- needed only by the Darwin-gated `buildURLSessionConfiguration()`
+// otherwise gets by with; needed only by the Darwin-gated `buildURLSessionConfiguration()`
 // tests below.
 import Foundation
 #endif
@@ -376,12 +376,12 @@ struct InternalsSessionConfigurationTests {
         configuration.enableNetworkFramework = true
         configuration.secureConnection = secureConnection
 
-        // Then -- SPKI pinning is enforced under Network.framework too, via
+        // Then: SPKI pinning is enforced under Network.framework too, via
         // `Internals.NIOTrustEvaluator`/`HTTPClient.Configuration.tlsCustomVerificationNetworkFramework`
         // (AsyncHTTPClient's fork, 1.38.0+), so it no longer needs to steer a session off that
         // executor the way it did when pinning only worked through the NIOSSL backend. Network.framework
         // doesn't exist at all off Darwin, so `isCompatibleWithNetworkFramework` itself stays
-        // unconditionally `false` there regardless of reasons -- checked directly on Darwin, and via
+        // unconditionally `false` there regardless of reasons, checked directly on Darwin, and via
         // the platform-independent reasons list everywhere else.
         #if canImport(Darwin)
         #expect(configuration.isCompatibleWithNetworkFramework)
@@ -490,7 +490,7 @@ struct InternalsSessionConfigurationTests {
     func configuration_whenSecureConnectionOmitsTLSVersionRange_urlSessionConfigurationKeepsSystemDefault()
         async throws
     {
-        // Given -- absence must stay absence, not get forced to some RequestDL-chosen floor
+        // Given: absence must stay absence, not get forced to some RequestDL-chosen floor
         let configuration = Internals.Session.Configuration()
         let defaultConfiguration = URLSessionConfiguration.ephemeral
 

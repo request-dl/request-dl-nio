@@ -390,7 +390,7 @@ extension InternalsSecureConnectionTests {
     /// running on Network.framework. Each one must flip `isCompatibleWithNetworkFramework` to
     /// `false` so the caller falls back to plain NIO instead of crashing or losing the setting
     /// without any signal. `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning),
-    /// `additionalTrustRoots`, and `.noHostnameVerification` are deliberately *not* in this list --
+    /// `additionalTrustRoots`, and `.noHostnameVerification` are deliberately *not* in this list;
     /// see `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
     @Test(
         arguments: [
@@ -464,10 +464,10 @@ extension InternalsSecureConnectionTests {
         // When
         mutate(&secureConnection)
 
-        // Then -- `networkFrameworkIncompatibilityReasons()` (the platform-independent logic this
+        // Then: `networkFrameworkIncompatibilityReasons()` (the platform-independent logic this
         // test actually exercises), not `isCompatibleWithNetworkFramework` (which is unconditionally
         // `false` off Darwin regardless of reasons, since Network.framework doesn't exist there at
-        // all -- see `secureConnection_whenDefault_isCompatibleWithNetworkFramework` above).
+        // all; see `secureConnection_whenDefault_isCompatibleWithNetworkFramework` above).
         #expect(secureConnection.networkFrameworkIncompatibilityReasons().isEmpty)
     }
 
@@ -584,7 +584,7 @@ extension InternalsSecureConnectionTests {
         // When
         let sut = try secureConnection.build(isCompatibleWithNetworkFramework: false)
 
-        // Then -- completes without ever attempting the Keychain round-trip, even on a machine
+        // Then: completes without ever attempting the Keychain round-trip, even on a machine
         // with no Keychain Sharing entitlement at all. `tlsConfiguration.certificateChain` still
         // carries the mTLS cert, proving `build()` did real work rather than short-circuiting.
         #expect(!sut.tlsConfiguration.certificateChain.isEmpty)

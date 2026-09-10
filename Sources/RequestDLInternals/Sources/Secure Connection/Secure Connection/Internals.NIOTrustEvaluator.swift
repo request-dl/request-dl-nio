@@ -3,7 +3,7 @@
 //
 
 // The `.nio` counterpart to `Internals.ServerTrustPolicy` (which only ever answers `.urlSession`'s
-// `SecTrust`-based challenge). AsyncHTTPClient no longer bundles SPKI pinning -- `tlsPinning`/
+// `SecTrust`-based challenge). AsyncHTTPClient no longer bundles SPKI pinning: `tlsPinning`/
 // `SPKIPinningConfiguration` were removed upstream in the fork's 1.38.0 release, replaced by two
 // thin, policy-free hooks (`HTTPClient.Configuration.tlsCustomVerification` for the NIOSSL backend,
 // `.tlsCustomVerificationNetworkFramework` for the Network.framework one) that let a caller fully

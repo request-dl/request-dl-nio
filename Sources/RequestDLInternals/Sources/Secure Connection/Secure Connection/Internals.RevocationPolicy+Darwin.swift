@@ -13,7 +13,7 @@ extension Internals.RevocationPolicy {
     var secPolicy: SecPolicy {
         // `SecPolicyCreateRevocation` is declared `__nullable` in the SDK header the way every
         // `SecPolicyCreate*` factory is, but never actually returns `NULL` for any combination of
-        // its own documented flags -- there's no invalid combination among
+        // its own documented flags: there's no invalid combination among
         // `kSecRevocation*`'s five bits for it to reject.
         switch self {
         case .strict:

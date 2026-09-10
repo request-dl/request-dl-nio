@@ -18,7 +18,7 @@ struct InternalsDarwinTrustEvaluationTests {
 
     @Test
     func evaluate_whenNoPinsConfigured_isAlwaysTrue() throws {
-        // Given -- nothing to pin against, so chain validity (already confirmed by the caller's
+        // Given: nothing to pin against, so chain validity (already confirmed by the caller's
         // own SecTrustEvaluate... call before this runs) is the whole check.
         let evaluation = Internals.DarwinTrustEvaluation(trustRootCertificates: [], pins: [], isStrict: true)
 
@@ -36,7 +36,7 @@ struct InternalsDarwinTrustEvaluationTests {
 
     @Test
     func evaluate_whenChainNotTrusted_isFalseRegardlessOfPins() throws {
-        // Given -- the caller's own `SecTrustEvaluate...` already rejected the chain; no pin
+        // Given: the caller's own `SecTrustEvaluate...` already rejected the chain; no pin
         // configuration should be able to override that.
         let evaluation = Internals.DarwinTrustEvaluation(trustRootCertificates: [], pins: [], isStrict: false)
 
@@ -76,7 +76,7 @@ struct InternalsDarwinTrustEvaluationTests {
 
     @Test
     func evaluate_whenPinMismatchUnderAuditPolicy_isTrue() throws {
-        // Given -- `.audit` only ever relaxes a pin mismatch, matching `ServerTrustPolicy`'s own
+        // Given: `.audit` only ever relaxes a pin mismatch, matching `ServerTrustPolicy`'s own
         // longstanding semantics.
         let unrelatedPin = Internals.ResolvedSPKIPin { _ in false }
         let evaluation = Internals.DarwinTrustEvaluation(
@@ -99,7 +99,7 @@ struct InternalsDarwinTrustEvaluationTests {
 
     @Test
     func evaluate_notifiesObserverWithTheSameOutcomeAndPinMatchState() throws {
-        // Given -- the observer must see exactly the accept/reject decision (and pin-match state)
+        // Given: the observer must see exactly the accept/reject decision (and pin-match state)
         // `evaluate(chain:chainIsTrusted:)` itself returns, not some separately recomputed value.
         let unrelatedPin = Internals.ResolvedSPKIPin { _ in false }
         let observer = RecordingTrustDecisionObserver()
@@ -129,7 +129,7 @@ struct InternalsDarwinTrustEvaluationTests {
 
     @Test
     func evaluate_whenChainNotTrusted_notifiesObserverWithNilPinsMatched() throws {
-        // Given -- a broken chain never gets far enough to consult pins at all.
+        // Given: a broken chain never gets far enough to consult pins at all.
         let observer = RecordingTrustDecisionObserver()
         let evaluation = Internals.DarwinTrustEvaluation(
             trustRootCertificates: [],
@@ -177,11 +177,11 @@ struct InternalsDarwinTrustEvaluationTests {
             isStrict: false
         )
 
-        // When -- self-anchored on its own (self-signed) certificate, so the only reason this
+        // When: self-anchored on its own (self-signed) certificate, so the only reason this
         // could still fail is a policy check beyond bare chain-of-trust.
         evaluation.prepare(sut, skipsHostnameVerification: true)
 
-        // Then -- a bare X.509 policy would accept this outright; a real SSL server policy
+        // Then: a bare X.509 policy would accept this outright; a real SSL server policy
         // rejects it for lacking the serverAuth EKU.
         var evaluationError: CFError?
         let isTrusted = SecTrustEvaluateWithError(sut, &evaluationError)

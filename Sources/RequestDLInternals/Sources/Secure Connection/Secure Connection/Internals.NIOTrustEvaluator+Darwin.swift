@@ -53,7 +53,7 @@ extension Internals.NIOTrustEvaluator {
             observer: observer
         )
 
-        // `SecTrustEvaluateAsyncWithError` must be called from -- and calls back on -- the same
+        // `SecTrustEvaluateAsyncWithError` must be called from, and calls back on, the same
         // queue.
         let queue = DispatchQueue(label: "RequestDL.NIOTrustEvaluator")
 
@@ -97,7 +97,7 @@ extension Internals.NIOTrustEvaluator {
                 }
 
                 var trust: SecTrust?
-                // A plain X.509 policy, deliberately without a hostname -- hostname/SNI matching
+                // A plain X.509 policy, deliberately without a hostname. Hostname/SNI matching
                 // stays NIOSSL's own separate gate (tied purely to `certificateVerification`,
                 // independent of this callback being installed), so this evaluator only needs to
                 // own chain-of-trust validation. Never affected by `skipsHostnameVerification`:

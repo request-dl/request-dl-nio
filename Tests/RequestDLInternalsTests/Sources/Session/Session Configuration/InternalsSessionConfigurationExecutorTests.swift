@@ -280,7 +280,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin() async throws {
-        // Given -- reachable under both URLSession and NIOTransportServices (the latter via
+        // Given: reachable under both URLSession and NIOTransportServices (the latter via
         // `Internals.NIOTrustEvaluator`), so this exercises the default priority order
         // (URLSession first) rather than URLSession being the only compatible option.
         var configuration = Internals.Session.Configuration()
@@ -305,7 +305,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenAdditionalTrustRootsSetAndNIOTransportServicesPreferred_resolvesToItOverURLSession()
         async throws
     {
-        // Given -- `additionalTrustRoots` alone (no SPKI pinning) doesn't rule out NIOTransportServices,
+        // Given: `additionalTrustRoots` alone (no SPKI pinning) doesn't rule out NIOTransportServices,
         // so an explicit preference for it wins instead of falling back to URLSession.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
@@ -330,7 +330,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNoHostnameVerificationSetAndNIOTransportServicesPreferred_resolvesToItOverURLSession()
         async throws
     {
-        // Given -- `.noHostnameVerification` alone doesn't rule out NIOTransportServices either
+        // Given: `.noHostnameVerification` alone doesn't rule out NIOTransportServices either
         // (`Internals.NIOTrustEvaluator` installs the custom verification callback AsyncHTTPClient's
         // own `precondition` trap otherwise requires), so an explicit preference for it wins.
         var configuration = Internals.Session.Configuration()
@@ -638,8 +638,8 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedAndIncompatible_throwsWithExactReasons() async throws {
-        // Given -- `keyLogger` (and the rest of "bucket D") stays a genuine Network.framework gap,
-        // unlike `additionalTrustRoots`/`.noHostnameVerification` -- see the two
+        // Given: `keyLogger` (and the rest of "bucket D") stays a genuine Network.framework gap,
+        // unlike `additionalTrustRoots`/`.noHostnameVerification`. See the two
         // `..._doesNotThrow` tests below for those.
         var configuration = Internals.Session.Configuration()
 
@@ -660,7 +660,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedWithAdditionalTrustRootsOnly_doesNotThrow() async throws {
-        // Given -- regression coverage for the gap `Internals.NIOTrustEvaluator` closed:
+        // Given: regression coverage for the gap `Internals.NIOTrustEvaluator` closed:
         // `additionalTrustRoots` alone, with no SPKI pinning, used to throw here.
         var configuration = Internals.Session.Configuration()
 
@@ -674,7 +674,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedWithNoHostnameVerificationOnly_doesNotThrow() async throws {
-        // Given -- AsyncHTTPClient's NIOTransportServices bridge traps on `.noHostnameVerification`
+        // Given: AsyncHTTPClient's NIOTransportServices bridge traps on `.noHostnameVerification`
         // via `precondition` unless a custom Network.framework verification callback is installed.
         // `Internals.NIOTrustEvaluator` installs exactly that callback whenever
         // `.noHostnameVerification` is configured, and swaps in a hostname-less trust policy

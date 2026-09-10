@@ -105,7 +105,7 @@ extension Internals {
 
         deinit {
             // Removing the mTLS identity's Keychain items (if any) doesn't depend on whether the
-            // client was already closed -- unlike shutting down `_client` below, doing this twice
+            // client was already closed. Unlike shutting down `_client` below, doing this twice
             // isn't an error, and there's no other owner racing to do it first.
             #if canImport(Darwin)
             if let localIdentityHandle {

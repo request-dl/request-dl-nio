@@ -4,12 +4,12 @@
 
 // The shared core `Internals.ServerTrustPolicy` (`.urlSession`) and `Internals.NIOTrustEvaluator`
 // (`.nio`/`.nioTransportServices`) both need, extracted after the two independently reimplemented
-// the same `SecTrust`-based accept/reject decision for a while -- and had already drifted once:
+// the same `SecTrust`-based accept/reject decision for a while, and had already drifted once:
 // `ServerTrustPolicy` handled `.noHostnameVerification` correctly from its very first version,
 // while `NIOTrustEvaluator` needed a dedicated fix later to catch up. Neither of the two consumers
-// hands off *how* to call `SecTrustEvaluate(WithError|AsyncWithError)` here -- `.urlSession`'s own
-// delegate queue makes the synchronous call safe, while `.nio`'s NIO event loop can't block on it
-// -- so this only owns what's identical either way: anchoring the trust, swapping in a
+// hands off *how* to call `SecTrustEvaluate(WithError|AsyncWithError)` here. `.urlSession`'s own
+// delegate queue makes the synchronous call safe, while `.nio`'s NIO event loop can't block on it,
+// so this only owns what's identical either way: anchoring the trust, swapping in a
 // hostname-less policy when asked, and the strict/audit SPKI pin decision once chain validation
 // already succeeded.
 
@@ -26,7 +26,7 @@ import Foundation
 
 extension Internals {
 
-    /// One SPKI pin, normalized to a same-process matcher regardless of where it came from --
+    /// One SPKI pin, normalized to a same-process matcher regardless of where it came from.
     /// `Internals.ServerTrustPolicy` also needs a `Descriptor`-capturable digest for
     /// `BackgroundDownloadTask` persistence, `Internals.NIOTrustEvaluator` doesn't; both build one
     /// of these to hand to `DarwinTrustEvaluation`, which only ever needs the matcher itself.

@@ -11,7 +11,7 @@ import Testing
 @testable import RequestDLInternals
 
 /// Tests `Internals.NIOTrustEvaluator` against a real, `openssl`-generated and
-/// `openssl verify`-checked three-level certificate chain (root CA -> intermediate CA -> leaf) --
+/// `openssl verify`-checked three-level certificate chain (root CA -> intermediate CA -> leaf),
 /// not mocks, so a broken chain genuinely fails to validate and a matching SPKI pin genuinely
 /// hashes to the configured digest. Covers the behavior this type exists for: pinning the
 /// intermediate (not just the leaf) matches, a pin mismatch only rejects under `.strict`, and a
@@ -20,7 +20,7 @@ struct InternalsNIOTrustEvaluatorTests {
 
     @Test
     func resolve_whenNothingConfigured_returnsNil() throws {
-        // Given -- SPKI pinning is the trigger this file's own chain-validation tests exercise,
+        // Given: SPKI pinning is the trigger this file's own chain-validation tests exercise,
         // but it's not the only one: on Darwin, `additionalTrustRoots`/`.noHostnameVerification`
         // alone also install this evaluator (see `InternalsSecureConnectionTests`'s
         // `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` for that).
@@ -35,7 +35,7 @@ struct InternalsNIOTrustEvaluatorTests {
     #if canImport(Darwin)
     @Test
     func resolve_whenOnlyRevocationPolicyConfigured_installsEvaluator() throws {
-        // Given -- NIOSSL/BoringSSL implements no revocation checking of its own, so this only
+        // Given: NIOSSL/BoringSSL implements no revocation checking of its own, so this only
         // ever installs the custom-verification evaluator on Darwin, the same way
         // `additionalTrustRoots`/`.noHostnameVerification` alone do (see
         // `resolve_whenNothingConfigured_returnsNil` above).
@@ -52,7 +52,7 @@ struct InternalsNIOTrustEvaluatorTests {
 
     @Test
     func resolve_whenOnlyObserverConfigured_installsEvaluator() throws {
-        // Given -- the observer alone is a reason to install custom verification on Darwin, even
+        // Given: the observer alone is a reason to install custom verification on Darwin, even
         // with every other trigger left at its default.
         var secureConnection = Internals.SecureConnection()
         secureConnection.trustDecisionObserver = NoOpTrustDecisionObserver()
@@ -87,7 +87,7 @@ struct InternalsNIOTrustEvaluatorTests {
     @Test
     func tlsCustomVerification_whenTrustRootNotConfigured_rejectsRegardlessOfPolicy() async throws {
         // The self-signed test root isn't in the real system trust store, so chain validation
-        // itself fails when it's never installed as a trust anchor here -- and that must reject
+        // itself fails when it's never installed as a trust anchor here, and that must reject
         // even under `.audit`, which only ever relaxes a *pin* mismatch, never a broken chain.
         try await assertVerification(
             pinningBase64: Self.leafSPKIPinBase64,
@@ -131,7 +131,7 @@ struct InternalsNIOTrustEvaluatorTests {
     // MARK: - Test fixtures
     //
     // A real chain, generated with openssl and confirmed with `openssl verify -CAfile root.crt
-    // -untrusted intermediate.crt leaf.crt` before being pasted in here -- root and intermediate
+    // -untrusted intermediate.crt leaf.crt` before being pasted in here. Root and intermediate
     // are P-256, the intermediate has `basicConstraints=critical,CA:TRUE,pathlen:0`, and the leaf
     // has `basicConstraints=critical,CA:FALSE` with `extendedKeyUsage=serverAuth`.
 
