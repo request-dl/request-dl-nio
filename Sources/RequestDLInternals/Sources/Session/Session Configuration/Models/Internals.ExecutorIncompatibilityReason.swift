@@ -7,7 +7,7 @@ extension Internals {
     /// One entry per configuration field that keeps a session off a given executor.
     ///
     /// Named per field, not per executor, since the same field can be fine on one executor and
-    /// not another -- the `*IncompatibilityReasons()` functions decide which of these apply for
+    /// not another: the `*IncompatibilityReasons()` functions decide which of these apply for
     /// which executor.
     package enum ExecutorIncompatibilityReason: Sendable, Hashable {
         case keyLogger

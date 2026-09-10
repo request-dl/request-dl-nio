@@ -136,14 +136,14 @@ struct UserAgentHeaderTests {
             }
         )
 
-        // Then -- once a custom value is folded in too, the header is no longer purely
+        // Then: once a custom value is folded in too, the header is no longer purely
         // RequestDL's untouched default, so it must not be reported as such.
         #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
     }
 
     @Test
     func hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing() async throws {
-        // Given -- a plain `CustomHeader`, not `UserAgentHeader(_:)`, and lowercased, unlike
+        // Given: a plain `CustomHeader`, not `UserAgentHeader(_:)`, and lowercased, unlike
         // `UserAgentHeader`'s own hardcoded "User-Agent" key.
         let resolved = try await resolve(
             TestProperty {
@@ -155,13 +155,13 @@ struct UserAgentHeaderTests {
             }
         )
 
-        // Then -- `HeaderNode.make(_:)` matches "User-Agent" case-insensitively, so this still
+        // Then: `HeaderNode.make(_:)` matches "User-Agent" case-insensitively, so this still
         // counts as a second write and disqualifies the marker, exactly like combining with
         // another `UserAgentHeader(_:)` does above.
         #expect(!resolved.requestConfiguration.hasDefaultUserAgent)
 
         // `CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s own
-        // hardcoded `" "` -- so this is stored as two separate values on one logical entry, not
+        // hardcoded `" "`: so this is stored as two separate values on one logical entry, not
         // joined into a single string the way `UserAgentHeader(_:)` combining is. See
         // `RawTaskExecutorDispatchTests.dataTask_defaultUserAgentCollidesWithCustomHeaderOverURLSession_mergesOntoTheWire`
         // for how `URLRequest` itself coalesces this into one comma-joined header on the wire.
@@ -183,7 +183,7 @@ struct UserAgentHeaderTests {
         withDefault.dropDefaultUserAgentForNativeReporting()
         withCustom.dropDefaultUserAgentForNativeReporting()
 
-        // Then -- URLSession synthesizes its own accurate User-Agent only when the request
+        // Then: URLSession synthesizes its own accurate User-Agent only when the request
         // carries none, so the untouched default is removed to let it do that, while a value
         // the caller actually asked for must reach the wire untouched.
         #expect(withDefault.headers["User-Agent"] == nil)

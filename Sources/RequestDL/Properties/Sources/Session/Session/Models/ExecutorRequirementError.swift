@@ -7,8 +7,8 @@ import RequestDLInternals
 /// An error thrown when `Session.requiredExecutor(_:)` pins a session to an ``Session/Executor``
 /// its configuration cannot actually run on.
 ///
-/// `RequestDLInternals`'s raw `Internals.IncompatibleExecutorConfigurationError` -- the internal,
-/// package-visible error -- gets caught where the session bootstraps and rewrapped into this
+/// `RequestDLInternals`'s raw `Internals.IncompatibleExecutorConfigurationError` (the internal,
+/// package-visible error) gets caught where the session bootstraps and rewrapped into this
 /// type, following the same split `SecureFileError` uses for `Internals.SecureFileLoadError`.
 public struct ExecutorRequirementError: Error, Sendable {
 

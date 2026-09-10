@@ -103,7 +103,7 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
 
 extension AsyncBytes {
 
-    // `deadline` deliberately left out -- it's incidental race metadata, not part of what
+    // `deadline` deliberately left out: it's incidental race metadata, not part of what
     // identifies one `AsyncBytes` stream, the same way it was identified by `seed`/`bytes` alone
     // before `.resource` timeouts existed.
     public static func == (lhs: Self, rhs: Self) -> Bool {

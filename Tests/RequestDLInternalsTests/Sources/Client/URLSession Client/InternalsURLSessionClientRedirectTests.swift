@@ -15,7 +15,7 @@ import Security
 /// `Internals.RedirectConfiguration` enforced by hand over `.urlSession`, since URLSession has
 /// no native "max redirects" / "allow cycles" concept.
 ///
-/// There was no pre-existing NIO-backend redirect round-trip suite to port from -- only unit
+/// There was no pre-existing NIO-backend redirect round-trip suite to port from: only unit
 /// tests for `Internals.RedirectConfiguration.build()`'s mapping and the `Session.enableRedirect`/
 /// `disableRedirect` modifiers existed. These assertions are instead derived directly from
 /// AsyncHTTPClient's own `RedirectState.redirect(to:)` (vendored in `async-http-client`,
@@ -74,7 +74,7 @@ struct InternalsURLSessionClientRedirectTests {
 
     @Test
     func execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError() async throws {
-        // Given -- two redirects (origin -> hop -> destination) against a client only willing to
+        // Given: two redirects (origin -> hop -> destination) against a client only willing to
         // follow one.
         let localServer = try await LocalServer(.standard)
         let origin = "/" + UUID().uuidString
@@ -118,13 +118,13 @@ struct InternalsURLSessionClientRedirectTests {
             )
             Issue.record("Not expecting success")
         } catch is Internals.URLSessionClient.RedirectLimitReachedError {
-            // Then -- expected
+            // Then: expected
         }
     }
 
     @Test
     func execute_whenRedirectRevisitsURL_throwsRedirectCycleDetectedError() async throws {
-        // Given -- origin -> hop -> origin, a two-hop cycle back to the first URL visited.
+        // Given: origin -> hop -> origin, a two-hop cycle back to the first URL visited.
         let localServer = try await LocalServer(.standard)
         let origin = "/" + UUID().uuidString
         let hop = "/" + UUID().uuidString
@@ -160,13 +160,13 @@ struct InternalsURLSessionClientRedirectTests {
             )
             Issue.record("Not expecting success")
         } catch is Internals.URLSessionClient.RedirectCycleDetectedError {
-            // Then -- expected
+            // Then: expected
         }
     }
 
     @Test
     func execute_whenRedirectAllowsCycles_followsBackToAVisitedURL() async throws {
-        // Given -- a two-hop cycle (origin -> hop -> origin -> ...), same URIs as the cycle test
+        // Given: a two-hop cycle (origin -> hop -> origin -> ...), same URIs as the cycle test
         // above, but with `allowCycles: true`.
         let localServer = try await LocalServer(.standard)
         let origin = "/" + UUID().uuidString
@@ -176,12 +176,13 @@ struct InternalsURLSessionClientRedirectTests {
         localServer.cleanup(at: hop)
 
         // `LocalServer.ResponseQueue` hands out one queued response per hit, most-recently-
-        // inserted first, then falls back to a bare `.ok` once exhausted -- unlike the other
+        // inserted first, then falls back to a bare `.ok` once exhausted. Unlike the other
         // redirect tests here, this chain actually revisits both URIs for real (that is the
         // point: `allowCycles: true` means the redirect is *followed*, not just permitted in the
-        // abstract), so each needs as many queued copies as it is genuinely re-fetched: origin is
-        // requested at redirects 0 and 2, hop at redirects 1 and 3 -- two hits apiece before the
-        // chain fails on the count, not the revisit.
+        // abstract), so each needs as many queued copies as it is genuinely re-fetched.
+        //
+        // Origin is requested at redirects 0 and 2, hop at redirects 1 and 3: two hits apiece
+        // before the chain fails on the count, not the revisit.
         for _ in 0..<2 {
             localServer.insert(
                 LocalServer.ResponseConfiguration(status: .found, headers: ["Location": hop], data: Data()),
@@ -204,7 +205,7 @@ struct InternalsURLSessionClientRedirectTests {
             redirectConfiguration: .follow(max: 3, allowCycles: true)
         )
 
-        // When -- origin -> hop -> origin -> hop is 3 redirects, exactly at `max`; a 4th would
+        // When: origin -> hop -> origin -> hop is 3 redirects, exactly at `max`; a 4th would
         // still be within `allowCycles: true`'s revisit tolerance but would exceed `max`, so the
         // chain must fail with the limit, not the cycle, error, proving `allowCycles` actually
         // suppressed cycle detection rather than the chain never revisiting anything.
@@ -215,7 +216,7 @@ struct InternalsURLSessionClientRedirectTests {
             )
             Issue.record("Not expecting success")
         } catch is Internals.URLSessionClient.RedirectLimitReachedError {
-            // Then -- expected: cycles are tolerated, only the count still gates it
+            // Then: expected, since cycles are tolerated and only the count still gates it
         }
     }
 
@@ -251,13 +252,13 @@ struct InternalsURLSessionClientRedirectTests {
             delegate: AcceptAnyServerTrustDelegate()
         )
 
-        // Then -- the redirect response itself, not an error and not the destination.
+        // Then: the redirect response itself, not an error and not the destination.
         #expect(result.head.status.code == 302)
         #expect(result.head.headerValues(named: "Location").first == destination)
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling; see the identical
 /// delegate in `InternalsURLSessionClientTests`/`RequestConfigurationURLSessionClientTests` for
 /// why this exists at all: `LocalServer` is always TLS-terminated with a throwaway self-signed
 /// certificate, on every hop of a redirect chain, not only the first request.

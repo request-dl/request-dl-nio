@@ -6,7 +6,7 @@
 
 RequestDL is a Swift package designed to simplify the process of performing network requests. It provides a set of tools, including the `RequestTask` protocol, which supports different types of requests, including `DataTask`, `DownloadTask`, and `UploadTask`.
 
-Requests can run over Apple's `URLSession`, or over SwiftNIO -- either plain `NIO` or `NIOTransportServices` (Network.framework) -- letting you pick the transport that best fits each platform and deployment target. See [Choosing a transport](#choosing-a-transport) below.
+Requests can run over Apple's `URLSession`, or over SwiftNIO (either plain `NIO` or `NIOTransportServices` for Network.framework), letting you pick the transport that best fits each platform and deployment target. See [Choosing a transport](#choosing-a-transport) below.
 
 One of the key features of RequestDL is its support for specifying properties of a request, such as `Query`, `Payload`, and `Headers`, among others. You can also use `RequestTaskModifier` and `RequestTaskInterceptor` to process the response after the request is complete, allowing for actions like decoding, mapping, error handling based on status codes, and logging responses in the console.
 
@@ -65,7 +65,7 @@ This is just a simple example of what RequestDL can do. Check out the documentat
 
 ## Choosing a transport
 
-By default, RequestDL picks the best available transport for the current platform and session configuration -- `URLSession` on Darwin platforms, falling back to SwiftNIO where needed. You can express a preference with `preferredExecutor(_:)`, which is honored whenever the rest of the session's configuration supports it, or pin a session to a specific transport with `requiredExecutor(_:)`, which fails the request instead of silently falling back if that transport can't satisfy the configuration:
+By default, RequestDL picks the best available transport for the current platform and session configuration: `URLSession` on Darwin platforms, falling back to SwiftNIO where needed. You can express a preference with `preferredExecutor(_:)`, which is honored whenever the rest of the session's configuration supports it, or pin a session to a specific transport with `requiredExecutor(_:)`, which fails the request instead of silently falling back if that transport can't satisfy the configuration:
 
 ```swift
 try await DataTask {

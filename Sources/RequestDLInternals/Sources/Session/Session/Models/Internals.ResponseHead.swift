@@ -29,7 +29,7 @@ extension Internals {
         /// A single name-value header pair.
         ///
         /// `RequestDL.HTTPHeaders` is the rich, order-preserving representation `RequestDL`
-        /// exposes publicly, but it lives in the `RequestDL` module, which depends on this one --
+        /// exposes publicly, but it lives in the `RequestDL` module, which depends on this one,
         /// so `ResponseHead`, used throughout the transport layer, carries headers as a plain
         /// `Codable` array of pairs instead. `RequestDL` converts to/from its own `HTTPHeaders`
         /// at the boundary.

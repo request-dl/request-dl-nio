@@ -90,7 +90,7 @@ struct InternalsCertificateTests {
                 // Then
                 // The finer-grained classification (relative-path detection, "can't open" vs.
                 // "invalid contents") lives entirely in `RequestDL.SecureFileError.init`, built
-                // from exactly this `resource`/`path`/`underlying` triple -- see
+                // from exactly this `resource`/`path`/`underlying` triple; see
                 // `SecureFileErrorTests` in `RequestDLTests` for that coverage.
                 #expect(error.resource == .certificate)
                 #expect(error.path == path)

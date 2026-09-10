@@ -7,8 +7,10 @@
 ///
 /// Pairs with ``RequestTask/digestAuthentication(_:maxAttempts:)``, which parses the server's
 /// `WWW-Authenticate: Digest` challenge on a `401`, stores it on a `DigestCredential`, and
-/// retries -- this property alone only ever *uses* a challenge already stored there; it never
-/// fetches one itself. The credential itself is never passed explicitly: it flows down through
+/// retries. This property alone only ever *uses* a challenge already stored there; it never
+/// fetches one itself.
+///
+/// The credential itself is never passed explicitly: it flows down through
 /// the environment the same way ``URLEncoder`` does, from whichever
 /// ``RequestTask/digestAuthentication(_:maxAttempts:)`` this request is under.
 ///
@@ -23,14 +25,16 @@
 /// ```
 ///
 /// - Important: Place this *after* every property that contributes to the URL (``BaseURL``,
-/// ``Path``, ``Query``) or the method (``RequestMethod``) -- the digest response is computed over
+/// ``Path``, ``Query``) or the method (``RequestMethod``): the digest response is computed over
 /// whatever they have already set by the time this runs, same as every other property that reads
 /// `Make` rather than only writing to it.
 ///
-/// - Note: Only `qop=auth` (or no `qop` at all, RFC 2069 style) is supported -- `qop=auth-int`,
+/// - Note: Only `qop=auth` (or no `qop` at all, RFC 2069 style) is supported. `qop=auth-int`,
 /// which additionally hashes the request body, is not. Neither are the `-sess` algorithm variants
-/// (`MD5-sess`/`SHA-256-sess`). A challenge asking for either is treated as unusable, the same as
-/// one missing `realm`/`nonce` entirely: this property contributes no header, and the request
+/// (`MD5-sess`/`SHA-256-sess`).
+///
+/// A challenge asking for either is treated as unusable, the same as one missing
+/// `realm`/`nonce` entirely: this property contributes no header, and the request
 /// goes out exactly as it would have without ``DigestAuthentication`` at all.
 public struct DigestAuthentication: Property {
 
@@ -88,7 +92,7 @@ public struct DigestAuthentication: Property {
     /// - Parameters:
     ///    - username: The username to authenticate with.
     ///    - password: The password to authenticate with.
-    ///    - method: The request's own HTTP method -- must match whatever ``RequestMethod`` (or
+    ///    - method: The request's own HTTP method: must match whatever ``RequestMethod`` (or
     ///    the default `GET`) this request actually uses, since it is hashed into the digest
     ///    response. Defaults to `.get`.
     ///
@@ -113,10 +117,11 @@ public struct DigestAuthentication: Property {
 
         // A leaf property with a hand-written `_makeProperty` doesn't go through `Property`'s
         // own default implementation, which is what runs `GraphOperation` (namespace,
-        // environment, stored object) for every composite property automatically -- without
-        // this, `@RequestEnvironment(\.digestCredential)` above would never see anything set via
-        // `.environment(\.digestCredential, ...)`/`Modifiers.DigestAuthentication` and would
-        // silently fall back to `DigestCredentialEnvironmentKey`'s own shared default.
+        // environment, stored object) for every composite property automatically.
+        //
+        // Without this, `@RequestEnvironment(\.digestCredential)` above would never see anything
+        // set via `.environment(\.digestCredential, ...)`/`Modifiers.DigestAuthentication` and
+        // would silently fall back to `DigestCredentialEnvironmentKey`'s own shared default.
         var inputs = inputs
         GraphOperation(property)(&inputs)
 

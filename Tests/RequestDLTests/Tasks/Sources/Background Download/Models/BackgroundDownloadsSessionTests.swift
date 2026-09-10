@@ -12,9 +12,11 @@ import Testing
 import Foundation
 
 /// Covers `BackgroundDownloads.Session`'s `taskDescription` encoding directly, independent of any
-/// real `URLSessionTask` -- this is what a delegate callback decodes after a relaunch, when
-/// nothing else about the original request survives, so it needs to round-trip correctly on its
-/// own merits, not just "happen to work" against whatever a live download produces.
+/// real `URLSessionTask`: this is what a delegate callback decodes after a relaunch, when
+/// nothing else about the original request survives.
+///
+/// It needs to round-trip correctly on its own merits, not just "happen to work" against
+/// whatever a live download produces.
 struct BackgroundDownloadsSessionTests {
 
     @Test
@@ -66,7 +68,7 @@ struct BackgroundDownloadsSessionTests {
 
     @Test
     func decodeServerTrust_whenNoneWasEncoded_returnsNil() async throws {
-        // Given -- the common case: a plain download, `serverTrust` defaulted to `nil`.
+        // Given: the common case, a plain download with `serverTrust` defaulted to `nil`.
         let encoded = BackgroundDownloads.Session.encode(
             id: "episode-42",
             destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
@@ -106,7 +108,7 @@ struct BackgroundDownloadsSessionTests {
 
     @Test
     func decodeClientIdentity_whenNoneWasEncoded_returnsNil() async throws {
-        // Given -- the common case: no client certificate configured.
+        // Given: the common case, no client certificate configured.
         let encoded = BackgroundDownloads.Session.encode(
             id: "episode-42",
             destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
@@ -123,7 +125,7 @@ struct BackgroundDownloadsSessionTests {
 
     @Test
     func encodeThenDecode_carriesBothServerTrustAndClientIdentityIndependently() async throws {
-        // Given -- both configured at once, the mTLS + custom-trust-roots combination.
+        // Given: both configured at once, the mTLS + custom-trust-roots combination.
         let serverTrust = Internals.ServerTrustPolicy.Descriptor(
             trustedRootCertificatesDER: [Data([0x01])],
             verification: .fullVerification
@@ -150,9 +152,10 @@ struct BackgroundDownloadsSessionTests {
     // MARK: - firstTask(matching:in:)
 
     /// `cancel(id:)`'s own matching logic, pulled out so it's testable against a plain array of
-    /// tasks instead of a real background `URLSession.allTasks`. Every task below comes from
-    /// `URLSession.shared`, created but never resumed -- just a way to get a real
-    /// `URLSessionTask` object to set `taskDescription` on.
+    /// tasks instead of a real background `URLSession.allTasks`.
+    ///
+    /// Every task below comes from `URLSession.shared`, created but never resumed; it's just a
+    /// way to get a real `URLSessionTask` object to set `taskDescription` on.
     @Test
     func firstTaskMatching_whenOneTaskHasMatchingID_returnsIt() async throws {
         // Given
@@ -200,7 +203,7 @@ struct BackgroundDownloadsSessionTests {
         let unrecognized = URLSession.shared.downloadTask(with: url)
         unrecognized.taskDescription = "not a descriptor"
 
-        // When / Then -- neither crashes nor false-matches; a task this type didn't create simply
+        // When / Then: neither crashes nor false-matches; a task this type didn't create simply
         // isn't a candidate.
         let match = BackgroundDownloads.Session.firstTask(
             matching: "episode-42",
@@ -218,7 +221,7 @@ struct BackgroundDownloadsSessionTests {
 
     @Test
     func cancel_whenNoDownloadHasEverBeenScheduled_returnsFalse() async throws {
-        // Given -- a fresh `Session` that has never scheduled anything, so there is no
+        // Given: a fresh `Session` that has never scheduled anything, so there is no
         // `URLSession` to even ask.
         let session = BackgroundDownloads.Session()
 

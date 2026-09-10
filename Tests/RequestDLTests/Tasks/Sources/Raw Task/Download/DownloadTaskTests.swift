@@ -60,7 +60,7 @@ struct DownloadTaskTests {
 extension DownloadTaskTests {
 
     /// Forced deterministically rather than relying on `resolveExecutor()`'s own default
-    /// preference the way `dataTask()` above does -- same round trip, pinned explicitly to
+    /// preference the way `dataTask()` above does: same round trip, pinned explicitly to
     /// `.urlSession`. Darwin-only: `.urlSession` isn't a real executor anywhere else, so pinning
     /// it there is not this test's intent.
     @Test

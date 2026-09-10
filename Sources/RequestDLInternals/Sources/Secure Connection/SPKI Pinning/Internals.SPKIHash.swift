@@ -25,7 +25,7 @@ extension Internals {
     package struct SPKIHash: Sendable, Hashable {
 
         /// Named algorithms `URLSessionClient`'s `SecTrust`-based trust evaluation can recompute
-        /// on its own -- `Data`/`Codable`, unlike `Algorithm.Type`, so a `ServerTrustPolicy` built
+        /// on its own. `Data`/`Codable`, unlike `Algorithm.Type`, so a `ServerTrustPolicy` built
         /// from one of these can also survive a `BackgroundDownloadTask` relaunch as a
         /// `ServerTrustPolicy.Descriptor`. Every hash algorithm actually documented for
         /// `RequestDL.SPKIHash` (SHA-256/384/512); anything else still pins correctly for the
@@ -86,7 +86,7 @@ extension Internals {
                 && lhs.algorithmID == rhs.algorithmID
         }
 
-        /// The digest this pin expects the peer's SPKI to hash to -- what `ServerTrustPolicy`
+        /// The digest this pin expects the peer's SPKI to hash to: what `ServerTrustPolicy`
         /// compares against, and what a `Descriptor` persists for `knownAlgorithm != nil` pins.
         package func resolvedDigest() throws -> Data {
             try producer(source)

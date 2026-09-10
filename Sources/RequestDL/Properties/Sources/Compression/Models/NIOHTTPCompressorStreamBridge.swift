@@ -6,7 +6,7 @@ import NIOCore
 import RequestDLInternals
 
 /// Bridges `Internals.NIOHTTPCompressorStream` (`ByteBuffer`-based) onto the public,
-/// `[UInt8]`-based ``CompressorStream`` -- backs ``GzipAlgorithm``/``DeflateAlgorithm``, the only
+/// `[UInt8]`-based ``CompressorStream``. It backs ``GzipAlgorithm``/``DeflateAlgorithm``, the only
 /// two built-in ``Compressor``s that do real work rather than throw
 /// ``NativeOnlyAlgorithmError``, since there is no OS-provided outgoing-compression shortcut
 /// either of them could defer to instead.

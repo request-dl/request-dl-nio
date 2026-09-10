@@ -21,16 +21,17 @@ import Security
 /// Unlike the upload tests, there is no known issue here to work around: this uses
 /// `session.dataTask(with:)` under the hood, not `uploadTask(withStreamedRequest:)`, so it never
 /// triggers the resumable-uploads-draft auto-negotiation that made `LocalServer` hang for uploads
-/// (see `RequestConfigurationURLSessionClientUploadTests.swift`'s type doc comment) -- and the existing
+/// (see `RequestConfigurationURLSessionClientUploadTests.swift`'s type doc comment). The existing
 /// buffered `execute(request:delegate:)`, which is also backed by a plain data task, already
 /// confirmed as much.
 ///
-/// `Internals.DownloadBuffer` -- the exact same type `Internals.Session.execute(...)` builds for
-/// the NIO backend -- is reused verbatim rather than reimplemented (it consumes
-/// `Internals.AnyBuffer`, not a NIO `ByteBuffer`, so it was already transport-agnostic). That
-/// reuse is why the tests below assert **exact** chunk boundaries for `.length` mode, stronger
+/// `Internals.DownloadBuffer` is the exact same type `Internals.Session.execute(...)` builds for
+/// the NIO backend, and is reused verbatim rather than reimplemented (it consumes
+/// `Internals.AnyBuffer`, not a NIO `ByteBuffer`, so it was already transport-agnostic).
+///
+/// That reuse is why the tests below assert **exact** chunk boundaries for `.length` mode, stronger
 /// than the acceptance note's minimum bar ("final assembled data and total byte counts match, not
-/// exact chunk boundaries") -- `DownloadBuffer`'s own re-slicing guarantee doesn't depend on how
+/// exact chunk boundaries"). `DownloadBuffer`'s own re-slicing guarantee doesn't depend on how
 /// its *input* happened to be fragmented, so it should hold across executors, not just on NIO;
 /// these tests are what confirm that design assumption rather than just asserting the loosest
 /// possible bar.
@@ -85,8 +86,8 @@ struct RequestConfigurationURLSessionClientDownloadTests {
         // `step.bytes.totalSize` comes from the response's own `Content-Length`, which
         // `LocalServer` sets to the size of the envelope it actually sends (`HTTPResult`'s
         // `{"receivedBytes":...,"response":...}`, built server-side from what it received on the
-        // request), not `response.data.count` -- the size of just the configured "response" field
-        // this test set up. Comparing against what was actually assembled here is what proves
+        // request), not `response.data.count` (the size of just the configured "response" field
+        // this test set up). Comparing against what was actually assembled here is what proves
         // `totalSize` and the real transfer agree, not a fixture-shaped coincidence.
         #expect(step.bytes.totalSize == assembled.count)
 
@@ -99,7 +100,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
 
     @Test
     func urlSessionClient_whenStreamingDownload_splitsOnSeparatorAcrossChunkBoundaries() async throws {
-        // Given -- a payload sized so the separator (`,`) straddles wherever URLSession happens
+        // Given: a payload sized so the separator (`,`) straddles wherever URLSession happens
         // to slice `didReceive data:` calls, exercising `Internals.DownloadBuffer`'s rolling
         // window (see its own doc comment) with real, executor-determined arrival boundaries
         // instead of ones a test controls directly.
@@ -147,7 +148,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
         let decoded = try HTTPResult<String>(assembled)
         #expect(decoded.response == output)
 
-        // Every chunk but a possible last remainder ends with the separator -- proves the
+        // Every chunk but a possible last remainder ends with the separator, proving the
         // rechunking actually happened along `,` boundaries, not just that concatenation works.
         // (The `HTTPResult` envelope itself adds exactly one more `,` between its own fields, so
         // this holds for the whole wire payload, not just the `output` field inside it.)
@@ -156,7 +157,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
     }
 
     /// A refused redirect fires before any response ever reaches
-    /// `didReceive response:completionHandler:` for the *destination* -- it's the redirect
+    /// `didReceive response:completionHandler:` for the *destination*. It's the redirect
     /// itself `willPerformHTTPRedirection` refuses, so `redirectError` has to be checked in
     /// `resolveHead(with:downloadBuffer:)`, not just in the buffered/streamed-upload paths'
     /// `didCompleteWithError:`. This is what proves that wiring, not just that redirects work at
@@ -164,7 +165,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
     /// `InternalsURLSessionClientRedirectTests`, which shares the same `TaskDelegate` code path).
     @Test
     func urlSessionClient_whenRedirectChainExceedsMax_throwsBeforeYieldingAStep() async throws {
-        // Given -- two redirects (origin -> hop -> destination) against a client only willing to
+        // Given: two redirects (origin -> hop -> destination) against a client only willing to
         // follow one.
         let localServer = try await LocalServer(.standard)
         let origin = "/" + UUID().uuidString
@@ -209,12 +210,12 @@ struct RequestConfigurationURLSessionClientDownloadTests {
             )
             Issue.record("Not expecting success")
         } catch is Internals.URLSessionClient.RedirectLimitReachedError {
-            // Then -- expected
+            // Then: expected
         }
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- `LocalServer` is
+/// Test-only stand-in for the real client's own TLS challenge handling. `LocalServer` is
 /// always TLS-terminated with a throwaway self-signed certificate, even outside any TLS feature
 /// under test, so *something* has to trust it for a plain, no-customization round trip to
 /// complete at all. Duplicated from `RequestConfigurationURLSessionClientTests.swift` (`private`

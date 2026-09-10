@@ -8,18 +8,20 @@ import SwiftAsyncStream
 
 /// A minimal SOCKS5 proxy (RFC 1928), no authentication.
 ///
-/// Exists for the same reason `LocalHTTPConnectProxy` does -- no pre-existing NIO-backend fixture
+/// Exists for the same reason `LocalHTTPConnectProxy` does: no pre-existing NIO-backend fixture
 /// proves a proxied connection actually carries traffic, only that `Internals.Proxy`'s config
-/// mapping is shaped correctly. Accepts the greeting (`VER NMETHODS METHODS`), replies with
-/// no-authentication (`0x00`) if offered, accepts one `CONNECT` request (`VER CMD RSV ATYP
-/// DST.ADDR DST.PORT`), replies success, then relays raw bytes both ways between the accepted
-/// connection and a freshly dialed one to the requested address -- opaque after that point,
-/// exactly like `LocalHTTPConnectProxy`'s own tunnel (`OutboundRelayHandler`, shared verbatim).
+/// mapping is shaped correctly.
+///
+/// Accepts the greeting (`VER NMETHODS METHODS`), replies with no-authentication (`0x00`) if
+/// offered, accepts one `CONNECT` request (`VER CMD RSV ATYP DST.ADDR DST.PORT`), replies
+/// success, then relays raw bytes both ways between the accepted connection and a freshly dialed
+/// one to the requested address. It's opaque after that point, exactly like
+/// `LocalHTTPConnectProxy`'s own tunnel (`OutboundRelayHandler`, shared verbatim).
 ///
 /// The exact bytes this responds to were captured empirically, not assumed from RFC 1928 alone:
 /// `URLSession`, given only `SOCKSEnable`/`SOCKSProxy`/`SOCKSPort` (no `SOCKSVersion`), sends a
 /// SOCKS5 greeting offering no-authentication (`05 01 00`) and, for a domain-name destination, a
-/// `CONNECT` request with `ATYP=0x03` (`05 01 00 03 <len> <domain> <port>`) -- confirmed by
+/// `CONNECT` request with `ATYP=0x03` (`05 01 00 03 <len> <domain> <port>`). This was confirmed by
 /// capturing the raw bytes a bare listener received, not by reading CFNetwork source or docs
 /// (there is no public documentation of this default at all).
 struct LocalSOCKSProxy: Sendable {
@@ -29,7 +31,7 @@ struct LocalSOCKSProxy: Sendable {
     let host = "127.0.0.1"
     let port: Int
 
-    /// How many complete `CONNECT` requests this proxy has actually parsed, successful or not --
+    /// How many complete `CONNECT` requests this proxy has actually parsed, successful or not;
     /// same purpose as `LocalHTTPConnectProxy.connectAttempts`.
     let connectAttempts: ConnectAttemptCounter
 
@@ -70,15 +72,17 @@ struct LocalSOCKSProxy: Sendable {
 
 /// One instance per accepted connection. Walks `.awaitingGreeting` -> `.awaitingRequest` ->
 /// `.relaying(Channel)` in order, hand-parsing the binary SOCKS5 framing incrementally (unlike
-/// `LocalHTTPConnectProxy`'s line-oriented HTTP text, there is no delimiter to scan for -- each
+/// `LocalHTTPConnectProxy`'s line-oriented HTTP text, there is no delimiter to scan for: each
 /// message's own length fields say how many more bytes are needed).
 ///
 /// `@unchecked` rather than provably `Sendable`: NIO guarantees every `ChannelHandler` callback
 /// for one channel runs on that channel's own `EventLoop`, one at a time, so `mode`/`buffer` are
-/// never actually touched concurrently. `startRelay(...)`'s `[weak self]` capture (needed since
-/// `ClientBootstrap(...).connect(...)`'s completion isn't guaranteed to land back on that same
-/// `EventLoop`) is itself what actually needs this -- the write to `mode` inside it is explicitly
-/// hopped onto `clientChannel.eventLoop` (this handler's own) before touching it.
+/// never actually touched concurrently.
+///
+/// `startRelay(...)`'s `[weak self]` capture (needed since `ClientBootstrap(...).connect(...)`'s
+/// completion isn't guaranteed to land back on that same `EventLoop`) is itself what actually
+/// needs this: the write to `mode` inside it is explicitly hopped onto `clientChannel.eventLoop`
+/// (this handler's own) before touching it.
 private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
@@ -145,7 +149,7 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     /// `VER(1)=0x05 NMETHODS(1) METHODS(NMETHODS)`. Refuses (`05 FF`, then closes) if
-    /// no-authentication (`0x00`) isn't among the offered methods -- this proxy supports nothing
+    /// no-authentication (`0x00`) isn't among the offered methods; this proxy supports nothing
     /// else, matching the NIO backend's own `.socksServer(host:port:)`, which takes no credentials
     /// either.
     private func processGreeting(context: ChannelHandlerContext) {
@@ -176,7 +180,7 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     /// `VER(1)=0x05 CMD(1) RSV(1) ATYP(1) DST.ADDR(variable) DST.PORT(2)`. Only `CMD=0x01`
-    /// (`CONNECT`) is supported -- `BIND`/`UDP ASSOCIATE` reply `command not supported` (`0x07`).
+    /// (`CONNECT`) is supported; `BIND`/`UDP ASSOCIATE` reply `command not supported` (`0x07`).
     /// `ATYP` `0x01` (IPv4), `0x03` (domain name, length-prefixed), and `0x04` (IPv6) are all
     /// parsed; anything else replies `address type not supported` (`0x08`).
     private func processRequest(context: ChannelHandlerContext) {
@@ -246,12 +250,14 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         reply(channel: channel, bytes: [0x05, replyCode, 0x00, 0x01, 0, 0, 0, 0, 0, 0], thenClose: true)
     }
 
-    // Raw `ByteBuffer`, not `wrapOutboundOut(out)`'s `NIOAny` -- `Channel.writeAndFlush` has a
+    // Raw `ByteBuffer`, not `wrapOutboundOut(out)`'s `NIOAny`: `Channel.writeAndFlush` has a
     // generic `Sendable`-constrained overload for exactly this (`ByteBuffer` is `Sendable`), where
-    // the `NIOAny`-typed overload is deprecated. Takes `channel` rather than `context` throughout
-    // this handler's private helpers -- `Channel`, unlike `ChannelHandlerContext`, is `Sendable`,
-    // so it's safe to pass into `startRelay(...)`'s `[weak self]` completion, which isn't
-    // guaranteed to already be running on this handler's own `EventLoop`.
+    // the `NIOAny`-typed overload is deprecated.
+    //
+    // Takes `channel` rather than `context` throughout this handler's private helpers: `Channel`,
+    // unlike `ChannelHandlerContext`, is `Sendable`, so it's safe to pass into `startRelay(...)`'s
+    // `[weak self]` completion, which isn't guaranteed to already be running on this handler's own
+    // `EventLoop`.
     private func reply(channel: Channel, bytes: [UInt8], thenClose: Bool) {
         var out = channel.allocator.buffer(capacity: bytes.count)
         out.writeBytes(bytes)
@@ -264,14 +270,15 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     /// Dials `host:port`, answers the request with success (`05 00`), and flips `mode` to
-    /// `.relaying` -- from here on `channelRead` forwards to `outboundChannel` directly. Mirrors
+    /// `.relaying`: from here on `channelRead` forwards to `outboundChannel` directly. Mirrors
     /// `LocalHTTPConnectProxy`'s own `startRelay(host:port:leftover:context:)` structurally (that
-    /// one keeps `context` -- it never needs to call a `context`-taking helper from inside the
+    /// one keeps `context`; it never needs to call a `context`-taking helper from inside the
     /// `[weak self]` completion the way `failRequest`/`reply` here do, so it never hits the same
-    /// non-`Sendable`-capture warning `channel` fixes here); the
-    /// bound address/port in the success reply are zeroed (`0.0.0.0:0`), which real SOCKS clients
-    /// -- `URLSession` included, confirmed by this file's own round-trip tests actually passing --
-    /// don't require to be meaningful.
+    /// non-`Sendable`-capture warning `channel` fixes here).
+    ///
+    /// The bound address/port in the success reply are zeroed (`0.0.0.0:0`), which real SOCKS
+    /// clients, `URLSession` included (confirmed by this file's own round-trip tests actually
+    /// passing), don't require to be meaningful.
     private func startRelay(host: String, port: Int, leftover: ByteBuffer?, channel clientChannel: Channel) {
         ClientBootstrap(group: group).connect(host: host, port: port).whenComplete { [weak self] result in
             guard let self else { return }
@@ -315,7 +322,7 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         case 0x01:
             return bytes.map { String($0) }.joined(separator: ".")
         case 0x04:
-            // No `Foundation`/`String(format:)` dependency needed for this rarely-hit branch --
+            // No `Foundation`/`String(format:)` dependency needed for this rarely-hit branch:
             // every test destination this proxy actually sees is a domain name (`0x03`).
             return stride(from: 0, to: bytes.count, by: 2)
                 .map { index -> String in
@@ -324,7 +331,7 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
                     return String(repeating: "0", count: 4 - hex.count) + hex
                 }
                 .joined(separator: ":")
-        default:  // 0x03 -- domain name
+        default:  // 0x03: domain name
             return String(decoding: bytes, as: UTF8.self)
         }
     }

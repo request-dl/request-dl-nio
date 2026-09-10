@@ -27,7 +27,7 @@ extension Internals.RedirectRequest {
 
 extension URLRequest {
 
-    /// Applies a ``Internals/RedirectStrategy``'s decision on top of `self` -- everything besides
+    /// Applies a ``Internals/RedirectStrategy``'s decision on top of `self`: everything besides
     /// `url`/`httpMethod`/headers (in particular, whatever body-related fields URLSession itself
     /// already set on the candidate request this is called on) is left untouched, mirroring how
     /// `Internals.NIORedirectStrategyAdapter` only overwrites those same three on the NIO side.
@@ -51,7 +51,7 @@ extension URLRequest {
 
 extension URL {
 
-    /// Whether `self` and `other` share an origin (scheme, host, and port), per RFC 6454 --
+    /// Whether `self` and `other` share an origin (scheme, host, and port), per RFC 6454. This
     /// mirrors `AsyncHTTPClient`'s own (internal, so not reachable from here) `URL
     /// .hasTheSameOrigin(as:)`, which the NIO executor's `followingRedirect` uses for the same
     /// cross-origin header stripping this type's own caller implements for the `URLSession`

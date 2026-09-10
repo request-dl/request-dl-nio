@@ -871,7 +871,7 @@ struct InternalsFileBufferTests {
 
     @Test
     func fileBuffer_whenBackedByRealFileUnread_wholeFileURLReturnsThatFile() async throws {
-        // Given -- a real, non-temporary file (constructed from an explicit `URL`, not one of
+        // Given: a real, non-temporary file (constructed from an explicit `URL`, not one of
         // the no-URL initializers that all go through `Internals.FileBufferURL.temporaryURL`).
         let fileURLManager = try await FileURLManager()
         defer { _ = fileURLManager }
@@ -888,7 +888,7 @@ struct InternalsFileBufferTests {
 
     @Test
     func fileBuffer_whenReaderIndexAdvanced_wholeFileURLReturnsNil() async throws {
-        // Given -- uploading straight from the file at this point would read more than this
+        // Given: uploading straight from the file at this point would read more than this
         // cursor has left, so the shortcut must decline once anything has been read.
         let fileURLManager = try await FileURLManager()
         defer { _ = fileURLManager }
@@ -907,9 +907,10 @@ struct InternalsFileBufferTests {
 
     @Test
     func fileBuffer_whenBackedByATemporaryResource_wholeFileURLReturnsNil() async throws {
-        // Given -- every no-URL initializer opens over `Internals.FileBufferURL.temporaryURL`,
-        // a file this package owns and may remove once nothing references it any more, so
-        // handing its `URL` to an unrelated, longer-lived caller (a `URLSessionUploadTask`)
+        // Given: every no-URL initializer opens over `Internals.FileBufferURL.temporaryURL`,
+        // a file this package owns and may remove once nothing references it any more.
+        //
+        // Handing its `URL` to an unrelated, longer-lived caller (a `URLSessionUploadTask`)
         // would be unsafe even though the reader index is untouched.
         let fileBuffer = await Internals.FileBuffer(Data("Hello world".utf8))
 

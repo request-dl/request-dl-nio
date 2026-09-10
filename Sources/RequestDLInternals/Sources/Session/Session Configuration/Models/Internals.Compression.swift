@@ -7,7 +7,7 @@ import NIOHTTPCompression
 
 extension Internals {
 
-    /// Namespace only -- compression is per-request/environment-driven, carried on
+    /// Namespace only: compression is per-request/environment-driven, carried on
     /// `RequestConfiguration` rather than pooled on the session, so there's no `.disabled`/
     /// `.enabled` state to carry here. `Algorithm` and `DuplicateHeaderBehavior` stay nested
     /// under this name to group them with the rest of the compression-related types below.
@@ -48,7 +48,7 @@ extension Internals.Compression {
 
 extension Internals {
 
-    /// Internals-layer counterpart to `RequestDL.Compressor`. Shared by both transports -- though
+    /// Internals-layer counterpart to `RequestDL.Compressor`. Shared by both transports, though
     /// unlike decompression, compression always runs through this package's own code on every
     /// executor (there is no native, OS-provided outgoing-compression equivalent to CFNetwork's
     /// transparent response decoding to defer to), so a compressor configured through the public
@@ -59,7 +59,7 @@ extension Internals {
     }
 
     /// Internals-layer counterpart to `RequestDL.CompressorStream`, operating on `ByteBuffer`
-    /// instead of `[UInt8]` -- the boundary conversion lives in the adapter that wraps a public
+    /// instead of `[UInt8]`: the boundary conversion lives in the adapter that wraps a public
     /// `Compressor`/`CompressorStream` into these.
     package protocol CompressorStream {
         mutating func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer

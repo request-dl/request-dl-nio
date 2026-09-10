@@ -5,7 +5,7 @@
 /// The request a ``RedirectStrategy`` is asked to decide on, and the request it can return to
 /// follow the redirect with.
 ///
-/// Already carries the standard rewrite rules a redirect implies -- method downgraded to `GET`
+/// Already carries the standard rewrite rules a redirect implies: method downgraded to `GET`
 /// on a `303` (or a `301`/`302` response to a `POST`), and `Authorization`/`Cookie`/`Origin`/
 /// `Proxy-Authorization` stripped when ``url`` no longer shares the original request's origin
 /// (scheme, host, and port). A strategy only needs to make further adjustments on top of that,
@@ -27,7 +27,7 @@ public struct RedirectRequest: Sendable {
     ///
     /// Read-only: which requests carry a body, and which don't, is already decided by the
     /// redirect rewrite rules (e.g. a `303` drops it) before a ``RedirectStrategy`` ever sees
-    /// this value -- there is no supported way to attach or remove a body from here.
+    /// this value; there is no supported way to attach or remove a body from here.
     public let hasBody: Bool
 
     // MARK: - Inits

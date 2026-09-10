@@ -13,15 +13,15 @@ import Foundation
 extension Internals.URLSessionClient {
 
     /// Routes a TLS challenge (server-trust, client-certificate) to `policy` only when it's for
-    /// `host` -- promoted from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`,
+    /// `host`. This is promoted from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`,
     /// not the single-identity `MTLSURLSessionDelegate` the spike test itself used. One
-    /// `URLSession` -- and so one `URLSessionClient`, pooled by `Internals.ClientManager` --
+    /// `URLSession`, and so one `URLSessionClient` pooled by `Internals.ClientManager`,
     /// genuinely does end up serving requests to many hosts; the host check is what keeps a
     /// challenge for one host from being answered with a policy meant for another.
     ///
     /// `Internals.URLSessionClient` only ever resolves one `Internals.SecureConnection` (the one
     /// it was configured with, same as `redirectConfiguration`/`proxy`), so there is only ever one
-    /// `Internals.URLSessionIdentityPolicy` to route to -- not a per-host map of them. What varies
+    /// `Internals.URLSessionIdentityPolicy` to route to, not a per-host map of them. What varies
     /// per request is `host`: `execute(...)` builds a fresh `TLSDelegate` for each request, pairing
     /// that one policy with the request's own destination host, since the client itself isn't tied
     /// to a single URL. A challenge for any other host (mid-redirect to a different host, for

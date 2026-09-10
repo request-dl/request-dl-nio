@@ -18,13 +18,14 @@ import struct Foundation.URL
 #endif
 
 /// Executes `requestConfiguration` through `session` with caching bypassed, mirroring the
-/// cache-then-execute orchestration `RawTask.result()` performs -- this file drives
+/// cache-then-execute orchestration `RawTask.result()` performs. This file drives
 /// `Internals.Session` directly (no `Property` tree to resolve), so it takes over just the
 /// `applyCompression()` + `client()` + `execute(client:request:...)` half of that pipeline
-/// (`RawTask.executeTraced` is the other caller of the first of those). Compression itself is no
-/// longer read off `session.configuration` -- it's already captured on `requestConfiguration`
-/// (via `Property.compression(_:onDuplicateHeader:shouldCompressBodyData:)`) by the time this
-/// runs, same as `RawTask.executeTraced` sees it.
+/// (`RawTask.executeTraced` is the other caller of the first of those).
+///
+/// Compression itself is no longer read off `session.configuration`: it's already captured on
+/// `requestConfiguration` (via `Property.compression(_:onDuplicateHeader:shouldCompressBodyData:)`)
+/// by the time this runs, same as `RawTask.executeTraced` sees it.
 private func execute(
     session: Internals.Session,
     requestConfiguration: RequestConfiguration

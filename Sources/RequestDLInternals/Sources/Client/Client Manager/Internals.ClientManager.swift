@@ -70,19 +70,21 @@ extension Internals {
             )
         }
 
-        /// Executor-aware counterpart to `client(provider:sessionConfiguration:)` -- resolves
+        /// Executor-aware counterpart to `client(provider:sessionConfiguration:)`: resolves
         /// `sessionConfiguration.resolveExecutor()` and actually builds/caches the client that
         /// decision points to, rather than only deciding in the abstract. Covers both axes:
-        /// `.urlSession` vs. not, and -- within the `.nio` branch -- plain NIO vs.
+        /// `.urlSession` vs. not, and, within the `.nio` branch, plain NIO vs.
         /// NIOTransportServices, so `preferredExecutor(.nioTransportServices)`/
         /// `requiredExecutor(.nioTransportServices)` actually decide which event loop group a real
         /// request gets, not just `enableNetworkFramework`.
         ///
         /// Shares this manager's own `_table` with the NIO-only `client(provider:sessionConfiguration:)`
-        /// above -- a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for
+        /// above: a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for
         /// the same provider (see `_createNewURLSessionClient`'s `id`), so the two can never
-        /// collide or be handed back for each other. Likewise, `_nioClient`'s own `isCompatibleWithNetworkFramework`
-        /// parameter -- not `sessionConfiguration.isCompatibleWithNetworkFramework` -- is what
+        /// collide or be handed back for each other.
+        ///
+        /// Likewise, `_nioClient`'s own `isCompatibleWithNetworkFramework`
+        /// parameter, not `sessionConfiguration.isCompatibleWithNetworkFramework`, is what
         /// keys a NIOTransportServices entry apart from a plain-NIO one here
         /// (`SessionProvider.uniqueIdentifier(with:)`'s `"NTW."` prefix reads that parameter, not
         /// `enableNetworkFramework` directly), so an executor-resolved and a flag-resolved client
@@ -137,7 +139,7 @@ extension Internals {
         // MARK: - Private methods
 
         /// Shared body for `client(provider:sessionConfiguration:)` and `resolvedClient(provider:sessionConfiguration:)`'s
-        /// `.nio`/`.nioTransportServices` branch -- the two differ only in *how* they decide
+        /// `.nio`/`.nioTransportServices` branch: the two differ only in *how* they decide
         /// `isCompatibleWithNetworkFramework` (the `enableNetworkFramework` flag directly, vs.
         /// `resolveExecutor()`'s own answer), never in what happens once that's decided.
         private func _nioClient(
@@ -253,7 +255,7 @@ extension Internals {
         /// - Warning: Lockless. The caller must be holding ``tableLock``.
         ///
         /// Returns the cached `Internals.ClientManager.Client` regardless of which backend it
-        /// wraps -- shared by both `client(provider:sessionConfiguration:)` (NIO-only, unwraps
+        /// wraps: shared by both `client(provider:sessionConfiguration:)` (NIO-only, unwraps
         /// `.nio`) and `resolvedClient(provider:sessionConfiguration:)` (unwraps `.urlSession`),
         /// so the age/reuse logic below is written once rather than duplicated per backend.
         private func _reusableItem(

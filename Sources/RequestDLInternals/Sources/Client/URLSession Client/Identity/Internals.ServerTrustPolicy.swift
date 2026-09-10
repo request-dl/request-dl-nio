@@ -4,7 +4,7 @@
 
 // The server-trust half of `Internals.URLSessionIdentityPolicy`, pulled out on its own: unlike
 // the client-identity half, it needs no Keychain round-trip, so it can be rebuilt from nothing
-// but raw certificate bytes -- which is exactly what a `BackgroundDownloadTask` needs to do after
+// but raw certificate bytes. That's exactly what a `BackgroundDownloadTask` needs to do after
 // a relaunch, with no `Internals.SecureConnection` left in memory to resolve from.
 
 #if canImport(Darwin)
@@ -215,7 +215,7 @@ extension Internals {
         package func descriptor() throws -> Descriptor {
             if spkiPinningDescriptor == nil, !evaluation.pins.isEmpty {
                 // Only reachable via `resolve(from:)`, whose SPKI pins never populated
-                // `spkiPinningDescriptor` because at least one used an unnameable algorithm --
+                // `spkiPinningDescriptor` because at least one used an unnameable algorithm.
                 // `init(descriptor:)` always sets `spkiPinningDescriptor` when `spkiPins` is
                 // non-empty, so this branch can't fire for an already-rebuilt policy.
                 throw DescriptorError.unpersistableAlgorithm
@@ -256,7 +256,7 @@ extension Internals {
 
             let isStrict = (secureConnection.tlsPinningPolicy ?? .strict) == .strict
 
-            // Each pin's digest is resolved exactly once here (base64 decoded, length-checked) --
+            // Each pin's digest is resolved exactly once here (base64 decoded, length-checked):
             // both `spkiPins` below (the live matcher, re-fetching this same digest per challenge
             // via `matchesSPKI`) and `spkiPinningDescriptor` reuse it, and a malformed pin throws
             // right here rather than lazily on first challenge or first background schedule.
@@ -271,8 +271,8 @@ extension Internals {
             }
 
             // `nil` whenever there are no pins at all, or whenever any pin's algorithm isn't one
-            // of the three `Internals.SPKIHash.KnownAlgorithm` cases -- deliberately *not* thrown
-            // here: an unnameable algorithm still pins correctly for live, in-process use
+            // of the three `Internals.SPKIHash.KnownAlgorithm` cases. This is deliberately *not*
+            // thrown here: an unnameable algorithm still pins correctly for live, in-process use
             // (`URLSessionClient`), it just can't be captured for a `BackgroundDownloadTask` to
             // rebuild after a relaunch. `descriptor()` is what throws, and only if it's actually
             // called with pins present but nothing capturable.
@@ -314,7 +314,7 @@ extension Internals {
             }
 
             if case .none = certificateVerification {
-                // Mirrors NIOSSL's `CertificateVerification.none` -- deliberately unsafe,
+                // Mirrors NIOSSL's `CertificateVerification.none`: deliberately unsafe,
                 // opt-in only. SPKI pins, like every other check below, don't apply here either:
                 // `.none` means trust evaluation itself was opted out of.
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))

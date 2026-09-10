@@ -9,7 +9,7 @@
 /// (starting with `:`) are dropped, and a frame with no `data:` line at all produces no event.
 ///
 /// - Note: Unlike the browser `EventSource` API, `retry` is exposed directly on the event instead of
-/// silently updating a reconnection timer -- this type performs no reconnection of its own, so the value
+/// silently updating a reconnection timer. This type performs no reconnection of its own, so the value
 /// is surfaced for the caller to act on if desired.
 public struct ServerSentEvent: Sendable, Hashable {
 

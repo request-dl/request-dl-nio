@@ -11,7 +11,7 @@ extension URLEncoder {
         case droppingIndex
 
         /// Encodes the index as a fixed, empty pair of square brackets, e.g. `[]`, the same for
-        /// every element -- unlike ``subscripted``, the brackets never carry the actual index.
+        /// every element. Unlike ``subscripted``, the brackets never carry the actual index.
         case brackets
 
         /// Encodes the index in square brackets, e.g. `[0]`.

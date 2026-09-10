@@ -42,7 +42,7 @@ extension Internals {
         /// `client()` above hands back unconditionally.
         ///
         /// Returns `Internals.ClientManager.Client` (the enum), not `any RequestExecutingClient`,
-        /// because that protocol -- and both concrete conformances -- live in the `RequestDL`
+        /// because that protocol, and both concrete conformances, live in the `RequestDL`
         /// module, which depends on this one (`RequestDLInternals`), not the other way around.
         /// `RawTask.result()`, in `RequestDL`, is what actually unwraps this into the protocol
         /// existential it needs.
@@ -53,13 +53,14 @@ extension Internals {
             )
         }
 
-        /// Forwards to `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`
-        /// -- kept here, with this exact signature, only because it already has direct test
+        /// Forwards to `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`.
+        /// Kept here, with this exact signature, only because it already has direct test
         /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
-        /// `InternalsClientResponseReceiverTests`); the actual implementation moved onto
-        /// `Internals.Client` itself, since this method's body never touched `self`
-        /// (`provider`/`configuration`/`manager`) to begin with -- only `client`, taken as a
-        /// parameter.
+        /// `InternalsClientResponseReceiverTests`).
+        ///
+        /// The actual implementation moved onto `Internals.Client` itself, since this method's
+        /// body never touched `self` (`provider`/`configuration`/`manager`) to begin with, only
+        /// `client`, taken as a parameter.
         package func execute(
             client: Internals.Client,
             request: HTTPClient.Request,

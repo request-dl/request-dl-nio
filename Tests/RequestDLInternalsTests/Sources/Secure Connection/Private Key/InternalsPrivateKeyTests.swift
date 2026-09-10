@@ -174,7 +174,7 @@ struct InternalsPrivateKeyTests {
                 // Then
                 // Relative-path detection and "can't open" vs. "invalid contents"
                 // classification live entirely in `RequestDL.SecureFileError.init`, built from
-                // exactly this `resource`/`path`/`underlying` triple -- see `SecureFileErrorTests`
+                // exactly this `resource`/`path`/`underlying` triple; see `SecureFileErrorTests`
                 // in `RequestDLTests` for that coverage.
                 #expect(error.resource == .privateKey)
                 #expect(error.path == path)

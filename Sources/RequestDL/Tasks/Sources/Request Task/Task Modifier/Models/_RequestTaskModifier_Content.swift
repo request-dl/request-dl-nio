@@ -23,12 +23,13 @@ public struct _RequestTaskModifier_Content<Modifier: RequestTaskModifier>: Reque
 
     // MARK: - Public methods
 
-    // `result()` uses the environment fixed in at construction (by `ModifiedRequestTask` --
+    // `result()` uses the environment fixed in at construction (by `ModifiedRequestTask`:
     // either empty, for a plain top-of-chain `.result()`, or scoped by
     // `ModifiedRequestTask._result(environment:)` to whatever an outer modifier passed down).
+    //
     // `_result(environment:)` must NOT delegate to `result()` (the protocol's default does that,
     // ignoring its own argument): `Modifiers.Environment.body` calls this directly with a
-    // *mutated* environment that deliberately differs from `self.environment` -- that mutation is
+    // *mutated* environment that deliberately differs from `self.environment`; that mutation is
     // the entire mechanism by which `.environment()` takes effect.
     public func result() async throws -> Modifier.Input {
         try await task._result(environment: environment)

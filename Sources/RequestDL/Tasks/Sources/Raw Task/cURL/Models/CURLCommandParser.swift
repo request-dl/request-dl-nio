@@ -92,8 +92,8 @@ enum CURLCommandParser {
                 let (name, headerValue) = try splitOnce(try value(for: token), separator: ":")
                 configuration.headers.add(name: name, value: headerValue)
 
-                // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)` -- unavailable
-                // under `FoundationEssentials`/Linux.
+                // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)`, which is
+                // unavailable under `FoundationEssentials`/Linux.
                 if name.lowercased() == "content-type" {
                     hasExplicitContentType = true
                 }
@@ -273,7 +273,7 @@ enum CURLCommandParser {
 
                 if isInsecure {
                     // `certificateVerification` is `NIOSSL.CertificateVerification?`, and
-                    // `CertificateVerification` itself has a case named `none` -- plain `.none`
+                    // `CertificateVerification` itself has a case named `none`: plain `.none`
                     // here resolves to `Optional<CertificateVerification>.none` (nil), not
                     // `CertificateVerification.none`, which leaves verification at its default
                     // (`.fullVerification`) instead of disabling it. `.some(.none)`
@@ -316,11 +316,11 @@ enum CURLCommandParser {
         var connectionProtocol: Internals.Proxy.ConnectionProtocol = .http
 
         // Neither `range(of:)` (Foundation, unavailable under `FoundationEssentials`/Linux) nor
-        // `firstRange(of:)` (stdlib, but gated to macOS 13/iOS 16 -- newer than this package's
+        // `firstRange(of:)` (stdlib, but gated to macOS 13/iOS 16, newer than this package's
         // macOS 12/iOS 15 minimum; see `URLOverrideEndpoint.init?(baseURL:)` for the same
-        // constraint). A scheme, when present, is always at the very start, so the first `:`
-        // followed by `//` is unambiguous -- an earlier `:` inside `user:pass@host:port` (no
-        // scheme) is never followed by `//`, so `hasPrefix("//")` alone tells the two apart.
+        // constraint) is used here. A scheme, when present, is always at the very start, so the
+        // first `:` followed by `//` is unambiguous: an earlier `:` inside `user:pass@host:port`
+        // (no scheme) is never followed by `//`, so `hasPrefix("//")` alone tells the two apart.
         if let colonIndex = remainder.firstIndex(of: ":"),
             remainder[remainder.index(after: colonIndex)...].hasPrefix("//")
         {

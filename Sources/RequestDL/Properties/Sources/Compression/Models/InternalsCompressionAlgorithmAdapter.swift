@@ -6,8 +6,8 @@ import NIOCore
 import RequestDLInternals
 
 /// Adapts a `RequestDL.Compressor` to `Internals.CompressionAlgorithm`, converting between this
-/// module's public `[UInt8]`-based protocols and the `ByteBuffer`-based ones `Internals` --
-/// shared by both transports -- can reference without depending back on this module.
+/// module's public `[UInt8]`-based protocols and the `ByteBuffer`-based ones `Internals`
+/// (shared by both transports) can reference without depending back on this module.
 struct InternalsCompressionAlgorithmAdapter: Internals.CompressionAlgorithm {
 
     // MARK: - Internal properties

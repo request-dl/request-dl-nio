@@ -18,7 +18,7 @@ import Security
 /// resolves to never silently changes behavior across requests sharing that session.
 ///
 /// `LocalServer.HTTPHandler` echoes back whatever `Cookie` header it actually received
-/// (`HTTPResult.receivedCookieHeader`) -- the only way to prove the *second* request didn't
+/// (`HTTPResult.receivedCookieHeader`): the only way to prove the *second* request didn't
 /// resend a cookie the *first* response set is to ask the server what it saw, not just what the
 /// client sent (which this test has no independent way to inspect).
 struct InternalsURLSessionClientCookieTests {
@@ -73,7 +73,7 @@ struct InternalsURLSessionClientCookieTests {
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling. See the identical
 /// delegate in the other `Internals.URLSessionClient` test files for why this exists at all:
 /// `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

@@ -10,7 +10,7 @@ struct DigestChallenge: Sendable, Hashable {
     let realm: String
     let nonce: String
     let opaque: String?
-    /// `true` when the challenge offered `qop=auth` (or the legacy, unquoted `qop=auth`) --
+    /// `true` when the challenge offered `qop=auth` (or the legacy, unquoted `qop=auth`).
     /// `auth-int`, which additionally hashes the request body, is treated the same as no `qop`
     /// at all: neither is supported, see ``DigestAuthentication``'s own doc comment.
     let hasAuthQop: Bool
@@ -66,7 +66,7 @@ struct DigestChallenge: Sendable, Hashable {
 
     // MARK: - Private static methods
 
-    /// Splits `string` on every unquoted occurrence of `separator` -- a plain `split(separator:)`
+    /// Splits `string` on every unquoted occurrence of `separator`: a plain `split(separator:)`
     /// would also split inside a quoted value that happens to contain the same character (a
     /// `nonce`/`opaque` is server-chosen, opaque data, and RFC 7616 does not forbid a comma in
     /// one).

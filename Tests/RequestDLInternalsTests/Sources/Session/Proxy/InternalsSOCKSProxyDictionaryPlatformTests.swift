@@ -14,24 +14,25 @@ import SwiftAsyncStream
 /// doc comment already flags: whether `URLSession` honors `connectionProxyDictionary`'s legacy
 /// SOCKS keys (`SOCKSEnable`/`SOCKSProxy`/`SOCKSPort`) *at all*, before committing to building a
 /// real SOCKS4/5 server test double to prove a working tunnel end to end. Mirrors
-/// `InternalsProxyDictionaryPlatformTests`'s own bare-`NWListener` technique exactly -- a listener
+/// `InternalsProxyDictionaryPlatformTests`'s own bare-`NWListener` technique exactly: a listener
 /// standing in for "some process at the configured proxy address," counting connection attempts,
-/// nothing that speaks the SOCKS protocol itself -- since that same technique already correctly
-/// separated "is the dictionary honored" from "does the resulting tunnel actually carry traffic"
-/// for the `.http` keys.
+/// nothing that speaks the SOCKS protocol itself. That's because the same technique already
+/// correctly separated "is the dictionary honored" from "does the resulting tunnel actually carry
+/// traffic" for the `.http` keys.
 ///
-/// Uses `https://example.invalid/` as the destination, not a loopback address --
+/// Uses `https://example.invalid/` as the destination, not a loopback address, because
 /// `InternalsProxyDictionaryPlatformTests`'s own finding is that every platform bypasses a
 /// configured proxy for loopback destinations as OS policy, independent of whether a given key
 /// set is honored at all, which would make a loopback destination here prove nothing either way.
 ///
 /// **Finding, confirmed by actually running both tests, not assumed:** `URLSession` does contact
-/// the configured SOCKS proxy address -- on macOS and an iOS Simulator alike, and confirmed
+/// the configured SOCKS proxy address on macOS and an iOS Simulator alike, and confirmed
 /// non-tautological by the negative-control test (no dictionary set, listener never contacted).
+///
 /// This overturns the "unreliable/undocumented" framing the original analysis carried forward
-/// into excluding `.socks` from `.urlSession` entirely -- at least the connection-attempt half of
+/// into excluding `.socks` from `.urlSession` entirely: at least the connection-attempt half of
 /// the picture works. It does **not** yet prove a working SOCKS tunnel end to end (handshake,
-/// auth negotiation, address relay) -- only that `URLSession` is willing to dial the configured
+/// auth negotiation, address relay); only that `URLSession` is willing to dial the configured
 /// address, which is the bare minimum a real SOCKS4/5 server test double (this file's own
 /// deliberately narrower scope) would need to even get contacted in the first place.
 struct InternalsSOCKSProxyDictionaryPlatformTests {
@@ -45,7 +46,7 @@ struct InternalsSOCKSProxyDictionaryPlatformTests {
         #expect(contacted)
     }
 
-    /// Negative control for the test above -- without this, a listener that happened to be
+    /// Negative control for the test above: without this, a listener that happened to be
     /// contacted for some unrelated reason (a stray system connection, ATS probing, ...) would
     /// make the positive result meaningless. Same discipline `InternalsURLSessionClientCookieTests`
     /// already holds itself to for its own tee assertion.
@@ -111,7 +112,7 @@ struct InternalsSOCKSProxyDictionaryPlatformTests {
         // test is whether the proxy gets contacted before (or instead of) any of that.
         _ = try? await session.data(for: URLRequest(url: URL(string: "https://example.invalid/")!))
 
-        // Give a just-missed connection a moment to land -- `data(for:)` returning doesn't
+        // Give a just-missed connection a moment to land: `data(for:)` returning doesn't
         // guarantee the listener's callback (a separate queue) has already run.
         try? await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
 
@@ -140,7 +141,7 @@ private final class ConnectAttemptCounter: @unchecked Sendable {
 }
 
 /// Bridges `NWListener.stateUpdateHandler` (called repeatedly) to a `CheckedContinuation` (usable
-/// exactly once) -- resumes on the first `.ready`/`.failed`, ignores every later call.
+/// exactly once): resumes on the first `.ready`/`.failed`, ignores every later call.
 private final class ContinuationBox: @unchecked Sendable {
 
     private let lock = Lock()

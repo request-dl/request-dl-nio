@@ -10,10 +10,13 @@
 ///
 /// - Warning: `Accept-Charset` is a legacy header the web platform has moved away from. The
 /// WHATWG Fetch Standard lists it among the forbidden request-header names a browser refuses to
-/// let a caller set at all (`fetch()`/`XMLHttpRequest.setRequestHeader` both reject it), and
-/// browsers stopped sending it on ordinary navigations years ago -- most servers, and every JSON
+/// let a caller set at all (`fetch()`/`XMLHttpRequest.setRequestHeader` both reject it).
+///
+/// Browsers stopped sending it on ordinary navigations years ago. Most servers, and every JSON
 /// endpoint (UTF-8 by definition), already ignore it. Sending it today mostly just signals a
-/// non-browser client. Prefer negotiating charset through the response's own `Content-Type`, or
+/// non-browser client.
+///
+/// Prefer negotiating charset through the response's own `Content-Type`, or
 /// an application-level convention with the server, instead.
 @available(
     *,

@@ -19,7 +19,7 @@ struct InternalsThrottledExecutorTests {
     }
 
     /// Mirrors `InternalsClientConcurrencyLimitTests`, but against the hoisted throttling logic
-    /// directly rather than through `Internals.Client` -- the wrapper any future concrete client
+    /// directly rather than through `Internals.Client`, the wrapper any future concrete client
     /// shares this gating behavior through.
     @Test
     func acquire_whenLimited_gatesConcurrentAcquisitions() async throws {

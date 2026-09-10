@@ -3,14 +3,17 @@
 //
 
 // What a `BackgroundDownloadTask` persists on `URLSessionTask.taskDescription` for a client
-// certificate (mTLS) -- deliberately never the private key's own bytes, only the file path it
-// lives at. Unlike `Internals.ServerTrustPolicy.Descriptor` (public certificate bytes, fine to
+// certificate (mTLS): deliberately never the private key's own bytes, only the file path it
+// lives at.
+//
+// Unlike `Internals.ServerTrustPolicy.Descriptor` (public certificate bytes, fine to
 // carry verbatim), embedding key material in a task's plain-text description would be a real
-// regression from the Keychain-only handling this package otherwise holds itself to. This is why
-// a client identity sourced from `.bytes` (in-memory only, no path to persist) can't be supported
-// here at all, and why an identity is rebuilt fresh from disk on every challenge rather than
-// cached: the file, not any in-memory state, is the only thing guaranteed to still exist after a
-// relaunch.
+// regression from the Keychain-only handling this package otherwise holds itself to.
+//
+// This is why a client identity sourced from `.bytes` (in-memory only, no path to persist) can't
+// be supported here at all, and why an identity is rebuilt fresh from disk on every challenge
+// rather than cached: the file, not any in-memory state, is the only thing guaranteed to still
+// exist after a relaunch.
 
 #if canImport(Darwin)
 
@@ -64,7 +67,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// `nil` when `secureConnection` configures no client identity at all -- the common case,
+        /// `nil` when `secureConnection` configures no client identity at all, the common case,
         /// and not an error.
         package static func resolve(from secureConnection: Internals.SecureConnection) throws -> Self? {
             switch (secureConnection.certificateChain, secureConnection.privateKey) {

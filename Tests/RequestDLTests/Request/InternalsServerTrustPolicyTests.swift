@@ -15,7 +15,7 @@ import Testing
 import Foundation
 import Security
 
-/// Covers `Internals.ServerTrustPolicy` -- the server-trust half `Internals.URLSessionIdentityPolicy`
+/// Covers `Internals.ServerTrustPolicy`: the server-trust half `Internals.URLSessionIdentityPolicy`
 /// now composes rather than duplicates, and the piece `BackgroundDownloadTask` resolves at
 /// schedule time and rebuilds again from a persisted ``Internals/ServerTrustPolicy/Descriptor``,
 /// simulating what happens after a relaunch with nothing else in memory.
@@ -166,7 +166,7 @@ struct InternalsServerTrustPolicyTests {
         #expect(descriptor.spkiPinning == nil)
     }
 
-    /// `Internals.SPKIHash.KnownAlgorithm` only names SHA-256/384/512 -- anything else, like
+    /// `Internals.SPKIHash.KnownAlgorithm` only names SHA-256/384/512. Anything else, like
     /// `Insecure.SHA1` here, still works for live pinning (see
     /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
     /// below) but can't be captured into a `Descriptor`.
@@ -221,7 +221,7 @@ struct InternalsServerTrustPolicyTests {
 
         let original = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
 
-        // When -- exactly what survives a relaunch: the `Descriptor`, JSON round-tripped the same
+        // When: exactly what survives a relaunch. The `Descriptor` is JSON round-tripped the same
         // way `BackgroundDownloads.Session` persists it on `taskDescription`, then rebuilt from
         // that alone.
         let encoded = try JSONEncoder().encode(original.descriptor())
@@ -309,11 +309,11 @@ struct InternalsServerTrustPolicyTests {
         #expect(observer.decisions == [TrustDecision(isTrusted: false, pinsMatched: false)])
     }
 
-    // MARK: - handle(challenge:completionHandler:) -- real handshake, rebuilt policy
+    // MARK: - handle(challenge:completionHandler:) (real handshake, rebuilt policy)
 
     /// The whole point of splitting this type out: a policy rebuilt from nothing but a
-    /// `Descriptor` -- no `Internals.SecureConnection`, no `Property` tree, exactly what a
-    /// `BackgroundDownloadTask` delegate callback has after a relaunch -- still has to genuinely
+    /// `Descriptor` (no `Internals.SecureConnection`, no `Property` tree, exactly what a
+    /// `BackgroundDownloadTask` delegate callback has after a relaunch) still has to genuinely
     /// validate a real server certificate against real trust roots, not just hold the right bytes
     /// in memory.
     @Test
@@ -358,7 +358,7 @@ struct InternalsServerTrustPolicyTests {
 
     @Test
     func rebuiltPolicy_whenTrustRootsDoNotMatch_rejectsRealServerCertificate() async throws {
-        // Given -- the client fixture's own certificate is not the one `LocalServer` presents, so
+        // Given: the client fixture's own certificate is not the one `LocalServer` presents, so
         // anchoring to it specifically must fail the handshake.
         let unrelatedCertificate = Certificates().client()
         let localServer = try await LocalServer(.standard)
@@ -386,7 +386,7 @@ struct InternalsServerTrustPolicyTests {
         }
     }
 
-    // MARK: - handle(challenge:completionHandler:) -- SPKI pinning, real handshake
+    // MARK: - handle(challenge:completionHandler:) (SPKI pinning, real handshake)
 
     @Test
     func rebuiltPolicy_whenSPKIPinningMatchesServerCertificate_acceptsHandshake() async throws {
@@ -430,9 +430,9 @@ struct InternalsServerTrustPolicyTests {
 
     @Test
     func rebuiltPolicy_whenSPKIPinningDoesNotMatchUnderStrictPolicy_rejectsHandshake() async throws {
-        // Given -- trust roots anchor to the real server certificate (so plain chain validation
+        // Given: trust roots anchor to the real server certificate (so plain chain validation
         // passes), but the configured pin is some other certificate's SPKI, not the one
-        // `LocalServer` actually presents -- isolating the rejection to the pin check itself.
+        // `LocalServer` actually presents. This isolates the rejection to the pin check itself.
         let server = Certificates().server()
         let unrelatedCertificate = Certificates().client()
         let wrongPin = try hashSPKI(from: unrelatedCertificate.certificateURL, algorithm: SHA256.self)
@@ -464,7 +464,7 @@ struct InternalsServerTrustPolicyTests {
 
     @Test
     func rebuiltPolicy_whenSPKIPinningDoesNotMatchUnderAuditPolicy_stillAcceptsHandshake() async throws {
-        // Given -- same mismatch as the strict-policy test above, but `.audit` is meant to warn
+        // Given: same mismatch as the strict-policy test above, but `.audit` is meant to warn
         // rather than block, mirroring what `SPKIPinningConfiguration` already does on the
         // NIOSSL/AsyncHTTPClient side.
         let server = Certificates().server()
@@ -503,7 +503,7 @@ struct InternalsServerTrustPolicyTests {
     }
 
     /// `Internals.SPKIHash.KnownAlgorithm` (SHA-256/384/512) only gates what a `Descriptor` can
-    /// carry across a `BackgroundDownloadTask` relaunch -- a live, in-process
+    /// carry across a `BackgroundDownloadTask` relaunch. A live, in-process
     /// `Internals.ServerTrustPolicy` (`URLSessionClient`'s own case, never persisted) pins
     /// correctly with any `Crypto.HashFunction`.
     @Test
@@ -545,7 +545,7 @@ struct InternalsServerTrustPolicyTests {
 
 extension InternalsServerTrustPolicyTests {
 
-    /// Mirrors `SPKIPinningTests.hashSPKI(from:)` -- the exact same SPKI-DER-then-hash pipeline
+    /// Mirrors `SPKIPinningTests.hashSPKI(from:)`: the exact same SPKI-DER-then-hash pipeline
     /// `Internals.SPKIHash`/`Internals.ServerTrustPolicy` use, generalized over the hash algorithm
     /// so `descriptor_whenSPKIPinningUsesUnnamedAlgorithm_throwsUnpersistableAlgorithm` and
     /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
@@ -557,7 +557,7 @@ extension InternalsServerTrustPolicyTests {
     }
 }
 
-/// Forwards a session's server-trust challenge straight to a `ServerTrustPolicy` -- the same
+/// Forwards a session's server-trust challenge straight to a `ServerTrustPolicy`: the same
 /// hookup `BackgroundDownloads.Session`'s own `urlSession(_:task:didReceive:completionHandler:)`
 /// does, minus the `taskDescription` decoding step, since this suite already has the policy in
 /// hand directly.

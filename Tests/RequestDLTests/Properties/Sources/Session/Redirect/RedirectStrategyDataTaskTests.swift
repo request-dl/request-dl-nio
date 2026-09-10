@@ -23,8 +23,8 @@ import struct Foundation.UUID
 /// `InternalsNIORedirectStrategyAdapterTests` and `InternalsURLSessionClientRedirectStrategyTests`
 /// (`RequestDLInternalsTests`) already cover the two transports' own redirect mechanics in
 /// isolation, each driving `Internals.RedirectStrategy` directly. What neither exercises is the
-/// bridge in between -- `InternalsRedirectStrategyAdapter`/`ClosureRedirectStrategy`, and the
-/// public `RedirectContext`/`RedirectRequest`/`RedirectHistoryEntry` themselves -- since a caller
+/// bridge in between: `InternalsRedirectStrategyAdapter`/`ClosureRedirectStrategy`, and the
+/// public `RedirectContext`/`RedirectRequest`/`RedirectHistoryEntry` themselves. A caller
 /// only ever reaches those through `Session`, not through `Internals` directly.
 struct RedirectStrategyDataTaskTests {
 
@@ -89,9 +89,9 @@ struct RedirectStrategyDataTaskTests {
     /// `.redirectStrategy`/`.onRedirect` over the `.nio`/`.nioTransportServices` executors drive
     /// AsyncHTTPClient's delegate-based `execute(request:delegate:...)` API, as opposed to its
     /// Concurrency `execute(_:deadline:logger:)` family that the `.urlSession` executor has no
-    /// need for. AsyncHTTPClient's own `.strategy` redirect mode is wired up for both --
+    /// need for. AsyncHTTPClient's own `.strategy` redirect mode is wired up for both:
     /// `RedirectHandler`/`RedirectStrategyDelegateBridge.swift` on its side bridge a strategy's
-    /// decision back into the delegate API's request/body types -- so this follows the redirect
+    /// decision back into the delegate API's request/body types. So this follows the redirect
     /// exactly like the `.urlSession` executor does above.
     @Test
     func dataTask_whenRedirectStrategyOverNIO_isInvokedAndControlsTheRedirect() async throws {
@@ -200,8 +200,8 @@ struct RedirectStrategyDataTaskTests {
     /// AsyncHTTPClient's delegate-based path used to fail the whole task for `.doNotFollow`
     /// (resuming normal delivery of the response that triggered the redirect had no route back
     /// from the state its response-delivery state machine had already committed to). Fixed by
-    /// asking the strategy the moment the response head arrives, before any body byte is read --
-    /// see `RedirectHandler.earlyStrategyDecision(head:)` on the async-http-client fork.
+    /// asking the strategy the moment the response head arrives, before any body byte is read.
+    /// See `RedirectHandler.earlyStrategyDecision(head:)` on the async-http-client fork.
     @Test
     func dataTask_whenRedirectStrategyDoesNotFollowOverNIO_returnsRedirectResponseUnfollowed() async throws {
         // Given

@@ -18,23 +18,24 @@ extension BackgroundDownloads {
     /// The single `URLSession` backing every ``BackgroundDownloadTask``, plus the delegate
     /// callbacks that turn its events into ``BackgroundDownloads/Event``.
     ///
-    /// One fixed identifier for the whole process, not one per download -- a background session
+    /// One fixed identifier for the whole process, not one per download: a background session
     /// happily runs many concurrent tasks, and splitting them across sessions would only add
     /// surface to keep in sync on reconnection for no real benefit. Individual downloads are told
     /// apart by `URLSessionTask.taskDescription`, not by which session they run on.
     ///
     /// Not an `actor`: `urlSession(_:downloadTask:didFinishDownloadingTo:)` has to move the
     /// downloaded file synchronously, before returning, since the system deletes the temporary
-    /// file right after that call returns -- an `await` hop there would race the cleanup.
+    /// file right after that call returns; an `await` hop there would race the cleanup.
     final class Session: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
 
         // MARK: - Internal static properties
 
         static let shared = Session()
 
-        /// Stable across launches (same bundle, same string every time) -- required for the
-        /// system to reconnect this session to tasks that outlived a previous process. Not
-        /// `private` -- `handleEvents(forIdentifier:completionHandler:)`'s identifier-matching
+        /// Stable across launches (same bundle, same string every time): required for the
+        /// system to reconnect this session to tasks that outlived a previous process.
+        ///
+        /// Not `private`: `handleEvents(forIdentifier:completionHandler:)`'s identifier-matching
         /// guard is unit-tested directly against this exact value, rather than duplicating it.
         static let identifier = "\(Bundle.main.bundleIdentifier ?? "RequestDL").BackgroundDownloadTask"
 
@@ -88,27 +89,27 @@ extension BackgroundDownloads {
             lock.withLock { _pendingCompletionHandler = completionHandler }
 
             // Recreating the session (or confirming it already exists) with the matching
-            // identifier is what makes the system replay queued delegate callbacks -- there is no
+            // identifier is what makes the system replay queued delegate callbacks; there is no
             // separate "reconnect" call.
             _ = urlSession()
         }
 
         /// Cancels the download with this `id`, if one is currently running.
         ///
-        /// No index of `id` -> `URLSessionTask` is kept around -- there is nowhere safe to keep
+        /// No index of `id` -> `URLSessionTask` is kept around: there is nowhere safe to keep
         /// one that would still be valid after a relaunch anyway, since a fresh process starts
         /// with nothing in memory. `allTasks` is the system's own live answer instead, always
         /// asked fresh: cheap enough for something that only runs when a caller explicitly asks
         /// to cancel something, not on any hot path.
         ///
         /// Cancelling a `URLSessionTask` this way makes it fail with `NSURLErrorCancelled`
-        /// shortly after, through the ordinary `didCompleteWithError` callback below -- so a
+        /// shortly after, through the ordinary `didCompleteWithError` callback below, so a
         /// cancellation is reported through ``BackgroundDownloads/onEvent`` as an ordinary
         /// `.failed` event, not a distinct case of its own.
         ///
         /// - Returns: `true` if a matching, still-running download was found and cancelled;
         /// `false` if none was (already finished, never existed, or no download has ever been
-        /// scheduled in this process at all -- checked without creating a session just to find
+        /// scheduled in this process at all, checked without creating a session just to find
         /// out, since there would be nothing in it to cancel either way).
         @discardableResult
         func cancel(id: String) async -> Bool {
@@ -141,11 +142,13 @@ extension BackgroundDownloads {
 
         // MARK: - URLSessionTaskDelegate
 
-        /// Not part of `URLSessionDownloadDelegate` itself -- `URLSessionTaskDelegate`, which
+        /// Not part of `URLSessionDownloadDelegate` itself: it's `URLSessionTaskDelegate`, which
         /// `URLSessionDownloadDelegate` already inherits from, so no extra protocol conformance
-        /// is needed to implement it. A task with no persisted `serverTrust` (the common case:
-        /// plain HTTPS, system trust) defers to the system's own default handling, exactly the
-        /// behavior this method not existing at all already had before this existed.
+        /// is needed to implement it.
+        ///
+        /// A task with no persisted `serverTrust` (the common case: plain HTTPS, system trust)
+        /// defers to the system's own default handling, exactly the behavior this method not
+        /// existing at all already had before this existed.
         func urlSession(
             _ session: URLSession,
             task: URLSessionTask,
@@ -215,7 +218,7 @@ extension BackgroundDownloads {
             }
 
             do {
-                // Best-effort -- a destination that doesn't already exist is the common case, and
+                // Best-effort: a destination that doesn't already exist is the common case, and
                 // `moveItem` below is what actually needs to succeed.
                 try? FileManager.default.removeItem(at: destination)
                 try FileManager.default.moveItem(at: location, to: destination)
@@ -246,7 +249,7 @@ extension BackgroundDownloads {
             )
         }
 
-        /// Also fires with `error == nil` on success -- ignored here, since a successful download
+        /// Also fires with `error == nil` on success; ignored here, since a successful download
         /// is already reported from `didFinishDownloadingTo` above, once the file has actually
         /// been moved to `destination`.
         func urlSession(
@@ -274,7 +277,7 @@ extension BackgroundDownloads {
 
         /// Everything a delegate callback needs to know about one download, carried on the
         /// `URLSessionTask` itself (`taskDescription`) rather than in a store RequestDL would
-        /// otherwise have to keep in sync with the system's own task bookkeeping -- the system
+        /// otherwise have to keep in sync with the system's own task bookkeeping: the system
         /// already persists this string across a relaunch for free.
         private struct Descriptor: Codable {
             let id: String
@@ -283,7 +286,7 @@ extension BackgroundDownloads {
             let clientIdentity: Internals.ClientIdentityDescriptor?
         }
 
-        // Not `private` -- unit-tested directly (`@testable import`) independent of any real
+        // Not `private`: unit-tested directly (`@testable import`) independent of any real
         // `URLSessionTask`, the same way `InternalsURLSessionUploadFileTests` covers its bridge
         // without a network round trip.
         static func encode(
@@ -317,14 +320,14 @@ extension BackgroundDownloads {
         }
 
         /// `nil` both when `taskDescription` isn't one this type encoded at all, and when it is
-        /// but carries no `serverTrust` (the common, plain-HTTPS case) -- either way, the caller's
+        /// but carries no `serverTrust` (the common, plain-HTTPS case). Either way, the caller's
         /// only correct response is the same: defer to the system's default handling.
         static func decodeServerTrust(_ taskDescription: String?) -> Internals.ServerTrustPolicy.Descriptor? {
             Self.decodeDescriptor(taskDescription)?.serverTrust
         }
 
         /// `nil` both when `taskDescription` isn't one this type encoded at all, and when it is
-        /// but carries no `clientIdentity` (no mTLS configured) -- either way, the caller's only
+        /// but carries no `clientIdentity` (no mTLS configured). Either way, the caller's only
         /// correct response is the same: defer to the system's default handling.
         static func decodeClientIdentity(_ taskDescription: String?) -> Internals.ClientIdentityDescriptor? {
             Self.decodeDescriptor(taskDescription)?.clientIdentity
@@ -344,7 +347,7 @@ extension BackgroundDownloads {
 
         // MARK: - Task matching
 
-        /// The pure part of ``cancel(id:)`` -- picking the right task out of a list -- pulled out
+        /// The pure part of ``cancel(id:)`` (picking the right task out of a list), pulled out
         /// on its own specifically so it's testable without a real background `URLSession` to ask
         /// `allTasks` of. A task with no `taskDescription`, or one this type didn't encode, simply
         /// never matches, the same way `decode(_:)`'s callers already treat it elsewhere.

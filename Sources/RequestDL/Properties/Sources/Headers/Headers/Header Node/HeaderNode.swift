@@ -44,7 +44,7 @@ struct HeaderNode: PropertyNode {
     func make(_ make: inout Make) async throws {
         self(&make.requestConfiguration.headers)
 
-        // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)` -- unavailable outside
+        // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)`: unavailable outside
         // Darwin (FoundationEssentials/Linux/Android), and this path runs for every executor,
         // not just `.urlSession`.
         if key.lowercased() == "user-agent" {
@@ -54,23 +54,26 @@ struct HeaderNode: PropertyNode {
 
     // MARK: - Private properties
 
-    /// Header names whose value every governing spec defines as singular -- repeating the field
+    /// Header names whose value every governing spec defines as singular: repeating the field
     /// line, or splicing a second value into it with whatever separator happens to be in scope,
     /// either violates the field's own grammar or produces something that fails to parse as
     /// anything valid at all.
     ///
-    /// `Host`: RFC 9110 §7.2 -- a server MUST 400 a request carrying more than one. `Origin`
+    /// `Host`: per RFC 9110 §7.2, a server MUST 400 a request carrying more than one. `Origin`
     /// (RFC 6454/Fetch) and `Referer` (RFC 9110 §10.1.3) are each a single serialized value, not
     /// a list. `Authorization`, `Content-Type`, and `Content-Length` are each exactly one
-    /// credentials/media-type/byte-count value -- `Payload`/`Authorization`/`DigestAuthentication`
-    /// already write them via a direct `headers.set(...)`, bypassing `HeaderNode` entirely, but
-    /// that only stops those *specific* properties from duplicating themselves. It does nothing
-    /// to stop an unrelated `CustomHeader` that happens to case-insensitively collide with one of
-    /// these names (e.g. `CustomHeader(name: "content-type", ...)` after a `Payload`) from
-    /// appending onto it via `.adding`, or -- worse, when a separator is also in scope -- from
-    /// splicing its value directly into the existing one, silently corrupting it into a single
-    /// unparseable string. Enforcing this here, for every write regardless of which `Property`
-    /// produced it, is the one place that closes both vectors.
+    /// credentials/media-type/byte-count value.
+    ///
+    /// `Payload`/`Authorization`/`DigestAuthentication` already write them via a direct
+    /// `headers.set(...)`, bypassing `HeaderNode` entirely, but that only stops those *specific*
+    /// properties from duplicating themselves. It does nothing to stop an unrelated
+    /// `CustomHeader` that happens to case-insensitively collide with one of these names (e.g.
+    /// `CustomHeader(name: "content-type", ...)` after a `Payload`) from appending onto it via
+    /// `.adding`, or, worse, when a separator is also in scope, from splicing its value directly
+    /// into the existing one, silently corrupting it into a single unparseable string.
+    ///
+    /// Enforcing this here, for every write regardless of which `Property` produced it, is the
+    /// one place that closes both vectors.
     ///
     /// Deliberately excludes `User-Agent`: combining multiple ``UserAgentHeader`` instances is a
     /// documented, intentional feature (see its own doc comment), so it cannot be forced to
@@ -79,21 +82,23 @@ struct HeaderNode: PropertyNode {
         "host", "origin", "referer", "authorization", "content-type", "content-length",
     ]
 
-    /// Header names whose combined value RFC 9110/9111 define as a comma-separated list --
+    /// Header names whose combined value RFC 9110/9111 define as a comma-separated list:
     /// `,` (plus optional whitespace) is the *only* separator any spec sanctions for folding
     /// multiple field lines into one, regardless of what `.headerSeparator(_:)` a caller passes.
     ///
     /// This isn't a matter of taste: `;` in particular already means something inside these
     /// headers' own grammar. `Accept`/`Accept-Charset`/`Accept-Encoding`/`Accept-Language` use it
-    /// to attach a `q` parameter to the *previous* element (`text/html;q=0.9`) -- joining two
+    /// to attach a `q` parameter to the *previous* element (`text/html;q=0.9`). Joining two
     /// instances with `.headerSeparator(";")` produces `text/html;q=0.9;application/json`, which
     /// a compliant `#(media-range)` parser reads as `application/json` being an (invalid)
-    /// parameter of `text/html`, not a second accepted type. `Cache-Control`'s directive list
-    /// (`1#cache-directive`, RFC 9111 §5.2) has no comparable internal use of `;`, but still
-    /// parses as one opaque, meaningless directive if joined with anything but `,`.
+    /// parameter of `text/html`, not a second accepted type.
+    ///
+    /// `Cache-Control`'s directive list (`1#cache-directive`, RFC 9111 §5.2) has no comparable
+    /// internal use of `;`, but still parses as one opaque, meaningless directive if joined with
+    /// anything but `,`.
     ///
     /// Only for headers RequestDL itself defines the semantics of. `CustomHeader` is deliberately
-    /// left alone -- for an arbitrary, non-standard header name, whatever separator its own
+    /// left alone: for an arbitrary, non-standard header name, whatever separator its own
     /// backend expects (if any) isn't something RequestDL can know or second-guess.
     private static let commaSeparatedNames: Set<String> = [
         "accept", "accept-charset", "accept-encoding", "accept-language", "cache-control",

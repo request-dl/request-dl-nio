@@ -161,12 +161,12 @@ public struct Session: Property {
     /// Enable the usage of Network framework on Apple Platforms when compatible.
     ///
     /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
-    /// or specific secure connection settings -- including ``SPKIPinning``, which Network framework's bridge into
+    /// or specific secure connection settings, including ``SPKIPinning``, which Network framework's bridge into
     /// `sec_protocol_options` never consults. When the session's ``SecureConnection`` carries any such setting, this flag
     /// is silently ignored and the session falls back to plain SwiftNIO instead of failing or dropping the incompatible
     /// setting: whichever secure-connection settings were configured still apply in full, just over a different transport.
     ///
-    /// - Note: Deprecated in favor of ``preferredExecutor(_:)`` -- specifically
+    /// - Note: Deprecated in favor of ``preferredExecutor(_:)``, specifically
     /// `.preferredExecutor(.nioTransportServices)`, which is wired into the same live decision
     /// this flag drives. `enableNetworkFramework(true)` keeps working exactly as before: it's
     /// treated as an *implicit* `preferredExecutor(.nioTransportServices)` whenever nothing else
@@ -300,7 +300,7 @@ public struct Session: Property {
     }
 
     ///
-    /// Hands every redirect-eligible response to `strategy`, which decides whether -- and how --
+    /// Hands every redirect-eligible response to `strategy`, which decides whether (and how)
     /// to follow it, instead of the fixed count/cycle limit ``enableRedirectFollow(max:allowCycles:)``
     /// applies. See ``RedirectStrategy``.
     ///
@@ -313,8 +313,8 @@ public struct Session: Property {
 
     ///
     /// Convenience over ``redirectStrategy(_:)`` for a policy that doesn't need its own type:
-    /// every redirect-eligible response is handed to `handler`, which decides whether -- and how
-    /// -- to follow it. See ``RedirectContext`` for what `handler` receives.
+    /// every redirect-eligible response is handed to `handler`, which decides whether (and how)
+    /// to follow it. See ``RedirectContext`` for what `handler` receives.
     ///
     /// - Parameter handler: The closure that decides each redirect.
     /// - Returns: The modified `Session` instance with the redirect strategy configured.
@@ -340,13 +340,13 @@ public struct Session: Property {
     ///
     /// ``Decompressor/gzip``/``Decompressor/deflate``/``Decompressor/brotliURLSessionOnly`` are
     /// placeholders for what the OS (`.urlSession`) or `async-http-client`
-    /// (`.nio`/`.nioTransportServices`) already decode natively -- RequestDL never reimplements
+    /// (`.nio`/`.nioTransportServices`) already decode natively; RequestDL never reimplements
     /// them, and in the common case where `algorithms` contains only those, nothing in this
     /// package ever touches the response bytes at all.
     ///
     /// A genuinely custom `Decompressor` changes that on `.urlSession`: CFNetwork's transparent
     /// decoding can only be switched off entirely, for every encoding at once, by taking over
-    /// `Accept-Encoding` ourselves -- so as soon as `algorithms` contains anything beyond the
+    /// `Accept-Encoding` ourselves, so as soon as `algorithms` contains anything beyond the
     /// three natives, this session sets `Accept-Encoding` itself (every configured algorithm,
     /// listed) and decodes all of it manually, including gzip/deflate if they're in the same
     /// list. `.nio`/`.nioTransportServices` have no such constraint: `async-http-client`'s own
@@ -354,8 +354,8 @@ public struct Session: Property {
     /// alongside manual dispatch for whatever it leaves untouched.
     ///
     /// A response whose `Content-Encoding` matches none of `algorithms` throws
-    /// ``UnsupportedContentEncodingError`` -- only reachable once this session has already taken
-    /// over decoding itself, per the paragraph above.
+    /// ``UnsupportedContentEncodingError``, which is only reachable once this session has already
+    /// taken over decoding itself, per the paragraph above.
     ///
     /// - Parameters:
     ///   - algorithms: The decompressors this session accepts. Passing `[]` is equivalent to

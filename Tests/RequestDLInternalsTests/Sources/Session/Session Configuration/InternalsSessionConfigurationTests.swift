@@ -344,7 +344,7 @@ struct InternalsSessionConfigurationTests {
         // Given
         let configuration = Internals.Session.Configuration()
 
-        // Then -- `false` regardless of `secureConnection`, since the caller never asked for
+        // Then: `false` regardless of `secureConnection`, since the caller never asked for
         // Network framework in the first place.
         #expect(!configuration.isCompatibleWithNetworkFramework)
     }
@@ -412,7 +412,7 @@ struct InternalsSessionConfigurationTests {
         // When
         let builtConfiguration = try configuration.build().httpClientConfiguration
 
-        // Then -- `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
+        // Then: `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
         // lifecycle itself (see the doc comment on `Configuration.tracer`).
         #expect((builtConfiguration.tracing.tracer as? NoOpTracer) != nil)
     }
@@ -446,7 +446,7 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.timeout.connect == nil)
         #expect(builtConfiguration.timeout.read == nil)
         #expect(builtConfiguration.proxy == nil)
-        // Off by default on every platform now -- decompression is opt-in, and `.disabled` gets
+        // Off by default on every platform now: decompression is opt-in, and `.disabled` gets
         // real parity with `.urlSession` via `Accept-Encoding: identity`, so the two platforms no
         // longer need different defaults.
         let expectedDecompression = HTTPClient.Decompression.disabled

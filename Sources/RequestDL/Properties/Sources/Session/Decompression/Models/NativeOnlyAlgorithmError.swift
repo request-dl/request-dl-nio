@@ -7,7 +7,7 @@
 ///
 /// In the normal case it never is: URLSession or `async-http-client` decodes these natively, and
 /// RequestDL never has to. It's only reached when one of these is mixed into
-/// ``Session/decompressionAlgorithms(_:limit:)`` alongside a genuinely custom algorithm --
+/// ``Session/decompressionAlgorithms(_:limit:)`` alongside a genuinely custom algorithm:
 /// mixing forces `.urlSession` to take over `Accept-Encoding` entirely (see
 /// ``Session/decompressionAlgorithms(_:limit:)``'s documentation), which means it also has to
 /// decode everything in the list itself, including the natives this type stands in for.

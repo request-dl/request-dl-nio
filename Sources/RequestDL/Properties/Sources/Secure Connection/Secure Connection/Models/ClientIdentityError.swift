@@ -17,20 +17,20 @@ import protocol Foundation.LocalizedError
 /// `URLSession`-presentable identity, under the `.urlSession` executor (`Session.Executor`).
 ///
 /// Building that identity is a Keychain round-trip with no in-memory alternative on Apple
-/// platforms -- see <doc:Using-a-Client-Certificate-with-URLSession> for the full walkthrough,
+/// platforms. See <doc:Using-a-Client-Certificate-with-URLSession> for the full walkthrough,
 /// including the one-time Xcode project setting
 /// (``Reason/missingKeychainSharingEntitlement(operation:)``'s most common cause) most apps using
 /// ``Certificate``/``PrivateKey`` under this executor need.
 ///
 /// `RequestDLInternals`'s raw `Internals.RawBytesIdentityBuilder.Error`/
-/// `Internals.URLSessionIdentityPolicy.ConfigurationError` -- the internal, package-visible errors
-/// -- get caught where the session bootstraps and rewrapped into this type, following the same
+/// `Internals.URLSessionIdentityPolicy.ConfigurationError` (the internal, package-visible errors)
+/// get caught where the session bootstraps and rewrapped into this type, following the same
 /// split `SecureFileError` uses for `Internals.SecureFileLoadError`.
 public struct ClientIdentityError: Error, Sendable {
 
     /// The specific reason RequestDL could not build a `URLSession`-presentable identity.
     public enum Reason: Sendable {
-        /// `SecureConnection` configured only a `certificateChain` or only a `privateKey` -- mTLS
+        /// `SecureConnection` configured only a `certificateChain` or only a `privateKey`; mTLS
         /// under `.urlSession` needs both.
         case incompleteClientIdentity
 
@@ -41,7 +41,7 @@ public struct ClientIdentityError: Error, Sendable {
         case invalidCertificateData
 
         /// The configured private key isn't RSA (PKCS#1 or PKCS#8) or EC P-256/P-384/P-521 (SEC1
-        /// or PKCS#8) -- the shapes this executor recognizes. `header` describes what was
+        /// or PKCS#8), the shapes this executor recognizes. `header` describes what was
         /// actually supplied, to help spot the mismatch (e.g. an Ed25519 key, which has no
         /// `SecKeyCreateWithData` entry point at all).
         case unsupportedKeyFormat(header: String)
@@ -53,7 +53,7 @@ public struct ClientIdentityError: Error, Sendable {
         /// This app is missing the Keychain Sharing capability that writing a client
         /// certificate/private key into the Keychain requires. `operation` names the specific
         /// Keychain call that failed. This is almost always fixed by adding **Keychain Sharing**
-        /// under the affected target's Signing & Capabilities tab in Xcode -- see
+        /// under the affected target's Signing & Capabilities tab in Xcode. See
         /// <doc:Using-a-Client-Certificate-with-URLSession>.
         case missingKeychainSharingEntitlement(operation: String)
 
@@ -61,9 +61,9 @@ public struct ClientIdentityError: Error, Sendable {
         /// names the specific Keychain call, `status` is the underlying `OSStatus`.
         ///
         /// On a non-sandboxed macOS process (a bare command-line tool, for instance), this can
-        /// surface even with Keychain Sharing correctly configured -- see
+        /// surface even with Keychain Sharing correctly configured. See
         /// <doc:Using-a-Client-Certificate-with-URLSession>'s "Platforms" section for that
-        /// specific, still-unresolved gap -- adding Keychain Sharing again will not fix it.
+        /// specific, still-unresolved gap; adding Keychain Sharing again will not fix it.
         case keychainOperationFailed(operation: String, status: OSStatus)
 
         /// An internal Keychain query returned a value of an unexpected type. Not expected to
@@ -126,7 +126,7 @@ public struct ClientIdentityError: Error, Sendable {
 extension ClientIdentityError: LocalizedError {
 
     /// A message describing what went wrong, self-diagnosable without needing to have already
-    /// read <doc:Using-a-Client-Certificate-with-URLSession> -- this is what
+    /// read <doc:Using-a-Client-Certificate-with-URLSession>. This is what
     /// `error.localizedDescription` surfaces, the way most callers actually display a caught
     /// error.
     public var errorDescription: String? {

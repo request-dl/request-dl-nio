@@ -15,7 +15,7 @@ extension Internals {
 
     /// Caches `Internals.PACEvaluator.evaluate(...)`'s result per `(scriptURL, targetURL)` pair,
     /// so a burst of requests to the same host doesn't each pay for a fresh network fetch and
-    /// JavaScript evaluation of the same PAC script -- the cost the original "PAC is skipped
+    /// JavaScript evaluation of the same PAC script: the cost the original "PAC is skipped
     /// entirely" version of this resolver was written specifically to avoid paying per request.
     package actor PACProxyCache {
 
@@ -29,7 +29,7 @@ extension Internals {
         /// Matches `Internals.Storage`/`Internals.ClientManager`'s own default lifetime.
         private static let lifetime: Int64 = 5 * 60 * 1_000_000_000
 
-        /// Bounds one evaluation's fetch-and-execute time -- without this, an unreachable PAC
+        /// Bounds one evaluation's fetch-and-execute time. Without this, an unreachable PAC
         /// server would hang every request routed through it, not just the first. 30s, not a
         /// tighter bound: a PAC file is commonly hosted on a slow internal server reached over a
         /// real (if sluggish) corporate network, and this only ever costs one request's worth of
@@ -50,9 +50,11 @@ extension Internals {
         // MARK: - Internal methods
 
         /// The proxy `scriptURL`'s PAC script resolves `targetURL` to, or `nil` for a direct
-        /// connection -- including when evaluation itself fails (a stale/misconfigured PAC file,
-        /// an unreachable PAC server, a script that throws): failing safe to direct is the same
-        /// choice `Internals.SystemProxyResolver.firstResolution(in:)` already makes for any other
+        /// connection, including when evaluation itself fails (a stale/misconfigured PAC file,
+        /// an unreachable PAC server, a script that throws).
+        ///
+        /// Failing safe to direct is the same choice
+        /// `Internals.SystemProxyResolver.firstResolution(in:)` already makes for any other
         /// proxy-list entry it can't parse.
         package func proxy(forScriptURL scriptURL: URL, targetURL: URL) async -> Internals.Proxy? {
             let key = Key(scriptURL: scriptURL, targetURL: targetURL)
@@ -96,7 +98,7 @@ extension Internals {
 
         private struct Entry {
             let proxy: Internals.Proxy?
-            // Monotonic, not wall clock -- same rationale as `Internals.Storage`/
+            // Monotonic, not wall clock: same rationale as `Internals.Storage`/
             // `Internals.ClientManager`: a `Date`-based deadline moves if the user or NTP moves
             // the system clock, and this must not advance while the device is suspended either
             // way.

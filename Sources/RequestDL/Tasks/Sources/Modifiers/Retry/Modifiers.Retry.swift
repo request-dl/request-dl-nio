@@ -9,7 +9,7 @@ extension Modifiers {
     /// ``RetryPolicy`` while it keeps throwing.
     ///
     /// Each retry calls the original task's `result()` again, which re-resolves and re-sends the
-    /// whole request from scratch -- see ``RetryPolicy`` for when that is, and isn't, safe to do.
+    /// whole request from scratch. See ``RetryPolicy`` for when that is, and isn't, safe to do.
     /// A `CancellationError` is never retried, regardless of `policy`.
     ///
     public struct Retry<Input: Sendable>: RequestTaskModifier {
@@ -63,11 +63,13 @@ extension RequestTask {
     ///
     /// Retries the task according to `policy` when it throws.
     ///
-    /// Use this to smooth over transient failures -- a dropped connection, a momentary `5xx`
-    /// surfaced by a modifier like ``RequestTask/acceptOnlyStatusCode(_:)`` further down the
-    /// chain -- without hand-rolling a retry loop around `result()`. Because each retry re-runs
-    /// the request from scratch, only apply it where that is safe: see ``RetryPolicy`` for the
-    /// idempotency caveat before using it on requests with side effects.
+    /// Use this to smooth over transient failures, such as a dropped connection or a momentary
+    /// `5xx` surfaced by a modifier like ``RequestTask/acceptOnlyStatusCode(_:)`` further down
+    /// the chain, without hand-rolling a retry loop around `result()`.
+    ///
+    /// Because each retry re-runs the request from scratch, only apply it where that is safe:
+    /// see ``RetryPolicy`` for the idempotency caveat before using it on requests with side
+    /// effects.
     ///
     /// ```swift
     /// try await DataTask {

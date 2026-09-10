@@ -240,8 +240,8 @@ extension Internals {
                 ) {
                     return key
                 }
-                // CryptoKit already parsed and validated this as a well-formed EC private key --
-                // a rejection of its own X9.63 output is a genuine Security-framework failure,
+                // CryptoKit already parsed and validated this as a well-formed EC private key,
+                // so a rejection of its own X9.63 output is a genuine Security-framework failure,
                 // not a format-recognition miss.
                 let message = creationError.map { String(describing: $0.takeRetainedValue()) } ?? "unknown"
                 throw Error.secKeyCreationFailed(message)
@@ -445,13 +445,15 @@ extension Internals {
             let status = SecItemAdd(query as CFDictionary, &result)
 
             guard status == errSecSuccess else {
-                // The label-based delete right above this call is best-effort, not a guarantee --
-                // e.g. a previous process that never reached its own `remove(_:)` (killed rather
-                // than cleanly terminated). An item already present with this exact label means
-                // this exact certificate/key is already stored (Keychain's own duplicate-item
-                // constraint for these classes is content-derived: issuer+serial for
-                // certificates, key material for keys), which is exactly the state this call was
-                // trying to reach -- so this is success, not failure.
+                // The label-based delete right above this call is best-effort, not a guarantee
+                // (e.g. a previous process that never reached its own `remove(_:)`, killed rather
+                // than cleanly terminated).
+                //
+                // An item already present with this exact label means this exact certificate/key
+                // is already stored (Keychain's own duplicate-item constraint for these classes is
+                // content-derived: issuer+serial for certificates, key material for keys), which
+                // is exactly the state this call was trying to reach, so this is success, not
+                // failure.
                 if status == errSecDuplicateItem {
                     return
                 }

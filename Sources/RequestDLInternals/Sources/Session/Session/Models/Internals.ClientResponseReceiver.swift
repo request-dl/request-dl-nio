@@ -241,15 +241,16 @@ extension Internals {
         }
 
         /// Fails the streams as though the request had failed before this delegate was ever
-        /// invoked -- the outcome of a pre-flight rejection (`HTTPClient.Task.failedTask`, used
+        /// invoked: the outcome of a pre-flight rejection (`HTTPClient.Task.failedTask`, used
         /// e.g. for `.invalidRedirectConfiguration`/`.alreadyShutdown`), which resolves the
-        /// task's own `futureResult` without calling any delegate method. Left alone, that
-        /// failure is silent: this delegate never learns the request is over, so `head`/
-        /// `upload`/`download` never close and whoever is awaiting them hangs forever.
+        /// task's own `futureResult` without calling any delegate method.
+        ///
+        /// Left alone, that failure is silent: this delegate never learns the request is over,
+        /// so `head`/`upload`/`download` never close and whoever is awaiting them hangs forever.
         ///
         /// Guarded by the same lock/state machine as every real callback, so it is a no-op once
-        /// the delegate has actually been driven -- exactly the case a pre-flight rejection never
-        /// reaches, since it calls this delegate zero times.
+        /// the delegate has actually been driven, which is exactly the case a pre-flight
+        /// rejection never reaches, since it calls this delegate zero times.
         package func failIfNotStarted(_ error: Error) {
             decide {
                 guard _state == .idle, _reference == .none else {

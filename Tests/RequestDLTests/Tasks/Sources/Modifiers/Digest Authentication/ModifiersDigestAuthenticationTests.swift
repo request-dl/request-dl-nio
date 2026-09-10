@@ -61,7 +61,7 @@ struct ModifiersDigestAuthenticationTests {
 
     @Test
     func digestAuthentication_whenNoCredentialPassed_stillRetriesAndSucceeds() async throws {
-        // Given -- no DigestCredential constructed or passed anywhere; `.digestAuthentication()`
+        // Given: no DigestCredential constructed or passed anywhere; `.digestAuthentication()`
         // must create and thread its own through the environment for `DigestAuthentication` to
         // pick up.
         let attempts = InlineProperty(wrappedValue: 0)

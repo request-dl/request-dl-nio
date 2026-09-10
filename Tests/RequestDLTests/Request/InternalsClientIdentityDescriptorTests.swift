@@ -14,7 +14,7 @@ import Testing
 import Foundation
 import Security
 
-/// Covers `Internals.ClientIdentityDescriptor` -- what `BackgroundDownloadTask` persists for a
+/// Covers `Internals.ClientIdentityDescriptor`: what `BackgroundDownloadTask` persists for a
 /// client certificate (mTLS), and rebuilds fresh from disk on every challenge, live or after a
 /// relaunch alike.
 struct InternalsClientIdentityDescriptorTests {
@@ -154,15 +154,16 @@ struct InternalsClientIdentityDescriptorTests {
         #expect(decoded == descriptor)
     }
 
-    // MARK: - makeIdentity() -- real handshake, rebuilt identity
+    // MARK: - makeIdentity() (real handshake, rebuilt identity)
 
     /// The whole point of splitting this type out: an identity rebuilt from nothing but a
-    /// `Descriptor` -- just a certificate/key file path on disk, no `Internals.SecureConnection`,
-    /// no `Property` tree -- still has to genuinely authenticate against a real server requiring
-    /// a client certificate, not just hold the right bytes in memory. Known issue in this bare
-    /// SwiftPM test harness specifically (no Keychain Sharing entitlement), same gap
+    /// `Descriptor` (just a certificate/key file path on disk, no `Internals.SecureConnection`,
+    /// no `Property` tree) still has to genuinely authenticate against a real server requiring
+    /// a client certificate, not just hold the right bytes in memory.
+    ///
+    /// Known issue in this bare SwiftPM test harness specifically (no Keychain Sharing entitlement), same gap
     /// `RequestConfigurationURLSessionClientMTLSTests` already documents at the live-executor
-    /// layer -- this proves the same wiring one layer further removed (via a JSON round trip
+    /// layer. This proves the same wiring one layer further removed (via a JSON round trip
     /// simulating a relaunch), not a new one.
     @Test
     func rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake() async throws {
@@ -236,7 +237,7 @@ struct InternalsClientIdentityDescriptorTests {
     }
 }
 
-/// Answers both halves of an mTLS handshake by hand -- the client-certificate credential directly
+/// Answers both halves of an mTLS handshake by hand: the client-certificate credential directly
 /// (this suite already has the identity in hand), and the server-trust half via
 /// `Internals.ServerTrustPolicy`, the same hookup `BackgroundDownloads.Session`'s own challenge
 /// delegate uses for each.

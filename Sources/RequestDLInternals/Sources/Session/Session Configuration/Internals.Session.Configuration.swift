@@ -19,12 +19,13 @@ extension Internals.Session {
         package var proxy: Internals.Proxy?
         package var ignoreUncleanSSLShutdown: Bool = false
 
-        /// The tracer RequestDL itself uses to instrument requests -- started, ended, and populated
+        /// The tracer RequestDL itself uses to instrument requests: started, ended, and populated
         /// with attributes by `RawTask.result()`, not handed to `async-http-client`.
+        ///
         /// `async-http-client`'s own built-in tracing (`HTTPClient.Configuration.tracing.tracer`) is
         /// unconditionally suppressed in `build()` below: its span-start reads `ServiceContext
         /// .current` only after hopping onto a SwiftNIO `EventLoop`, which loses Swift's task-locals
-        /// and makes it impossible to parent the span correctly -- RequestDL owns the whole span
+        /// and makes it impossible to parent the span correctly. RequestDL owns the whole span
         /// lifecycle itself instead, one layer up, entirely within the caller's own task.
         ///
         /// Defaults to a no-op tracer rather than inheriting ambient global state: RequestDL's API is
@@ -36,18 +37,21 @@ extension Internals.Session {
         /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
         package var tracer: any Tracer = NoOpTracer()
 
-        /// Off by default on every platform -- decompression is opt-in, matching the fact that
-        /// the risky posture is decompressing unbounded, not leaving compressed bytes alone. This
-        /// used to differ on Apple platforms, matching URLSession's own forced, unconditional
-        /// auto-decompression there -- that divergence only existed because there was no way to
-        /// turn URLSession's transparent decoding off. `requiresManualURLSessionHandling` below
-        /// now takes over `Accept-Encoding` (`identity`) to get real `.disabled` parity on
-        /// `.urlSession` too, so the two platforms no longer need different defaults.
+        /// Off by default on every platform: decompression is opt-in, matching the fact that
+        /// the risky posture is decompressing unbounded, not leaving compressed bytes alone.
+        ///
+        /// This used to differ on Apple platforms, matching URLSession's own forced,
+        /// unconditional auto-decompression there; that divergence only existed because there
+        /// was no way to turn URLSession's transparent decoding off.
+        ///
+        /// `requiresManualURLSessionHandling` below now takes over `Accept-Encoding` (`identity`)
+        /// to get real `.disabled` parity on `.urlSession` too, so the two platforms no longer
+        /// need different defaults.
         package var decompression: Internals.Decompression = .disabled
 
         package var dnsOverride: [String: String] = [:]
 
-        /// Renamed from the old `networkFrameworkWaitForConnectivity` -- no longer a straight
+        /// Renamed from the old `networkFrameworkWaitForConnectivity`: no longer a straight
         /// forward to AsyncHTTPClient's own field of that name (which only took effect on
         /// NIOTransportServices). Consumed by `Internals.NetworkPathGate` instead, via
         /// `networkPathConstraints`, uniformly across every executor. See `build()`.
@@ -62,14 +66,14 @@ extension Internals.Session {
         package var maximumConcurrentConnections: Int?
 
         /// Soft hint: reorders `resolveExecutor()`'s pick among the executors this configuration
-        /// is already compatible with -- never forces one it isn't. `nil` leaves the default
+        /// is already compatible with; never forces one it isn't. `nil` leaves the default
         /// priority order (`.urlSession` › `.nioTransportServices` › `.nio`) untouched. See
         /// `Session.preferredExecutor(_:)`.
         package var preferredExecutor: Internals.Executor?
 
         /// Hard pin: `requireExecutor(_:)` throws `IncompatibleExecutorConfigurationError` rather
         /// than falling back when this is set and the configuration can't actually run on it.
-        /// `nil` means no pin -- resolution is free to fall back. See
+        /// `nil` means no pin: resolution is free to fall back. See
         /// `Session.requiredExecutor(_:)`.
         package var requiredExecutor: Internals.Executor?
 
@@ -117,7 +121,7 @@ extension Internals.Session {
                 configuration.httpVersion = httpVersion.build()
             }
 
-            // Always suppressed here, regardless of `tracer` above -- see the doc comment on that
+            // Always suppressed here, regardless of `tracer` above; see the doc comment on that
             // property for why `async-http-client`'s own built-in tracing is never engaged.
             configuration.tracing.tracer = NoOpTracer()
 
@@ -173,7 +177,7 @@ extension Internals.Session.Configuration {
     }
 
     /// The bucket-D fields that keep a configuration off `.urlSession` regardless of what
-    /// `secureConnection` allows -- these are AsyncHTTPClient/HTTP-layer concerns orthogonal to
+    /// `secureConnection` allows: these are AsyncHTTPClient/HTTP-layer concerns orthogonal to
     /// which TLS transport is underneath, so they're checked here rather than on `SecureConnection`.
     package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
         var reasons = secureConnection?.urlSessionIncompatibilityReasons() ?? []
@@ -202,12 +206,14 @@ extension Internals.Session.Configuration {
     /// The mirror image of `urlSessionIncompatibilityReasons()`: fields that keep a configuration
     /// off `.nio`/`.nioTransportServices` instead of off `.urlSession`. Today just a
     /// `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`, or a
-    /// third-party one answering the same way) -- neither NIO-backed executor goes through
-    /// CFNetwork, and `NIOHTTPCompression` has no decoder for whatever such an algorithm stands
-    /// in for, so there is no fallback of any kind for them to reach.
+    /// third-party one answering the same way).
+    ///
+    /// Neither NIO-backed executor goes through CFNetwork, and `NIOHTTPCompression` has no
+    /// decoder for whatever such an algorithm stands in for, so there is no fallback of any kind
+    /// for them to reach.
     ///
     /// - Important: Only consulted by `requireExecutor(_:)`, deliberately not by
-    /// `resolveExecutor()` -- see that method's own doc comment for why automatic resolution
+    /// `resolveExecutor()`; see that method's own doc comment for why automatic resolution
     /// tolerates this instead of failing over it.
     package func nonURLSessionExecutorIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
         guard
@@ -221,8 +227,8 @@ extension Internals.Session.Configuration {
     }
 
     /// `nil` when none of the four network-availability knobs were touched, so `RawTask.result()`
-    /// can skip `Internals.NetworkPathGate` -- and therefore skip ever starting
-    /// `Internals.NetworkPathMonitor` -- entirely for sessions that never use this API.
+    /// can skip `Internals.NetworkPathGate`, and therefore skip ever starting
+    /// `Internals.NetworkPathMonitor`, entirely for sessions that never use this API.
     package var networkPathConstraints: Internals.NetworkPathGate.Constraints? {
         guard
             allowsCellularAccess != nil
@@ -264,7 +270,7 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.enableNetworkFramework == rhs.enableNetworkFramework
             && lhs.maximumConcurrentConnections == rhs.maximumConcurrentConnections
             // `preferredExecutor` is a soft hint, so two configurations differing only there could
-            // arguably still share a pooled client -- but `requiredExecutor` is a hard pin, and
+            // arguably still share a pooled client, but `requiredExecutor` is a hard pin, and
             // `Internals.ClientManager` uses this `==` as its pooled-client cache key
             // (`item.sessionConfiguration == sessionConfiguration`). Omitting either would let a
             // request pinned to one executor silently reuse a pooled client resolved for another,
@@ -279,40 +285,45 @@ extension Internals.Session.Configuration {
 
     /// Picks the best executor this configuration actually supports, in priority order.
     ///
-    /// URLSession is tried first on Apple platforms -- best OS integration (background transfers,
-    /// ATS, HTTP/3 maturity) -- then NIOTransportServices, then plain NIO as the universal
+    /// URLSession is tried first on Apple platforms (best OS integration: background transfers,
+    /// ATS, HTTP/3 maturity), then NIOTransportServices, then plain NIO as the universal
     /// fallback. `.urlSession` and `.nioTransportServices` are independent capability checks, not
     /// a hierarchy: a field can be reachable on one and not the other (see
     /// `urlSessionIncompatibilityReasons()`/`SecureConnection.networkFrameworkIncompatibilityReasons()`).
-    /// This is a default ordering, not a fixed law -- `preferredExecutor`/`requiredExecutor`
+    /// This is a default ordering, not a fixed law: `preferredExecutor`/`requiredExecutor`
     /// (public API) let a caller override it.
     ///
     /// - Important: `requiredExecutor`, when set, is returned unconditionally, without
-    /// re-checking compatibility here -- that check already happened, and already threw if it
+    /// re-checking compatibility here: that check already happened, and already threw if it
     /// failed, in `requireExecutor(_:)` (called separately, before this, by `RawTask.result()`).
     /// A caller that reaches this method with `requiredExecutor` set and never called
-    /// `requireExecutor(_:)` first bypasses that guarantee -- same contract `Internals.ClientManager
+    /// `requireExecutor(_:)` first bypasses that guarantee; same contract `Internals.ClientManager
     /// .resolvedClient(provider:sessionConfiguration:)`'s own callers already have to honor.
     ///
     /// - Important: `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`, already
     /// public/released API predating `preferredExecutor`) is treated as an implicit
-    /// `preferredExecutor(.nioTransportServices)` when nothing else already set one. Needed
-    /// because this method's own NIOTransportServices-vs-plain-NIO answer now actually drives a
-    /// real request (rather than only `enableNetworkFramework`, read independently by
-    /// `Internals.ClientManager.client(provider:sessionConfiguration:)`): without the implicit
-    /// preference, `.urlSession`'s default first-priority position would otherwise silently take
-    /// over for anyone calling only `enableNetworkFramework(true)` -- a transport switch neither
-    /// this flag's existing callers nor its own doc comment ever signed up for. An explicit
-    /// `preferredExecutor` (any case, including `.urlSession`) still wins over this implicit one.
+    /// `preferredExecutor(.nioTransportServices)` when nothing else already set one.
+    ///
+    /// This is needed because this method's own NIOTransportServices-vs-plain-NIO answer now
+    /// actually drives a real request (rather than only `enableNetworkFramework`, read
+    /// independently by `Internals.ClientManager.client(provider:sessionConfiguration:)`):
+    /// without the implicit preference, `.urlSession`'s default first-priority position would
+    /// otherwise silently take over for anyone calling only `enableNetworkFramework(true)`, a
+    /// transport switch neither this flag's existing callers nor its own doc comment ever
+    /// signed up for.
+    ///
+    /// An explicit `preferredExecutor` (any case, including `.urlSession`) still wins over this
+    /// implicit one.
     ///
     /// - Important: A `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`)
     /// is deliberately **not** checked here. Automatic resolution has no explicit instruction to
     /// honor, so it degrades gracefully instead of failing a request outright over an algorithm
     /// that may never even be exercised (the response might never actually come back `br`-encoded
-    /// at all) -- worst case, `.nio`/`.nioTransportServices` gets picked and the existing
+    /// at all): worst case, `.nio`/`.nioTransportServices` gets picked and the existing
     /// manual-dispatch machinery reports the mismatch only if and when a `br` response actually
     /// arrives, exactly as it already does for every other unresolvable `Content-Encoding`.
-    /// `requireExecutor(_:)` is the one that enforces this eagerly -- an explicit
+    ///
+    /// `requireExecutor(_:)` is the one that enforces this eagerly: an explicit
     /// `.requiredExecutor(_:)` pin is a deliberate instruction, and honoring it silently despite a
     /// guaranteed failure would be the same silent-degradation bug class #289 already fixed for
     /// every other field here.
@@ -328,7 +339,7 @@ extension Internals.Session.Configuration {
         let effectivePreferredExecutor = preferredExecutor ?? (enableNetworkFramework ? .nioTransportServices : nil)
 
         // `effectivePreferredExecutor` only ever reorders among the candidates the two checks
-        // above already say are compatible -- it is never consulted on its own, and never
+        // above already say are compatible: it is never consulted on its own, and never
         // returned without the matching compatibility check passing first. `.nio` needs no such
         // check: it is the universal fallback (see this method's own `- Important` note above for
         // the one field that's still allowed to fail later rather than block that fallback here).
@@ -358,7 +369,7 @@ extension Internals.Session.Configuration {
     ///
     /// This is the direct fix for the bug class #289 closed: NIOTransportServices used to
     /// silently drop settings it couldn't carry over instead of failing loudly. A caller pinning
-    /// an executor explicitly is asking for a guarantee, not a best-effort -- ignoring what it
+    /// an executor explicitly is asking for a guarantee, not a best-effort: ignoring what it
     /// can't do here would just move that same silent-degradation bug to a new call site.
     package func requireExecutor(_ executor: Internals.Executor) throws {
         let reasons: [Internals.ExecutorIncompatibilityReason]
@@ -423,7 +434,7 @@ extension NIOSSL.TLSVersion {
 
 extension Internals.Session.Configuration {
 
-    /// `URLSession` counterpart to `build() -> HTTPClient.Configuration` -- built fresh per
+    /// `URLSession` counterpart to `build() -> HTTPClient.Configuration`: built fresh per
     /// `Internals.URLSessionClient` instance, mirroring how `build()` is also called once per
     /// `Internals.Client`.
     ///
@@ -449,24 +460,28 @@ extension Internals.Session.Configuration {
     /// Compression is environment/`Payload`-driven, carried on `RequestConfiguration` rather than
     /// pooled per session, so there's no field on this type for it to translate.
     /// `RequestConfiguration.applyCompression()` compresses `RequestBody` itself, once, before
-    /// either this method or `RequestConfiguration.build(eventLoop:)` ever runs -- every executor
+    /// either this method or `RequestConfiguration.build(eventLoop:)` ever runs: every executor
     /// receives an already-compressed body, so there is nothing left for this method to translate.
     func buildURLSessionConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
 
-        // `.ephemeral` only means "don't persist to disk" -- it still ships a real, if small,
+        // `.ephemeral` only means "don't persist to disk": it still ships a real, if small,
         // in-memory `URLCache` and defaults `requestCachePolicy` to `.useProtocolCachePolicy`,
         // which independently interprets standard HTTP caching semantics (including request
         // directives like `Cache-Control: only-if-cached`) against that cache before a request
-        // ever reaches the network. `Internals.CacheControl`/`DataCache` already own caching
-        // entirely on RequestDL's side; a second, invisible cache layer underneath URLSession
-        // does nothing useful and actively conflicts with it -- an `only-if-cached` request
-        // RequestDL's own logic correctly decided should hit the network (nothing configured
-        // locally to serve it from) would otherwise fail outright with `NSURLErrorDomain` -2000
-        // ("can't load from network"), since URLSession's own cache has nothing either and
-        // `.useProtocolCachePolicy` refuses to fall through past that. Ignoring URLSession's
-        // cache unconditionally routes every request to the network, where RequestDL's own
-        // cache/strategy logic already decided whether it should run at all.
+        // ever reaches the network.
+        //
+        // `Internals.CacheControl`/`DataCache` already own caching entirely on RequestDL's side;
+        // a second, invisible cache layer underneath URLSession does nothing useful and actively
+        // conflicts with it: an `only-if-cached` request RequestDL's own logic correctly decided
+        // should hit the network (nothing configured locally to serve it from) would otherwise
+        // fail outright with `NSURLErrorDomain` -2000 ("can't load from network"), since
+        // URLSession's own cache has nothing either and `.useProtocolCachePolicy` refuses to
+        // fall through past that.
+        //
+        // Ignoring URLSession's cache unconditionally routes every request to the network,
+        // where RequestDL's own cache/strategy logic already decided whether it should run at
+        // all.
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
 
         if let read = timeout.read {

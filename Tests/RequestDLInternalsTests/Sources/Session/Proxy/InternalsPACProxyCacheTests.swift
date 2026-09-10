@@ -35,7 +35,7 @@ struct InternalsPACProxyCacheTests {
         let targetURL = try #require(URL(string: "https://example.com/"))
         let cache = Internals.PACProxyCache()
 
-        // When -- first call fetches and evaluates for real.
+        // When: first call fetches and evaluates for real.
         let first = await cache.proxy(forScriptURL: server.scriptURL, targetURL: targetURL)
 
         // Then the server goes away entirely: a second call that still needs a fresh fetch would
@@ -67,7 +67,7 @@ struct InternalsPACProxyCacheTests {
 
         let cache = Internals.PACProxyCache()
 
-        // When -- two different target URLs against the same script, both uncached.
+        // When: two different target URLs against the same script, both uncached.
         let internalProxy = await cache.proxy(
             forScriptURL: server.scriptURL,
             targetURL: try #require(URL(string: "https://internal.example.com/"))
@@ -77,7 +77,7 @@ struct InternalsPACProxyCacheTests {
             targetURL: try #require(URL(string: "https://external.example.com/"))
         )
 
-        // Then -- the cache key includes the target URL, so this isn't just the first result
+        // Then: the cache key includes the target URL, so this isn't just the first result
         // reused for the second, different, URL.
         #expect(internalProxy == nil)
         #expect(externalProxy?.host == "127.0.0.1")
@@ -85,17 +85,17 @@ struct InternalsPACProxyCacheTests {
 
     @Test
     func proxy_whenEvaluationFails_cachesDirectRatherThanRetryingEveryCall() async throws {
-        // Given -- nothing listens on this port.
+        // Given: nothing listens on this port.
         let scriptURL = try #require(URL(string: "http://127.0.0.1:1/proxy.pac"))
         let targetURL = try #require(URL(string: "https://example.com/"))
         let cache = Internals.PACProxyCache()
 
-        // When -- two calls for the same unreachable script; if the failure weren't cached, both
+        // When: two calls for the same unreachable script. If the failure weren't cached, both
         // would separately pay the same (short but nonzero) connection-refused round trip.
         let first = await cache.proxy(forScriptURL: scriptURL, targetURL: targetURL)
         let second = await cache.proxy(forScriptURL: scriptURL, targetURL: targetURL)
 
-        // Then -- fails safe to direct, same as `Internals.SystemProxyResolver.firstResolution(in:)`
+        // Then: fails safe to direct, same as `Internals.SystemProxyResolver.firstResolution(in:)`
         // already does for any other unparseable entry, not thrown back out to the caller.
         #expect(first == nil)
         #expect(second == nil)
@@ -103,7 +103,7 @@ struct InternalsPACProxyCacheTests {
 }
 
 /// Serves exactly one PAC script to exactly one connection at a time. Mirrors
-/// `InternalsPACEvaluatorTests`'s identical, file-private helper -- not shared, since neither
+/// `InternalsPACEvaluatorTests`'s identical, file-private helper; not shared, since neither
 /// file is a dependency of the other.
 private final class LocalPACServer: @unchecked Sendable {
 
@@ -190,7 +190,7 @@ private final class LocalPACServer: @unchecked Sendable {
 private struct MissingListenerPortError: Error {}
 
 /// Bridges `NWListener.stateUpdateHandler` (called repeatedly) to a `CheckedContinuation` (usable
-/// exactly once) -- resumes on the first `.ready`/`.failed`, ignores every later call.
+/// exactly once): resumes on the first `.ready`/`.failed`, ignores every later call.
 private final class PortContinuationBox: @unchecked Sendable {
 
     private let lock = NSLock()

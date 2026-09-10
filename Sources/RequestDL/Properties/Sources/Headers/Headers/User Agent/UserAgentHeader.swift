@@ -46,7 +46,7 @@ public struct UserAgentHeader: Property {
     private let isDefault: Bool
 
     /// `ProcessInfo.processInfo.userAgent` bundle/version/OS lookups and string interpolation,
-    /// computed once per process rather than on every ``init()`` call -- none of its inputs
+    /// computed once per process rather than on every ``init()`` call: none of its inputs
     /// change while the process is running, and `init()` runs again every time a request's
     /// property tree is rebuilt (`_makeProperty` is called once per resolve), not once per app
     /// launch.

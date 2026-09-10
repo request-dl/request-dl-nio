@@ -7,13 +7,13 @@ import NIOCore
 extension Internals {
 
     /// Wraps `source` so each chunk is compressed as it's pulled, instead of draining the whole
-    /// source into memory before compression starts -- the actual upload begins as soon as the
+    /// source into memory before compression starts: the actual upload begins as soon as the
     /// first compressed bytes exist, and only ever holds one chunk's worth of the original body
     /// in memory at a time.
     ///
     /// Generic over its source (rather than hardwired to `Internals.BodySequence`) because
-    /// `RequestDLInternals` cannot depend back on `RequestDL`, where `RequestBody` -- the actual
-    /// source this wraps in practice -- is defined.
+    /// `RequestDLInternals` cannot depend back on `RequestDL`, where `RequestBody`, the actual
+    /// source this wraps in practice, is defined.
     package struct CompressingByteSequence<Source: AsyncSequence & Sendable>: Sendable, AsyncSequence
     where Source.Element == ByteBuffer {
 
@@ -35,7 +35,7 @@ extension Internals {
 
             // MARK: - Internal methods
 
-            /// Created lazily here, on the first call, rather than in `makeAsyncIterator()` --
+            /// Created lazily here, on the first call, rather than in `makeAsyncIterator()`:
             /// `AsyncIteratorProtocol.makeAsyncIterator()` isn't `throws`, and creating a
             /// `Compressor`'s stream (`Decompressor`'s own `callAsFunction()` counterpart) is
             /// allowed to fail.
@@ -45,7 +45,7 @@ extension Internals {
                 }
 
                 // Pulled into a local, non-`Optional` binding for the rest of this call, and
-                // written back below -- `CompressorStream`'s `callAsFunction`/`finish` are
+                // written back below, since `CompressorStream`'s `callAsFunction`/`finish` are
                 // `mutating`, so calling them through `self.stream` directly would need force
                 // unwrapping it on every use instead of just once, here, right after creating it.
                 var stream = try self.stream ?? algorithm()
@@ -70,7 +70,7 @@ extension Internals {
         // MARK: - Internal properties
 
         /// Exposed so `RequestBody.totalSize`/`.chunkSize` can report the *original*,
-        /// pre-compression body's own values as best-effort estimates -- see that type's own
+        /// pre-compression body's own values as best-effort estimates. See that type's own
         /// doc comments for why those, not the (not-yet-known) compressed size, are what a
         /// compressing body reports there.
         package let source: Source
