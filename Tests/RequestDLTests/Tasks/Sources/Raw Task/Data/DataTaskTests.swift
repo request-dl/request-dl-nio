@@ -224,7 +224,7 @@ struct DataTaskTests {
 
         // When / Then
         await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform -- see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
         ) {
             let data = try await DataTask {
                 BaseURL(localServer.baseURL)

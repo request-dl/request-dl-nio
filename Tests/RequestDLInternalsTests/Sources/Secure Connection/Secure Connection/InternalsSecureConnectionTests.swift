@@ -617,7 +617,7 @@ extension InternalsSecureConnectionTests {
 
         // When / Then
         await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform -- see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
         ) {
             let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
 

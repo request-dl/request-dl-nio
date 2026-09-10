@@ -212,7 +212,7 @@ struct InternalsClientIdentityDescriptorTests {
 
         // Then
         await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform -- see RequestConfigurationURLSessionClientMTLSTests's type doc comment",
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment",
             {
                 let (handle, intermediates) = try rebuiltClientIdentityDescriptor.makeIdentity()
                 defer { Internals.RawBytesIdentityBuilder.remove(handle) }

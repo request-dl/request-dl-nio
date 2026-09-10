@@ -49,7 +49,7 @@ extension Internals {
                         "-----BEGIN EC PRIVATE KEY-----" or PKCS#8 \
                         "-----BEGIN PRIVATE KEY-----"), unencrypted. A password-protected key is \
                         only supported for traditional PKCS#1 RSA PEM \
-                        ("-----BEGIN RSA PRIVATE KEY-----" with "Proc-Type"/"DEK-Info" headers) -- \
+                        ("-----BEGIN RSA PRIVATE KEY-----" with "Proc-Type"/"DEK-Info" headers), \
                         not PKCS#8's "-----BEGIN ENCRYPTED PRIVATE KEY-----", and not any \
                         password-protected EC key.
                         """
