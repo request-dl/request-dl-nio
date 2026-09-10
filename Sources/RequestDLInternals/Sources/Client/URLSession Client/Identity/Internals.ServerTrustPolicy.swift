@@ -24,7 +24,7 @@ extension Internals {
 
     package final class ServerTrustPolicy: @unchecked Sendable {
 
-        /// A `Codable`, `NIOSSL`-free snapshot of one `ServerTrustPolicy` -- what actually
+        /// A `Codable`, `NIOSSL`-free snapshot of one `ServerTrustPolicy`: what actually
         /// survives a relaunch. Certificates are carried as raw DER bytes rather than file paths,
         /// since the original source (`.bytes` or `.file`) has already been resolved once by the
         /// time this is built, and a persisted path could stop pointing at the same content (or
@@ -62,7 +62,7 @@ extension Internals {
                 }
             }
 
-            /// Mirrors `Internals.RevocationPolicy`'s two cases -- a separate `Codable` enum
+            /// Mirrors `Internals.RevocationPolicy`'s two cases: a separate `Codable` enum
             /// rather than making that type itself `Codable`, the same way `SPKIPinning.Policy`
             /// mirrors `Internals.SPKIPinningPolicy` instead of reusing it.
             package enum Revocation: String, Codable, Equatable, Sendable {
@@ -84,12 +84,12 @@ extension Internals {
                 }
             }
 
-            /// SPKI pinning, captured as raw digests rather than `Internals.SPKIHash` -- the
+            /// SPKI pinning, captured as raw digests rather than `Internals.SPKIHash`, since the
             /// latter type-erases its hash algorithm into a closure that can't survive `Codable`
             /// encoding. `algorithm` is restricted to the three named ones
             /// (`Internals.SPKIHash.KnownAlgorithm`) precisely so a `Descriptor` can recompute the
             /// matching digest of a peer's SPKI bytes after a relaunch with no
-            /// `Internals.SecureConnection` in hand -- see ``ServerTrustPolicy/resolve(from:)``,
+            /// `Internals.SecureConnection` in hand. See ``ServerTrustPolicy/resolve(from:)``,
             /// which throws rather than silently dropping a pin it can't capture this way.
             package struct SPKIPinning: Codable, Equatable, Sendable {
                 package let pins: [Pin]
@@ -130,7 +130,7 @@ extension Internals {
         }
 
         /// Thrown by ``descriptor`` when a configured SPKI pin can't be captured into a
-        /// `Descriptor` -- only ever `.unpersistableAlgorithm`, for a pin built with a
+        /// `Descriptor`. Only ever `.unpersistableAlgorithm`, for a pin built with a
         /// `Crypto.HashFunction` other than SHA-256/384/512
         /// (`Internals.SPKIHash.KnownAlgorithm`'s three cases). Live, in-process pinning still
         /// works fine with any such algorithm; only surviving a `BackgroundDownloadTask` relaunch
@@ -149,8 +149,8 @@ extension Internals {
 
         // MARK: - Private properties
 
-        /// The trust-root/SPKI pin decision itself, shared with `Internals.NIOTrustEvaluator` --
-        /// this type only owns what's specific to a `URLAuthenticationChallenge`: the `.none`
+        /// The trust-root/SPKI pin decision itself, shared with `Internals.NIOTrustEvaluator`.
+        /// This type only owns what's specific to a `URLAuthenticationChallenge`: the `.none`
         /// bypass, and `Descriptor` persistence for `BackgroundDownloadTask`.
         private let evaluation: Internals.DarwinTrustEvaluation
         private let certificateVerification: NIOSSL.CertificateVerification
@@ -179,13 +179,13 @@ extension Internals {
         }
 
         /// Rebuilds a policy from a previously captured ``descriptor``. A certificate that fails
-        /// to parse back out of its own DER bytes is dropped silently rather than thrown -- it
+        /// to parse back out of its own DER bytes is dropped silently rather than thrown; it
         /// was already valid DER when captured (`SecCertificateCopyData` never produces anything
         /// else), so this is not expected to happen in practice, and failing the whole challenge
         /// over one bad anchor would be a worse outcome than trusting one fewer root than
         /// intended.
         ///
-        /// - Note: Never carries a ``TrustDecisionObserver`` -- `Descriptor` is `Codable`-only, and
+        /// - Note: Never carries a ``TrustDecisionObserver``. `Descriptor` is `Codable`-only, and
         /// an observer is a live object reference with nothing left to reference after a relaunch.
         package convenience init(descriptor: Descriptor) {
             self.init(
@@ -207,7 +207,7 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        /// The `Codable` snapshot of this exact policy -- everything ``init(descriptor:)`` needs
+        /// The `Codable` snapshot of this exact policy: everything ``init(descriptor:)`` needs
         /// to rebuild an equivalent one later, with no `Internals.SecureConnection` in hand.
         ///
         /// - Throws: ``DescriptorError/unpersistableAlgorithm`` if `resolve(from:)` was given SPKI
@@ -231,7 +231,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// Resolves trust roots and SPKI pinning straight from a `SecureConnection` -- the same
+        /// Resolves trust roots and SPKI pinning straight from a `SecureConnection`, the same
         /// `Internals.TrustRoots`/`Internals.AdditionalTrustRoots` parsing
         /// `Internals.URLSessionIdentityPolicy` uses for its own server-trust half, shared rather
         /// than duplicated between the two. Every pin's digest is resolved eagerly (base64
@@ -299,7 +299,7 @@ extension Internals {
         }
 
         /// Answers a server-trust challenge. Anything else (client-certificate, or any other
-        /// authentication method) defers to the system's default handling -- this type only ever
+        /// authentication method) defers to the system's default handling; this type only ever
         /// speaks to the server side of a handshake.
         package func handle(
             challenge: URLAuthenticationChallenge,

@@ -9,7 +9,7 @@ import NIOCore
 /// ``SSLKeyLogger`` defines a method that can be used to log keys in the format expected by
 /// tools that support the `SSLKEYLOGFILE`.
 ///
-/// - Important: Reachable under `.nio` only -- this is a **permanent** limitation, not a gap
+/// - Important: Reachable under `.nio` only. This is a **permanent** limitation, not a gap
 /// awaiting a fix. Neither Network.framework nor `URLSession` exposes any public API for
 /// observing per-session TLS secrets; a session with a key logger configured that also resolves
 /// to `.nioTransportServices` crashes the process outright

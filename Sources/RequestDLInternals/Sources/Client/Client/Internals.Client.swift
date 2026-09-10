@@ -54,7 +54,7 @@ extension Internals {
 
         #if canImport(Darwin)
         /// The mTLS client identity's Keychain-item handle, when `SecureConnection.certificateChain`/
-        /// `.privateKey` were configured for a Network.framework connection -- held for as long as
+        /// `.privateKey` were configured for a Network.framework connection. Held for as long as
         /// this `Client` (and so this client's underlying `HTTPClient`) is alive, and released in
         /// `deinit`, mirroring `Internals.URLSessionIdentityPolicy`'s own identity lifecycle exactly.
         private let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?

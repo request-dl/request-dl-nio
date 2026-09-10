@@ -4,7 +4,7 @@
 
 import RequestDLInternals
 
-/// Observes each TLS trust-evaluation decision a secure connection makes -- for observability or
+/// Observes each TLS trust-evaluation decision a secure connection makes, for observability or
 /// security-audit logging.
 ///
 /// ``TrustDecisionObserver`` is purely informational: a ``TrustDecision`` has already been

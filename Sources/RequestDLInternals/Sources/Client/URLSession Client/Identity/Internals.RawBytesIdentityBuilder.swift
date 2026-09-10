@@ -104,16 +104,16 @@ extension Internals {
         }
 
         /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
-        /// down to DER -- or, when a password is set, decrypts it first. Only traditional PKCS#1
+        /// down to DER, or, when a password is set, decrypts it first. Only traditional PKCS#1
         /// RSA PEM (`-----BEGIN RSA PRIVATE KEY-----` with `Proc-Type`/`DEK-Info` headers) can
         /// actually be decrypted here, via `_RSA.Signing.PrivateKey(encryptedPEMRepresentation:
-        /// passphraseCallback:)` -- the only encrypted-key entry point anywhere in this package's
+        /// passphraseCallback:)`, the only encrypted-key entry point anywhere in this package's
         /// dependency graph. `swift-certificates` has none at all (its own private-key parsing
         /// only understands unencrypted PKCS#8 `PrivateKeyInfo`, for its own CSR/cert-signing
         /// needs). PKCS#8's `EncryptedPrivateKeyInfo` and every encrypted EC key (P-256/P-384/
-        /// P-521 -- `Crypto`'s own types have no passphrase-protected PEM import at all) still
-        /// throw `Error/unsupportedKeyFormat(_:)`, same as a `.der`-sourced password-protected key
-        /// (BoringSSL's own decryption call here only takes a PEM string, never raw DER).
+        /// P-521, since `Crypto`'s own types have no passphrase-protected PEM import at all) still
+        /// throw `Error/unsupportedKeyFormat(_:)`, same as a `.der`-sourced password-protected key:
+        /// BoringSSL's own decryption call here only takes a PEM string, never raw DER.
         package static func privateKeyDER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
             switch privateKeySource {
             case .privateKey(let privateKey):
@@ -147,7 +147,7 @@ extension Internals {
 
         /// Decrypts a password-protected traditional PKCS#1 RSA PEM key via BoringSSL
         /// (`_RSA.Signing.PrivateKey(encryptedPEMRepresentation:passphraseCallback:)`, from
-        /// `_CryptoExtras`) and returns its plain DER -- ready for `secKey(fromDER:)`'s own
+        /// `_CryptoExtras`) and returns its plain DER, ready for `secKey(fromDER:)`'s own
         /// PKCS#1/PKCS#8 cascade exactly like any other RSA key. Fails closed on anything that
         /// entry point can't parse: a wrong passphrase, an EC key, or a PKCS#8-encrypted one.
         private static func decryptedRSAPrivateKeyDER(
@@ -184,7 +184,7 @@ extension Internals {
         /// Strips PEM armor down to the base64-decoded DER payload, for any of the three headers
         /// this executor recognizes for a private key: PKCS#1 RSA (`RSA PRIVATE KEY`), SEC1 EC
         /// (`EC PRIVATE KEY`), and PKCS#8 (`PRIVATE KEY`, itself wrapping either RSA or EC). Which
-        /// header matched doesn't change what happens next -- ``secKey(fromDER:)`` classifies the
+        /// header matched doesn't change what happens next: ``secKey(fromDER:)`` classifies the
         /// DER content itself, not the PEM label around it.
         package static func privateKeyDER(fromPEM pemData: Data) throws -> Data {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
@@ -220,14 +220,14 @@ extension Internals {
         /// Builds a `SecKey` from DER-encoded private key bytes of unknown shape, trying each
         /// interpretation Security/CryptoKit can actually consume, in order:
         ///
-        /// 1. Bare PKCS#1 (`RSAPrivateKey`) -- what `SecKeyCreateWithData` wants for RSA directly.
-        /// 2. EC, either bare SEC1 (`ECPrivateKey`) or PKCS#8-wrapped -- CryptoKit's DER
+        /// 1. Bare PKCS#1 (`RSAPrivateKey`): what `SecKeyCreateWithData` wants for RSA directly.
+        /// 2. EC, either bare SEC1 (`ECPrivateKey`) or PKCS#8-wrapped. CryptoKit's DER
         ///    initializer accepts both shapes for whichever curve it is (P-256/P-384/P-521 tried
         ///    in that order, since nothing here is told the curve ahead of time), and its
         ///    `x963Representation` (`04 || X || Y || private scalar`) is what `SecKeyCreateWithData`
-        ///    wants for EC -- there is no direct entry point for SEC1/PKCS#8 DER the way there is
+        ///    wants for EC. There is no direct entry point for SEC1/PKCS#8 DER the way there is
         ///    for RSA's PKCS#1.
-        /// 3. PKCS#8-wrapped RSA -- the one shape Security has no direct entry point for at all,
+        /// 3. PKCS#8-wrapped RSA: the one shape Security has no direct entry point for at all,
         ///    so the inner PKCS#1 payload is unwrapped by hand first.
         ///
         /// Anything else (Ed25519, X25519, malformed input, ...) is rejected.
@@ -279,7 +279,7 @@ extension Internals {
         }
 
         /// Tries `der` as a bare SEC1 `ECPrivateKey` or a PKCS#8 envelope wrapping one, one curve
-        /// size at a time -- CryptoKit's DER initializer accepts both shapes for the same call, so
+        /// size at a time. CryptoKit's DER initializer accepts both shapes for the same call, so
         /// there's no need to distinguish them here, and it derives the public point from the
         /// private scalar when SEC1's own (optional) public-key field is absent, which
         /// `SecKeyCreateWithData` has no way to do on its own.
@@ -298,7 +298,7 @@ extension Internals {
 
         /// Unwraps PKCS#8's `PrivateKeyInfo ::= SEQUENCE { version INTEGER, algorithm SEQUENCE,
         /// privateKey OCTET STRING, ... }` down to its `privateKey` field. Doesn't check
-        /// `algorithm`'s OID -- the caller only keeps the result if it goes on to parse as PKCS#1
+        /// `algorithm`'s OID: the caller only keeps the result if it goes on to parse as PKCS#1
         /// RSA, so a PKCS#8-wrapped EC key (already handled by reading the *outer* PKCS#8 bytes
         /// directly in `ecX963Representation(fromDER:)`) or anything else simply fails that
         /// caller's own `SecKeyCreateWithData` check instead of being misidentified here.
@@ -318,7 +318,7 @@ extension Internals {
         /// There is no public API on iOS to pair a certificate and a private key into a
         /// `SecIdentity` purely in memory (`SecIdentityCreateWithCertificate` is macOS-only). The
         /// only public path is a Keychain round-trip: add both items, then query them back
-        /// together as a single `kSecClassIdentity` match -- which is exactly what this does,
+        /// together as a single `kSecClassIdentity` match. That's exactly what this does,
         /// deliberately avoiding the macOS-only shortcut so the result generalizes to iOS/tvOS/
         /// watchOS.
         package static func makeIdentity(
@@ -435,7 +435,7 @@ extension Internals {
         /// Removes both Keychain items an identity built by
         /// ``makeIdentity(certificateDER:privateKeyDER:)`` was built from.
         /// `Internals.URLSessionIdentityPolicy` calls this from `deinit`, once the identity is no
-        /// longer needed -- not after every request.
+        /// longer needed, not after every request.
         package static func remove(_ handle: Handle) {
             #if os(macOS)
             let useDataProtectionKeychain = false
@@ -477,7 +477,7 @@ extension Internals {
             }
         }
 
-        /// Lowercase hex SHA-256 of `data` -- deterministic Keychain item labeling only, not a
+        /// Lowercase hex SHA-256 of `data`, for deterministic Keychain item labeling only, not a
         /// security boundary, so `CryptoKit` (always available on Darwin) is enough; no need for
         /// a constant-time comparison anywhere this is used.
         private static func hexDigest(_ data: Data) -> String {
@@ -489,7 +489,7 @@ extension Internals {
     }
 }
 
-/// Minimal DER TLV (tag-length-value) reader -- only as much as unwrapping a PKCS#8
+/// Minimal DER TLV (tag-length-value) reader, only as much as unwrapping a PKCS#8
 /// `PrivateKeyInfo` envelope needs, not a general-purpose ASN.1 parser. Bounds-checked
 /// throughout: malformed input throws rather than trapping.
 private struct DERReader {
@@ -507,8 +507,8 @@ private struct DERReader {
     }
 
     /// Reads one TLV whose tag must match `tag` and returns its content bytes. Supports both
-    /// short-form and long-form DER lengths -- PKCS#8 envelopes routinely exceed the 127-byte
-    /// short-form limit once a real RSA key is inside.
+    /// short-form and long-form DER lengths, since PKCS#8 envelopes routinely exceed the
+    /// 127-byte short-form limit once a real RSA key is inside.
     mutating func read(tag: UInt8) throws -> [UInt8] {
         guard offset < bytes.count, bytes[offset] == tag else {
             throw MalformedDERError()

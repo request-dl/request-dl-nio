@@ -77,15 +77,15 @@ extension Internals {
         /// `skipsHostnameVerification` swaps in `SecPolicyCreateSSL(true, nil)`: a real SSL server
         /// policy (still checks the server-auth `extendedKeyUsage` and everything else a
         /// certificate presented for TLS server auth normally must satisfy), just without the
-        /// hostname match. Deliberately *not* `SecPolicyCreateBasicX509()` -- that's a bare X.509
-        /// chain-of-trust policy with no purpose/EKU checks at all, a wider relaxation than
-        /// `.noHostnameVerification` ever asked for: it would accept a certificate lacking the
-        /// server-auth `extendedKeyUsage` that `SecPolicyCreateSSL(true, nil)` correctly rejects
-        /// (see `InternalsDarwinTrustEvaluationTests`'s
+        /// hostname match. Deliberately *not* `SecPolicyCreateBasicX509()`, a bare X.509
+        /// chain-of-trust policy with no purpose/EKU checks at all: that would be a wider
+        /// relaxation than `.noHostnameVerification` ever asked for, accepting a certificate
+        /// lacking the server-auth `extendedKeyUsage` that `SecPolicyCreateSSL(true, nil)`
+        /// correctly rejects (see `InternalsDarwinTrustEvaluationTests`'s
         /// `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`).
         ///
         /// `revocationPolicy`, when set, is appended to whichever policy array results from the
-        /// above -- `SecTrustCopyPolicies` reads `trust`'s current array first (its default SSL/
+        /// above. `SecTrustCopyPolicies` reads `trust`'s current array first (its default SSL/
         /// X.509 policy, when `skipsHostnameVerification` didn't just replace it) rather than
         /// dropping it, since `SecTrustSetPolicies` replaces the whole array rather than appending
         /// to it.
@@ -116,15 +116,15 @@ extension Internals {
             }
         }
 
-        /// The accept/reject decision, given `chainIsTrusted` -- the caller's own
+        /// The accept/reject decision, given `chainIsTrusted`, the caller's own
         /// `SecTrustEvaluate(WithError|AsyncWithError)` result for `trust`. Notifies `observer`,
         /// when configured, with the outcome either way, before returning it.
         ///
-        /// `pins.isEmpty` means nothing is configured to pin against -- chain validity by itself
+        /// `pins.isEmpty` means nothing is configured to pin against, so chain validity by itself
         /// is the whole check then. Otherwise every certificate in `trust`'s chain is checked, leaf
-        /// and intermediates alike -- OWASP's recommended backup-pin practice, pinning an
-        /// intermediate CA (which rotates far less often than the leaf) alongside or instead of it
-        /// -- and a mismatch only rejects under `isStrict`.
+        /// and intermediates alike (OWASP's recommended backup-pin practice, pinning an
+        /// intermediate CA, which rotates far less often than the leaf, alongside or instead of
+        /// it), and a mismatch only rejects under `isStrict`.
         package func evaluate(chain trust: SecTrust, chainIsTrusted: Bool) -> Bool {
             guard chainIsTrusted else {
                 observer?(TrustDecision(isTrusted: false, pinsMatched: nil))
@@ -148,13 +148,13 @@ extension Internals {
         // MARK: - Private methods
 
         /// Every certificate's SPKI (SubjectPublicKeyInfo) structure in `trust`'s chain,
-        /// DER-encoded -- what a pin's digest is computed over. Reuses NIOSSL's own
+        /// DER-encoded: what a pin's digest is computed over. Reuses NIOSSL's own
         /// `NIOSSLPublicKey.toSPKIBytes()` on each certificate's DER bytes rather than
         /// reconstructing the SPKI ASN.1 wrapper from a bare `SecKey` export by hand, so a pin
         /// configured once produces the identical digest regardless of which executor
         /// (`.urlSession`, `.nio`, `.nioTransportServices`) ends up carrying the connection.
         /// Certificates that don't round-trip through NIOSSL are dropped rather than failing the
-        /// whole chain -- not expected in practice for a trust `SecTrustEvaluate...` already
+        /// whole chain; that isn't expected in practice for a trust `SecTrustEvaluate...` already
         /// accepted moments earlier.
         private static func chainSPKIDERBytes(of trust: SecTrust) -> [Data] {
             guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate] else {

@@ -384,9 +384,9 @@ extension InternalsSecureConnectionTests {
     }
 
     /// Regression coverage for the fields AsyncHTTPClient's NIOTransportServices bridge either
-    /// traps on (`keyLogger`, with no custom verification callback able to work around it -- unlike
+    /// traps on (`keyLogger`, with no custom verification callback able to work around it, unlike
     /// `.noHostnameVerification`, see the doc comment below) or silently drops (everything else
-    /// here -- they're read from the built `TLSConfiguration` and then never looked at again) when
+    /// here; they're read from the built `TLSConfiguration` and then never looked at again) when
     /// running on Network.framework. Each one must flip `isCompatibleWithNetworkFramework` to
     /// `false` so the caller falls back to plain NIO instead of crashing or losing the setting
     /// without any signal. `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning),
@@ -434,7 +434,7 @@ extension InternalsSecureConnectionTests {
     /// and `.noHostnameVerification` all reach Network.framework: mTLS through
     /// `tlsLocalIdentityNetworkFramework`, and the other three through
     /// `Internals.NIOTrustEvaluator` installing `tlsCustomVerificationNetworkFramework` on its own,
-    /// independently of whether SPKI pinning is also configured -- `skipsHostnameVerification`
+    /// independently of whether SPKI pinning is also configured. `skipsHostnameVerification`
     /// additionally swaps in a hostname-less trust policy for the `.noHostnameVerification` case
     /// specifically. Mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible`
     /// below, but for the Network.framework-facing reason list.
@@ -481,7 +481,7 @@ extension InternalsSecureConnectionTests {
     }
 
     /// Mirrors `secureConnection_whenNetworkFrameworkUnsupportedFieldSet_isIncompatible` above,
-    /// but for the URLSession-facing reason list -- deliberately a *different* field set, since
+    /// but for the URLSession-facing reason list: deliberately a *different* field set, since
     /// the two executors aren't a strict hierarchy of each other.
     @Test(
         arguments: [
@@ -562,12 +562,12 @@ extension InternalsSecureConnectionTests {
         #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.keyLogger))
     }
 
-    /// Regression coverage: `build()` used to call `makeLocalIdentityForNetworkFramework()` -- a
-    /// Keychain round-trip -- unconditionally on Darwin whenever both `certificateChain`/
+    /// Regression coverage: `build()` used to call `makeLocalIdentityForNetworkFramework()`, a
+    /// Keychain round-trip, unconditionally on Darwin whenever both `certificateChain`/
     /// `privateKey` were configured, even for a caller that was never going to run over
     /// Network.framework at all. That meant configuring mTLS for `.urlSession`/
     /// `.nioTransportServices` silently broke a `.nio`-pinned request too, on any process without
-    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness) -- see
+    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness). See
     /// `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)` specifically
     /// to avoid this and used to hit it anyway.
     @Test
@@ -595,11 +595,11 @@ extension InternalsSecureConnectionTests {
 
     /// Regression coverage for a crash: `TLSConfiguration.getNWProtocolTLSOptions()`
     /// (AsyncHTTPClient's NIOTransportServices bridge) `preconditionFailure`s the instant
-    /// `certificateChain`/`privateKey` is non-empty, unconditionally -- so leaving either set,
+    /// `certificateChain`/`privateKey` is non-empty, unconditionally, so leaving either set,
     /// even alongside a correctly-built `localIdentityHandle`, would crash the process the moment
     /// this configuration actually ran over `.nioTransportServices`. `build()` bundles that
     /// `TLSConfiguration` and the Network.framework identity into one throwing call, so this can't
-    /// inspect the former without the latter's Keychain round-trip also succeeding -- a known gap
+    /// inspect the former without the latter's Keychain round-trip also succeeding, a known gap
     /// on this bare SwiftPM test harness (see `InternalsClientIdentityDescriptorTests`) unrelated
     /// to what's actually being checked here, hence the `withKnownIssue` wrapper.
     @Test

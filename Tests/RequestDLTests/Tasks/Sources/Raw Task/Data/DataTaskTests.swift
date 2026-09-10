@@ -185,10 +185,10 @@ struct DataTaskTests {
     /// Regression coverage for the crash `Internals.SecureConnection.build(isCompatibleWithNetworkFramework:)`
     /// fixed: `certificateChain`/`privateKey` used to always land on the same `TLSConfiguration`
     /// AsyncHTTPClient's NIOTransportServices bridge also reads, which `preconditionFailure`s the
-    /// instant either is non-empty -- regardless of the Network.framework-native identity also
+    /// instant either is non-empty, regardless of the Network.framework-native identity also
     /// being supplied correctly via `tlsLocalIdentityNetworkFramework`. Reachable in practice via
     /// `enableNetworkFramework(true)`/`preferredExecutor(.nioTransportServices)`/this test's own
-    /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured -- nothing in
+    /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured; nothing in
     /// `networkFrameworkIncompatibilityReasons()` ever stood in the way, since mTLS is genuinely
     /// supported there, just through a different channel.
     ///
@@ -306,7 +306,7 @@ struct DataTaskTests {
     /// custom verification callback is installed). Paired with
     /// `dataTask_whenNoHostnameVerificationSetWithoutTrustRoots_stillRejectsUntrustedCertificate`
     /// below (chain trust still enforced with no `TrustRoots`), this proves the fix skips exactly
-    /// the hostname check and nothing more -- `Internals.NIOTrustEvaluator` swaps the `SecTrust`'s
+    /// the hostname check and nothing more. `Internals.NIOTrustEvaluator` swaps the `SecTrust`'s
     /// policy for a hostname-less one but still anchors it on `TrustRoots`/`additionalTrustRoots`
     /// and still evaluates the chain.
     @Test
@@ -359,7 +359,7 @@ struct DataTaskTests {
 
     /// The other half of the pair above: with no `TrustRoots` to vouch for this self-signed test
     /// certificate, the handshake must still fail even though `.noHostnameVerification` turns off
-    /// hostname matching -- proving that flag alone never became "trust everything."
+    /// hostname matching, proving that flag alone never became "trust everything."
     @Test
     func dataTask_whenNoHostnameVerificationSetWithoutTrustRoots_stillRejectsUntrustedCertificate() async throws {
         // Given

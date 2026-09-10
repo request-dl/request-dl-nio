@@ -12,7 +12,7 @@ import struct Foundation.Data
 
 extension NIOSSLCertificate {
 
-    /// The DER-encoded SubjectPublicKeyInfo structure of this certificate's public key -- what an
+    /// The DER-encoded SubjectPublicKeyInfo structure of this certificate's public key: what an
     /// `Internals.SPKIHash` pin's digest is computed over. `nil` if the public key can't be
     /// extracted or exported, which isn't expected for a certificate NIOSSL has already parsed.
     package func spkiDERBytes() -> Data? {

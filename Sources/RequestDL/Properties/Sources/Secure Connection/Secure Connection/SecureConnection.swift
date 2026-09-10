@@ -166,12 +166,12 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the key log object for the secure connection.
     ///
-    /// - Important: Reachable under ``Session/Executor/nio`` only -- this is a **permanent**
+    /// - Important: Reachable under ``Session/Executor/nio`` only. This is a **permanent**
     /// limitation of the underlying platforms, not a gap awaiting a fix. Neither Network.framework
     /// nor `URLSession` exposes any public API for observing per-session TLS secrets, so
     /// ``Session/requiredExecutor(_:)``/``Session/preferredExecutor(_:)`` steer a session with a
     /// key logger configured away from both ``Session/Executor/nioTransportServices`` and
-    /// ``Session/Executor/urlSession`` -- letting that combination reach the OS layer at all would
+    /// ``Session/Executor/urlSession``. Letting that combination reach the OS layer at all would
     /// crash the process outright under Network.framework.
     ///
     /// - Parameter keyLogger: The `SSLKeyLogger` object.
@@ -233,7 +233,7 @@ public struct SecureConnection<Content: Property>: Property {
     /// Sets the revocation-checking policy for the secure connection.
     ///
     /// - Important: Reachable on Apple platforms only (``Session/Executor/nio``,
-    /// ``Session/Executor/nioTransportServices``, ``Session/Executor/urlSession``) -- NIOSSL/
+    /// ``Session/Executor/nioTransportServices``, ``Session/Executor/urlSession``). NIOSSL/
     /// BoringSSL implements no revocation checking of its own, so this has no effect at all on
     /// Linux.
     ///
@@ -244,10 +244,10 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets an observer that's notified of each TLS trust-evaluation decision this secure
-    /// connection makes -- for observability or security-audit logging, purely informational.
+    /// connection makes, for observability or security-audit logging, purely informational.
     ///
     /// - Important: See ``TrustDecisionObserver``'s own doc comment for exactly when this fires
-    /// under each executor -- it's not every connection.
+    /// under each executor; it's not every connection.
     ///
     /// - Parameter observer: The observer to notify of each trust decision.
     /// - Returns: A modified `SecureConnection` with the trust decision observer set.

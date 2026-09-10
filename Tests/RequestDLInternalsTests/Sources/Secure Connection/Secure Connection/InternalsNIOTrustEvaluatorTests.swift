@@ -175,12 +175,12 @@ struct InternalsNIOTrustEvaluatorTests {
         """
 
     /// `openssl x509 -in leaf.crt -pubkey -noout | openssl pkey -pubin -outform der | openssl
-    /// dgst -sha256 -binary | base64` -- computed independently of any code under test.
+    /// dgst -sha256 -binary | base64`, computed independently of any code under test.
     private static let leafSPKIPinBase64 = "IikJpHu0p+Tm4dpFCXRFXMkLLYsRjwePLjgvHYMYnJw="
 
     /// Same recipe as `leafSPKIPinBase64`, run against `intermediate.crt`.
     private static let intermediateSPKIPinBase64 = "0715ggkh3Sde/vilUaD01AjS05rQT2NopWpK584Krrc="
 
-    /// `openssl rand -base64 32` -- doesn't match any certificate in the chain, on purpose.
+    /// `openssl rand -base64 32`, doesn't match any certificate in the chain, on purpose.
     private static let unrelatedPinBase64 = "tH0BF9jVlk3y2e1huTk41UtsPgrhf4cFbJLczhAfH3g="
 }

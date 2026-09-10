@@ -17,11 +17,11 @@ import FoundationEssentials
 import Foundation
 #endif
 
-/// Covers `Internals.RawBytesIdentityBuilder.secKey(fromDER:)`'s own format classification --
-/// RSA/PKCS#1, RSA/PKCS#8, EC/SEC1, EC/PKCS#8 -- independent of the Keychain round trip
+/// Covers `Internals.RawBytesIdentityBuilder.secKey(fromDER:)`'s own format classification,
+/// namely RSA/PKCS#1, RSA/PKCS#8, EC/SEC1, EC/PKCS#8, independent of the Keychain round trip
 /// `makeIdentity(certificateDER:privateKeyDER:)` wraps around it. That round trip is a confirmed,
 /// unconditional `withKnownIssue` on this SwiftPM test harness regardless of key type (no Keychain
-/// Sharing entitlement -- see `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment),
+/// Sharing entitlement; see `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment),
 /// so testing the actual new logic here, which needs no Keychain access at all
 /// (`SecKeyCreateWithData` builds an ephemeral, non-persistent `SecKey` purely in memory), is what
 /// actually proves PKCS#8/EC support works, in an environment where the full round trip can't.
@@ -29,7 +29,7 @@ import Foundation
 /// Test fixtures are generated fresh per run rather than checked in as static files: RSA keys via
 /// `SecKeyCreateRandomKey` (no Keychain persistence needed since `kSecAttrIsPermanent` isn't set),
 /// EC keys via `CryptoKit`. `DERWriter`/PKCS#8- and SEC1-shaping below is the deliberate inverse of
-/// production's own minimal `DERReader` -- confirmed correct against `SecKeyCreateWithData`/
+/// production's own minimal `DERReader`, confirmed correct against `SecKeyCreateWithData`/
 /// `CryptoKit`'s own encoders, not just internally consistent with itself.
 struct InternalsRawBytesIdentityBuilderTests {
 
@@ -83,10 +83,10 @@ struct InternalsRawBytesIdentityBuilderTests {
 
     /// The encrypted/plain pair is a real key, generated once with `openssl genrsa -aes256
     /// -passout pass:\(Self.encryptedRSAPassword) 2048` and `openssl rsa -in <that> -passin
-    /// pass:... ` -- not hand-assembled the way the plain-PKCS#1/SEC1 fixtures above are, since
+    /// pass:... `. Not hand-assembled the way the plain-PKCS#1/SEC1 fixtures above are, since
     /// there's no in-process way to produce the legacy `Proc-Type`/`DEK-Info` encrypted PEM form
-    /// at all (`_RSA.Signing.PrivateKey` -- what production itself decrypts this with -- has no
-    /// encrypt-to-PEM direction, only decrypt-from-PEM).
+    /// at all: `_RSA.Signing.PrivateKey`, what production itself decrypts this with, has no
+    /// encrypt-to-PEM direction, only decrypt-from-PEM.
     @Test
     func privateKeyDER_whenGivenPasswordProtectedPKCS1RSAPEM_decryptsToSameDERAsThePlainKey() throws {
         let source = Internals.PrivateKeySource.privateKey(
@@ -123,8 +123,8 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
 
-    /// `_RSA.Signing.PrivateKey(encryptedPEMRepresentation:passphraseCallback:)` -- the only
-    /// encrypted-key entry point available -- takes a PEM string, never raw DER, so a
+    /// `_RSA.Signing.PrivateKey(encryptedPEMRepresentation:passphraseCallback:)`, the only
+    /// encrypted-key entry point available, takes a PEM string, never raw DER, so a
     /// password-protected key sourced as `.der` has no decryption path at all and must fail
     /// before even attempting one.
     @Test
@@ -157,7 +157,7 @@ struct InternalsRawBytesIdentityBuilderTests {
         #expect(Self.keySizeInBits(of: secKey) == curve.keySizeInBits)
     }
 
-    /// SEC1's own `publicKey` field is optional -- a real-world EC key can omit it, and
+    /// SEC1's own `publicKey` field is optional: a real-world EC key can omit it, and
     /// `secKey(fromDER:)` (via CryptoKit) must derive the public point from the private scalar
     /// alone rather than require it. Distinct from the test above, not redundant with it.
     @Test(arguments: [Self.Curve.p256, .p384, .p521])
@@ -211,7 +211,7 @@ struct InternalsRawBytesIdentityBuilderTests {
     }
 
     /// Curve25519 has no `SecKeyCreateWithData` entry point at all, and CryptoKit's `Curve25519`
-    /// types have no DER export to even attempt -- so a real, well-formed key of a genuinely
+    /// types have no DER export to even attempt, so a real, well-formed key of a genuinely
     /// unsupported kind is exercised here via its raw scalar instead, confirming the cascade
     /// fails closed on it rather than misidentifying it as something else.
     @Test
@@ -322,7 +322,7 @@ extension InternalsRawBytesIdentityBuilderTests {
         """
 
     /// The same key as ``encryptedRSAPEM``, decrypted once via
-    /// `openssl rsa -in encrypted.pem -passin pass:testpassword123` -- kept alongside it as the
+    /// `openssl rsa -in encrypted.pem -passin pass:testpassword123`, kept alongside it as the
     /// independent "known good" DER these tests compare the decrypted result against.
     fileprivate static let plainRSAPEM = """
         -----BEGIN RSA PRIVATE KEY-----
@@ -355,7 +355,7 @@ extension InternalsRawBytesIdentityBuilderTests {
         """
 
     /// PKCS#8's `PrivateKeyInfo ::= SEQUENCE { version INTEGER, algorithm SEQUENCE, privateKey
-    /// OCTET STRING }`, hand-assembled -- the deliberate inverse of production's own `DERReader`
+    /// OCTET STRING }`, hand-assembled, the deliberate inverse of production's own `DERReader`
     /// unwrap, confirmed correct via the round trip these tests actually run, not just by
     /// construction.
     fileprivate static func pkcs8(wrapping innerKeyDER: Data, algorithmOID: [UInt8]) -> Data {
@@ -371,7 +371,7 @@ extension InternalsRawBytesIdentityBuilderTests {
 
     /// SEC1's `ECPrivateKey ::= SEQUENCE { version INTEGER, privateKey OCTET STRING, [0]
     /// parameters ECParameters OPTIONAL, [1] publicKey BIT STRING OPTIONAL }`. `publicKeyPoint`
-    /// (X9.63 `04 || X || Y`) is genuinely optional, matching the real ASN.1 grammar -- see
+    /// (X9.63 `04 || X || Y`) is genuinely optional, matching the real ASN.1 grammar. See
     /// `secKey_whenGivenBareSEC1ECDERWithoutPublicKey_derivesItAndSucceeds`.
     fileprivate static func sec1ECPrivateKeyDER(scalar: Data, curveOID: [UInt8], publicKeyPoint: Data?) -> Data {
         var children: [[UInt8]] = [
@@ -442,7 +442,7 @@ extension InternalsRawBytesIdentityBuilderTests {
     }
 }
 
-/// Minimal DER TLV writer -- the deliberate inverse of production's `DERReader`
+/// Minimal DER TLV writer, the deliberate inverse of production's `DERReader`
 /// (`Internals.RawBytesIdentityBuilder.swift`), used only to hand-assemble PKCS#8/SEC1 test
 /// fixtures. Not shipped: this lives in the test target only.
 private enum DERWriter {
@@ -477,12 +477,12 @@ private enum DERWriter {
         tlv(tag: 0x04, content: bytes)
     }
 
-    /// A BIT STRING with zero unused bits -- every use here wraps a byte-aligned EC point.
+    /// A BIT STRING with zero unused bits: every use here wraps a byte-aligned EC point.
     static func bitString(_ bytes: [UInt8]) -> [UInt8] {
         tlv(tag: 0x03, content: [0x00] + bytes)
     }
 
-    /// EXPLICIT context-specific tagging (`[n]`) -- `content` is the complete inner TLV
+    /// EXPLICIT context-specific tagging (`[n]`). `content` is the complete inner TLV
     /// (including its own tag and length), wrapped in an outer `0xA0 | n` tag.
     static func explicit(_ number: UInt8, _ content: [UInt8]) -> [UInt8] {
         tlv(tag: 0xA0 | number, content: content)

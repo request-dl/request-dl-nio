@@ -80,7 +80,7 @@ extension Internals.Session {
         // MARK: - Internal methods
 
         /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
-        /// actually run over Network.framework (`.nioTransportServices`) -- forwarded to
+        /// actually run over Network.framework (`.nioTransportServices`). Forwarded to
         /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
         /// worth paying for the mTLS identity's Keychain round-trip at all. Defaults to `true` so
         /// every caller that doesn't yet know which executor won (every test call site, plus any
@@ -134,7 +134,7 @@ extension Internals.Session {
 extension Internals.Session.Configuration {
 
     /// `build()`'s result: the `HTTPClient.Configuration` to hand `AsyncHTTPClient.HTTPClient`,
-    /// plus (on Darwin) the mTLS identity's `RawBytesIdentityBuilder.Handle`, if any -- kept
+    /// plus (on Darwin) the mTLS identity's `RawBytesIdentityBuilder.Handle`, if any. Kept
     /// alongside the configuration rather than folded into it because whoever constructs the
     /// actual `HTTPClient` needs both: the configuration to build it with, and the handle to hold
     /// onto for as long as that client lives, so it can remove the identity's Keychain items once
@@ -399,15 +399,15 @@ import Network
 extension NIOSSL.TLSVersion {
 
     /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
-    /// `tlsMaximumSupportedProtocolVersion`'s type -- present unconditionally on every platform
+    /// `tlsMaximumSupportedProtocolVersion`'s type. Present unconditionally on every platform
     /// this package targets (iOS 13/macOS 10.15, both below this package's own deployment
     /// floor), so there's no availability branch to take here the way AsyncHTTPClient's own
     /// NIOTransportServices bridge still needs for its pre-iOS-13 `SSLProtocol` fallback.
     ///
-    /// - Note: `.TLSv10`/`.TLSv11` are deprecated (macOS 12+) but not unavailable -- mirrored
-    /// here anyway, deliberately: a caller who explicitly asked NIOSSL for TLS 1.0/1.1 (interop
-    /// with a legacy server, say) gets the same answer under `.urlSession`, not a silent upgrade
-    /// to whatever Apple currently recommends instead.
+    /// - Note: `.TLSv10`/`.TLSv11` are deprecated (macOS 12+) but not unavailable, and are
+    /// mirrored here anyway, deliberately: a caller who explicitly asked NIOSSL for TLS 1.0/1.1
+    /// (interop with a legacy server, say) gets the same answer under `.urlSession`, not a
+    /// silent upgrade to whatever Apple currently recommends instead.
     var urlSessionProtocolVersion: tls_protocol_version_t {
         switch self {
         case .tlsv1: return .TLSv10
@@ -429,16 +429,16 @@ extension Internals.Session.Configuration {
     /// `Internals.ClientManager` pools and later shuts down. Cookies are additionally disabled
     /// unconditionally in `Internals.URLSessionClient.init` itself regardless of what this builds.
     ///
-    /// `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has no
+    /// `timeout.read` maps onto `timeoutIntervalForRequest`; `URLSessionConfiguration` has no
     /// distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
     /// `minimumTLSVersion`/`maximumTLSVersion` map onto `tlsMinimumSupportedProtocolVersion`/
-    /// `tlsMaximumSupportedProtocolVersion` -- the one other `SecureConnection` field with a
+    /// `tlsMaximumSupportedProtocolVersion`, the one other `SecureConnection` field with a
     /// direct `URLSessionConfiguration` counterpart. Every other field this configuration could
     /// carry that has no `URLSessionConfiguration` counterpart (`connectionPool`,
     /// `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific
-    /// with nothing to translate to, or -- for the fields that matter, like
+    /// with nothing to translate to, or, for the fields that matter, like
     /// `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
-    /// `decompression == .disabled` -- already excluded from resolving to `.urlSession` at all by
+    /// `decompression == .disabled`, already excluded from resolving to `.urlSession` at all by
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
     ///

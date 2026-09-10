@@ -12,7 +12,7 @@ public enum SPKIPinningPolicy: Sendable, Hashable {
 
     /// Permit the connection on a pin mismatch, for observability only.
     ///
-    /// - Warning: Never use in production -- it effectively disables pinning while keeping audit
+    /// - Warning: Never use in production. It effectively disables pinning while keeping audit
     /// visibility (e.g. logging) for debugging, testing, or migration windows.
     case audit
 

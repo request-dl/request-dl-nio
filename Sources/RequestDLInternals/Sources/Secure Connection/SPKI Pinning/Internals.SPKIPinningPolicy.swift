@@ -4,7 +4,7 @@
 
 extension Internals {
 
-    /// Failure behavior for an SPKI pin mismatch -- `RequestDL`'s own definition, since
+    /// Failure behavior for an SPKI pin mismatch. `RequestDL`'s own definition, since
     /// AsyncHTTPClient no longer bundles a pinning policy for this package to borrow. Trust
     /// evaluation, including SPKI pinning, is `RequestDL`'s own responsibility, resolved through
     /// `Internals.ServerTrustPolicy`/`Internals.NIOTrustEvaluator`.

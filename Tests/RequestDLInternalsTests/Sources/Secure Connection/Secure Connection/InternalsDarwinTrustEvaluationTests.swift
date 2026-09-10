@@ -155,12 +155,12 @@ struct InternalsDarwinTrustEvaluationTests {
 
     /// Regression coverage for the correctness fix folded into the `NIOTrustEvaluator`/
     /// `ServerTrustPolicy` unification: `prepare(_:skipsHostnameVerification:)` uses
-    /// `SecPolicyCreateSSL(true, nil)` -- a real SSL server policy that still requires proper
-    /// server-auth `extendedKeyUsage`, just without the hostname match -- not
+    /// `SecPolicyCreateSSL(true, nil)`, a real SSL server policy that still requires proper
+    /// server-auth `extendedKeyUsage`, just without the hostname match, rather than
     /// `SecPolicyCreateBasicX509()` (a bare chain-of-trust policy with no purpose/EKU checks at
     /// all), which is what `NIOTrustEvaluator`'s Network.framework closure used to build before
     /// this type existed. The fixtures' "client" certificate is self-signed with
-    /// `extendedKeyUsage=clientAuth` only (no `serverAuth`) -- exactly the shape a bare X.509
+    /// `extendedKeyUsage=clientAuth` only (no `serverAuth`): exactly the shape a bare X.509
     /// policy would still accept but a real SSL server policy correctly rejects.
     @Test
     func prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage() throws {
@@ -192,7 +192,7 @@ struct InternalsDarwinTrustEvaluationTests {
     /// composition: `SecTrustSetPolicies` replaces a trust's whole policy array rather than
     /// appending to it, so appending a revocation policy without first reading the trust's
     /// existing array back via `SecTrustCopyPolicies` would silently drop the base SSL/X.509
-    /// policy `SecTrustCreateWithCertificates` installed it with -- this asserts the array grows
+    /// policy `SecTrustCreateWithCertificates` installed it with. This asserts the array grows
     /// by exactly one rather than being replaced outright.
     @Test
     func prepare_whenRevocationPolicyConfiguredWithoutSkippingHostnameVerification_appendsToExistingPolicies() throws {
@@ -234,7 +234,7 @@ struct InternalsDarwinTrustEvaluationTests {
 }
 
 /// A test double recording every ``TrustDecision`` it's notified of, in order. `@unchecked
-/// Sendable` is safe here -- every test in this file calls `evaluate(chain:chainIsTrusted:)`
+/// Sendable` is safe here, since every test in this file calls `evaluate(chain:chainIsTrusted:)`
 /// synchronously, from a single thread, never concurrently.
 private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
     private(set) var decisions: [TrustDecision] = []

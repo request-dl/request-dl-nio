@@ -465,7 +465,7 @@ struct InternalsSessionConfigurationTests {
 
     #if canImport(Darwin)
     /// Regression coverage: `minimumTLSVersion`/`maximumTLSVersion` used to be silently dropped
-    /// under `.urlSession` -- no `URLSessionConfiguration` counterpart was ever set, despite both
+    /// under `.urlSession`: no `URLSessionConfiguration` counterpart was ever set, despite both
     /// being genuinely reachable via `tlsMinimumSupportedProtocolVersion`/
     /// `tlsMaximumSupportedProtocolVersion` (public API since iOS 13/macOS 10.15, both already
     /// below this package's own deployment floor).

@@ -3,11 +3,11 @@
 //
 
 /// A snapshot of one TLS trust evaluation's outcome, handed to a configured
-/// ``TrustDecisionObserver`` right after a peer certificate chain has been evaluated -- purely
+/// ``TrustDecisionObserver`` right after a peer certificate chain has been evaluated. Purely
 /// informational, produced *after* the accept/reject decision it describes has already been made.
 public struct TrustDecision: Sendable, Equatable {
 
-    /// Whether the peer's certificate chain was ultimately trusted -- the same accept/reject
+    /// Whether the peer's certificate chain was ultimately trusted: the same accept/reject
     /// outcome the connection itself acts on.
     public let isTrusted: Bool
 

@@ -235,7 +235,7 @@ struct InternalsServerTrustPolicyTests {
     // MARK: - Trust decision observer
 
     /// A live (never `descriptor()`-rebuilt) policy, since `Descriptor` is `Codable`-only and
-    /// can't carry an observer across a relaunch -- see ``Internals/ServerTrustPolicy/init(descriptor:)``'s
+    /// can't carry an observer across a relaunch. See ``Internals/ServerTrustPolicy/init(descriptor:)``'s
     /// own doc comment.
     @Test
     func handle_whenChainAndPinsBothMatch_notifiesObserverWithTrustedDecision() async throws {
@@ -580,7 +580,7 @@ private final class ForwardingChallengeDelegate: NSObject, URLSessionTaskDelegat
 }
 
 /// A test double recording every ``TrustDecision`` it's notified of, in order. `@unchecked
-/// Sendable` is safe here -- `URLSession`'s challenge delegate callback runs each handshake's
+/// Sendable` is safe here, since `URLSession`'s challenge delegate callback runs each handshake's
 /// decision serially, one at a time, for these single-request tests.
 private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
     private(set) var decisions: [TrustDecision] = []

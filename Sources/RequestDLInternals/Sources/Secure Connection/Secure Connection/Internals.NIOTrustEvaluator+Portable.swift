@@ -18,8 +18,8 @@ import Foundation
 extension Internals.NIOTrustEvaluator {
 
     /// Off Darwin there's no `Security.framework` to hand chain-of-trust validation off to, so
-    /// this replicates it with `swift-certificates` -- `RFC5280Policy` for the same category of
-    /// checks NIOSSL's own BoringSSL-backed default path performs (chain building, signature,
+    /// this replicates it with `swift-certificates`, using `RFC5280Policy` for the same category
+    /// of checks NIOSSL's own BoringSSL-backed default path performs (chain building, signature,
     /// validity period, basic constraints), run *separately* from the SPKI pin check below, so a
     /// pin mismatch under `.audit` can be told apart from an actual broken chain, which must
     /// always reject regardless of policy.
@@ -105,7 +105,7 @@ extension Internals.NIOTrustEvaluator {
     }
 
     #if os(Android)
-    /// Mirrors NIOSSL's own `AndroidCABundle.swift` search heuristic -- Android ships its trust
+    /// Mirrors NIOSSL's own `AndroidCABundle.swift` search heuristic. Android ships its trust
     /// store as a directory of individual PEM certificates, not a single bundle file the way
     /// Linux/FreeBSD do, so `systemDefaultCertificateStore()` below reads every entry in whichever
     /// of these is found instead of parsing one path as a single PEM bundle.
@@ -142,11 +142,11 @@ extension Internals.NIOTrustEvaluator {
     }
     #else
     /// A minimal version of NIOSSL's own `LinuxCABundle.swift`/`FreeBSDCABundle.swift` search
-    /// heuristics (file-based paths only) -- kept in sync with NIOSSL's own lists so pinning on
+    /// heuristics (file-based paths only), kept in sync with NIOSSL's own lists so pinning on
     /// top of the system default trust store resolves the same roots NIOSSL's default path would
     /// have used. Windows and WASI have no entry here because NIOSSL's own
-    /// `platformDefaultConfiguration` doesn't load a default trust store on either platform either
-    /// -- there's no NIOSSL-native behavior left to mirror.
+    /// `platformDefaultConfiguration` doesn't load a default trust store on either platform
+    /// either, so there's no NIOSSL-native behavior left to mirror.
     private static let systemCABundleFileSearchPaths = [
         "/etc/ssl/certs/ca-certificates.crt",  // Ubuntu, Debian, Arch, Alpine (Linux)
         "/etc/pki/tls/certs/ca-bundle.crt",  // Fedora (Linux)

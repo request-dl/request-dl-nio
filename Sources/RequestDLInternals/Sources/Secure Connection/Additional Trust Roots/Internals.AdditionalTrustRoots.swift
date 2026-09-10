@@ -48,7 +48,7 @@ extension Internals {
             }
         }
 
-        /// The flat list of `NIOSSLCertificate`s this configuration resolves to -- what a trust
+        /// The flat list of `NIOSSLCertificate`s this configuration resolves to: what a trust
         /// evaluator needs to set as anchors, as opposed to `build()`'s `NIOSSLAdditionalTrustRoots`,
         /// which stays a `.file` reference rather than reading it eagerly.
         package func resolvedCertificates() throws -> [NIOSSLCertificate] {
