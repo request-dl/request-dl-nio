@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Security
 import Testing
 
 @testable import RequestDLInternals
@@ -13,6 +12,10 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif
+
+#if canImport(Darwin)
+
+import Security
 
 struct InternalsDarwinTrustEvaluationTests {
 
@@ -245,3 +248,5 @@ private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unch
         decisions.append(decision)
     }
 }
+
+#endif
