@@ -629,14 +629,27 @@ extension InternalsSecureConnectionTests {
         )
 
         // When / Then
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
-        ) {
+        func verify() throws {
             let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
 
             #expect(sut.tlsConfiguration.certificateChain.isEmpty)
             #expect(sut.tlsConfiguration.privateKey == nil)
         }
+
+        // The Keychain round-trip this "known issue" is about only happens inside
+        // `#if canImport(Darwin)` code (`makeLocalIdentityForNetworkFramework()`); off Darwin,
+        // `build(isCompatibleWithNetworkFramework:)` never touches the Keychain at all, so `verify()`
+        // succeeds outright there and `withKnownIssue` would fail the test for "not" hitting an
+        // issue that was never reachable off Darwin to begin with.
+        #if canImport(Darwin)
+        await withKnownIssue(
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+        ) {
+            try verify()
+        }
+        #else
+        try verify()
+        #endif
     }
 
     @Test

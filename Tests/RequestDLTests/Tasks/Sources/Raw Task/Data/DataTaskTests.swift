@@ -225,9 +225,7 @@ struct DataTaskTests {
         defer { localServer.cleanup(at: uri) }
 
         // When / Then
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
-        ) {
+        func verify() async throws {
             let data = try await DataTask {
                 BaseURL(localServer.baseURL)
                 Path(uri)
@@ -248,6 +246,21 @@ struct DataTaskTests {
             let result = try HTTPResult<String>(data)
             #expect(result.response == output)
         }
+
+        // The Keychain round-trip this "known issue" is about only happens inside
+        // `#if canImport(Darwin)` code (the mTLS identity Network.framework needs); off Darwin,
+        // `.nioTransportServices` never touches the Keychain at all, so `verify()` succeeds
+        // outright there and `withKnownIssue` would fail the test for not hitting an issue that
+        // was never reachable off Darwin to begin with.
+        #if canImport(Darwin)
+        await withKnownIssue(
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+        ) {
+            try await verify()
+        }
+        #else
+        try await verify()
+        #endif
     }
 
     /// Regression coverage for the gap `Internals.NIOTrustEvaluator` closed: `additionalTrustRoots`
