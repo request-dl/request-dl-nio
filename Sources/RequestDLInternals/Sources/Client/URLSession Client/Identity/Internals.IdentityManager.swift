@@ -12,13 +12,15 @@ extension Internals {
     /// One `SecIdentity` built by
     /// `Internals.RawBytesIdentityBuilder.makeIdentity(certificateDER:privateKeyDER:)`,
     /// reference-counted against every other `IdentityHandle` built for the same certificate/key
-    /// pair. Multiple independently-built `Internals.Client`/`Internals.URLSessionIdentityPolicy`
+    /// pair.
+    ///
+    /// Multiple independently-built `Internals.Client`/`Internals.URLSessionIdentityPolicy`
     /// instances configured with the same mTLS identity share one Keychain-backed `SecIdentity`
     /// and one pair of Keychain items, rather than the first to deallocate deleting items the
     /// others still depend on.
     ///
     /// The underlying Keychain items are removed only once every live `IdentityHandle` for that
-    /// pair has deinitialized -- see ``IdentityManager``.
+    /// pair has deinitialized; see ``IdentityManager``.
     package final class IdentityHandle: @unchecked Sendable {
         package let identity: SecIdentity
         fileprivate let label: String
@@ -35,9 +37,10 @@ extension Internals {
 
     /// Deduplicates ``IdentityHandle``s by their content-derived Keychain label, process-wide.
     /// `Internals.RawBytesIdentityBuilder.makeIdentity(certificateDER:privateKeyDER:)` and
-    /// `IdentityHandle.deinit` are this type's only two callers, and both take the same lock --
-    /// so a build for a label and the teardown of that label's last surviving handle can never
-    /// interleave: one Keychain round trip (add or delete) always finishes before the next
+    /// `IdentityHandle.deinit` are this type's only two callers, and both take the same lock.
+    ///
+    /// A build for a label and the teardown of that label's last surviving handle can therefore
+    /// never interleave: one Keychain round trip (add or delete) always finishes before the next
     /// begins.
     package final class IdentityManager: @unchecked Sendable {
         package static let shared = IdentityManager()
@@ -91,7 +94,7 @@ extension Internals {
     }
 }
 
-/// A weak reference to a class instance, usable as a dictionary value -- `weak var` isn't allowed
+/// A weak reference to a class instance, usable as a dictionary value. `weak var` isn't allowed
 /// directly on a dictionary's `Value` generic parameter, so `Internals.IdentityManager` stores
 /// one of these per label instead.
 private struct Weak<Value: AnyObject> {

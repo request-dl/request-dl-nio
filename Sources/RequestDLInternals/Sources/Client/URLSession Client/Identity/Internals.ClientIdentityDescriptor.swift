@@ -96,12 +96,12 @@ extension Internals {
         }
 
         /// Rebuilds a `SecIdentity` from disk, via the same Keychain round-trip
-        /// `Internals.URLSessionIdentityPolicy` uses -- safe to call repeatedly (the Keychain
+        /// `Internals.URLSessionIdentityPolicy` uses. Safe to call repeatedly (the Keychain
         /// label is content-derived, so re-adding the same identity is a no-op success, not a
         /// duplicate), and expected to be: this runs fresh on every client-certificate challenge,
         /// live or after a relaunch alike.
         ///
-        /// The caller doesn't need to remove the returned handle explicitly -- just don't retain
+        /// The caller doesn't need to remove the returned handle explicitly; just don't retain
         /// it past the point it's done answering. `Internals.IdentityHandle`'s own `deinit`
         /// releases it, deleting the underlying Keychain items only once every other live handle
         /// for this same certificate/key pair has gone away too.

@@ -324,25 +324,27 @@ extension Internals {
             let secKey = try Self.secKey(fromDER: privateKeyDER)
 
             // Deterministic (content-derived, not random) so that rebuilding an identity for the
-            // same certificate+key -- a repeated test run, an app relaunching with the same
-            // configured client certificate after a previous run's Keychain items never got
-            // cleaned up, or a second `Internals.IdentityHandle` for the same pair sharing this
-            // one -- reliably finds and reuses (or, on a fresh process, clears) its own leftovers
-            // below instead of hitting errSecDuplicateItem. Folds in the private key, not just
-            // the certificate, so two different keys accidentally paired with the same
-            // certificate never collide under one Keychain item. `kSecValueRef`-based matching
-            // (delete "whatever item has this exact key/certificate value") looked like the more
-            // direct way to express that and is what the original spike did, but empirically did
-            // not reliably match an existing item across process runs; label-based matching does.
+            // same certificate+key reliably finds and reuses (or, on a fresh process, clears) its
+            // own leftovers below instead of hitting errSecDuplicateItem. That covers a repeated
+            // test run, an app relaunching with the same configured client certificate after a
+            // previous run's Keychain items never got cleaned up, and a second
+            // `Internals.IdentityHandle` for the same pair sharing this one.
+            //
+            // Folds in the private key, not just the certificate, so two different keys
+            // accidentally paired with the same certificate never collide under one Keychain
+            // item. `kSecValueRef`-based matching (delete "whatever item has this exact
+            // key/certificate value") looked like the more direct way to express that and is what
+            // the original spike did, but empirically did not reliably match an existing item
+            // across process runs; label-based matching does.
             let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
 
             return try Internals.IdentityManager.shared.handle(for: label) {
                 // `swift test` (and any unsigned command-line process) has no
                 // `keychain-access-groups` entitlement, which the data-protection keychain
-                // requires -- forcing the legacy file-based keychain is a macOS-only
-                // accommodation for that. Not present on iOS/tvOS/watchOS, where there is only
-                // the data-protection keychain and a properly signed/provisioned app already
-                // carries the entitlement it needs.
+                // requires; forcing the legacy file-based keychain is a macOS-only accommodation
+                // for that. Not present on iOS/tvOS/watchOS, where there is only the
+                // data-protection keychain and a properly signed/provisioned app already carries
+                // the entitlement it needs.
                 #if os(macOS)
                 let useDataProtectionKeychain = false
                 #else
@@ -369,7 +371,7 @@ extension Internals {
                         kSecClass: kSecClassKey,
                         kSecValueRef: secKey,
                         kSecAttrLabel: label,
-                        // This device only, not iCloud Keychain -- the key only needs to survive
+                        // This device only, not iCloud Keychain: the key only needs to survive
                         // this process's lifetime, not sync anywhere.
                         kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
                         kSecUseDataProtectionKeychain: useDataProtectionKeychain,
@@ -387,7 +389,7 @@ extension Internals {
                     operation: "SecItemAdd(certificate)"
                 )
 
-                // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter --
+                // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter:
                 // an identity is a synthetic pairing of a certificate and a key by matching
                 // public key, not an item with its own attributes, so the label set on the
                 // certificate/key above isn't necessarily inherited by it. Fetching every

@@ -370,7 +370,7 @@ extension Internals.SecureConnection {
         /// The Keychain-backed identity for mTLS under Network.framework, when both
         /// `certificateChain` and `privateKey` are configured. Carries `.identity` for
         /// `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework`; whoever ends up owning
-        /// this (`Internals.Client`, currently) just needs to hold onto it -- its own `deinit`
+        /// this (`Internals.Client`, currently) just needs to hold onto it. Its own `deinit`
         /// releases the underlying Keychain items once nothing else references them.
         package let localIdentityHandle: Internals.IdentityHandle?
         #endif

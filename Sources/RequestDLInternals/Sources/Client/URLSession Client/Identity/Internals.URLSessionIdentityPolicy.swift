@@ -26,12 +26,14 @@ extension Internals {
     /// that half is needed.
     ///
     /// Built once per `SecureConnection` and held for as long as the owning
-    /// `Internals.URLSessionClient` is alive -- mirrors NIOSSL's own per-connection
-    /// `TLSConfiguration` caching in `Internals.ClientManager`. The Keychain items backing the
-    /// client identity, if any, are released through `identityHandle`'s own `deinit`, not after
-    /// every request -- and only actually deleted once every other live `Internals.IdentityHandle`
-    /// for that same certificate/key pair (e.g. another `URLSessionIdentityPolicy` instance
-    /// configured with the same mTLS identity) has gone away too. See `Internals.IdentityManager`.
+    /// `Internals.URLSessionClient` is alive, mirroring NIOSSL's own per-connection
+    /// `TLSConfiguration` caching in `Internals.ClientManager`.
+    ///
+    /// The Keychain items backing the client identity, if any, are released through
+    /// `identityHandle`'s own `deinit`, not after every request, and only actually deleted once
+    /// every other live `Internals.IdentityHandle` for that same certificate/key pair (e.g.
+    /// another `URLSessionIdentityPolicy` instance configured with the same mTLS identity) has
+    /// gone away too. See `Internals.IdentityManager`.
     package final class URLSessionIdentityPolicy: @unchecked Sendable {
 
         package enum ConfigurationError: Swift.Error, CustomStringConvertible, Sendable {
