@@ -10,16 +10,17 @@ import Testing
 /// `operation`'s own ~10ms sleep, sized against scheduler jitter rather than `operation`'s
 /// duration.
 ///
-/// 10s already wasn't hypothetical headroom -- it replaced a 2s margin that flaked once already.
-/// It still wasn't enough: CI's iOS/iPadOS/tvOS/watchOS/visionOS *Simulator* runners (unlike
+/// 10s already wasn't hypothetical headroom: it replaced a 2s margin that flaked once already.
+/// It still wasn't enough. CI's iOS/iPadOS/tvOS/watchOS/visionOS *Simulator* runners (unlike
 /// macOS/Mac Catalyst, which run at host speed, or Linux/Android, which don't run this suite
 /// under a simulator at all) have been directly observed stalling this same 10ms operation for
-/// 35-64 real seconds under contention -- confirmed from the raw `xcodebuild` log of failing CI
+/// 35-64 real seconds under contention. Confirmed from the raw `xcodebuild` log of failing CI
 /// runs, where the whole suite (1000+ tests) still finished in under two minutes and named this
-/// exact test as one of only a handful of real failures, not a hang or crash. 120s gives headroom
-/// over the worst observed stall (64s) with room to spare, while every non-simulator platform
-/// keeps the original tight 10s -- loosening it there would only slow down catching a genuine
-/// regression on runners that were never the problem.
+/// exact test as one of only a handful of real failures, not a hang or crash.
+///
+/// 120s gives headroom over the worst observed stall (64s) with room to spare, while every
+/// non-simulator platform keeps the original tight 10s: loosening it there would only slow down
+/// catching a genuine regression on runners that were never the problem.
 private let raceMarginNanoseconds: Int64 = {
     #if (os(iOS) && !targetEnvironment(macCatalyst)) || os(tvOS) || os(watchOS) || os(visionOS)
     return 120_000_000_000
@@ -47,7 +48,7 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationFinishesBeforeDeadline_returnsItsResult() async throws {
-        // Given -- see `raceMarginNanoseconds`'s doc comment for why this is wider on Simulator
+        // Given: see `raceMarginNanoseconds`'s doc comment for why this is wider on Simulator
         // platforms than on host-speed ones.
         let deadline = Internals.ResourceDeadline(nanoseconds: raceMarginNanoseconds)
 
@@ -63,7 +64,7 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationOutlivesDeadline_throwsResourceTimeoutError() async throws {
-        // Given -- deadline much shorter than the operation.
+        // Given: deadline much shorter than the operation.
         let deadline = Internals.ResourceDeadline(nanoseconds: 10_000_000)
 
         // When / Then
@@ -106,14 +107,15 @@ struct InternalsResourceDeadlineTests {
 
     /// Regression coverage for a real race, not just a hypothetical one: with `.urlSession` as
     /// the default executor on Darwin, a fast enough loopback `operation` could actually win
-    /// against an already-elapsed deadline before this fast path existed -- `race(seed:_:)` used
+    /// against an already-elapsed deadline before this fast path existed. `race(seed:_:)` used
     /// to always start `operation` and the deadline's own `Task.sleep(nanoseconds:)` (even a
     /// zero-duration one still needs a real scheduler hop) as two equally-real competing child
-    /// tasks, so "already in the past" was a coin flip, not a guarantee. This deadline is built
-    /// already elapsed (`nanoseconds: 0`, so even `DispatchTime.now()` right after `init` is
-    /// past it), and `operation` never suspends at all -- as fast as an operation can possibly
-    /// be -- so if this ever raced instead of short-circuiting, `operation` winning would be the
-    /// likely outcome, not the timeout.
+    /// tasks, so "already in the past" was a coin flip, not a guarantee.
+    ///
+    /// This deadline is built already elapsed (`nanoseconds: 0`, so even `DispatchTime.now()`
+    /// right after `init` is past it), and `operation` never suspends at all: as fast as an
+    /// operation can possibly be. So if this ever raced instead of short-circuiting, `operation`
+    /// winning would be the likely outcome, not the timeout.
     @Test
     func race_whenDeadlineAlreadyElapsed_throwsWithoutRunningOperationEvenWhenOperationNeverSuspends() async throws {
         // Given
@@ -138,7 +140,7 @@ struct InternalsResourceDeadlineTests {
     }
 
     /// Companion to the test above: an already-elapsed deadline must cancel `seed` too, the same
-    /// as the outlives-deadline path already does -- `RawTask`/`AsyncResponse.Iterator` depend on
+    /// as the outlives-deadline path already does. `RawTask`/`AsyncResponse.Iterator` depend on
     /// that to tear down a connection this fast path now bypasses starting `operation` for.
     @Test
     func race_whenDeadlineAlreadyElapsed_cancelsGivenSeed() async throws {
@@ -170,7 +172,7 @@ struct InternalsResourceDeadlineTests {
 
     @Test
     func race_whenOperationFinishesBeforeDeadline_neverCancelsGivenSeed() async throws {
-        // Given -- see `raceMarginNanoseconds`'s doc comment above.
+        // Given: see `raceMarginNanoseconds`'s doc comment above.
         let deadline = Internals.ResourceDeadline(nanoseconds: raceMarginNanoseconds)
 
         actor CancellationFlag {

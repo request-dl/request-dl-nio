@@ -25,7 +25,7 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        /// Whether this client currently has any request in flight -- mirrors
+        /// Whether this client currently has any request in flight. Mirrors
         /// `Internals.Client.isRunning`, read by `Internals.ClientManager`'s idle-cleanup sweep so
         /// a busy client is never recycled out from under an in-flight request.
         package var isRunning: Bool {
@@ -36,7 +36,7 @@ extension Internals {
 
         private let session: URLSession
         private let throttledExecutor: Internals.ThrottledExecutor
-        /// Transport-agnostic in-flight counter also used by `Internals.Client` -- backs
+        /// Transport-agnostic in-flight counter also used by `Internals.Client`. Backs
         /// `isRunning` the same way there, just for `URLSession` tasks instead of
         /// `HTTPClient.Task`s.
         private let operationQueue = Internals.ClientOperationQueue()
@@ -52,8 +52,8 @@ extension Internals {
         // MARK: - Inits
 
         /// - Parameter secureConnection: Resolved once, here, into an
-        /// `Internals.URLSessionIdentityPolicy` -- including the Keychain round-trip a client
-        /// identity needs -- and cached for the lifetime of this client, mirroring
+        /// `Internals.URLSessionIdentityPolicy`, including the Keychain round-trip a client
+        /// identity needs, and cached for the lifetime of this client, mirroring
         /// NIOSSL's own per-connection `TLSConfiguration` caching in `Internals.ClientManager`.
         /// `nil` when the resolved request carries no TLS customization at all.
         /// - Parameter redirectConfiguration: Defaults to AsyncHTTPClient's own default
@@ -61,10 +61,10 @@ extension Internals {
         /// so a caller that does not set `Internals.Session.Configuration.redirectConfiguration`
         /// gets identical behavior regardless of which executor the session resolves to.
         /// - Parameter proxy: Both `.http` (`.server`) and `.socks` are mapped onto
-        /// `configuration` -- `.bearer` proxy authorization is the one thing that stays excluded
+        /// `configuration`. `.bearer` proxy authorization is the one thing that stays excluded
         /// from `.urlSession` upstream (`Internals.ExecutorIncompatibilityReason
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
-        /// here -- see `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
+        /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
         package init(
             configuration: URLSessionConfiguration,
@@ -74,19 +74,21 @@ extension Internals {
             maximumConcurrentConnections: Int? = nil
         ) throws {
             let configuration = configuration
-            // Explicitly `[:]`, not left untouched, when `proxy` is `nil` -- `URLSession` treats an
+            // Explicitly `[:]`, not left untouched, when `proxy` is `nil`. `URLSession` treats an
             // unset `connectionProxyDictionary` as "inherit whatever macOS's Network preferences
             // (or a device's Wi-Fi proxy config) currently say," unlike AsyncHTTPClient, which has
-            // no such discovery at all. Without this, a caller who declares neither `Proxy` nor
-            // `SystemProxy` -- the documented "system proxy is ignored unless opted into" contract
-            // `SystemProxy`'s own doc comment makes -- would silently pick up an ambient proxy
-            // anyway on `.urlSession`, but not on the NIO executor: the exact kind of
-            // executor-dependent behavior change this package works hard to avoid elsewhere (see
-            // `httpShouldSetCookies`/`httpCookieStorage` below, same rationale).
+            // no such discovery at all.
+            //
+            // Without this, a caller who declares neither `Proxy` nor `SystemProxy` (the
+            // documented "system proxy is ignored unless opted into" contract `SystemProxy`'s own
+            // doc comment makes) would silently pick up an ambient proxy anyway on `.urlSession`,
+            // but not on the NIO executor: the exact kind of executor-dependent behavior change
+            // this package works hard to avoid elsewhere (see `httpShouldSetCookies`/
+            // `httpCookieStorage` below, same rationale).
             configuration.connectionProxyDictionary = proxy?.buildConnectionProxyDictionary() ?? [:]
 
             // Required normalization, not optional: URLSession persists cookies in a jar by
-            // default, the NIO executor has none at all -- without
+            // default, the NIO executor has none at all. Without
             // this, which executor a session happens to resolve to would silently change
             // behavior across requests that share a session.
             configuration.httpShouldSetCookies = false
@@ -107,39 +109,41 @@ extension Internals {
         ///
         /// - Parameter delegate: Per-task delegate for concerns this method does not itself
         /// handle. `nil` falls back to the session's own default handling. Redirect enforcement,
-        /// proxy authentication, and -- when this client was built with a `secureConnection` --
+        /// proxy authentication, and, when this client was built with a `secureConnection`,
         /// the server-trust/client-certificate challenge (see `TaskDelegate` below) all run
         /// regardless of `delegate`; `delegate` is only consulted for a TLS challenge this client
         /// has no `identityPolicy` to answer.
         ///
-        /// Deliberately not `session.data(for:request:delegate:)` -- a captured crash report
+        /// Deliberately not `session.data(for:request:delegate:)`. A captured crash report
         /// (`EXC_BREAKPOINT`/`SIGTRAP`, entirely inside Foundation's own
         /// `NSURLSession.data(for:delegate:)` closures on the `com.apple.NSURLSession-work`
         /// queue, no frame of this package's own code anywhere in the crashing thread) confirms a
-        /// real, if rare, bug in that bridge -- reproducible on an iOS Simulator under heavy
+        /// real, if rare, bug in that bridge, reproducible on an iOS Simulator under heavy
         /// concurrent test load, not this package's own delegate (`TaskDelegate`'s shared state
-        /// is already lock-protected). Bridged by hand instead, the same way the streamed-upload
+        /// is already lock-protected).
+        ///
+        /// Bridged by hand instead, the same way the streamed-upload
         /// overload below already does: build a plain `dataTask(with:)` with no completion
         /// handler of its own, so `TaskDelegate` (already `URLSessionDataDelegate`-conforming) is
         /// the *only* thing consuming the response/data, and let its own
-        /// `didCompleteWithError:` -- which already knows how to turn `redirectError`/the
-        /// accumulated response into exactly this method's return shape -- resolve `completion`
+        /// `didCompleteWithError:`, which already knows how to turn `redirectError`/the
+        /// accumulated response into exactly this method's return shape, resolve `completion`
         /// once the task finishes. (An earlier version of this fix instead read `data`/`response`
         /// off a `dataTask(with:completionHandler:)` completion handler directly, alongside the
-        /// same delegate -- reachable together, but not guaranteed to agree with each other:
-        /// caught by `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError`, which
+        /// same delegate: reachable together, but not guaranteed to agree with each other.
+        /// Caught by `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError`, which
         /// started failing with `MissingURLResponseError` instead of the expected
         /// `RedirectLimitReachedError` once a redirect was actually refused.)
         ///
         /// `session.data(for:delegate:)` also cancelled its underlying `URLSessionTask`
-        /// automatically when the awaiting Swift `Task` was cancelled -- a guarantee this hand
+        /// automatically when the awaiting Swift `Task` was cancelled: a guarantee this hand
         /// bridge has to restore explicitly, via `CancellableTaskBox`, since nothing does that for
         /// a bare `withCheckedThrowingContinuation` on its own.
         package func execute(
             request: URLRequest,
             delegate: URLSessionTaskDelegate? = nil
         ) async throws -> (head: Internals.ResponseHead, body: Data) {
-            // Waited on before anything else, mirroring `Internals.Client.execute` -- a session
+            // Waited on before anything else, mirroring `Internals.Client.execute`: a session
             // configured with a limit must never let more requests than that reach the network,
             // whether the cap is enforced by the NIO or the URLSession executor.
             let release = await throttledExecutor.acquire()
@@ -180,7 +184,7 @@ extension Internals {
         /// front. Materializes `body` (any `AsyncSequence` of `ByteBuffer`; in practice
         /// `Internals.BodySequence`, or `RequestBody` itself from the `RequestDL` module, both of
         /// which conform) via `Internals.URLSessionUploadFile`, then uploads from whichever shape
-        /// that produced -- `uploadTask(with:from:)` for a body small enough to just hold in
+        /// that produced: `uploadTask(with:from:)` for a body small enough to just hold in
         /// memory, `uploadTask(with:fromFile:)` for one that spilled to disk.
         ///
         /// Deliberately does not drive `uploadTask(withStreamedRequest:)` + `needNewBodyStream`
@@ -188,18 +192,18 @@ extension Internals {
         /// `InputStream` (Swift subclass or a genuine `CFReadStream`) is ever recognized as
         /// reaching end-of-body. Neither of the two shapes used here goes through `InputStream` at
         /// all, so neither is affected; the file-backed one also re-reads the file itself for any
-        /// retry/redirect that resends the body -- nothing here needs to hand back a fresh body
+        /// retry/redirect that resends the body, so nothing here needs to hand back a fresh body
         /// more than once.
         ///
         /// - Parameter existingUploadFile: Set when the caller already knows `body`'s entire
         /// content is sitting untouched in this file (`RequestBody.wholeFileURL`, a
-        /// `Payload(url:)`-only body) -- skips `Internals.URLSessionUploadFile.write(body:)`
+        /// `Payload(url:)`-only body). Skips `Internals.URLSessionUploadFile.write(body:)`
         /// entirely rather than draining `body` only to recreate a copy of a file that already
         /// exists. `body` is still required in that case (for the generic `Body` type/call-site
         /// symmetry with the other overload below) but is never iterated.
         /// - Parameter onUploadProgress: Called once per `didSendBodyData` callback, in delivery
         /// order, with `(bytesSentThisCall, totalBytesExpectedToSend)`. Order and eventual
-        /// completion are what's guaranteed -- individual chunk sizes are URLSession's own to
+        /// completion are what's guaranteed; individual chunk sizes are URLSession's own to
         /// pick, not RequestDL's.
         package func execute<Body: AsyncSequence & Sendable>(
             request: URLRequest,
@@ -268,13 +272,13 @@ extension Internals {
         /// waiting for the whole body. Mirrors the NIO backend's own
         /// `Internals.AsyncResponse` shape: `Internals.DownloadStep.bytes` is a live
         /// `Internals.AsyncBytes` a caller iterates separately, re-chunked to `readingMode` by
-        /// `Internals.DownloadBuffer` -- the same type `Internals.Session.execute(...)` builds for
+        /// `Internals.DownloadBuffer`, the same type `Internals.Session.execute(...)` builds for
         /// the NIO path, reused verbatim here rather than reimplemented, since it already has no
         /// NIO dependency of its own (it consumes `Internals.AnyBuffer`, not `ByteBuffer`
         /// directly).
         ///
         /// Unlike the other two `execute` overloads, the throttle slot acquired at the top is
-        /// *not* released when this method returns -- it has to stay held until the download
+        /// *not* released when this method returns: it has to stay held until the download
         /// itself finishes, which happens well after this `async` call returns its
         /// `Internals.DownloadStep`. `TaskDelegate` releases it from
         /// `urlSession(_:task:didCompleteWithError:)` instead.
@@ -291,7 +295,7 @@ extension Internals {
             }
 
             // Built here, in an `async` context that can freely `await`, rather than inside a
-            // synchronous delegate callback -- `Internals.DownloadBuffer.init(readingMode:)` is
+            // synchronous delegate callback: `Internals.DownloadBuffer.init(readingMode:)` is
             // itself `async`, and `didReceive response:completionHandler:` below has no way to
             // await it without risking `didReceive data:` firing (URLSession serializes delegate
             // callbacks for one task, but only across calls that have themselves returned) before
@@ -321,7 +325,7 @@ extension Internals {
         }
 
         /// Executes `request`, returning a `SessionTask` whose response streams upload progress
-        /// (when `request` carries a body), the response head, and the body -- optionally teed
+        /// (when `request` carries a body), the response head, and the body, optionally teed
         /// to `cache` as it downloads.
         ///
         /// Mirrors `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`:
@@ -330,11 +334,11 @@ extension Internals {
         /// `Internals.AsyncResponse` from that the NIO backend already produces, just fed by this
         /// client's own callbacks instead of `Internals.ClientResponseReceiver`'s.
         ///
-        /// No new delegate machinery -- reuses the exact `headCompletion`/`downloadBuffer`
+        /// No new delegate machinery: reuses the exact `headCompletion`/`downloadBuffer`
         /// mechanism `execute(request:readingMode:delegate:)` already has below, just resolving
         /// into these three streams instead of a continuation. The cache tee
         /// (`Internals.DownloadBuffer.cacheStream(_:)`) attaches from right here, at the same
-        /// point `Internals.ClientResponseReceiver.didReceiveHead` attaches it on the NIO side --
+        /// point `Internals.ClientResponseReceiver.didReceiveHead` attaches it on the NIO side,
         /// before any body chunk can arrive, since `didReceive response:completionHandler:`
         /// always precedes `didReceive data:`.
         package func execute(
@@ -359,16 +363,16 @@ extension Internals {
         }
 
         /// Combines what `execute(request:streaming:delegate:onUploadProgress:)` and
-        /// `execute(request:readingMode:delegate:)` each build separately -- a genuinely streamed
+        /// `execute(request:readingMode:delegate:)` each build separately: a genuinely streamed
         /// request body *and* a genuinely streamed response, at once.
         ///
         /// `TaskDelegate` already implements both `needNewBodyStream`/`didSendBodyData` and
-        /// `didReceive response:`/`didReceive data:` unconditionally -- this is the first call
+        /// `didReceive response:`/`didReceive data:` unconditionally. This is the first call
         /// site that activates both sets of optional fields on the same task, not new delegate
         /// logic. See `execute(request:readingMode:uploadingBytes:cache:logger:)` just above for
         /// everything else (the three-stream `SessionTask` shape, the cache tee).
         /// - Parameter existingUploadFile: See the standalone streaming `execute`'s doc comment
-        /// for this same parameter -- identical meaning here, `body` still required but unread
+        /// for this same parameter. Identical meaning here, `body` still required but unread
         /// when set.
         package func execute<Body: AsyncSequence & Sendable>(
             request: URLRequest,
@@ -398,7 +402,7 @@ extension Internals {
             )
         }
 
-        /// Shared body for the two `SessionTask`-producing `execute` overloads above -- they
+        /// Shared body for the two `SessionTask`-producing `execute` overloads above. They
         /// differ only in whether a body needs materializing first (`makeUploadBody`, `nil` for
         /// the no-body/non-streaming case), which in turn decides whether this builds a
         /// `dataTask(with:)`, an `uploadTask(with:from:)`, or an `uploadTask(with:fromFile:)`. See
@@ -418,12 +422,12 @@ extension Internals {
             let operation = operationQueue.operation()
 
             // CFNetwork's transparent `Content-Encoding` decoding can only be switched off by
-            // taking over `Accept-Encoding` ourselves -- and doing so suppresses it entirely, for
+            // taking over `Accept-Encoding` ourselves, and doing so suppresses it entirely, for
             // every encoding, not just the one added. So this is all-or-nothing: either every
             // configured algorithm is one CFNetwork already decodes natively and this stays
             // quiet, or `Accept-Encoding` is set here and this package decodes everything in the
             // list itself, manually, including the natives. `.disabled` reaches the same
-            // `identity` override -- see `Internals.Decompression.requiresManualURLSessionHandling`.
+            // `identity` override; see `Internals.Decompression.requiresManualURLSessionHandling`.
             let decompressionDispatch: Internals.ManualDecompressionDispatch
             var request = request
 
@@ -483,18 +487,18 @@ extension Internals {
             // Set before `task.resume()`, same ordering `execute(request:readingMode:delegate:)`
             // already relies on, so no callback can fire before this closure is in place.
             taskDelegate.headCompletion = { result in
-                // A response head -- success or failure -- can only exist once the request body
+                // A response head, success or failure, can only exist once the request body
                 // finished sending, so this is also where `upload` closes: mirrors
                 // `Internals.ClientResponseReceiver.didReceiveHead`, which closes `upload` again
                 // here too even though `didSendRequest` already closed it once, redundantly and
-                // harmlessly (`Internals.AsyncStream.close()` is idempotent) -- `onDownloadComplete`
+                // harmlessly (`Internals.AsyncStream.close()` is idempotent). `onDownloadComplete`
                 // below closes it a third time for the same reason: any path that reaches the end
                 // must leave `upload` closed, not just the common one.
                 upload.close()
 
                 switch result {
                 case .success(let step):
-                    // Attached before `head` is ever read from -- ordered against every future
+                    // Attached before `head` is ever read from: ordered against every future
                     // `downloadBuffer.append(_:)` by `Internals.DownloadBuffer`'s own queue, the
                     // same guarantee `Internals.ClientResponseReceiver.didReceiveHead` relies on.
                     if let cacheStream = cache?(step.head) {
@@ -536,7 +540,7 @@ extension Internals {
             )
         }
 
-        /// Invalidates the underlying `URLSession` -- mirrors `Internals.Client.shutdown()`, read
+        /// Invalidates the underlying `URLSession`. Mirrors `Internals.Client.shutdown()`, read
         /// by `Internals.ClientManager`'s idle-cleanup sweep. Idempotent and a no-op while a
         /// request is still in flight, same guard as the NIO counterpart.
         ///
@@ -560,8 +564,8 @@ extension Internals {
                 return false
             }
 
-            // No outstanding tasks per the `isRunning` guard above, so there is nothing to drain
-            // -- unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
+            // No outstanding tasks per the `isRunning` guard above, so there is nothing to drain.
+            // Unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
             session.invalidateAndCancel()
             return true
         }
@@ -571,14 +575,14 @@ extension Internals {
 extension Internals.URLSessionClient {
 
     /// `URLSession` only ever hands back a non-`HTTPURLResponse` for a non-HTTP(S) scheme, which
-    /// RequestDL never builds a request for -- this should be unreachable in practice.
+    /// RequestDL never builds a request for; this should be unreachable in practice.
     package struct UnexpectedURLResponseError: Error, Sendable {
         package let response: URLResponse
     }
 
     /// A streamed-upload task (`execute(request:streaming:delegate:onUploadProgress:)`) completed
-    /// with no error and yet never called `urlSession(_:dataTask:didReceive:completionHandler:)`
-    /// -- should be unreachable given `URLSession`'s own contract (every task either fails or
+    /// with no error and yet never called `urlSession(_:dataTask:didReceive:completionHandler:)`.
+    /// Should be unreachable given `URLSession`'s own contract (every task either fails or
     /// eventually receives a response), kept as a named error rather than force-unwrapping.
     package struct MissingURLResponseError: Error, Sendable {}
 
@@ -594,8 +598,8 @@ extension Internals.URLSessionClient {
     /// Lets a `withTaskCancellationHandler`'s `onCancel` closure reach a `URLSessionTask` that a
     /// concurrently-running `operation` closure is still in the middle of creating.
     ///
-    /// `onCancel` can fire the instant cancellation is requested -- including strictly before
-    /// `operation` ever assigns `task` -- so a plain `URLSessionTask?` written to after the fact
+    /// `onCancel` can fire the instant cancellation is requested, including strictly before
+    /// `operation` ever assigns `task`, so a plain `URLSessionTask?` written to after the fact
     /// could miss a cancellation that arrived in that gap. `task`'s setter checks for exactly that
     /// ordering and cancels immediately instead of losing it.
     fileprivate final class CancellableTaskBox: @unchecked Sendable {
@@ -628,7 +632,7 @@ extension Internals.URLSessionClient {
 }
 
 /// `Internals.URLSessionClient`'s own per-request delegate: redirect enforcement, proxy
-/// authentication, and -- when this client was built with a `secureConnection` -- TLS challenge
+/// authentication, and, when this client was built with a `secureConnection`, TLS challenge
 /// handling, none of which URLSession has a configuration-level API for; all must instead be
 /// answered through delegate callbacks. A TLS challenge this delegate's
 /// own `tlsDelegate` can't answer (no `identityPolicy`, or a different host) falls through to
@@ -645,12 +649,12 @@ extension Internals.URLSessionClient {
         private let tlsDelegate: TLSDelegate?
         private let forwardingDelegate: URLSessionTaskDelegate?
         private let onUploadProgress: (@Sendable (Int, Int) -> Void)?
-        /// Set for the streamed-download `execute(request:readingMode:delegate:)` path only --
+        /// Set for the streamed-download `execute(request:readingMode:delegate:)` path only.
         /// `nil` for the other two, which is exactly the switch `didReceive
         /// response:completionHandler:`/`didReceive data:`/`didCompleteWithError:` use below to
         /// tell which of the three modes this instance is answering for.
         private let downloadBuffer: Internals.DownloadBuffer?
-        /// Releases the throttle slot `execute(request:readingMode:delegate:)` acquired -- see
+        /// Releases the throttle slot `execute(request:readingMode:delegate:)` acquired. See
         /// that method's own doc comment for why it can't just `defer { release() }` the way the
         /// other two `execute` overloads do.
         private let onDownloadComplete: (@Sendable () -> Void)?
@@ -658,7 +662,7 @@ extension Internals.URLSessionClient {
 
         // MARK: - Unsafe properties
 
-        /// All visited URLs, starting with the request's own -- mirrors `RedirectState.visited`.
+        /// All visited URLs, starting with the request's own. Mirrors `RedirectState.visited`.
         private var _visited: [String]
         private var _redirectError: Error?
         /// The most recently sent request, updated on every followed redirect. Together with
@@ -666,11 +670,11 @@ extension Internals.URLSessionClient {
         /// executor builds from its own `HTTPClientRequestResponse` history.
         private var _lastRequest: URLRequest
         private var _history: [Internals.RedirectHistoryEntry] = []
-        /// Redirects followed under `.strategy` mode specifically -- independent of `_history`,
+        /// Redirects followed under `.strategy` mode specifically, independent of `_history`,
         /// which accumulates regardless of mode, mirroring the NIO adapter's own
         /// `customRedirectCount` (incremented only when `.strategy` chooses `.follow`).
         private var _strategyRedirectCount = 0
-        /// Response accumulation for the streamed-upload path only -- the buffered path never
+        /// Response accumulation for the streamed-upload path only. The buffered path never
         /// touches these, since `session.data(for:delegate:)` does its own accumulation
         /// regardless of what extra `URLSessionDataDelegate` methods this class implements.
         private var _response: URLResponse?
@@ -681,7 +685,7 @@ extension Internals.URLSessionClient {
         private var _completion: ((Result<(head: Internals.ResponseHead, body: Data), Error>) -> Void)?
         /// Set by `execute(request:readingMode:delegate:)` right after construction, resolved from
         /// `didReceive response:completionHandler:` (the common case) or, if the task fails before
-        /// a response ever arrives, from `didCompleteWithError:` instead -- guarded by `_headResolved`
+        /// a response ever arrives, from `didCompleteWithError:` instead. Guarded by `_headResolved`
         /// so whichever fires first wins and the other is a no-op.
         private var _headCompletion: ((Result<Internals.DownloadStep, Error>) -> Void)?
         private var _headResolved = false
@@ -733,7 +737,7 @@ extension Internals.URLSessionClient {
 
         /// Enforces `Internals.RedirectConfiguration` for this task.
         ///
-        /// URLSession has no native "max redirects" / "allow cycles" concept --
+        /// URLSession has no native "max redirects" / "allow cycles" concept:
         /// `willPerformHTTPRedirection` only ever offers "follow this exact request" or "don't,
         /// and treat the redirect response as final." Both the counting and the cycle detection
         /// below are a direct port of what AsyncHTTPClient's own `RedirectState`
@@ -742,12 +746,12 @@ extension Internals.URLSessionClient {
         ///
         /// `.disallow` needs no tracking at all: every redirect is refused via
         /// `completionHandler(nil)`, same as AsyncHTTPClient handing back the 3xx response
-        /// untouched when `redirectHandler` is `nil` -- not a `redirectError`, since declining to
+        /// untouched when `redirectHandler` is `nil`. This is not a `redirectError`, since declining to
         /// follow is not itself a failure.
         ///
         /// Both `.follow` and `.strategy` strip `Authorization`/`Cookie`/`Origin`/
         /// `Proxy-Authorization` from `request` when it no longer shares the previously sent
-        /// request's origin (scheme, host, and port) -- `URLSession` does not do this on its own,
+        /// request's origin (scheme, host, and port). `URLSession` does not do this on its own,
         /// unlike the NIO executor's `followingRedirect`/`transformRequestForRedirect`, which this
         /// mirrors so a redirect leaking credentials to a different host fails the same way under
         /// either transport.
@@ -781,7 +785,7 @@ extension Internals.URLSessionClient {
                 switch outcome {
                 case .success:
                     let sanitizedRequest = sanitizedForRedirect(request)
-                    // `historyEntry(for:)` takes `lock` itself to read `_lastRequest` -- must
+                    // `historyEntry(for:)` takes `lock` itself to read `_lastRequest`, so it must
                     // resolve it before entering this block, not inside it, or it deadlocks
                     // `Lock`, which is not reentrant.
                     let entry = historyEntry(for: response)
@@ -834,7 +838,7 @@ extension Internals.URLSessionClient {
 
         // MARK: - Private methods
 
-        /// The request that produced `response`, per `_lastRequest` -- i.e. the request one hop
+        /// The request that produced `response`, per `_lastRequest`: the request one hop
         /// before `request` in `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
         private func historyEntry(for response: HTTPURLResponse) -> Internals.RedirectHistoryEntry {
             lock.withLock {
@@ -905,7 +909,7 @@ extension Internals.URLSessionClient {
             onUploadProgress?(Int(bytesSent), Int(totalBytesExpectedToSend))
         }
 
-        /// Response-side counterpart to `needNewBodyStream` above -- exercised by the
+        /// Response-side counterpart to `needNewBodyStream` above. Exercised by the
         /// streamed-upload path (which, unlike the buffered path's `session.data(for:delegate:)`,
         /// has no built-in response accumulation of its own to fall back on) and, differently, by
         /// the streamed-download path, which resolves `headCompletion` right here instead of
@@ -931,11 +935,11 @@ extension Internals.URLSessionClient {
                 return
             }
 
-            // Sync, deliberately -- `Internals.DownloadBuffer.append(_:)` enqueues onto an
+            // Sync, deliberately: `Internals.DownloadBuffer.append(_:)` enqueues onto an
             // ordered queue, and submission order has to match arrival order. Building the
             // `Internals.DataBuffer` on a detached `Task` (its usual, `async`, in-memory-or-file
             // generic initializer) would let two chunks race to enqueue and reassemble the body
-            // out of order -- `Internals.Buffer`'s own "Synchronous construction, in memory only"
+            // out of order. `Internals.Buffer`'s own "Synchronous construction, in memory only"
             // extension exists for precisely this reason (see its doc comment, which calls out a
             // NIO delegate callback as the original motivating case; this is the same shape of
             // problem one layer up, for `URLSessionDataDelegate` instead of
@@ -944,7 +948,7 @@ extension Internals.URLSessionClient {
             downloadBuffer.append(Internals.DataBuffer(byteURL))
         }
 
-        /// Resolves `completion`/`headCompletion` -- the streamed-upload and streamed-download
+        /// Resolves `completion`/`headCompletion`: the streamed-upload and streamed-download
         /// paths' only way to learn a task is done, since neither goes through
         /// `session.data(for:delegate:)`'s own `async` completion. A no-op for the buffered path,
         /// where `completion` is never set.
@@ -953,8 +957,8 @@ extension Internals.URLSessionClient {
                 defer { onDownloadComplete?() }
 
                 // A failure before any response ever arrived (e.g. connection refused) means
-                // `didReceive response:` never ran and `headCompletion` is still unresolved --
-                // resolve it now rather than leaving `execute(request:readingMode:delegate:)`
+                // `didReceive response:` never ran and `headCompletion` is still unresolved.
+                // Resolve it now rather than leaving `execute(request:readingMode:delegate:)`
                 // suspended forever. `resolveHead(with:downloadBuffer:)` is a no-op if a response
                 // already resolved it, so this is safe to call unconditionally.
                 if let error {
@@ -998,10 +1002,10 @@ extension Internals.URLSessionClient {
 
         // MARK: - Private methods
 
-        /// Resolves `headCompletion` from the response URLSession actually delivered --
+        /// Resolves `headCompletion` from the response URLSession actually delivered:
         /// `didReceive response:completionHandler:`'s normal path. A no-op if `headCompletion`
         /// already resolved (guarded by `_headResolved`), which only happens if
-        /// `didCompleteWithError:` beat it to a failure -- shouldn't happen given `URLSession`'s
+        /// `didCompleteWithError:` beat it to a failure. Shouldn't happen given `URLSession`'s
         /// own callback ordering, kept anyway since resolving a completion handler twice is a
         /// trap, not a silent bug.
         private func resolveHead(with response: URLResponse, downloadBuffer: Internals.DownloadBuffer) {
@@ -1049,7 +1053,7 @@ extension Internals.URLSessionClient {
             )
         }
 
-        /// Resolves `headCompletion` with `error` -- only actually resolves anything if no
+        /// Resolves `headCompletion` with `error`. Only actually resolves anything if no
         /// response ever arrived to resolve it first (guarded by the same `_headResolved` flag
         /// `resolveHead(with:downloadBuffer:)` uses); called unconditionally from
         /// `didCompleteWithError:` so a connection-level failure before any response (refused,
@@ -1065,7 +1069,7 @@ extension Internals.URLSessionClient {
             completion?(.failure(error))
         }
 
-        /// `.basic`/`.basicRawCredentials` only -- `URLCredential` has exactly two shapes
+        /// `.basic`/`.basicRawCredentials` only. `URLCredential` has exactly two shapes
         /// (user/password, identity/certificates), neither of which can carry an arbitrary
         /// bearer token, which is why `.bearer` proxy authorization is excluded from
         /// `.urlSession` entirely (`Internals.ExecutorIncompatibilityReason
@@ -1111,7 +1115,7 @@ extension Internals.ResponseHead {
                 code: UInt(response.statusCode),
                 reason: HTTPURLResponse.localizedString(forStatusCode: response.statusCode)
             ),
-            // `HTTPURLResponse` does not expose the negotiated HTTP version -- only
+            // `HTTPURLResponse` does not expose the negotiated HTTP version, only
             // `URLSessionTaskMetrics`, via a delegate callback this non-streaming round trip has
             // no reason to collect. `LocalServer`, and every executor-neutral caller today,
             // speaks HTTP/1.1 only, so that is the safe assumption here.
@@ -1122,7 +1126,7 @@ extension Internals.ResponseHead {
                 }
                 return HeaderField(name: name, value: value)
             },
-            // Not observable per response over URLSession -- connection reuse is entirely
+            // Not observable per response over URLSession: connection reuse is entirely
             // internal to the session. `true` matches HTTP/1.1's own default.
             isKeepAlive: true
         )

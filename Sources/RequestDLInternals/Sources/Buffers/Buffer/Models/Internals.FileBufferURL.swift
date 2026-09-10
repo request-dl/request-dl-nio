@@ -68,7 +68,7 @@ extension Internals {
 
         private let url: URL
         /// Whether this location is one this package created for its own scratch use (and will
-        /// remove once nothing needs it any more), as opposed to a caller-supplied path -- see
+        /// remove once nothing needs it any more), as opposed to a caller-supplied path. See
         /// `Internals.Buffer.wholeFileURL`, the one external reader of this flag, for why the
         /// distinction matters outside this type.
         package let isTemporary: Bool

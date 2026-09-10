@@ -11,7 +11,7 @@ import Testing
 
 /// Executes a bare GET against `urlString` through `session`, mirroring what
 /// `RequestDL`'s `RawTask` does once it has resolved a `RequestConfiguration` into a plain
-/// `HTTPClient.Request` -- this file has no access to `RequestConfiguration` itself, since that
+/// `HTTPClient.Request`. This file has no access to `RequestConfiguration` itself, since that
 /// type lives in `RequestDL`, which depends on this module rather than the other way around.
 private func execute(session: Internals.Session, urlString: String) async throws -> Internals.AsyncResponse {
     let client = try await session.client()

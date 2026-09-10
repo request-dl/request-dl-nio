@@ -14,13 +14,13 @@ import Foundation
 import Security
 
 /// Covers `.strategy` mode over `.urlSession`, plus the cross-origin header stripping shared by
-/// both `.follow` and `.strategy` -- see the doc comment on `TaskDelegate.urlSession(_:task:
+/// both `.follow` and `.strategy`; see the doc comment on `TaskDelegate.urlSession(_:task:
 /// willPerformHTTPRedirection:newRequest:completionHandler:)`.
 struct InternalsURLSessionClientRedirectStrategyTests {
 
     @Test
     func execute_whenRedirectCrossOrigin_stripsSensitiveHeadersBeforeStrategySees() async throws {
-        // Given -- two different LocalServer ports count as two different origins.
+        // Given: two different LocalServer ports count as two different origins.
         let origin = try await LocalServer(.standard)
         let destination = try await LocalServer(
             .init(host: "localhost", port: 8891, option: .none)
@@ -70,7 +70,7 @@ struct InternalsURLSessionClientRedirectStrategyTests {
             delegate: AcceptAnyServerTrustDelegate()
         )
 
-        // Then -- the redirect went through to the cross-origin destination...
+        // Then: the redirect went through to the cross-origin destination...
         #expect(result.head.status.code == 200)
         let decoded = try JSONDecoder().decode(HTTPResult<String>.self, from: result.body)
         #expect(decoded.response == output)
@@ -81,15 +81,16 @@ struct InternalsURLSessionClientRedirectStrategyTests {
         #expect(!headers.contains(name: "Cookie"))
     }
 
-    /// - Note: Asserts on `Cookie` and a plain custom header, not `Authorization` --
+    /// - Note: Asserts on `Cookie` and a plain custom header, not `Authorization`:
     /// `URLSession` drops `Authorization` on *every* redirect it performs, same-origin included,
     /// as an OS-level default this type has no hook to override (confirmed empirically: swapping
-    /// this test's header to `Authorization` fails even though nothing here strips it). That is
-    /// strictly more conservative than the RFC 9110-derived, origin-only stripping this type adds
-    /// on top for `Cookie`/`Origin`/`Proxy-Authorization`, so it is not a gap.
+    /// this test's header to `Authorization` fails even though nothing here strips it).
+    ///
+    /// That is strictly more conservative than the RFC 9110-derived, origin-only stripping this
+    /// type adds on top for `Cookie`/`Origin`/`Proxy-Authorization`, so it is not a gap.
     @Test
     func execute_whenRedirectSameOrigin_preservesHeaders() async throws {
-        // Given -- both hops on the same LocalServer, so same origin.
+        // Given: both hops on the same LocalServer, so same origin.
         let localServer = try await LocalServer(.standard)
         let originPath = "/" + UUID().uuidString
         let destinationPath = "/" + UUID().uuidString
@@ -173,7 +174,7 @@ struct InternalsURLSessionClientRedirectStrategyTests {
             delegate: AcceptAnyServerTrustDelegate()
         )
 
-        // Then -- the redirect response itself, not the destination.
+        // Then: the redirect response itself, not the destination.
         #expect(result.head.status.code == 302)
         #expect(result.head.headerValues(named: "Location").first == destination)
     }
@@ -213,14 +214,14 @@ struct InternalsURLSessionClientRedirectStrategyTests {
             )
             Issue.record("Not expecting success")
         } catch is ThrowingRedirectStrategy.SomeError {
-            // Then -- expected
+            // Then: expected
         }
     }
 }
 
 // MARK: - Test doubles
 
-/// Synchronous by design -- `Internals.RedirectStrategy.redirectDecision(for:)` isn't `async`, so
+/// Synchronous by design: `Internals.RedirectStrategy.redirectDecision(for:)` isn't `async`, so
 /// capturing what it saw for later assertions must not go through anything that would let the
 /// test read it before the callback (called from URLSession's own delegate queue) has finished.
 private final class CapturedContext: Sendable {
@@ -262,9 +263,9 @@ private struct ThrowingRedirectStrategy: Internals.RedirectStrategy {
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling (see the identical
 /// delegate in `InternalsURLSessionClientRedirectTests`/`InternalsURLSessionClientTests` for why
-/// this exists at all: `LocalServer` is always TLS-terminated with a throwaway self-signed
+/// this exists at all): `LocalServer` is always TLS-terminated with a throwaway self-signed
 /// certificate, on every hop of a redirect chain, not only the first request.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 

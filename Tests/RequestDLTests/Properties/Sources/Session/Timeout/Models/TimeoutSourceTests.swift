@@ -31,8 +31,8 @@ struct TimeoutSourceTests {
         #expect(allTimeout == [.connect, .read])
     }
 
-    /// `.resource` means something different from `.connect`/`.read` -- a total end-to-end
-    /// deadline, not a per-phase one -- so it must never be folded into `.all`, or every existing
+    /// `.resource` means something different from `.connect`/`.read`: a total end-to-end
+    /// deadline, not a per-phase one. It must never be folded into `.all`, or every existing
     /// `.all` caller would silently start getting a resource-wide deadline they never asked for.
     @Test
     func allTimeout_neverIncludesResource() async throws {

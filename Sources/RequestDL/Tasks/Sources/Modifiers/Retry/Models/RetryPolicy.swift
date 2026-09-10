@@ -7,16 +7,16 @@
 ///
 /// Retrying re-executes the whole request from scratch: the ``Property`` content behind the task
 /// is resolved and sent again as if it were a brand-new call, not a resumption of the failed one.
-/// That is safe for requests that are safe to repeat -- `GET`/`HEAD`, or any request whose body is
-/// described declaratively (``Payload``'s `data`/`url`/`json` initializers, for instance) rather
-/// than consumed from a caller-owned, single-use stream that can't be read a second time.
+/// That is safe for requests that are safe to repeat, such as `GET`/`HEAD`, or any request whose
+/// body is described declaratively (``Payload``'s `data`/`url`/`json` initializers, for instance)
+/// rather than consumed from a caller-owned, single-use stream that can't be read a second time.
 ///
 /// It is **not** safe by default for requests with side effects that aren't idempotent (a `POST`
 /// that creates a resource, for example): if the original request actually reached the server but
-/// its response was lost -- a timeout, a dropped connection -- retrying it can duplicate that side
-/// effect. `RetryPolicy` has no visibility into the request it is applied to, so it cannot enforce
-/// this on its own; scope `shouldRetry` and where `.retry(_:)` is applied in the call graph
-/// accordingly.
+/// its response was lost, say to a timeout or a dropped connection, retrying it can duplicate
+/// that side effect. `RetryPolicy` has no visibility into the request it is applied to, so it
+/// cannot enforce this on its own; scope `shouldRetry` and where `.retry(_:)` is applied in the
+/// call graph accordingly.
 ///
 /// ```swift
 /// try await DataTask {
@@ -44,8 +44,8 @@ public struct RetryPolicy: Sendable {
     ///   - shouldRetry: Called with each thrown error to decide whether it is worth retrying.
     ///     Returning `false` stops retrying and rethrows that error immediately. Defaults to
     ///     retrying every error except cancellation, which is never retried.
-    ///   - delay: Called with the retry attempt number -- `1` for the delay before the second
-    ///     overall attempt, `2` before the third, and so on -- to compute how long to wait
+    ///   - delay: Called with the retry attempt number (`1` for the delay before the second
+    ///     overall attempt, `2` before the third, and so on) to compute how long to wait
     ///     before it.
     ///
     public init(

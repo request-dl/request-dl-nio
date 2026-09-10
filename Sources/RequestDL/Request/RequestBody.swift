@@ -29,8 +29,8 @@ public struct RequestBody: Sendable {
 
     // MARK: - Public properties
 
-    /// The size of each chunk used for streaming the body data. `.zero` for a compressing body --
-    /// chunking is the compressor's own business there, not a fixed size decided upfront.
+    /// The size of each chunk used for streaming the body data. `.zero` for a compressing body,
+    /// since chunking is the compressor's own business there, not a fixed size decided upfront.
     public var chunkSize: Int {
         switch backing {
         case .fixed(let body):
@@ -42,7 +42,7 @@ public struct RequestBody: Sendable {
 
     /// The total size of the body data in bytes.
     ///
-    /// - Important: For a compressing body, this reports the *original*, pre-compression size --
+    /// - Important: For a compressing body, this reports the *original*, pre-compression size:
     /// a best-effort upper-bound progress estimate, not the actual wire size, which isn't known
     /// until the whole body has streamed through. A progress reader dividing by this value sees
     /// its percentage approach completion a little before the upload actually finishes, rather
@@ -57,7 +57,7 @@ public struct RequestBody: Sendable {
     }
 
     /// The file this body already lives in, when nothing but reading it directly would be
-    /// needed to reproduce it exactly -- see `Internals.BodySequence.wholeFileURL`. Not public:
+    /// needed to reproduce it exactly (see `Internals.BodySequence.wholeFileURL`). Not public:
     /// this exists for `Internals.URLSessionClient+RequestExecutingClient.swift` to skip a
     /// redundant copy for a `Payload(url:)`-only body, not as API surface for callers of
     /// `RequestBody` itself.
@@ -73,7 +73,7 @@ public struct RequestBody: Sendable {
         }
     }
 
-    /// The size to declare on the wire -- `nil` switches both executors to unknown-length,
+    /// The size to declare on the wire. `nil` switches both executors to unknown-length,
     /// chunked-transfer upload. Distinct from the public ``totalSize``, which for a compressing
     /// body reports the *original* size as a progress estimate, never the (not-yet-known) wire
     /// size a `Content-Length`/declared-length upload would need to be exactly right.
@@ -110,7 +110,7 @@ public struct RequestBody: Sendable {
 
     // MARK: - Internal methods
 
-    /// Wraps this body so each chunk is compressed as it's pulled by the transport -- see
+    /// Wraps this body so each chunk is compressed as it's pulled by the transport. See
     /// `Internals.CompressingByteSequence`'s own doc comment for why that's worth doing over
     /// draining the whole body into memory before compression starts.
     func compressed(with algorithm: any Internals.CompressionAlgorithm) -> RequestBody {
@@ -119,7 +119,7 @@ public struct RequestBody: Sendable {
             return RequestBody(backing: .compressing(.init(source: body, algorithm: algorithm)))
         case .compressing:
             // `RequestConfiguration.applyCompression()` only ever calls this once, on a freshly
-            // assembled body -- reached only if some future caller compresses twice.
+            // assembled body; this case is reached only if some future caller compresses twice.
             return self
         }
     }
@@ -198,7 +198,7 @@ extension RequestBody: AsyncSequence {
         ///
         /// - Returns: The next `ByteBuffer` in the sequence, or `nil` if there are no more elements.
         /// - Throws: Whatever a configured ``Compressor``'s ``CompressorStream`` throws, for a
-        /// compressing body -- a fixed body never throws, but shares this signature so callers
+        /// compressing body. A fixed body never throws, but shares this signature so callers
         /// don't need to know which kind of `RequestBody` they were handed.
         ///
         public mutating func next() async throws -> NIOCore.ByteBuffer? {

@@ -18,16 +18,16 @@ import Foundation
 /// Unit coverage for `Internals.URLSessionUploadFile`, the replacement for the `InputStream`-based
 /// upload bridge (`Internals.URLSessionUploadStream`, removed) that was found to be permanently
 /// broken against `uploadTask(withStreamedRequest:)`. Independent of `URLSession`/a real network
-/// round trip -- that's `RequestConfigurationURLSessionClientUploadTests` in `RequestDLTests`.
+/// round trip: that's `RequestConfigurationURLSessionClientUploadTests` in `RequestDLTests`.
 ///
 /// `inMemoryThreshold` is passed explicitly and small throughout, rather than relying on the
-/// production default (`Internals.URLSessionUploadFile.inMemoryThreshold`, 8 MiB) -- these tests
+/// production default (`Internals.URLSessionUploadFile.inMemoryThreshold`, 8 MiB); these tests
 /// need to force each branch deterministically without allocating megabytes of payload per case.
 struct InternalsURLSessionUploadFileTests {
 
     @Test
     func write_whenBodyFitsWithinThreshold_returnsDataWithoutTouchingDisk() async throws {
-        // Given -- a recognizable, non-repeating byte pattern, so any reordering or corruption
+        // Given: a recognizable, non-repeating byte pattern, so any reordering or corruption
         // shows up as a content mismatch, not just a wrong total.
         let payload = Data((0..<1_000).map { UInt8($0 % 251) })
         let chunkSize = 77
@@ -69,7 +69,7 @@ struct InternalsURLSessionUploadFileTests {
 
     @Test
     func write_whenBodyExceedsThreshold_spillsToFileWithAllBytesInOrder() async throws {
-        // Given -- comfortably past a deliberately tiny threshold, so this exercises the spillover
+        // Given: comfortably past a deliberately tiny threshold, so this exercises the spillover
         // path (buffer what's already read, then keep draining straight to the file) rather than
         // the in-memory one.
         let payload = Data((0..<10_000).map { UInt8($0 % 251) })
@@ -98,7 +98,7 @@ struct InternalsURLSessionUploadFileTests {
 
     @Test
     func write_whenBodyThrowsWithinThreshold_rethrowsWithoutTouchingDisk() async throws {
-        // Given -- fails before the threshold is ever reached, so this exercises the in-memory
+        // Given: fails before the threshold is ever reached, so this exercises the in-memory
         // read loop's own error path, which never creates a file at all.
         struct UpstreamError: Error, Equatable {}
 
@@ -114,7 +114,7 @@ struct InternalsURLSessionUploadFileTests {
 
     @Test
     func write_whenBodyThrowsAfterSpillover_removesTheTemporaryFileAndRethrows() async throws {
-        // Given -- exceeds the threshold first (forcing the spillover file into existence), then
+        // Given: exceeds the threshold first (forcing the spillover file into existence), then
         // fails while still draining the remainder into it.
         struct UpstreamError: Error, Equatable {}
 
@@ -122,7 +122,7 @@ struct InternalsURLSessionUploadFileTests {
         continuation.yield(ByteBuffer(repeating: 0, count: 4_096))
         continuation.finish(throwing: UpstreamError())
 
-        // When / Then -- the failing path never hands back a `FileBufferURL` for the caller to
+        // When / Then: the failing path never hands back a `FileBufferURL` for the caller to
         // clean up itself, so a matching catch is the whole assertion: the file it wrote partway
         // through is already gone by the time this throws.
         await #expect(throws: UpstreamError.self) {

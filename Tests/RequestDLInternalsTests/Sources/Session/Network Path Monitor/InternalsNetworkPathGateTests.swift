@@ -22,7 +22,7 @@ private struct FakeNetworkPathObserver: Internals.NetworkPathObserving {
     }
 }
 
-/// An observer whose `updates()` stream never yields and never finishes on its own -- used to
+/// An observer whose `updates()` stream never yields and never finishes on its own; used to
 /// exercise real `Task` cancellation while `NetworkPathGate.wait(for:)` is awaiting it.
 private struct HangingNetworkPathObserver: Internals.NetworkPathObserving {
 

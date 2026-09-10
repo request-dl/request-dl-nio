@@ -16,11 +16,11 @@ struct FormNode: PropertyNode {
     let items: [FormItem]
 
     /// Captured from `inputs.environment.descriptorFormFields` at `_makeProperty` time by
-    /// whichever `Property` builds this node (`Form`, `FormGroup`) -- not read from inside
+    /// whichever `Property` builds this node (`Form`, `FormGroup`); not read from inside
     /// `make()` itself, since `PropertyNode.make(_:)` has no `environment` of its own to read.
     let descriptorFormFields: DescriptorFormFieldBox?
 
-    /// Same capture-at-`_makeProperty`-time reasoning as `descriptorFormFields` -- see
+    /// Same capture-at-`_makeProperty`-time reasoning as `descriptorFormFields`; see
     /// `PayloadNode`'s identical fields.
     let compression: (any Compressor)?
     let compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior

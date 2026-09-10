@@ -56,7 +56,7 @@ struct DataTaskTests {
     }
 
     /// A deadline this short is guaranteed to already have elapsed by the time the request even
-    /// reaches the network -- deterministic without needing an artificially slow server, the same
+    /// reaches the network: deterministic without needing an artificially slow server, the same
     /// technique real-network cancellation tests elsewhere in this suite rely on.
     @Test
     func dataTask_whenResourceTimeoutAlreadyElapsed_throwsResourceTimeoutError() async throws {
@@ -126,12 +126,14 @@ struct DataTaskTests {
 
     /// Pinned to `.nio`: a real client-certificate handshake over `.urlSession` is a confirmed,
     /// unconditional `withKnownIssue` on this SwiftPM test harness (no Keychain Sharing
-    /// entitlement on any platform -- see `RequestConfigurationURLSessionClientMTLSTests`'s type
+    /// entitlement on any platform; see `RequestConfigurationURLSessionClientMTLSTests`'s type
     /// doc comment, which already tracks this exact gap at the `Internals.URLSessionClient`
-    /// layer). Since `resolveExecutor()` decides which backend a real `DataTask` runs over,
-    /// this test would otherwise hit that same unconditional gap by default and fail for a
-    /// reason that has nothing to do with what it's actually verifying -- that mTLS client-cert
-    /// auth works end to end through the public `DataTask` API, which NIO already does reliably.
+    /// layer).
+    ///
+    /// Since `resolveExecutor()` decides which backend a real `DataTask` runs over, this test
+    /// would otherwise hit that same unconditional gap by default and fail for a reason that has
+    /// nothing to do with what it's actually verifying: that mTLS client-cert auth works end to
+    /// end through the public `DataTask` API, which NIO already does reliably.
     @Test
     func dataTask_whenCAEnabled() async throws {
         // Given
@@ -495,11 +497,13 @@ extension DataTaskTests {
     }
 
     /// `Session.requiredExecutor(_:)` must fail loudly at request time, not silently run on a
-    /// different executor -- this is `RawTask`'s own validation throwing `ExecutorRequirementError`,
+    /// different executor: this is `RawTask`'s own validation throwing `ExecutorRequirementError`,
     /// exercised through the real public `DataTask` entry point rather than by calling
     /// `Internals.Session.Configuration.requireExecutor(_:)` directly (already covered in
-    /// `InternalsSessionConfigurationExecutorTests`). No `LocalServer` needed -- the throw happens
-    /// before any client is built or network I/O starts.
+    /// `InternalsSessionConfigurationExecutorTests`).
+    ///
+    /// No `LocalServer` needed: the throw happens before any client is built or network I/O
+    /// starts.
     @Test
     func dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO() async throws {
         // Given: a custom cipher suite has no Network.framework equivalent at all (silently
@@ -525,7 +529,7 @@ extension DataTaskTests {
             _ = try await task.result()
             Issue.record("Not expecting success")
         } catch let error as ExecutorRequirementError {
-            // Then -- actionable, not just "it throws": names the pinned executor, the
+            // Then: actionable, not just "it throws". Names the pinned executor, the
             // conflicting field, and points at the escape hatch.
             #expect(error.requiredExecutor == .nioTransportServices)
             #expect(error.reasons == [.cipherSuiteValues])
@@ -535,7 +539,7 @@ extension DataTaskTests {
     }
 
     /// Counterpart to the test above: a `requiredExecutor` the configuration *can* actually run
-    /// on must not throw -- proving the validation doesn't reject compatible configurations along
+    /// on must not throw, proving the validation doesn't reject compatible configurations along
     /// the way.
     @Test
     func dataTask_whenRequiredExecutorIsCompatible_doesNotThrowExecutorRequirementError() async throws {

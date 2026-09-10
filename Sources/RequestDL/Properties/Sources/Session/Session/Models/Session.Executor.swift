@@ -12,7 +12,7 @@ extension Session {
         case urlSession
         /// SwiftNIO's Network.framework transport (`NIOTransportServices`).
         case nioTransportServices
-        /// Plain SwiftNIO -- the universal fallback available on every supported platform.
+        /// Plain SwiftNIO, the universal fallback available on every supported platform.
         case nio
 
         // MARK: - Inits

@@ -12,7 +12,7 @@ extension Internals {
         case follow(max: Int, allowCycles: Bool)
 
         /// Redirects are handed to a pluggable ``Internals/RedirectStrategy``. There is no
-        /// built-in redirect-count/cycle limit in this mode -- it replaces, not composes with,
+        /// built-in redirect-count/cycle limit in this mode: it replaces, not composes with,
         /// `.follow`'s limits, mirroring `AsyncHTTPClient.HTTPClient.Configuration
         /// .RedirectConfiguration.strategy(_:)`, which this bridges to for the NIO executor. See
         /// `RequestDL.RedirectStrategy` for why.
@@ -35,7 +35,7 @@ extension Internals {
 
 // MARK: - Equatable
 
-// `.strategy` carries an existential with no meaningful notion of equality, so -- like `NaN` --
+// `.strategy` carries an existential with no meaningful notion of equality, so, like `NaN`,
 // a `.strategy` value is never equal to any other value, including another `.strategy`. This is
 // deliberate, matching AsyncHTTPClient's own `RedirectConfiguration.Mode`: a `Session` carrying a
 // `.strategy` never matches a previously pooled client's `Internals.Session.Configuration` by

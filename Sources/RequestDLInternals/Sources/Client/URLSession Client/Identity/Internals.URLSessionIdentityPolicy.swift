@@ -21,9 +21,9 @@ extension Internals {
 
     /// The resolved, `URLSession`-ready form of one `Internals.SecureConnection`: a client
     /// identity (if `certificateChain`/`privateKey` were configured), composed with an
-    /// `Internals.ServerTrustPolicy` for the trust roots/verification mode/SPKI pinning half -- the one part
-    /// of this that needs no Keychain round-trip, and so is reusable on its own wherever only
-    /// that half is needed.
+    /// `Internals.ServerTrustPolicy` for the trust roots/verification mode/SPKI pinning half, the
+    /// one part of this that needs no Keychain round-trip, and so is reusable on its own wherever
+    /// only that half is needed.
     ///
     /// Built once per `SecureConnection` and held for as long as the owning
     /// `Internals.URLSessionClient` is alive, mirroring NIOSSL's own per-connection

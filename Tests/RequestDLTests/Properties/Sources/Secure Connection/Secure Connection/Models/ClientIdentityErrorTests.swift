@@ -10,15 +10,18 @@ import Testing
 
 @testable import RequestDL
 
-/// Covers `ClientIdentityError`'s own rewrap/description logic -- independent of the real
+/// Covers `ClientIdentityError`'s own rewrap/description logic, independent of the real
 /// Keychain round-trip that actually triggers it (`RawTaskExecutorDispatchTests` covers that end
-/// to end through the public `DataTask` API). Without this type, `RawTask.result()` would let
+/// to end through the public `DataTask` API).
+///
+/// Without this type, `RawTask.result()` would let
 /// `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy.ConfigurationError`
-/// -- both package-visible, unreachable by name outside this package -- leak straight to a public
+/// (both package-visible, unreachable by name outside this package) leak straight to a public
 /// `DataTask`/`UploadTask`/`DownloadTask` caller, and `error.localizedDescription` on either one
 /// is Foundation's generic "The operation couldn't be completed" text, not the actionable message
-/// their own `CustomStringConvertible.description` carries. These tests pin both the rewrap and
-/// the `errorDescription`/`localizedDescription` fix in place.
+/// their own `CustomStringConvertible.description` carries.
+///
+/// These tests pin both the rewrap and the `errorDescription`/`localizedDescription` fix in place.
 struct ClientIdentityErrorTests {
 
     @Test
@@ -63,8 +66,8 @@ struct ClientIdentityErrorTests {
         #expect(error.description.contains("Using-a-Client-Certificate-with-URLSession.md"))
     }
 
-    /// The exact gap this type exists to close: `.localizedDescription` -- what most catch sites
-    /// actually print/display -- must carry the same actionable text `.description` does, not
+    /// The exact gap this type exists to close: `.localizedDescription` (what most catch sites
+    /// actually print/display) must carry the same actionable text `.description` does, not
     /// Foundation's generic NSError fallback. Confirmed failing before `LocalizedError`
     /// conformance was added (see the phase's own investigation), not assumed.
     @Test
@@ -103,7 +106,7 @@ struct ClientIdentityErrorTests {
         #expect(status == errSecItemNotFound)
         #expect(error.description.contains("SecItemCopyMatching(identity)"))
         #expect(error.description.contains("\(errSecItemNotFound)"))
-        // This bucket must not claim a missing entitlement -- it can be a genuinely different,
+        // This bucket must not claim a missing entitlement: it can be a genuinely different,
         // still-unresolved issue on non-sandboxed macOS (see <doc:Using-a-Client-Certificate-with-URLSession>'s
         // "Platforms" section), and telling someone to add a capability that won't fix it would be
         // actively misleading.

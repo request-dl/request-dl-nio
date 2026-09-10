@@ -20,7 +20,7 @@ enum DigestAlgorithm: Sendable, Hashable {
 
     // MARK: - Inits
 
-    /// - Parameter rawValue: The challenge's `algorithm` parameter, or `nil` when absent --
+    /// - Parameter rawValue: The challenge's `algorithm` parameter, or `nil` when absent,
     /// which RFC 7616 §3.3 says implies `MD5`, the same default RFC 2069 always assumed.
     init?(rawValue: String?) {
         switch rawValue?.uppercased() {
@@ -41,7 +41,7 @@ enum DigestAlgorithm: Sendable, Hashable {
 
     /// Whether this is a `-sess` variant, which folds a client/server nonce pair into `HA1`
     /// itself rather than recomputing it fresh for every request. Not currently supported by
-    /// ``DigestAuthentication`` -- see its own doc comment.
+    /// ``DigestAuthentication``; see its own doc comment.
     var isSession: Bool {
         switch self {
         case .md5Sess, .sha256Sess:

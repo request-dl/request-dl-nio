@@ -13,7 +13,7 @@ import Foundation
 import Security
 
 /// `.socks`, mapped onto `URLSessionConfiguration.connectionProxyDictionary`'s `SOCKSEnable`/
-/// `SOCKSProxy`/`SOCKSPort` keys -- the SOCKS counterpart to
+/// `SOCKSProxy`/`SOCKSPort` keys: the SOCKS counterpart to
 /// `InternalsURLSessionClientProxyTests`, proving a full SOCKS5 handshake (`LocalSOCKSProxy`, a
 /// real hand-rolled server, not just a byte-counting listener) actually carries traffic end to
 /// end, not just that `URLSession` dials the configured address
@@ -21,11 +21,13 @@ import Security
 ///
 /// **Same macOS/Catalyst-only known issue as the `.http` suite, for the same reason:**
 /// `LocalServer`/`LocalSOCKSProxy` always bind to `localhost`, and macOS/Catalyst bypass a
-/// configured proxy for `localhost` by name as OS-level policy, independent of protocol --
-/// confirmed for `.http` in `InternalsProxyDictionaryPlatformTests`, and this OS policy has no
-/// reason to distinguish SOCKS from HTTP CONNECT (both are just "is this destination proxied at
-/// all," decided before either protocol is spoken). iOS, tvOS, watchOS, and visionOS Simulators
-/// don't bypass `localhost`, so these round trips genuinely pass there.
+/// configured proxy for `localhost` by name as OS-level policy, independent of protocol. This
+/// was confirmed for `.http` in `InternalsProxyDictionaryPlatformTests`, and this OS policy has
+/// no reason to distinguish SOCKS from HTTP CONNECT (both are just "is this destination proxied
+/// at all," decided before either protocol is spoken).
+///
+/// iOS, tvOS, watchOS, and visionOS Simulators don't bypass `localhost`, so these round trips
+/// genuinely pass there.
 struct InternalsURLSessionClientSOCKSProxyTests {
 
     /// See the type doc comment, and `InternalsProxyDictionaryPlatformTests`'s file-level one, for
@@ -68,7 +70,7 @@ struct InternalsURLSessionClientSOCKSProxyTests {
             delegate: AcceptAnyServerTrustDelegate()
         )
 
-        // Then -- expected to fail only on macOS/Catalyst (see the type doc comment); genuinely
+        // Then: expected to fail only on macOS/Catalyst (see the type doc comment); genuinely
         // passes elsewhere, reaching the destination through a real SOCKS5 handshake and decoding
         // `output`.
         try withKnownIssue(
@@ -86,7 +88,7 @@ struct InternalsURLSessionClientSOCKSProxyTests {
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling; see the identical
 /// delegate in the other `Internals.URLSessionClient` test files for why this exists at all:
 /// `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

@@ -41,7 +41,7 @@ struct DigestChallengeTests {
 
     @Test
     func init_whenQopOffersAuthAndAuthInt_recognizesAuth() throws {
-        // Given -- a comma-separated qop list inside quotes, per RFC 7616 §3.3.
+        // Given: a comma-separated qop list inside quotes, per RFC 7616 §3.3.
         let header = #"Digest realm="test", qop="auth,auth-int", nonce="abc123""#
 
         // When
@@ -96,7 +96,7 @@ struct DigestChallengeTests {
 
     @Test
     func init_toleratesACommaInsideAQuotedValue() throws {
-        // Given -- a comma inside `opaque`, which RFC 7616 does not forbid.
+        // Given: a comma inside `opaque`, which RFC 7616 does not forbid.
         let header = #"Digest realm="test", nonce="abc123", opaque="left,right""#
 
         // When

@@ -5,8 +5,8 @@
 import RequestDLInternals
 
 /// Adapts a `RequestDL.RedirectStrategy` to `Internals.RedirectStrategy`, translating between
-/// this module's public request/response types and the ones `Internals` -- shared by both
-/// transports -- can reference without depending back on this module.
+/// this module's public request/response types and the ones `Internals` (shared by both
+/// transports) can reference without depending back on this module.
 struct InternalsRedirectStrategyAdapter: Internals.RedirectStrategy {
 
     // MARK: - Internal properties

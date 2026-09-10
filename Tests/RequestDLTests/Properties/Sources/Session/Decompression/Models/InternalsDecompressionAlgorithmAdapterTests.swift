@@ -9,7 +9,7 @@ import Testing
 struct InternalsDecompressionAlgorithmAdapterTests {
 
     /// A genuinely custom `Decompressor` that happens to claim the same `contentEncodingValue`
-    /// as a built-in placeholder -- exactly the shape a caller would reach for to replace
+    /// as a built-in placeholder: exactly the shape a caller would reach for to replace
     /// ``GzipAlgorithm``'s (silent, OS-native) handling with their own logic.
     private struct CustomAlgorithm: Decompressor {
         let contentEncodingValue: String
@@ -42,9 +42,9 @@ struct InternalsDecompressionAlgorithmAdapterTests {
         contentEncodingValue: String
     ) {
         // A custom algorithm claiming "gzip"/"deflate"/"br" must NOT be mistaken for the built-in
-        // placeholder that shares its wire name -- otherwise `.urlSession` would let CFNetwork
+        // placeholder that shares its wire name; otherwise `.urlSession` would let CFNetwork
         // decode the response transparently and this algorithm would never actually run. Only
-        // the three built-in types above -- which do nothing themselves -- get `true`.
+        // the three built-in types above (which do nothing themselves) get `true`.
         let adapter = InternalsDecompressionAlgorithmAdapter(
             algorithm: CustomAlgorithm(contentEncodingValue: contentEncodingValue)
         )
@@ -64,7 +64,7 @@ struct InternalsDecompressionAlgorithmAdapterTests {
 
     @Test
     func isNativelyDecodedByNIO_whenBrotliURLSessionOnlyAlgorithm_isFalse() {
-        // `NIOHTTPCompression` has no brotli decoder at all, native or otherwise -- unlike
+        // `NIOHTTPCompression` has no brotli decoder at all, native or otherwise; unlike
         // `isNativelyDecodedByURLSession`, brotli is never natively decoded here.
         #expect(
             !InternalsDecompressionAlgorithmAdapter(algorithm: BrotliURLSessionOnlyAlgorithm())
@@ -77,7 +77,7 @@ struct InternalsDecompressionAlgorithmAdapterTests {
         contentEncodingValue: String
     ) {
         // A custom algorithm claiming "gzip"/"deflate" must NOT be mistaken for the built-in
-        // placeholder that shares its wire name -- otherwise `async-http-client`'s own
+        // placeholder that shares its wire name; otherwise `async-http-client`'s own
         // `NIOHTTPResponseDecompressor` would decode the response transparently and this
         // algorithm would never actually run.
         let adapter = InternalsDecompressionAlgorithmAdapter(

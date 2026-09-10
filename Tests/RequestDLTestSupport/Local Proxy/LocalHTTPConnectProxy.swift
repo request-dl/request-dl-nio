@@ -14,24 +14,29 @@ import struct Foundation.Data
 
 /// A minimal HTTP `CONNECT` proxy.
 ///
-/// No pre-existing NIO-backend proxy round-trip fixture existed to reuse -- `ProxyTests`
+/// No pre-existing NIO-backend proxy round-trip fixture existed to reuse: `ProxyTests`
 /// (`RequestDLTests`) and `InternalsProxyTests` (`RequestDLInternalsTests`) only cover config
-/// mapping, never an actual proxied connection. This stands in for a real forward proxy just
-/// enough to prove a `CONNECT` tunnel (with optional Basic proxy authentication) actually carries
-/// traffic: it accepts one `CONNECT host:port` request, optionally challenges it for
-/// `Proxy-Authorization`, replies `200 Connection Established`, then relays raw bytes both ways
-/// between the accepted connection and a freshly dialed one to `host:port` -- opaque after that
-/// point, so it works equally for a plain or TLS-wrapped tunnel (`LocalServer` is always TLS).
+/// mapping, never an actual proxied connection.
 ///
-/// Deliberately hand-parses the `CONNECT` request/writes the response as raw bytes rather than
-/// using `NIOHTTP1`'s codec (`HTTPRequestDecoder`/`HTTPResponseEncoder`) removed mid-connection --
-/// an earlier version did that, and removing handlers asynchronously while the client is free to
-/// start writing tunnel bytes (a TLS `ClientHello`, the instant it sees the `200`) the moment the
-/// response is flushed raced the removal on iOS/tvOS/watchOS/visionOS Simulators (reliably; never
-/// observed on macOS): bytes meant for the tunnel could still reach the not-yet-removed
-/// `HTTPRequestDecoder`, which trips `NIOAny`'s type-mismatch fatal error on anything that isn't
-/// a well-formed HTTP request. One handler for the whole connection, switching mode internally
-/// once the `CONNECT` is answered, has no such window -- nothing is ever removed from the pipeline.
+/// This stands in for a real forward proxy just enough to prove a `CONNECT` tunnel (with
+/// optional Basic proxy authentication) actually carries traffic: it accepts one `CONNECT
+/// host:port` request, optionally challenges it for `Proxy-Authorization`, replies `200
+/// Connection Established`, then relays raw bytes both ways between the accepted connection and
+/// a freshly dialed one to `host:port`. It's opaque after that point, so it works equally for a
+/// plain or TLS-wrapped tunnel (`LocalServer` is always TLS).
+///
+/// Deliberately hand-parses the `CONNECT` request and writes the response as raw bytes, rather
+/// than using `NIOHTTP1`'s codec (`HTTPRequestDecoder`/`HTTPResponseEncoder`) removed
+/// mid-connection. An earlier version did that: removing handlers asynchronously while the
+/// client is free to start writing tunnel bytes (a TLS `ClientHello`, the instant it sees the
+/// `200`) the moment the response is flushed raced the removal on iOS/tvOS/watchOS/visionOS
+/// Simulators (reliably; never observed on macOS).
+///
+/// Bytes meant for the tunnel could still reach the not-yet-removed `HTTPRequestDecoder`, which
+/// trips `NIOAny`'s type-mismatch fatal error on anything that isn't a well-formed HTTP request.
+///
+/// One handler for the whole connection, switching mode internally once the `CONNECT` is
+/// answered, has no such window: nothing is ever removed from the pipeline.
 struct LocalHTTPConnectProxy: Sendable {
 
     // MARK: - Internal properties
@@ -42,7 +47,7 @@ struct LocalHTTPConnectProxy: Sendable {
     /// How many `CONNECT` requests this proxy has actually received, successful or not.
     ///
     /// Exists so a test can assert the proxy was genuinely used rather than the request having
-    /// somehow reached its destination directly -- both `127.0.0.1` targets and system-level
+    /// somehow reached its destination directly: both `127.0.0.1` targets and system-level
     /// "bypass proxy for local addresses" rules are exactly the kind of thing that silently
     /// short-circuits proxying and would otherwise let a broken `connectionProxyDictionary`
     /// mapping pass every test for the wrong reason.
@@ -110,14 +115,16 @@ final class ConnectAttemptCounter: @unchecked Sendable {
 /// One instance per accepted connection. Starts in `.awaitingRequest`, hand-parsing raw bytes
 /// until a full `CONNECT` request (terminated by a blank line) has arrived; once answered, flips
 /// to `.relaying` and every subsequent byte is forwarded to the dialed destination channel
-/// instead -- the same handler, the same pipeline position, throughout.
+/// instead: the same handler, the same pipeline position, throughout.
 ///
 /// `@unchecked` rather than provably `Sendable`: NIO guarantees every `ChannelHandler` callback
 /// for one channel runs on that channel's own `EventLoop`, one at a time, so `mode`/`buffer` are
-/// never actually touched concurrently. `startRelay(...)`'s `[weak self]` capture (needed since
-/// `ClientBootstrap(...).connect(...)`'s completion isn't guaranteed to land back on that same
-/// `EventLoop`) is itself what actually needs this -- the write to `mode` inside it is explicitly
-/// hopped onto `clientChannel.eventLoop` (this handler's own) before touching it.
+/// never actually touched concurrently.
+///
+/// `startRelay(...)`'s `[weak self]` capture (needed since `ClientBootstrap(...).connect(...)`'s
+/// completion isn't guaranteed to land back on that same `EventLoop`) is itself what actually
+/// needs this: the write to `mode` inside it is explicitly hopped onto `clientChannel.eventLoop`
+/// (this handler's own) before touching it.
 private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
@@ -173,7 +180,7 @@ private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
 
     // MARK: - Private methods
 
-    /// A `CONNECT` request has no body -- the blank line ending its headers also ends the
+    /// A `CONNECT` request has no body: the blank line ending its headers also ends the
     /// request, so waiting for `"\r\n\r\n"` is sufficient (no `Content-Length`/chunked handling
     /// needed, unlike a general HTTP/1.1 parser).
     private func processBufferedRequest(context: ChannelHandlerContext) {
@@ -236,7 +243,7 @@ private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
         let host = String(components[0])
 
         // Anything the client pipelined onto the same TCP segment as the `CONNECT` request
-        // itself (a TLS `ClientHello`, in principle) is tunnel data, not more request to parse --
+        // itself (a TLS `ClientHello`, in principle) is tunnel data, not more request to parse;
         // held onto and relayed once the tunnel exists, not dropped. `headerEndRange` is already
         // in `buffer`'s own (absolute) index space, same as `ByteBufferView`'s throughout.
         let leftoverStart = headerEndRange.lowerBound + 4
@@ -258,11 +265,12 @@ private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
         var out = context.channel.allocator.buffer(capacity: response.utf8.count)
         out.writeString(response)
 
-        // Raw `ByteBuffer`, not `wrapOutboundOut(out)`'s `NIOAny` -- `Channel.writeAndFlush` has a
+        // Raw `ByteBuffer`, not `wrapOutboundOut(out)`'s `NIOAny`: `Channel.writeAndFlush` has a
         // generic `Sendable`-constrained overload for exactly this (`ByteBuffer` is `Sendable`),
-        // where the `NIOAny`-typed overload is deprecated. `channel`, not `context`, is what's
-        // safe to hold onto across `whenComplete` -- see `LocalServer.HTTPHandler`'s own comment
-        // on the same pattern.
+        // where the `NIOAny`-typed overload is deprecated.
+        //
+        // `channel`, not `context`, is what's safe to hold onto across `whenComplete`; see
+        // `LocalServer.HTTPHandler`'s own comment on the same pattern.
         let channel = context.channel
 
         channel.writeAndFlush(out).whenComplete { _ in
@@ -274,7 +282,7 @@ private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
         buffer.clear()
     }
 
-    /// Dials `host:port`, answers the `CONNECT` with `200`, and flips `mode` to `.relaying` --
+    /// Dials `host:port`, answers the `CONNECT` with `200`, and flips `mode` to `.relaying`:
     /// from here on `channelRead` forwards to `outboundChannel` directly, and a lightweight
     /// closure-based handler on `outboundChannel`'s own pipeline forwards the other direction.
     /// Nothing is ever added to or removed from *this* channel's pipeline.
@@ -317,7 +325,7 @@ private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
     // MARK: - Private static methods
 
     /// `ByteBufferView` has no built-in subsequence search (that's `swift-algorithms`, not a
-    /// dependency here) -- header sizes here are a few hundred bytes at most, so the naive scan
+    /// dependency here); header sizes here are a few hundred bytes at most, so the naive scan
     /// is more than fast enough.
     private static func firstRange(of pattern: [UInt8], in view: ByteBufferView) -> Range<Int>? {
         guard !pattern.isEmpty, view.count >= pattern.count else {
@@ -347,7 +355,7 @@ private final class ConnectHandler: ChannelInboundHandler, @unchecked Sendable {
 }
 
 /// The destination side of a tunnel: forwards every byte read back to the original client
-/// connection, and closes it once the destination goes away. Not `private` -- `LocalSOCKSProxy`
+/// connection, and closes it once the destination goes away. Not `private`: `LocalSOCKSProxy`
 /// reuses this verbatim for its own tunnel, the relay half being identical regardless of which
 /// proxy protocol negotiated it.
 ///
@@ -381,7 +389,7 @@ extension StringProtocol {
     }
 
     /// `trimmingCharacters(in: .whitespaces)` needs full `Foundation` (`CharacterSet`), not
-    /// available under `FoundationEssentials` on Linux -- this header-value trim only ever needs
+    /// available under `FoundationEssentials` on Linux; this header-value trim only ever needs
     /// to strip plain ASCII spaces, so it doesn't need `Foundation` at all.
     fileprivate func trimmingLeadingAndTrailingSpaces() -> String {
         var value = Substring(self)

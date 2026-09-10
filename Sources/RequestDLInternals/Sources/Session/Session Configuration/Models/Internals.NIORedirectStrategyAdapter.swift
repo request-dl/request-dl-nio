@@ -12,7 +12,7 @@ extension Internals {
     /// directly from its own redirect delegate.
     ///
     /// - Important: Only `url`/`method`/`headers` round-trip through `Internals.RedirectRequest`.
-    /// `HTTPClientRequest.body` -- along with everything else `HTTPClientRequest` carries -- is
+    /// `HTTPClientRequest.body` (along with everything else `HTTPClientRequest` carries) is
     /// taken from AsyncHTTPClient's own candidate request untouched, since
     /// `Internals.RedirectRequest` has no supported way to replace it (see
     /// ``Internals/RedirectRequest/hasBody``).
@@ -30,7 +30,7 @@ extension Internals {
             let decision = try strategy.redirectDecision(
                 for: .init(
                     redirectRequest: .init(context.redirectRequest),
-                    // `context.response` is the response of `history`'s last entry -- see
+                    // `context.response` is the response of `history`'s last entry: see
                     // `HTTPClientRedirectContext`'s own doc comment ("the full per-request
                     // `history`... including the one that produced [the response]").
                     response: .init(context.response, url: history.last?.request.url ?? ""),

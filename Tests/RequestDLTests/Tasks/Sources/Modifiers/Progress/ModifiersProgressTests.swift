@@ -230,9 +230,11 @@ struct ModifiersProgressTests {
 
         let result = try HTTPResult<String>(data)
 
-        // Then -- decoded-content equality, not a byte-count comparison against a hand-built
-        // envelope: the server's JSON response can grow additional optional fields over time
-        // (e.g. `receivedUserAgentHeader`), which would throw off a raw size comparison without
+        // Then: decoded-content equality, not a byte-count comparison against a hand-built
+        // envelope.
+        //
+        // The server's JSON response can grow additional optional fields over time (e.g.
+        // `receivedUserAgentHeader`), which would throw off a raw size comparison without
         // actually reflecting anything wrong with the response itself.
         #expect(result.response == message)
         #expect(downloadMonitor.totalSize == data.count)
@@ -275,12 +277,15 @@ struct ModifiersProgressTests {
 
             // Pinned to `.nio`: the assertion below expects upload progress to fire in exact
             // `payloadChunkSize(64)` increments, which is `Internals.BodySequence`'s own
-            // NIO/streaming-body chunking guarantee, not a portable one -- URLSession's
-            // `uploadTask(with:from:)` (used for a body this small) reports the whole upload in a
-            // single `didSendBodyData` callback instead, since individual upload chunk sizes are
-            // executor-specific. The download chunk-boundary assertion further below stays
-            // executor-portable on purpose (it holds on `.urlSession` too) -- only the upload
-            // half of this test is backend-specific.
+            // NIO/streaming-body chunking guarantee, not a portable one.
+            //
+            // URLSession's `uploadTask(with:from:)` (used for a body this small) reports the
+            // whole upload in a single `didSendBodyData` callback instead, since individual
+            // upload chunk sizes are executor-specific.
+            //
+            // The download chunk-boundary assertion further below stays executor-portable on
+            // purpose (it holds on `.urlSession` too); only the upload half of this test is
+            // backend-specific.
             Session.localServer
                 .requiredExecutor(.nio)
 

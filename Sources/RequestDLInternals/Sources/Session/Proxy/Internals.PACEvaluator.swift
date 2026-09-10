@@ -16,19 +16,21 @@ import struct Foundation.URL
 
 extension Internals {
 
-    /// Bridges `CFNetworkExecuteProxyAutoConfigurationURL` -- a callback/`CFRunLoopSource` API,
-    /// not `async`-native -- into `async throws`.
+    /// Bridges `CFNetworkExecuteProxyAutoConfigurationURL` (a callback/`CFRunLoopSource` API,
+    /// not `async`-native) into `async throws`.
     ///
     /// The Swift Concurrency cooperative thread pool never runs a `CFRunLoop` on any of its
     /// threads (nothing calls `CFRunLoopRun()`/`CFRunLoopRunInMode()` there), so simply adding
     /// the source CFNetwork hands back to "the current run loop" from a `Task` would leave it
-    /// registered but never pumped -- the callback would never fire, and the awaiting
-    /// continuation would hang forever. This spins one dedicated, short-lived `Thread` per
-    /// evaluation instead, whose only job is to add the source to its own run loop and pump that
-    /// loop (`CFRunLoopRunInMode`) until either the callback fires or `timeout` elapses.
+    /// registered but never pumped: the callback would never fire, and the awaiting
+    /// continuation would hang forever.
+    ///
+    /// This spins one dedicated, short-lived `Thread` per evaluation instead, whose only job is
+    /// to add the source to its own run loop and pump that loop (`CFRunLoopRunInMode`) until
+    /// either the callback fires or `timeout` elapses.
     ///
     /// One thread per call, not a shared long-lived one: PAC evaluation is a rare, slow
-    /// (network-fetch-bound), cached operation (see `Internals.PACProxyCache`) -- the cost of
+    /// (network-fetch-bound), cached operation (see `Internals.PACProxyCache`), so the cost of
     /// spinning a thread per *uncached* call is negligible next to the fetch itself, and it
     /// avoids the lifecycle/reentrancy bookkeeping a shared pumped run loop would need for
     /// concurrent callers.
@@ -49,14 +51,15 @@ extension Internals {
         /// returns the first directly-usable proxy the script resolves to (`nil` for an explicit
         /// direct connection, or for a script that resolves to nothing this package recognizes).
         ///
-        /// Parsed via `Internals.SystemProxyResolver.firstUsableProxy(in:)` -- the exact same
+        /// Parsed via `Internals.SystemProxyResolver.firstUsableProxy(in:)`, the exact same
         /// dictionary-shape parsing the non-PAC path already does, since
         /// `CFNetworkExecuteProxyAutoConfigurationURL`'s result uses the identical shape
-        /// `CFNetworkCopyProxiesForURL` does (minus any `kCFProxyTypeAutoConfigurationURL` entry --
-        /// CFNetwork's own guarantee that a script cannot chain to another PAC file). Parsed
-        /// inside `pacEvaluationCallback`, before the result ever crosses back into `async`
-        /// context: the raw `CFArray` of `[String: Any]` dictionaries isn't `Sendable`, but the
-        /// parsed `Internals.Proxy?` is.
+        /// `CFNetworkCopyProxiesForURL` does (minus any `kCFProxyTypeAutoConfigurationURL` entry,
+        /// CFNetwork's own guarantee that a script cannot chain to another PAC file).
+        ///
+        /// This parsing happens inside `pacEvaluationCallback`, before the result ever crosses
+        /// back into `async` context: the raw `CFArray` of `[String: Any]` dictionaries isn't
+        /// `Sendable`, but the parsed `Internals.Proxy?` is.
         package static func evaluate(
             scriptURL: URL,
             targetURL: URL,
@@ -77,7 +80,7 @@ extension Internals {
 }
 
 /// Owns exactly one `evaluate(...)` call's continuation, the run loop that pumps it, and the
-/// `CFRunLoopSource` CFNetwork hands back -- one instance per call, never shared, never reused.
+/// `CFRunLoopSource` CFNetwork hands back: one instance per call, never shared, never reused.
 private final class PACContinuationBox: @unchecked Sendable {
 
     // MARK: - Private properties
@@ -94,7 +97,7 @@ private final class PACContinuationBox: @unchecked Sendable {
 
     // MARK: - Internal methods
 
-    /// Runs entirely on the dedicated thread `PACEvaluator.evaluate(...)` spun up for it --
+    /// Runs entirely on the dedicated thread `PACEvaluator.evaluate(...)` spun up for it. It
     /// blocks that thread (and only that thread) until `resume(returning:)`/`resume(throwing:)`
     /// has been called exactly once, one way or another.
     func run(scriptURL: URL, targetURL: URL, timeout: Double) {
@@ -119,7 +122,7 @@ private final class PACContinuationBox: @unchecked Sendable {
         defer { CFRunLoopRemoveSource(runLoop, source, .defaultMode) }
 
         // `false`: only `CFRunLoopStop(_:)` (fired by `pacEvaluationCallback` below, the instant
-        // the result is in) or `timeout` elapsing ends this -- not merely the first source this
+        // the result is in) or `timeout` elapsing ends this, not merely the first source this
         // run loop happens to service, which need not be the PAC one.
         let result = CFRunLoopRunInMode(.defaultMode, timeout, false)
 
@@ -145,7 +148,7 @@ private final class PACContinuationBox: @unchecked Sendable {
     }
 }
 
-/// `@convention(c)`, so it cannot capture anything -- `info` (round-tripped through
+/// `@convention(c)`, so it cannot capture anything: `info` (round-tripped through
 /// `CFStreamClientContext` unretained, since the box already outlives the call by blocking its
 /// own thread in `CFRunLoopRunInMode` for exactly this long) is how `PACContinuationBox.run(...)`
 /// hands this its identity back.

@@ -11,13 +11,15 @@ extension Internals {
     /// A shared, process-lifetime wrapper around a single `NWPathMonitor`, fanning its updates
     /// out to any number of concurrent ``updates()`` subscribers.
     ///
-    /// One `NWPathMonitor` for the whole process, not one per request/gate call -- starting a
-    /// fresh monitor has real overhead. Lazily created via `.shared`'s own thread-safe lazy
-    /// static initialization, so a process that never sets `allowsCellularAccess`/
-    /// `allowsExpensiveNetworkAccess`/`allowsConstrainedNetworkAccess`/`waitsForConnectivity`
-    /// never starts an `NWPathMonitor` at all -- `Internals.NetworkPathGate.wait(for:)` is only
-    /// ever called when at least one of those four is set, and `.shared` is only referenced from
-    /// inside that call's default `observer` argument.
+    /// One `NWPathMonitor` for the whole process, not one per request/gate call: starting a
+    /// fresh monitor has real overhead.
+    ///
+    /// Lazily created via `.shared`'s own thread-safe lazy static initialization, so a process
+    /// that never sets `allowsCellularAccess`/`allowsExpensiveNetworkAccess`/
+    /// `allowsConstrainedNetworkAccess`/`waitsForConnectivity` never starts an `NWPathMonitor`
+    /// at all: `Internals.NetworkPathGate.wait(for:)` is only ever called when at least one of
+    /// those four is set, and `.shared` is only referenced from inside that call's default
+    /// `observer` argument.
     package final class NetworkPathMonitor: NetworkPathObserving, @unchecked Sendable {
 
         package static let shared = NetworkPathMonitor()
@@ -87,7 +89,7 @@ extension Internals {
             }
         }
 
-        /// Identity anchor for a single `updates()` subscription -- kept alive by its own
+        /// Identity anchor for a single `updates()` subscription, kept alive by its own
         /// `onTermination` closure until termination fires, then released.
         private final class SubscriberToken: Sendable {}
     }

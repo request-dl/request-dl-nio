@@ -10,7 +10,7 @@ import struct Foundation.Data
 
 /// Incrementally decodes `text/event-stream` bytes into ``ServerSentEvent`` values.
 ///
-/// Bytes are fed in arbitrary chunks via ``feed(_:)`` -- a chunk may end mid-line, and a line may even
+/// Bytes are fed in arbitrary chunks via ``feed(_:)``: a chunk may end mid-line, and a line may even
 /// be split across a `CR`/`LF` boundary between two chunks. State is kept internally so a caller never
 /// has to reassemble lines itself.
 struct ServerSentEventParser {
@@ -39,7 +39,7 @@ struct ServerSentEventParser {
         return events
     }
 
-    /// Flushes whatever the stream left buffered when it ended -- a trailing line with no `CR`/`LF`
+    /// Flushes whatever the stream left buffered when it ended: a trailing line with no `CR`/`LF`
     /// terminator, and/or a frame that was never closed off by a final blank line. Real servers
     /// routinely close the connection right after the last event without emitting that blank line,
     /// so treating end-of-stream as an implicit frame boundary avoids silently dropping it.

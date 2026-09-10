@@ -101,7 +101,7 @@ struct RequestBodyBuildingTests {
 
     @Test
     func requestBody_whenBackedByASingleUnreadFile_wholeFileURLReturnsThatFile() async throws {
-        // Given -- forwards straight to `Internals.BodySequence.wholeFileURL`; see
+        // Given: forwards straight to `Internals.BodySequence.wholeFileURL`; see
         // `InternalsBodySequenceTests`/`InternalsFileBufferTests` for the underlying-buffer-level
         // coverage of what "qualifies" means. This test only confirms `RequestBody` itself
         // forwards it, since `Internals.URLSessionClient+RequestExecutingClient.swift` reads it

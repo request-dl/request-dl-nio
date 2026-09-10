@@ -9,7 +9,7 @@ import Testing
 struct DigestResponseTests {
 
     /// The worked SHA-256 example from RFC 7616 §3.9.1. The `response` value below is the
-    /// RFC's own published result -- independently cross-checked outside this codebase, feeding
+    /// RFC's own published result: independently cross-checked outside this codebase, feeding
     /// this same challenge/credential/`cnonce` chain through `shasum -a 256` by hand, and the two
     /// agreed byte for byte, before trusting it as this test's expectation.
     @Test

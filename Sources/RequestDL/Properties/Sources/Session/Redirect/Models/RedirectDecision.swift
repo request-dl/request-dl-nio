@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// The result of a ``RedirectStrategy`` deciding whether -- and how -- to follow a redirect.
+/// The result of a ``RedirectStrategy`` deciding whether (and how) to follow a redirect.
 public enum RedirectDecision: Sendable {
 
     /// Follow the redirect using the given request.

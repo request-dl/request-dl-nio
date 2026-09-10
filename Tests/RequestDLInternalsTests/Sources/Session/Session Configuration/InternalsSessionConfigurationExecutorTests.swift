@@ -11,11 +11,11 @@ import Testing
 
 struct InternalsSessionConfigurationExecutorTests {
 
-    /// A stand-in for `BrotliURLSessionOnlyAlgorithm` -- that concrete type lives in `RequestDL`,
+    /// A stand-in for `BrotliURLSessionOnlyAlgorithm`: that concrete type lives in `RequestDL`,
     /// which this target doesn't depend on, so `Internals.Session.Configuration
     /// .nonURLSessionExecutorIncompatibilityReasons()` is exercised here against any
     /// `Internals.DecompressionAlgorithm` answering `requiresURLSession: true`, matching how
-    /// `InternalsDecompressionAlgorithmAdapter` (in `RequestDL`) actually produces that answer --
+    /// `InternalsDecompressionAlgorithmAdapter` (in `RequestDL`) actually produces that answer,
     /// via `algorithm is BrotliURLSessionOnlyAlgorithm`, not a public protocol requirement.
     private struct MockURLSessionOnlyAlgorithm: Internals.DecompressionAlgorithm {
         var contentEncodingValue: String { "br" }
@@ -116,7 +116,7 @@ struct InternalsSessionConfigurationExecutorTests {
     }
 
     /// A SOCKS proxy is reachable under `.urlSession` via `connectionProxyDictionary`'s legacy
-    /// `SOCKSEnable`/`SOCKSProxy`/`SOCKSPort` keys -- confirmed empirically (a bare `NWListener`
+    /// `SOCKSEnable`/`SOCKSProxy`/`SOCKSPort` keys. Confirmed empirically (a bare `NWListener`
     /// probe, `InternalsSOCKSProxyDictionaryPlatformTests`, shows `URLSession` genuinely dials the
     /// configured address) before removing this from the exclusion list, not assumed from the
     /// original analysis's "unreliable/undocumented" framing.
@@ -140,7 +140,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func configuration_whenProxyBearerAuthorizationSet_containsReason() async throws {
-        // Given -- no `URLCredential` shape can carry an arbitrary bearer token, unlike
+        // Given: no `URLCredential` shape can carry an arbitrary bearer token, unlike
         // `.basic`/`.basicRawCredentials`, which map onto the proxy authentication challenge
         // delegate cleanly.
         var configuration = Internals.Session.Configuration()
@@ -184,7 +184,7 @@ struct InternalsSessionConfigurationExecutorTests {
         // When
         configuration.decompression = .disabled
 
-        // Then -- `.disabled` gets real parity with NIO on `.urlSession` now, via
+        // Then: `.disabled` gets real parity with NIO on `.urlSession` now, via
         // `Accept-Encoding: identity` at request-build time, so it no longer disqualifies the
         // executor the way it used to.
         #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
@@ -243,7 +243,7 @@ struct InternalsSessionConfigurationExecutorTests {
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
 
-        // When -- fine under NIOTransportServices, unsupported under URLSession (bucket D)
+        // When: fine under NIOTransportServices, unsupported under URLSession (bucket D)
         configuration.httpVersion = .http1Only
 
         let sut = configuration.resolveExecutor()
@@ -404,7 +404,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenNIOTransportServicesPreferredAndCompatible_resolvesToItOverURLSession() async throws {
-        // Given -- compatible with both `.urlSession` and `.nioTransportServices`, so the
+        // Given: compatible with both `.urlSession` and `.nioTransportServices`, so the
         // preference is what breaks the tie rather than falling to the default priority order.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
@@ -423,7 +423,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenNIOPreferred_resolvesToNIORegardlessOfOtherCompatibility() async throws {
-        // Given -- compatible with everything, yet `.nio` is explicitly preferred.
+        // Given: compatible with everything, yet `.nio` is explicitly preferred.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .nio
@@ -465,7 +465,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenURLSessionPreferredButIncompatible_fallsBackToNIOTransportServices() async throws {
-        // Given -- unreachable under URLSession (bucket D), unaffected under NIOTransportServices
+        // Given: unreachable under URLSession (bucket D), unaffected under NIOTransportServices
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .urlSession
@@ -485,7 +485,7 @@ struct InternalsSessionConfigurationExecutorTests {
     // MARK: - resolveExecutor() with enableNetworkFramework
 
     /// `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`) is already public,
-    /// released API that predates `preferredExecutor` -- its whole point, historically, was
+    /// released API that predates `preferredExecutor`; its whole point, historically, was
     /// opting a session into NIOTransportServices. Since this method's own
     /// NIOTransportServices-vs-plain-NIO answer drives a real request, `.urlSession`'s default
     /// first-priority position would otherwise silently take over for a caller who only ever set
@@ -496,7 +496,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNetworkFrameworkEnabledWithoutExplicitPreference_resolvesToNIOTransportServices()
         async throws
     {
-        // Given -- compatible with `.urlSession` too, so the implicit preference is what breaks
+        // Given: compatible with `.urlSession` too, so the implicit preference is what breaks
         // the tie rather than `.urlSession`'s own default priority.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
@@ -517,7 +517,7 @@ struct InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenNetworkFrameworkEnabledAndURLSessionExplicitlyPreferred_explicitPreferenceWins()
         async throws
     {
-        // Given -- an explicit `preferredExecutor` (any case) always outranks the implicit one
+        // Given: an explicit `preferredExecutor` (any case) always outranks the implicit one
         // `enableNetworkFramework` contributes.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
@@ -535,7 +535,7 @@ struct InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
-    /// The flag's implicit preference is still just a preference, not a guarantee -- a
+    /// The flag's implicit preference is still just a preference, not a guarantee: a
     /// NIOTransportServices-incompatible field must still fall through past it, the same way an
     /// explicit `preferredExecutor(.nioTransportServices)` already does two tests above this
     /// section (including why the fallback lands on `.nio`, not `.urlSession`).
@@ -559,18 +559,19 @@ struct InternalsSessionConfigurationExecutorTests {
 
     // MARK: - resolveExecutor() with requiredExecutor
 
-    /// Regression coverage for a real bug end-to-end testing caught -- `resolveExecutor()`'s own
+    /// Regression coverage for a real bug end-to-end testing caught: `resolveExecutor()`'s own
     /// doc comment already claimed `requiredExecutor` "lets a caller override it," but the
-    /// implementation below only ever consulted `preferredExecutor`. `requiredExecutor(.nio)`
-    /// validated (via `requireExecutor(_:)`,
-    /// called separately) without ever actually being the executor a real request dispatched
-    /// over -- `resolveExecutor()` picked `.urlSession` anyway on a compatible config, silently.
-    /// Caught by a `DataTaskTests` test pinning `.requiredExecutor(.nio)` to keep a client-cert
-    /// mTLS test off `.urlSession`'s unconditional Keychain-Sharing gap, which kept hitting that
-    /// gap anyway until this was fixed.
+    /// implementation below only ever consulted `preferredExecutor`.
+    ///
+    /// `requiredExecutor(.nio)` validated (via `requireExecutor(_:)`, called separately) without
+    /// ever actually being the executor a real request dispatched over; `resolveExecutor()`
+    /// picked `.urlSession` anyway on a compatible config, silently. Caught by a `DataTaskTests`
+    /// test pinning `.requiredExecutor(.nio)` to keep a client-cert mTLS test off `.urlSession`'s
+    /// unconditional Keychain-Sharing gap, which kept hitting that gap anyway until this was
+    /// fixed.
     @Test
     func resolveExecutor_whenNIORequired_resolvesToNIORegardlessOfPreferredExecutorOrCompatibility() async throws {
-        // Given -- compatible with `.urlSession`, and even prefers it, yet `.nio` is required.
+        // Given: compatible with `.urlSession`, and even prefers it, yet `.nio` is required.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .urlSession
@@ -585,7 +586,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenURLSessionRequired_resolvesToURLSessionRegardlessOfPreferredExecutor() async throws {
-        // Given -- `requiredExecutor` is trusted unconditionally, on every platform (see the
+        // Given: `requiredExecutor` is trusted unconditionally, on every platform (see the
         // "without prior validation" test below for why that's fine in practice even here).
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
@@ -601,15 +602,17 @@ struct InternalsSessionConfigurationExecutorTests {
 
     /// `resolveExecutor()` trusts `requiredExecutor` unconditionally and platform-independently
     /// by design (see its own doc comment, and the fact this returns before the
-    /// `#if canImport(Darwin)` gate below) -- the compatibility check already happened, and
-    /// already threw, in `requireExecutor(_:)`. This test documents that trust rather than
-    /// re-deriving it: a config `requiredExecutor` claims is `.urlSession`-compatible despite
-    /// `httpVersion == .http1Only` (a genuine bucket-D exclusion) still resolves to `.urlSession`
-    /// here, on every platform, because nothing calls `requireExecutor(_:)` in this test to catch
-    /// the mismatch first -- exactly mirroring what a caller who skips that call gets in
-    /// production too. `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)`'s
-    /// own non-Darwin branch is what actually keeps this harmless there in practice (it never
-    /// looks at `resolveExecutor()`'s answer at all outside Darwin), not this method.
+    /// `#if canImport(Darwin)` gate below): the compatibility check already happened, and
+    /// already threw, in `requireExecutor(_:)`.
+    ///
+    /// This test documents that trust rather than re-deriving it: a config `requiredExecutor`
+    /// claims is `.urlSession`-compatible despite `httpVersion == .http1Only` (a genuine
+    /// bucket-D exclusion) still resolves to `.urlSession` here, on every platform, because
+    /// nothing calls `requireExecutor(_:)` in this test to catch the mismatch first, exactly
+    /// mirroring what a caller who skips that call gets in production too.
+    /// `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)`'s own non-Darwin
+    /// branch is what actually keeps this harmless there in practice (it never looks at
+    /// `resolveExecutor()`'s answer at all outside Darwin), not this method.
     @Test
     func resolveExecutor_whenRequiredExecutorSetWithoutPriorValidation_isTrustedAnywayOnEveryPlatform() async throws {
         // Given
@@ -799,7 +802,7 @@ struct InternalsSessionConfigurationExecutorTests {
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [MockURLSessionOnlyAlgorithm()], limit: .none)
 
-        // When / Then -- the one executor such an algorithm actually requires is, naturally,
+        // When / Then: the one executor such an algorithm actually requires is, naturally,
         // still fine with it.
         try configuration.requireExecutor(.urlSession)
     }
@@ -828,7 +831,7 @@ struct InternalsSessionConfigurationExecutorTests {
     /// `requireExecutor(_:)` hard-pin tests above: there was no explicit instruction to honor, so
     /// forcing `.urlSession` itself incompatible (`dnsOverride`) still resolves to whatever the
     /// normal fallback order would have picked anyway (`.nioTransportServices` here, since
-    /// nothing makes that incompatible either) rather than throwing -- the request goes ahead,
+    /// nothing makes that incompatible either) rather than throwing. The request goes ahead,
     /// and the existing manual-dispatch machinery only ever reports a problem if a `br` response
     /// actually arrives, same as any other `Content-Encoding` this package can't decode. See
     /// `resolveExecutor()`'s own doc comment.

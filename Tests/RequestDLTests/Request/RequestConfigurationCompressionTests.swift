@@ -85,7 +85,7 @@ struct RequestConfigurationCompressionTests {
         configuration.body = await RequestBody(buffers: [Internals.DataBuffer(payload)])
         configuration.shouldCompressBodyData = { $0 == payload.count }
 
-        // When -- the closure only agrees to compress if it was handed exactly the body's byte
+        // When: the closure only agrees to compress if it was handed exactly the body's byte
         // count, so a `Content-Encoding` header afterward is itself proof the right value arrived.
         try configuration.applyCompression()
 
@@ -107,7 +107,7 @@ struct RequestConfigurationCompressionTests {
         // Then
         #expect(configuration.headers.first(name: "Content-Encoding") == "gzip")
 
-        // The final, on-the-wire size is only known once the whole body has streamed through --
+        // The final, on-the-wire size is only known once the whole body has streamed through, so
         // `Content-Length` is removed rather than declared upfront, falling back to chunked
         // transfer encoding on both executors.
         #expect(configuration.headers.first(name: "Content-Length") == nil)
@@ -201,7 +201,7 @@ struct RequestConfigurationCompressionTests {
 
     @Test
     func applyCompression_whenBodyIsLarge_compressesInBoundedMemoryAcrossManyChunks() async throws {
-        // Given -- several times over `Internals.BodySequence`'s own chunking, so the compressor
+        // Given: several times over `Internals.BodySequence`'s own chunking, so the compressor
         // genuinely gets fed many separate calls, not one lucky single chunk.
         var configuration = RequestConfiguration()
         let payload = Data(String(repeating: "abcdefgh", count: 2_000_000).utf8)
@@ -211,7 +211,7 @@ struct RequestConfigurationCompressionTests {
         // When
         try configuration.applyCompression()
 
-        // Then -- draining the wrapped body chunk by chunk (rather than all at once) and
+        // Then: draining the wrapped body chunk by chunk (rather than all at once) and
         // reassembling still reproduces byte-identical gzip output, proving the per-chunk
         // `Compressor` state (window, checksum) survives correctly across many calls.
         var chunkCount = 0

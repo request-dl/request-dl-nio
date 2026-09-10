@@ -8,7 +8,7 @@ extension Modifiers {
     /// specific set of ``ContentType``s.
     ///
     /// Unlike ``AcceptOnlyStatusCode``, this inspects the response body's declared type rather
-    /// than the status line, catching cases a 2xx status code alone would miss -- for example, a
+    /// than the status line, catching cases a 2xx status code alone would miss: for example, a
     /// proxy or CDN returning an HTML error page with a `200 OK` status.
     ///
     /// Matching ignores parameters (`charset`, etc.) on both sides and honors the `*/*` and

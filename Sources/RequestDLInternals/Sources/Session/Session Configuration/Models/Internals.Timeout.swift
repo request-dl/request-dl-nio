@@ -10,15 +10,15 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        /// Nanoseconds, matching `UnitTime.nanoseconds` -- `RequestDL`'s public unit of time.
+        /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
         package var connect: Int64?
 
-        /// Nanoseconds, matching `UnitTime.nanoseconds` -- `RequestDL`'s public unit of time.
+        /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
         package var read: Int64?
 
-        /// Nanoseconds, matching `UnitTime.nanoseconds` -- `RequestDL`'s public unit of time.
+        /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
         ///
-        /// Unlike `connect`/`read`, this isn't part of `HTTPClient.Configuration.Timeout` -- no
+        /// Unlike `connect`/`read`, this isn't part of `HTTPClient.Configuration.Timeout`: no
         /// AsyncHTTPClient knob covers a resource-wide deadline, so `build()` below doesn't
         /// forward it. `RawTask` reads it directly to drive `Internals.ResourceDeadline` instead.
         package var resource: Int64?

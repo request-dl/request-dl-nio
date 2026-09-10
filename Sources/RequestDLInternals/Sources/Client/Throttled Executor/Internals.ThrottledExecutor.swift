@@ -30,7 +30,7 @@ extension Internals {
         /// Waits for a free slot, then hands back a closure that releases it.
         ///
         /// There is no `withPermit`-style scoped variant here because the operations this guards
-        /// -- an in-flight `HTTPClient.Task`, a future URLSession task -- outlive the call that
+        /// (an in-flight `HTTPClient.Task`, a future URLSession task) outlive the call that
         /// starts them. The caller owns calling the returned closure exactly once, whenever it
         /// considers the throttled operation complete.
         package func acquire() async -> @Sendable () -> Void {

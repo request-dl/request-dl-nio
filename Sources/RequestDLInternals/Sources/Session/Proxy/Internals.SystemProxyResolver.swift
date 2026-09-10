@@ -24,9 +24,9 @@ extension Internals {
     /// `AsyncHTTPClient` has no discovery of its own: its proxy is explicit configuration and
     /// nothing else. `URLSession` goes through CFNetwork, which reads the system settings, and
     /// that difference is why an interception proxy such as Proxyman or Charles captures one
-    /// and not the other. Both executors go through this same resolver -- including proxy
-    /// auto-configuration (PAC) scripts, evaluated via `Internals.PACEvaluator`/
-    /// `Internals.PACProxyCache` -- so `SystemProxy()` behaves identically regardless of which
+    /// and not the other. Both executors go through this same resolver, including proxy
+    /// auto-configuration (PAC) scripts evaluated via `Internals.PACEvaluator`/
+    /// `Internals.PACProxyCache`, so `SystemProxy()` behaves identically regardless of which
     /// executor a session resolves to.
     package enum SystemProxyResolver {
 
@@ -69,7 +69,7 @@ extension Internals.SystemProxyResolver {
         }
     }
 
-    /// What one entry in a CFNetwork proxy-list dictionary resolves to -- shared between the
+    /// What one entry in a CFNetwork proxy-list dictionary resolves to: shared between the
     /// direct `CFNetworkCopyProxiesForURL` result here and a PAC script's own evaluated result
     /// (`Internals.PACEvaluator`), since both use the identical dictionary shape.
     package enum Resolution: Sendable, Equatable {
@@ -79,12 +79,12 @@ extension Internals.SystemProxyResolver {
         case proxy(Internals.Proxy)
         /// A PAC script still needs to be fetched and evaluated
         /// (`kCFProxyTypeAutoConfigurationURL`) before a proxy (or direct connection) is known.
-        /// Never itself produced by evaluating a PAC script -- CFNetwork's own guarantee that a
+        /// Never itself produced by evaluating a PAC script: CFNetwork's own guarantee that a
         /// script cannot chain to another PAC file.
         case autoConfiguration(URL)
     }
 
-    /// Walks `proxies` and returns the first entry this package recognizes -- `.direct` ends the
+    /// Walks `proxies` and returns the first entry this package recognizes: `.direct` ends the
     /// search outright (later entries are fallbacks for a failed proxy, not alternatives), an
     /// unrecognized or unparseable entry is skipped in favor of the next one.
     package static func firstResolution(in proxies: [[String: Any]]) -> Resolution? {

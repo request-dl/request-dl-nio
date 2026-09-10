@@ -173,10 +173,10 @@ struct InternalsRawBytesIdentityBuilderTests {
 
     @Test(arguments: [Self.Curve.p256, .p384, .p521])
     func secKey_whenGivenPKCS8WrappedECDER_succeeds(_ curve: Self.Curve) throws {
-        // `CryptoKit`'s own `derRepresentation` -- confirmed PKCS#8 (a `SEQUENCE` containing an
-        // `INTEGER` then a nested `SEQUENCE` AlgorithmIdentifier, not SEC1's `OCTET STRING`), not
-        // assumed -- is exactly what a real caller exporting a CryptoKit-generated key would hand
-        // this executor.
+        // `CryptoKit`'s own `derRepresentation` is confirmed PKCS#8, not merely assumed to be: a
+        // `SEQUENCE` containing an `INTEGER` then a nested `SEQUENCE` AlgorithmIdentifier, not
+        // SEC1's `OCTET STRING`. That's exactly what a real caller exporting a
+        // CryptoKit-generated key would hand this executor.
         let der = curve.generateAndExportPKCS8DER()
 
         let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: der)
@@ -252,7 +252,7 @@ extension InternalsRawBytesIdentityBuilderTests {
         (SecKeyCopyAttributes(secKey) as? [CFString: Any])?[kSecAttrKeySizeInBits] as? Int
     }
 
-    /// A fresh, ephemeral 2048-bit RSA key's PKCS#1 DER, generated purely in memory --
+    /// A fresh, ephemeral 2048-bit RSA key's PKCS#1 DER, generated purely in memory:
     /// `kSecAttrIsPermanent` is deliberately left unset, so nothing here touches the Keychain.
     fileprivate static func makeRSAPKCS1DER() throws -> Data {
         var error: Unmanaged<CFError>?

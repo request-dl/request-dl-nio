@@ -20,9 +20,9 @@ struct ModifiersEnvironmentTests {
     struct OuterTask: RequestTask {
 
         func result() async throws -> Int {
-            // Deliberately calls the plain `result()`, not the SPI `_result(environment:)` --
-            // this is what an unrelated `RequestTask` constructed inside another task's body
-            // would do, with no way to (and no reason to) reach for the SPI entry point.
+            // Deliberately calls the plain `result()`, not the SPI `_result(environment:)`: this
+            // is what an unrelated `RequestTask` constructed inside another task's body would
+            // do, with no way to (and no reason to) reach for the SPI entry point.
             try await NumberTask().result()
         }
     }
@@ -66,7 +66,7 @@ struct ModifiersEnvironmentTests {
             .environment(\.number, 2)
             .result()
 
-        // Then -- `NumberTask`, constructed fresh inside `OuterTask.result()`, never received
+        // Then: `NumberTask`, constructed fresh inside `OuterTask.result()`, never received
         // `OuterTask`'s own `.environment(\.number, 2)`, so it falls back to the key's default.
         #expect(value == 1)
     }

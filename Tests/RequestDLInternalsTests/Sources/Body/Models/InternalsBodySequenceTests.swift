@@ -230,8 +230,8 @@ struct InternalsBodySequenceTests {
 
     @Test
     func bodySequence_whenMultipleBuffersIncludingAFile_wholeFileURLReturnsNil() async throws {
-        // Given -- mirrors the multipart shape `bodySequence_whenReadingConcurrently...` above
-        // builds: a real request body is never *only* the file once there's more than one part.
+        // Given: mirrors the multipart shape `bodySequence_whenReadingConcurrently...` above
+        // builds; a real request body is never *only* the file once there's more than one part.
         let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
         defer { _ = fileURLManager }
 
