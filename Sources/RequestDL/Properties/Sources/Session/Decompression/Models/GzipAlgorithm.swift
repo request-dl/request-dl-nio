@@ -5,7 +5,7 @@
 /// Gzip, both directions.
 ///
 /// As a ``Decompressor``, this is a placeholder standing in for decoding always performed
-/// natively by the OS (`.urlSession`) or `async-http-client` (`.nio`/`.nioTransportServices`) --
+/// natively by the OS (`.urlSession`) or `async-http-client` (`.nio`/`.nioTransportServices`),
 /// never by this type. The `Decompressor` `callAsFunction()` throws ``NativeOnlyAlgorithmError``
 /// if it's ever actually invoked, which only happens when mixed into the same list as a
 /// genuinely custom algorithm. See ``Session/decompressionAlgorithms(_:limit:)``.
@@ -46,6 +46,6 @@ extension Compressor where Self == GzipAlgorithm {
 
 extension Decompressor where Self == GzipAlgorithm {
 
-    /// Decodes gzip-encoded responses -- natively, by whichever executor the request resolves to.
+    /// Decodes gzip-encoded responses natively, by whichever executor the request resolves to.
     public static var gzip: Self { .init() }
 }

@@ -31,7 +31,7 @@ extension Internals.Client: RequestExecutingClient {
 
     /// - Note: `isKeepAlive` has no equivalent on `HTTPClient.Response` and this method's own
     /// caller (`Internals.CacheControl`'s conditional-revalidation check) never reads it either
-    /// way -- `true` is an inert default, matching the same call `Internals.ResponseHead.init(_
+    /// way: `true` is an inert default, matching the same call `Internals.ResponseHead.init(_
     /// response: HTTPURLResponse)` makes for the same reason on the URLSession side.
     package func revalidationHead(
         configuration: RequestConfiguration,

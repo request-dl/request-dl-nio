@@ -15,7 +15,7 @@ import SwiftAsyncStream
 /// runs on (macOS, and every Simulator/Catalyst destination `xcodebuild test` can target).
 ///
 /// Deliberately independent of `LocalServer`/`LocalHTTPConnectProxy` (NIOSSL-backed, HTTP/1
-/// codec) -- those exist to prove a *working tunnel* end to end, which needs the platform's
+/// codec): those exist to prove a *working tunnel* end to end, which needs the platform's
 /// TLS/HTTP stack to cooperate for reasons orthogonal to the question this file asks. This file
 /// only asks whether the configured proxy address is contacted **at all**, using a bare
 /// `Network.framework` `NWListener` standing in for "some process listening on the configured
@@ -24,17 +24,18 @@ import SwiftAsyncStream
 /// **Finding, corrected from an earlier pass in this same investigation:** `connectionProxyDictionary`
 /// is *not* broken. The first version of this check pointed at a loopback destination (matching
 /// `LocalServer`, which only ever binds to `127.0.0.1`/`localhost`) and saw the proxy never
-/// contacted, which was misread as `URLSession` ignoring the dictionary outright. Comparing
-/// destinations directly (`127.0.0.1`, `localhost`, an arbitrary non-loopback IP, and a
+/// contacted, which was misread as `URLSession` ignoring the dictionary outright.
+///
+/// Comparing destinations directly (`127.0.0.1`, `localhost`, an arbitrary non-loopback IP, and a
 /// non-resolving hostname), across macOS, Mac Catalyst, and iOS/tvOS/watchOS/visionOS Simulators,
-/// isolated the real cause -- and a second, narrower one underneath it:
+/// isolated the real cause, and a second, narrower one underneath it:
 ///
 /// - Every platform bypasses a configured proxy for the **literal** loopback IP
 ///   (`127.0.0.1`) as OS-level policy, independent of this dictionary being wired correctly.
 /// - **macOS and Mac Catalyst additionally bypass `localhost` by name.** iOS, tvOS, watchOS, and
-///   visionOS Simulators do **not** -- `localhost` gets proxied there exactly like any other
+///   visionOS Simulators do **not**: `localhost` gets proxied there exactly like any other
 ///   hostname. (Simulators share their host Mac's network stack for the underlying socket, but
-///   evidently not this particular CFNetwork policy decision -- Catalyst, which really does run
+///   evidently not this particular CFNetwork policy decision. Catalyst, which really does run
 ///   the macOS frameworks directly, matches macOS exactly, which is what makes this a platform
 ///   distinction and not a "shares the same kernel" artifact.)
 /// - Non-loopback destinations are proxied reliably everywhere.
@@ -55,7 +56,7 @@ struct InternalsProxyDictionaryPlatformTests {
 
     @Test
     func urlSession_whenConnectionProxyDictionarySet_bypassesProxyForLiteralLoopbackIP() async throws {
-        // Given / When -- unlike `localhost` below, contacting `127.0.0.1` directly is bypassed
+        // Given / When: unlike `localhost` below, contacting `127.0.0.1` directly is bypassed
         // on every platform this was checked on.
         let contacted = try await proxyWasContacted(destination: "https://127.0.0.1:9/")
 
@@ -68,7 +69,7 @@ struct InternalsProxyDictionaryPlatformTests {
         // Given / When
         let contacted = try await proxyWasContacted(destination: "https://localhost:9/")
 
-        // Then -- see the file-level doc comment for why this genuinely differs by platform
+        // Then: see the file-level doc comment for why this genuinely differs by platform
         // rather than being flaky: macOS/Catalyst bypass `localhost` same as the literal IP;
         // every Simulator platform proxies it like any other hostname.
         #if os(macOS) || targetEnvironment(macCatalyst)
@@ -134,7 +135,7 @@ struct InternalsProxyDictionaryPlatformTests {
         // ever touched.
         _ = try? await session.data(for: URLRequest(url: URL(string: destination)!))
 
-        // Give a just-missed connection a moment to land -- `data(for:)` returning doesn't
+        // Give a just-missed connection a moment to land: `data(for:)` returning doesn't
         // guarantee the listener's callback (a separate queue) has already run.
         try? await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
 
@@ -163,7 +164,7 @@ private final class ConnectAttemptCounter: @unchecked Sendable {
 }
 
 /// Bridges `NWListener.stateUpdateHandler` (called repeatedly) to a `CheckedContinuation` (usable
-/// exactly once) -- resumes on the first `.ready`/`.failed`, ignores every later call.
+/// exactly once): resumes on the first `.ready`/`.failed`, ignores every later call.
 private final class ContinuationBox: @unchecked Sendable {
 
     private let lock = Lock()

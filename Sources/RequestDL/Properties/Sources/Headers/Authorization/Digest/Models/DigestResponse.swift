@@ -18,7 +18,7 @@ enum DigestResponse {
     ) -> String {
         let algorithm = challenge.algorithm
 
-        // HA1 -- the `-sess` variant, which additionally folds in a client/server nonce pair, is
+        // HA1: the `-sess` variant, which additionally folds in a client/server nonce pair, is
         // rejected by `DigestChallenge.init(headerValue:)` before this is ever reached.
         let ha1 = algorithm.hexDigest("\(username):\(challenge.realm):\(password)")
         let ha2 = algorithm.hexDigest("\(method):\(uri)")
@@ -64,7 +64,7 @@ enum DigestResponse {
 
     // MARK: - Private static methods
 
-    /// A fresh, random client nonce -- per RFC 7616 §3.4, it must be unpredictable, since it
+    /// A fresh, random client nonce. Per RFC 7616 §3.4, it must be unpredictable, since it
     /// factors into the response hash the same way the server's own nonce does.
     private static func randomHexString(byteCount: Int = 16) -> String {
         var generator = SystemRandomNumberGenerator()

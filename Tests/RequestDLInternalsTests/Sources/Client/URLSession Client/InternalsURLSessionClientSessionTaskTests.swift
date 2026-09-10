@@ -12,14 +12,14 @@ import Testing
 
 import Foundation
 
-/// `Internals.URLSessionClient`'s two `SessionTask`-producing `execute` overloads -- the pieces
+/// `Internals.URLSessionClient`'s two `SessionTask`-producing `execute` overloads: the pieces
 /// `RequestExecutingClient`'s `.urlSession` conformance
 /// (`Internals.URLSessionClient+RequestExecutingClient.swift`, `RequestDLTests`) is built from.
 /// Exercised directly here, no `RawTask`/`RequestConfiguration` involved.
 ///
 /// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real network I/O
 /// against a `LocalServer`, on the same simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift`
-/// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives -- see
+/// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives; see
 /// `RequestConfigurationURLSessionClientUploadTests`'s own copy of this note for the failure mode
 /// these two traits avoid.
 @Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
@@ -68,7 +68,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             }
         }
 
-        // Then -- a GET has no body to report progress for, so `upload` closes with nothing in
+        // Then: a GET has no body to report progress for, so `upload` closes with nothing in
         // it, same as the NIO backend's own bodyless-request behavior.
         #expect(uploadSteps.isEmpty)
 
@@ -81,7 +81,7 @@ struct InternalsURLSessionClientSessionTaskTests {
     /// Mirrors `InternalsURLSessionClientCookieTests`'s own discipline for proving a test isn't
     /// tautological: verified by temporarily removing the `downloadBuffer.cacheStream(cacheStream)`
     /// call this test depends on and confirming it fails, then restoring it and confirming it
-    /// passes again -- not shipped as two versions of the code, just how this test was checked.
+    /// passes again. Not shipped as two versions of the code, just how this test was checked.
     @Test
     func sessionTask_whenCacheProvided_teesDownloadedChunksToCache() async throws {
         // Given
@@ -131,7 +131,7 @@ struct InternalsURLSessionClientSessionTaskTests {
             }
         }
 
-        // Then -- the cache stream must close on its own once the download finishes, or
+        // Then: the cache stream must close on its own once the download finishes, or
         // `cachedChunks` above would hang forever; it does, since `Internals.DownloadBuffer`
         // closes `_cacheStream` alongside its own `stream` in `_close()`.
         let assembledDownload = downloadedChunks.reduce(Data(), +)
@@ -143,7 +143,7 @@ struct InternalsURLSessionClientSessionTaskTests {
 
     @Test
     func sessionTask_whenCancelledMidDownload_stopsRunningSoonAfter() async throws {
-        // Given -- large enough that cancelling after the first chunk still leaves real work
+        // Given: large enough that cancelling after the first chunk still leaves real work
         // in flight for cancellation to actually interrupt, not race a download that already
         // finished.
         let localServer = try await LocalServer(.standard)
@@ -182,7 +182,7 @@ struct InternalsURLSessionClientSessionTaskTests {
 
         sessionTask.seed()
 
-        // Then -- `didCompleteWithError:` (cancellation included) is what releases the
+        // Then: `didCompleteWithError:` (cancellation included) is what releases the
         // `operationQueue` slot `isRunning` reads, so this polls briefly instead of asserting
         // immediately after an async cancel with no ordering guarantee of its own.
         var stillRunning = client.isRunning
@@ -194,18 +194,20 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(!stillRunning)
     }
 
-    /// **Used to be a confirmed `withKnownIssue`** -- the original `uploadTask(withStreamedRequest:)`
+    /// **Used to be a confirmed `withKnownIssue`.** The original `uploadTask(withStreamedRequest:)`
     /// bridge hit a confirmed CFNetwork bug (a custom `InputStream` is never recognized as
     /// reaching end-of-body); it was replaced with `Internals.URLSessionUploadFile` (small bodies
     /// stay in memory and upload
     /// via `uploadTask(with:from:)`; anything past `inMemoryThreshold` spills to a temp file and
     /// uploads via `uploadTask(with:fromFile:)`), neither of which touches `InputStream`/
-    /// `needNewBodyStream`, so neither is affected -- this test's 128 KiB payload takes the
-    /// in-memory branch. One genuine bug was found and fixed while diagnosing the old known issue,
+    /// `needNewBodyStream`, so neither is affected. This test's 128 KiB payload takes the
+    /// in-memory branch.
+    ///
+    /// One genuine bug was found and fixed while diagnosing the old known issue,
     /// independent of that fix and still in effect: `upload` was only closing from
     /// `onDownloadComplete` (task completion), not as soon as the body actually finished sending
     /// the way `Internals.ClientResponseReceiver.didReceiveHead`/`didSendRequest` close it on the
-    /// NIO side -- a live progress bar would otherwise have hung waiting for the whole download
+    /// NIO side. A live progress bar would otherwise have hung waiting for the whole download
     /// before ever hearing "upload done."
     @Test
     func sessionTask_whenStreamingUploadAndDownload_reportsUploadProgressInIncreasingOrder() async throws {
@@ -318,7 +320,7 @@ struct InternalsURLSessionClientSessionTaskTests {
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling. See the identical
 /// delegate elsewhere in this suite for why this exists at all: `LocalServer` is always
 /// TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

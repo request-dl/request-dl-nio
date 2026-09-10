@@ -39,14 +39,15 @@ extension Property {
     /// header accordingly.
     ///
     /// Unlike response decompression (``Session/decompressionAlgorithms(_:limit:)``), this is
-    /// attached near the body itself, not the session -- it's environment-driven, the same way
-    /// ``Property/payloadEncoder(_:)`` is, so it applies to every `Payload`/`Form` in scope, and
-    /// is independent of which ``Session/Executor`` the request resolves to: the body is
+    /// attached near the body itself, not the session: it's environment-driven, the same way
+    /// ``Property/payloadEncoder(_:)`` is, so it applies to every `Payload`/`Form` in scope.
+    ///
+    /// It's also independent of which ``Session/Executor`` the request resolves to. The body is
     /// compressed once, up front, so `.urlSession`/`.nioTransportServices`/`.nio` and every
     /// negotiated HTTP version all see the same already-compressed bytes.
     ///
     /// Compression is only worth its CPU cost for bodies that are both sizable and not already
-    /// compressed (a large JSON payload, say, but not an image) -- use `shouldCompressBodyData`
+    /// compressed (a large JSON payload, say, but not an image). Use `shouldCompressBodyData`
     /// to gate it on the body's byte count, the same threshold Alamofire's own
     /// `DeflateRequestCompressor.shouldCompressBodyData` recommends. Left `nil`, every request
     /// with a body is compressed whenever a `Compressor` is configured, regardless of size.

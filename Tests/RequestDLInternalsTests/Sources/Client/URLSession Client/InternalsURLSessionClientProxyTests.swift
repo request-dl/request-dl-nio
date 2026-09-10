@@ -19,16 +19,18 @@ import Security
 /// **This suite's round trips only fail to pass on macOS and Mac Catalyst, for a reason unrelated
 /// to whether the mapping is correct:** `LocalServer`/`LocalHTTPConnectProxy` always bind to
 /// `localhost`, and macOS/Catalyst specifically bypass a configured proxy for `localhost` (by
-/// name) as OS-level policy -- confirmed directly, and precisely, in
+/// name) as OS-level policy, confirmed directly, and precisely, in
 /// `InternalsProxyDictionaryPlatformTests`, which is where the actual mapping-correctness proof
-/// and the full per-platform matrix live, not here. iOS, tvOS, watchOS, and visionOS Simulators
-/// do **not** bypass `localhost`, so these round trips genuinely pass there -- `withKnownIssue`
-/// below is conditioned on platform (`when:`) to match, rather than unconditionally expecting
-/// failure. If `LocalServer` ever stops being loopback-only, or Apple ever changes the
-/// macOS/Catalyst policy, these would need revisiting, not the mapping itself.
+/// and the full per-platform matrix live, not here.
 ///
-/// There was no pre-existing NIO-backend proxy round-trip suite to reuse -- `ProxyTests` and
-/// `InternalsProxyTests` only cover config mapping, never an actual proxied connection -- so
+/// iOS, tvOS, watchOS, and visionOS Simulators do **not** bypass `localhost`, so these round trips
+/// genuinely pass there; `withKnownIssue` below is conditioned on platform (`when:`) to match,
+/// rather than unconditionally expecting failure. If `LocalServer` ever stops being loopback-only,
+/// or Apple ever changes the macOS/Catalyst policy, these would need revisiting, not the mapping
+/// itself.
+///
+/// There was no pre-existing NIO-backend proxy round-trip suite to reuse: `ProxyTests` and
+/// `InternalsProxyTests` only cover config mapping, never an actual proxied connection.
 /// `LocalHTTPConnectProxy` exists specifically to make this checkable at all, for either executor.
 struct InternalsURLSessionClientProxyTests {
 
@@ -72,7 +74,7 @@ struct InternalsURLSessionClientProxyTests {
             delegate: AcceptAnyServerTrustDelegate()
         )
 
-        // Then -- expected to fail only on macOS/Catalyst (see the type doc comment); genuinely
+        // Then: expected to fail only on macOS/Catalyst (see the type doc comment); genuinely
         // passes elsewhere, reaching the destination and decoding `output`.
         try withKnownIssue(
             "macOS/Catalyst bypass a configured proxy for localhost -- see the type doc comment",
@@ -122,7 +124,7 @@ struct InternalsURLSessionClientProxyTests {
             delegate: AcceptAnyServerTrustDelegate()
         )
 
-        // Then -- expected to fail only on macOS/Catalyst (see the type doc comment); genuinely
+        // Then: expected to fail only on macOS/Catalyst (see the type doc comment); genuinely
         // passes elsewhere, reaching the destination and decoding `output`.
         try withKnownIssue(
             "macOS/Catalyst bypass a configured proxy for localhost -- see the type doc comment",
@@ -139,13 +141,13 @@ struct InternalsURLSessionClientProxyTests {
     }
 
     /// `URLSessionConfiguration.connectionProxyDictionary` left `nil` (its own default) means
-    /// "inherit whatever the OS's Network preferences currently say" -- `Internals.URLSessionClient`
+    /// "inherit whatever the OS's Network preferences currently say": `Internals.URLSessionClient`
     /// must explicitly set it to `[:]` when no `Proxy`/resolved `SystemProxy` is configured, or the
     /// documented "system proxy is ignored unless opted into" contract (`RequestDL.SystemProxy`'s
     /// own doc comment) silently breaks on this executor while still holding on the NIO one.
     ///
-    /// `URLSessionConfiguration` is a class, so the same instance passed in is what `init` mutates
-    /// -- inspecting it after construction directly observes what `Internals.URLSessionClient`
+    /// `URLSessionConfiguration` is a class, so the same instance passed in is what `init` mutates;
+    /// inspecting it after construction directly observes what `Internals.URLSessionClient`
     /// actually did, no need to reach into the private `URLSession` it built from it.
     @Test
     func init_whenNoProxyConfigured_explicitlyDisablesConnectionProxyDictionary() throws {
@@ -156,13 +158,13 @@ struct InternalsURLSessionClientProxyTests {
         // When
         _ = try Internals.URLSessionClient(configuration: configuration)
 
-        // Then -- explicitly `[:]`, not still `nil`: a `nil ?? [:]` fallback in the assertion
+        // Then: explicitly `[:]`, not still `nil`. A `nil ?? [:]` fallback in the assertion
         // itself would pass either way, defeating the point of this test.
         #expect(configuration.connectionProxyDictionary?.isEmpty == true)
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling. See the identical
 /// delegate in the other `Internals.URLSessionClient` test files for why this exists at all:
 /// `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

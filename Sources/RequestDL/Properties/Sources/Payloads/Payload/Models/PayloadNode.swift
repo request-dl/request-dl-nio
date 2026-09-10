@@ -14,7 +14,7 @@ struct PayloadNode: PropertyNode {
     let chunkSize: Int?
     let payloadEncoder: (any PayloadEncoder)?
 
-    /// Captured from `inputs.environment` at `_makeProperty` time -- see `RequestConfiguration
+    /// Captured from `inputs.environment` at `_makeProperty` time; see `RequestConfiguration
     /// .compression`'s own doc comment for why this can't be read from inside `make(_:)` itself.
     let compression: (any Compressor)?
     let compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior
@@ -82,9 +82,10 @@ struct PayloadNode: PropertyNode {
         output: PayloadOutput,
         make: inout Make
     ) {
-        // Only fills in a default, never overrides an explicit `RequestMethod` -- whichever
-        // node runs first wins, since `RequestMethod`'s own node assigns unconditionally. A
-        // body attached to whatever method ends up unset otherwise falls through to `"GET"` at
+        // Only fills in a default, never overrides an explicit `RequestMethod`: whichever
+        // node runs first wins, since `RequestMethod`'s own node assigns unconditionally.
+        //
+        // A body attached to whatever method ends up unset otherwise falls through to `"GET"` at
         // request-build time, which AsyncHTTPClient tolerates silently but URLSession/CFNetwork
         // does not: a GET carrying a body fails outright (`NSURLErrorDataLengthExceedsMaximum`,
         // confirmed against a real server, not LocalServer- or beta-OS-specific).

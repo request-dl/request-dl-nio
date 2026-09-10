@@ -9,7 +9,7 @@ extension Internals {
     /// since AsyncHTTPClient has no hook to configure the equivalent `NWParameters` itself (see
     /// swift-server/async-http-client#915 and #918, both closed with no path forward).
     ///
-    /// Pre-flight only, checked once before the request is dispatched -- never re-evaluated once
+    /// Pre-flight only, checked once before the request is dispatched, never re-evaluated once
     /// a transfer is under way. This matches `URLSession` itself: `waitsForConnectivity`/
     /// `taskIsWaitingForConnectivity` only ever cover the initial connection phase, and a network
     /// change mid-transfer surfaces there as an ordinary task error, not a retry. So this is
@@ -83,8 +83,8 @@ extension Internals {
         // MARK: - Private static methods
 
         /// The single source of truth for whether `path` satisfies `constraints`: `nil` means it
-        /// does, any other value names the first constraint it violates, checked in this order --
-        /// connectivity, then cellular, then expensive, then constrained.
+        /// does, any other value names the first constraint it violates, checked in this order
+        /// (connectivity, then cellular, then expensive, then constrained).
         private static func reason(
             for path: NetworkPath,
             _ constraints: Constraints

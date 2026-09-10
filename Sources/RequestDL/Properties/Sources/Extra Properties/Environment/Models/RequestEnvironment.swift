@@ -7,7 +7,7 @@
 /// ## Overview
 ///
 /// ``RequestEnvironment`` reads a value out of the ``RequestEnvironmentValues`` in scope for
-/// whichever type declares it -- a ``Property`` (populated while the request's property graph is
+/// whichever type declares it: a ``Property`` (populated while the request's property graph is
 /// built) or a ``RequestTask`` (populated the same way, when the task actually runs). Both are
 /// driven by the same mechanism: reflection over the declaring type's stored properties, so no
 /// extra plumbing is needed on either side beyond declaring the wrapper.
@@ -55,7 +55,7 @@
 ///     .result()
 /// ```
 ///
-/// - Note: Falls back to the key's own default when read before anything ever populated it --
+/// - Note: Falls back to the key's own default when read before anything ever populated it:
 /// a property never resolved through a graph, a task run via a bare `.result()`, a preview, or a
 /// test reading the wrapper directly.
 @propertyWrapper

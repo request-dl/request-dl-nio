@@ -7,7 +7,7 @@ import NIOCore
 /// A completed session's cancellation seed together with its response.
 ///
 /// Holds `Internals.AsyncResponse` rather than converting it into `RequestDL`'s
-/// public `AsyncResponse` wrapper here -- that wrapper is a `RequestDL`-domain concept,
+/// public `AsyncResponse` wrapper here, since that wrapper is a `RequestDL`-domain concept,
 /// so building it from `seed`/`response` is left to `RequestDL`'s own call sites.
 package struct SessionTask: Sendable {
 

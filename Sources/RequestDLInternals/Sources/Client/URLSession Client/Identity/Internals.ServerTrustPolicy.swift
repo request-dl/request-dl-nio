@@ -4,7 +4,7 @@
 
 // The server-trust half of `Internals.URLSessionIdentityPolicy`, pulled out on its own: unlike
 // the client-identity half, it needs no Keychain round-trip, so it can be rebuilt from nothing
-// but raw certificate bytes -- which is exactly what a `BackgroundDownloadTask` needs to do after
+// but raw certificate bytes. That's exactly what a `BackgroundDownloadTask` needs to do after
 // a relaunch, with no `Internals.SecureConnection` left in memory to resolve from.
 
 #if canImport(Darwin)
@@ -24,7 +24,7 @@ extension Internals {
 
     package final class ServerTrustPolicy: @unchecked Sendable {
 
-        /// A `Codable`, `NIOSSL`-free snapshot of one `ServerTrustPolicy` -- what actually
+        /// A `Codable`, `NIOSSL`-free snapshot of one `ServerTrustPolicy`: what actually
         /// survives a relaunch. Certificates are carried as raw DER bytes rather than file paths,
         /// since the original source (`.bytes` or `.file`) has already been resolved once by the
         /// time this is built, and a persisted path could stop pointing at the same content (or
@@ -33,6 +33,7 @@ extension Internals {
             package let trustedRootCertificatesDER: [Data]
             package let verification: Verification
             package let spkiPinning: SPKIPinning?
+            package let revocationPolicy: Revocation?
 
             package enum Verification: String, Codable, Equatable, Sendable {
                 case none
@@ -61,12 +62,34 @@ extension Internals {
                 }
             }
 
-            /// SPKI pinning, captured as raw digests rather than `Internals.SPKIHash` -- the
+            /// Mirrors `Internals.RevocationPolicy`'s two cases: a separate `Codable` enum
+            /// rather than making that type itself `Codable`, the same way `SPKIPinning.Policy`
+            /// mirrors `Internals.SPKIPinningPolicy` instead of reusing it.
+            package enum Revocation: String, Codable, Equatable, Sendable {
+                case strict
+                case disabled
+
+                package init(_ revocationPolicy: Internals.RevocationPolicy) {
+                    switch revocationPolicy {
+                    case .strict: self = .strict
+                    case .disabled: self = .disabled
+                    }
+                }
+
+                package var value: Internals.RevocationPolicy {
+                    switch self {
+                    case .strict: return .strict
+                    case .disabled: return .disabled
+                    }
+                }
+            }
+
+            /// SPKI pinning, captured as raw digests rather than `Internals.SPKIHash`, since the
             /// latter type-erases its hash algorithm into a closure that can't survive `Codable`
             /// encoding. `algorithm` is restricted to the three named ones
             /// (`Internals.SPKIHash.KnownAlgorithm`) precisely so a `Descriptor` can recompute the
             /// matching digest of a peer's SPKI bytes after a relaunch with no
-            /// `Internals.SecureConnection` in hand -- see ``ServerTrustPolicy/resolve(from:)``,
+            /// `Internals.SecureConnection` in hand. See ``ServerTrustPolicy/resolve(from:)``,
             /// which throws rather than silently dropping a pin it can't capture this way.
             package struct SPKIPinning: Codable, Equatable, Sendable {
                 package let pins: [Pin]
@@ -96,16 +119,18 @@ extension Internals {
             package init(
                 trustedRootCertificatesDER: [Data],
                 verification: Verification,
-                spkiPinning: SPKIPinning? = nil
+                spkiPinning: SPKIPinning? = nil,
+                revocationPolicy: Revocation? = nil
             ) {
                 self.trustedRootCertificatesDER = trustedRootCertificatesDER
                 self.verification = verification
                 self.spkiPinning = spkiPinning
+                self.revocationPolicy = revocationPolicy
             }
         }
 
         /// Thrown by ``descriptor`` when a configured SPKI pin can't be captured into a
-        /// `Descriptor` -- only ever `.unpersistableAlgorithm`, for a pin built with a
+        /// `Descriptor`. Only ever `.unpersistableAlgorithm`, for a pin built with a
         /// `Crypto.HashFunction` other than SHA-256/384/512
         /// (`Internals.SPKIHash.KnownAlgorithm`'s three cases). Live, in-process pinning still
         /// works fine with any such algorithm; only surviving a `BackgroundDownloadTask` relaunch
@@ -122,21 +147,13 @@ extension Internals {
             }
         }
 
-        // MARK: - Private types
-
-        /// One pin, normalized to a same-process matcher regardless of whether it came from a
-        /// live `Internals.SPKIHash` (`resolve(from:)`) or a rebuilt `Descriptor.SPKIPinning.Pin`
-        /// (`init(descriptor:)`) -- `handle(challenge:)` doesn't need to know which.
-        private struct ResolvedSPKIPin: @unchecked Sendable {
-            let matches: @Sendable (Data) -> Bool
-        }
-
         // MARK: - Private properties
 
-        private let trustedRootCertificates: [SecCertificate]
+        /// The trust-root/SPKI pin decision itself, shared with `Internals.NIOTrustEvaluator`.
+        /// This type only owns what's specific to a `URLAuthenticationChallenge`: the `.none`
+        /// bypass, and `Descriptor` persistence for `BackgroundDownloadTask`.
+        private let evaluation: Internals.DarwinTrustEvaluation
         private let certificateVerification: NIOSSL.CertificateVerification
-        private let spkiPins: [ResolvedSPKIPin]
-        private let spkiPinningIsStrict: Bool
         private let spkiPinningDescriptor: Descriptor.SPKIPinning?
 
         // MARK: - Inits
@@ -144,23 +161,32 @@ extension Internals {
         private init(
             trustedRootCertificates: [SecCertificate],
             certificateVerification: NIOSSL.CertificateVerification,
-            spkiPins: [ResolvedSPKIPin],
+            spkiPins: [Internals.ResolvedSPKIPin],
             spkiPinningIsStrict: Bool,
-            spkiPinningDescriptor: Descriptor.SPKIPinning?
+            spkiPinningDescriptor: Descriptor.SPKIPinning?,
+            revocationPolicy: Internals.RevocationPolicy?,
+            observer: (any TrustDecisionObserver)?
         ) {
-            self.trustedRootCertificates = trustedRootCertificates
+            self.evaluation = Internals.DarwinTrustEvaluation(
+                trustRootCertificates: trustedRootCertificates,
+                pins: spkiPins,
+                isStrict: spkiPinningIsStrict,
+                revocationPolicy: revocationPolicy,
+                observer: observer
+            )
             self.certificateVerification = certificateVerification
-            self.spkiPins = spkiPins
-            self.spkiPinningIsStrict = spkiPinningIsStrict
             self.spkiPinningDescriptor = spkiPinningDescriptor
         }
 
         /// Rebuilds a policy from a previously captured ``descriptor``. A certificate that fails
-        /// to parse back out of its own DER bytes is dropped silently rather than thrown -- it
+        /// to parse back out of its own DER bytes is dropped silently rather than thrown; it
         /// was already valid DER when captured (`SecCertificateCopyData` never produces anything
         /// else), so this is not expected to happen in practice, and failing the whole challenge
         /// over one bad anchor would be a worse outcome than trusting one fewer root than
         /// intended.
+        ///
+        /// - Note: Never carries a ``TrustDecisionObserver``. `Descriptor` is `Codable`-only, and
+        /// an observer is a live object reference with nothing left to reference after a relaunch.
         package convenience init(descriptor: Descriptor) {
             self.init(
                 trustedRootCertificates: descriptor.trustedRootCertificatesDER.compactMap {
@@ -168,41 +194,44 @@ extension Internals {
                 },
                 certificateVerification: descriptor.verification.nioSSLValue,
                 spkiPins: (descriptor.spkiPinning?.pins ?? []).map { pin in
-                    ResolvedSPKIPin { spkiDERBytes in
+                    Internals.ResolvedSPKIPin { spkiDERBytes in
                         Self.digest(spkiDERBytes, algorithm: pin.algorithm) == pin.digest
                     }
                 },
                 spkiPinningIsStrict: descriptor.spkiPinning?.policy == .strict,
-                spkiPinningDescriptor: descriptor.spkiPinning
+                spkiPinningDescriptor: descriptor.spkiPinning,
+                revocationPolicy: descriptor.revocationPolicy?.value,
+                observer: nil
             )
         }
 
         // MARK: - Internal properties
 
-        /// The `Codable` snapshot of this exact policy -- everything ``init(descriptor:)`` needs
+        /// The `Codable` snapshot of this exact policy: everything ``init(descriptor:)`` needs
         /// to rebuild an equivalent one later, with no `Internals.SecureConnection` in hand.
         ///
         /// - Throws: ``DescriptorError/unpersistableAlgorithm`` if `resolve(from:)` was given SPKI
         /// pins built with a `Crypto.HashFunction` other than SHA-256/384/512.
         package func descriptor() throws -> Descriptor {
-            if spkiPinningDescriptor == nil, !spkiPins.isEmpty {
+            if spkiPinningDescriptor == nil, !evaluation.pins.isEmpty {
                 // Only reachable via `resolve(from:)`, whose SPKI pins never populated
-                // `spkiPinningDescriptor` because at least one used an unnameable algorithm --
+                // `spkiPinningDescriptor` because at least one used an unnameable algorithm.
                 // `init(descriptor:)` always sets `spkiPinningDescriptor` when `spkiPins` is
                 // non-empty, so this branch can't fire for an already-rebuilt policy.
                 throw DescriptorError.unpersistableAlgorithm
             }
 
             return Descriptor(
-                trustedRootCertificatesDER: trustedRootCertificates.map { SecCertificateCopyData($0) as Data },
+                trustedRootCertificatesDER: evaluation.trustRootCertificates.map { SecCertificateCopyData($0) as Data },
                 verification: Descriptor.Verification(certificateVerification),
-                spkiPinning: spkiPinningDescriptor
+                spkiPinning: spkiPinningDescriptor,
+                revocationPolicy: evaluation.revocationPolicy.map(Descriptor.Revocation.init)
             )
         }
 
         // MARK: - Internal methods
 
-        /// Resolves trust roots and SPKI pinning straight from a `SecureConnection` -- the same
+        /// Resolves trust roots and SPKI pinning straight from a `SecureConnection`, the same
         /// `Internals.TrustRoots`/`Internals.AdditionalTrustRoots` parsing
         /// `Internals.URLSessionIdentityPolicy` uses for its own server-trust half, shared rather
         /// than duplicated between the two. Every pin's digest is resolved eagerly (base64
@@ -212,14 +241,14 @@ extension Internals {
             var trustedRootCertificates: [SecCertificate] = []
 
             if let trustRoots = secureConnection.trustRoots {
-                trustedRootCertificates += try certificates(from: trustRoots).map {
+                trustedRootCertificates += try trustRoots.resolvedCertificates().map {
                     try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
                 }
             }
 
             if let additionalTrustRoots = secureConnection.additionalTrustRoots {
                 for additionalTrustRoot in additionalTrustRoots {
-                    trustedRootCertificates += try certificates(from: additionalTrustRoot).map {
+                    trustedRootCertificates += try additionalTrustRoot.resolvedCertificates().map {
                         try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
                     }
                 }
@@ -227,7 +256,7 @@ extension Internals {
 
             let isStrict = (secureConnection.tlsPinningPolicy ?? .strict) == .strict
 
-            // Each pin's digest is resolved exactly once here (base64 decoded, length-checked) --
+            // Each pin's digest is resolved exactly once here (base64 decoded, length-checked):
             // both `spkiPins` below (the live matcher, re-fetching this same digest per challenge
             // via `matchesSPKI`) and `spkiPinningDescriptor` reuse it, and a malformed pin throws
             // right here rather than lazily on first challenge or first background schedule.
@@ -236,14 +265,14 @@ extension Internals {
             }
 
             let spkiPins = resolvedPins.map { resolved in
-                ResolvedSPKIPin { spkiDERBytes in
+                Internals.ResolvedSPKIPin { spkiDERBytes in
                     (try? resolved.pin.matchesSPKI(spkiDERBytes)) ?? false
                 }
             }
 
             // `nil` whenever there are no pins at all, or whenever any pin's algorithm isn't one
-            // of the three `Internals.SPKIHash.KnownAlgorithm` cases -- deliberately *not* thrown
-            // here: an unnameable algorithm still pins correctly for live, in-process use
+            // of the three `Internals.SPKIHash.KnownAlgorithm` cases. This is deliberately *not*
+            // thrown here: an unnameable algorithm still pins correctly for live, in-process use
             // (`URLSessionClient`), it just can't be captured for a `BackgroundDownloadTask` to
             // rebuild after a relaunch. `descriptor()` is what throws, and only if it's actually
             // called with pins present but nothing capturable.
@@ -263,12 +292,14 @@ extension Internals {
                 certificateVerification: secureConnection.certificateVerification ?? .fullVerification,
                 spkiPins: spkiPins,
                 spkiPinningIsStrict: isStrict,
-                spkiPinningDescriptor: spkiPinningDescriptor
+                spkiPinningDescriptor: spkiPinningDescriptor,
+                revocationPolicy: secureConnection.revocationPolicy,
+                observer: secureConnection.trustDecisionObserver
             )
         }
 
         /// Answers a server-trust challenge. Anything else (client-certificate, or any other
-        /// authentication method) defers to the system's default handling -- this type only ever
+        /// authentication method) defers to the system's default handling; this type only ever
         /// speaks to the server side of a handshake.
         package func handle(
             challenge: URLAuthenticationChallenge,
@@ -283,46 +314,26 @@ extension Internals {
             }
 
             if case .none = certificateVerification {
-                // Mirrors NIOSSL's `CertificateVerification.none` -- deliberately unsafe,
+                // Mirrors NIOSSL's `CertificateVerification.none`: deliberately unsafe,
                 // opt-in only. SPKI pins, like every other check below, don't apply here either:
                 // `.none` means trust evaluation itself was opted out of.
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
                 return
             }
 
-            if certificateVerification == .noHostnameVerification {
-                let policy = SecPolicyCreateSSL(true, nil)
-                _ = SecTrustSetPolicies(serverTrust, policy as CFTypeRef)
-            }
-
-            if !trustedRootCertificates.isEmpty {
-                _ = SecTrustSetAnchorCertificates(serverTrust, trustedRootCertificates as CFArray)
-                _ = SecTrustSetAnchorCertificatesOnly(serverTrust, true)
-            }
+            evaluation.prepare(
+                serverTrust,
+                skipsHostnameVerification: certificateVerification == .noHostnameVerification
+            )
 
             var evaluationError: CFError?
             let isTrusted = SecTrustEvaluateWithError(serverTrust, &evaluationError)
 
-            guard isTrusted else {
-                completionHandler(.cancelAuthenticationChallenge, nil)
-                return
-            }
-
-            guard !spkiPins.isEmpty else {
-                completionHandler(.useCredential, URLCredential(trust: serverTrust))
-                return
-            }
-
-            let pinsMatched =
-                Self.leafSPKIDERBytes(of: serverTrust).map { leafSPKIDERBytes in
-                    spkiPins.contains { $0.matches(leafSPKIDERBytes) }
-                } ?? false
-
-            if pinsMatched || !spkiPinningIsStrict {
-                // `.audit` behaves exactly like AsyncHTTPClient's own SPKI pinning policy: a
-                // mismatch (or, here, a leaf the SPKI bytes couldn't even be extracted from) is
-                // still accepted, on the assumption this is a deliberate debugging/migration
-                // window rather than production traffic.
+            // `.audit` behaves exactly like AsyncHTTPClient's own former SPKI pinning policy: a
+            // mismatch (or a leaf the SPKI bytes couldn't even be extracted from) is still
+            // accepted, on the assumption this is a deliberate debugging/migration window rather
+            // than production traffic.
+            if evaluation.evaluate(chain: serverTrust, chainIsTrusted: isTrusted) {
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
             } else {
                 completionHandler(.cancelAuthenticationChallenge, nil)
@@ -330,37 +341,6 @@ extension Internals {
         }
 
         // MARK: - Private methods
-
-        /// The leaf certificate's SPKI (SubjectPublicKeyInfo) structure, DER-encoded -- what an
-        /// `Internals.SPKIHash` pin's digest is computed over. Reuses NIOSSL's own
-        /// `NIOSSLPublicKey.toSPKIBytes()` on the leaf's DER bytes rather than reconstructing the
-        /// SPKI ASN.1 wrapper from a bare `SecKey` export by hand, so a pin configured once
-        /// produces the identical digest regardless of which executor (`URLSession` here, plain
-        /// NIO/NIOTransportServices elsewhere) ends up carrying the connection. `nil` on any
-        /// failure along the way (no certificates in the trust, DER that doesn't round-trip
-        /// through NIOSSL, a public key NIOSSL can't export) -- treated the same as "pin
-        /// mismatch" by the caller, since none of these are expected to happen for a trust that
-        /// `SecTrustEvaluateWithError` already accepted moments earlier.
-        private static func leafSPKIDERBytes(of trust: SecTrust) -> Data? {
-            guard
-                let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
-                let leaf = chain.first
-            else {
-                return nil
-            }
-
-            let derBytes = [UInt8](SecCertificateCopyData(leaf) as Data)
-
-            guard
-                let certificate = try? NIOSSLCertificate(bytes: derBytes, format: .der),
-                let publicKey = try? certificate.extractPublicKey(),
-                let spkiBytes = try? publicKey.toSPKIBytes()
-            else {
-                return nil
-            }
-
-            return Data(spkiBytes)
-        }
 
         private static func digest(_ data: Data, algorithm: Internals.SPKIHash.KnownAlgorithm) -> Data {
             switch algorithm {
@@ -370,29 +350,6 @@ extension Internals {
             }
         }
 
-        private static func certificates(from trustRoots: Internals.TrustRoots) throws -> [NIOSSLCertificate] {
-            switch trustRoots {
-            case .file(let file):
-                return try Internals.Certificate(file, format: .pem).build()
-            case .bytes(let bytes):
-                return try Internals.Certificate(bytes, format: .pem).build()
-            case .certificates(let certificates):
-                return try certificates.flatMap { try $0.build() }
-            }
-        }
-
-        private static func certificates(
-            from additionalTrustRoots: Internals.AdditionalTrustRoots
-        ) throws -> [NIOSSLCertificate] {
-            switch additionalTrustRoots {
-            case .file(let file):
-                return try Internals.Certificate(file, format: .pem).build()
-            case .bytes(let bytes):
-                return try Internals.Certificate(bytes, format: .pem).build()
-            case .certificates(let certificates):
-                return try certificates.flatMap { try $0.build() }
-            }
-        }
     }
 }
 

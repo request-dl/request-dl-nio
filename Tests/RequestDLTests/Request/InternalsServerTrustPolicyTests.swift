@@ -15,7 +15,7 @@ import Testing
 import Foundation
 import Security
 
-/// Covers `Internals.ServerTrustPolicy` -- the server-trust half `Internals.URLSessionIdentityPolicy`
+/// Covers `Internals.ServerTrustPolicy`: the server-trust half `Internals.URLSessionIdentityPolicy`
 /// now composes rather than duplicates, and the piece `BackgroundDownloadTask` resolves at
 /// schedule time and rebuilds again from a persisted ``Internals/ServerTrustPolicy/Descriptor``,
 /// simulating what happens after a relaunch with nothing else in memory.
@@ -90,6 +90,50 @@ struct InternalsServerTrustPolicyTests {
         #expect(descriptor.trustedRootCertificatesDER.count == 2)
     }
 
+    // MARK: - Revocation policy
+
+    @Test
+    func resolve_whenRevocationPolicyConfigured_capturesInDescriptor() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .strict
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.revocationPolicy == .strict)
+    }
+
+    @Test
+    func resolve_whenNoRevocationPolicyConfigured_descriptorHasNone() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.revocationPolicy == nil)
+    }
+
+    @Test
+    func descriptor_roundTripsRevocationPolicyThroughInit() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .disabled
+
+        let original = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        // When
+        let encoded = try JSONEncoder().encode(original.descriptor())
+        let decoded = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: encoded)
+        let rebuilt = Internals.ServerTrustPolicy(descriptor: decoded)
+
+        // Then
+        #expect(try rebuilt.descriptor() == original.descriptor())
+    }
+
     // MARK: - SPKI pinning
 
     @Test
@@ -122,7 +166,7 @@ struct InternalsServerTrustPolicyTests {
         #expect(descriptor.spkiPinning == nil)
     }
 
-    /// `Internals.SPKIHash.KnownAlgorithm` only names SHA-256/384/512 -- anything else, like
+    /// `Internals.SPKIHash.KnownAlgorithm` only names SHA-256/384/512. Anything else, like
     /// `Insecure.SHA1` here, still works for live pinning (see
     /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
     /// below) but can't be captured into a `Descriptor`.
@@ -177,7 +221,7 @@ struct InternalsServerTrustPolicyTests {
 
         let original = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
 
-        // When -- exactly what survives a relaunch: the `Descriptor`, JSON round-tripped the same
+        // When: exactly what survives a relaunch. The `Descriptor` is JSON round-tripped the same
         // way `BackgroundDownloads.Session` persists it on `taskDescription`, then rebuilt from
         // that alone.
         let encoded = try JSONEncoder().encode(original.descriptor())
@@ -188,11 +232,88 @@ struct InternalsServerTrustPolicyTests {
         #expect(try rebuilt.descriptor() == original.descriptor())
     }
 
-    // MARK: - handle(challenge:completionHandler:) -- real handshake, rebuilt policy
+    // MARK: - Trust decision observer
+
+    /// A live (never `descriptor()`-rebuilt) policy, since `Descriptor` is `Codable`-only and
+    /// can't carry an observer across a relaunch. See ``Internals/ServerTrustPolicy/init(descriptor:)``'s
+    /// own doc comment.
+    @Test
+    func handle_whenChainAndPinsBothMatch_notifiesObserverWithTrustedDecision() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+        let observer = RecordingTrustDecisionObserver()
+        secureConnection.trustDecisionObserver = observer
+
+        let policy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        let delegate = ForwardingChallengeDelegate(policy: policy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        _ = try await session.data(for: request)
+
+        // Then
+        #expect(observer.decisions == [TrustDecision(isTrusted: true, pinsMatched: true)])
+    }
+
+    @Test
+    func handle_whenPinMismatch_notifiesObserverWithUntrustedDecisionAndUnmatchedPins() async throws {
+        // Given
+        let server = Certificates().server()
+        let unrelatedCertificate = Certificates().client()
+        let wrongPin = try hashSPKI(from: unrelatedCertificate.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.cleanup(at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(wrongPin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+        let observer = RecordingTrustDecisionObserver()
+        secureConnection.trustDecisionObserver = observer
+
+        let policy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        let delegate = ForwardingChallengeDelegate(policy: policy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        await #expect(throws: (any Error).self) {
+            try await session.data(for: request)
+        }
+
+        // Then
+        #expect(observer.decisions == [TrustDecision(isTrusted: false, pinsMatched: false)])
+    }
+
+    // MARK: - handle(challenge:completionHandler:) (real handshake, rebuilt policy)
 
     /// The whole point of splitting this type out: a policy rebuilt from nothing but a
-    /// `Descriptor` -- no `Internals.SecureConnection`, no `Property` tree, exactly what a
-    /// `BackgroundDownloadTask` delegate callback has after a relaunch -- still has to genuinely
+    /// `Descriptor` (no `Internals.SecureConnection`, no `Property` tree, exactly what a
+    /// `BackgroundDownloadTask` delegate callback has after a relaunch) still has to genuinely
     /// validate a real server certificate against real trust roots, not just hold the right bytes
     /// in memory.
     @Test
@@ -237,7 +358,7 @@ struct InternalsServerTrustPolicyTests {
 
     @Test
     func rebuiltPolicy_whenTrustRootsDoNotMatch_rejectsRealServerCertificate() async throws {
-        // Given -- the client fixture's own certificate is not the one `LocalServer` presents, so
+        // Given: the client fixture's own certificate is not the one `LocalServer` presents, so
         // anchoring to it specifically must fail the handshake.
         let unrelatedCertificate = Certificates().client()
         let localServer = try await LocalServer(.standard)
@@ -265,7 +386,7 @@ struct InternalsServerTrustPolicyTests {
         }
     }
 
-    // MARK: - handle(challenge:completionHandler:) -- SPKI pinning, real handshake
+    // MARK: - handle(challenge:completionHandler:) (SPKI pinning, real handshake)
 
     @Test
     func rebuiltPolicy_whenSPKIPinningMatchesServerCertificate_acceptsHandshake() async throws {
@@ -309,9 +430,9 @@ struct InternalsServerTrustPolicyTests {
 
     @Test
     func rebuiltPolicy_whenSPKIPinningDoesNotMatchUnderStrictPolicy_rejectsHandshake() async throws {
-        // Given -- trust roots anchor to the real server certificate (so plain chain validation
+        // Given: trust roots anchor to the real server certificate (so plain chain validation
         // passes), but the configured pin is some other certificate's SPKI, not the one
-        // `LocalServer` actually presents -- isolating the rejection to the pin check itself.
+        // `LocalServer` actually presents. This isolates the rejection to the pin check itself.
         let server = Certificates().server()
         let unrelatedCertificate = Certificates().client()
         let wrongPin = try hashSPKI(from: unrelatedCertificate.certificateURL, algorithm: SHA256.self)
@@ -343,7 +464,7 @@ struct InternalsServerTrustPolicyTests {
 
     @Test
     func rebuiltPolicy_whenSPKIPinningDoesNotMatchUnderAuditPolicy_stillAcceptsHandshake() async throws {
-        // Given -- same mismatch as the strict-policy test above, but `.audit` is meant to warn
+        // Given: same mismatch as the strict-policy test above, but `.audit` is meant to warn
         // rather than block, mirroring what `SPKIPinningConfiguration` already does on the
         // NIOSSL/AsyncHTTPClient side.
         let server = Certificates().server()
@@ -382,7 +503,7 @@ struct InternalsServerTrustPolicyTests {
     }
 
     /// `Internals.SPKIHash.KnownAlgorithm` (SHA-256/384/512) only gates what a `Descriptor` can
-    /// carry across a `BackgroundDownloadTask` relaunch -- a live, in-process
+    /// carry across a `BackgroundDownloadTask` relaunch. A live, in-process
     /// `Internals.ServerTrustPolicy` (`URLSessionClient`'s own case, never persisted) pins
     /// correctly with any `Crypto.HashFunction`.
     @Test
@@ -424,7 +545,7 @@ struct InternalsServerTrustPolicyTests {
 
 extension InternalsServerTrustPolicyTests {
 
-    /// Mirrors `SPKIPinningTests.hashSPKI(from:)` -- the exact same SPKI-DER-then-hash pipeline
+    /// Mirrors `SPKIPinningTests.hashSPKI(from:)`: the exact same SPKI-DER-then-hash pipeline
     /// `Internals.SPKIHash`/`Internals.ServerTrustPolicy` use, generalized over the hash algorithm
     /// so `descriptor_whenSPKIPinningUsesUnnamedAlgorithm_throwsUnpersistableAlgorithm` and
     /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
@@ -436,7 +557,7 @@ extension InternalsServerTrustPolicyTests {
     }
 }
 
-/// Forwards a session's server-trust challenge straight to a `ServerTrustPolicy` -- the same
+/// Forwards a session's server-trust challenge straight to a `ServerTrustPolicy`: the same
 /// hookup `BackgroundDownloads.Session`'s own `urlSession(_:task:didReceive:completionHandler:)`
 /// does, minus the `taskDescription` decoding step, since this suite already has the policy in
 /// hand directly.
@@ -455,6 +576,17 @@ private final class ForwardingChallengeDelegate: NSObject, URLSessionTaskDelegat
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         policy.handle(challenge: challenge, completionHandler: completionHandler)
+    }
+}
+
+/// A test double recording every ``TrustDecision`` it's notified of, in order. `@unchecked
+/// Sendable` is safe here, since `URLSession`'s challenge delegate callback runs each handshake's
+/// decision serially, one at a time, for these single-request tests.
+private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
+    private(set) var decisions: [TrustDecision] = []
+
+    func callAsFunction(_ decision: TrustDecision) {
+        decisions.append(decision)
     }
 }
 

@@ -75,7 +75,7 @@ struct RequestConfigurationURLRequestTests {
 
     @Test
     func buildURLRequest_whenURLIsMalformed_throwsInvalidRequestURLError() async throws {
-        // Given -- no `BaseURL`, so `url` is empty, which `Foundation.URL(string:)` rejects.
+        // Given: no `BaseURL`, so `url` is empty, which `Foundation.URL(string:)` rejects.
         // Mirrors `BaseURL`'s own documented warning: omitting it is a real, reachable mistake,
         // not a hypothetical one.
         let configuration = RequestConfiguration()

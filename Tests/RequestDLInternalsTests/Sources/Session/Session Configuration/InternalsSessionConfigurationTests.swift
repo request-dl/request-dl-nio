@@ -5,6 +5,7 @@
 import AsyncHTTPClient
 import Crypto
 import NIOCore
+import NIOSSL
 import Testing
 import Tracing
 
@@ -15,6 +16,17 @@ import Tracing
 import FoundationEssentials
 #else
 import struct Foundation.UUID
+#endif
+
+#if canImport(Network)
+import Network
+#endif
+
+#if canImport(Darwin)
+// `URLSessionConfiguration` isn't part of the narrow `import struct Foundation.UUID` this file
+// otherwise gets by with; needed only by the Darwin-gated `buildURLSessionConfiguration()`
+// tests below.
+import Foundation
 #endif
 
 struct InternalsSessionConfigurationTests {
@@ -28,7 +40,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.secureConnection = secureConnection
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(
@@ -47,7 +59,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.redirectConfiguration = redirectConfiguration
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(
@@ -76,7 +88,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.timeout = timeout
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.timeout.connect == .nanoseconds(connect))
@@ -93,7 +105,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.connectionPool = connectionPool
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.connectionPool == connectionPool)
@@ -114,7 +126,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -140,7 +152,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -165,7 +177,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -188,7 +200,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.proxy = proxy
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.proxy?.host == proxy.host)
@@ -206,7 +218,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.decompression = decompression
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(
@@ -229,7 +241,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.httpVersion = version
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.httpVersion == version.build())
@@ -249,7 +261,7 @@ struct InternalsSessionConfigurationTests {
         // When
         configuration.multipathServiceType = multipathServiceType
 
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.enableMultipath)
@@ -261,7 +273,7 @@ struct InternalsSessionConfigurationTests {
         let configuration = Internals.Session.Configuration()
 
         // When
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(!builtConfiguration.enableMultipath)
@@ -332,7 +344,7 @@ struct InternalsSessionConfigurationTests {
         // Given
         let configuration = Internals.Session.Configuration()
 
-        // Then -- `false` regardless of `secureConnection`, since the caller never asked for
+        // Then: `false` regardless of `secureConnection`, since the caller never asked for
         // Network framework in the first place.
         #expect(!configuration.isCompatibleWithNetworkFramework)
     }
@@ -352,7 +364,7 @@ struct InternalsSessionConfigurationTests {
     }
 
     @Test
-    func configuration_whenNetworkFrameworkEnabledWithSPKIPinning_isCompatibleWithNetworkFrameworkIsFalse()
+    func configuration_whenNetworkFrameworkEnabledWithSPKIPinning_isCompatibleWithNetworkFrameworkIsTrue()
         async throws
     {
         // Given
@@ -364,11 +376,17 @@ struct InternalsSessionConfigurationTests {
         configuration.enableNetworkFramework = true
         configuration.secureConnection = secureConnection
 
-        // Then -- SPKI pinning silently overrides the Network framework request rather than
-        // failing outright or dropping the pins: AsyncHTTPClient's NIOTransportServices bridge
-        // never consults `SPKIPinningConfiguration`, so honoring `enableNetworkFramework` here
-        // would mean the pins stop being enforced without any signal to the caller.
-        #expect(!configuration.isCompatibleWithNetworkFramework)
+        // Then: SPKI pinning is enforced under Network.framework too, via
+        // `Internals.NIOTrustEvaluator`/`HTTPClient.Configuration.tlsCustomVerificationNetworkFramework`
+        // (AsyncHTTPClient's fork, 1.38.0+), so it no longer needs to steer a session off that
+        // executor the way it did when pinning only worked through the NIOSSL backend. Network.framework
+        // doesn't exist at all off Darwin, so `isCompatibleWithNetworkFramework` itself stays
+        // unconditionally `false` there regardless of reasons, checked directly on Darwin, and via
+        // the platform-independent reasons list everywhere else.
+        #if canImport(Darwin)
+        #expect(configuration.isCompatibleWithNetworkFramework)
+        #endif
+        #expect(secureConnection.networkFrameworkIncompatibilityReasons().isEmpty)
         #expect(secureConnection.tlsPins != nil)
     }
 
@@ -392,9 +410,9 @@ struct InternalsSessionConfigurationTests {
         configuration.tracer = RecordingTracer()
 
         // When
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
-        // Then -- `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
+        // Then: `async-http-client`'s own tracing is always suppressed; RequestDL owns the span
         // lifecycle itself (see the doc comment on `Configuration.tracer`).
         #expect((builtConfiguration.tracing.tracer as? NoOpTracer) != nil)
     }
@@ -406,14 +424,14 @@ struct InternalsSessionConfigurationTests {
 
         // Then
         #expect((configuration.tracer as? NoOpTracer) != nil)
-        #expect((try configuration.build().tracing.tracer as? NoOpTracer) != nil)
+        #expect((try configuration.build().httpClientConfiguration.tracing.tracer as? NoOpTracer) != nil)
     }
 
     @Test
     func configuration_whenInit_shouldBeDefault() async throws {
         // When
         let configuration = Internals.Session.Configuration()
-        let builtConfiguration = try configuration.build()
+        let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
         #expect(builtConfiguration.tlsConfiguration == nil)
@@ -428,7 +446,7 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.timeout.connect == nil)
         #expect(builtConfiguration.timeout.read == nil)
         #expect(builtConfiguration.proxy == nil)
-        // Off by default on every platform now -- decompression is opt-in, and `.disabled` gets
+        // Off by default on every platform now: decompression is opt-in, and `.disabled` gets
         // real parity with `.urlSession` via `Accept-Encoding: identity`, so the two platforms no
         // longer need different defaults.
         let expectedDecompression = HTTPClient.Decompression.disabled
@@ -444,6 +462,52 @@ struct InternalsSessionConfigurationTests {
         #expect(builtConfiguration.httpVersion == .automatic)
         #expect(!builtConfiguration.enableMultipath)
     }
+
+    #if canImport(Darwin)
+    /// Regression coverage: `minimumTLSVersion`/`maximumTLSVersion` used to be silently dropped
+    /// under `.urlSession`: no `URLSessionConfiguration` counterpart was ever set, despite both
+    /// being genuinely reachable via `tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion` (public API since iOS 13/macOS 10.15, both already
+    /// below this package's own deployment floor).
+    @Test
+    func configuration_whenSecureConnectionSetsTLSVersionRange_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.minimumTLSVersion = .tlsv12
+        secureConnection.maximumTLSVersion = .tlsv13
+        configuration.secureConnection = secureConnection
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.tlsMinimumSupportedProtocolVersion == .TLSv12)
+        #expect(urlSessionConfiguration.tlsMaximumSupportedProtocolVersion == .TLSv13)
+    }
+
+    @Test
+    func configuration_whenSecureConnectionOmitsTLSVersionRange_urlSessionConfigurationKeepsSystemDefault()
+        async throws
+    {
+        // Given: absence must stay absence, not get forced to some RequestDL-chosen floor
+        let configuration = Internals.Session.Configuration()
+        let defaultConfiguration = URLSessionConfiguration.ephemeral
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(
+            urlSessionConfiguration.tlsMinimumSupportedProtocolVersion
+                == defaultConfiguration.tlsMinimumSupportedProtocolVersion
+        )
+        #expect(
+            urlSessionConfiguration.tlsMaximumSupportedProtocolVersion
+                == defaultConfiguration.tlsMaximumSupportedProtocolVersion
+        )
+    }
+    #endif
 }
 
 private struct RecordingTracer: Tracer, Sendable {

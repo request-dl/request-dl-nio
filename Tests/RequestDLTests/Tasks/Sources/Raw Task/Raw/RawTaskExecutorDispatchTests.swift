@@ -27,20 +27,23 @@ import class Foundation.ProcessInfo
 ///
 /// `InternalsClientManagerExecutorTests` (`RequestDLInternalsTests`) already proved
 /// `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)` resolves and caches a
-/// working `.urlSession` client, using a hand-built `Internals.ClientManager`/`SessionProvider` --
+/// working `.urlSession` client, using a hand-built `Internals.ClientManager`/`SessionProvider`,
 /// deliberately isolated from the `Property`/`Resolve` pipeline and from `Internals.ClientManager
-/// .shared`. This file proves the layer above that: a real `DataTask`, resolved through an actual
+/// .shared`.
+///
+/// This file proves the layer above that: a real `DataTask`, resolved through an actual
 /// `Property` tree exactly as an app would build one, and dispatched via the *same* shared pool
-/// `RawTask.result()` itself reads from -- not a fresh, test-isolated manager.
+/// `RawTask.result()` itself reads from, not a fresh, test-isolated manager.
 struct RawTaskExecutorDispatchTests {
 
     @Test
     func dataTask_whenNoExecutorPreferenceSet_actuallyDispatchesOverURLSessionOnDarwin() async throws {
-        // Given -- a config compatible with every executor, so `.urlSession` is
-        // `resolveExecutor()`'s own default preference, not something forced here. A
-        // session id unique to this test run keeps it off `Session.localServer`'s shared pooled
-        // entry, so nothing else running concurrently can affect (or be affected by) the
-        // `Internals.ClientManager.shared` lookup below.
+        // Given: a config compatible with every executor, so `.urlSession` is
+        // `resolveExecutor()`'s own default preference, not something forced here.
+        //
+        // A session id unique to this test run keeps it off `Session.localServer`'s shared
+        // pooled entry, so nothing else running concurrently can affect (or be affected by)
+        // the `Internals.ClientManager.shared` lookup below.
         let localServer = try await LocalServer(.standard)
         let uri = "/" + UUID().uuidString
         let certificate = Certificates().server()
@@ -62,14 +65,14 @@ struct RawTaskExecutorDispatchTests {
             }
         }
 
-        // When -- through the real public API, exactly as an app would call it. No executor
+        // When: through the real public API, exactly as an app would call it. No executor
         // modifier anywhere in `content` above.
         let data = try await DataTask { content }.extractPayload().result()
 
         let result = try HTTPResult<String>(data)
         #expect(result.response == output)
 
-        // Then -- resolving the identical property tree again and asking
+        // Then: resolving the identical property tree again and asking
         // `Internals.ClientManager.shared` (the pool the `DataTask` call above actually used)
         // what it holds for this exact provider is what proves the *real* call dispatched over
         // `.urlSession`, rather than merely that `.urlSession` was resolvable in isolation.
@@ -83,11 +86,14 @@ struct RawTaskExecutorDispatchTests {
 
     @Test
     func dataTask_whenNIORequired_actuallyDispatchesOverNIOEvenThoughURLSessionWouldBeCompatible() async throws {
-        // Given -- same shape as above (would default to `.urlSession` on Darwin), but this time
-        // pinned to `.nio` explicitly. Regression coverage for the bug this phase's own testing
-        // caught: `requiredExecutor(.nio)` used to validate without ever actually being the
-        // executor a real request dispatched over -- `resolveExecutor()` read only
-        // `preferredExecutor`, so a `.urlSession`-compatible config kept resolving there anyway.
+        // Given: same shape as above (would default to `.urlSession` on Darwin), but this time
+        // pinned to `.nio` explicitly.
+        //
+        // Regression coverage for the bug this phase's own testing caught: `requiredExecutor(.nio)`
+        // used to validate without ever actually being the executor a real request dispatched
+        // over, since `resolveExecutor()` read only `preferredExecutor`, so a
+        // `.urlSession`-compatible config kept resolving there anyway.
+        //
         // See `InternalsSessionConfigurationExecutorTests`'s "resolveExecutor() with
         // requiredExecutor" section for the unit-level fix; this is the same fact proven one
         // layer up, through a real `DataTask` round trip.
@@ -130,13 +136,15 @@ struct RawTaskExecutorDispatchTests {
 
     /// Regression coverage for the gap `Session.compression(_:)` used to have: its
     /// `NIOHTTPRequestCompressor` was spliced into the `.nio` executor's own connection pipeline
-    /// (`Internals.Session.Configuration.build()`), which `.urlSession` never runs through --
+    /// (`Internals.Session.Configuration.build()`), which `.urlSession` never runs through.
     /// `compression` wasn't even listed in `urlSessionIncompatibilityReasons()`, so a session
     /// pinned (or, on Darwin, defaulted) to `.urlSession` silently sent the body uncompressed,
-    /// no error anywhere. `RequestConfiguration.applyCompression(_:onDuplicateHeader:)` now
-    /// compresses `RequestBody` itself, once, before either executor ever sees it -- this proves
-    /// that fix through the real, public `DataTask` API, pinned to `.urlSession` explicitly so
-    /// there is no ambiguity about which executor actually sent the request.
+    /// no error anywhere.
+    ///
+    /// `RequestConfiguration.applyCompression(_:onDuplicateHeader:)` now compresses `RequestBody`
+    /// itself, once, before either executor ever sees it. This proves that fix through the real,
+    /// public `DataTask` API, pinned to `.urlSession` explicitly so there is no ambiguity about
+    /// which executor actually sent the request.
     @Test
     func dataTask_whenCompressionEnabledOverURLSession_sendsCompressedBody() async throws {
         // Given
@@ -164,7 +172,7 @@ struct RawTaskExecutorDispatchTests {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
             }
 
-            // `.compression(_:)` is environment-driven, like `.payloadEncoder(_:)` -- it has to
+            // `.compression(_:)` is environment-driven, like `.payloadEncoder(_:)`: it has to
             // be attached to (or above) the `Payload` it should affect, not to an unrelated
             // sibling like `Session` above, whose own `.environment(_:_:)` mutation never
             // reaches anything outside its own subtree.
@@ -180,7 +188,7 @@ struct RawTaskExecutorDispatchTests {
         #expect(result.response == output)
 
         // The server only ever sees the wire bytes it read, so a `receivedBytes` well below the
-        // original payload size is proof the request body actually went out gzip-compressed --
+        // original payload size is proof the request body actually went out gzip-compressed,
         // over `.urlSession`, not just over `.nio`.
         #expect(result.receivedBytes < payload.count / 2)
 
@@ -227,7 +235,7 @@ struct RawTaskExecutorDispatchTests {
         let data = try await DataTask { content }.extractPayload().result()
         let result = try HTTPResult<String>(data)
 
-        // Then -- URLSession synthesizes its own accurate report once RequestDL's own default is
+        // Then: URLSession synthesizes its own accurate report once RequestDL's own default is
         // dropped, so the server sees *something*, just not RequestDL's neutral
         // `AppID/version OS/version` string.
         let receivedUserAgent = try #require(result.receivedUserAgentHeader)
@@ -273,7 +281,7 @@ struct RawTaskExecutorDispatchTests {
     }
 
     /// Companion to both tests above: NIO never synthesizes its own `User-Agent`, so dropping
-    /// RequestDL's default there -- the way `.urlSession` does -- would just send the request
+    /// RequestDL's default there, the way `.urlSession` does, would just send the request
     /// with none. RequestDL's neutral default must survive under `.nio`.
     @Test
     func dataTask_withDefaultUserAgentOverNIO_keepsRequestDLsNeutralDefault() async throws {
@@ -311,13 +319,15 @@ struct RawTaskExecutorDispatchTests {
 
     /// Regression coverage for combining RequestDL's default with a plain `CustomHeader(name:
     /// "user-agent", ...)`, not `UserAgentHeader(_:)`. `HeaderNode.make(_:)` matches "User-Agent"
-    /// case-insensitively, so this still disqualifies `hasDefaultUserAgent` -- see
+    /// case-insensitively, so this still disqualifies `hasDefaultUserAgent`; see
     /// `UserAgentHeaderTests.hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing`
     /// for that check at the graph-resolve level, where the two values are still stored
     /// separately (`CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s
-    /// own hardcoded `" "`). This proves what actually reaches the wire once `URLRequest` gets
-    /// involved: `buildURLRequestWithoutBody()` calls `addValue(_:forHTTPHeaderField:)` once per
-    /// stored value, and `URLRequest` itself -- confirmed against a live instance, not assumed --
+    /// own hardcoded `" "`).
+    ///
+    /// This proves what actually reaches the wire once `URLRequest` gets involved:
+    /// `buildURLRequestWithoutBody()` calls `addValue(_:forHTTPHeaderField:)` once per stored
+    /// value, and `URLRequest` itself, confirmed against a live instance and not assumed,
     /// coalesces same-name fields (case-insensitively) into one comma-joined header, no space.
     @Test
     func dataTask_defaultUserAgentCollidesWithCustomHeaderOverURLSession_mergesOntoTheWire() async throws {
@@ -350,33 +360,36 @@ struct RawTaskExecutorDispatchTests {
         let data = try await DataTask { content }.extractPayload().result()
         let result = try HTTPResult<String>(data)
 
-        // Then -- neither value was dropped (a second write already disqualified
+        // Then: neither value was dropped (a second write already disqualified
         // `hasDefaultUserAgent`), and both landed on the wire merged into one header.
         #expect(result.receivedUserAgentHeader == "\(ProcessInfo.processInfo.userAgent),ABC")
     }
 
     /// Cancellation, validated for real. `Internals.TaskSeed` (transport-agnostic) cancels when
-    /// the response is *dropped*, not when the
-    /// awaiting `_Concurrency.Task` is marked cancelled -- nothing in the iteration path
-    /// (`AsyncBytes.AsyncIterator.next()`, `Internals.AsyncStream`) checks
-    /// `Task.isCancelled`/`Task.checkCancellation()`. So the whole round trip below runs inside
-    /// one scope: read the one chunk `withPartialResponseServer` ever sends, then let that scope
-    /// end -- dropping both the loop's iterator and the `TaskResult<AsyncBytes>` itself, the only
-    /// two things holding the seed alive.
+    /// the response is *dropped*, not when the awaiting `_Concurrency.Task` is marked cancelled:
+    /// nothing in the iteration path (`AsyncBytes.AsyncIterator.next()`, `Internals.AsyncStream`)
+    /// checks `Task.isCancelled`/`Task.checkCancellation()`.
+    ///
+    /// So the whole round trip below runs inside one scope: read the one chunk
+    /// `withPartialResponseServer` ever sends, then let that scope end, dropping both the loop's
+    /// iterator and the `TaskResult<AsyncBytes>` itself, the only two things holding the seed
+    /// alive.
     ///
     /// `LocalServer` always answers fully and immediately, and a "just make the body big" version
     /// of this test (tried first) turned out not to prove anything: over a local loopback
     /// connection, even a multi-megabyte body transfers, and the underlying `URLSessionTask`
     /// completes naturally, well before any scope-based cancellation logic gets a chance to do
-    /// anything -- the test passed whether or not cancellation actually worked. `withPartialResponseServer`
-    /// sends valid HTTP/1.1 headers plus a small body, then goes silent while declaring a
-    /// `Content-Length` it never finishes -- keeping the connection genuinely, indefinitely
-    /// "mid-transfer" until this test explicitly ends it, so the poll below can only pass because
-    /// dropping the response actually cancelled something still running.
+    /// anything. The test passed whether or not cancellation actually worked.
+    ///
+    /// `withPartialResponseServer` sends valid HTTP/1.1 headers plus a small body, then goes
+    /// silent while declaring a `Content-Length` it never finishes, keeping the connection
+    /// genuinely, indefinitely "mid-transfer" until this test explicitly ends it, so the poll
+    /// below can only pass because dropping the response actually cancelled something still
+    /// running.
     @Test
     func downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingURLSessionClient() async throws {
         try await withPartialResponseServer { port in
-            // Given -- plain HTTP: this server speaks raw bytes, not TLS, and `.urlSession`
+            // Given: plain HTTP. This server speaks raw bytes, not TLS, and `.urlSession`
             // reaches `127.0.0.1` over HTTP with no ATS issue in this test harness (confirmed by
             // running it, not assumed).
             let content = TestProperty {
@@ -386,7 +399,7 @@ struct RawTaskExecutorDispatchTests {
                     .requiredExecutor(.urlSession)
 
                 // The default reading mode (`.length(1_024)`) waits for a full 1024-byte chunk
-                // before yielding anything -- `withPartialResponseServer` only ever sends 19
+                // before yielding anything. `withPartialResponseServer` only ever sends 19
                 // bytes ("partial-body-bytes") before going silent, so the default would wait
                 // forever for a chunk boundary that can never arrive. A length well under that
                 // lets the first (and only) chunk surface promptly instead.
@@ -409,7 +422,7 @@ struct RawTaskExecutorDispatchTests {
                 let result = try await DownloadTask { content }.result()
                 for try await _ in result.payload {
                     // The server has already gone silent for good at this point, having declared
-                    // far more `Content-Length` than it will ever actually send -- genuinely
+                    // far more `Content-Length` than it will ever actually send: genuinely
                     // mid-flight, not a download that happened to finish before this loop got
                     // here.
                     observedRunningMidFlight = client.isRunning
@@ -419,7 +432,7 @@ struct RawTaskExecutorDispatchTests {
 
             #expect(observedRunningMidFlight)
 
-            // Then -- `didCompleteWithError:` releases the operation-queue slot asynchronously,
+            // Then: `didCompleteWithError:` releases the operation-queue slot asynchronously,
             // so poll briefly rather than asserting immediately after the scope above ends.
             var stillRunning = client.isRunning
             for _ in 0..<50 where stillRunning {
@@ -433,16 +446,16 @@ struct RawTaskExecutorDispatchTests {
 
     /// Companion to `DataTaskTests.dataTask_whenResourceTimeoutAlreadyElapsed_throwsResourceTimeoutError`:
     /// that one proves `Timeout(.resource)` throws `ResourceTimeoutError` at all, but with a
-    /// deadline so short it has already elapsed before the request even reaches the network --
-    /// it says nothing about whether the deadline actually tears down a connection that's
+    /// deadline so short it has already elapsed before the request even reaches the network.
+    /// It says nothing about whether the deadline actually tears down a connection that's
     /// genuinely still running, nor which executor it ran that proof against (`Session.localServer`
     /// carries no executor preference, so it only happens to resolve to `.urlSession` by Darwin's
-    /// own default -- see `dataTask_whenNoExecutorPreferenceSet_actuallyDispatchesOverURLSessionOnDarwin`
+    /// own default; see `dataTask_whenNoExecutorPreferenceSet_actuallyDispatchesOverURLSessionOnDarwin`
     /// above).
     ///
     /// This pins `.urlSession` explicitly, so this regression coverage can't silently go stale
-    /// if that default ever changes, and reuses `withPartialResponseServer` -- headers plus a
-    /// small body, then silence forever -- so the deadline has to fire against a connection
+    /// if that default ever changes, and reuses `withPartialResponseServer` (headers plus a
+    /// small body, then silence forever), so the deadline has to fire against a connection
     /// that's demonstrably still open, the same technique
     /// `downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingURLSessionClient`
     /// above uses to prove cancellation for real instead of merely asserting an error type.
@@ -469,13 +482,13 @@ struct RawTaskExecutorDispatchTests {
 
             #expect(!client.isRunning)
 
-            // When / Then -- the server never finishes the body, so this can only complete by the
+            // When / Then: the server never finishes the body, so this can only complete by the
             // deadline actually firing.
             await #expect(throws: ResourceTimeoutError.self) {
                 _ = try await DataTask { content }.extractPayload().result()
             }
 
-            // Then -- not just an error thrown at the caller: the live `URLSessionTask` behind it
+            // Then: not just an error thrown at the caller. The live `URLSessionTask` behind it
             // actually got torn down. `didCompleteWithError:` releases state asynchronously, so
             // poll briefly rather than asserting immediately.
             var stillRunning = client.isRunning
@@ -489,19 +502,20 @@ struct RawTaskExecutorDispatchTests {
     }
 
     /// Confirms the identity-building failure a real mTLS `DataTask` hits under `.urlSession` on
-    /// this SwiftPM test harness (no Keychain Sharing entitlement -- see
+    /// this SwiftPM test harness (no Keychain Sharing entitlement; see
     /// `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment) surfaces through the
     /// *public* API as a documented ``ClientIdentityError``, not a raw
     /// `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy
-    /// .ConfigurationError` -- both package-visible types a real consumer app cannot even name,
+    /// .ConfigurationError`. Both are package-visible types a real consumer app cannot even name,
     /// and whose `localizedDescription` (Foundation's generic NSError fallback, absent this fix)
-    /// carries none of their own actionable `description` text. `ClientIdentityErrorTests` covers
-    /// the rewrap/description logic itself in isolation; this is the same fact proven end to end,
-    /// through the real `DataTask` entry point, the same way `dataTask_whenCAEnabled`
-    /// (`DataTaskTests`, pinned to `.nio` specifically to avoid this exact gap) already does for
-    /// the NIO backend.
+    /// carries none of their own actionable `description` text.
     ///
-    /// Deliberately does not assert on the *specific* ``ClientIdentityError/Reason`` -- this
+    /// `ClientIdentityErrorTests` covers the rewrap/description logic itself in isolation; this
+    /// is the same fact proven end to end, through the real `DataTask` entry point, the same way
+    /// `dataTask_whenCAEnabled` (`DataTaskTests`, pinned to `.nio` specifically to avoid this
+    /// exact gap) already does for the NIO backend.
+    ///
+    /// Deliberately does not assert on the *specific* ``ClientIdentityError/Reason``: this
     /// harness has been observed to hit this gap two different ways (`errSecMissingEntitlement`
     /// on `SecItemAdd`, or `errSecItemNotFound` on the identity lookup right after a successful
     /// add), and both are genuine, independently-reachable failure modes this test should pass
@@ -546,7 +560,7 @@ struct RawTaskExecutorDispatchTests {
             _ = try await DataTask { content }.extractPayload().result()
             Issue.record("Expected this SwiftPM test harness's missing Keychain Sharing entitlement to throw")
         } catch let error as ClientIdentityError {
-            // Then -- the public, documented type, not a leaked internal one, with the same
+            // Then: the public, documented type, not a leaked internal one, with the same
             // actionable text through both access paths a real caller might use.
             #expect(!error.description.isEmpty)
             #expect((error as any Error).localizedDescription == error.description)
@@ -557,7 +571,7 @@ struct RawTaskExecutorDispatchTests {
 
     /// Companion to the test above: confirms cancellation frees the throttle slot for real, not
     /// just that `isRunning` (a separate counter, released in the same completion callback but
-    /// not the same value) happens to drop -- the same bar `InternalsClientConcurrencyLimitTests`
+    /// not the same value) happens to drop, the same bar `InternalsClientConcurrencyLimitTests`
     /// already holds the NIO path to, one layer up through the public API. `Internals.ThrottledExecutor`
     /// exposes no inspectable count of its own, so this proves it indirectly: with
     /// `maximumConcurrentConnections(1)`, a second request genuinely cannot proceed while the
@@ -566,7 +580,7 @@ struct RawTaskExecutorDispatchTests {
     func downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest() async throws {
         try await withPartialResponseServer { firstPort in
             try await withCompleteResponseServer { secondPort in
-                // Given -- both requests share one `Session` id/configuration (hence one pooled
+                // Given: both requests share one `Session` id/configuration (hence one pooled
                 // `Internals.URLSessionClient`, hence one throttle) even though they hit two
                 // different plain-HTTP servers.
                 let sessionID = "com.requestdl.tests.7b4-throttle.\(UUID())"
@@ -589,7 +603,7 @@ struct RawTaskExecutorDispatchTests {
                 let releaseSignal = ReleaseSignal()
                 let secondRequestState = SecondRequestState()
 
-                // When -- holds the only permit until explicitly told to let go, so this test
+                // When: holds the only permit until explicitly told to let go, so this test
                 // controls the moment of cancellation directly instead of racing a timeout
                 // against it.
                 async let firstDownload: Void = {
@@ -609,7 +623,7 @@ struct RawTaskExecutorDispatchTests {
                     await secondRequestState.markCompleted()
                 }()
 
-                // Then -- still queued behind the first request's held permit.
+                // Then: still queued behind the first request's held permit.
                 try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
                 #expect(await !secondRequestState.isCompleted)
 
@@ -626,7 +640,7 @@ struct RawTaskExecutorDispatchTests {
 }
 
 /// Lets a test hold a cancellation at an exact, chosen moment instead of racing a fixed delay
-/// against it -- used by `downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest`
+/// against it. Used by `downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest`
 /// to keep the first request's throttle permit held until the test is ready to observe the second
 /// request still being blocked by it.
 private actor ReleaseSignal {
@@ -657,8 +671,8 @@ private actor SecondRequestState {
 
 // MARK: - Raw servers for deterministic mid-flight state
 
-/// A server that answers with valid HTTP/1.1 headers -- including a `Content-Length` far larger
-/// than what it will ever actually send -- plus a small amount of body, then goes silent. The
+/// A server that answers with valid HTTP/1.1 headers, including a `Content-Length` far larger
+/// than what it will ever actually send, plus a small amount of body, then goes silent. The
 /// connection stays open, genuinely "mid-transfer," for as long as the test wants, until the
 /// client cancels it or the test closes the server. `LocalServer` always answers a request fully
 /// and immediately, so it cannot produce this state on its own.
@@ -668,7 +682,7 @@ private func withPartialResponseServer<Result>(
     try await withRawServer(PartialResponseHandler.init, body)
 }
 
-/// A server that answers a request fully and immediately, over plain HTTP -- the throttle test's
+/// A server that answers a request fully and immediately, over plain HTTP: the throttle test's
 /// second, "should actually complete once let through" request.
 private func withCompleteResponseServer<Result>(
     _ body: (Int) async throws -> Result
@@ -716,7 +730,7 @@ private final class PartialResponseHandler: ChannelInboundHandler, @unchecked Se
                 + "partial-body-bytes"
         )
         context.writeAndFlush(wrapOutboundOut(buffer), promise: nil)
-        // Deliberately writes nothing further -- see this file's own doc comment on
+        // Deliberately writes nothing further; see this file's own doc comment on
         // `withPartialResponseServer` for why.
     }
 }

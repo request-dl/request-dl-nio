@@ -35,15 +35,17 @@ public protocol RequestTask<Element>: Sendable {
 
 extension RequestTask {
 
-    /// Runs the task with a fresh, empty environment -- the entry point for a task that isn't
+    /// Runs the task with a fresh, empty environment: the entry point for a task that isn't
     /// nested inside another task's `.environment()`/`_result(environment:)` call.
     ///
     /// Conformers that only need `result()` to do real work off of `environment` (`RawTask`,
     /// `MockedTask`, wrapper types forwarding to an inner task, ...) implement `_result(environment:)`
     /// instead and get this for free. Conformers with no use for `environment` at all (a plain
     /// custom `RequestTask`) implement `result()` directly instead and get `_result(environment:)`
-    /// for free -- see its own default below. Implementing neither recurses forever; every
-    /// conformer needs at least one real implementation.
+    /// for free; see its own default below.
+    ///
+    /// Implementing neither recurses forever: every conformer needs at least one real
+    /// implementation.
     public func result() async throws -> Element {
         try await _result(environment: RequestEnvironmentValues())
     }
@@ -51,8 +53,8 @@ extension RequestTask {
     /// This method is used internally and should not be called directly.
     ///
     /// The default implementation threads `environment` into any `@RequestEnvironment`-marked
-    /// stored property found via reflection -- the same mechanism `@RequestEnvironment` already
-    /// uses -- and then calls the ordinary `result()`. Conformers that need `environment` to do
+    /// stored property found via reflection (the same mechanism `@RequestEnvironment` already
+    /// uses) and then calls the ordinary `result()`. Conformers that need `environment` to do
     /// real work (building a request, mocking a response, ...) override this instead of relying
     /// on the default.
     @_spi(Private)

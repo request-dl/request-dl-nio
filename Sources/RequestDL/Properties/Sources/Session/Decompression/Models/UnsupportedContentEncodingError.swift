@@ -6,7 +6,7 @@
 /// ``Session/decompressionAlgorithms(_:limit:)``.
 ///
 /// Only reachable once RequestDL has already taken over `Accept-Encoding` itself (any
-/// non-native algorithm in the list, or `.disabled`'s own `identity` override) -- a server is
+/// non-native algorithm in the list, or `.disabled`'s own `identity` override). A server is
 /// free to ignore what it was asked for, and this is what surfaces that rather than silently
 /// handing back undecoded bytes as if they were plain text.
 public struct UnsupportedContentEncodingError: Error, Sendable {

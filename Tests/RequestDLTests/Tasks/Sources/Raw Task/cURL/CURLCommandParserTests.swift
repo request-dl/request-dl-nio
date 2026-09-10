@@ -261,7 +261,7 @@ struct CURLCommandParserTests {
         // Given / When
         let command = try await CURLCommandParser.parseCommand("curl https://example.com")
 
-        // Then -- a command using only the request-level subset must not touch
+        // Then: a command using only the request-level subset must not touch
         // `Make.sessionConfiguration` in any way, same as before these flags existed.
         #expect(command.sessionConfigurationEdit == nil)
     }
@@ -271,7 +271,7 @@ struct CURLCommandParserTests {
         // Given
         let command = try await CURLCommandParser.parseCommand("curl -k https://example.com")
 
-        // When -- any session-level flag (here just `-k`) makes the edit apply curl's own
+        // When: any session-level flag (here just `-k`) makes the edit apply curl's own
         // default for redirects too, not just leave this package's own (opposite) default in
         // place.
         var sessionConfiguration = Internals.Session.Configuration()
@@ -322,10 +322,10 @@ struct CURLCommandParserTests {
         let edit = try #require(command.sessionConfigurationEdit)
         edit(&sessionConfiguration)
 
-        // Then -- `.some(.none)`, not plain `.none`: the field is `CertificateVerification?`,
+        // Then: `.some(.none)`, not plain `.none`. The field is `CertificateVerification?`,
         // and `CertificateVerification` itself has a `.none` case, so unqualified `.none` here
         // would be inferred as `Optional.none` (nil) and pass vacuously whether or not the
-        // production code actually set anything -- exactly the bug this test exists to catch.
+        // production code actually set anything, exactly the bug this test exists to catch.
         #expect(sessionConfiguration.secureConnection?.certificateVerification == .some(.none))
     }
 
@@ -433,7 +433,7 @@ struct CURLCommandParserTests {
         let edit = try #require(command.sessionConfigurationEdit)
         edit(&sessionConfiguration)
 
-        // Then -- the port is validated but not carried into `dnsOverride`, which has no port
+        // Then: the port is validated but not carried into `dnsOverride`, which has no port
         // dimension.
         #expect(sessionConfiguration.dnsOverride == ["example.com": "127.0.0.1"])
     }
@@ -514,7 +514,7 @@ struct CURLCommandParserTests {
             "curl -o response.json -w '%{http_code}' https://example.com"
         )
 
-        // Then -- their arguments must not be mistaken for the URL or throw as unsupported.
+        // Then: their arguments must not be mistaken for the URL or throw as unsupported.
         #expect(configuration.url == "https://example.com")
     }
 
@@ -528,7 +528,7 @@ struct CURLCommandParserTests {
 
     @Test
     func repeatedURLFlagIsRejected() async throws {
-        // Given / When / Then -- `--url` used to silently overwrite a previous `url`/`--url`
+        // Given / When / Then: `--url` used to silently overwrite a previous `url`/`--url`
         // instead of rejecting it like a second bare URL does; both now reject consistently.
         await #expect(throws: CURLParsingError.self) {
             try await CURLCommandParser.parse("curl --url https://example.com --url https://example.org")

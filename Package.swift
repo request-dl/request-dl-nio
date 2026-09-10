@@ -20,7 +20,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/request-dl/async-http-client",
-            from: "1.37.0"
+            from: "1.38.1"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
@@ -71,6 +71,10 @@ let package = Package(
             url: "https://github.com/apple/swift-crypto.git",
             from: "4.5.2"
         ),
+        .package(
+            url: "https://github.com/apple/swift-certificates.git",
+            from: "1.20.0"
+        ),
     ],
     targets: [
         .target(
@@ -92,6 +96,8 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
+                .product(name: "X509", package: "swift-certificates"),
             ],
             swiftSettings: [.defaultIsolation(nil)],
         ),

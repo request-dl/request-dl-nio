@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Everything a ``RedirectStrategy`` is handed to decide whether -- and how -- to follow one
+/// Everything a ``RedirectStrategy`` is handed to decide whether and how to follow one
 /// redirect.
 public struct RedirectContext: Sendable {
 
@@ -23,7 +23,7 @@ public struct RedirectContext: Sendable {
     /// `history.count - 1`).
     ///
     /// - Important: There is no built-in redirect limit once a ``RedirectStrategy`` is
-    /// configured -- enforce your own policy against this value (or `history`) to avoid an
+    /// configured. Enforce your own policy against this value (or `history`) to avoid an
     /// infinite redirect loop.
     public var redirectCount: Int
 

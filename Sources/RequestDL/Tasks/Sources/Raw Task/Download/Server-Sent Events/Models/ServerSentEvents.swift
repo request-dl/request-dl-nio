@@ -11,7 +11,7 @@ import struct Foundation.Data
 /// An `AsyncSequence` that parses `text/event-stream` framing out of ``AsyncBytes``.
 ///
 /// Bytes are consumed incrementally as they arrive over the network, so the response body is never
-/// buffered in full -- only the currently in-flight event frame is kept in memory.
+/// buffered in full: only the currently in-flight event frame is kept in memory.
 public struct ServerSentEvents: Sendable, AsyncSequence {
 
     public typealias Element = ServerSentEvent

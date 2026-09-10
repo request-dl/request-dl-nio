@@ -11,7 +11,7 @@ struct InternalsDecompressionTests {
 
     /// `isNativelyDecodedByURLSession`/`isNativelyDecodedByNIO: true` here stand in for what
     /// `InternalsDecompressionAlgorithmAdapter` (in `RequestDL`) actually answers for the real
-    /// `GzipAlgorithm` -- a structural type check, not a `contentEncodingValue` comparison. See
+    /// `GzipAlgorithm`: a structural type check, not a `contentEncodingValue` comparison. See
     /// `MockCustomAlgorithmNamedGzip` below for why that distinction is the whole point.
     private struct MockGzipAlgorithm: Internals.DecompressionAlgorithm {
         var contentEncodingValue: String { "gzip" }
@@ -39,12 +39,14 @@ struct InternalsDecompressionTests {
     }
 
     /// A genuinely custom algorithm that happens to share `contentEncodingValue` with the
-    /// built-in `GzipAlgorithm` -- `isNativelyDecodedByURLSession`/`isNativelyDecodedByNIO` both
+    /// built-in `GzipAlgorithm`: `isNativelyDecodedByURLSession`/`isNativelyDecodedByNIO` both
     /// default to `false` (neither is overridden here), matching what a real third-party
-    /// `Decompressor` gets. This is exactly the case the type-based checks exist for: without
-    /// them, this would be indistinguishable from `MockGzipAlgorithm` above and would get
-    /// silently bypassed -- by CFNetwork under `.urlSession`, by `NIOHTTPResponseDecompressor`
-    /// under `.nio`/`.nioTransportServices` -- instead of actually running.
+    /// `Decompressor` gets.
+    ///
+    /// This is exactly the case the type-based checks exist for: without them, this would be
+    /// indistinguishable from `MockGzipAlgorithm` above and would get silently bypassed instead
+    /// of actually running (by CFNetwork under `.urlSession`, by `NIOHTTPResponseDecompressor`
+    /// under `.nio`/`.nioTransportServices`).
     private struct MockCustomAlgorithmNamedGzip: Internals.DecompressionAlgorithm {
         var contentEncodingValue: String { "gzip" }
         func callAsFunction() throws -> any Internals.DecompressorStream {
@@ -82,7 +84,7 @@ struct InternalsDecompressionTests {
         // When
         let sut = decompression.build()
 
-        // Then -- gzip/deflate are always delegated to `async-http-client`'s own native handler,
+        // Then: gzip/deflate are always delegated to `async-http-client`'s own native handler,
         // regardless of what else is configured alongside them.
         #expect(
             String(describing: sut)
@@ -95,7 +97,7 @@ struct InternalsDecompressionTests {
 
     @Test
     func decompression_whenEnabledWithOnlyCustomAlgorithm_buildsDisabled() {
-        // Given -- nothing `NIOHTTPResponseDecompressor` recognizes, so the native NIO handler
+        // Given: nothing `NIOHTTPResponseDecompressor` recognizes, so the native NIO handler
         // stays off and manual dispatch owns the whole response.
         let decompression = Internals.Decompression.enabled(
             algorithms: [MockCustomAlgorithm()],
@@ -112,10 +114,10 @@ struct InternalsDecompressionTests {
 
     @Test
     func decompression_whenCustomAlgorithmSharesGzipContentEncoding_stillRequiresManualURLSessionHandling() {
-        // Given -- a genuinely custom algorithm whose `contentEncodingValue` happens to be
+        // Given: a genuinely custom algorithm whose `contentEncodingValue` happens to be
         // "gzip", same as the built-in placeholder. `isNativelyDecodedByURLSession` is a
         // structural check against the built-in types, not a `contentEncodingValue` comparison,
-        // so this must NOT be treated the same as `MockGzipAlgorithm` -- otherwise `.urlSession`
+        // so this must NOT be treated the same as `MockGzipAlgorithm`; otherwise `.urlSession`
         // would let CFNetwork decode the response transparently and this algorithm would never
         // actually run.
         let decompression = Internals.Decompression.enabled(
@@ -129,7 +131,7 @@ struct InternalsDecompressionTests {
 
     @Test
     func decompression_whenCustomAlgorithmSharesGzipContentEncoding_buildsDisabledUnderNIO() {
-        // Given -- same collision as the `.urlSession` test above, but checked against the NIO
+        // Given: same collision as the `.urlSession` test above, but checked against the NIO
         // side: `NIOHTTPResponseDecompressor` is a single switch triggered purely by the
         // response's `Content-Encoding` header, so leaving it on here would decode the response
         // before this custom algorithm's manual dispatch ever got a chance to run.
@@ -152,8 +154,8 @@ struct InternalsDecompressionTests {
             limit: .none
         )
 
-        // Then -- `.urlSession` can't leave CFNetwork decoding gzip transparently while also
-        // taking over `Accept-Encoding` for the custom algorithm -- the moment anything
+        // Then: `.urlSession` can't leave CFNetwork decoding gzip transparently while also
+        // taking over `Accept-Encoding` for the custom algorithm. The moment anything
         // non-native is in the list, this package decodes everything in it itself.
         #expect(decompression.requiresManualURLSessionHandling)
 
@@ -177,7 +179,7 @@ struct InternalsDecompressionTests {
 
     @Test
     func decompression_whenEnabledWithSameContentEncodingValues_equals() {
-        // Given -- equality compares the set of `Content-Encoding` values and the limit, not
+        // Given: equality compares the set of `Content-Encoding` values and the limit, not
         // algorithm identity, so two configurations that behave identically are equal.
         let lhs = Internals.Decompression.enabled(algorithms: [MockGzipAlgorithm()], limit: .none)
         let rhs = Internals.Decompression.enabled(algorithms: [MockGzipAlgorithm()], limit: .none)

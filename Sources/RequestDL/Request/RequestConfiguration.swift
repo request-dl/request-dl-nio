@@ -94,7 +94,7 @@ public struct RequestConfiguration: Sendable {
     private var didWriteUserAgent = false
 
     /// Captured from `inputs.environment.compression` at `_makeProperty` time by whichever
-    /// `Property` builds the node that produces ``body`` (`Payload`, `Form`, `FormGroup`) -- not
+    /// `Property` builds the node that produces ``body`` (`Payload`, `Form`, `FormGroup`). It is not
     /// read from inside a node's own `make(_:)`, since `PropertyNode.make(_:)` has no
     /// `environment` of its own to read. `nil` when no `Property.compression(_:onDuplicateHeader
     /// :shouldCompressBodyData:)` is in scope, or when nothing in the tree ever produces a body
@@ -168,13 +168,13 @@ import Foundation
 
 extension RequestConfiguration {
 
-    /// `URLSession` counterpart to `build(eventLoop:)` -- needs no `EventLoop`, since it drains
+    /// `URLSession` counterpart to `build(eventLoop:)`. It needs no `EventLoop`, since it drains
     /// `RequestBody` through its `AsyncSequence` conformance rather than the
     /// `EventLoopFuture`-driven streaming path `build(eventLoop:)` uses.
     ///
     /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See
     /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart, which drains `body`
-    /// itself -- into memory too, for anything under
+    /// itself, into memory too, for anything under
     /// `Internals.URLSessionUploadFile.inMemoryThreshold`, or a temporary file for anything larger.
     func buildURLRequest() async throws -> URLRequest {
         var request = try buildURLRequestWithoutBody()
@@ -193,9 +193,9 @@ extension RequestConfiguration {
         return request
     }
 
-    /// URL/method/headers only -- deliberately never touches `body`. Pairs with
+    /// URL/method/headers only; this deliberately never touches `body`. Pairs with
     /// `Internals.URLSessionClient.execute(request:streaming:delegate:onUploadProgress:)`, which
-    /// drives `body` itself -- via `uploadTask(with:from:)` or `uploadTask(with:fromFile:)`
+    /// drives `body` itself, via `uploadTask(with:from:)` or `uploadTask(with:fromFile:)`
     /// depending on size, see `Internals.URLSessionUploadFile`; both
     /// ignore whatever `httpBody`/`httpBodyStream` the request carries, so setting either here
     /// would be dead weight the caller has to know to not rely on rather than something actually
@@ -208,8 +208,8 @@ extension RequestConfiguration {
         var request = URLRequest(url: requestURL)
         request.httpMethod = method ?? "GET"
 
-        // Overrides `URLRequest`'s own default (`.useProtocolCachePolicy`), which -- independent
-        // of RequestDL's own `Internals.CacheControl`/`DataCache` -- lets URLSession's own
+        // Overrides `URLRequest`'s own default (`.useProtocolCachePolicy`), which, independent
+        // of RequestDL's own `Internals.CacheControl`/`DataCache`, lets URLSession's own
         // `URLCache` answer from its own state before ever reaching the network. RequestDL owns
         // caching entirely itself; a second, invisible cache layer underneath URLSession does
         // nothing useful and only risks disagreeing with it.
@@ -221,16 +221,17 @@ extension RequestConfiguration {
                 continue
             }
 
-            // `only-if-cached` is stripped from the wire header -- CFNetwork itself, underneath
+            // `only-if-cached` is stripped from the wire header: CFNetwork itself, underneath
             // URLSession, honors this directive against its *own* cache before the request above
-            // ever applies: regardless of `request.cachePolicy`, a `Cache-Control:
+            // ever applies. Regardless of `request.cachePolicy`, a `Cache-Control:
             // only-if-cached` request URLSession has nothing cached for fails outright with
-            // `NSURLErrorDomain` -2000 ("can't load from network"). `Internals.CacheControl`
-            // already resolved what this directive means for RequestDL's own cache before this
-            // request is ever built (see `effectiveCacheStrategy`) -- by the time execution
-            // reaches here, forwarding it verbatim would only hand the same decision to a second,
-            // stricter cache this package doesn't control and never asked to be consulted only
-            // conditionally in the first place.
+            // `NSURLErrorDomain` -2000 ("can't load from network").
+            //
+            // `Internals.CacheControl` already resolved what this directive means for RequestDL's
+            // own cache before this request is ever built (see `effectiveCacheStrategy`). By the
+            // time execution reaches here, forwarding it verbatim would only hand the same
+            // decision to a second, stricter cache this package doesn't control and never asked
+            // to be consulted only conditionally in the first place.
             let remaining =
                 value
                 .split(separator: ",")
@@ -248,7 +249,7 @@ extension RequestConfiguration {
     }
 }
 
-/// `url` failed to parse as a `Foundation.URL` -- mirrors `build(eventLoop:)`'s own failure mode,
+/// `url` failed to parse as a `Foundation.URL`. Mirrors `build(eventLoop:)`'s own failure mode,
 /// where `HTTPClient.Request`'s URL parser rejects the same kind of malformed string.
 struct InvalidRequestURLError: Error, Sendable {
     let url: String

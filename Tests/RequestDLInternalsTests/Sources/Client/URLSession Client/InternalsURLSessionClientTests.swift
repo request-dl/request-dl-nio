@@ -53,7 +53,7 @@ struct InternalsURLSessionClientTests {
 
     @Test
     func execute_whenMaximumConcurrentConnectionsSet_stillCompletesEveryRequest() async throws {
-        // Given -- not a concurrency-gating assertion (that lives in
+        // Given: not a concurrency-gating assertion (that lives in
         // `InternalsThrottledExecutorTests`); just confirms the client wires the cap through
         // without breaking the request itself.
         let localServer = try await LocalServer(.standard)
@@ -84,11 +84,12 @@ struct InternalsURLSessionClientTests {
     }
 
     /// `execute(request:delegate:)` bridges `dataTask(with:)` to `async`/`await` by hand
-    /// (`session.data(for:delegate:)` has a confirmed crash under load -- see the method's own
-    /// doc comment) -- unlike that Foundation API, nothing cancels the underlying
-    /// `URLSessionTask` for free just because the awaiting Swift `Task` was cancelled. This
-    /// confirms `CancellableTaskBox` actually restores that: cancelling the caller's `Task` both
-    /// makes the call throw and stops the real network request, not just the first of the two.
+    /// (`session.data(for:delegate:)` has a confirmed crash under load; see the method's own
+    /// doc comment). Unlike that Foundation API, nothing cancels the underlying
+    /// `URLSessionTask` for free just because the awaiting Swift `Task` was cancelled.
+    ///
+    /// This confirms `CancellableTaskBox` actually restores that: cancelling the caller's `Task`
+    /// both makes the call throw and stops the real network request, not just the first of the two.
     @Test
     func execute_whenTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows() async throws {
         try await withHangingServer { port in
@@ -123,7 +124,7 @@ struct InternalsURLSessionClientTests {
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- see the identical
+/// Test-only stand-in for the real client's own TLS challenge handling; see the identical
 /// delegate in `RequestConfigurationURLSessionClientTests` (`RequestDLTests`) for why this exists
 /// at all: `LocalServer` is always TLS-terminated with a throwaway self-signed certificate.
 private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

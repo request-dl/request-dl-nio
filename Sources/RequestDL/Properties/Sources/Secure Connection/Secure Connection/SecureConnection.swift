@@ -12,6 +12,16 @@ import RequestDLInternals
 /// each creates the underlying secure connection configuration on its own the first time it's
 /// needed. Nest them here only when also configuring settings that live directly on
 /// `SecureConnection` (`version`, `cipherSuites`, `keyLogger`, ...).
+///
+/// > Important: `URLSessionConfiguration` has no API for TLS version or ALPN policy.
+/// `version(maximum:)` and ``applicationProtocols(_:)`` are treated as incompatible with
+/// ``Session/Executor/urlSession``, like `cipherSuites(_:)`: automatic executor resolution skips
+/// `.urlSession` when either is set, and pinning to it throws ``ExecutorRequirementError``.
+/// `version(minimum:)` is the one exception: it has no effect under `.urlSession` but isn't
+/// flagged, because App Transport Security offers a real equivalent, an
+/// `NSExceptionMinimumTLSVersion` entry in your app's `Info.plist`, that `version(maximum:)` and
+/// ``applicationProtocols(_:)`` don't have. See
+/// <doc:Configuring-App-Transport-Security-for-URLSession>.
 public struct SecureConnection<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -118,6 +128,10 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the minimum TLS version for the secure connection.
     ///
+    /// > Important: Has no effect under ``Session/Executor/urlSession``. Configure an
+    /// `NSExceptionMinimumTLSVersion` ATS exception in `Info.plist` instead. See
+    /// <doc:Configuring-App-Transport-Security-for-URLSession>.
+    ///
     /// - Parameter minimum: The minimum TLS version to use.
     /// - Returns: A modified `SecureConnection` with the minimum TLS version set.
     public func version(minimum: TLSVersion) -> Self {
@@ -125,6 +139,13 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the maximum TLS version for the secure connection.
+    ///
+    /// > Important: `URLSessionConfiguration` has no maximum-TLS-version API, and App Transport
+    /// Security has no `Info.plist` key for one either, so this is treated as incompatible with
+    /// ``Session/Executor/urlSession``: automatic executor resolution skips it in favor of a
+    /// NIO-based executor, and pinning to `.urlSession` via ``Session/requiredExecutor(_:)``
+    /// throws ``ExecutorRequirementError``. See
+    /// <doc:Configuring-App-Transport-Security-for-URLSession>.
     ///
     /// - Parameter maximum: The maximum TLS version to use.
     /// - Returns: A modified `SecureConnection` with the maximum TLS version set.
@@ -165,6 +186,15 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the key log object for the secure connection.
+    ///
+    /// - Important: Reachable under ``Session/Executor/nio`` only. This is a **permanent**
+    /// limitation of the underlying platforms, not a gap awaiting a fix. Neither Network.framework
+    /// nor `URLSession` exposes any public API for observing per-session TLS secrets.
+    ///
+    /// ``Session/requiredExecutor(_:)``/``Session/preferredExecutor(_:)`` steer a session with a
+    /// key logger configured away from both ``Session/Executor/nioTransportServices`` and
+    /// ``Session/Executor/urlSession``. Letting that combination reach the OS layer at all would
+    /// crash the process outright under Network.framework.
     ///
     /// - Parameter keyLogger: The `SSLKeyLogger` object.
     /// - Returns: A modified `SecureConnection` with the key logger set.
@@ -222,7 +252,38 @@ public struct SecureConnection<Content: Property>: Property {
         edit { $0.secureConnection.certificateVerification = verification.build() }
     }
 
+    /// Sets the revocation-checking policy for the secure connection.
+    ///
+    /// - Important: Reachable on Apple platforms only (``Session/Executor/nio``,
+    /// ``Session/Executor/nioTransportServices``, ``Session/Executor/urlSession``). NIOSSL/
+    /// BoringSSL implements no revocation checking of its own, so this has no effect at all on
+    /// Linux.
+    ///
+    /// - Parameter policy: The revocation-checking policy to use.
+    /// - Returns: A modified `SecureConnection` with the revocation policy set.
+    public func revocationPolicy(_ policy: RevocationPolicy) -> Self {
+        edit { $0.secureConnection.revocationPolicy = policy.build() }
+    }
+
+    /// Sets an observer that's notified of each TLS trust-evaluation decision this secure
+    /// connection makes, for observability or security-audit logging, purely informational.
+    ///
+    /// - Important: See ``TrustDecisionObserver``'s own doc comment for exactly when this fires
+    /// under each executor; it's not every connection.
+    ///
+    /// - Parameter observer: The observer to notify of each trust decision.
+    /// - Returns: A modified `SecureConnection` with the trust decision observer set.
+    public func trustDecisionObserver(_ observer: TrustDecisionObserver) -> Self {
+        edit { $0.secureConnection.trustDecisionObserver = observer }
+    }
+
     /// Sets the application protocols for the secure connection.
+    ///
+    /// > Important: `URLSession` negotiates ALPN automatically and `Info.plist` has no key to
+    /// override it, so this is treated as incompatible with ``Session/Executor/urlSession``:
+    /// automatic executor resolution skips it in favor of a NIO-based executor, and pinning to
+    /// `.urlSession` via ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``.
+    /// See <doc:Configuring-App-Transport-Security-for-URLSession>.
     ///
     /// - Parameter protocols: The application protocols to use.
     /// - Returns: A modified `SecureConnection` with the application protocols set.
@@ -240,6 +301,12 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the cipher suites for the secure connection using string representations.
     ///
+    /// > Important: `URLSessionConfiguration` has no cipher suite list API, so this is treated as
+    /// incompatible with ``Session/Executor/urlSession``: automatic executor resolution skips it
+    /// in favor of a NIO-based executor, and pinning to `.urlSession` via
+    /// ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError`` instead of silently
+    /// dropping it.
+    ///
     /// - Parameter suites: The cipher suites to use as string representations.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
     public func cipherSuites(_ suites: String...) -> Self {
@@ -250,6 +317,12 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the cipher suites for the secure connection using `TLSCipher` values.
+    ///
+    /// > Important: `URLSessionConfiguration` has no cipher suite list API, so this is treated as
+    /// incompatible with ``Session/Executor/urlSession``: automatic executor resolution skips it
+    /// in favor of a NIO-based executor, and pinning to `.urlSession` via
+    /// ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError`` instead of silently
+    /// dropping it.
     ///
     /// - Parameter suites: The cipher suites to use as `TLSCipher` values.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.

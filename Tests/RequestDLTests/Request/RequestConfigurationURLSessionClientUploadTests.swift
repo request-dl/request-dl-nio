@@ -22,30 +22,34 @@ import Security
 /// the total bytes it actually received, not per-chunk), but drives
 /// `RequestConfiguration.buildURLRequestWithoutBody()` + the streaming `execute` overload directly
 /// instead of `UploadTask`, and trusts `LocalServer`'s self-signed certificate via a test-only
-/// delegate the same way the non-streaming suite does -- no TLS customization is in scope here
+/// delegate the same way the non-streaming suite does. No TLS customization is in scope here
 /// either.
 ///
-/// **Both tests below used to be a confirmed `withKnownIssue`** -- the original bridge
+/// **Both tests below used to be a confirmed `withKnownIssue`.** The original bridge
 /// (`Internals.URLSessionUploadStream`, an `InputStream` subclass) drove
 /// `uploadTask(withStreamedRequest:)`, which on this OS build automatically negotiates the IETF
-/// "resumable uploads" draft for any streamed upload, and a from-scratch investigation confirmed
-/// the real cause runs deeper than that draft negotiation alone: no custom `InputStream` -- a
-/// Swift subclass or a genuine `CFReadStream` -- is ever recognized by CFNetwork as reaching
+/// "resumable uploads" draft for any streamed upload. A from-scratch investigation confirmed
+/// the real cause runs deeper than that draft negotiation alone: no custom `InputStream`, whether
+/// a Swift subclass or a genuine `CFReadStream`, is ever recognized by CFNetwork as reaching
 /// end-of-body, on `LocalServer`, two independent HTTP/2 servers, and `https://httpbin.org/post`
 /// alike. Every callback-level hypothesis (`copyProperty`/`setProperty`, `getBuffer`,
-/// object-identity) was ruled out without finding the mechanism. `Internals.URLSessionUploadFile`
+/// object-identity) was ruled out without finding the mechanism.
+///
+/// `Internals.URLSessionUploadFile`
 /// works around it instead of fixing it: it drains `body` and this now drives
 /// `uploadTask(with:from:)` (small bodies, kept in memory) or
 /// `uploadTask(with:fromFile:)` (anything past `Internals.URLSessionUploadFile.inMemoryThreshold`,
-/// spilled to a temporary file) -- both completely different `URLSession` code paths that never
+/// spilled to a temporary file). Both are completely different `URLSession` code paths that never
 /// touch `InputStream`/`needNewBodyStream` (or the resumable-uploads draft) at all. Both payloads
 /// in `urlSessionClient_whenStreamingUpload...` below (256 KiB, 128 KiB) sit comfortably under
 /// that threshold, so those two tests specifically exercise the in-memory branch;
 /// `InternalsURLSessionUploadFileTests` (`RequestDLInternalsTests`) covers the file-spillover
-/// branch directly, without a real network round trip. A third shape -- a `Payload(url:)` body
+/// branch directly, without a real network round trip.
+///
+/// A third shape, a `Payload(url:)` body
 /// that's already sitting in a file untouched, forwarded as `existingUploadFile` rather than
 /// drained at all (a same-day refinement past the memory/disk split, to avoid a redundant copy
-/// of a file that's already exactly right) -- is exercised by
+/// of a file that's already exactly right), is exercised by
 /// `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`.
 ///
 /// See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`) for why
@@ -55,13 +59,15 @@ import Security
 /// `.serialized`: this suite's three tests all do real network I/O against a `LocalServer`, and
 /// unlike every other real-I/O suite here (`SessionExecutionTests`, `DataCacheTests`,
 /// `CachedRequestTests`, all already `.serialized`) this one ran its own tests concurrently with
-/// each other -- real, informative `NSURLErrorTimedOut` failures directly observed on CI Simulator
+/// each other. Real, informative `NSURLErrorTimedOut` failures directly observed on CI Simulator
 /// runners in `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`
 /// (request-dl-nio#327) tracked back partly to this suite adding to its *own* concurrent load, on
-/// top of whatever contention the rest of the job was already under. `.concurrent(
+/// top of whatever contention the rest of the job was already under.
+///
+/// `.concurrent(
 /// watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real network I/O on the same
 /// simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift` documents as prone to
-/// scheduler-contention `AsyncLock.Watchdog` false positives -- without these, a stall elsewhere
+/// scheduler-contention `AsyncLock.Watchdog` false positives. Without these, a stall elsewhere
 /// in the same job (this suite adding to the unthrottled concurrent load) can trip a watchdog
 /// fatally and crash the whole test process mid-run, taking every other in-flight test down with
 /// it, rather than surfacing as this suite's own (real, informative) timeout.
@@ -125,7 +131,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
     /// body is backed by exactly one unread, non-temporary `Internals.FileBuffer`, so
     /// `RequestBody.wholeFileURL` resolves to the fixture file itself and
     /// `Internals.URLSessionClient+RequestExecutingClient.swift` passes it straight through as
-    /// `existingUploadFile` -- exercised directly here (rather than only at the `RequestBody`
+    /// `existingUploadFile`. It's exercised directly here (rather than only at the `RequestBody`
     /// unit-test level, `RequestBodyBuildingTests`) so a real round trip confirms the shortcut
     /// still delivers the exact right bytes, not just that the URL gets forwarded correctly.
     @Test
@@ -188,13 +194,13 @@ struct RequestConfigurationURLSessionClientUploadTests {
         #expect(decoded.receivedBytes == upload.count)
         #expect(decoded.response == output)
 
-        // The fixture file must survive the upload untouched -- unlike `.file`, `.existingFile`
+        // The fixture file must survive the upload untouched: unlike `.file`, `.existingFile`
         // is never this package's to remove.
         #expect(await fileURL.isReachable)
     }
 
-    /// Not exact chunk-by-chunk byte counts or timing (URLSession's own to pick, not RequestDL's)
-    /// -- just that `didSendBodyData` fires in a sequence whose cumulative total is monotonically
+    /// Not exact chunk-by-chunk byte counts or timing (URLSession's own to pick, not RequestDL's),
+    /// just that `didSendBodyData` fires in a sequence whose cumulative total is monotonically
     /// increasing and reaches the whole body, mirroring what `ModifiersProgressTests`'s looser
     /// upload assertion (`uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count`, sum only)
     /// checks on the NIO backend. `uploadTask(with:fromFile:)` still fires `didSendBodyData` the
@@ -255,7 +261,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
     }
 }
 
-/// Test-only stand-in for the real client's own TLS challenge handling -- `LocalServer` is
+/// Test-only stand-in for the real client's own TLS challenge handling. `LocalServer` is
 /// always TLS-terminated with a throwaway self-signed certificate, even outside any TLS feature
 /// under test, so *something* has to trust it for a plain, no-customization round trip to
 /// complete at all. Duplicated from `RequestConfigurationURLSessionClientTests.swift` (`private`
@@ -281,7 +287,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
     }
 }
 
-/// Collects `onUploadProgress` samples under a lock -- the callback is `@Sendable` and may be
+/// Collects `onUploadProgress` samples under a lock; the callback is `@Sendable` and may be
 /// invoked off the main actor.
 private final class ProgressRecorder: @unchecked Sendable {
 

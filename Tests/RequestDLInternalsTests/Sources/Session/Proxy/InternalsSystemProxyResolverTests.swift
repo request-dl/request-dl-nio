@@ -12,10 +12,10 @@ import CFNetwork
 import Foundation
 
 /// `Internals.SystemProxyResolver.firstResolution(in:)`/`firstUsableProxy(in:)` against synthetic
-/// CFNetwork proxy-list dictionaries -- the same shape `CFNetworkCopyProxiesForURL` and a PAC
+/// CFNetwork proxy-list dictionaries: the same shape `CFNetworkCopyProxiesForURL` and a PAC
 /// script's own evaluated result both use, exercised directly here instead of through either of
-/// those (both depend on state -- system settings, or a real script fetch -- this suite doesn't
-/// control).
+/// those (both depend on state, either system settings or a real script fetch, that this suite
+/// doesn't control).
 struct InternalsSystemProxyResolverTests {
 
     @Test
@@ -41,7 +41,7 @@ struct InternalsSystemProxyResolverTests {
 
     @Test
     func firstResolution_whenNoneEntryPrecedesAnHTTPEntry_stopsAtDirect() async throws {
-        // Given -- later entries are fallbacks for a failed proxy, not alternatives to try
+        // Given: later entries are fallbacks for a failed proxy, not alternatives to try
         // instead of an explicit direct connection.
         let proxies: [[String: Any]] = [
             [kCFProxyTypeKey as String: kCFProxyTypeNone],
@@ -132,7 +132,7 @@ struct InternalsSystemProxyResolverTests {
 
     @Test
     func firstResolution_whenEntryMissingHostOrPort_skipsToNextEntry() async throws {
-        // Given -- an HTTP entry missing its port is unusable and skipped, falling through to
+        // Given: an HTTP entry missing its port is unusable and skipped, falling through to
         // the SOCKS entry after it.
         let proxies: [[String: Any]] = [
             [
@@ -177,7 +177,7 @@ struct InternalsSystemProxyResolverTests {
 
     @Test
     func firstUsableProxy_whenAutoConfigurationURLEntry_isNil() async throws {
-        // Given -- `firstUsableProxy(in:)` is `Internals.PACEvaluator`'s own entry point, parsing
+        // Given: `firstUsableProxy(in:)` is `Internals.PACEvaluator`'s own entry point, parsing
         // an *already evaluated* PAC result, which CFNetwork guarantees never itself contains an
         // auto-configuration entry. Defensively treated the same as "nothing this package
         // recognizes" rather than recursing.

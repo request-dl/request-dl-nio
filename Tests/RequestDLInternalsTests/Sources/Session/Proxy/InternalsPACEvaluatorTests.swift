@@ -13,29 +13,31 @@ import Foundation
 import Network
 
 /// `Internals.PACEvaluator.evaluate(scriptURL:targetURL:timeout:)` against real, locally-served
-/// PAC scripts -- a bare `NWListener` speaking just enough HTTP/1.1 to serve one script and close,
+/// PAC scripts: a bare `NWListener` speaking just enough HTTP/1.1 to serve one script and close,
 /// so this doesn't depend on the CI machine's actual system proxy settings (unlike
 /// `SystemProxyTests`/`InternalsSystemProxyResolverTests`'s own integration tests) while still
 /// exercising the genuine `CFNetworkExecuteProxyAutoConfigurationURL` fetch + JavaScript
 /// evaluation + `CFRunLoopSource` pumping end to end, not a mock of any part of it.
 ///
 /// `file://` was tried first and rejected: `CFNetworkExecuteProxyAutoConfigurationURL` fails
-/// every `file://` script with `kCFURLErrorUnsupportedURLScheme` (-1002) -- PAC fetching only
+/// every `file://` script with `kCFURLErrorUnsupportedURLScheme` (-1002). PAC fetching only
 /// speaks HTTP(S), the same as every browser's own PAC support.
 ///
 /// `.serialized`: every test here spins up a real dedicated `Thread` plus real network I/O
-/// against a local listener -- running them concurrently with each other adds self-inflicted
-/// contention on top of whatever the rest of the job is already under, the same class of problem
-/// `RequestConfigurationURLSessionClientUploadTests` (request-dl-nio#327) traced part of its own
-/// CI timeouts back to; every other suite here doing comparable real I/O (`SessionExecutionTests`,
-/// `DataCacheTests`, `CachedRequestTests`) already serializes for the same reason.
+/// against a local listener, and running them concurrently with each other adds self-inflicted
+/// contention on top of whatever the rest of the job is already under. That's the same class of
+/// problem `RequestConfigurationURLSessionClientUploadTests` (request-dl-nio#327) traced part of
+/// its own CI timeouts back to; every other suite here doing comparable real I/O
+/// (`SessionExecutionTests`, `DataCacheTests`, `CachedRequestTests`) already serializes for the
+/// same reason.
+///
 /// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: on the same
 /// simulator runners `WatchdogAffectedPlatformConcurrencyLimit.swift` documents as prone to
-/// scheduler-contention `AsyncLock.Watchdog` false positives -- confirmed directly: a run under
+/// scheduler-contention `AsyncLock.Watchdog` false positives. Confirmed directly: a run under
 /// severe simulator contention (every test in the job, including trivial synchronous ones, taking
 /// 80-160s instead of milliseconds) blew both this suite's own generous timing margins and,
 /// separately, crashed the whole job's process via the watchdog, taking every other in-flight test
-/// down with it -- the exact failure mode these two traits exist to prevent.
+/// down with it, which is the exact failure mode these two traits exist to prevent.
 @Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsPACEvaluatorTests {
 
@@ -113,7 +115,7 @@ struct InternalsPACEvaluatorTests {
 
     @Test
     func evaluate_whenScriptBranchesOnHost_choosesAccordingly() async throws {
-        // Given -- proves `targetURL` genuinely reaches the script, not just that some fixed
+        // Given: proves `targetURL` genuinely reaches the script, not just that some fixed
         // return value comes back regardless of input.
         let server = try await LocalPACServer.start(
             scriptContents: """
@@ -168,19 +170,20 @@ struct InternalsPACEvaluatorTests {
 
     @Test
     func evaluate_whenScriptUnreachable_throwsWithinTimeout() async throws {
-        // Given -- nothing listens on this port; connection refused, not a slow fetch, but still
-        // exercised the same way a genuinely hung PAC server would be.
+        // Given: nothing listens on this port, so the connection is refused rather than slow to
+        // fetch, but it's still exercised the same way a genuinely hung PAC server would be.
         let scriptURL = try #require(URL(string: "http://127.0.0.1:1/proxy.pac"))
 
-        // When / Then -- bounded by the timeout below, not the run's own default (much longer),
+        // When / Then: bounded by the timeout below, not the run's own default (much longer),
         // proving the timeout is actually enforced rather than merely accepted as a parameter.
-        // 120s, not a tighter multiple of the 3s `timeout` itself: the wall-clock bound
+        //
+        // 120s, not a tighter multiple of the 3s `timeout` itself, because the wall-clock bound
         // `CFRunLoopRunInMode` enforces only fires once this thread is actually scheduled to check
-        // it, so under severe CI Simulator scheduler contention it can slip well past the
-        // configured value -- confirmed directly, a contended run already pushed this as high as
-        // 82s at a 60s margin. Still meaningfully bounded relative to
-        // `Internals.PACProxyCache`'s own much longer default timeout, so a genuine regression
-        // (the timeout parameter silently stops being honored at all) still fails this.
+        // it. Under severe CI Simulator scheduler contention it can slip well past the configured
+        // value; confirmed directly, a contended run already pushed this as high as 82s at a 60s
+        // margin. Still meaningfully bounded relative to `Internals.PACProxyCache`'s own much
+        // longer default timeout, so a genuine regression (the timeout parameter silently stops
+        // being honored at all) still fails this.
         let start = DispatchTime.now()
 
         await #expect(throws: (any Error).self) {
@@ -198,8 +201,8 @@ struct InternalsPACEvaluatorTests {
 
 /// Serves exactly one PAC script to exactly one connection at a time, in the minimal HTTP/1.1
 /// this needs: no request parsing at all (whatever `CFNetworkExecuteProxyAutoConfigurationURL`
-/// sends is ignored -- the response is the same regardless of path/headers), and every connection
-/// gets the same canned `200 OK` response, then closes.
+/// sends is ignored, since the response is the same regardless of path/headers), and every
+/// connection gets the same canned `200 OK` response, then closes.
 private final class LocalPACServer: @unchecked Sendable {
 
     // MARK: - Internal properties
@@ -285,8 +288,8 @@ private final class LocalPACServer: @unchecked Sendable {
 private struct MissingListenerPortError: Error {}
 
 /// Bridges `NWListener.stateUpdateHandler` (called repeatedly) to a `CheckedContinuation` (usable
-/// exactly once) -- resumes on the first `.ready`/`.failed`, ignores every later call. Mirrors
-/// `InternalsProxyDictionaryPlatformTests`'s identical, file-private helper -- not shared, since
+/// exactly once): resumes on the first `.ready`/`.failed`, ignores every later call. Mirrors
+/// `InternalsProxyDictionaryPlatformTests`'s identical, file-private helper; not shared, since
 /// neither file is a dependency of the other.
 private final class PortContinuationBox: @unchecked Sendable {
 

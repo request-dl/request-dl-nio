@@ -23,7 +23,7 @@ import struct Foundation.Data
 /// ```
 ///
 /// To log the command line right alongside the request that actually runs it, use the
-/// `onDescribe`-taking overload instead -- it returns a task that, once performed, produces the
+/// `onDescribe`-taking overload instead. It returns a task that, once performed, produces the
 /// description, hands it to the closure, then performs the request for real:
 ///
 /// ```swift

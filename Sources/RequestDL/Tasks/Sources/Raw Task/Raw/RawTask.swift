@@ -28,7 +28,7 @@ struct RawTask<Content: Property>: RequestTask {
 
         try await notifyDescriptorHooks(resolved: resolved, environment: environment)
 
-        // Checked before anything else touches `resolved` -- a hard-pinned executor this
+        // Checked before anything else touches `resolved`: a hard-pinned executor this
         // configuration can't actually run on must fail loudly, not after paying for a
         // logger/client/cache setup nobody will get to use.
         try validateRequiredExecutor(resolved: resolved)
@@ -71,7 +71,7 @@ struct RawTask<Content: Property>: RequestTask {
     // MARK: - Private methods, setup
 
     /// Hands the exact configuration this request is about to send to every
-    /// `description(_:enabled:onDescribe:)` hook queued on `environment` -- before anything
+    /// `description(_:enabled:onDescribe:)` hook queued on `environment`, before anything
     /// downstream gets a chance to fail, so a hook still sees the resolved request even if the
     /// executor check or the request itself doesn't go through.
     private func notifyDescriptorHooks(
@@ -112,20 +112,24 @@ struct RawTask<Content: Property>: RequestTask {
         }
     }
 
-    /// `resolvedClient()` -- not `client()` -- is what makes `preferredExecutor`/
+    /// `resolvedClient()`, not `client()`, is what makes `preferredExecutor`/
     /// `requiredExecutor` (validated by `validateRequiredExecutor(resolved:)`, for the hard-pin
     /// case) actually decide which backend this request runs over, instead of always the NIO
-    /// one. `resolvedClient()` returns `Internals.ClientManager.Client` (an enum), not
-    /// `any RequestExecutingClient` directly -- see that method's own doc comment for why -- so
+    /// one.
+    ///
+    /// `resolvedClient()` returns `Internals.ClientManager.Client` (an enum), not
+    /// `any RequestExecutingClient` directly (see that method's own doc comment for why), so
     /// this is the one place that unwraps it into the existential everything below expects.
     ///
-    /// Also the one place that knows, concretely, which case was picked -- surfaced as
+    /// Also the one place that knows, concretely, which case was picked, surfaced as
     /// `isURLSessionExecutor` so `executeTraced` can decide whether to drop RequestDL's default
     /// `User-Agent` in favor of URLSession's own native one (see
-    /// `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`). `.nioTransportServices`
-    /// never reaches its own case here -- `Internals.ClientManager.Client` only distinguishes
-    /// `.nio`/`.urlSession`, folding NIOTransportServices into `.nio` since both share the same
-    /// `RequestExecutingClient` conformance and differ only in which `EventLoopGroup` backs them.
+    /// `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`).
+    ///
+    /// `.nioTransportServices` never reaches its own case here: `Internals.ClientManager.Client`
+    /// only distinguishes `.nio`/`.urlSession`, folding NIOTransportServices into `.nio` since
+    /// both share the same `RequestExecutingClient` conformance and differ only in which
+    /// `EventLoopGroup` backs them.
     private func resolveClient(
         resolved: Resolved
     ) async throws -> (client: any RequestExecutingClient, isURLSessionExecutor: Bool) {
@@ -157,15 +161,15 @@ struct RawTask<Content: Property>: RequestTask {
 
     private typealias OnResponseHead = @Sendable (Result<Internals.ResponseHead, Error>) -> Void
 
-    /// Runs the resolved request to completion, racing it against `deadline` and -- only when
-    /// `RequestServiceContext` was actually declared -- binding `ServiceContext.current` for its
+    /// Runs the resolved request to completion, racing it against `deadline` and, only when
+    /// `RequestServiceContext` was actually declared, binding `ServiceContext.current` for its
     /// duration.
     ///
-    /// Only rebinds the task-local when `RequestServiceContext` was actually declared -- leaving
+    /// Only rebinds the task-local when `RequestServiceContext` was actually declared; leaving
     /// it untouched otherwise preserves whatever `ServiceContext.current` the caller's own task
     /// already carries. `executeTraced(resolved:client:isURLSessionExecutor:cache:logger:)` starts
     /// its span reading this same task-local, so both the explicit and the ambient case are picked
-    /// up correctly here -- there's no `EventLoop` hop between the bind and the read.
+    /// up correctly here: there's no `EventLoop` hop between the bind and the read.
     private func runSession(
         resolved: Resolved,
         client: any RequestExecutingClient,
@@ -178,7 +182,7 @@ struct RawTask<Content: Property>: RequestTask {
         //
         // `@Sendable` because `Internals.ResourceDeadline.race(seed:_:)` below runs it as a real
         // task-group child task when `Timeout(.resource)` is configured, not just called inline
-        // in this task -- otherwise the race is a plain `await` with no isolation change at all.
+        // in this task; otherwise the race is a plain `await` with no isolation change at all.
         @Sendable
         func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
             switch await cacheControl(client) {
@@ -210,14 +214,14 @@ struct RawTask<Content: Property>: RequestTask {
         }
     }
 
-    /// Owns the whole span lifecycle itself -- start, header injection, attributes, and end --
+    /// Owns the whole span lifecycle itself (start, header injection, attributes, and end)
     /// rather than handing `tracer` to `async-http-client`'s own `tracing.tracer`. That built-in
     /// instrumentation only starts its span after hopping onto a SwiftNIO `EventLoop`, which loses
     /// Swift's task-locals and makes it structurally impossible for it to see whatever
     /// `ServiceContext` the caller bound. Running the whole thing here, one layer up and entirely
     /// within the caller's own task, sidesteps that.
     ///
-    /// A `RequestConfiguration` copy, not a NIO-specific `HTTPClient.Request` -- the span context
+    /// A `RequestConfiguration` copy, not a NIO-specific `HTTPClient.Request`: the span context
     /// has to reach the wire for both `.nio` and `.urlSession`, and
     /// `client.execute(configuration:cache:logger:)` (`RequestExecutingClient`, not
     /// `Internals.Session.execute`) is what stays transport-agnostic. Every conformance builds its
@@ -232,7 +236,7 @@ struct RawTask<Content: Property>: RequestTask {
     ) async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
         var configuration = resolved.requestConfiguration
 
-        // Only `.urlSession` gets its default `User-Agent` dropped -- see
+        // Only `.urlSession` gets its default `User-Agent` dropped; see
         // `dropDefaultUserAgentForNativeReporting()`'s own doc comment for why NIO and
         // NIOTransportServices keep RequestDL's neutral default instead.
         if isURLSessionExecutor {
@@ -264,7 +268,7 @@ struct RawTask<Content: Property>: RequestTask {
     // MARK: - Private static methods, tracing
 
     /// Starts the request span, sets its request-side attributes, and injects it into
-    /// `configuration.headers` as W3C trace headers -- everything the span needs before the
+    /// `configuration.headers` as W3C trace headers: everything the span needs before the
     /// request actually goes out on the wire.
     private static func startRequestSpan(
         tracer: any Tracer,
@@ -286,7 +290,7 @@ struct RawTask<Content: Property>: RequestTask {
     }
 
     /// Mirrors what async-http-client's own built-in tracing sets on the request span as of
-    /// https://github.com/swift-server/async-http-client/pull/906 -- `url.query` is deliberately
+    /// https://github.com/swift-server/async-http-client/pull/906. `url.query` is deliberately
     /// left out, since query strings can carry tokens/PII that shouldn't end up on a span by
     /// default.
     private static func setURLAttributes(on span: any Span, url: String) {
@@ -311,7 +315,7 @@ struct RawTask<Content: Property>: RequestTask {
         }
     }
 
-    /// The port implied by `scheme` when the URL itself doesn't specify one -- mirrors
+    /// The port implied by `scheme` when the URL itself doesn't specify one; mirrors
     /// `async-http-client`'s own `DeconstructedURL`/`Scheme.defaultPort`, so `server.port` on the
     /// span still gets a value for the common `http://example.com` (no explicit port) case.
     private static func defaultPort(forScheme scheme: String) -> Int? {
@@ -350,15 +354,19 @@ extension RawTask {
     ///
     /// Not part of the `_result(environment:)` chain — like `RequestTask.result()`'s own default
     /// (`_result(environment: RequestEnvironmentValues())`), this is an entry point, not
-    /// something nested inside another task's `.environment()`. `descriptorFormFields` is set on
-    /// that fresh environment and threaded through `Resolve.init(root:environment:)` into
-    /// `_PropertyInputs.environment`, which is how `FormNode` — the only node that needs to know
-    /// a description pass is running, since it's the only place per-field structure would
-    /// otherwise be lost to multipart flattening — receives it: captured by `Form`/`FormGroup`'s
-    /// own `_makeProperty` at construction time, not read from inside `make()` itself (nodes have
-    /// no `environment` of their own to read there). `partiallyBuild()`, unlike `build()`, never
-    /// constructs an `Internals.Session` or resolves a client, which is exactly right here:
-    /// nothing about producing a description touches the network.
+    /// something nested inside another task's `.environment()`.
+    ///
+    /// `descriptorFormFields` is set on that fresh environment and threaded through
+    /// `Resolve.init(root:environment:)` into `_PropertyInputs.environment`, which is how
+    /// `FormNode` — the only node that needs to know a description pass is running, since it's
+    /// the only place per-field structure would otherwise be lost to multipart flattening —
+    /// receives it: captured by `Form`/`FormGroup`'s own `_makeProperty` at construction time,
+    /// not read from inside `make()` itself (nodes have no `environment` of their own to read
+    /// there).
+    ///
+    /// `partiallyBuild()`, unlike `build()`, never constructs an `Internals.Session` or resolves
+    /// a client, which is exactly right here: nothing about producing a description touches the
+    /// network.
     func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {
         let formFieldBox = DescriptorFormFieldBox()
 

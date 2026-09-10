@@ -14,7 +14,7 @@ struct ExecutorRequirementErrorTests {
         // Given
         let internalError = Internals.IncompatibleExecutorConfigurationError(
             requiredExecutor: .nioTransportServices,
-            reasons: [.additionalTrustRootsUnderNetworkFramework, .certificateChain]
+            reasons: [.dnsOverrideUnderURLSession, .keyLogger]
         )
 
         // When
@@ -22,7 +22,7 @@ struct ExecutorRequirementErrorTests {
 
         // Then
         #expect(error.requiredExecutor == .nioTransportServices)
-        #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework, .certificateChain])
+        #expect(error.reasons == [.dnsOverrideUnderURLSession, .keyLogger])
     }
 
     @Test
@@ -45,9 +45,7 @@ struct ExecutorRequirementErrorTests {
 
     @Test(
         arguments: [
-            Internals.ExecutorIncompatibilityReason.certificateChain,
-            .privateKey,
-            .keyLogger,
+            Internals.ExecutorIncompatibilityReason.keyLogger,
             .cipherSuites,
             .cipherSuiteValues,
             .renegotiationSupport,
@@ -57,13 +55,13 @@ struct ExecutorRequirementErrorTests {
             .shutdownTimeout,
             .pskHint,
             .pskIdentityResolver,
-            .noHostnameVerificationUnderNetworkFramework,
-            .additionalTrustRootsUnderNetworkFramework,
             .dnsOverrideUnderURLSession,
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
             .proxyBearerAuthorizationUnderURLSession,
             .decompressionRequiresURLSession,
+            .maximumTLSVersionUnderURLSession,
+            .applicationProtocolsUnderURLSession,
         ]
     )
     func reason_whenEveryInternalCaseMapped_hasNonEmptyDescription(

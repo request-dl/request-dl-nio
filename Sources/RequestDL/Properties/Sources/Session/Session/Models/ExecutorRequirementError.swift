@@ -7,15 +7,13 @@ import RequestDLInternals
 /// An error thrown when `Session.requiredExecutor(_:)` pins a session to an ``Session/Executor``
 /// its configuration cannot actually run on.
 ///
-/// `RequestDLInternals`'s raw `Internals.IncompatibleExecutorConfigurationError` -- the internal,
-/// package-visible error -- gets caught where the session bootstraps and rewrapped into this
+/// `RequestDLInternals`'s raw `Internals.IncompatibleExecutorConfigurationError` (the internal,
+/// package-visible error) gets caught where the session bootstraps and rewrapped into this
 /// type, following the same split `SecureFileError` uses for `Internals.SecureFileLoadError`.
 public struct ExecutorRequirementError: Error, Sendable {
 
     /// One configuration field that keeps a session off the required executor.
     public enum Reason: Sendable, Hashable {
-        case certificateChain
-        case privateKey
         case keyLogger
         case cipherSuites
         case cipherSuiteValues
@@ -26,23 +24,18 @@ public struct ExecutorRequirementError: Error, Sendable {
         case shutdownTimeout
         case pskHint
         case pskIdentityResolver
-        case noHostnameVerificationUnderNetworkFramework
-        case additionalTrustRootsUnderNetworkFramework
-        case tlsPinning
         case dnsOverrideUnderURLSession
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
         case decompressionRequiresURLSession
+        case maximumTLSVersionUnderURLSession
+        case applicationProtocolsUnderURLSession
 
         // MARK: - Inits
 
         init(_ reason: Internals.ExecutorIncompatibilityReason) {
             switch reason {
-            case .certificateChain:
-                self = .certificateChain
-            case .privateKey:
-                self = .privateKey
             case .keyLogger:
                 self = .keyLogger
             case .cipherSuites:
@@ -63,12 +56,6 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .pskHint
             case .pskIdentityResolver:
                 self = .pskIdentityResolver
-            case .noHostnameVerificationUnderNetworkFramework:
-                self = .noHostnameVerificationUnderNetworkFramework
-            case .additionalTrustRootsUnderNetworkFramework:
-                self = .additionalTrustRootsUnderNetworkFramework
-            case .tlsPinning:
-                self = .tlsPinning
             case .dnsOverrideUnderURLSession:
                 self = .dnsOverrideUnderURLSession
             case .http1OnlyUnderURLSession:
@@ -79,6 +66,10 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .proxyBearerAuthorizationUnderURLSession
             case .decompressionRequiresURLSession:
                 self = .decompressionRequiresURLSession
+            case .maximumTLSVersionUnderURLSession:
+                self = .maximumTLSVersionUnderURLSession
+            case .applicationProtocolsUnderURLSession:
+                self = .applicationProtocolsUnderURLSession
             }
         }
     }
@@ -119,10 +110,6 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .certificateChain:
-            return "a client certificate chain"
-        case .privateKey:
-            return "a client private key"
         case .keyLogger:
             return "a TLS key logger"
         case .cipherSuites:
@@ -143,12 +130,6 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "a PSK hint"
         case .pskIdentityResolver:
             return "a PSK identity resolver"
-        case .noHostnameVerificationUnderNetworkFramework:
-            return "disabled hostname verification (unsupported under Network.framework)"
-        case .additionalTrustRootsUnderNetworkFramework:
-            return "additional trust roots (unsupported under Network.framework)"
-        case .tlsPinning:
-            return "SPKI certificate pinning"
         case .dnsOverrideUnderURLSession:
             return "a DNS override (unsupported under URLSession)"
         case .http1OnlyUnderURLSession:
@@ -160,6 +141,10 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .decompressionRequiresURLSession:
             return
                 "a decompression algorithm that only works under URLSession (unsupported under NIO/NIOTransportServices)"
+        case .maximumTLSVersionUnderURLSession:
+            return "a maximum TLS version (unsupported under URLSession)"
+        case .applicationProtocolsUnderURLSession:
+            return "an ALPN application protocol list (unsupported under URLSession)"
         }
     }
 }

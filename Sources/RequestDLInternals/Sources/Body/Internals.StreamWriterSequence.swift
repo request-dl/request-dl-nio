@@ -7,7 +7,7 @@ import NIOCore
 
 extension Internals {
 
-    /// Generic over `Body` -- rather than hardwired to `Internals.BodySequence` -- so it can
+    /// Generic over `Body`, rather than hardwired to `Internals.BodySequence`, so it can
     /// drive either a fixed, known-length body or a `Internals.CompressingByteSequence` (whose
     /// final size, and whose ability to fail mid-stream if a custom `Compressor` throws, are both
     /// only known once the whole thing has been pulled through).

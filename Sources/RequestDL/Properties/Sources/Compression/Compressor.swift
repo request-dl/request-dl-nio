@@ -5,7 +5,7 @@
 /// A pluggable request-compression algorithm.
 ///
 /// Conform to this to teach RequestDL a compression scheme it doesn't know natively, without
-/// writing a new Task Modifier or Property -- install it via ``Property/compression(_:onDuplicateHeader:shouldCompressBodyData:)``,
+/// writing a new Task Modifier or Property; install it via ``Property/compression(_:onDuplicateHeader:shouldCompressBodyData:)``,
 /// the same way ``gzip``/``deflate`` already work.
 ///
 /// Unlike ``Decompressor``, there's no OS-provided shortcut this package can defer to: neither
@@ -15,7 +15,7 @@
 ///
 /// `callAsFunction()` is called once per request, producing a fresh ``CompressorStream`` that
 /// owns whatever mutable encode state the format needs (a zlib window, for instance) for exactly
-/// that one request -- never shared or reused across requests, since this type itself is
+/// that one request. It's never shared or reused across requests, since this type itself is
 /// `Sendable` and may be reused freely across many concurrent ones.
 public protocol Compressor: Sendable {
 
@@ -29,11 +29,11 @@ public protocol Compressor: Sendable {
 /// The stateful, per-request half of a ``Compressor``.
 ///
 /// Fed the outgoing body as it becomes available. Returning `[]` is always valid: a codec may
-/// buffer internally and emit nothing until it has enough to produce meaningful output -- exactly
+/// buffer internally and emit nothing until it has enough to produce meaningful output, exactly
 /// how `deflate()` itself behaves, buffering several writes before flushing anything back out.
 ///
 /// ``finish()`` is called exactly once, after the last chunk, and flushes whatever the encoder is
-/// still holding (a gzip trailer/checksum, for instance) -- nothing calls this a second time to
+/// still holding (a gzip trailer/checksum, for instance). Nothing calls this a second time to
 /// give an encoder another chance.
 public protocol CompressorStream {
 

@@ -14,7 +14,7 @@ import Foundation
 ///
 /// Deliberately not a member of ``BackgroundDownloadTask`` itself: a generic type's static
 /// storage is per-specialization in Swift, and every `BackgroundDownloadTask<Content>` call site
-/// has its own concrete `Content` -- a handler stored there would only ever see the downloads
+/// has its own concrete `Content`, a handler stored there would only ever see the downloads
 /// created with that exact `Content` type, not every download in the app. `BackgroundDownloads`
 /// is a plain, non-generic namespace specifically so there is exactly one of everything below,
 /// regardless of how many different `BackgroundDownloadTask<Content>` specializations exist.
@@ -24,11 +24,11 @@ public enum BackgroundDownloads {
     /// created with.
     public enum Event: Sendable {
         /// `bytesWritten`/`totalBytesExpected` are the running totals for the whole download, not
-        /// the size of this particular callback -- matching
+        /// the size of this particular callback, matching
         /// `URLSessionDownloadDelegate.urlSession(_:downloadTask:didWriteData:totalBytesWritten:totalBytesExpectedToWrite:)`.
         case progress(id: String, destination: URL, bytesWritten: Int64, totalBytesExpected: Int64)
 
-        /// The file is already at `destination` by the time this fires -- moved there from
+        /// The file is already at `destination` by the time this fires, moved there from
         /// `URLSession`'s own temporary location before this event is ever produced.
         case completed(id: String, destination: URL)
 
@@ -38,7 +38,7 @@ public enum BackgroundDownloads {
     /// Called for every event from every ``BackgroundDownloadTask`` in the process, on an
     /// unspecified queue.
     ///
-    /// Set this once, early -- ideally before any ``BackgroundDownloadTask`` is ever created,
+    /// Set this once, early, ideally before any ``BackgroundDownloadTask`` is ever created,
     /// and unconditionally on every launch, including a launch the system triggered only to
     /// deliver background events (there is no user-visible UI at that point, but the events still
     /// need somewhere to go).
@@ -52,9 +52,10 @@ public enum BackgroundDownloads {
     ///
     /// Required for background downloads to work at all: this is how the system hands back the
     /// identifier of the session it wants reconnected, and the completion handler that has to be
-    /// called once every queued event has actually been delivered to ``onEvent`` -- calling it
-    /// any earlier risks the system snapshotting the app before its state reflects what actually
-    /// finished.
+    /// called once every queued event has actually been delivered to ``onEvent``.
+    ///
+    /// Calling it any earlier risks the system snapshotting the app before its state reflects
+    /// what actually finished.
     ///
     /// ```swift
     /// func application(
@@ -78,11 +79,11 @@ public enum BackgroundDownloads {
     /// Cancels the ``BackgroundDownloadTask`` scheduled with this `id`, if it's still running.
     ///
     /// A cancelled download is reported through ``onEvent`` as an ordinary `.failed` event (the
-    /// underlying error is `NSURLErrorCancelled`), the same way any other failure is -- there is
+    /// underlying error is `NSURLErrorCancelled`), the same way any other failure is: there is
     /// no separate "was cancelled" event of its own.
     ///
     /// - Returns: `true` if a matching, still-running download was found and cancelled; `false`
-    ///   if none was -- it may have already finished, failed, or never existed.
+    ///   if none was, since it may have already finished, failed, or never existed.
     @discardableResult
     public static func cancel(id: String) async -> Bool {
         await Session.shared.cancel(id: id)

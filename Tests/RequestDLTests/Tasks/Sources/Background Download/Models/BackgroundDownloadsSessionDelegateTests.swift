@@ -13,16 +13,16 @@ import Testing
 import Foundation
 
 /// Covers `BackgroundDownloads.Session`'s `URLSessionDownloadDelegate` callbacks directly, against
-/// a task built from an ordinary (non-background) `URLSession.shared` -- never resumed, only ever
+/// a task built from an ordinary (non-background) `URLSession.shared`. It is never resumed, only ever
 /// used as a way to get a real `URLSessionDownloadTask` object to set `taskDescription` on and
 /// hand to the delegate method by hand. This exercises the same code a real background transfer
 /// would run through, without starting one: this SwiftPM test harness has none of the entitlements
 /// a real background session needs to actually schedule anything (the same gap already documented
-/// for Keychain-backed mTLS), so this is the ceiling of what can be verified here -- see
+/// for Keychain-backed mTLS), so this is the ceiling of what can be verified here. See
 /// `BackgroundDownloadTaskTests`'s own doc comment for the same reasoning applied to `result()`.
 ///
 /// Every delegate method under test is synchronous by contract (that's the whole reason `Session`
-/// isn't an `actor` -- see its own doc comment), so every assertion below runs immediately after
+/// isn't an `actor`; see its own doc comment), so every assertion below runs immediately after
 /// the call that's supposed to have triggered it, with no `await`/polling needed. Every test also
 /// builds its own `BackgroundDownloads.Session()` rather than reusing `.shared`, so `onEvent`
 /// assertions never race another test's.
@@ -68,7 +68,7 @@ struct BackgroundDownloadsSessionDelegateTests {
     func didFinishDownloadingTo_whenDestinationAlreadyExists_overwritesIt() async throws {
         try await withTemporaryFileURL("source.tmp") { location in
             try await withTemporaryFileURL("destination.bin") { destination in
-                // Given -- `withTemporaryFileURL` itself already creates an empty file at
+                // Given: `withTemporaryFileURL` itself already creates an empty file at
                 // `destination`, so this is already exercising the overwrite path; write
                 // something recognizable there first to make sure it really gets replaced, not
                 // just left alone as "already existing."
@@ -92,7 +92,7 @@ struct BackgroundDownloadsSessionDelegateTests {
     @Test
     func didFinishDownloadingTo_whenSourceFileIsMissing_reportsFailed() async throws {
         try await withTemporaryFileURL("destination.bin") { destination in
-            // Given -- `location` deliberately never gets a file written to it, so `moveItem`
+            // Given: `location` deliberately never gets a file written to it, so `moveItem`
             // has nothing to move.
             let missingLocation = temporaryDirectoryURL.appendingPathComponent("RequestDL.\(UUID()).missing")
 
@@ -122,7 +122,7 @@ struct BackgroundDownloadsSessionDelegateTests {
     @Test
     func didFinishDownloadingTo_whenTaskDescriptionMissing_doesNothing() async throws {
         try await withTemporaryFileURL("source.tmp") { location in
-            // Given -- no `taskDescription` set at all, the shape a task RequestDL didn't create
+            // Given: no `taskDescription` set at all, the shape a task RequestDL didn't create
             // would have.
             try Data("content".utf8).write(to: location)
 
@@ -135,7 +135,7 @@ struct BackgroundDownloadsSessionDelegateTests {
             // When
             session.urlSession(.shared, downloadTask: task, didFinishDownloadingTo: location)
 
-            // Then -- neither reported nor moved; this task simply isn't this delegate's to
+            // Then: neither reported nor moved; this task simply isn't this delegate's to
             // handle.
             #expect(events.all.isEmpty)
             #expect(FileManager.default.fileExists(atPath: location.path))
@@ -164,7 +164,7 @@ struct BackgroundDownloadsSessionDelegateTests {
                 totalBytesExpectedToWrite: 16_384
             )
 
-            // Then -- the running totals, not the size of this one callback.
+            // Then: the running totals, not the size of this one callback.
             let recorded = events.all
             #expect(recorded.count == 1)
 
@@ -214,7 +214,7 @@ struct BackgroundDownloadsSessionDelegateTests {
         }
     }
 
-    /// The delegate also fires this on success, with `error == nil` -- must not double-report on
+    /// The delegate also fires this on success, with `error == nil`; must not double-report on
     /// top of `didFinishDownloadingTo`'s own `.completed` event.
     @Test
     func didCompleteWithError_whenErrorIsNil_reportsNothing() async throws {
@@ -253,7 +253,7 @@ struct BackgroundDownloadsSessionDelegateTests {
         // Then
         #expect(firstCalled.wasCalled)
 
-        // And -- a second finish-events call with no new `handleEvents` in between must not
+        // And: a second finish-events call with no new `handleEvents` in between must not
         // re-invoke a stale handler.
         let secondCalled = CallBox()
         session.urlSessionDidFinishEvents(forBackgroundURLSession: .shared)
@@ -279,7 +279,7 @@ struct BackgroundDownloadsSessionDelegateTests {
 
 // MARK: - Test helpers
 
-/// Both helpers below are plain, lock-backed classes, not actors -- every callback under test
+/// Both helpers below are plain, lock-backed classes, not actors. Every callback under test
 /// (`onEvent`, `handleEvents`'s `completionHandler`) is synchronous by contract, so an `actor`
 /// would force an `await` onto assertions that need to run immediately, not after a hop.
 private final class EventBox: @unchecked Sendable {

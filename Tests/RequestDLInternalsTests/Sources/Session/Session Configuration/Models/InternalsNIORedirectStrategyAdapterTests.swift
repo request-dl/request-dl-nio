@@ -10,7 +10,7 @@ import Testing
 @testable import RequestDLInternals
 
 /// Covers `Internals.NIORedirectStrategyAdapter`'s conversions in isolation, without a real
-/// network round trip -- the strategy mechanism itself (rewriting a redirect request, refusing
+/// network round trip. The strategy mechanism itself (rewriting a redirect request, refusing
 /// one, detecting cycles via history, a strategy that throws) is AsyncHTTPClient's own, covered
 /// by its own test suite; what's authored here, and worth its own coverage, is the mapping to and
 /// from `Internals.RedirectContext`/`RedirectRequest`/`RedirectDecision`.
@@ -18,7 +18,7 @@ struct InternalsNIORedirectStrategyAdapterTests {
 
     @Test
     func redirectDecision_whenFollowing_onlyOverridesURLMethodAndHeaders() throws {
-        // Given -- a candidate request AsyncHTTPClient already built, carrying a body the
+        // Given: a candidate request AsyncHTTPClient already built, carrying a body the
         // strategy never touches.
         var candidateRequest = HTTPClientRequest(url: "https://example.com/redirected")
         candidateRequest.method = .GET
@@ -59,7 +59,7 @@ struct InternalsNIORedirectStrategyAdapterTests {
         #expect(resultingRequest.url == "https://example.com/adjusted")
         #expect(resultingRequest.method == .POST)
         #expect(resultingRequest.headers.first(name: "X-Adjusted") == "yes")
-        // Body -- untouched, since `Internals.RedirectRequest` has no way to replace it.
+        // Body: untouched, since `Internals.RedirectRequest` has no way to replace it.
         #expect(resultingRequest.body != nil)
 
         // The strategy saw the candidate's own url/method/headers, unmodified.

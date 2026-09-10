@@ -21,14 +21,19 @@ extension Internals {
 
     /// The resolved, `URLSession`-ready form of one `Internals.SecureConnection`: a client
     /// identity (if `certificateChain`/`privateKey` were configured), composed with an
-    /// `Internals.ServerTrustPolicy` for the trust roots/verification mode/SPKI pinning half -- the one part
-    /// of this that needs no Keychain round-trip, and so is reusable on its own wherever only
-    /// that half is needed.
+    /// `Internals.ServerTrustPolicy` for the trust roots/verification mode/SPKI pinning half, the
+    /// one part of this that needs no Keychain round-trip, and so is reusable on its own wherever
+    /// only that half is needed.
     ///
     /// Built once per `SecureConnection` and held for as long as the owning
-    /// `Internals.URLSessionClient` is alive -- mirrors NIOSSL's own per-connection
-    /// `TLSConfiguration` caching in `Internals.ClientManager`. The Keychain items backing the
-    /// client identity, if any, are removed in `deinit`, not after every request.
+    /// `Internals.URLSessionClient` is alive, mirroring NIOSSL's own per-connection
+    /// `TLSConfiguration` caching in `Internals.ClientManager`.
+    ///
+    /// The Keychain items backing the client identity, if any, are released through
+    /// `identityHandle`'s own `deinit`, not after every request, and only actually deleted once
+    /// every other live `Internals.IdentityHandle` for that same certificate/key pair (e.g.
+    /// another `URLSessionIdentityPolicy` instance configured with the same mTLS identity) has
+    /// gone away too. See `Internals.IdentityManager`.
     package final class URLSessionIdentityPolicy: @unchecked Sendable {
 
         package enum ConfigurationError: Swift.Error, CustomStringConvertible, Sendable {
@@ -48,7 +53,7 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let identityHandle: Internals.RawBytesIdentityBuilder.Handle?
+        private let identityHandle: Internals.IdentityHandle?
         private let intermediateCertificates: [SecCertificate]
         private let serverTrustPolicy: Internals.ServerTrustPolicy
 
@@ -61,13 +66,13 @@ extension Internals {
                 intermediateCertificates = []
 
             case (.some(let certificateChain), .some(let privateKey)):
-                let derCertificates = try Self.derCertificates(from: certificateChain)
+                let derCertificates = try RawBytesIdentityBuilder.certificateDERs(from: certificateChain)
 
                 guard let leaf = derCertificates.first else {
                     throw ConfigurationError.emptyCertificateChain
                 }
 
-                let privateKeyDER = try Self.privateKeyDER(from: privateKey)
+                let privateKeyDER = try RawBytesIdentityBuilder.privateKeyDER(from: privateKey)
 
                 identityHandle = try RawBytesIdentityBuilder.makeIdentity(
                     certificateDER: leaf,
@@ -82,12 +87,6 @@ extension Internals {
             }
 
             self.serverTrustPolicy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
-        }
-
-        deinit {
-            if let identityHandle {
-                RawBytesIdentityBuilder.remove(identityHandle)
-            }
         }
 
         // MARK: - Internal methods
@@ -119,58 +118,6 @@ extension Internals {
             )
         }
 
-        // MARK: - Private methods
-
-        /// The leaf certificate (index 0) plus any intermediates, as DER bytes -- reuses NIOSSL's
-        /// own PEM/DER + file/bytes parsing (`Internals.CertificateChain.build()`) rather than
-        /// re-implementing it, since `CertificateChain.build()` always resolves to
-        /// `.certificate(NIOSSLCertificate)` sources regardless of how it was configured.
-        private static func derCertificates(from certificateChain: Internals.CertificateChain) throws -> [Data] {
-            try certificateChain.build().map { source in
-                guard case .certificate(let certificate) = source else {
-                    // `Internals.CertificateChain.build()` always resolves to `.certificate`
-                    // sources -- every branch loads the certificate(s) up front rather than
-                    // deferring to NIOSSL via the (deprecated) `.file` source case.
-                    preconditionFailure(
-                        "Internals.CertificateChain.build() unexpectedly produced a non-certificate source"
-                    )
-                }
-                return Data(try certificate.toDERBytes())
-            }
-        }
-
-        /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
-        /// down to DER -- `RawBytesIdentityBuilder.secKey(fromDER:)` does the actual format
-        /// classification (RSA/EC, PKCS#1/PKCS#8/SEC1) once real DER bytes are in hand either
-        /// way. A password-protected key is rejected outright, since there is no public API to
-        /// export a decrypted key back out to DER once NIOSSL has parsed it.
-        private static func privateKeyDER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
-            switch privateKeySource {
-            case .privateKey(let privateKey):
-                guard privateKey.password == nil else {
-                    throw RawBytesIdentityBuilder.Error.unsupportedKeyFormat("password-protected key")
-                }
-
-                let rawBytes: Data
-                switch privateKey.source {
-                case .bytes(let bytes):
-                    rawBytes = Data(bytes)
-                case .file(let file):
-                    do {
-                        rawBytes = try Data(contentsOf: URL(fileURLWithPath: file))
-                    } catch {
-                        throw SecureFileLoadError(resource: .privateKey, path: file, underlying: error)
-                    }
-                }
-
-                switch privateKey.format {
-                case .der:
-                    return rawBytes
-                case .pem:
-                    return try RawBytesIdentityBuilder.privateKeyDER(fromPEM: rawBytes)
-                }
-            }
-        }
     }
 }
 

@@ -131,10 +131,10 @@ extension Internals {
         }
 
         /// The file this whole body already lives in, when it's backed by exactly one buffer
-        /// that is itself an unread, non-temporary `Internals.FileBuffer` -- i.e. uploading
+        /// that is itself an unread, non-temporary `Internals.FileBuffer`: uploading
         /// straight from that file would produce exactly these bytes, with nothing to drain or
         /// copy first. `nil` for anything else: no buffers, more than one (multipart included),
-        /// a `DataBuffer`, or a `FileBuffer` that doesn't qualify -- see
+        /// a `DataBuffer`, or a `FileBuffer` that doesn't qualify. See
         /// `Internals.Buffer.wholeFileURL` for what "qualify" means.
         package var wholeFileURL: URL? {
             guard buffers.count == 1, let fileBuffer = buffers[0] as? Internals.FileBuffer else {

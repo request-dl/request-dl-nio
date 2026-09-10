@@ -20,7 +20,7 @@ import Glibc
 #endif
 
 /// End-to-end coverage for a genuinely custom (non-native) `Decompressor`, run against a raw
-/// socket server that returns bytes exactly as configured -- not a unit test of the codec, but
+/// socket server that returns bytes exactly as configured: not a unit test of the codec, but
 /// of the manual-dispatch wiring itself: deriving `Accept-Encoding` from the configured
 /// algorithm, matching the response's `Content-Encoding` against it, and decoding through
 /// `Internals.AsyncResponse`'s transport-agnostic hook.
@@ -28,7 +28,7 @@ import Glibc
 /// Doesn't use the shared `LocalServer` test harness: its `HTTPHandler` always re-encodes every
 /// configured response body into a `{"receivedBytes": ..., "response": ...}` JSON envelope
 /// (`LocalServer.HTTPHandler.responseData()`), which silently discards a non-JSON body like a
-/// custom `Content-Encoding` payload -- it isn't built for raw-bytes-in, raw-bytes-out.
+/// custom `Content-Encoding` payload; it isn't built for raw-bytes-in, raw-bytes-out.
 struct CustomDecompressorIntegrationTests {
 
     /// A toy run-length codec: a flat sequence of (byte, count) pairs, count in `1...255`.
@@ -79,14 +79,14 @@ struct CustomDecompressorIntegrationTests {
     }
 
     /// A one-shot raw HTTP/1.1 server: accepts a single connection, ignores the request, and
-    /// writes back exactly the bytes given -- no framework in the middle re-encoding anything.
+    /// writes back exactly the bytes given; no framework in the middle re-encoding anything.
     private final class RawHTTPServer: @unchecked Sendable {
         let port: UInt16
         private let listenSocket: Int32
 
         init() throws {
             // `SOCK_STREAM` is a plain `Int32` constant on Darwin, but Glibc types it as
-            // `__socket_type` (a `RawRepresentable` enum with a `UInt32` `rawValue`) -- `socket`
+            // `__socket_type` (a `RawRepresentable` enum with a `UInt32` `rawValue`); `socket`
             // itself expects `Int32` either way.
             #if canImport(Darwin)
             let socketType = SOCK_STREAM
@@ -127,7 +127,7 @@ struct CustomDecompressorIntegrationTests {
 
         /// Serves exactly one request/response on a background thread, then closes.
         ///
-        /// - Note: `DispatchQueue`, not `Thread` -- `Thread` lives in full `Foundation`, not
+        /// - Note: `DispatchQueue`, not `Thread`: `Thread` lives in full `Foundation`, not
         /// `FoundationEssentials`, which is all that's guaranteed to `import` here (see the
         /// file-level `#if canImport(FoundationEssentials)` above). `Dispatch` is portable
         /// either way.
@@ -153,7 +153,7 @@ struct CustomDecompressorIntegrationTests {
     }
 
     /// Real gzip-compressed bytes, via the same `GzipAlgorithm` `Compressor` a real upload would
-    /// use -- not a fixture, so this stays correct if the codec's own output ever changes shape.
+    /// use: not a fixture, so this stays correct if the codec's own output ever changes shape.
     private static func gzipCompress(_ string: String) throws -> [UInt8] {
         let compressor: any Compressor = GzipAlgorithm()
         var stream = try compressor()
@@ -166,12 +166,15 @@ struct CustomDecompressorIntegrationTests {
     func decompressionAlgorithms_whenOnlyNativeAlgorithmConfigured_bypassesManualDispatchUnderURLSession()
         async throws
     {
-        // Given -- `.gzip` alone never forces `.urlSession` to take over `Accept-Encoding` (see
+        // Given: `.gzip` alone never forces `.urlSession` to take over `Accept-Encoding` (see
         // `isNativelyDecodedByURLSession`), unlike the other tests in this file that mix in a
-        // custom algorithm. This exercises `Internals.URLSessionClient.executeSessionTask`'s
-        // plain `.enabled` (bypass) branch specifically -- CFNetwork decodes the response
-        // entirely on its own, with `decompressionDispatch` never becoming `.dispatch`. No
-        // executor is forced here -- `.urlSession` is what this session resolves to by default.
+        // custom algorithm.
+        //
+        // This exercises `Internals.URLSessionClient.executeSessionTask`'s plain `.enabled`
+        // (bypass) branch specifically: CFNetwork decodes the response entirely on its own, with
+        // `decompressionDispatch` never becoming `.dispatch`.
+        //
+        // No executor is forced here; `.urlSession` is what this session resolves to by default.
         let server = try RawHTTPServer()
         let original = String(repeating: "hello native gzip, no custom algorithm in the mix. ", count: 200)
         let encoded = try Self.gzipCompress(original)
@@ -200,15 +203,16 @@ struct CustomDecompressorIntegrationTests {
 
     @Test
     func decompressionAlgorithms_whenOnlyNativeAlgorithmConfigured_bypassesManualDispatchUnderNIO() async throws {
-        // Given -- the `.nio` counterpart to the test above, regression coverage for a real bug:
-        // unlike `.urlSession`, `NIOHTTPResponseDecompressor` has no all-or-nothing
+        // Given: the `.nio` counterpart to the test above, regression coverage for a real bug.
+        // Unlike `.urlSession`, `NIOHTTPResponseDecompressor` has no all-or-nothing
         // `Accept-Encoding` constraint to work around, so `Internals.Client.execute` dispatched
         // manually for every configured algorithm unconditionally, on the assumption that
-        // `NIOHTTPResponseDecompressor` strips `Content-Encoding` once it decodes. It doesn't
-        // (confirmed against the vendored `swift-nio-extras` source) -- so a response compressed
-        // with a genuinely native-only algorithm like `.gzip` reached manual dispatch anyway and
-        // threw `NativeOnlyAlgorithmError`, exactly like a real caller configuring only `.gzip`
-        // under `.nio` would have hit on every request.
+        // `NIOHTTPResponseDecompressor` strips `Content-Encoding` once it decodes.
+        //
+        // It doesn't (confirmed against the vendored `swift-nio-extras` source), so a response
+        // compressed with a genuinely native-only algorithm like `.gzip` reached manual dispatch
+        // anyway and threw `NativeOnlyAlgorithmError`, exactly like a real caller configuring
+        // only `.gzip` under `.nio` would have hit on every request.
         let server = try RawHTTPServer()
         let original = String(repeating: "hello native gzip under NIO, no custom algorithm. ", count: 200)
         let encoded = try Self.gzipCompress(original)
@@ -282,7 +286,7 @@ struct CustomDecompressorIntegrationTests {
             """
         server.respondOnce(headers: headers, body: body)
 
-        // When / Then -- configuring a custom algorithm at all forces this package to take over
+        // When / Then: configuring a custom algorithm at all forces this package to take over
         // decoding for the whole request, so a server sending something that matches none of the
         // configured algorithms must fail loudly rather than hand back undecoded bytes silently.
         await #expect(throws: UnsupportedContentEncodingError.self) {
@@ -295,7 +299,7 @@ struct CustomDecompressorIntegrationTests {
         }
     }
 
-    /// Coverage for the real `BrotliURLSessionOnlyAlgorithm` type specifically -- not a mock --
+    /// Coverage for the real `BrotliURLSessionOnlyAlgorithm` type specifically (not a mock),
     /// confirming `InternalsDecompressionAlgorithmAdapter`'s `algorithm is
     /// BrotliURLSessionOnlyAlgorithm` check actually fires for it, end to end through the public
     /// API: pinning `.nio` while it's configured must fail before ever touching the network,
@@ -304,7 +308,7 @@ struct CustomDecompressorIntegrationTests {
     func decompressionAlgorithms_whenBrotliURLSessionOnlyConfiguredAndNIORequired_throwsExecutorRequirementError()
         async throws
     {
-        // Given -- a port nothing is listening on: if this reached the network at all, it would
+        // Given: a port nothing is listening on. If this reached the network at all, it would
         // fail with a connection error instead, not this one.
         await #expect(throws: ExecutorRequirementError.self) {
             _ = try await DataTask {

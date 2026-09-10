@@ -6,7 +6,7 @@ extension Internals.ClientManager {
 
     /// The concrete client cached behind one `Internals.ClientManager` table entry.
     ///
-    /// `.nio` backs both plain NIO and NIOTransportServices -- `Internals.Client` is the same
+    /// `.nio` backs both plain NIO and NIOTransportServices: `Internals.Client` is the same
     /// type either way, differentiated only by which `EventLoopGroup` `SessionProvider.group(with:)`
     /// handed it, so there is nothing for this enum to distinguish between those two. `.urlSession`
     /// is the one genuinely different transport.

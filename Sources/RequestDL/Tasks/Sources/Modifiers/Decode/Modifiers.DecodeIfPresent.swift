@@ -16,10 +16,10 @@ extension Modifiers {
     /// optional instance of a specified type, treating an empty body as `nil` instead of
     /// attempting to run it through `JSONDecoder`.
     ///
-    /// Unlike ``Decode``, which always hands the raw bytes to `JSONDecoder` -- and therefore
-    /// fails with an opaque "the given data was not valid JSON" on an empty body -- this is meant
-    /// for endpoints that may legitimately answer with no body at all, such as a `204 No Content`
-    /// or `205 Reset Content` response to a `DELETE`/`PUT`.
+    /// Unlike ``Decode``, which always hands the raw bytes to `JSONDecoder` (and therefore fails
+    /// with an opaque "the given data was not valid JSON" on an empty body), this is meant for
+    /// endpoints that may legitimately answer with no body at all, such as a `204 No Content` or
+    /// `205 Reset Content` response to a `DELETE`/`PUT`.
     ///
     public struct DecodeIfPresent<Input: Sendable, Element: Decodable & Sendable, Output: Sendable>: RequestTaskModifier
     {

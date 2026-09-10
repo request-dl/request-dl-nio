@@ -12,8 +12,8 @@ extension Timeout {
     /// 1. `connect`: The connect timeout case. The default value is 30s.
     /// 2. `read`: The read timeout case.
     /// 3. `resource`: A total end-to-end deadline, covering connection, redirects, and the entire body transfer.
-    /// 4. `all`: Defines the same timeout interval for both connect and read -- deliberately excludes `resource`,
-    ///    since it means something different (a ceiling on the *whole* request) than the other two.
+    /// 4. `all`: Defines the same timeout interval for both connect and read. It deliberately excludes `resource`,
+    ///    since that means something different (a ceiling on the *whole* request) than the other two.
     ///
     /// In the example below, a request is made to the Google's website with the timeout for all types.
     ///
@@ -38,7 +38,7 @@ extension Timeout {
         /// A total end-to-end deadline for the request, mirroring
         /// `URLSessionConfiguration.timeoutIntervalForResource`: covers connecting, following any
         /// redirects, and streaming the entire response body, all as one budget. Enforced by
-        /// RequestDL itself -- neither AsyncHTTPClient's `Timeout` nor `URLSessionConfiguration`'s
+        /// RequestDL itself, since neither AsyncHTTPClient's `Timeout` nor `URLSessionConfiguration`'s
         /// own per-phase timeouts offer a single knob for this.
         ///
         /// Not included in ``all``: unlike `connect`/`read`, this isn't a per-phase timeout, so

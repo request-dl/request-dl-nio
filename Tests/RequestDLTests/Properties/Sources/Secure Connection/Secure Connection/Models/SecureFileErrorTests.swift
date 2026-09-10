@@ -15,8 +15,8 @@ import struct Foundation.Data
 
 private struct SomeUnderlyingError: Error {}
 
-/// Covers `SecureFileError.init(resource:path:underlying:)`'s own classification logic --
-/// relative-path detection and "can't open" vs. "invalid contents" -- independent of which
+/// Covers `SecureFileError.init(resource:path:underlying:)`'s own classification logic
+/// (relative-path detection and "can't open" vs. "invalid contents"), independent of which
 /// caller (`Certificate`, `PrivateKey`) triggered it. `Internals.Certificate`/`Internals.PrivateKey`
 /// only need to get `resource`/`path`/`underlying` right; see `InternalsCertificateTests` and
 /// `InternalsPrivateKeyTests` in `RequestDLInternalsTests` for that half.

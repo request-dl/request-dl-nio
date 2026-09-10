@@ -12,7 +12,7 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-/// No `LocalServer` anywhere here -- `.description(_:)` only resolves the `Property` graph
+/// No `LocalServer` anywhere here: `.description(_:)` only resolves the `Property` graph
 /// (`Resolve(...).partiallyBuild()`), it never builds a session or touches the network.
 struct CURLTaskDescriptorTests {
 
@@ -86,7 +86,7 @@ struct CURLTaskDescriptorTests {
         }
         .description(.cURL)
 
-        // Then -- one `-F` per field, not a flattened blob.
+        // Then: one `-F` per field, not a flattened blob.
         #expect(command.contains(#"-F 'name=John Doe'"#))
         #expect(command.contains("-F 'avatar=@avatar.png;type=image/png'"))
 
@@ -95,7 +95,7 @@ struct CURLTaskDescriptorTests {
         #expect(!command.contains("multipart/form-data"))
     }
 
-    /// A plain (no `filename`) form field's bytes aren't necessarily valid UTF-8 -- e.g. binary
+    /// A plain (no `filename`) form field's bytes aren't necessarily valid UTF-8, e.g. binary
     /// `Data` handed to `Form` without a filename. Regression test for a bug where those bytes
     /// were lossily decoded to `String` (replacing anything invalid with U+FFFD) before ever
     /// reaching `curlShellQuote`'s own byte-safe fallback, silently corrupting the value.

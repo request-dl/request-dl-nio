@@ -6,7 +6,7 @@ import NIOHTTP1
 
 extension Internals {
 
-    /// Internals-layer counterpart to `RequestDL.RedirectRequest` -- see it for the meaning of
+    /// Internals-layer counterpart to `RequestDL.RedirectRequest`. See it for the meaning of
     /// each property. Kept apart because `RequestDL.HTTPHeaders` lives one layer up and cannot be
     /// referenced from here.
     package struct RedirectRequest: Sendable {

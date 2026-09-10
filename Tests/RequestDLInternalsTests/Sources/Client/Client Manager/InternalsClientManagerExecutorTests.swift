@@ -15,10 +15,11 @@ import NIOTransportServices
 
 /// `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)` actually selects and
 /// caches an `Internals.URLSessionClient` for a configuration `resolveExecutor()` picks
-/// `.urlSession` for, rather than that decision staying abstract. Distinct from
-/// `RequestConfigurationURLSessionClientTests` (`RequestDLTests`), which
+/// `.urlSession` for, rather than that decision staying abstract.
+///
+/// Distinct from `RequestConfigurationURLSessionClientTests` (`RequestDLTests`), which
 /// forces `.urlSession` by hand-building `Internals.URLSessionClient` directly and bypasses
-/// `Internals.ClientManager` entirely -- these tests are the ones that would fail if
+/// `Internals.ClientManager` entirely: these tests are the ones that would fail if
 /// `resolvedClient` merely inspected `resolveExecutor()` without ever building/caching a real
 /// client behind it.
 struct InternalsClientManagerExecutorTests {
@@ -30,7 +31,7 @@ struct InternalsClientManagerExecutorTests {
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
 
-        // `resolveExecutor()` alone only says what *could* run -- the point of this suite is
+        // `resolveExecutor()` alone only says what *could* run. The point of this suite is
         // confirming `resolvedClient` actually built and cached the client that decision points
         // to, not just returned a matching enum case with nothing behind it.
         #expect(sessionConfiguration.resolveExecutor() == .urlSession)
@@ -101,11 +102,11 @@ struct InternalsClientManagerExecutorTests {
 
     @Test
     func resolvedClient_whenConfigurationIsIncompatibleWithURLSession_fallsBackToNIO() async throws {
-        // Given -- a DNS override is excluded from `.urlSession` (bucket D; `URLSessionConfiguration`
+        // Given: a DNS override is excluded from `.urlSession` (bucket D; `URLSessionConfiguration`
         // has no equivalent to hook one in), so `resolveExecutor()` must fall through to
         // `.nio`/`.nioTransportServices`, and `resolvedClient` must cache a `.nio` entry rather
-        // than a `.urlSession` one. (A SOCKS proxy used to be this test's example -- no longer
-        // incompatible, see `InternalsSessionConfigurationExecutorTests
+        // than a `.urlSession` one. (A SOCKS proxy used to be this test's example, but it's no
+        // longer incompatible; see `InternalsSessionConfigurationExecutorTests
         // .configuration_whenSOCKSProxySet_doesNotContainReason`.)
         let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
         let provider = Internals.SharedSessionProvider()
@@ -128,13 +129,14 @@ struct InternalsClientManagerExecutorTests {
         }
     }
 
-    /// Regression coverage for the `enableNetworkFramework`/executor unification --
+    /// Regression coverage for the `enableNetworkFramework`/executor unification:
     /// `resolvedClient`'s `.nio` fallback branch used to always call
     /// `client(provider:sessionConfiguration:)` unmodified, which decides
     /// NIOTransportServices-vs-plain-NIO purely from the `enableNetworkFramework` flag, never from
     /// `resolveExecutor()`'s own (correct) answer. `preferredExecutor(.nioTransportServices)`
     /// therefore had zero effect on which event loop group backed a real client.
-    /// `enableNetworkFramework` is never set here at all -- proving this is `resolveExecutor()`'s
+    ///
+    /// `enableNetworkFramework` is never set here at all, proving this is `resolveExecutor()`'s
     /// decision alone, not the flag's.
     @Test
     func
@@ -194,7 +196,7 @@ struct InternalsClientManagerExecutorTests {
     }
 }
 
-/// Test-only stand-in for the real TLS challenge handling -- see the identical delegate in
+/// Test-only stand-in for the real TLS challenge handling; see the identical delegate in
 /// `InternalsURLSessionClientTests`/`RequestConfigurationURLSessionClientTests` for why this
 /// exists at all: `LocalServer` is always TLS-terminated with a throwaway self-signed
 /// certificate.

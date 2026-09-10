@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import RequestDLInternals
 
 /// SPKI-based certificate pinning configuration for secure connections.
@@ -22,8 +21,8 @@ import RequestDLInternals
 ///
 /// - Warning: Always deploy non-empty backup pins in production to avoid lockout during certificate rotation.
 ///
-/// - Note: Incompatible with ``Session/enableNetworkFramework(_:)`` -- pinning is never dropped to honor that flag; the
-/// session instead falls back to plain SwiftNIO and keeps enforcing the pins.
+/// - Note: Incompatible with ``Session/enableNetworkFramework(_:)``: pinning is never dropped to honor that flag.
+/// The session instead falls back to plain SwiftNIO and keeps enforcing the pins.
 public struct SPKIPinning<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -31,7 +30,7 @@ public struct SPKIPinning<Content: Property>: Property {
         let nodes: [LeafNode<SPKIHashNode>]
 
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
-            secureConnection.tlsPinningPolicy = policy
+            secureConnection.tlsPinningPolicy = policy.build()
             secureConnection.tlsPins = nodes.map(\.hash)
         }
     }
