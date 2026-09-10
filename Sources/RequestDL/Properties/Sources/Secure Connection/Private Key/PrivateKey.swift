@@ -90,14 +90,15 @@ public struct PrivateKey: Property {
     /// Creates a private key from a file with the specified format, and allows for providing a
     /// `NIOSSLSecureBytes` password..
     ///
-    /// - Important: Reachable under ``Session/Executor/nio`` unconditionally. Under
-    /// ``Session/Executor/urlSession``/``Session/Executor/nioTransportServices``, only a
-    /// traditional PKCS#1 RSA PEM key (`format: .pem`, `"-----BEGIN RSA PRIVATE KEY-----"` with
-    /// `Proc-Type`/`DEK-Info` headers) can actually be decrypted -- both executors need mTLS
-    /// identity as a Keychain `SecIdentity`, which needs the key already decrypted, and no
-    /// decryption entry point in this package's dependencies covers PKCS#8-encrypted or EC
-    /// (P-256/P-384/P-521) keys. A password-protected key outside that shape throws when the
-    /// session actually resolves to one of those two executors.
+    /// - Important: Reachable under ``Session/Executor/nio`` unconditionally -- NIOSSL/BoringSSL
+    /// decrypts the key itself, straight from this password. Under
+    /// ``Session/Executor/urlSession``/``Session/Executor/nioTransportServices``, mTLS needs a
+    /// Keychain `SecIdentity`, which needs the key material already decrypted to build one --
+    /// this package can decrypt a traditional PKCS#1 RSA PEM key itself to get there
+    /// (`format: .pem`, `"-----BEGIN RSA PRIVATE KEY-----"` with `Proc-Type`/`DEK-Info` headers),
+    /// but has no decryption path at all for a PKCS#8-encrypted key or any EC key (P-256/P-384/
+    /// P-521). A password-protected key outside that one decryptable shape throws once the
+    /// session actually resolves to either of those two executors.
     ///
     /// - Parameters:
     ///   - file: The path to the file containing the private key.
