@@ -30,8 +30,16 @@ extension Internals {
         /// The mirror image of the `UnderURLSession` cases above: a configured
         /// `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`, or a
         /// third-party one answering the same way) rules out `.nio`/`.nioTransportServices`
-        /// instead of `.urlSession` -- neither goes through CFNetwork, and `NIOHTTPCompression`
+        /// instead of `.urlSession`. Neither goes through CFNetwork, and `NIOHTTPCompression`
         /// has no decoder for whatever such an algorithm stands in for.
         case decompressionRequiresURLSession
+        /// `URLSessionConfiguration` has no maximum-TLS-version API. Unlike `minimumTLSVersion`
+        /// (reachable under URLSession via an ATS `NSExceptionMinimumTLSVersion` entry in
+        /// Info.plist), there is no App Transport Security key for a maximum either, so this has
+        /// no reachable equivalent under URLSession at all.
+        case maximumTLSVersionUnderURLSession
+        /// `URLSession` negotiates ALPN automatically and Info.plist has no key to override the
+        /// protocol list it offers, so this has no reachable equivalent under URLSession at all.
+        case applicationProtocolsUnderURLSession
     }
 }

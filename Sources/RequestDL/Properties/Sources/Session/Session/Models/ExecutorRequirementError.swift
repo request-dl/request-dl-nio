@@ -29,6 +29,8 @@ public struct ExecutorRequirementError: Error, Sendable {
         case proxyConnectHeadersUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
         case decompressionRequiresURLSession
+        case maximumTLSVersionUnderURLSession
+        case applicationProtocolsUnderURLSession
 
         // MARK: - Inits
 
@@ -64,6 +66,10 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .proxyBearerAuthorizationUnderURLSession
             case .decompressionRequiresURLSession:
                 self = .decompressionRequiresURLSession
+            case .maximumTLSVersionUnderURLSession:
+                self = .maximumTLSVersionUnderURLSession
+            case .applicationProtocolsUnderURLSession:
+                self = .applicationProtocolsUnderURLSession
             }
         }
     }
@@ -135,6 +141,10 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .decompressionRequiresURLSession:
             return
                 "a decompression algorithm that only works under URLSession (unsupported under NIO/NIOTransportServices)"
+        case .maximumTLSVersionUnderURLSession:
+            return "a maximum TLS version (unsupported under URLSession)"
+        case .applicationProtocolsUnderURLSession:
+            return "an ALPN application protocol list (unsupported under URLSession)"
         }
     }
 }
