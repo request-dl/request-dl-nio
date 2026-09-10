@@ -5,7 +5,8 @@
 // Promoted from the URLSession Executor Spike (formerly
 // `Tests/RequestDLTests/URLSession Executor Spike/RawBytesIdentityBuilder.swift`) for
 // request-dl-nio#287. Supports RSA (PKCS#1 or PKCS#8) and EC P-256/P-384/P-521 (SEC1 or
-// PKCS#8) private keys.
+// PKCS#8) private keys, unencrypted -- plus password-protected traditional PKCS#1 RSA PEM
+// keys specifically, decrypted via `_CryptoExtras` (see `privateKeyDER(from:)`).
 
 #if canImport(Darwin)
 

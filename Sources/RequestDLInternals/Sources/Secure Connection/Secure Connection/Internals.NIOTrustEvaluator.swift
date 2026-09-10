@@ -26,17 +26,18 @@ extension Internals {
     /// `TLSConfiguration.additionalTrustRoots` on its own) stays completely untouched, at no added
     /// cost, for the common case of not pinning.
     ///
-    /// On Darwin, `resolve(from:)` *also* triggers on `additionalTrustRoots` and/or
-    /// `.noHostnameVerification` alone, with no pins: unlike NIOSSL, Network.framework has no
-    /// native way to see `additionalTrustRoots` at all, and no simple flag to skip hostname
-    /// matching the way NIOSSL's `certificateVerification` does (see `Internals.SecureConnection`'s
-    /// own doc comment on `isCompatibleWithNetworkFramework`) -- both gaps only close through this
-    /// evaluator's `tlsCustomVerificationNetworkFramework`. The actual accept/reject decision is
-    /// `Internals.DarwinTrustEvaluation`'s, shared with `Internals.ServerTrustPolicy`
-    /// (`.urlSession`) rather than reimplemented here: an empty pin set means "nothing to pin,"
-    /// passing on chain validity alone rather than failing closed the way it would for a genuine,
-    /// configured-but-unmatched pin; `skipsHostnameVerification` separately controls whether the
-    /// chain check itself considers the hostname at all.
+    /// On Darwin, `resolve(from:)` *also* triggers on `additionalTrustRoots`, `.noHostnameVerification`,
+    /// `revocationPolicy`, or a `trustDecisionObserver`, any one alone with no pins: unlike NIOSSL,
+    /// Network.framework has no native way to see `additionalTrustRoots` at all, no simple flag to
+    /// skip hostname matching the way NIOSSL's `certificateVerification` does (see
+    /// `Internals.SecureConnection`'s own doc comment on `isCompatibleWithNetworkFramework`), and no
+    /// revocation-checking or trust-decision-observability hook of its own either -- all four gaps
+    /// only close through this evaluator's `tlsCustomVerificationNetworkFramework`. The actual
+    /// accept/reject decision is `Internals.DarwinTrustEvaluation`'s, shared with
+    /// `Internals.ServerTrustPolicy` (`.urlSession`) rather than reimplemented here: an empty pin
+    /// set means "nothing to pin," passing on chain validity alone rather than failing closed the
+    /// way it would for a genuine, configured-but-unmatched pin; `skipsHostnameVerification`
+    /// separately controls whether the chain check itself considers the hostname at all.
     package struct NIOTrustEvaluator: Sendable {
 
         /// Installs on `HTTPClient.Configuration.tlsCustomVerification` -- the NIOSSL backend,

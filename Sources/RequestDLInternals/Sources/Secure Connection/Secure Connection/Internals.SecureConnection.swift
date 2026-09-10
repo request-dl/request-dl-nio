@@ -16,24 +16,28 @@ extension Internals {
         // MARK: - Internal properties
 
         /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`),
-        /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, and `.noHostnameVerification` all reach
-        /// Network.framework, through the two trust/identity hooks `Internals.NIOTrustEvaluator`/
-        /// `makeLocalIdentityForNetworkFramework()` install. Neither `additionalTrustRoots` nor
-        /// `.noHostnameVerification` has a native Network.framework counterpart (unlike `trustRoots`,
+        /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, `.noHostnameVerification`,
+        /// `revocationPolicy`, and `trustDecisionObserver` all reach Network.framework, through the
+        /// two trust/identity hooks `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`
+        /// install. None of `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
+        /// `trustDecisionObserver` has a native Network.framework counterpart (unlike `trustRoots`,
         /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own `certificateVerification`
-        /// flag) -- `Internals.NIOTrustEvaluator` is what makes both work there: it installs
-        /// `tlsCustomVerificationNetworkFramework` whenever either is configured, independently of
-        /// whether SPKI pinning is also active, and swaps in a hostname-less policy on the
-        /// `SecTrust` it's handed only when `.noHostnameVerification` is actually configured
-        /// (`makeDarwinEvaluator`'s `skipsHostnameVerification`). `build()`'s NIOSSL-facing
-        /// `tlsCustomVerification` stays gated to pins only, since NIOSSL already honors both
-        /// `additionalTrustRoots` and `.noHostnameVerification` natively via `TLSConfiguration` and
-        /// doesn't need the assist. What's genuinely unreachable under Network.framework:
-        /// `keyLogger` (no Network.framework equivalent at all). The rest (`cipherSuiteValues`,
-        /// `renegotiationSupport`, `signingSignatureAlgorithms`, `verifySignatureAlgorithms`,
-        /// `sendCANameList`, `shutdownTimeout`, `pskHint`, `pskIdentityResolver`) aren't rejected
-        /// there at all — they're read from the built `TLSConfiguration` and then never looked at
-        /// again, so the connection silently negotiates without them rather than failing loudly.
+        /// flag) -- `Internals.NIOTrustEvaluator` is what makes all four work there: it installs
+        /// `tlsCustomVerificationNetworkFramework` whenever any one is configured, independently of
+        /// whether SPKI pinning is also active, and swaps in a hostname-less policy and/or a
+        /// revocation policy on the `SecTrust` it's handed only when those are actually configured
+        /// (`Internals.DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`). `build()`'s
+        /// NIOSSL-facing `tlsCustomVerification` stays gated to pins only, since NIOSSL already
+        /// honors both `additionalTrustRoots` and `.noHostnameVerification` natively via
+        /// `TLSConfiguration` and doesn't need the assist for those two -- `revocationPolicy` and
+        /// `trustDecisionObserver` still route through it on `.nio` too, since NIOSSL/BoringSSL has
+        /// no revocation checking or trust-decision hook of its own at all. What's genuinely
+        /// unreachable under Network.framework: `keyLogger` (no Network.framework equivalent at
+        /// all). The rest (`cipherSuiteValues`, `renegotiationSupport`, `signingSignatureAlgorithms`,
+        /// `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`,
+        /// `pskIdentityResolver`) aren't rejected there at all — they're read from the built
+        /// `TLSConfiguration` and then never looked at again, so the connection silently negotiates
+        /// without them rather than failing loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return networkFrameworkIncompatibilityReasons().isEmpty
@@ -92,15 +96,16 @@ extension Internals {
         }
 
         /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
-        /// `.noHostnameVerification`/`tlsPins` -- all five are reachable under URLSession, via a
-        /// Keychain round-trip (`certificateChain`/`privateKey`) or `SecTrust`/`SecPolicy`
-        /// (everything else). They're also all reachable under Network.framework (see
-        /// `networkFrameworkIncompatibilityReasons()` above) via `Internals.NIOTrustEvaluator`/
-        /// `makeLocalIdentityForNetworkFramework()`, so this list and that one agree on every
-        /// field except `keyLogger`, the one genuine Network.framework-specific gap. Whether
-        /// the app actually carries the Keychain Sharing entitlement the identity round-trip needs
-        /// is a runtime fact this static check cannot see; a missing entitlement surfaces at
-        /// identity-build time as its own runtime error, not as a reason in this list.
+        /// `.noHostnameVerification`/`tlsPins`/`revocationPolicy`/`trustDecisionObserver` -- all
+        /// seven are reachable under URLSession, via a Keychain round-trip (`certificateChain`/
+        /// `privateKey`) or `SecTrust`/`SecPolicy` (everything else). They're also all reachable
+        /// under Network.framework (see `networkFrameworkIncompatibilityReasons()` above) via
+        /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`, so this list and
+        /// that one agree on every field except `keyLogger`, the one genuine
+        /// Network.framework-specific gap. Whether the app actually carries the Keychain Sharing
+        /// entitlement the identity round-trip needs is a runtime fact this static check cannot
+        /// see; a missing entitlement surfaces at identity-build time as its own runtime error, not
+        /// as a reason in this list.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
