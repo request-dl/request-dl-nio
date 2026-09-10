@@ -55,9 +55,12 @@ extension Internals {
         #if canImport(Darwin)
         /// The mTLS client identity's Keychain-item handle, when `SecureConnection.certificateChain`/
         /// `.privateKey` were configured for a Network.framework connection. Held for as long as
-        /// this `Client` (and so this client's underlying `HTTPClient`) is alive, and released in
-        /// `deinit`, mirroring `Internals.URLSessionIdentityPolicy`'s own identity lifecycle exactly.
-        private let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?
+        /// this `Client` (and so this client's underlying `HTTPClient`) is alive; released
+        /// automatically through `IdentityHandle`'s own `deinit` once this property is torn down,
+        /// mirroring `Internals.URLSessionIdentityPolicy`'s own identity lifecycle exactly, and
+        /// only actually deleting the underlying Keychain items once every other live
+        /// `Internals.IdentityHandle` for that same certificate/key pair has gone away too.
+        private let localIdentityHandle: Internals.IdentityHandle?
         #endif
 
         // MARK: - Unsafe properties
@@ -73,7 +76,7 @@ extension Internals {
         package init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
-            localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle? = nil,
+            localIdentityHandle: Internals.IdentityHandle? = nil,
             maximumConcurrentConnections: Int? = nil
         ) {
             _isClosed = false
@@ -104,14 +107,9 @@ extension Internals {
         #endif
 
         deinit {
-            // Removing the mTLS identity's Keychain items (if any) doesn't depend on whether the
-            // client was already closed. Unlike shutting down `_client` below, doing this twice
-            // isn't an error, and there's no other owner racing to do it first.
-            #if canImport(Darwin)
-            if let localIdentityHandle {
-                RawBytesIdentityBuilder.remove(localIdentityHandle)
-            }
-            #endif
+            // The mTLS identity's Keychain items (if any) are released through
+            // `localIdentityHandle`'s own `deinit`, automatically, once this stored property is
+            // torn down below -- no explicit call needed here.
 
             // Shutting down from here is a last resort, so it is guarded by the same flag the
             // explicit path sets. Without the guard this shut down a client the manager had

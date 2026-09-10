@@ -136,20 +136,20 @@ extension Internals.Session {
 extension Internals.Session.Configuration {
 
     /// `build()`'s result: the `HTTPClient.Configuration` to hand `AsyncHTTPClient.HTTPClient`,
-    /// plus (on Darwin) the mTLS identity's `RawBytesIdentityBuilder.Handle`, if any. Kept
-    /// alongside the configuration rather than folded into it because whoever constructs the
-    /// actual `HTTPClient` needs both: the configuration to build it with, and the handle to hold
-    /// onto for as long as that client lives, so it can remove the identity's Keychain items once
-    /// the client itself goes away. See `Internals.Client.deinit`.
+    /// plus (on Darwin) the mTLS identity's `Internals.IdentityHandle`, if any. Kept alongside
+    /// the configuration rather than folded into it because whoever constructs the actual
+    /// `HTTPClient` needs both: the configuration to build it with, and the handle to hold onto
+    /// for as long as that client lives, so `IdentityHandle`'s own `deinit` can release the
+    /// identity's Keychain items once the client itself goes away. See `Internals.Client`.
     package struct Output: Sendable {
         package let httpClientConfiguration: HTTPClient.Configuration
 
         #if canImport(Darwin)
-        package let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?
+        package let localIdentityHandle: Internals.IdentityHandle?
 
         package init(
             httpClientConfiguration: HTTPClient.Configuration,
-            localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle? = nil
+            localIdentityHandle: Internals.IdentityHandle? = nil
         ) {
             self.httpClientConfiguration = httpClientConfiguration
             self.localIdentityHandle = localIdentityHandle

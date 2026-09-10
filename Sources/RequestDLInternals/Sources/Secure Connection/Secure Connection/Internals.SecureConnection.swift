@@ -279,16 +279,18 @@ extension Internals {
         }
 
         #if canImport(Darwin)
-        /// Builds the `RawBytesIdentityBuilder.Handle` for mTLS under Network.framework when both
+        /// Builds the `Internals.IdentityHandle` for mTLS under Network.framework when both
         /// `certificateChain` and `privateKey` are configured, via the same Keychain round-trip
         /// `Internals.URLSessionIdentityPolicy` already uses for `.urlSession`, through the shared
         /// `RawBytesIdentityBuilder` entry points.
         ///
-        /// Returns the whole `Handle`, not just its `.identity`. `Internals.Client` holds onto it
-        /// and calls `RawBytesIdentityBuilder.remove(_:)` from its own `deinit`, mirroring
-        /// `URLSessionIdentityPolicy`'s lifecycle exactly, just one layer further down the chain
-        /// (`Output` -> `Internals.Session.Configuration.Output` -> `Internals.Client`).
-        private func makeLocalIdentityForNetworkFramework() throws -> Internals.RawBytesIdentityBuilder.Handle? {
+        /// Returns the whole `Internals.IdentityHandle`, not just its `.identity`.
+        /// `Internals.Client` holds onto it, one layer further down the chain (`Output` ->
+        /// `Internals.Session.Configuration.Output` -> `Internals.Client`); its own `deinit`
+        /// releases the handle automatically, deleting the underlying Keychain items only once
+        /// every other live handle for the same certificate/key pair (e.g. a
+        /// `URLSessionIdentityPolicy` instance sharing the same mTLS identity) has gone away too.
+        private func makeLocalIdentityForNetworkFramework() throws -> Internals.IdentityHandle? {
             switch (certificateChain, privateKey) {
             case (nil, nil):
                 return nil
@@ -367,10 +369,10 @@ extension Internals.SecureConnection {
 
         /// The Keychain-backed identity for mTLS under Network.framework, when both
         /// `certificateChain` and `privateKey` are configured. Carries `.identity` for
-        /// `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework` *and* the Keychain-item
-        /// label needed to remove it again, since whoever ends up owning this identity's lifetime
-        /// (`Internals.Client`, currently) needs both.
-        package let localIdentityHandle: Internals.RawBytesIdentityBuilder.Handle?
+        /// `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework`; whoever ends up owning
+        /// this (`Internals.Client`, currently) just needs to hold onto it -- its own `deinit`
+        /// releases the underlying Keychain items once nothing else references them.
+        package let localIdentityHandle: Internals.IdentityHandle?
         #endif
     }
 }

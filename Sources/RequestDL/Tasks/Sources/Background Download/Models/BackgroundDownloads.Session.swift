@@ -166,15 +166,18 @@ extension BackgroundDownloads {
                 .handle(challenge: challenge, completionHandler: completionHandler)
         }
 
-        /// Rebuilds the identity fresh from disk for this one challenge and removes it again
-        /// right after handing the credential over -- no identity is cached across calls, so
-        /// there's nothing to invalidate if the same task is challenged again later (a redirect
-        /// to a new host, for instance): it's simply rebuilt again, from the same file, the same
-        /// way. Safe to remove immediately: once `SecItemCopyMatching` has handed back a
-        /// `SecIdentity`, the in-memory object doesn't stop working just because the Keychain
-        /// entry backing it is deleted afterward, the same assumption
-        /// `Internals.URLSessionIdentityPolicy.deinit` already relies on, just at a smaller grain
-        /// here.
+        /// Rebuilds the identity fresh from disk for this one challenge -- no identity is cached
+        /// across calls, so there's nothing to invalidate if the same task is challenged again
+        /// later (a redirect to a new host, for instance): it's simply rebuilt again, from the
+        /// same file, the same way.
+        ///
+        /// `handle` isn't retained past this method, so it deinitializes (and, if no other live
+        /// `Internals.IdentityHandle` shares this exact certificate/key pair, removes the
+        /// Keychain items backing it) right after `completionHandler` returns -- safe even then:
+        /// once `SecItemCopyMatching` has handed back a `SecIdentity`, the in-memory object
+        /// doesn't stop working just because the Keychain entry backing it is deleted afterward,
+        /// the same assumption `Internals.URLSessionIdentityPolicy` already relies on, just at a
+        /// smaller grain here.
         private func handleClientCertificateChallenge(
             task: URLSessionTask,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
@@ -197,8 +200,6 @@ extension BackgroundDownloads {
                     persistence: .forSession
                 )
             )
-
-            Internals.RawBytesIdentityBuilder.remove(handle)
         }
 
         // MARK: - URLSessionDownloadDelegate

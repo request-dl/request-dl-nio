@@ -74,13 +74,6 @@ extension Internals {
             }
         }
 
-        /// One identity built by ``makeIdentity(certificateDER:privateKeyDER:)``, together with
-        /// everything needed to remove it from the Keychain again.
-        package struct Handle {
-            package let identity: SecIdentity
-            fileprivate let label: String
-        }
-
         // MARK: - Identity sources (CertificateChain/PrivateKeySource -> raw DER bytes)
         //
         // Shared by every executor that needs a `SecIdentity` built from an
@@ -326,132 +319,120 @@ extension Internals {
         package static func makeIdentity(
             certificateDER: Data,
             privateKeyDER: Data
-        ) throws -> Handle {
+        ) throws -> Internals.IdentityHandle {
             let certificate = try certificate(fromDER: certificateDER)
             let secKey = try Self.secKey(fromDER: privateKeyDER)
 
             // Deterministic (content-derived, not random) so that rebuilding an identity for the
-            // same certificate -- a repeated test run, or an app relaunching with the same
-            // configured client certificate after a previous run's `deinit`-triggered `remove(_:)`
-            // never got to run -- reliably finds and clears its own leftovers below instead of
-            // hitting errSecDuplicateItem. `kSecValueRef`-based matching (delete "whatever item
-            // has this exact key/certificate value") looked like the more direct way to express
-            // that and is what the original spike did, but empirically did not reliably match an
-            // existing item across process runs; label-based matching does.
-            let label = "RequestDL.mtls." + Self.hexDigest(certificateDER)
+            // same certificate+key -- a repeated test run, an app relaunching with the same
+            // configured client certificate after a previous run's Keychain items never got
+            // cleaned up, or a second `Internals.IdentityHandle` for the same pair sharing this
+            // one -- reliably finds and reuses (or, on a fresh process, clears) its own leftovers
+            // below instead of hitting errSecDuplicateItem. Folds in the private key, not just
+            // the certificate, so two different keys accidentally paired with the same
+            // certificate never collide under one Keychain item. `kSecValueRef`-based matching
+            // (delete "whatever item has this exact key/certificate value") looked like the more
+            // direct way to express that and is what the original spike did, but empirically did
+            // not reliably match an existing item across process runs; label-based matching does.
+            let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
 
-            // `swift test` (and any unsigned command-line process) has no `keychain-access-groups`
-            // entitlement, which the data-protection keychain requires -- forcing the legacy
-            // file-based keychain is a macOS-only accommodation for that. Not present on
-            // iOS/tvOS/watchOS, where there is only the data-protection keychain and a properly
-            // signed/provisioned app already carries the entitlement it needs.
-            #if os(macOS)
-            let useDataProtectionKeychain = false
-            #else
-            let useDataProtectionKeychain = true
-            #endif
+            return try Internals.IdentityManager.shared.handle(for: label) {
+                // `swift test` (and any unsigned command-line process) has no
+                // `keychain-access-groups` entitlement, which the data-protection keychain
+                // requires -- forcing the legacy file-based keychain is a macOS-only
+                // accommodation for that. Not present on iOS/tvOS/watchOS, where there is only
+                // the data-protection keychain and a properly signed/provisioned app already
+                // carries the entitlement it needs.
+                #if os(macOS)
+                let useDataProtectionKeychain = false
+                #else
+                let useDataProtectionKeychain = true
+                #endif
 
-            SecItemDelete(
-                [
-                    kSecClass: kSecClassKey,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ] as CFDictionary
-            )
-            SecItemDelete(
-                [
-                    kSecClass: kSecClassCertificate,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ] as CFDictionary
-            )
+                SecItemDelete(
+                    [
+                        kSecClass: kSecClassKey,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ] as CFDictionary
+                )
+                SecItemDelete(
+                    [
+                        kSecClass: kSecClassCertificate,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ] as CFDictionary
+                )
 
-            try addToKeychain(
-                query: [
-                    kSecClass: kSecClassKey,
-                    kSecValueRef: secKey,
-                    kSecAttrLabel: label,
-                    // This device only, not iCloud Keychain -- the key only needs to survive this
-                    // process's lifetime, not sync anywhere.
-                    kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ],
-                operation: "SecItemAdd(key)"
-            )
+                try addToKeychain(
+                    query: [
+                        kSecClass: kSecClassKey,
+                        kSecValueRef: secKey,
+                        kSecAttrLabel: label,
+                        // This device only, not iCloud Keychain -- the key only needs to survive
+                        // this process's lifetime, not sync anywhere.
+                        kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ],
+                    operation: "SecItemAdd(key)"
+                )
 
-            try addToKeychain(
-                query: [
-                    kSecClass: kSecClassCertificate,
-                    kSecValueRef: certificate,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ],
-                operation: "SecItemAdd(certificate)"
-            )
+                try addToKeychain(
+                    query: [
+                        kSecClass: kSecClassCertificate,
+                        kSecValueRef: certificate,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ],
+                    operation: "SecItemAdd(certificate)"
+                )
 
-            // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter -- an
-            // identity is a synthetic pairing of a certificate and a key by matching public key,
-            // not an item with its own attributes, so the label set on the certificate/key above
-            // isn't necessarily inherited by it. Fetching every identity currently in this
-            // keychain and matching by certificate bytes is the approach that reliably works in
-            // practice.
-            let identityQuery: [CFString: Any] = [
-                kSecClass: kSecClassIdentity,
-                kSecMatchLimit: kSecMatchLimitAll,
-                kSecReturnRef: true,
-                kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-            ]
-
-            var identitiesResult: CFTypeRef?
-            let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
-
-            guard identityStatus == errSecSuccess else {
-                throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
-            }
-
-            guard let identities = identitiesResult as? [SecIdentity] else {
-                throw Error.identityLookupReturnedWrongType
-            }
-
-            let wantedCertificateData = SecCertificateCopyData(certificate) as Data
-
-            let matchingIdentity = identities.first { identity in
-                var identityCertificate: SecCertificate?
-                guard
-                    SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
-                    let identityCertificate
-                else {
-                    return false
-                }
-
-                return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
-            }
-
-            guard let matchingIdentity else {
-                throw Error.keychainOperationFailed(errSecItemNotFound, operation: "matching identity by certificate")
-            }
-
-            return Handle(identity: matchingIdentity, label: label)
-        }
-
-        /// Removes both Keychain items an identity built by
-        /// ``makeIdentity(certificateDER:privateKeyDER:)`` was built from.
-        /// `Internals.URLSessionIdentityPolicy` calls this from `deinit`, once the identity is no
-        /// longer needed, not after every request.
-        package static func remove(_ handle: Handle) {
-            #if os(macOS)
-            let useDataProtectionKeychain = false
-            #else
-            let useDataProtectionKeychain = true
-            #endif
-
-            for itemClass in [kSecClassKey, kSecClassCertificate] {
-                let query: [CFString: Any] = [
-                    kSecClass: itemClass,
-                    kSecAttrLabel: handle.label,
+                // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter --
+                // an identity is a synthetic pairing of a certificate and a key by matching
+                // public key, not an item with its own attributes, so the label set on the
+                // certificate/key above isn't necessarily inherited by it. Fetching every
+                // identity currently in this keychain and matching by certificate bytes is the
+                // approach that reliably works in practice.
+                let identityQuery: [CFString: Any] = [
+                    kSecClass: kSecClassIdentity,
+                    kSecMatchLimit: kSecMatchLimitAll,
+                    kSecReturnRef: true,
                     kSecUseDataProtectionKeychain: useDataProtectionKeychain,
                 ]
-                SecItemDelete(query as CFDictionary)
+
+                var identitiesResult: CFTypeRef?
+                let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
+
+                guard identityStatus == errSecSuccess else {
+                    throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
+                }
+
+                guard let identities = identitiesResult as? [SecIdentity] else {
+                    throw Error.identityLookupReturnedWrongType
+                }
+
+                let wantedCertificateData = SecCertificateCopyData(certificate) as Data
+
+                let matchingIdentity = identities.first { identity in
+                    var identityCertificate: SecCertificate?
+                    guard
+                        SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
+                        let identityCertificate
+                    else {
+                        return false
+                    }
+
+                    return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
+                }
+
+                guard let matchingIdentity else {
+                    throw Error.keychainOperationFailed(
+                        errSecItemNotFound,
+                        operation: "matching identity by certificate"
+                    )
+                }
+
+                return matchingIdentity
             }
         }
 

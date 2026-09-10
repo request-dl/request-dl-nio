@@ -28,7 +28,10 @@ extension Internals {
     /// Built once per `SecureConnection` and held for as long as the owning
     /// `Internals.URLSessionClient` is alive -- mirrors NIOSSL's own per-connection
     /// `TLSConfiguration` caching in `Internals.ClientManager`. The Keychain items backing the
-    /// client identity, if any, are removed in `deinit`, not after every request.
+    /// client identity, if any, are released through `identityHandle`'s own `deinit`, not after
+    /// every request -- and only actually deleted once every other live `Internals.IdentityHandle`
+    /// for that same certificate/key pair (e.g. another `URLSessionIdentityPolicy` instance
+    /// configured with the same mTLS identity) has gone away too. See `Internals.IdentityManager`.
     package final class URLSessionIdentityPolicy: @unchecked Sendable {
 
         package enum ConfigurationError: Swift.Error, CustomStringConvertible, Sendable {
@@ -48,7 +51,7 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let identityHandle: Internals.RawBytesIdentityBuilder.Handle?
+        private let identityHandle: Internals.IdentityHandle?
         private let intermediateCertificates: [SecCertificate]
         private let serverTrustPolicy: Internals.ServerTrustPolicy
 
@@ -82,12 +85,6 @@ extension Internals {
             }
 
             self.serverTrustPolicy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
-        }
-
-        deinit {
-            if let identityHandle {
-                RawBytesIdentityBuilder.remove(identityHandle)
-            }
         }
 
         // MARK: - Internal methods
