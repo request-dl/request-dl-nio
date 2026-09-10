@@ -152,7 +152,7 @@ struct RequestConfigurationURLSessionClientMTLSTests {
         // every platform (confirmed on macOS and iOS Simulator directly), not a defect in the
         // mapping this test otherwise exercises, and not specific to macOS.
         await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform -- see the type doc comment",
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see the type doc comment",
             {
                 let urlSessionClient = try Internals.URLSessionClient(
                     configuration: .ephemeral,

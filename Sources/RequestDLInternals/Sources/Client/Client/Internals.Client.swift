@@ -52,12 +52,45 @@ extension Internals {
         /// request is asked to execute until it completes, is cancelled, or is released.
         private let throttledExecutor: Internals.ThrottledExecutor
 
+        #if canImport(Darwin)
+        /// The mTLS client identity's Keychain-item handle, when `SecureConnection.certificateChain`/
+        /// `.privateKey` were configured for a Network.framework connection. Held for as long as
+        /// this `Client` (and so this client's underlying `HTTPClient`) is alive.
+        ///
+        /// Released automatically through `IdentityHandle`'s own `deinit` once this property is
+        /// torn down, mirroring `Internals.URLSessionIdentityPolicy`'s own identity lifecycle
+        /// exactly, and only actually deleting the underlying Keychain items once every other
+        /// live `Internals.IdentityHandle` for that same certificate/key pair has gone away too.
+        private let localIdentityHandle: Internals.IdentityHandle?
+        #endif
+
         // MARK: - Unsafe properties
 
         private var _isClosed: Bool
 
         // MARK: - Inits
 
+        // Swift doesn't reliably parse a parameter conditionally included in the middle of a
+        // parameter list (as opposed to a whole declaration), so this is two complete inits
+        // rather than one with a `#if`-guarded parameter.
+        #if canImport(Darwin)
+        package init(
+            eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
+            configuration: HTTPClient.Configuration,
+            localIdentityHandle: Internals.IdentityHandle? = nil,
+            maximumConcurrentConnections: Int? = nil
+        ) {
+            _isClosed = false
+            _client = .init(
+                eventLoopGroupProvider: eventLoopGroupProvider,
+                configuration: configuration
+            )
+            throttledExecutor = Internals.ThrottledExecutor(
+                maximumConcurrentConnections: maximumConcurrentConnections
+            )
+            self.localIdentityHandle = localIdentityHandle
+        }
+        #else
         package init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
@@ -72,8 +105,13 @@ extension Internals {
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
         }
+        #endif
 
         deinit {
+            // The mTLS identity's Keychain items (if any) are released through
+            // `localIdentityHandle`'s own `deinit`, automatically, once this stored property is
+            // torn down below. No explicit call needed here.
+
             // Shutting down from here is a last resort, so it is guarded by the same flag the
             // explicit path sets. Without the guard this shut down a client the manager had
             // already closed, and the second call is an error nobody was positioned to see.

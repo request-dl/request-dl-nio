@@ -2,9 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import NIOCore
 import NIOSSL
+
+#if canImport(Darwin)
+import Security
+#endif
 
 extension Internals {
 
@@ -12,17 +15,33 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        /// - Note: Mirrors exactly what AsyncHTTPClient's NIOTransportServices bridge
-        /// (`TLSConfiguration.getNWProtocolTLSOptions`) can carry over into native
-        /// `sec_protocol_options` when running on Network.framework. `certificateChain`,
-        /// `privateKey`, `keyLogger`, and `.noHostnameVerification` trap there via
-        /// `precondition` — reaching this transport with any of them set would crash the
-        /// process, not just silently downgrade. The others listed below (`cipherSuiteValues`,
-        /// `additionalTrustRoots`, `renegotiationSupport`, `signingSignatureAlgorithms`,
+        /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`),
+        /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, `.noHostnameVerification`,
+        /// `revocationPolicy`, and `trustDecisionObserver` all reach Network.framework, through the
+        /// two trust/identity hooks `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`
+        /// install. None of `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
+        /// `trustDecisionObserver` has a native Network.framework counterpart (unlike `trustRoots`,
+        /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own `certificateVerification`
+        /// flag). `Internals.NIOTrustEvaluator` is what makes all four work there: it installs
+        /// `tlsCustomVerificationNetworkFramework` whenever any one is configured, independently of
+        /// whether SPKI pinning is also active, and swaps in a hostname-less policy and/or a
+        /// revocation policy on the `SecTrust` it's handed only when those are actually configured
+        /// (`Internals.DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`).
+        ///
+        /// `build()`'s NIOSSL-facing `tlsCustomVerification` stays gated to pins only, since NIOSSL
+        /// already honors both `additionalTrustRoots` and `.noHostnameVerification` natively via
+        /// `TLSConfiguration` and doesn't need the assist for those two. `revocationPolicy` and
+        /// `trustDecisionObserver`, though, still route through it on `.nio` as well, since
+        /// NIOSSL/BoringSSL has no revocation checking or trust-decision hook of its own at all.
+        ///
+        /// What's genuinely unreachable under Network.framework is `keyLogger` (no
+        /// Network.framework equivalent at all).
+        ///
+        /// The rest (`cipherSuiteValues`, `renegotiationSupport`, `signingSignatureAlgorithms`,
         /// `verifySignatureAlgorithms`, `sendCANameList`, `shutdownTimeout`, `pskHint`,
-        /// `pskIdentityResolver`, `tlsPins`) aren't rejected there at all — they're read from the
-        /// built `TLSConfiguration` and then never looked at again, so the connection would
-        /// silently negotiate without them rather than fail loudly.
+        /// `pskIdentityResolver`) aren't rejected there at all; they're read from the built
+        /// `TLSConfiguration` and then never looked at again, so the connection silently negotiates
+        /// without them rather than failing loudly.
         package var isCompatibleWithNetworkFramework: Bool {
             #if canImport(Darwin)
             return networkFrameworkIncompatibilityReasons().isEmpty
@@ -36,8 +55,10 @@ extension Internals {
         package var useDefaultTrustRoots: Bool = false
         package var trustRoots: TrustRoots?
         package var additionalTrustRoots: [AdditionalTrustRoots]?
-        package var tlsPinningPolicy: SPKIPinningPolicy?
+        package var tlsPinningPolicy: Internals.SPKIPinningPolicy?
         package var tlsPins: [SPKIHash]?
+        package var revocationPolicy: Internals.RevocationPolicy?
+        package var trustDecisionObserver: (any TrustDecisionObserver)?
         package var privateKey: PrivateKeySource?
         package var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
         package var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
@@ -59,21 +80,14 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// Backs `isCompatibleWithNetworkFramework` above -- single source of truth instead of
+        /// Backs `isCompatibleWithNetworkFramework` above: a single source of truth instead of
         /// two lists that can drift apart again the way the original 4-field check did.
         package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
-            if certificateChain != nil { reasons.append(.certificateChain) }
-            if privateKey != nil { reasons.append(.privateKey) }
             if keyLogger != nil { reasons.append(.keyLogger) }
-            if certificateVerification == .noHostnameVerification {
-                reasons.append(.noHostnameVerificationUnderNetworkFramework)
-            }
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
-            if additionalTrustRoots != nil { reasons.append(.additionalTrustRootsUnderNetworkFramework) }
-            if tlsPins != nil { reasons.append(.tlsPinning) }
             if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
             if signingSignatureAlgorithms != nil { reasons.append(.signingSignatureAlgorithms) }
             if verifySignatureAlgorithms != nil { reasons.append(.verifySignatureAlgorithms) }
@@ -86,17 +100,24 @@ extension Internals {
         }
 
         /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
-        /// `.noHostnameVerification`/`tlsPins` -- all five are reachable under URLSession, via a
-        /// Keychain round-trip (`certificateChain`/`privateKey`) or `SecTrust`/`SecPolicy`
-        /// (everything else), unlike under Network.framework (see
-        /// `networkFrameworkIncompatibilityReasons()` above, where SPKI pinning stays
-        /// incompatible -- it's wired only through `SPKIPinningConfiguration`, which
-        /// AsyncHTTPClient's NIOTransportServices bridge never consults). `Internals.ServerTrustPolicy`
-        /// recomputes each pin's SPKI digest itself from the peer's leaf certificate rather than
-        /// going through `SPKIPinningConfiguration` at all. Whether the app actually carries the
-        /// Keychain Sharing entitlement the identity round-trip needs is a runtime fact this
-        /// static check cannot see; a missing entitlement surfaces at identity-build time as its
-        /// own runtime error, not as a reason in this list.
+        /// `.noHostnameVerification`/`tlsPins`/`revocationPolicy`/`trustDecisionObserver`; all
+        /// seven are reachable under URLSession, via a Keychain round-trip (`certificateChain`/
+        /// `privateKey`) or `SecTrust`/`SecPolicy` (everything else). They're also all reachable
+        /// under Network.framework (see `networkFrameworkIncompatibilityReasons()` above) via
+        /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`, so this list and
+        /// that one agree on every field except `keyLogger`, the one genuine
+        /// Network.framework-specific gap.
+        ///
+        /// Whether the app actually carries the Keychain Sharing entitlement the identity
+        /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
+        /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
+        ///
+        /// Also deliberately does *not* check `minimumTLSVersion`, unlike its sibling
+        /// `maximumTLSVersion` right below. `minimumTLSVersion` has a real, reachable equivalent
+        /// under URLSession (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist),
+        /// so flagging it here would push callers off `.urlSession` even when they have a working
+        /// alternative. `maximumTLSVersion` and `applicationProtocols` have no such alternative;
+        /// there is no ATS key for either, so those *are* flagged.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
@@ -110,12 +131,37 @@ extension Internals {
             if keyLogger != nil { reasons.append(.keyLogger) }
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
+            if maximumTLSVersion != nil { reasons.append(.maximumTLSVersionUnderURLSession) }
+            if applicationProtocols != nil { reasons.append(.applicationProtocolsUnderURLSession) }
 
             return reasons
         }
 
-        package func build() throws -> Output {
-            var tlsConfiguration = try makeTLSConfigurationByContext()
+        /// - Parameter isCompatibleWithNetworkFramework: Whether the caller is actually going to
+        /// run this over Network.framework. Cuts both ways:
+        ///
+        ///   - When `false`, skips `makeLocalIdentityForNetworkFramework()` entirely rather than
+        ///     performing its Keychain round-trip only to hand back a handle nothing will use. A
+        ///     `.nio` (plain-socket) client, for example, has no use for a Network.framework
+        ///     identity, and shouldn't need Keychain Sharing entitlement (or a working Keychain at
+        ///     all) just because `certificateChain`/`privateKey` happen to be configured for some
+        ///     other executor's mTLS.
+        ///   - When `true`, `makeTLSConfigurationByContext()` below leaves `certificateChain`/
+        ///     `privateKey` off the returned `TLSConfiguration` entirely. mTLS travels through
+        ///     `tlsLocalIdentityNetworkFramework`/`localIdentityHandle` for Network.framework
+        ///     instead, and leaving both set on the same `TLSConfiguration` this build also hands
+        ///     to `HTTPClient.Configuration` is fatal, not just redundant: AsyncHTTPClient's
+        ///     NIOTransportServices bridge (`TLSConfiguration.getNWProtocolTLSOptions()`)
+        ///     `preconditionFailure`s the instant either is non-empty, unconditionally, regardless
+        ///     of whether a local identity was also supplied.
+        ///
+        /// Defaults to `true`, matching this method's original unconditional behavior for the
+        /// identity-building half, for callers that don't know or don't care which executor will
+        /// consume this.
+        package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
+            var tlsConfiguration = try makeTLSConfigurationByContext(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
 
             if let minimumTLSVersion {
                 tlsConfiguration.minimumTLSVersion = minimumTLSVersion
@@ -189,44 +235,94 @@ extension Internals {
                 }
             }
 
-            return try .init(
+            let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
+
+            // NIOSSL already honors `additionalTrustRoots` natively, via the plain
+            // `tlsConfiguration.additionalTrustRoots` assignment above. Unlike
+            // `tlsCustomVerificationNetworkFramework` below, its custom-verification callback
+            // stays reserved for what it can't do on its own (SPKI pinning), so a
+            // `trustEvaluator` built only for `additionalTrustRoots` never gets attached here.
+            let hasPins = !(tlsPins ?? []).isEmpty
+
+            #if canImport(Darwin)
+            return .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsPinning: buildTLSPinning()
+                tlsCustomVerification: hasPins ? trustEvaluator?.tlsCustomVerification : nil,
+                tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
+                localIdentityHandle: isCompatibleWithNetworkFramework ? try makeLocalIdentityForNetworkFramework() : nil
             )
+            #else
+            return .init(
+                tlsConfiguration: tlsConfiguration,
+                tlsCustomVerification: hasPins ? trustEvaluator?.tlsCustomVerification : nil
+            )
+            #endif
         }
 
         // MARK: - Private methods
 
-        private func makeTLSConfigurationByContext() throws -> NIOSSL.TLSConfiguration {
+        /// - Parameter isCompatibleWithNetworkFramework: See `build(isCompatibleWithNetworkFramework:)`'s
+        /// own doc comment. When `true`, `certificateChain`/`privateKey` are deliberately left off
+        /// the returned `TLSConfiguration`. mTLS still travels through
+        /// `tlsLocalIdentityNetworkFramework`/`localIdentityHandle` (`makeLocalIdentityForNetworkFramework()`)
+        /// for Network.framework; setting these two *as well*, on the same `TLSConfiguration`
+        /// AsyncHTTPClient's NIOTransportServices bridge also reads, would crash there outright.
+        private func makeTLSConfigurationByContext(
+            isCompatibleWithNetworkFramework: Bool
+        ) throws -> NIOSSL.TLSConfiguration {
             var tlsConfiguration: TLSConfiguration
 
             tlsConfiguration = .makeClientConfiguration()
 
-            if let certificateChain {
-                tlsConfiguration.certificateChain = try certificateChain.build()
-            }
+            if !isCompatibleWithNetworkFramework {
+                if let certificateChain {
+                    tlsConfiguration.certificateChain = try certificateChain.build()
+                }
 
-            if let privateKey {
-                tlsConfiguration.privateKey = try privateKey.build()
+                if let privateKey {
+                    tlsConfiguration.privateKey = try privateKey.build()
+                }
             }
 
             return tlsConfiguration
         }
 
-        private func buildTLSPinning() throws -> SPKIPinningConfiguration? {
-            guard let tlsPins else {
+        #if canImport(Darwin)
+        /// Builds the `Internals.IdentityHandle` for mTLS under Network.framework when both
+        /// `certificateChain` and `privateKey` are configured, via the same Keychain round-trip
+        /// `Internals.URLSessionIdentityPolicy` already uses for `.urlSession`, through the shared
+        /// `RawBytesIdentityBuilder` entry points.
+        ///
+        /// Returns the whole `Internals.IdentityHandle`, not just its `.identity`.
+        /// `Internals.Client` holds onto it, one layer further down the chain (`Output` ->
+        /// `Internals.Session.Configuration.Output` -> `Internals.Client`); its own `deinit`
+        /// releases the handle automatically, deleting the underlying Keychain items only once
+        /// every other live handle for the same certificate/key pair (e.g. a
+        /// `URLSessionIdentityPolicy` instance sharing the same mTLS identity) has gone away too.
+        private func makeLocalIdentityForNetworkFramework() throws -> Internals.IdentityHandle? {
+            switch (certificateChain, privateKey) {
+            case (nil, nil):
                 return nil
-            }
 
-            let pins = try tlsPins.reduce(into: [AsyncHTTPClient.SPKIHash]()) {
-                try $1.resolve(&$0)
-            }
+            case (.some(let certificateChain), .some(let privateKey)):
+                let derCertificates = try RawBytesIdentityBuilder.certificateDERs(from: certificateChain)
 
-            return .init(
-                pins: pins,
-                policy: tlsPinningPolicy ?? .strict
-            )
+                guard let leaf = derCertificates.first else {
+                    throw Internals.URLSessionIdentityPolicy.ConfigurationError.emptyCertificateChain
+                }
+
+                let privateKeyDER = try RawBytesIdentityBuilder.privateKeyDER(from: privateKey)
+
+                return try RawBytesIdentityBuilder.makeIdentity(
+                    certificateDER: leaf,
+                    privateKeyDER: privateKeyDER
+                )
+
+            case (.some, nil), (nil, .some):
+                throw Internals.URLSessionIdentityPolicy.ConfigurationError.incompleteClientIdentity
+            }
         }
+        #endif
     }
 }
 
@@ -258,6 +354,8 @@ extension Internals.SecureConnection: Equatable {
             && lhs.cipherSuiteValues == rhs.cipherSuiteValues
             && lhs.tlsPins == rhs.tlsPins
             && lhs.tlsPinningPolicy == rhs.tlsPinningPolicy
+            && lhs.revocationPolicy == rhs.revocationPolicy
+            && lhs.trustDecisionObserver === rhs.trustDecisionObserver
     }
 }
 
@@ -265,6 +363,25 @@ extension Internals.SecureConnection {
 
     package struct Output: Sendable {
         package let tlsConfiguration: TLSConfiguration
-        package let tlsPinning: SPKIPinningConfiguration?
+
+        /// Installs on `HTTPClient.Configuration.tlsCustomVerification` when SPKI pinning is
+        /// configured, and stays `nil` otherwise, leaving the NIOSSL backend's own native
+        /// trust-root handling completely untouched.
+        package let tlsCustomVerification:
+            (@Sendable ([NIOSSLCertificate], EventLoopPromise<NIOSSLVerificationResult>) -> Void)?
+
+        #if canImport(Darwin)
+        /// Installs on `HTTPClient.Configuration.tlsCustomVerificationNetworkFramework` when SPKI
+        /// pinning is configured.
+        package let tlsCustomVerificationNetworkFramework:
+            (@Sendable (SecTrust, @escaping @Sendable (Bool) -> Void) -> Void)?
+
+        /// The Keychain-backed identity for mTLS under Network.framework, when both
+        /// `certificateChain` and `privateKey` are configured. Carries `.identity` for
+        /// `HTTPClient.Configuration.tlsLocalIdentityNetworkFramework`; whoever ends up owning
+        /// this (`Internals.Client`, currently) just needs to hold onto it. Its own `deinit`
+        /// releases the underlying Keychain items once nothing else references them.
+        package let localIdentityHandle: Internals.IdentityHandle?
+        #endif
     }
 }

@@ -229,6 +229,14 @@ public struct Session: Property {
     /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
     /// the configuration supports it.
     ///
+    /// Pinning to `.urlSession` does **not** catch a `SecureConnection` minimum TLS version.
+    /// `ExecutorRequirementError` isn't thrown for it; it simply has no effect, because
+    /// `URLSessionConfiguration` has no API for it at all. That policy instead lives in your
+    /// app's `Info.plist`, via App Transport Security. See
+    /// <doc:Configuring-App-Transport-Security-for-URLSession>. A maximum TLS version or an ALPN
+    /// protocol list, which have no `Info.plist` equivalent at all, *are* caught: they throw
+    /// `ExecutorRequirementError` like any other incompatible field.
+    ///
     /// ```swift
     /// struct MyRequest: Property {
     ///     var body: some Property {

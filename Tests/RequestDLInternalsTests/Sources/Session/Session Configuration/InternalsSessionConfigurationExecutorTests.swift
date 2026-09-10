@@ -3,6 +3,7 @@
 //
 
 import NIOHTTP1
+import NIOSSL
 import Testing
 
 @testable import RequestDLInternals
@@ -267,7 +268,7 @@ struct InternalsSessionConfigurationExecutorTests {
         configuration.httpVersion = .http1Only
 
         var secureConnection = Internals.SecureConnection()
-        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        secureConnection.cipherSuiteValues = [.TLS_AES_128_GCM_SHA256]
         configuration.secureConnection = secureConnection
 
         // When
@@ -279,12 +280,113 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin() async throws {
-        // Given -- reachable under URLSession, unlike under NIOTransportServices
+        // Given: reachable under both URLSession and NIOTransportServices (the latter via
+        // `Internals.NIOTrustEvaluator`), so this exercises the default priority order
+        // (URLSession first) rather than URLSession being the only compatible option.
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
 
         var secureConnection = Internals.SecureConnection()
         secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .urlSession)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    @Test
+    func resolveExecutor_whenAdditionalTrustRootsSetAndNIOTransportServicesPreferred_resolvesToItOverURLSession()
+        async throws
+    {
+        // Given: `additionalTrustRoots` alone (no SPKI pinning) doesn't rule out NIOTransportServices,
+        // so an explicit preference for it wins instead of falling back to URLSession.
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
+        configuration.preferredExecutor = .nioTransportServices
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    @Test
+    func resolveExecutor_whenNoHostnameVerificationSetAndNIOTransportServicesPreferred_resolvesToItOverURLSession()
+        async throws
+    {
+        // Given: `.noHostnameVerification` alone doesn't rule out NIOTransportServices either
+        // (`Internals.NIOTrustEvaluator` installs the custom verification callback AsyncHTTPClient's
+        // own `precondition` trap otherwise requires), so an explicit preference for it wins.
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
+        configuration.preferredExecutor = .nioTransportServices
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateVerification = .noHostnameVerification
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    /// Mirrors `resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin` above,
+    /// but for a field that has *no* URLSession-reachable equivalent (no ATS `Info.plist` key for
+    /// a maximum TLS version), so it must fall back away from `.urlSession` instead.
+    @Test
+    func resolveExecutor_whenMaximumTLSVersionSet_resolvesToNIOTransportServicesOnDarwin() async throws {
+        // Given: fine under NIOTransportServices, unsupported under URLSession
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = .tlsv12
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
+    /// `minimumTLSVersion` is the deliberate exception: it has a real equivalent under URLSession
+    /// (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so unlike
+    /// `maximumTLSVersion` above, it must never force a fallback away from `.urlSession`.
+    @Test
+    func resolveExecutor_whenMinimumTLSVersionSet_resolvesToURLSessionOnDarwin() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.decompression = .enabled(algorithms: [], limit: .none)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.minimumTLSVersion = .tlsv12
         configuration.secureConnection = secureConnection
 
         // When
@@ -335,27 +437,30 @@ struct InternalsSessionConfigurationExecutorTests {
 
     /// A preference the configuration can't actually satisfy is not an override. Resolution must
     /// fall through to whatever the default priority order would have picked among the
-    /// compatible candidates, not honor the preference anyway.
+    /// compatible candidates, not honor the preference anyway. Here, that's all the way to `.nio`,
+    /// since the field used also rules out `.urlSession`.
+    ///
+    /// There's no longer a field that rules out only `.nioTransportServices` while sparing
+    /// `.urlSession`: `additionalTrustRoots` and `.noHostnameVerification` were the last two, and
+    /// `Internals.NIOTrustEvaluator` closed both gaps (see the `..._resolvesToItOverURLSession`
+    /// tests above). Every remaining incompatible field rejects both executors identically (see
+    /// `resolveExecutor_whenIncompatibleWithBothURLSessionAndNIOTransportServices_resolvesToNIO`).
     @Test
-    func resolveExecutor_whenNIOTransportServicesPreferredButIncompatible_fallsBackToURLSession() async throws {
-        // Given -- reachable under URLSession, unreachable under NIOTransportServices
+    func resolveExecutor_whenNIOTransportServicesPreferredButIncompatible_fallsBackToNIO() async throws {
+        // Given
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.preferredExecutor = .nioTransportServices
 
         var secureConnection = Internals.SecureConnection()
-        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        secureConnection.cipherSuiteValues = [.TLS_AES_128_GCM_SHA256]
         configuration.secureConnection = secureConnection
 
         // When
         let sut = configuration.resolveExecutor()
 
         // Then
-        #if canImport(Darwin)
-        #expect(sut == .urlSession)
-        #else
         #expect(sut == .nio)
-        #endif
     }
 
     @Test
@@ -433,27 +538,23 @@ struct InternalsSessionConfigurationExecutorTests {
     /// The flag's implicit preference is still just a preference, not a guarantee -- a
     /// NIOTransportServices-incompatible field must still fall through past it, the same way an
     /// explicit `preferredExecutor(.nioTransportServices)` already does two tests above this
-    /// section.
+    /// section (including why the fallback lands on `.nio`, not `.urlSession`).
     @Test
-    func resolveExecutor_whenNetworkFrameworkEnabledButIncompatible_fallsThroughToURLSession() async throws {
-        // Given -- reachable under URLSession, unreachable under NIOTransportServices
+    func resolveExecutor_whenNetworkFrameworkEnabledButIncompatible_fallsThroughToNIO() async throws {
+        // Given
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
         configuration.enableNetworkFramework = true
 
         var secureConnection = Internals.SecureConnection()
-        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        secureConnection.cipherSuiteValues = [.TLS_AES_128_GCM_SHA256]
         configuration.secureConnection = secureConnection
 
         // When
         let sut = configuration.resolveExecutor()
 
         // Then
-        #if canImport(Darwin)
-        #expect(sut == .urlSession)
-        #else
         #expect(sut == .nio)
-        #endif
     }
 
     // MARK: - resolveExecutor() with requiredExecutor
@@ -586,11 +687,13 @@ struct InternalsSessionConfigurationExecutorTests {
 
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedAndIncompatible_throwsWithExactReasons() async throws {
-        // Given
+        // Given: `keyLogger` (and the rest of "bucket D") stays a genuine Network.framework gap,
+        // unlike `additionalTrustRoots`/`.noHostnameVerification`. See the two
+        // `..._doesNotThrow` tests below for those.
         var configuration = Internals.Session.Configuration()
 
         var secureConnection = Internals.SecureConnection()
-        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        secureConnection.cipherSuiteValues = [.TLS_AES_128_GCM_SHA256]
         configuration.secureConnection = secureConnection
 
         // When
@@ -600,8 +703,39 @@ struct InternalsSessionConfigurationExecutorTests {
         } catch let error as Internals.IncompatibleExecutorConfigurationError {
             // Then
             #expect(error.requiredExecutor == .nioTransportServices)
-            #expect(error.reasons == [.additionalTrustRootsUnderNetworkFramework])
+            #expect(error.reasons == [.cipherSuiteValues])
         }
+    }
+
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithAdditionalTrustRootsOnly_doesNotThrow() async throws {
+        // Given: regression coverage for the gap `Internals.NIOTrustEvaluator` closed:
+        // `additionalTrustRoots` alone, with no SPKI pinning, used to throw here.
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.file("/dev/null")]
+        configuration.secureConnection = secureConnection
+
+        // When / Then
+        try configuration.requireExecutor(.nioTransportServices)
+    }
+
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithNoHostnameVerificationOnly_doesNotThrow() async throws {
+        // Given: AsyncHTTPClient's NIOTransportServices bridge traps on `.noHostnameVerification`
+        // via `precondition` unless a custom Network.framework verification callback is installed.
+        // `Internals.NIOTrustEvaluator` installs exactly that callback whenever
+        // `.noHostnameVerification` is configured, and swaps in a hostname-less trust policy
+        // inside it, so this doesn't throw.
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateVerification = .noHostnameVerification
+        configuration.secureConnection = secureConnection
+
+        // When / Then
+        try configuration.requireExecutor(.nioTransportServices)
     }
 
     // MARK: - nonURLSessionExecutorIncompatibilityReasons() / early rejection

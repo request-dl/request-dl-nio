@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import NIOCore
 import NIOSSL
 import Testing
@@ -383,18 +384,18 @@ extension InternalsSecureConnectionTests {
     }
 
     /// Regression coverage for the fields AsyncHTTPClient's NIOTransportServices bridge either
-    /// traps on (`certificateChain`, `privateKey`, `keyLogger`, `.noHostnameVerification`) or
-    /// silently drops (everything else here) when running on Network.framework. Each one must
-    /// flip `isCompatibleWithNetworkFramework` to `false` so the caller falls back to plain NIO
-    /// instead of crashing or losing the setting without any signal.
+    /// traps on (`keyLogger`, with no custom verification callback able to work around it, unlike
+    /// `.noHostnameVerification`, see the doc comment below) or silently drops (everything else
+    /// here; they're read from the built `TLSConfiguration` and then never looked at again) when
+    /// running on Network.framework.
+    ///
+    /// Each one must flip `isCompatibleWithNetworkFramework` to `false` so the caller falls back
+    /// to plain NIO instead of crashing or losing the setting without any signal.
+    /// `certificateChain`/`privateKey` (mTLS), `tlsPins` (SPKI pinning), `additionalTrustRoots`,
+    /// and `.noHostnameVerification` are deliberately *not* in this list; see
+    /// `secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible` below.
     @Test(
         arguments: [
-            { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.certificateVerification = .noHostnameVerification
-            },
-            { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.additionalTrustRoots = [.file("/dev/null")]
-            },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.renegotiationSupport = .once
             },
@@ -431,6 +432,49 @@ extension InternalsSecureConnectionTests {
         #expect(!secureConnection.isCompatibleWithNetworkFramework)
     }
 
+    /// mTLS (`certificateChain`/`privateKey`), SPKI pinning (`tlsPins`), `additionalTrustRoots`,
+    /// and `.noHostnameVerification` all reach Network.framework: mTLS through
+    /// `tlsLocalIdentityNetworkFramework`, and the other three through
+    /// `Internals.NIOTrustEvaluator` installing `tlsCustomVerificationNetworkFramework` on its own,
+    /// independently of whether SPKI pinning is also configured. `skipsHostnameVerification`
+    /// additionally swaps in a hostname-less trust policy for the `.noHostnameVerification` case
+    /// specifically.
+    ///
+    /// Mirrors `secureConnection_whenURLSessionReachableFieldSet_remainsCompatible` below, but for
+    /// the Network.framework-facing reason list.
+    @Test(
+        arguments: [
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.certificateChain = .certificates([])
+                secureConnection.privateKey = .privateKey(.init([], format: .pem))
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.tlsPins = [.init(source: .rawData(.init()), algorithm: SHA256.self)]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.additionalTrustRoots = [.file("/dev/null")]
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.certificateVerification = .noHostnameVerification
+            },
+        ] as [@Sendable (inout Internals.SecureConnection) -> Void]
+    )
+    func secureConnection_whenNetworkFrameworkReachableFieldSet_remainsCompatible(
+        _ mutate: @Sendable (inout Internals.SecureConnection) -> Void
+    ) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+
+        // When
+        mutate(&secureConnection)
+
+        // Then: `networkFrameworkIncompatibilityReasons()` (the platform-independent logic this
+        // test actually exercises), not `isCompatibleWithNetworkFramework` (which is unconditionally
+        // `false` off Darwin regardless of reasons, since Network.framework doesn't exist there at
+        // all; see `secureConnection_whenDefault_isCompatibleWithNetworkFramework` above).
+        #expect(secureConnection.networkFrameworkIncompatibilityReasons().isEmpty)
+    }
+
     @Test
     func secureConnection_whenDefault_urlSessionIncompatibilityReasonsIsEmpty() async throws {
         // Given
@@ -441,7 +485,7 @@ extension InternalsSecureConnectionTests {
     }
 
     /// Mirrors `secureConnection_whenNetworkFrameworkUnsupportedFieldSet_isIncompatible` above,
-    /// but for the URLSession-facing reason list -- deliberately a *different* field set, since
+    /// but for the URLSession-facing reason list: deliberately a *different* field set, since
     /// the two executors aren't a strict hierarchy of each other.
     @Test(
         arguments: [
@@ -468,6 +512,12 @@ extension InternalsSecureConnectionTests {
             },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.cipherSuites = "DEFAULT"
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.maximumTLSVersion = .tlsv12
+            },
+            { (secureConnection: inout Internals.SecureConnection) in
+                secureConnection.applicationProtocols = ["h2"]
             },
         ] as [@Sendable (inout Internals.SecureConnection) -> Void]
     )
@@ -520,5 +570,119 @@ extension InternalsSecureConnectionTests {
 
         // Then
         #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.keyLogger))
+    }
+
+    /// Regression coverage: `build()` used to call `makeLocalIdentityForNetworkFramework()`, a
+    /// Keychain round-trip, unconditionally on Darwin whenever both `certificateChain`/
+    /// `privateKey` were configured, even for a caller that was never going to run over
+    /// Network.framework at all. That meant configuring mTLS for `.urlSession`/
+    /// `.nioTransportServices` silently broke a `.nio`-pinned request too, on any process without
+    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness).
+    ///
+    /// See `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)`
+    /// specifically to avoid this and used to hit it anyway.
+    @Test
+    func secureConnection_whenMTLSConfiguredButNetworkFrameworkNotNeeded_skipsKeychainIdentityBuild() async throws {
+        // Given
+        let client = Certificates().client()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+
+        // When
+        let sut = try secureConnection.build(isCompatibleWithNetworkFramework: false)
+
+        // Then: completes without ever attempting the Keychain round-trip, even on a machine
+        // with no Keychain Sharing entitlement at all. `tlsConfiguration.certificateChain` still
+        // carries the mTLS cert, proving `build()` did real work rather than short-circuiting.
+        #expect(!sut.tlsConfiguration.certificateChain.isEmpty)
+        #if canImport(Darwin)
+        #expect(sut.localIdentityHandle == nil)
+        #endif
+    }
+
+    /// Regression coverage for a crash: `TLSConfiguration.getNWProtocolTLSOptions()`
+    /// (AsyncHTTPClient's NIOTransportServices bridge) `preconditionFailure`s the instant
+    /// `certificateChain`/`privateKey` is non-empty, unconditionally, so leaving either set,
+    /// even alongside a correctly-built `localIdentityHandle`, would crash the process the moment
+    /// this configuration actually ran over `.nioTransportServices`.
+    ///
+    /// `build()` bundles that `TLSConfiguration` and the Network.framework identity into one
+    /// throwing call, so this can't inspect the former without the latter's Keychain round-trip
+    /// also succeeding, a known gap on this bare SwiftPM test harness (see
+    /// `InternalsClientIdentityDescriptorTests`) unrelated to what's actually being checked here,
+    /// hence the `withKnownIssue` wrapper.
+    @Test
+    func secureConnection_whenMTLSConfiguredAndNetworkFrameworkNeeded_omitsRawCertificateChainFromTLSConfiguration()
+        async throws
+    {
+        // Given
+        let client = Certificates().client()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+
+        // When / Then
+        func verify() throws {
+            let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
+
+            #expect(sut.tlsConfiguration.certificateChain.isEmpty)
+            #expect(sut.tlsConfiguration.privateKey == nil)
+        }
+
+        // The Keychain round-trip this "known issue" is about only happens inside
+        // `#if canImport(Darwin)` code (`makeLocalIdentityForNetworkFramework()`); off Darwin,
+        // `build(isCompatibleWithNetworkFramework:)` never touches the Keychain at all, so `verify()`
+        // succeeds outright there and `withKnownIssue` would fail the test for "not" hitting an
+        // issue that was never reachable off Darwin to begin with.
+        #if canImport(Darwin)
+        await withKnownIssue(
+            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
+        ) {
+            try verify()
+        }
+        #else
+        try verify()
+        #endif
+    }
+
+    @Test
+    func secureConnection_whenMaximumTLSVersionSet_urlSessionIncompatibilityReasonsContainsIt() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = .tlsv12
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.maximumTLSVersionUnderURLSession))
+    }
+
+    @Test
+    func secureConnection_whenApplicationProtocolsSet_urlSessionIncompatibilityReasonsContainsIt() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.applicationProtocols = ["h2"]
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.applicationProtocolsUnderURLSession))
+    }
+
+    /// `minimumTLSVersion` is deliberately excluded from `urlSessionIncompatibilityReasons()`,
+    /// unlike its sibling `maximumTLSVersion` above. It has a real, reachable equivalent under
+    /// URLSession (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so it
+    /// must never force a fallback away from `.urlSession` or trip `requiredExecutor(.urlSession)`.
+    @Test
+    func secureConnection_whenMinimumTLSVersionSet_remainsCompatibleWithURLSession() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.minimumTLSVersion = .tlsv12
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 }

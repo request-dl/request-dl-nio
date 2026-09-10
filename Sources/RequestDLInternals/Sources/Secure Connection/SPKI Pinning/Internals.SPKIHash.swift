@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import Crypto
 
 #if canImport(FoundationEssentials)
@@ -12,6 +11,16 @@ import struct Foundation.Data
 #endif
 
 extension Internals {
+
+    /// Thrown by `SPKIHash.resolvedDigest()` when the configured source doesn't decode to a
+    /// digest of the length `Algorithm.Digest.byteCount` expects.
+    package struct SPKIHashError: Swift.Error, CustomStringConvertible, Sendable {
+        package var description: String {
+            "Invalid SPKI hash: the configured digest is not valid base64, or its length doesn't match the hash algorithm's digest size."
+        }
+
+        package init() {}
+    }
 
     package struct SPKIHash: Sendable, Hashable {
 
@@ -31,7 +40,8 @@ extension Internals {
         private let source: SPKIHashSource
 
         private let algorithmID: ObjectIdentifier
-        private let producer: @Sendable (SPKIHashSource) throws -> AsyncHTTPClient.SPKIHash
+        private let digestByteCount: Int
+        private let producer: @Sendable (SPKIHashSource) throws -> Data
         private let digest: @Sendable (Data) -> Data
 
         package let knownAlgorithm: KnownAlgorithm?
@@ -42,8 +52,24 @@ extension Internals {
         ) {
             self.source = source
             self.algorithmID = .init(algorithm)
-            self.producer = {
-                try AsyncHTTPClient.SPKIHash(algorithm: algorithm, source: $0)
+            self.digestByteCount = Algorithm.Digest.byteCount
+            self.producer = { source in
+                let bytes: Data
+                switch source {
+                case .base64String(let base64):
+                    guard let decoded = Data(base64Encoded: base64) else {
+                        throw SPKIHashError()
+                    }
+                    bytes = decoded
+                case .rawData(let raw):
+                    bytes = raw
+                }
+
+                guard bytes.count == Algorithm.Digest.byteCount else {
+                    throw SPKIHashError()
+                }
+
+                return bytes
             }
             self.digest = { Data(algorithm.hash(data: $0)) }
 
@@ -60,15 +86,10 @@ extension Internals {
                 && lhs.algorithmID == rhs.algorithmID
         }
 
-        package func resolve(_ tlsPins: inout [AsyncHTTPClient.SPKIHash]) throws {
-            let hash = try producer(source)
-            tlsPins.append(hash)
-        }
-
         /// The digest this pin expects the peer's SPKI to hash to -- what `ServerTrustPolicy`
         /// compares against, and what a `Descriptor` persists for `knownAlgorithm != nil` pins.
         package func resolvedDigest() throws -> Data {
-            try producer(source).bytes
+            try producer(source)
         }
 
         /// Whether `spkiDERBytes` (the SPKI structure `NIOSSLPublicKey.toSPKIBytes()` produces for
@@ -102,20 +123,5 @@ extension Internals {
     package enum SPKIHashSource: Sendable, Hashable {
         case base64String(String)
         case rawData(Data)
-    }
-}
-
-extension AsyncHTTPClient.SPKIHash {
-
-    fileprivate init<Algorithm: HashFunction>(
-        algorithm: Algorithm.Type,
-        source: Internals.SPKIHashSource
-    ) throws {
-        switch source {
-        case .base64String(let base64):
-            try self.init(algorithm: algorithm, base64: base64)
-        case .rawData(let bytes):
-            try self.init(algorithm: algorithm, bytes: bytes)
-        }
     }
 }

@@ -255,6 +255,8 @@ extension ResolveTests {
                                     additionalTrustRoots = nil,
                                     tlsPinningPolicy = nil,
                                     tlsPins = nil,
+                                    revocationPolicy = nil,
+                                    trustDecisionObserver = nil,
                                     privateKey = nil,
                                     signingSignatureAlgorithms = nil,
                                     verifySignatureAlgorithms = nil,

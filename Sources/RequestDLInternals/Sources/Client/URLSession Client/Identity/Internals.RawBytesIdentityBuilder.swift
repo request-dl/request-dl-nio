@@ -5,17 +5,20 @@
 // Promoted from the URLSession Executor Spike (formerly
 // `Tests/RequestDLTests/URLSession Executor Spike/RawBytesIdentityBuilder.swift`) for
 // request-dl-nio#287. Supports RSA (PKCS#1 or PKCS#8) and EC P-256/P-384/P-521 (SEC1 or
-// PKCS#8) private keys.
+// PKCS#8) private keys, unencrypted, plus password-protected traditional PKCS#1 RSA PEM
+// keys specifically, decrypted via `_CryptoExtras` (see `privateKeyDER(from:)`).
 
 #if canImport(Darwin)
 
 import CryptoKit
+import NIOSSL
 import Security
+import _CryptoExtras
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
-import struct Foundation.Data
+import Foundation
 #endif
 
 extension Internals {
@@ -44,7 +47,11 @@ extension Internals {
                         URLSession executor: RSA (PKCS#1 "-----BEGIN RSA PRIVATE KEY-----" or \
                         PKCS#8 "-----BEGIN PRIVATE KEY-----") and EC P-256/P-384/P-521 (SEC1 \
                         "-----BEGIN EC PRIVATE KEY-----" or PKCS#8 \
-                        "-----BEGIN PRIVATE KEY-----").
+                        "-----BEGIN PRIVATE KEY-----"), unencrypted. A password-protected key is \
+                        only supported for traditional PKCS#1 RSA PEM \
+                        ("-----BEGIN RSA PRIVATE KEY-----" with "Proc-Type"/"DEK-Info" headers), \
+                        not PKCS#8's "-----BEGIN ENCRYPTED PRIVATE KEY-----", and not any \
+                        password-protected EC key.
                         """
                 case .secKeyCreationFailed(let message):
                     return "SecKeyCreateWithData failed: \(message)."
@@ -67,11 +74,95 @@ extension Internals {
             }
         }
 
-        /// One identity built by ``makeIdentity(certificateDER:privateKeyDER:)``, together with
-        /// everything needed to remove it from the Keychain again.
-        package struct Handle {
-            package let identity: SecIdentity
-            fileprivate let label: String
+        // MARK: - Identity sources (CertificateChain/PrivateKeySource -> raw DER bytes)
+        //
+        // Shared by every executor that needs a `SecIdentity` built from an
+        // `Internals.SecureConnection`'s `certificateChain`/`privateKey`: `.urlSession`
+        // (`Internals.URLSessionIdentityPolicy`) and `.nio` under Network.framework
+        // (`Internals.SecureConnection.makeLocalIdentityForNetworkFramework()`) alike.
+
+        /// The leaf certificate (index 0) plus any intermediates, as DER bytes.
+        /// `Internals.CertificateChain.build()` always resolves to `.certificate` sources
+        /// regardless of how it was configured (bytes, file, or pre-built certificates), so this
+        /// never hits its own `preconditionFailure`.
+        package static func certificateDERs(from certificateChain: Internals.CertificateChain) throws -> [Data] {
+            try certificateChain.build().map { source in
+                guard case .certificate(let certificate) = source else {
+                    preconditionFailure(
+                        "Internals.CertificateChain.build() unexpectedly produced a non-certificate source"
+                    )
+                }
+                return Data(try certificate.toDERBytes())
+            }
+        }
+
+        /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
+        /// down to DER, or, when a password is set, decrypts it first. Only traditional PKCS#1
+        /// RSA PEM (`-----BEGIN RSA PRIVATE KEY-----` with `Proc-Type`/`DEK-Info` headers) can
+        /// actually be decrypted here, via `_RSA.Signing.PrivateKey(encryptedPEMRepresentation:
+        /// passphraseCallback:)`, the only encrypted-key entry point anywhere in this package's
+        /// dependency graph. `swift-certificates` has none at all (its own private-key parsing
+        /// only understands unencrypted PKCS#8 `PrivateKeyInfo`, for its own CSR/cert-signing
+        /// needs).
+        ///
+        /// PKCS#8's `EncryptedPrivateKeyInfo` and every encrypted EC key (P-256/P-384/
+        /// P-521, since `Crypto`'s own types have no passphrase-protected PEM import at all) still
+        /// throw `Error/unsupportedKeyFormat(_:)`, same as a `.der`-sourced password-protected key:
+        /// BoringSSL's own decryption call here only takes a PEM string, never raw DER.
+        package static func privateKeyDER(from privateKeySource: Internals.PrivateKeySource) throws -> Data {
+            switch privateKeySource {
+            case .privateKey(let privateKey):
+                let rawBytes: Data
+                switch privateKey.source {
+                case .bytes(let bytes):
+                    rawBytes = Data(bytes)
+                case .file(let file):
+                    do {
+                        rawBytes = try Data(contentsOf: URL(fileURLWithPath: file))
+                    } catch {
+                        throw SecureFileLoadError(resource: .privateKey, path: file, underlying: error)
+                    }
+                }
+
+                if let password = privateKey.password {
+                    guard privateKey.format == .pem else {
+                        throw Error.unsupportedKeyFormat("password-protected key in DER format")
+                    }
+                    return try Self.decryptedRSAPrivateKeyDER(fromEncryptedPEM: rawBytes, password: password)
+                }
+
+                switch privateKey.format {
+                case .der:
+                    return rawBytes
+                case .pem:
+                    return try Self.privateKeyDER(fromPEM: rawBytes)
+                }
+            }
+        }
+
+        /// Decrypts a password-protected traditional PKCS#1 RSA PEM key via BoringSSL
+        /// (`_RSA.Signing.PrivateKey(encryptedPEMRepresentation:passphraseCallback:)`, from
+        /// `_CryptoExtras`) and returns its plain DER, ready for `secKey(fromDER:)`'s own
+        /// PKCS#1/PKCS#8 cascade exactly like any other RSA key. Fails closed on anything that
+        /// entry point can't parse: a wrong passphrase, an EC key, or a PKCS#8-encrypted one.
+        private static func decryptedRSAPrivateKeyDER(
+            fromEncryptedPEM pemData: Data,
+            password: NIOSSLSecureBytes
+        ) throws -> Data {
+            guard let pemString = String(data: pemData, encoding: .utf8) else {
+                throw Error.unsupportedKeyFormat("non-UTF8 input")
+            }
+
+            do {
+                let key = try _RSA.Signing.PrivateKey(encryptedPEMRepresentation: pemString) { setPassphrase in
+                    setPassphrase(Array(password))
+                }
+                return key.derRepresentation
+            } catch {
+                throw Error.unsupportedKeyFormat(
+                    "password-protected key that isn't a decryptable traditional PKCS#1 RSA PEM key"
+                )
+            }
         }
 
         // MARK: - Certificate (DER bytes -> SecCertificate, no Keychain involved)
@@ -88,7 +179,7 @@ extension Internals {
         /// Strips PEM armor down to the base64-decoded DER payload, for any of the three headers
         /// this executor recognizes for a private key: PKCS#1 RSA (`RSA PRIVATE KEY`), SEC1 EC
         /// (`EC PRIVATE KEY`), and PKCS#8 (`PRIVATE KEY`, itself wrapping either RSA or EC). Which
-        /// header matched doesn't change what happens next -- ``secKey(fromDER:)`` classifies the
+        /// header matched doesn't change what happens next: ``secKey(fromDER:)`` classifies the
         /// DER content itself, not the PEM label around it.
         package static func privateKeyDER(fromPEM pemData: Data) throws -> Data {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
@@ -124,14 +215,14 @@ extension Internals {
         /// Builds a `SecKey` from DER-encoded private key bytes of unknown shape, trying each
         /// interpretation Security/CryptoKit can actually consume, in order:
         ///
-        /// 1. Bare PKCS#1 (`RSAPrivateKey`) -- what `SecKeyCreateWithData` wants for RSA directly.
-        /// 2. EC, either bare SEC1 (`ECPrivateKey`) or PKCS#8-wrapped -- CryptoKit's DER
+        /// 1. Bare PKCS#1 (`RSAPrivateKey`): what `SecKeyCreateWithData` wants for RSA directly.
+        /// 2. EC, either bare SEC1 (`ECPrivateKey`) or PKCS#8-wrapped. CryptoKit's DER
         ///    initializer accepts both shapes for whichever curve it is (P-256/P-384/P-521 tried
         ///    in that order, since nothing here is told the curve ahead of time), and its
         ///    `x963Representation` (`04 || X || Y || private scalar`) is what `SecKeyCreateWithData`
-        ///    wants for EC -- there is no direct entry point for SEC1/PKCS#8 DER the way there is
+        ///    wants for EC. There is no direct entry point for SEC1/PKCS#8 DER the way there is
         ///    for RSA's PKCS#1.
-        /// 3. PKCS#8-wrapped RSA -- the one shape Security has no direct entry point for at all,
+        /// 3. PKCS#8-wrapped RSA: the one shape Security has no direct entry point for at all,
         ///    so the inner PKCS#1 payload is unwrapped by hand first.
         ///
         /// Anything else (Ed25519, X25519, malformed input, ...) is rejected.
@@ -183,7 +274,7 @@ extension Internals {
         }
 
         /// Tries `der` as a bare SEC1 `ECPrivateKey` or a PKCS#8 envelope wrapping one, one curve
-        /// size at a time -- CryptoKit's DER initializer accepts both shapes for the same call, so
+        /// size at a time. CryptoKit's DER initializer accepts both shapes for the same call, so
         /// there's no need to distinguish them here, and it derives the public point from the
         /// private scalar when SEC1's own (optional) public-key field is absent, which
         /// `SecKeyCreateWithData` has no way to do on its own.
@@ -202,7 +293,7 @@ extension Internals {
 
         /// Unwraps PKCS#8's `PrivateKeyInfo ::= SEQUENCE { version INTEGER, algorithm SEQUENCE,
         /// privateKey OCTET STRING, ... }` down to its `privateKey` field. Doesn't check
-        /// `algorithm`'s OID -- the caller only keeps the result if it goes on to parse as PKCS#1
+        /// `algorithm`'s OID: the caller only keeps the result if it goes on to parse as PKCS#1
         /// RSA, so a PKCS#8-wrapped EC key (already handled by reading the *outer* PKCS#8 bytes
         /// directly in `ecX963Representation(fromDER:)`) or anything else simply fails that
         /// caller's own `SecKeyCreateWithData` check instead of being misidentified here.
@@ -222,138 +313,128 @@ extension Internals {
         /// There is no public API on iOS to pair a certificate and a private key into a
         /// `SecIdentity` purely in memory (`SecIdentityCreateWithCertificate` is macOS-only). The
         /// only public path is a Keychain round-trip: add both items, then query them back
-        /// together as a single `kSecClassIdentity` match -- which is exactly what this does,
+        /// together as a single `kSecClassIdentity` match. That's exactly what this does,
         /// deliberately avoiding the macOS-only shortcut so the result generalizes to iOS/tvOS/
         /// watchOS.
         package static func makeIdentity(
             certificateDER: Data,
             privateKeyDER: Data
-        ) throws -> Handle {
+        ) throws -> Internals.IdentityHandle {
             let certificate = try certificate(fromDER: certificateDER)
             let secKey = try Self.secKey(fromDER: privateKeyDER)
 
             // Deterministic (content-derived, not random) so that rebuilding an identity for the
-            // same certificate -- a repeated test run, or an app relaunching with the same
-            // configured client certificate after a previous run's `deinit`-triggered `remove(_:)`
-            // never got to run -- reliably finds and clears its own leftovers below instead of
-            // hitting errSecDuplicateItem. `kSecValueRef`-based matching (delete "whatever item
-            // has this exact key/certificate value") looked like the more direct way to express
-            // that and is what the original spike did, but empirically did not reliably match an
-            // existing item across process runs; label-based matching does.
-            let label = "RequestDL.mtls." + Self.hexDigest(certificateDER)
+            // same certificate+key reliably finds and reuses (or, on a fresh process, clears) its
+            // own leftovers below instead of hitting errSecDuplicateItem. That covers a repeated
+            // test run, an app relaunching with the same configured client certificate after a
+            // previous run's Keychain items never got cleaned up, and a second
+            // `Internals.IdentityHandle` for the same pair sharing this one.
+            //
+            // Folds in the private key, not just the certificate, so two different keys
+            // accidentally paired with the same certificate never collide under one Keychain
+            // item. `kSecValueRef`-based matching (delete "whatever item has this exact
+            // key/certificate value") looked like the more direct way to express that and is what
+            // the original spike did, but empirically did not reliably match an existing item
+            // across process runs; label-based matching does.
+            let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
 
-            // `swift test` (and any unsigned command-line process) has no `keychain-access-groups`
-            // entitlement, which the data-protection keychain requires -- forcing the legacy
-            // file-based keychain is a macOS-only accommodation for that. Not present on
-            // iOS/tvOS/watchOS, where there is only the data-protection keychain and a properly
-            // signed/provisioned app already carries the entitlement it needs.
-            #if os(macOS)
-            let useDataProtectionKeychain = false
-            #else
-            let useDataProtectionKeychain = true
-            #endif
+            return try Internals.IdentityManager.shared.handle(for: label) {
+                // `swift test` (and any unsigned command-line process) has no
+                // `keychain-access-groups` entitlement, which the data-protection keychain
+                // requires; forcing the legacy file-based keychain is a macOS-only accommodation
+                // for that. Not present on iOS/tvOS/watchOS, where there is only the
+                // data-protection keychain and a properly signed/provisioned app already carries
+                // the entitlement it needs.
+                #if os(macOS)
+                let useDataProtectionKeychain = false
+                #else
+                let useDataProtectionKeychain = true
+                #endif
 
-            SecItemDelete(
-                [
-                    kSecClass: kSecClassKey,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ] as CFDictionary
-            )
-            SecItemDelete(
-                [
-                    kSecClass: kSecClassCertificate,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ] as CFDictionary
-            )
+                SecItemDelete(
+                    [
+                        kSecClass: kSecClassKey,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ] as CFDictionary
+                )
+                SecItemDelete(
+                    [
+                        kSecClass: kSecClassCertificate,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ] as CFDictionary
+                )
 
-            try addToKeychain(
-                query: [
-                    kSecClass: kSecClassKey,
-                    kSecValueRef: secKey,
-                    kSecAttrLabel: label,
-                    // This device only, not iCloud Keychain -- the key only needs to survive this
-                    // process's lifetime, not sync anywhere.
-                    kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ],
-                operation: "SecItemAdd(key)"
-            )
+                try addToKeychain(
+                    query: [
+                        kSecClass: kSecClassKey,
+                        kSecValueRef: secKey,
+                        kSecAttrLabel: label,
+                        // This device only, not iCloud Keychain: the key only needs to survive
+                        // this process's lifetime, not sync anywhere.
+                        kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ],
+                    operation: "SecItemAdd(key)"
+                )
 
-            try addToKeychain(
-                query: [
-                    kSecClass: kSecClassCertificate,
-                    kSecValueRef: certificate,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ],
-                operation: "SecItemAdd(certificate)"
-            )
+                try addToKeychain(
+                    query: [
+                        kSecClass: kSecClassCertificate,
+                        kSecValueRef: certificate,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ],
+                    operation: "SecItemAdd(certificate)"
+                )
 
-            // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter -- an
-            // identity is a synthetic pairing of a certificate and a key by matching public key,
-            // not an item with its own attributes, so the label set on the certificate/key above
-            // isn't necessarily inherited by it. Fetching every identity currently in this
-            // keychain and matching by certificate bytes is the approach that reliably works in
-            // practice.
-            let identityQuery: [CFString: Any] = [
-                kSecClass: kSecClassIdentity,
-                kSecMatchLimit: kSecMatchLimitAll,
-                kSecReturnRef: true,
-                kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-            ]
-
-            var identitiesResult: CFTypeRef?
-            let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
-
-            guard identityStatus == errSecSuccess else {
-                throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
-            }
-
-            guard let identities = identitiesResult as? [SecIdentity] else {
-                throw Error.identityLookupReturnedWrongType
-            }
-
-            let wantedCertificateData = SecCertificateCopyData(certificate) as Data
-
-            let matchingIdentity = identities.first { identity in
-                var identityCertificate: SecCertificate?
-                guard
-                    SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
-                    let identityCertificate
-                else {
-                    return false
-                }
-
-                return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
-            }
-
-            guard let matchingIdentity else {
-                throw Error.keychainOperationFailed(errSecItemNotFound, operation: "matching identity by certificate")
-            }
-
-            return Handle(identity: matchingIdentity, label: label)
-        }
-
-        /// Removes both Keychain items an identity built by
-        /// ``makeIdentity(certificateDER:privateKeyDER:)`` was built from.
-        /// `Internals.URLSessionIdentityPolicy` calls this from `deinit`, once the identity is no
-        /// longer needed -- not after every request.
-        package static func remove(_ handle: Handle) {
-            #if os(macOS)
-            let useDataProtectionKeychain = false
-            #else
-            let useDataProtectionKeychain = true
-            #endif
-
-            for itemClass in [kSecClassKey, kSecClassCertificate] {
-                let query: [CFString: Any] = [
-                    kSecClass: itemClass,
-                    kSecAttrLabel: handle.label,
+                // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter:
+                // an identity is a synthetic pairing of a certificate and a key by matching
+                // public key, not an item with its own attributes, so the label set on the
+                // certificate/key above isn't necessarily inherited by it. Fetching every
+                // identity currently in this keychain and matching by certificate bytes is the
+                // approach that reliably works in practice.
+                let identityQuery: [CFString: Any] = [
+                    kSecClass: kSecClassIdentity,
+                    kSecMatchLimit: kSecMatchLimitAll,
+                    kSecReturnRef: true,
                     kSecUseDataProtectionKeychain: useDataProtectionKeychain,
                 ]
-                SecItemDelete(query as CFDictionary)
+
+                var identitiesResult: CFTypeRef?
+                let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
+
+                guard identityStatus == errSecSuccess else {
+                    throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
+                }
+
+                guard let identities = identitiesResult as? [SecIdentity] else {
+                    throw Error.identityLookupReturnedWrongType
+                }
+
+                let wantedCertificateData = SecCertificateCopyData(certificate) as Data
+
+                let matchingIdentity = identities.first { identity in
+                    var identityCertificate: SecCertificate?
+                    guard
+                        SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
+                        let identityCertificate
+                    else {
+                        return false
+                    }
+
+                    return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
+                }
+
+                guard let matchingIdentity else {
+                    throw Error.keychainOperationFailed(
+                        errSecItemNotFound,
+                        operation: "matching identity by certificate"
+                    )
+                }
+
+                return matchingIdentity
             }
         }
 
@@ -381,7 +462,7 @@ extension Internals {
             }
         }
 
-        /// Lowercase hex SHA-256 of `data` -- deterministic Keychain item labeling only, not a
+        /// Lowercase hex SHA-256 of `data`, for deterministic Keychain item labeling only, not a
         /// security boundary, so `CryptoKit` (always available on Darwin) is enough; no need for
         /// a constant-time comparison anywhere this is used.
         private static func hexDigest(_ data: Data) -> String {
@@ -393,7 +474,7 @@ extension Internals {
     }
 }
 
-/// Minimal DER TLV (tag-length-value) reader -- only as much as unwrapping a PKCS#8
+/// Minimal DER TLV (tag-length-value) reader, only as much as unwrapping a PKCS#8
 /// `PrivateKeyInfo` envelope needs, not a general-purpose ASN.1 parser. Bounds-checked
 /// throughout: malformed input throws rather than trapping.
 private struct DERReader {
@@ -411,8 +492,8 @@ private struct DERReader {
     }
 
     /// Reads one TLV whose tag must match `tag` and returns its content bytes. Supports both
-    /// short-form and long-form DER lengths -- PKCS#8 envelopes routinely exceed the 127-byte
-    /// short-form limit once a real RSA key is inside.
+    /// short-form and long-form DER lengths, since PKCS#8 envelopes routinely exceed the
+    /// 127-byte short-form limit once a real RSA key is inside.
     mutating func read(tag: UInt8) throws -> [UInt8] {
         guard offset < bytes.count, bytes[offset] == tag else {
             throw MalformedDERError()

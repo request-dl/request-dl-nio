@@ -174,7 +174,8 @@ extension Internals {
                 return try _createNewClient(
                     id: sessionProviderID,
                     eventLoopGroup: eventLoopGroup,
-                    sessionConfiguration: sessionConfiguration
+                    sessionConfiguration: sessionConfiguration,
+                    isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
                 )
             }
         }
@@ -298,13 +299,26 @@ extension Internals {
         private func _createNewClient(
             id: String,
             eventLoopGroup: EventLoopGroup,
-            sessionConfiguration: Internals.Session.Configuration
+            sessionConfiguration: Internals.Session.Configuration,
+            isCompatibleWithNetworkFramework: Bool
         ) throws -> Internals.Client {
+            let output = try sessionConfiguration.build(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
+            #if canImport(Darwin)
             let client = Internals.Client(
                 eventLoopGroupProvider: .shared(eventLoopGroup),
-                configuration: try sessionConfiguration.build(),
+                configuration: output.httpClientConfiguration,
+                localIdentityHandle: output.localIdentityHandle,
                 maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
             )
+            #else
+            let client = Internals.Client(
+                eventLoopGroupProvider: .shared(eventLoopGroup),
+                configuration: output.httpClientConfiguration,
+                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            )
+            #endif
 
             tableLock.withLock {
                 var items = _table[id] ?? []

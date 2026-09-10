@@ -79,12 +79,22 @@ extension Internals.Session {
 
         // MARK: - Internal methods
 
-        package func build() throws -> HTTPClient.Configuration {
-            let secureConnectionOutput = try secureConnection?.build()
+        /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
+        /// actually run over Network.framework (`.nioTransportServices`). Forwarded to
+        /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
+        /// worth paying for the mTLS identity's Keychain round-trip at all.
+        ///
+        /// Defaults to `true` so every caller that doesn't yet know which executor won (every
+        /// test call site, plus any future caller) keeps the original always-build behavior;
+        /// `Internals.ClientManager` is the one caller that does know, and passes its actual
+        /// answer.
+        package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
+            let secureConnectionOutput = try secureConnection?.build(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
 
             var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
-                tlsPinning: secureConnectionOutput?.tlsPinning,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
                 connectionPool: connectionPool,
@@ -92,6 +102,13 @@ extension Internals.Session {
                 decompression: decompression.build(),
                 tracing: .init()
             )
+
+            configuration.tlsCustomVerification = secureConnectionOutput?.tlsCustomVerification
+            #if canImport(Darwin)
+            configuration.tlsCustomVerificationNetworkFramework =
+                secureConnectionOutput?.tlsCustomVerificationNetworkFramework
+            configuration.tlsLocalIdentityNetworkFramework = secureConnectionOutput?.localIdentityHandle?.identity
+            #endif
 
             configuration.dnsOverride = dnsOverride
             configuration.enableMultipath = (multipathServiceType != .none)
@@ -104,8 +121,44 @@ extension Internals.Session {
             // property for why `async-http-client`'s own built-in tracing is never engaged.
             configuration.tracing.tracer = NoOpTracer()
 
-            return configuration
+            #if canImport(Darwin)
+            return Output(
+                httpClientConfiguration: configuration,
+                localIdentityHandle: secureConnectionOutput?.localIdentityHandle
+            )
+            #else
+            return Output(httpClientConfiguration: configuration)
+            #endif
         }
+    }
+}
+
+extension Internals.Session.Configuration {
+
+    /// `build()`'s result: the `HTTPClient.Configuration` to hand `AsyncHTTPClient.HTTPClient`,
+    /// plus (on Darwin) the mTLS identity's `Internals.IdentityHandle`, if any. Kept alongside
+    /// the configuration rather than folded into it because whoever constructs the actual
+    /// `HTTPClient` needs both: the configuration to build it with, and the handle to hold onto
+    /// for as long as that client lives, so `IdentityHandle`'s own `deinit` can release the
+    /// identity's Keychain items once the client itself goes away. See `Internals.Client`.
+    package struct Output: Sendable {
+        package let httpClientConfiguration: HTTPClient.Configuration
+
+        #if canImport(Darwin)
+        package let localIdentityHandle: Internals.IdentityHandle?
+
+        package init(
+            httpClientConfiguration: HTTPClient.Configuration,
+            localIdentityHandle: Internals.IdentityHandle? = nil
+        ) {
+            self.httpClientConfiguration = httpClientConfiguration
+            self.localIdentityHandle = localIdentityHandle
+        }
+        #else
+        package init(httpClientConfiguration: HTTPClient.Configuration) {
+            self.httpClientConfiguration = httpClientConfiguration
+        }
+        #endif
     }
 }
 
@@ -332,10 +385,40 @@ extension Internals.Session.Configuration {
 
 #if canImport(Darwin)
 
+import NIOSSL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
+#endif
+
+#if canImport(Network)
+import Network
+#endif
+
+#if canImport(Network)
+extension NIOSSL.TLSVersion {
+
+    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion`'s type. Present unconditionally on every platform
+    /// this package targets (iOS 13/macOS 10.15, both below this package's own deployment
+    /// floor), so there's no availability branch to take here the way AsyncHTTPClient's own
+    /// NIOTransportServices bridge still needs for its pre-iOS-13 `SSLProtocol` fallback.
+    ///
+    /// - Note: `.TLSv10`/`.TLSv11` are deprecated (macOS 12+) but not unavailable, and are
+    /// mirrored here anyway, deliberately: a caller who explicitly asked NIOSSL for TLS 1.0/1.1
+    /// (interop with a legacy server, say) gets the same answer under `.urlSession`, not a
+    /// silent upgrade to whatever Apple currently recommends instead.
+    var urlSessionProtocolVersion: tls_protocol_version_t {
+        switch self {
+        case .tlsv1: return .TLSv10
+        case .tlsv11: return .TLSv11
+        case .tlsv12: return .TLSv12
+        case .tlsv13: return .TLSv13
+        }
+    }
+}
 #endif
 
 extension Internals.Session.Configuration {
@@ -348,13 +431,18 @@ extension Internals.Session.Configuration {
     /// `Internals.ClientManager` pools and later shuts down. Cookies are additionally disabled
     /// unconditionally in `Internals.URLSessionClient.init` itself regardless of what this builds.
     ///
-    /// Only `timeout.read` maps onto `timeoutIntervalForRequest` -- `URLSessionConfiguration` has
-    /// no distinct connect-phase timeout to receive `timeout.connect`. Every other field this
-    /// configuration could carry that has no `URLSessionConfiguration` counterpart
-    /// (`connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is
-    /// either NIO/NIOTS-specific with nothing to translate to, or -- for the fields that matter,
-    /// like `dnsOverride`/`httpVersion == .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/
-    /// `decompression == .disabled` -- already excluded from resolving to `.urlSession` at all by
+    /// `timeout.read` maps onto `timeoutIntervalForRequest`; `URLSessionConfiguration` has no
+    /// distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
+    /// `minimumTLSVersion`/`maximumTLSVersion` map onto `tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion`, the one other `SecureConnection` field with a
+    /// direct `URLSessionConfiguration` counterpart.
+    ///
+    /// Every other field this configuration could carry that has no `URLSessionConfiguration`
+    /// counterpart (`connectionPool`, `ignoreUncleanSSLShutdown`,
+    /// `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific with nothing to
+    /// translate to, or, for the fields that matter, like `dnsOverride`/`httpVersion ==
+    /// .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/`decompression == .disabled`,
+    /// already excluded from resolving to `.urlSession` at all by
     /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
     /// configuration to lose in translation.
     ///
@@ -384,6 +472,16 @@ extension Internals.Session.Configuration {
         if let read = timeout.read {
             configuration.timeoutIntervalForRequest = TimeInterval(read) / 1_000_000_000
         }
+
+        #if canImport(Network)
+        if let minimumTLSVersion = secureConnection?.minimumTLSVersion {
+            configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.urlSessionProtocolVersion
+        }
+
+        if let maximumTLSVersion = secureConnection?.maximumTLSVersion {
+            configuration.tlsMaximumSupportedProtocolVersion = maximumTLSVersion.urlSessionProtocolVersion
+        }
+        #endif
 
         return configuration
     }

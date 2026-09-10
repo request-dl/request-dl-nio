@@ -90,6 +90,50 @@ struct InternalsServerTrustPolicyTests {
         #expect(descriptor.trustedRootCertificatesDER.count == 2)
     }
 
+    // MARK: - Revocation policy
+
+    @Test
+    func resolve_whenRevocationPolicyConfigured_capturesInDescriptor() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .strict
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.revocationPolicy == .strict)
+    }
+
+    @Test
+    func resolve_whenNoRevocationPolicyConfigured_descriptorHasNone() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // When
+        let descriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
+
+        // Then
+        #expect(descriptor.revocationPolicy == nil)
+    }
+
+    @Test
+    func descriptor_roundTripsRevocationPolicyThroughInit() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.revocationPolicy = .disabled
+
+        let original = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        // When
+        let encoded = try JSONEncoder().encode(original.descriptor())
+        let decoded = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: encoded)
+        let rebuilt = Internals.ServerTrustPolicy(descriptor: decoded)
+
+        // Then
+        #expect(try rebuilt.descriptor() == original.descriptor())
+    }
+
     // MARK: - SPKI pinning
 
     @Test
@@ -186,6 +230,83 @@ struct InternalsServerTrustPolicyTests {
 
         // Then
         #expect(try rebuilt.descriptor() == original.descriptor())
+    }
+
+    // MARK: - Trust decision observer
+
+    /// A live (never `descriptor()`-rebuilt) policy, since `Descriptor` is `Codable`-only and
+    /// can't carry an observer across a relaunch. See ``Internals/ServerTrustPolicy/init(descriptor:)``'s
+    /// own doc comment.
+    @Test
+    func handle_whenChainAndPinsBothMatch_notifiesObserverWithTrustedDecision() async throws {
+        // Given
+        let server = Certificates().server()
+        let pin = try hashSPKI(from: server.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = "Hello World"
+
+        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(pin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+        let observer = RecordingTrustDecisionObserver()
+        secureConnection.trustDecisionObserver = observer
+
+        let policy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        let delegate = ForwardingChallengeDelegate(policy: policy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        _ = try await session.data(for: request)
+
+        // Then
+        #expect(observer.decisions == [TrustDecision(isTrusted: true, pinsMatched: true)])
+    }
+
+    @Test
+    func handle_whenPinMismatch_notifiesObserverWithUntrustedDecisionAndUnmatchedPins() async throws {
+        // Given
+        let server = Certificates().server()
+        let unrelatedCertificate = Certificates().client()
+        let wrongPin = try hashSPKI(from: unrelatedCertificate.certificateURL, algorithm: SHA256.self)
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.cleanup(at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.tlsPins = [.init(source: .rawData(wrongPin), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .strict
+        let observer = RecordingTrustDecisionObserver()
+        secureConnection.trustDecisionObserver = observer
+
+        let policy = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+
+        let delegate = ForwardingChallengeDelegate(policy: policy)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        // When
+        await #expect(throws: (any Error).self) {
+            try await session.data(for: request)
+        }
+
+        // Then
+        #expect(observer.decisions == [TrustDecision(isTrusted: false, pinsMatched: false)])
     }
 
     // MARK: - handle(challenge:completionHandler:) -- real handshake, rebuilt policy
@@ -455,6 +576,17 @@ private final class ForwardingChallengeDelegate: NSObject, URLSessionTaskDelegat
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         policy.handle(challenge: challenge, completionHandler: completionHandler)
+    }
+}
+
+/// A test double recording every ``TrustDecision`` it's notified of, in order. `@unchecked
+/// Sendable` is safe here, since `URLSession`'s challenge delegate callback runs each handshake's
+/// decision serially, one at a time, for these single-request tests.
+private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
+    private(set) var decisions: [TrustDecision] = []
+
+    func callAsFunction(_ decision: TrustDecision) {
+        decisions.append(decision)
     }
 }
 
