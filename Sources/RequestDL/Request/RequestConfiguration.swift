@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+import Tracing
+
 #if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
 #endif
-import RequestDLInternals
-import Tracing
 
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,

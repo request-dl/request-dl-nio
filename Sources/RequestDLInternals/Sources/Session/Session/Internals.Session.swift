@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Logging
+
 #if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
 #endif
-import Logging
 
 extension Internals {
 

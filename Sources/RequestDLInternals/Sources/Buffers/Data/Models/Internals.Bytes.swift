@@ -288,11 +288,12 @@ extension Internals {
                     strategy = .automatic
                 }
 
-                let data = buffer.getData(
-                    at: buffer.readerIndex,
-                    length: buffer.readableBytes,
-                    byteTransferStrategy: strategy
-                ) ?? Data()
+                let data =
+                    buffer.getData(
+                        at: buffer.readerIndex,
+                        length: buffer.readableBytes,
+                        byteTransferStrategy: strategy
+                    ) ?? Data()
 
                 storage = .data(DataStorage(data: data, readerIndex: .zero, writerIndex: data.count))
                 return data

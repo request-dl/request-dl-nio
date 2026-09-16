@@ -2,11 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+import Tracing
+
 #if canImport(NIOCore)
 import NIOCore
 #endif
-import RequestDLInternals
-import Tracing
 
 /// The Session object is used to set various properties related to the request context.
 ///

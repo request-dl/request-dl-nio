@@ -3,12 +3,13 @@
 //
 
 import Crypto
+import RequestDLInternals
+import SwiftAsyncStream
+
 #if canImport(NIOCore)
 import NIOCore
 import NIOFileSystem
 #endif
-import RequestDLInternals
-import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

@@ -2,11 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Tracing
+
 #if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
 #endif
-import Tracing
 
 extension Internals.Session {
 

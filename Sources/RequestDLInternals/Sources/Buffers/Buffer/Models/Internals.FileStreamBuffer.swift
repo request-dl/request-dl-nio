@@ -2,12 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
+import SystemPackage
+
 #if canImport(NIOCore)
 import NIOCore
 import NIOFileSystem
 #endif
-import SwiftAsyncStream
-import SystemPackage
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

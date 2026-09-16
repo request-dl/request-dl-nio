@@ -2,11 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftASN1
+
 #if canImport(NIOCore)
 import NIOSSL
 #endif
-
-import SwiftASN1
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

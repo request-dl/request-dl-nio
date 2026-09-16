@@ -57,12 +57,12 @@ struct PortableGzipCompressorStream: CompressorStream {
 
     mutating func finish() throws -> [UInt8] {
         var output = Data([
-            0x1F, 0x8B,             // Magic number
-            0x08,                   // CM: deflate
-            0x00,                   // FLG: none set
-            0x00, 0x00, 0x00, 0x00, // MTIME: unset
-            0x00,                   // XFL: unset
-            0xFF                    // OS: unknown
+            0x1F, 0x8B,  // Magic number
+            0x08,  // CM: deflate
+            0x00,  // FLG: none set
+            0x00, 0x00, 0x00, 0x00,  // MTIME: unset
+            0x00,  // XFL: unset
+            0xFF,  // OS: unknown
         ])
         output.append(try (buffer as NSData).compressed(using: .zlib) as Data)
 

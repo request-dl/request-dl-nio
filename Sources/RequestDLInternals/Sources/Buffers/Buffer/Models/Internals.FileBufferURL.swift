@@ -2,10 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SystemPackage
+
 #if canImport(NIOCore)
 import NIOFileSystem
 #endif
-import SystemPackage
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

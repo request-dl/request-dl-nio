@@ -263,11 +263,13 @@ extension Internals {
                         throw FileAlreadyExistsError(path: path.string)
                     }
 
-                    guard FileManager.default.createFile(
-                        atPath: path.string,
-                        contents: nil,
-                        attributes: [.posixPermissions: 0o600]
-                    ) else {
+                    guard
+                        FileManager.default.createFile(
+                            atPath: path.string,
+                            contents: nil,
+                            attributes: [.posixPermissions: 0o600]
+                        )
+                    else {
                         throw FileHandleOpenError(path: path.string)
                     }
                 case .modifyFile(let createIfNecessary, let permissions):
@@ -276,11 +278,13 @@ extension Internals {
                     }
 
                     if !exists {
-                        guard FileManager.default.createFile(
-                            atPath: path.string,
-                            contents: nil,
-                            attributes: [.posixPermissions: permissions.rawValue]
-                        ) else {
+                        guard
+                            FileManager.default.createFile(
+                                atPath: path.string,
+                                contents: nil,
+                                attributes: [.posixPermissions: permissions.rawValue]
+                            )
+                        else {
                             throw FileHandleOpenError(path: path.string)
                         }
                     }

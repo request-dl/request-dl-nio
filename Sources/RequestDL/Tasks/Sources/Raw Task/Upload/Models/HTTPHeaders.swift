@@ -2,10 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(NIOCore)
 import NIOHTTP1
 #endif
-import RequestDLInternals
 
 /// Provides methods and properties for HTTP headers.
 ///
