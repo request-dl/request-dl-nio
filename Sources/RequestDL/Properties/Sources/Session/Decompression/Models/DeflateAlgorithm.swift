@@ -13,7 +13,7 @@
 /// As a ``Compressor``, though, this does real work: there is no OS-provided shortcut for
 /// compressing an outgoing body the way there is for decoding an incoming one. With NIO
 /// available, `callAsFunction()` drives `NIOHTTPRequestCompressor`, streaming in bounded memory;
-/// without it, ``PortableDeflateCompressorStream`` produces the same zlib-wrapped wire format
+/// without it, `PortableDeflateCompressorStream` produces the same zlib-wrapped wire format
 /// using Foundation + the `Compression` framework instead, buffering the whole body rather than
 /// streaming it, see that type's own doc comment for why. If even `zlib` isn't importable, this
 /// falls back to ``CompressionUnavailableError`` like ``GzipAlgorithm`` always does.

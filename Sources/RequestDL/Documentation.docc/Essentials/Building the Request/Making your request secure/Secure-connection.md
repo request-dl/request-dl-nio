@@ -169,6 +169,7 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 ### Client authorization
 - ``RequestDL/Certificates``
 - ``RequestDL/PrivateKey``
+- ``RequestDL/SecureBytes``
 
 ### PSK authentication
 - ``RequestDL/PSKIdentity``

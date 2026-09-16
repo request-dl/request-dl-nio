@@ -9,7 +9,7 @@
 /// does, so these built-ins do real work as a ``Compressor`` rather than standing in for
 /// something the transport already does. Both algorithms drive `NIOHTTPRequestCompressor` when
 /// NIO is available, and fall back to a portable, `zlib`-backed implementation otherwise
-/// (``PortableGzipCompressorStream``/``PortableDeflateCompressorStream``). This error only fires
+/// (`PortableGzipCompressorStream`/`PortableDeflateCompressorStream`). This error only fires
 /// in the narrowest case: NIO *and* `zlib` both unavailable, which, outside of a build the
 /// package doesn't actually support yet, shouldn't happen in practice.
 public struct CompressionUnavailableError: Error, Sendable {
