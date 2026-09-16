@@ -23,7 +23,7 @@ extension Internals {
     /// final size, and whose ability to fail mid-stream if a custom `Compressor` throws, are both
     /// only known once the whole thing has been pulled through).
     ///
-    /// `Body.Element` is `Data`, matching the public `RequestBody`'s own currency — this type is
+    /// `Body.Element` is `Data`, matching the public `RequestBody`'s own currency, this type is
     /// the one place that actually needs a `ByteBuffer` (`HTTPClient.Body.StreamWriter` wants
     /// one), so the conversion happens right here, once per chunk, rather than forcing NIO onto
     /// `RequestBody`'s public surface.

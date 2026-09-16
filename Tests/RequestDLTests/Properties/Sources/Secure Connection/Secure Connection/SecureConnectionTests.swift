@@ -412,7 +412,7 @@ struct SecureConnectionTests {
         // Given
         // Regression test: `SecureConnection` used to wrap its resolved output into a private
         // leaf node distinct from `SecureConnectionNode`, so an outer `SecureConnection`'s own
-        // `search(for: SecureConnectionNode.self)` never found a nested one — every certificate
+        // `search(for: SecureConnectionNode.self)` never found a nested one, every certificate
         // and TLS setting the inner `SecureConnection` configured was silently dropped.
 
         // When

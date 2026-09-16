@@ -8,7 +8,7 @@ import NIOSSL
 
 extension Internals {
 
-    /// Portable mirror of `NIOSSL.SignatureAlgorithm` — a raw `UInt16` wrapper, same shape as
+    /// Portable mirror of `NIOSSL.SignatureAlgorithm`, a raw `UInt16` wrapper, same shape as
     /// `RequestDL.SignatureAlgorithm`, which these static members are named to match.
     package struct SignatureAlgorithm: Sendable, RawRepresentable, Hashable {
 

@@ -155,8 +155,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     }
 
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {
-        // Mirrors every header the resolved request would carry — `Headers`, `AcceptHeader`,
-        // `Authorization`, `Payload`'s `Content-Type`/`Content-Length`, and so on — so the mocked
+        // Mirrors every header the resolved request would carry, `Headers`, `AcceptHeader`,
+        // `Authorization`, `Payload`'s `Content-Type`/`Content-Length`, and so on, so the mocked
         // response doubles as a way to inspect exactly what the request would have looked like.
         // `headers` overlays on top, for anything that isn't part of the request itself.
         var responseHeaders = resolved.requestConfiguration.headers

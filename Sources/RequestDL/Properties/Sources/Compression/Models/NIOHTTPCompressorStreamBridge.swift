@@ -3,7 +3,7 @@
 //
 
 // `Internals.NIOHTTPCompressorStream` (what this bridges to) is itself unconditionally NIO-only
-// — see that type's own doc comment — so there's nothing this bridge could do without NIO
+//, see that type's own doc comment, so there's nothing this bridge could do without NIO
 // either. `GzipAlgorithm`/`DeflateAlgorithm` fall back to ``CompressionUnavailableError`` when
 // this type doesn't exist at all.
 #if canImport(NIOCore)

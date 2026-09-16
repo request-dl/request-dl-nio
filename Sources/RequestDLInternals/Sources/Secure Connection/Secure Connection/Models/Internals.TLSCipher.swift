@@ -8,7 +8,7 @@ import NIOSSL
 
 extension Internals {
 
-    /// Portable mirror of `NIOSSL.NIOTLSCipher` — a raw `UInt16` wrapper, same shape and same
+    /// Portable mirror of `NIOSSL.NIOTLSCipher`, a raw `UInt16` wrapper, same shape and same
     /// static members as `RequestDL.TLSCipher`.
     package struct TLSCipher: Sendable, RawRepresentable, Hashable {
 

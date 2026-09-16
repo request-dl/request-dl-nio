@@ -38,7 +38,7 @@ extension URL {
     /// This URL as a `FilePath`, which is the currency the file system layer speaks.
     ///
     /// The one place the conversion happens, rather than every call site spelling out
-    /// `FilePath(absolutePath(percentEncoded: false))` — forgetting the `false` there hands
+    /// `FilePath(absolutePath(percentEncoded: false))`, forgetting the `false` there hands
     /// the file system a name containing literal escapes.
     package var filePath: FilePath {
         FilePath(absolutePath(percentEncoded: false))
@@ -84,7 +84,7 @@ extension URL {
     /// Creates an empty file here, and any missing directory above it.
     ///
     /// A no op when the file already exists, so the content of an existing file is never at
-    /// risk. Must not pass `replaceExisting: true` here — that reads as the opposite of the
+    /// risk. Must not pass `replaceExisting: true` here, that reads as the opposite of the
     /// intent, and is only harmless because of the surrounding existence check.
     ///
     /// - Throws: Whatever the file system reports. A failure to stat is propagated rather than
@@ -129,7 +129,7 @@ extension URL {
 
     /// Reads the whole file at this location into memory.
     ///
-    /// - Note: There is no `Data(contentsOf:)` here — that reaches for platform file I/O that
+    /// - Note: There is no `Data(contentsOf:)` here, that reaches for platform file I/O that
     /// `FoundationEssentials` does not provide. `NIOFileSystem` is the package's own portable
     /// file layer, already used throughout `Internals`.
     package func readData() async throws -> Data {
@@ -151,7 +151,7 @@ extension URL {
 
     /// Writes `data` to this location, replacing whatever was there.
     ///
-    /// - Note: Closes on every path, including the one where the write itself throws — see
+    /// - Note: Closes on every path, including the one where the write itself throws, see
     /// `DiskStorage.writeAndClose(_:to:)` for why that discipline matters with `NIOFileSystem`
     /// handles.
     package func write(_ data: Data) async throws {

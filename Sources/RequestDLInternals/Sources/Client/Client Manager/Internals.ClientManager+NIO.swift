@@ -2,8 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-// This whole extension is the `.nio`/`.nioTransportServices` half of `Internals.ClientManager` —
-// see its own doc comment below — so none of it exists at all without NIO.
+// This whole extension is the `.nio`/`.nioTransportServices` half of `Internals.ClientManager`,
+// see its own doc comment below, so none of it exists at all without NIO.
 #if canImport(NIOCore)
 
 import NIOCore
@@ -11,7 +11,7 @@ import SwiftAsyncStream
 
 /// The `.nio`/`.nioTransportServices` half of `Internals.ClientManager`, split out from the main
 /// declaration (which stays in `Internals.ClientManager.swift`, alongside the shared table/lock
-/// bookkeeping and the `.urlSession` half) because this half — and only this half — needs
+/// bookkeeping and the `.urlSession` half) because this half, and only this half, needs
 /// `NIOCore.EventLoopGroup`/`Internals.Client`.
 ///
 /// Reaches into the main declaration's `lock`/`tableLock`/`_table`/`_reusableItem(id:sessionConfiguration:)`,

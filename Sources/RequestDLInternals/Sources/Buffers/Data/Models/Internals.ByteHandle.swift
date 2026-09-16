@@ -103,7 +103,7 @@ extension Internals {
                 // side happened to leave behind.
                 let data = url.withStorage { bytes, writtenBytes -> Data? in
                     // Out of range is a possible outcome of a truncated or concurrently reset
-                    // buffer, not a programming error, so this reports rather than traps —
+                    // buffer, not a programming error, so this reports rather than traps,
                     // must not be a `precondition`, which would turn every such race into a
                     // crash.
                     guard index >= .zero, index < writtenBytes else {

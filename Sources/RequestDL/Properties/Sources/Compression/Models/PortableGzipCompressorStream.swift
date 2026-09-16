@@ -3,11 +3,11 @@
 //
 
 // Only reachable once the future URLSession-only trait exists (see `URLSESSION_ONLY_REPORT.md`
-// at the repo root) — NIOCore is always present today, so `#if !canImport(NIOCore)` never
+// at the repo root), NIOCore is always present today, so `#if !canImport(NIOCore)` never
 // evaluates `true` in this build, and `swift build`/`swift test` never type-check this file.
 // Verified correct by writing real `.gz` files from a standalone script and validating them with
 // the system `gunzip -t` (byte-for-byte content check against a random binary payload too),
-// since the normal test suite can't reach it yet — same discipline as
+// since the normal test suite can't reach it yet, same discipline as
 // `PortableDeflateCompressorStream`, whose header/trailer-wrapping technique this mirrors.
 //
 // Gated on `canImport(zlib)` too (not just `!canImport(NIOCore)`): the `crc32()` trailer below is
@@ -22,16 +22,16 @@ import zlib
 /// Portable ``CompressorStream`` behind ``GzipAlgorithm`` when NIO isn't available, producing the
 /// same wire format (`Content-Encoding: gzip`, i.e. an RFC 1952 gzip stream) that
 /// ``NIOHTTPCompressorStreamBridge`` produces through `NIOHTTPRequestCompressor`, using only
-/// Foundation + Apple's `Compression` framework instead — the gzip counterpart of
+/// Foundation + Apple's `Compression` framework instead, the gzip counterpart of
 /// ``PortableDeflateCompressorStream``.
 ///
 /// - Important: As with the zlib wrapper, `NSData.compressed(using: .zlib)` only ever hands back
-///   **raw DEFLATE** (RFC 1951) — see that type's own doc comment. Gzip's own container (RFC
+///   **raw DEFLATE** (RFC 1951), see that type's own doc comment. Gzip's own container (RFC
 ///   1952) is a different wrapper around the same raw deflate bytes: a 10-byte header (magic
 ///   `0x1F 0x8B`, compression method `0x08`, no flags, zeroed mtime, unset extra flags, `0xFF`
-///   for "OS unknown" — none of these are load-bearing for a decoder, they're metadata a
+///   for "OS unknown", none of these are load-bearing for a decoder, they're metadata a
 ///   compliant reader ignores) followed by a little-endian CRC-32 of the *uncompressed* bytes and
-///   a little-endian `UInt32` of the uncompressed size modulo 2^32 (`ISIZE`, per spec — not a
+///   a little-endian `UInt32` of the uncompressed size modulo 2^32 (`ISIZE`, per spec, not a
 ///   bug for bodies over 4 GiB, decoders are required to handle the wraparound). Confirmed
 ///   correct by writing real `.gz` files and validating them with the system `gunzip -t` before
 ///   writing this, not assumed from the spec alone.

@@ -120,7 +120,7 @@ struct PrivateKeyTests {
         )
     }
 
-    // `PrivateKey(_:in:format:)` only exists on Darwin — it is built on `Bundle`, which is not
+    // `PrivateKey(_:in:format:)` only exists on Darwin, it is built on `Bundle`, which is not
     // part of `FoundationEssentials`. This test exists to cover that initializer specifically,
     // so unlike the rest of this file, it has no portable counterpart to fall back to.
     #if canImport(Darwin)

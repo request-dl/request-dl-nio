@@ -15,7 +15,7 @@
 /// available, `callAsFunction()` drives `NIOHTTPRequestCompressor`, streaming in bounded memory;
 /// without it, ``PortableDeflateCompressorStream`` produces the same zlib-wrapped wire format
 /// using Foundation + the `Compression` framework instead, buffering the whole body rather than
-/// streaming it — see that type's own doc comment for why. If even `zlib` isn't importable, this
+/// streaming it, see that type's own doc comment for why. If even `zlib` isn't importable, this
 /// falls back to ``CompressionUnavailableError`` like ``GzipAlgorithm`` always does.
 public struct DeflateAlgorithm: Compressor, Decompressor {
 

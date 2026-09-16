@@ -16,18 +16,18 @@ import NIOFoundationEssentialsCompat
 
 extension Internals {
 
-    /// A byte store shaped like `NIOCore.ByteBuffer` — reader/writer cursors over a growable
-    /// buffer — without callers ever knowing what actually backs it.
+    /// A byte store shaped like `NIOCore.ByteBuffer`, reader/writer cursors over a growable
+    /// buffer, without callers ever knowing what actually backs it.
     ///
     /// Backed by `Data` by default. When built from an existing `NIOCore.ByteBuffer` (only
     /// possible where NIO is available), it stays `ByteBuffer`-backed instead of converting
     /// eagerly, so a value that started as one never pays a conversion unless something asks
-    /// for the other representation — and once it does, the result is cached back into
+    /// for the other representation, and once it does, the result is cached back into
     /// ``storage``, so asking again does not pay a second time.
     ///
     /// This is the currency at the handful of places that need one shape both executors can
     /// agree on (request body chunks, the compression stream protocols, `ByteURL`'s own
-    /// storage). Whatever is `.nio`-only keeps using `NIOCore.ByteBuffer` directly — this type
+    /// storage). Whatever is `.nio`-only keeps using `NIOCore.ByteBuffer` directly, this type
     /// only exists at the boundary between the two.
     package struct Bytes: Sendable {
 
@@ -43,7 +43,7 @@ extension Internals {
 
         private struct DataStorage: Sendable {
             /// Every byte ever written, including any past the current `writerIndex` left
-            /// behind by a rewind — the same "bytes past it are still there" invariant
+            /// behind by a rewind, the same "bytes past it are still there" invariant
             /// `NIOCore.ByteBuffer` has. Always addressed `0..<data.count`.
             var data: Data
             var readerIndex: Int
@@ -77,7 +77,7 @@ extension Internals {
         }
 
         #if canImport(NIOCore)
-        /// Adopts `buffer` as is. Stays `ByteBuffer`-backed — nothing is converted until a
+        /// Adopts `buffer` as is. Stays `ByteBuffer`-backed, nothing is converted until a
         /// caller explicitly asks for ``asData(byteTransferStrategy:)``.
         package init(_ buffer: NIOCore.ByteBuffer) {
             storage = .byteBuffer(buffer)
@@ -138,12 +138,12 @@ extension Internals {
         /// this store's backing already holds there rather than clearing it first.
         ///
         /// For the `.data` case that is either real bytes still physically present from an
-        /// earlier, larger write that was since rewound — reused as is, matching what NIO's own
-        /// capacity reuse would do — or genuinely new ground, which is zero-filled because
+        /// earlier, larger write that was since rewound, reused as is, matching what NIO's own
+        /// capacity reuse would do, or genuinely new ground, which is zero-filled because
         /// growing `Data` has nothing else to reveal. For the `.byteBuffer` case this defers to
         /// NIO outright, capacity precondition included: a caller that wants a deterministic
-        /// zero-filled gap regardless of backing — the way a file handle seeking past EOF
-        /// behaves — should call ``writeRepeatingByte(_:count:)`` instead, exactly as
+        /// zero-filled gap regardless of backing, the way a file handle seeking past EOF
+        /// behaves, should call ``writeRepeatingByte(_:count:)`` instead, exactly as
         /// `Internals.ByteHandle.write(contentsOf:)` already does.
         package mutating func moveWriterIndex(to index: Int) {
             precondition(index >= .zero, "Writer index \(index) is negative")
@@ -225,7 +225,7 @@ extension Internals {
         }
 
         /// Reads `length` bytes from the reader index, advancing it, and returns them as a new
-        /// ``Bytes`` — `nil` when fewer than `length` bytes are readable.
+        /// ``Bytes``, `nil` when fewer than `length` bytes are readable.
         package mutating func readSlice(length: Int) -> Self? {
             guard length >= .zero, length <= readableBytes else {
                 return nil
@@ -267,7 +267,7 @@ extension Internals {
         /// The readable range as `Data`, without moving this cursor.
         ///
         /// - Important: When this is `ByteBuffer`-backed, the result is cached back into
-        /// `self` — asking again does not convert a second time, but a caller that only ever
+        /// `self`, asking again does not convert a second time, but a caller that only ever
         /// needed `Data` once has now paid to keep both representations reachable. A `ByteBuffer`
         /// caller is expected to prefer ``asByteBuffer()`` if this value is likely to cross the
         /// boundary more than once.

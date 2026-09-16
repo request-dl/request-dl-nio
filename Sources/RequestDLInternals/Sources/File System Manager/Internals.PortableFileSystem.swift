@@ -3,7 +3,7 @@
 //
 
 // Only reachable once the future URLSession-only trait exists (see `URLSESSION_ONLY_REPORT.md`
-// at the repo root) — NIOCore is always present today, so `#if !canImport(NIOCore)` never
+// at the repo root), NIOCore is always present today, so `#if !canImport(NIOCore)` never
 // evaluates `true` in this build, and `swift build`/`swift test` never type-check this file.
 // Verified by temporarily forcing this branch to compile against every real call site
 // (`Internals.FileStreamBuffer`, `Internals.FileBufferURL`, `URL+Extensions.swift`,
@@ -19,7 +19,7 @@ extension Internals {
     /// `Internals.fileSystem` is actually called with across this package, backed by
     /// `FileManager`/`FileHandle` instead, every blocking call routed through
     /// `Internals.FileSystemManager.run` so it never runs on whichever Swift Concurrency
-    /// cooperative thread happens to call in here — see that type's own doc comment for why that
+    /// cooperative thread happens to call in here, see that type's own doc comment for why that
     /// distinction matters under `swift-testing`'s parallel execution.
     ///
     /// Deliberately narrow: this mirrors the subset of `NIOFileSystem.FileSystem`'s API this
@@ -28,7 +28,7 @@ extension Internals {
     /// (`.newFile(replaceExisting:)`, `.bytes(_:)`, `.unlimited`, `entry.name.string`, …)
     /// closely enough that most call sites in `FileBufferURL`/`FileStreamBuffer`/
     /// `URL+Extensions.swift`/`DiskStorage.swift` compile completely unchanged against
-    /// whichever of the two types `Internals.fileSystem` resolves to — not a general-purpose
+    /// whichever of the two types `Internals.fileSystem` resolves to, not a general-purpose
     /// file system abstraction.
     package enum PortableFileSystem {
 
@@ -44,12 +44,12 @@ extension Internals {
         /// package actually constructs. `.modifyFile`'s `permissions` takes the same
         /// `SystemPackage.FilePermissions` `NIOFileSystem` itself takes (portable already, no
         /// NIO needed), matching call-site syntax (`.ownerReadWrite`) exactly rather than
-        /// introducing a parallel type — caught by the force-compiled verification pass missing
+        /// introducing a parallel type, caught by the force-compiled verification pass missing
         /// this parameter entirely on the first attempt (`Internals.FileStreamBuffer.init
         /// (writingTo:)` passes it unconditionally).
         package enum WriteOptions: Sendable {
             /// Creates a fresh, empty file. Errors if one is already there and
-            /// `replaceExisting` is `false` — `NIOFileSystem`'s own contract for this case,
+            /// `replaceExisting` is `false`, `NIOFileSystem`'s own contract for this case,
             /// unlike `.modifyFile` below, which is silent about an existing file by design.
             case newFile(replaceExisting: Bool)
             /// Opens an existing file untouched, only creating one that is missing.
@@ -63,7 +63,7 @@ extension Internals {
         }
 
         /// Counterpart to the `ByteCount` `readToEnd(maximumSizeAllowed:)` takes, narrowed to
-        /// the one case (`.unlimited`) this package ever passes — nothing here enforces a cap,
+        /// the one case (`.unlimited`) this package ever passes, nothing here enforces a cap,
         /// same as passing `.unlimited` on the NIOFileSystem side does not either.
         package enum ReadLimit: Sendable {
             case unlimited
@@ -128,7 +128,7 @@ extension Internals {
 
             /// - Returns: The number of bytes written. Always the full count: unlike a raw
             /// `write(2)`, `FileHandle.write(contentsOf:)` already loops internally over a short
-            /// write rather than surfacing one, so there is nothing partial to report here — the
+            /// write rather than surfacing one, so there is nothing partial to report here, the
             /// short-write retry loop in `Internals.FileStreamBuffer.writeData(_:)` still runs
             /// correctly against this, it simply never has to loop more than once in practice.
             @discardableResult
@@ -165,7 +165,7 @@ extension Internals {
         }
 
         /// Handed to `withDirectoryHandle(atPath:_:)`'s closure. The listing itself already ran
-        /// by the time this exists — see that method's doc comment for why a snapshot is fine
+        /// by the time this exists, see that method's doc comment for why a snapshot is fine
         /// here.
         package struct DirectoryHandle: Sendable {
 
@@ -173,7 +173,7 @@ extension Internals {
 
             /// `AsyncThrowingStream`, not a plain `AsyncStream`, purely so `for try await entry
             /// in dir.listContents()` at the call site stays valid Swift regardless of which
-            /// backend is active — this particular listing can't actually fail once it already
+            /// backend is active, this particular listing can't actually fail once it already
             /// has a `DirectoryHandle` in hand, since the enumeration happened up front in
             /// `withDirectoryHandle(atPath:_:)`.
             package func listContents() -> AsyncThrowingStream<DirectoryEntry, Error> {
@@ -189,7 +189,7 @@ extension Internals {
         // MARK: - Errors
 
         /// Thrown by `openFile(forWritingAt:options:)` for `.newFile(replaceExisting: false)`
-        /// against a path that already has something there — `NIOFileSystem`'s own contract for
+        /// against a path that already has something there, `NIOFileSystem`'s own contract for
         /// that combination, not a silent open-the-existing-file fallback.
         package struct FileAlreadyExistsError: Error, Sendable {
             package let path: String
@@ -201,7 +201,7 @@ extension Internals {
             package let path: String
         }
 
-        /// Thrown when `FileHandle`'s own failable initializer returns `nil` — a path that
+        /// Thrown when `FileHandle`'s own failable initializer returns `nil`, a path that
         /// exists but couldn't actually be opened (permissions, a directory where a file was
         /// expected, and similar).
         package struct FileHandleOpenError: Error, Sendable {
@@ -211,7 +211,7 @@ extension Internals {
         // MARK: - Internal static methods
 
         /// - Returns: `nil` for a missing file. A genuine I/O error (a permission problem, for
-        /// instance) is folded into `nil` too, rather than propagated — a simplification versus
+        /// instance) is folded into `nil` too, rather than propagated, a simplification versus
         /// `NIOFileSystem`'s own `info(forFileAt:)`, acceptable because every call site in this
         /// package already wraps this in its own `try?` or treats a miss as "empty"/"absent"
         /// regardless of cause.
@@ -308,7 +308,7 @@ extension Internals {
 
         /// Unlike `NIOFileSystem`'s own streaming directory iterator, this enumerates the whole
         /// directory up front (`FileManager.contentsOfDirectory(atPath:)`) and hands the closure
-        /// a fixed snapshot — acceptable because every caller in this package (`DiskStorage
+        /// a fixed snapshot, acceptable because every caller in this package (`DiskStorage
         /// .records()`) already reads a directory that is, at most, a few thousand cache entries,
         /// never a directory large enough for eager enumeration to matter.
         package static func withDirectoryHandle<T: Sendable>(

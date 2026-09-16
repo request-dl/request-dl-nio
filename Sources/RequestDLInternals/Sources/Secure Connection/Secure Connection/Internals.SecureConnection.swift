@@ -66,7 +66,7 @@ extension Internals {
         package var verifySignatureAlgorithms: [Internals.SignatureAlgorithm]?
         package var sendCANameList: Bool?
         package var renegotiationSupport: Internals.RenegotiationSupport?
-        /// Nanoseconds, matching `UnitTime.nanoseconds` — same convention as `Internals.Timeout`/
+        /// Nanoseconds, matching `UnitTime.nanoseconds`, same convention as `Internals.Timeout`/
         /// `Internals.ConnectionPool`/`Internals.ClientManager.lifetime`.
         package var shutdownTimeout: Int64?
         #if canImport(NIOCore)

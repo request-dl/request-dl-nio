@@ -19,7 +19,7 @@ extension Internals {
         // MARK: - Private static properties
 
         /// Flags a `provider(_:with:)` that is still running after 15s. Development builds
-        /// only — see `AsyncLock.Watchdog`.
+        /// only, see `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 15) {
             Internals.assertionFailure($0)
