@@ -238,15 +238,15 @@ extension Internals {
             var trustedRootCertificates: [SecCertificate] = []
 
             if let trustRoots = secureConnection.trustRoots {
-                trustedRootCertificates += try trustRoots.resolvedCertificates().map {
-                    try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
+                trustedRootCertificates += try trustRoots.resolvedDERBytes().map {
+                    try RawBytesIdentityBuilder.certificate(fromDER: $0)
                 }
             }
 
             if let additionalTrustRoots = secureConnection.additionalTrustRoots {
                 for additionalTrustRoot in additionalTrustRoots {
-                    trustedRootCertificates += try additionalTrustRoot.resolvedCertificates().map {
-                        try RawBytesIdentityBuilder.certificate(fromDER: Data($0.toDERBytes()))
+                    trustedRootCertificates += try additionalTrustRoot.resolvedDERBytes().map {
+                        try RawBytesIdentityBuilder.certificate(fromDER: $0)
                     }
                 }
             }

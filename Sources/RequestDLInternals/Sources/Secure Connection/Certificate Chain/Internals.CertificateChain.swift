@@ -2,7 +2,16 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOSSL
+#endif
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.URL
+#endif
 
 extension Internals {
 
@@ -33,6 +42,29 @@ extension Internals {
             }
         }
 
+        /// Portable counterpart to `build()`, built on `Internals.Certificate`'s own DER
+        /// extraction — see that type's `resolvedDERBytes()`/`resolvedPEMCertificateDERBytes(of:)`
+        /// doc comments. `.bytes` and `.file` both read every certificate in the bundle here,
+        /// matching `build()`'s own `NIOSSLCertificate.fromPEMBytes`/`.fromPEMFile` calls — unlike
+        /// the single-certificate `Certificate.resolvedDERBytes()`, this type's `build()` never
+        /// had that asymmetry to begin with.
+        package func resolvedDERBytes() throws -> [Data] {
+            switch self {
+            case .certificates(let certificates):
+                return try certificates.flatMap { try $0.resolvedDERBytes() }
+            case .bytes(let bytes):
+                return try Internals.Certificate.resolvedPEMCertificateDERBytes(of: Data(bytes))
+            case .file(let file):
+                do {
+                    let data = try Data(contentsOf: URL(fileURLWithPath: file))
+                    return try Internals.Certificate.resolvedPEMCertificateDERBytes(of: data)
+                } catch {
+                    throw SecureFileLoadError(resource: .certificate, path: file, underlying: error)
+                }
+            }
+        }
+
+        #if canImport(NIOCore)
         package func build() throws -> [NIOSSLCertificateSource] {
             switch self {
             case .certificates(let certificates):
@@ -53,5 +85,6 @@ extension Internals {
                 }
             }
         }
+        #endif
     }
 }

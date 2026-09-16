@@ -11,7 +11,6 @@
 #if canImport(Darwin)
 
 import CryptoKit
-import NIOSSL
 import Security
 import _CryptoExtras
 
@@ -81,19 +80,14 @@ extension Internals {
         // (`Internals.URLSessionIdentityPolicy`) and `.nio` under Network.framework
         // (`Internals.SecureConnection.makeLocalIdentityForNetworkFramework()`) alike.
 
-        /// The leaf certificate (index 0) plus any intermediates, as DER bytes.
-        /// `Internals.CertificateChain.build()` always resolves to `.certificate` sources
-        /// regardless of how it was configured (bytes, file, or pre-built certificates), so this
-        /// never hits its own `preconditionFailure`.
+        /// The leaf certificate (index 0) plus any intermediates, as DER bytes. Built on
+        /// `Internals.CertificateChain.resolvedDERBytes()` (portable, `SwiftASN1`-backed) rather
+        /// than `build()` + NIOSSL's own `.toDERBytes()` — this used to round-trip through NIOSSL
+        /// just to get back DER bytes that were already available, which also meant this
+        /// Darwin-only, `.urlSession`-reachable file secretly depended on NIOSSL. See
+        /// `Internals.Certificate.resolvedDERBytes()`'s doc comment for the technique.
         package static func certificateDERs(from certificateChain: Internals.CertificateChain) throws -> [Data] {
-            try certificateChain.build().map { source in
-                guard case .certificate(let certificate) = source else {
-                    preconditionFailure(
-                        "Internals.CertificateChain.build() unexpectedly produced a non-certificate source"
-                    )
-                }
-                return Data(try certificate.toDERBytes())
-            }
+            try certificateChain.resolvedDERBytes()
         }
 
         /// Loads the configured private key's raw bytes and, for `.pem`, strips the PEM armor
@@ -147,7 +141,7 @@ extension Internals {
         /// entry point can't parse: a wrong passphrase, an EC key, or a PKCS#8-encrypted one.
         private static func decryptedRSAPrivateKeyDER(
             fromEncryptedPEM pemData: Data,
-            password: NIOSSLSecureBytes
+            password: Internals.SecureBytes
         ) throws -> Data {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
                 throw Error.unsupportedKeyFormat("non-UTF8 input")

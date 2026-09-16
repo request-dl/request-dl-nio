@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import RequestDLInternals
 import Testing
 
@@ -95,7 +94,7 @@ struct InternalsClientIdentityDescriptorTests {
             .init(
                 client.privateKeyURL.absolutePath(percentEncoded: false),
                 format: .pem,
-                password: NIOSSLSecureBytes("password".utf8)
+                password: Internals.SecureBytes("password".utf8)
             )
         )
 
