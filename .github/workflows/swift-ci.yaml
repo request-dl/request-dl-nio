@@ -92,3 +92,15 @@ jobs:
       # Step 5
       enable-coverage-upload: true
     secrets: inherit
+
+  urlsession-only-build:
+    name: "🌐 URLSession-only Build"
+    # Skip draft PRs, matching the reusable "Swift CI" job's own guard above.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build RequestDL with the NIOTransport trait disabled
+        run: swift build --disable-default-traits --target RequestDL
