@@ -42,13 +42,26 @@ extension Internals {
         /// The first value stored under `name`, compared case insensitively per RFC 9110 (same
         /// contract as `NIOHTTP1.HTTPHeaders.first(name:)`/`RequestDL.HTTPHeaders.first(name:)`).
         package func first(name: String) -> String? {
-            let name = name.lowercased()
-            return pairs.first { $0.name.lowercased() == name }?.value
+            pairs.first { Self.namesEqual($0.name, name) }?.value
         }
 
         /// Whether any value is stored under `name`, compared case insensitively.
         package func contains(name: String) -> Bool {
             first(name: name) != nil
+        }
+
+        // MARK: - Private static methods
+
+        /// HTTP header names are ASCII tokens (RFC 9110 §5.1), so this folds case byte by byte
+        /// instead of calling `String.lowercased()` on each side — Unicode-aware and allocates
+        /// a full lowercased copy per call, neither of which a name comparison needs, and a scan
+        /// over every stored pair otherwise pays that allocation once per pair, per lookup.
+        private static func namesEqual(_ lhs: String, _ rhs: String) -> Bool {
+            lhs.utf8.elementsEqual(rhs.utf8) { asciiLowercased($0) == asciiLowercased($1) }
+        }
+
+        private static func asciiLowercased(_ byte: UInt8) -> UInt8 {
+            byte >= UInt8(ascii: "A") && byte <= UInt8(ascii: "Z") ? byte + 32 : byte
         }
     }
 }
