@@ -57,7 +57,7 @@ public struct Proxy<Headers: Property>: Property {
                 port: port,
                 connection: connectionProtocol,
                 authorization: authorization,
-                connectHeaders: connectHeaders.build()
+                connectHeaders: connectHeaders.makeInternalHeaders()
             )
         }
     }

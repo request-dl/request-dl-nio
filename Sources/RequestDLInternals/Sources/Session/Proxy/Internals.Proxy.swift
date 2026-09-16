@@ -2,8 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
-import NIOHTTP1
+#endif
 
 extension Internals {
 
@@ -15,6 +16,7 @@ extension Internals {
             case basicRawCredentials(String)
             case bearer(tokens: String)
 
+            #if canImport(NIOCore)
             package func build() -> HTTPClient.Authorization {
                 switch self {
                 case .basic(let username, let password):
@@ -25,6 +27,7 @@ extension Internals {
                     return .bearer(tokens: tokens)
                 }
             }
+            #endif
         }
 
         package enum ConnectionProtocol: Sendable, Hashable {
@@ -41,14 +44,14 @@ extension Internals {
         ///
         /// Ignored for `.socks`, which has no `CONNECT` phase. Excluded from `Hashable`, same as
         /// upstream's own `HTTPClient.Configuration.Proxy` — `NIOHTTP1.HTTPHeaders` isn't `Hashable`.
-        package let connectHeaders: HTTPHeaders
+        package let connectHeaders: Internals.HTTPHeaders
 
         package init(
             host: String,
             port: Int,
             connection connectionProtocol: ConnectionProtocol,
             authorization: Authorization?,
-            connectHeaders: HTTPHeaders = [:]
+            connectHeaders: Internals.HTTPHeaders = [:]
         ) {
             self.host = host
             self.port = port
@@ -57,6 +60,7 @@ extension Internals {
             self.connectHeaders = connectHeaders
         }
 
+        #if canImport(NIOCore)
         package func build() -> HTTPClient.Configuration.Proxy {
             switch connectionProtocol {
             case .http:
@@ -64,12 +68,13 @@ extension Internals {
                     host: host,
                     port: port,
                     authorization: authorization?.build(),
-                    connectHeaders: connectHeaders
+                    connectHeaders: connectHeaders.build()
                 )
             case .socks:
                 return .socksServer(host: host, port: port)
             }
         }
+        #endif
     }
 }
 

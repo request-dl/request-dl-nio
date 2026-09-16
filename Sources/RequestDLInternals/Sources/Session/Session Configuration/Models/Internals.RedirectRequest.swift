@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOHTTP1
-
 extension Internals {
 
     /// Internals-layer counterpart to `RequestDL.RedirectRequest`. See it for the meaning of
@@ -13,13 +11,13 @@ extension Internals {
 
         package var url: String
         package var method: String
-        package var headers: NIOHTTP1.HTTPHeaders
+        package var headers: Internals.HTTPHeaders
         package let hasBody: Bool
 
         package init(
             url: String,
             method: String,
-            headers: NIOHTTP1.HTTPHeaders,
+            headers: Internals.HTTPHeaders,
             hasBody: Bool
         ) {
             self.url = url

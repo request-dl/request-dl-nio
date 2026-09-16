@@ -4,6 +4,7 @@
 
 import Logging
 import NIOHTTP1
+import RequestDLInternals
 
 /// Provides methods and properties for HTTP headers.
 ///
@@ -195,6 +196,10 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
         self.init(Array(headers))
     }
 
+    init(_ headers: Internals.HTTPHeaders) {
+        self.init(Array(headers))
+    }
+
     // MARK: - Public methods
 
     ///
@@ -382,6 +387,13 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     // MARK: - Internal methods
 
     func build() -> NIOHTTP1.HTTPHeaders {
+        .init(Array(self))
+    }
+
+    /// Same conversion as ``build()``, into the portable currency `Internals.Proxy`/
+    /// `Internals.RedirectRequest` actually store — both reachable from either executor, so
+    /// neither can hold a `NIOHTTP1.HTTPHeaders` unconditionally.
+    func makeInternalHeaders() -> Internals.HTTPHeaders {
         .init(Array(self))
     }
 

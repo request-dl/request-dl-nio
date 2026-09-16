@@ -46,7 +46,7 @@ extension Internals {
                 var request = context.redirectRequest
                 request.url = redirectRequest.url
                 request.method = .init(rawValue: redirectRequest.method)
-                request.headers = redirectRequest.headers
+                request.headers = redirectRequest.headers.build()
                 return .follow(request)
             }
         }
@@ -61,7 +61,7 @@ extension Internals.RedirectRequest {
         self.init(
             url: request.url,
             method: request.method.rawValue,
-            headers: request.headers,
+            headers: Internals.HTTPHeaders(request.headers),
             hasBody: request.body != nil
         )
     }

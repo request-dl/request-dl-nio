@@ -219,7 +219,7 @@ extension Internals {
             else { return nil }
 
             let modifiedHeaders = updateCacheHeaders(
-                HTTPHeaders(cachedData.cachedResponse.response.headers.map { ($0.name, $0.value) }),
+                RequestDL.HTTPHeaders(cachedData.cachedResponse.response.headers.map { ($0.name, $0.value) }),
                 with: headers
             )
 
@@ -246,7 +246,7 @@ extension Internals {
         private func getUpdatedHeadersForCache(
             client: any RequestExecutingClient,
             cached cachedData: CachedData
-        ) async -> HTTPHeaders? {
+        ) async -> RequestDL.HTTPHeaders? {
             var requestConfiguration = requestConfiguration
             requestConfiguration.method = "HEAD"
 
@@ -296,12 +296,12 @@ extension Internals {
                 }
             }
 
-            return HTTPHeaders(head.headers.map { ($0.name, $0.value) })
+            return RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
         }
 
         /// Sets a conditional request header from the values the cached response carries.
         private func setConditionalHeader(
-            _ headers: inout HTTPHeaders,
+            _ headers: inout RequestDL.HTTPHeaders,
             named name: String,
             from values: [String]?
         ) {
@@ -323,9 +323,9 @@ extension Internals {
         /// could only ever add a directive that was missing and never refresh one that existed,
         /// and picking up a fresher `max-age` is the entire point of revalidating.
         private func updateCacheHeaders(
-            _ cachedHeaders: HTTPHeaders,
-            with newHeaders: HTTPHeaders
-        ) -> HTTPHeaders {
+            _ cachedHeaders: RequestDL.HTTPHeaders,
+            with newHeaders: RequestDL.HTTPHeaders
+        ) -> RequestDL.HTTPHeaders {
             var merged = cachedHeaders
 
             replaceHeader(&merged, with: newHeaders, for: "Cache-Control")
@@ -335,8 +335,8 @@ extension Internals {
         }
 
         private func replaceHeader(
-            _ headers: inout HTTPHeaders,
-            with newHeaders: HTTPHeaders,
+            _ headers: inout RequestDL.HTTPHeaders,
+            with newHeaders: RequestDL.HTTPHeaders,
             for name: String
         ) {
             guard let values = newHeaders[name], !values.isEmpty else {
@@ -356,7 +356,7 @@ extension Internals {
 
         private func updateCachedResponse(
             _ cachedResponse: CachedResponse,
-            with updatedHeaders: HTTPHeaders
+            with updatedHeaders: RequestDL.HTTPHeaders
         ) -> CachedResponse {
             .init(
                 response: .init(
@@ -379,7 +379,7 @@ extension Internals {
             }
 
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
-                let headHeaders = HTTPHeaders(head.headers.map { ($0.name, $0.value) })
+                let headHeaders = RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
                 guard
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),

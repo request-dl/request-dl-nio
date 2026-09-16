@@ -47,7 +47,7 @@ extension Internals.RedirectRequest {
         self.init(
             url: request.url,
             method: request.method,
-            headers: request.headers.build(),
+            headers: request.headers.makeInternalHeaders(),
             hasBody: request.hasBody
         )
     }
