@@ -211,7 +211,7 @@ extension Internals {
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil,
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil
-        ) async throws -> (head: Internals.ResponseHead, body: Data) where Body.Element == ByteBuffer {
+        ) async throws -> (head: Internals.ResponseHead, body: Data) where Body.Element == Data {
             let release = await throttledExecutor.acquire()
             defer { release() }
 
@@ -384,7 +384,7 @@ extension Internals {
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil
-        ) async throws -> SessionTask where Body.Element == ByteBuffer {
+        ) async throws -> SessionTask where Body.Element == Data {
             try await executeSessionTask(
                 request: request,
                 readingMode: readingMode,

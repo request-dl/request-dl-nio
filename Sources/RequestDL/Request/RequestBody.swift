@@ -9,6 +9,7 @@ import RequestDLInternals
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.Data
 import struct Foundation.URL
 #endif
 
@@ -182,7 +183,7 @@ extension RequestBody: AsyncSequence {
 
     ///
     /// An iterator for traversing the `RequestBody`'s underlying buffer sequence.
-    /// This allows the body to be treated as a sequence of `ByteBuffer` chunks.
+    /// This allows the body to be treated as a sequence of `Data` chunks.
     ///
     public struct AsyncIterator: AsyncIteratorProtocol {
 
@@ -196,22 +197,22 @@ extension RequestBody: AsyncSequence {
         ///
         /// Advances to the next element in the sequence of buffer chunks.
         ///
-        /// - Returns: The next `ByteBuffer` in the sequence, or `nil` if there are no more elements.
+        /// - Returns: The next `Data` chunk in the sequence, or `nil` if there are no more elements.
         /// - Throws: Whatever a configured ``Compressor``'s ``CompressorStream`` throws, for a
         /// compressing body. A fixed body never throws, but shares this signature so callers
         /// don't need to know which kind of `RequestBody` they were handed.
         ///
-        public mutating func next() async throws -> NIOCore.ByteBuffer? {
+        public mutating func next() async throws -> Data? {
             switch backing {
             case .fixed(var iterator):
-                let element = await iterator.next()
+                var element = await iterator.next()
                 backing = .fixed(iterator)
-                return element
+                return element?.asData()
 
             case .compressing(var iterator):
-                let element = try await iterator.next()
+                var element = try await iterator.next()
                 backing = .compressing(iterator)
-                return element
+                return element?.asData()
             }
         }
     }

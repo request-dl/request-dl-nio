@@ -22,6 +22,16 @@ extension [ByteBuffer] {
     }
 }
 
+extension [Internals.Bytes] {
+
+    func resolveData() -> [Data] {
+        map {
+            var mutableBytes = $0
+            return mutableBytes.asData()
+        }
+    }
+}
+
 extension Array where Element: _BufferRepresentable {
 
     func resolveData() async -> [Data] {

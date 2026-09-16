@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import Testing
 
 @testable import RequestDLInternals
@@ -225,10 +224,10 @@ struct InternalsURLSessionClientSessionTaskTests {
         var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
         request.httpMethod = "POST"
 
-        let (stream, continuation) = AsyncStream<ByteBuffer>.makeStream()
+        let (stream, continuation) = AsyncStream<Data>.makeStream()
         for start in Swift.stride(from: 0, to: payload.count, by: 4_096) {
             let end = Swift.min(start + 4_096, payload.count)
-            continuation.yield(ByteBuffer(bytes: payload[start..<end]))
+            continuation.yield(Data(payload[start..<end]))
         }
         continuation.finish()
 
@@ -284,8 +283,8 @@ struct InternalsURLSessionClientSessionTaskTests {
         var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
         request.httpMethod = "POST"
 
-        let (stream, continuation) = AsyncStream<ByteBuffer>.makeStream()
-        continuation.yield(ByteBuffer(bytes: payload))
+        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        continuation.yield(Data(payload))
         continuation.finish()
 
         // See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`)

@@ -183,8 +183,8 @@ extension RequestConfiguration {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for try await buffer in body {
-                data.append(contentsOf: buffer.readableBytesView)
+            for try await chunk in body {
+                data.append(chunk)
             }
 
             request.httpBody = data

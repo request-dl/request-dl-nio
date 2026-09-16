@@ -607,8 +607,8 @@ extension CURLCommandParserTests {
     private func drain(_ body: RequestBody) async throws -> Data {
         var data = Data()
 
-        for try await buffer in body {
-            data.append(contentsOf: buffer.readableBytesView)
+        for try await chunk in body {
+            data.append(chunk)
         }
 
         return data

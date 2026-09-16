@@ -4,6 +4,13 @@
 
 import AsyncHTTPClient
 import NIOCore
+import NIOFoundationEssentialsCompat
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension Internals {
 
@@ -11,8 +18,13 @@ extension Internals {
     /// drive either a fixed, known-length body or a `Internals.CompressingByteSequence` (whose
     /// final size, and whose ability to fail mid-stream if a custom `Compressor` throws, are both
     /// only known once the whole thing has been pulled through).
+    ///
+    /// `Body.Element` is `Data`, matching the public `RequestBody`'s own currency — this type is
+    /// the one place that actually needs a `ByteBuffer` (`HTTPClient.Body.StreamWriter` wants
+    /// one), so the conversion happens right here, once per chunk, rather than forcing NIO onto
+    /// `RequestBody`'s public surface.
     package struct StreamWriterSequence<Body: AsyncSequence & Sendable>: Sendable, AsyncSequence
-    where Body.Element == ByteBuffer {
+    where Body.Element == Data {
 
         package struct AsyncIterator: AsyncIteratorProtocol {
 
@@ -41,7 +53,7 @@ extension Internals {
                     return nil
                 }
 
-                return writer.write(.byteBuffer(item))
+                return writer.write(.byteBuffer(ByteBuffer(data: item)))
             }
         }
 
