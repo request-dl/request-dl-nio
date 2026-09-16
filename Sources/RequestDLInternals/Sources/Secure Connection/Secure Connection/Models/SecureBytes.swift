@@ -47,13 +47,6 @@ public struct SecureBytes: Sendable, Equatable, ExpressibleByArrayLiteral {
         self.init(elements)
     }
 
-    #if canImport(NIOCore)
-    /// Adopts an existing `NIOSSLSecureBytes` as is, with no copy.
-    public init(_ secureBytes: NIOSSLSecureBytes) {
-        storage = .nio(secureBytes)
-    }
-    #endif
-
     // MARK: - Internal methods
 
     #if canImport(NIOCore)
