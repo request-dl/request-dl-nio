@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -102,7 +101,7 @@ extension Internals {
                 // writing to the same `ByteURL`, and moving the indices one statement at a
                 // time let the two interleave, which reads from whatever offset the other
                 // side happened to leave behind.
-                let data = url.withStorage { buffer, writtenBytes -> Data? in
+                let data = url.withStorage { bytes, writtenBytes -> Data? in
                     // Out of range is a possible outcome of a truncated or concurrently reset
                     // buffer, not a programming error, so this reports rather than traps —
                     // must not be a `precondition`, which would turn every such race into a
@@ -115,13 +114,14 @@ extension Internals {
                     // which would make a partial tail indistinguishable from EOF.
                     let length = min(count, writtenBytes - index)
 
-                    buffer.moveWriterIndex(to: writtenBytes)
-                    buffer.moveReaderIndex(to: index)
+                    bytes.moveWriterIndex(to: writtenBytes)
+                    bytes.moveReaderIndex(to: index)
 
-                    // `readSlice` and a view, not `readData`. The `Data` returning members of
-                    // `ByteBuffer` live in `NIOFoundationCompat`, which pulls in all of
-                    // `Foundation` — exactly the dependency this type exists to avoid.
-                    return buffer.readSlice(length: length).map { Data($0.readableBytesView) }
+                    guard var slice = bytes.readSlice(length: length) else {
+                        return nil
+                    }
+
+                    return slice.asData()
                 }
 
                 _index = UInt64(index + (data?.count ?? .zero))
@@ -144,30 +144,29 @@ extension Internals {
 
                 let index = Int(_index)
 
-                // Same reasoning as `read`, plus the cost: mutating the buffer in place keeps
+                // Same reasoning as `read`, plus the cost: mutating the store in place keeps
                 // its storage uniquely referenced, so appending does not copy everything
                 // written so far on every call.
-                let written = url.withStorage { buffer, writtenBytes -> Int in
-                    buffer.moveReaderIndex(to: .zero)
+                let written = url.withStorage { bytes, writtenBytes -> Int in
+                    bytes.moveReaderIndex(to: .zero)
 
-                    let gap = index - buffer.writerIndex
+                    let gap = index - bytes.writerIndex
 
                     if gap > .zero {
                         // Seeked past the end. A file handle leaves a hole there and carries
                         // on, so match it. Handing the index straight to `moveWriterIndex`
-                        // trips NIO's capacity precondition and takes the process down.
-                        _ = buffer.writeRepeatingByte(.zero, count: gap)
+                        // trips the NIO backing's capacity precondition and takes the process
+                        // down when this store happens to be `ByteBuffer`-backed.
+                        _ = bytes.writeRepeatingByte(.zero, count: gap)
                     } else {
-                        buffer.moveWriterIndex(to: index)
+                        bytes.moveWriterIndex(to: index)
                     }
 
-                    // `writeBytes`, not `writeData`, for the `NIOFoundationCompat` reason
-                    // above. `DataProtocol` is a collection of `UInt8`, so it fits.
-                    let written = buffer.writeBytes(data)
+                    let written = bytes.writeBytes(data)
 
                     // A write in the middle rewinds the writer index, so the count has to be a
                     // high water mark rather than the current position.
-                    writtenBytes = max(writtenBytes, buffer.writerIndex)
+                    writtenBytes = max(writtenBytes, bytes.writerIndex)
 
                     return written
                 }

@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -25,7 +23,7 @@ extension Internals {
 
             // MARK: - Private properties
 
-            private var bytes: NIOCore.ByteBuffer
+            private var bytes: Internals.Bytes
 
             // MARK: - Inits
 
@@ -51,7 +49,7 @@ extension Internals {
             /// Iterative on purpose. Recursing once per source buffer meant the stack depth
             /// tracked the number of buffers feeding a single chunk, which a body assembled
             /// from many small parts turns into an overflow.
-            package mutating func next() async -> NIOCore.ByteBuffer? {
+            package mutating func next() async -> Internals.Bytes? {
                 guard chunkSize > .zero else {
                     return nil
                 }
@@ -103,7 +101,9 @@ extension Internals {
                     return nil
                 }
 
-                let chunk = ByteBuffer(buffer: bytes)
+                // Value semantics, not a copy constructor: `bytes` is a struct, so this is
+                // already an independent snapshot before it gets rewound below.
+                let chunk = bytes
 
                 bytes.moveReaderIndex(to: .zero)
                 bytes.moveWriterIndex(to: .zero)
