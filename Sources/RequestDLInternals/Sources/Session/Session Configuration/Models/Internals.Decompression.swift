@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
+#endif
 
 extension Internals {
 
@@ -59,6 +61,7 @@ extension Internals {
         /// algorithm that happens to declare `contentEncodingValue == "gzip"` must not enable this,
         /// or `async-http-client` would decode the response out from under it before manual
         /// dispatch ever got a chance to hand it over.
+        #if canImport(NIOCore)
         package func build() -> HTTPClient.Decompression {
             switch self {
             case .disabled:
@@ -68,6 +71,7 @@ extension Internals {
                 return hasNIONativeAlgorithm ? .enabled(limit: limit.build()) : .disabled
             }
         }
+        #endif
     }
 }
 

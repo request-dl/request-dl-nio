@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOHTTP1
 import RequestDLInternals
 import Tracing
 

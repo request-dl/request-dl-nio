@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOSSL
+#endif
 
 extension Internals.Certificate {
 
@@ -24,6 +26,7 @@ extension Internals.Certificate {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() -> NIOSSLSerializationFormats {
             switch self {
             case .der:
@@ -32,5 +35,6 @@ extension Internals.Certificate {
                 return .pem
             }
         }
+        #endif
     }
 }

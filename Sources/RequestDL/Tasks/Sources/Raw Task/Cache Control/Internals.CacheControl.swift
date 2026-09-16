@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
-import Logging
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)

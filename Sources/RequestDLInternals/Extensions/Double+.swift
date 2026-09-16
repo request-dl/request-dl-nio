@@ -24,7 +24,14 @@ extension Double {
             return "\(Int64(rounded()))"
         }
 
-        let scale = Double.pow(10 as Double, Double(fractionDigits))
+        // A loop, not `pow(_:_:)`, which needs either Foundation/Darwin's libm or
+        // `swift-numerics`, neither a real dependency of this file. `fractionDigits` is always
+        // small (1-3 at every call site), so there is no precision or performance to gain from a
+        // real exponentiation routine.
+        var scale: Double = 1
+        for _ in 0..<fractionDigits {
+            scale *= 10
+        }
         let scaled = Int64((self * scale).rounded())
 
         let whole = scaled / Int64(scale)

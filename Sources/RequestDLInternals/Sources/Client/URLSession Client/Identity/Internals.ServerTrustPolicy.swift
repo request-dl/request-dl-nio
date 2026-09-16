@@ -9,7 +9,6 @@
 
 #if canImport(Darwin)
 
-import AsyncHTTPClient
 import Crypto
 import Security
 

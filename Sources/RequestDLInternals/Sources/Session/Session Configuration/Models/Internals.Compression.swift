@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOHTTPCompression
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -30,6 +32,7 @@ extension Internals.Compression {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() -> NIOCompression.Algorithm {
             switch self {
             case .gzip:
@@ -38,6 +41,7 @@ extension Internals.Compression {
                 return .deflate
             }
         }
+        #endif
     }
 
     /// What to do when the request already carries a `Content-Encoding` header before

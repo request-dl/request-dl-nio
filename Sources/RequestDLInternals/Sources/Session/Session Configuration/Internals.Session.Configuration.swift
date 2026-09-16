@@ -418,8 +418,6 @@ extension Internals.Session.Configuration {
 
 #if canImport(Darwin)
 
-import NIOSSL
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else

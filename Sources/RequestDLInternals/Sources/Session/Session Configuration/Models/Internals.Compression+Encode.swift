@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.NIOHTTPCompressorStream` drives `NIOHTTPRequestCompressor` directly, so this whole
+// file is NIO-only: there's no portable equivalent here the way `Internals.PrivateKey`/
+// `Internals.Certificate` have one. `PortableGzipCompressorStream`/`PortableDeflateCompressorStream`
+// (in the `RequestDL` module) are what stand in for it when NIOCore isn't available.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOEmbedded
 import NIOFoundationEssentialsCompat
@@ -217,3 +223,5 @@ extension Internals {
         }
     }
 }
+
+#endif
