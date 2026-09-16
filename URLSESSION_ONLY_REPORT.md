@@ -5,14 +5,22 @@ touch it) compile without any of the NIO family — `NIOCore`, `NIOSSL`, `NIOHTT
 `AsyncHTTPClient`, etc. — so that a future SPM trait can offer a Darwin/`.urlSession`-only build
 that never links NIO at all: no dependency to fetch, no code to compile, smaller binary.
 
-**No such trait exists yet.** Every change described here is prep work, done entirely behind
+**No such trait exists in `Package.swift` yet** — that's still future work — **but the compile
+target itself is done and verified for real.** Every change described here is behind
 `#if canImport(NIOCore)` (never `#if canImport(Darwin)` — see "The one rule" below), which
-evaluates `true` unconditionally today since NIOCore is always a dependency of this package. This
-means every change so far is provably safe: the full test suite (`swift test`, both
-`RequestDLTests` and `RequestDLInternalsTests`) passes exactly as before after each step, because
-nothing has actually been removed from today's build — only marked as *removable later*. Adding
-the actual trait to `Package.swift` and proving a real NIO-free build is future work, blocked on
-finishing the items below.
+evaluates `true` unconditionally today since NIOCore is always a dependency of this package, so
+none of it changes today's actual build. What changed this session: rather than resting on "this
+is provably safe because the `#else` branch is unreachable," every `#if canImport(NIOCore)` in
+both `RequestDLInternals` and the touched parts of `RequestDL` was temporarily forced to its
+`false` branch (a scripted, reverted-before-commit sed pass, not a permanent change) and the whole
+package — `swift build`, the full `RequestDLInternals`/`RequestDL` targets — was compiled for
+real against that forced state. It built clean. That is the actual claim this file makes now:
+today, right now, `RequestDLInternals` and `RequestDL`'s NIO-touching call sites all have a
+genuine, compiling, non-NIO path — not just a documented intention to have one. (Test *targets*
+were not forced through the same exercise — see "What 'done' does and doesn't mean" below.)
+
+Finishing the SPM trait itself, and re-running this same forced-build check against it once it
+exists (a real, not scripted, `!canImport(NIOCore)` build), is what's left.
 
 Delete this file (and update the `urlsession-only-trait-isolation` memory that points to it) once
 the trait exists and this whole effort is done — same lifecycle as `URLSESSION_TASK.md`/
@@ -72,11 +80,10 @@ tests, means something broke.
    portable, but part of it (usually a `build()`/conversion method producing a real NIO type) is
    still unconditional. This is the state most "done" items below are actually in — it's a
    deliberate, correct intermediate state (see "Why partial gating is fine" below), not
-   unfinished work, *except* for `Internals.SecureConnection.swift` itself, where the
-   unconditional part (`build()`/`Output`) is the actual remaining blocker for the whole
-   `RequestDLInternals` target to compile without NIO — see Open Item 1.
-4. **Untouched** — still unconditionally imports NIO throughout, never looked at. See Open Items
-   1 and 2.
+   unfinished work. `Internals.SecureConnection.swift`'s own `build()`/`Output` — once *the*
+   named blocker for the whole target — is now itself gated too; see the Done table.
+4. **Untouched** — still unconditionally imports NIO throughout, never looked at. See the Open
+   section for what's left.
 
 ### Why partial gating is fine
 
@@ -184,11 +191,98 @@ behavior it used to be.
 | — | `Internals.ClientManager` split into `Internals.ClientManager.swift` (portable: table/lock/lifetime bookkeeping, no NIO import at all now) + `Internals.ClientManager+NIO.swift` (the `.nio`/`.nioTransportServices` half, whole file gated) | Fully gated |
 | — | `Internals.Session.Configuration.connectionPool` → `Internals.ConnectionPool` | Partially gated (storage portable, `.build()` NIO-only, as expected) |
 | — | `Internals.Proxy` (`Authorization.build()`, struct `build()`) | Partially gated |
-| — | `Internals.SecureConnection`'s 8 TLS knob fields (`certificateVerification`, `signing`/`verifySignatureAlgorithms`, `renegotiationSupport`, `min`/`maximumTLSVersion`, `cipherSuiteValues`, `shutdownTimeout`) → portable `Internals.*` mirror types | Partially gated (storage portable; `build()`/`Output` still unconditional — see Open Item 1) |
+| — | `Internals.SecureConnection`'s 8 TLS knob fields (`certificateVerification`, `signing`/`verifySignatureAlgorithms`, `renegotiationSupport`, `min`/`maximumTLSVersion`, `cipherSuiteValues`, `shutdownTimeout`) → portable `Internals.*` mirror types | Partially gated (storage portable, `build()` NIO-only, as expected) |
 | — | `Internals.ServerTrustPolicy` (own `certificateVerification` copy) | Fully removed (`import NIOSSL` gone entirely) |
 | — | `SSLKeyLogger`/`SSLPSKIdentityResolver` protocols (public + internal) + `PSKIdentity` Property + `Internals.SecureConnection.keyLogger`/`pskHint`/`pskIdentityResolver` fields + the 12 NIO-exclusive `SecureConnection` builder methods | Fully gated |
 | — | `DeflateAlgorithm`/`GzipAlgorithm`'s `Compressor` (outbound request-body compression) → `PortableDeflateCompressorStream`/`PortableGzipCompressorStream`, both gated on `!canImport(NIOCore) && canImport(zlib)`, falling back to `CompressionUnavailableError` only if even `zlib` is missing | Fully gated (both algorithms) |
 | — | `Internals.fileSystem`/`FileSystemManager.run` → `Internals.PortableFileSystem` (`FileManager`/`FileHandle`, offloaded via `DispatchQueue.global()`), consumed unchanged by `FileStreamBuffer`/`FileBufferURL`/`URL+Extensions.swift`/`DiskStorage.swift` | Fully gated — see "Disk I/O" writeup below |
+| — | `Internals.SecureConnection.build()`/`Output`/`makeTLSConfigurationByContext(_:)`/`makeLocalIdentityForNetworkFramework()` | Fully gated — narrowed away entirely (no portable counterpart needed; see "SecureConnection itself" writeup below) |
+| — | `Internals.Certificate`/`CertificateChain`/`TrustRoots`/`AdditionalTrustRoots` → portable `resolvedDERBytes()` (`SwiftASN1`-backed), replacing the NIOSSL round-trip in `RawBytesIdentityBuilder`/`ServerTrustPolicy`/`ClientIdentityDescriptor` | Fully gated — see "Certificate DER extraction" writeup below |
+| — | `Internals.DarwinTrustEvaluation.chainSPKIDERBytes(of:)` → `X509`-based SPKI extraction, replacing `NIOSSLCertificate.spkiDERBytes()` (now-dead `NIOSSLCertificate+SPKI.swift` deleted) | Fully gated |
+| — | `Internals.PrivateKey.password`/`PrivateKeySource` → `Internals.SecureBytes` (portable mirror of `NIOSSLSecureBytes`) + public `RequestDL.SecureBytes`, new additive `PrivateKey` initializer overloads | Fully gated (existing `NIOSSLSecureBytes`-taking overloads untouched, still available when NIOCore is present) |
+| — | `PropertyMockedTask` (the `.mockedTask` feature) → rewritten on `RequestBody`'s own `AsyncSequence` conformance instead of `EventLoopGroup`/`HTTPClient.Body` | Fully portable now for both executors, not just gated — see "Mock task portability" writeup below |
+| — | `Internals.Session`/`Client`/`UnsafeTask`/`ClientResponseReceiver`/`EventLoopGroupManager`/`MultiThreadedEventLoopGroup`/`TSEventLoopGroup`/`NIORedirectStrategyAdapter`/`NIOTrustEvaluator`(`+Darwin`)/`StreamWriterSequence`, `Internals.Session.Configuration`'s `build()`/`Output`, `HTTPVersion`/`RedirectConfiguration`/`Timeout`'s `build()`, `RequestBody`/`RequestConfiguration`'s `build(eventLoop:)`, `Internals.Client+RequestExecutingClient.swift` | Fully or partially gated — the "everything else" pass; see "The rest of the core" writeup below |
+| — | `Internals.AsyncBytes`/`AsyncResponse`/`SessionTask`/`DownloadBuffer` | `import NIOCore` was dead in all four — deleted, no gate needed |
+| — | `Internals.Storage.lifetime` → `Int64` nanoseconds (was `NIOCore.TimeAmount`) | Fully portable, matches the `Internals.Timeout`/`ConnectionPool` convention |
+| — | `Internals.URLSessionClient.swift`'s one real `ByteBuffer` construction (`Internals.ByteURL(ByteBuffer(bytes: data))`) → `Internals.ByteURL()` + `.replace(with:)` | Fully portable; `import NIOCore` was otherwise unused in this file and is now gone |
+| — | `Internals.TLSVersion.urlSessionProtocolVersion` moved onto the portable mirror directly (was an extension on `NIOSSL.TLSVersion`) | `.urlSession`'s own config-building path no longer needs NIOSSL for this |
+
+### Certificate DER extraction (closed out this session)
+
+`RawBytesIdentityBuilder.certificateDERs(from:)` and `ServerTrustPolicy.resolve(from:)` (the
+`.urlSession` mTLS/pinning path — reachable and exercised today, not hypothetical) both used to
+round-trip through NIOSSL just to get DER bytes back out: `CertificateChain.build()`/
+`TrustRoots.resolvedCertificates()` (NIOSSL parsing) followed immediately by `.toDERBytes()`
+(NIOSSL serializing back out). That meant two Darwin-only, `.urlSession`-reachable files secretly
+depended on NIOSSL despite never importing it directly (the same cross-module-visibility gap
+`Internals.ServerTrustPolicy.swift`'s own "`import NIOSSL` gone entirely" Done row already ran
+into once) — `Internals.ClientIdentityDescriptor.swift` (`BackgroundDownloadTask`'s client-cert
+rebuild) had the identical pattern, found only by force-compiling the whole package and watching
+it fail there too.
+
+Fixed by giving `Internals.Certificate` a portable `resolvedDERBytes() -> [Data]`, built on
+`SwiftASN1`'s `PEMDocument.parseMultiple(pemString:)` rather than a hand-rolled PEM splitter.
+`SwiftASN1`/`X509` are already portable package dependencies — confirmed by reading
+`swift-certificates`'s own `Package.swift` (`X509` depends only on `SwiftASN1`, `Crypto`,
+`_CryptoExtras`, none of which touch NIOCore), not assumed. `CertificateChain`/`TrustRoots`/
+`AdditionalTrustRoots` each grew their own `resolvedDERBytes()` built on the same primitive.
+
+One real, non-obvious behavioral asymmetry, confirmed by test rather than assumed: `build()`'s
+`.bytes` case constructs a single `NIOSSLCertificate(bytes:format:)` (silently keeps only the
+*first* certificate in a multi-certificate PEM blob) while its `.file` case calls
+`NIOSSLCertificate.fromPEMFile`/`.fromPEMBytes` (reads every certificate). `resolvedDERBytes()`
+deliberately reproduces this asymmetry rather than "fixing" it silently while porting — see
+`Internals.Certificate.resolvedDERBytes()`'s own doc comment and
+`InternalsCertificateTests.resolvedDERBytes_whenPEMBundleBytesHasMultipleCertificates_matchesBuildsSingleCertificateBehavior()`.
+Verified byte-for-byte against `NIOSSLCertificate`'s own DER output across `.bytes`/`.file`,
+`.pem`/`.der`, single- and multi-certificate bundles, and malformed-input error paths.
+
+### SecureConnection itself (closed out this session)
+
+Turned out **not** to need a portable counterpart at all. `Internals.SecureConnection.build()`/
+`Output`/`makeTLSConfigurationByContext(_:)`/`makeLocalIdentityForNetworkFramework()` have exactly
+one caller in the whole codebase — `Internals.Session.Configuration.build()`, which itself exists
+only to construct an `HTTPClient.Configuration` (a NIOCore/AsyncHTTPClient-only type, consumed
+only by `Internals.ClientManager+NIO.swift`, the `.nio`/`.nioTransportServices` client builder).
+`.urlSession` never touches any of this: it reads `certificateChain`/`privateKey`/`trustRoots`/
+etc. straight off `Internals.SecureConnection`'s own portable fields, through
+`ServerTrustPolicy`/`URLSessionIdentityPolicy`/`RawBytesIdentityBuilder` instead. So the whole
+`build()`/`Output` surface (and `Internals.Session.Configuration.build()`/`Output` one layer up)
+is narrowed away entirely under `#if canImport(NIOCore)` — the same "narrow the public API
+surface" pattern already used for `Internals.Executor`'s `.nio` cases, not a new technique.
+
+### Mock task portability (closed out this session)
+
+`PropertyMockedTask` (`.mockedTask`) used to construct `Internals.Client` (the NIO-only client)
+and drive the request body through `EventLoopGroup`/`HTTPClient.Body.stream` unconditionally,
+regardless of which executor the surrounding `Session` actually resolved to — a real capability
+gap for a URLSession-only build, not a mechanical gate: the whole feature would have silently
+stopped existing. Fixed properly, not gated: `mockBodyResponse` now drives `RequestBody` through
+its own `AsyncSequence` conformance (`for try await chunk in body`), appending each chunk to
+`Internals.DownloadBuffer` via `Internals.ByteURL()` + `.replace(with:)` — no `EventLoopGroup`
+needed for either executor, since `RequestBody` was already portable. The client-resolution half
+now goes through `resolvedClient()` (the executor-aware entry point `RawTask.resolveClient(_:)`
+already uses) instead of `Internals.ClientManager.shared.client(...)` (NIO-only). Net effect: the
+mock feature works identically for both executors today, and needs no further change once the
+trait exists.
+
+### The rest of the core (closed out this session)
+
+Force-compiling the whole package surfaced a long tail of files that were either never gated
+despite the report already classifying them as bucket A (`Internals.NIOTrustEvaluator.swift`/
+`+Darwin.swift` — the report said "legitimately NIO-only forever, no work needed" but nobody had
+actually wrapped them), or genuinely shared types nobody had looked at yet
+(`Internals.Session`/`Client`/`ClientResponseReceiver`/`UnsafeTask`/`EventLoopGroupManager`/
+`MultiThreadedEventLoopGroup`/`TSEventLoopGroup`/`NIORedirectStrategyAdapter`/
+`StreamWriterSequence`, `Internals.Session.Configuration`'s own `build()`/`Output`,
+`HTTPVersion`/`RedirectConfiguration`/`Timeout`'s `build()` methods, `RequestBody`/
+`RequestConfiguration`'s `build(eventLoop:)`, `Internals.Client+RequestExecutingClient.swift`).
+Each was checked for real usage (grep for non-doc-comment references, not assumed from the file
+name) before gating, to avoid accidentally walling off something `Internals.URLSessionClient.swift`
+still needed — `Internals.AsyncBytes`/`AsyncResponse`/`SessionTask`/`Internals.DownloadBuffer`
+turned out to already be shared and portable, with a merely *dead* `import NIOCore` each (deleted,
+not gated), confirmed by successfully building with the import removed before committing to that
+conclusion.
 
 ### Compression codec (closed out this session)
 
@@ -315,48 +409,30 @@ way before it could ship dead: the first draft of `PortableFileSystem.WriteOptio
 was missing its `permissions` parameter entirely, a hard compile error invisible to normal
 `swift build`/`swift test` since this branch never type-checks in today's build.
 
-## Open
+## What "done" does and doesn't mean
 
-### 1. Finish `Internals.SecureConnection` — the actual remaining blocker
+The whole-package forced-build check this session ran (see the top of this file) verified
+`swift build` for both `RequestDLInternals` and `RequestDL`. It did **not** verify:
 
-`Internals.SecureConnection.swift`'s `build()`/`Output`/`makeTLSConfigurationByContext(_:)`/
-`makeLocalIdentityForNetworkFramework()` are still unconditionally `import NIOSSL`. This is fine
-in isolation (matches the "partial gating" pattern — these methods are inherently NIO-only), but
-it means **this file, and by extension the whole target, still can't compile without NIO today**,
-regardless of how many other files get gated — until this one's own file-level imports move
-behind `#if canImport(NIOCore)` too, wrapping `build()`/`Output` themselves.
-
-Also untouched, and blocking the same file transitively (all still unconditional `import NIOSSL`):
-
-- `Sources/RequestDLInternals/Sources/Secure Connection/Certificate/Internals.Certificate.swift`
-- `.../Certificate/Models/Internals.Certificate.Format.swift`
-- `.../Certificate Chain/Internals.CertificateChain.swift`
-- `.../Additional Trust Roots/Internals.AdditionalTrustRoots.swift`
-- `.../Trust Roots/Internals.TrustRoots.swift`
-- `.../Private Key/Internals.PrivateKey.swift`
-- `.../Private Key Source/Internals.PrivateKeySource.swift`
-- `.../SPKI Pinning/NIOSSLCertificate+SPKI.swift`
-
-These all produce/consume `NIOSSLCertificate`/`NIOSSLCertificateSource`/`NIOSSLPrivateKeySource`
-directly (`build() -> [NIOSSLCertificate]` and similar) — `Internals.SecureConnection.build()`
-calls straight into them. Same treatment as the 8 fields already done: these would need their own
-portable mirrors (probably just "raw DER bytes + format", since that's what they ultimately are
-under the NIOSSL wrapping) with NIO-only `build()`s, OR — worth considering before doing the
-mechanical work — whether it's cheaper to keep these fields as-is and instead gate
-`Internals.SecureConnection.build()`'s *whole* NIO-consuming half behind `#if canImport(NIOCore)`
-directly, accepting that `certificateChain`/`privateKey`/`trustRoots`/`additionalTrustRoots`
-simply aren't configurable without NIO either (they're **currently** reachable under
-`.urlSession` too, via a Keychain round-trip through `RawBytesIdentityBuilder` — check whether
-that still holds before picking this option, since it would be a real capability loss for
-URLSession-only builds, not just a mechanical no-op removal).
-
-`Internals.NIOTrustEvaluator.swift`/`+Darwin.swift`/`+Portable.swift` are legitimately `.nio`-only
-forever (bucket A) — no work needed there beyond eventually moving them into a NIO-only
-subfolder once the trait exists. Same for `Internals.DarwinTrustEvaluation.swift` — check first
-whether it's already NIO-free (it was, in the original audit); re-verify since this session
-didn't re-touch it. `Internals.RawBytesIdentityBuilder.swift`/`Internals.URLSessionIdentityPolicy.swift`
-are bucket C (thin coupling), likely resolve mostly on their own once the fields above are fixed,
-since their own NIOSSL touches are largely re-using vocabulary that becomes portable.
+- **Test targets under the forced-off state.** `RequestDLInternalsTests`/`RequestDLTests` were
+  left untouched by the forced-build pass — they're written to exercise the real, NIOCore-present
+  build (comparing against `NIOSSLCertificate`/`NIOSSLPrivateKey` output, for instance), which is
+  the only state they can ever actually run in until the trait exists. Attempting to force-compile
+  every test file the same way the source was would mean either duplicating large parts of the
+  test suite for a build that doesn't exist yet, or gating test assertions themselves — neither is
+  what any earlier session in this file did either. What *was* verified: the real, NIOCore-present
+  build's full test suite (`swift test`, both targets) still passes after every change — 1220
+  tests / 168 suites (`RequestDLTests`) + 568 tests / 84 suites (`RequestDLInternalsTests`, up
+  from 560 — new `resolvedDERBytes()` coverage), 3 + 4 known issues, matching the baseline this
+  file has tracked all along.
+- **Runtime behavior.** A build that type-checks without NIOCore is not the same claim as "an app
+  built this way, once the trait exists, behaves correctly at runtime" — no such build has ever
+  actually been produced or run. The DER-extraction/SPKI work was cross-checked against real
+  output (`NIOSSLCertificate`'s own DER bytes, the system `gunzip`/`openssl`-equivalent tooling
+  used elsewhere in this file) specifically because "compiles" alone wasn't going to be enough
+  evidence for that piece.
+- **The `RequestDL` product's own test-support/example targets**, or any downstream package that
+  depends on this one — out of scope for a `swift build` of this package alone.
 
 ## Gotchas hit this session (worth knowing before continuing)
 
@@ -399,3 +475,26 @@ since their own NIOSSL touches are largely re-using vocabulary that becomes port
   confirmed valid by writing actual `.gz` files and checking them with the system `gunzip -t`
   rather than trusting the RFC 1952 spec alone. See `PortableDeflateCompressorStream`'s and
   `PortableGzipCompressorStream`'s doc comments.
+- **A report classifying a file as "bucket A, no work needed" is not the same as that file
+  actually being gated.** `Internals.NIOTrustEvaluator.swift` was called out as "legitimately
+  `.nio`-only forever, no work needed" as far back as the original audit — and still had a bare,
+  unconditional `import NIOCore`/`import NIOSSL` at the top, never wrapped, until this session's
+  forced-build pass actually tried to compile without it and failed. The same was true of
+  `Internals.Session`/`Client`/`ClientResponseReceiver`/`UnsafeTask`/several others. Only a real
+  attempt at the thing this file is working toward — forcing every gate to its `#else` branch and
+  compiling — reliably finds this class of gap; a classification written down in a doc comment or
+  a report, however confident, doesn't compile anything.
+- **A NIOSSL-only file can be a dependency's dependency without ever writing `import NIOSSL`
+  itself.** `Internals.ServerTrustPolicy.swift`, `Internals.ClientIdentityDescriptor.swift`, and
+  `.urlSession`'s own `TLSVersion.urlSessionProtocolVersion` conversion all called a method
+  (`resolvedCertificates()`/`CertificateChain.build()`/`NIOSSL.TLSVersion.urlSessionProtocolVersion`)
+  whose *return type* was NIOSSL-defined, without the calling file ever spelling out `import
+  NIOSSL` — Swift resolves member access on an already-typed value without requiring its
+  declaring module imported into the calling file. `grep -l "^import NIOSSL"` misses this
+  category entirely; only actually gating the callee and watching the caller fail to compile
+  surfaces it.
+- **Before trusting a third-party package's dependency graph, read its actual `Package.swift`.**
+  `SwiftASN1`/`X509` (`swift-certificates`) turned out to have zero NIOCore/NIOSSL in their own
+  dependency tree — confirmed by reading `.build/checkouts/swift-certificates/Package.swift`
+  directly, not assumed from "it's used somewhere in a NIO-heavy codebase" — which is what made
+  routing the portable certificate/SPKI work through them safe to do at all.
