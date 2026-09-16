@@ -6,6 +6,14 @@
 import NIOSSL
 #endif
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
+
 /// A byte sequence for a password/passphrase, such as ``Internals/PrivateKey``'s `password`,
 /// that stays constructible without NIO. When NIOSSL is available, it stores straight into
 /// NIOSSL's own `NIOSSLSecureBytes` (auto-zeroing storage included).
@@ -14,17 +22,16 @@ import NIOSSL
 /// differs, gated by `#if canImport(NIOCore)`:
 /// - `.nio`: a real `NIOSSLSecureBytes`, so this value gets NIOSSL's own zero-on-deallocation
 ///   guarantee for free, and ``build()`` returns it directly with no copy.
-/// - `.bytes`: a plain `[UInt8]` fallback where NIOSSL isn't available. This does **not** zero
-///   its storage on deallocation. That is a deliberate simplification for that path, not an
-///   oversight: the data this carries is a caller-supplied password/passphrase, not derived key
-///   material, and the actual cryptographic keys built from it are still handled by
-///   `Crypto`/NIOSSL/BoringSSL, which already zero what they own internally.
+/// - `.bytes`: a `ZeroingBytes` fallback where NIOSSL isn't available, backed by a heap
+///   allocation that zeroes itself on deallocation the same way `NIOSSLSecureBytes` does, just
+///   without NIOSSL/BoringSSL's `OPENSSL_cleanse` to lean on. See `ZeroingBytes`'s own doc
+///   comment for the platform-specific primitive each case uses.
 public struct SecureBytes: Sendable, Equatable, ExpressibleByArrayLiteral {
 
     // MARK: - Private storage
 
     private enum Storage: Sendable, Equatable {
-        case bytes([UInt8])
+        case bytes(ZeroingBytes)
         #if canImport(NIOCore)
         case nio(NIOSSLSecureBytes)
         #endif
@@ -39,7 +46,7 @@ public struct SecureBytes: Sendable, Equatable, ExpressibleByArrayLiteral {
         #if canImport(NIOCore)
         storage = .nio(NIOSSLSecureBytes(bytes))
         #else
-        storage = .bytes(Array(bytes))
+        storage = .bytes(ZeroingBytes(bytes))
         #endif
     }
 
@@ -96,5 +103,71 @@ extension SecureBytes: RandomAccessCollection {
             return secureBytes[position]
         #endif
         }
+    }
+}
+
+// MARK: - ZeroingBytes
+
+/// Heap-allocated byte storage that overwrites itself with zeroes when deallocated, backing
+/// `SecureBytes`'s NIOSSL-free fallback. Mirrors `NIOSSLSecureBytes`'s own `deinit`, but reaches
+/// for each platform's own libc primitive instead of NIOSSL/BoringSSL's `OPENSSL_cleanse`
+/// (unavailable here, since this path exists specifically for builds without NIOSSL):
+/// - Darwin: `memset_s`, part of libc since macOS 10.9 / iOS 7 (C11 Annex K), needing no extra
+///   dependency.
+/// - Glibc/Musl: `explicit_bzero`, glibc's own answer to the same problem (available since
+///   glibc 2.25), present in musl too.
+///
+/// Both are, like `memset_s`, defined specifically to survive dead-store elimination: unlike a
+/// plain `memset`/manual loop right before a `free`, the optimizer cannot assume the compiler
+/// knows their contract and drop the call as dead code.
+package final class ZeroingBytes: @unchecked Sendable {
+
+    // MARK: - Private properties
+
+    private let buffer: UnsafeMutableBufferPointer<UInt8>
+
+    // MARK: - Inits
+
+    package init(_ bytes: some Sequence<UInt8>) {
+        let bytes = Array(bytes)
+        let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: bytes.count)
+        _ = buffer.initialize(fromContentsOf: bytes)
+        self.buffer = buffer
+    }
+
+    deinit {
+        guard let baseAddress = buffer.baseAddress else {
+            return
+        }
+
+        #if canImport(Darwin)
+        memset_s(baseAddress, buffer.count, 0, buffer.count)
+        #elseif canImport(Glibc) || canImport(Musl)
+        explicit_bzero(baseAddress, buffer.count)
+        #else
+        baseAddress.update(repeating: 0, count: buffer.count)
+        #endif
+
+        buffer.deallocate()
+    }
+
+    // MARK: - Internal properties
+
+    package var startIndex: Int { buffer.startIndex }
+    package var endIndex: Int { buffer.endIndex }
+
+    // MARK: - Internal subscript
+
+    package subscript(position: Int) -> UInt8 {
+        buffer[position]
+    }
+}
+
+extension ZeroingBytes: RandomAccessCollection {}
+
+extension ZeroingBytes: Equatable {
+
+    package static func == (_ lhs: ZeroingBytes, _ rhs: ZeroingBytes) -> Bool {
+        lhs.buffer.count == rhs.buffer.count && lhs.buffer.elementsEqual(rhs.buffer)
     }
 }
