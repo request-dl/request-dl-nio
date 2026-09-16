@@ -56,12 +56,9 @@ extension Internals {
         /// base64-decoding each one. Verified against `NIOSSLCertificate.fromPEMFile`'s own DER
         /// output for byte-for-byte equality. See `InternalsCertificateTests`.
         ///
-        /// - Important: Deliberately matches `build()`'s own asymmetry between the two `.pem`
-        /// sources, confirmed by that same test suite, not assumed: `.file` reads every
-        /// certificate in the bundle (`NIOSSLCertificate.fromPEMFile`'s own behavior), but
-        /// `.bytes` only ever reads the *first* one, since `build()`'s `.bytes` case constructs a
-        /// single `NIOSSLCertificate(bytes:format:)` rather than calling `.fromPEMBytes`. Fixing
-        /// that asymmetry would be a real behavior change, so it is left alone here on purpose.
+        /// - Important: Matches `build()`'s own behavior for both `.pem` sources: `.file` and
+        /// `.bytes` each read every certificate in the bundle, matching
+        /// `NIOSSLCertificate.fromPEMFile`/`.fromPEMBytes`'s own behavior.
         package func resolvedDERBytes() throws -> [Data] {
             let raw: Data
 
@@ -81,14 +78,7 @@ extension Internals {
                 return [raw]
             case .pem:
                 do {
-                    let documents = try Self.resolvedPEMCertificateDERBytes(of: raw)
-
-                    switch source {
-                    case .bytes:
-                        return [documents[0]]
-                    case .file:
-                        return documents
-                    }
+                    return try Self.resolvedPEMCertificateDERBytes(of: raw)
                 } catch {
                     if case .file(let file) = source {
                         throw SecureFileLoadError(resource: .certificate, path: file, underlying: error)
@@ -101,9 +91,7 @@ extension Internals {
         /// Every certificate's DER bytes found in a `.pem`-format blob, in order. This is the
         /// shared parsing step `resolvedDERBytes()` builds on, and that `CertificateChain`/
         /// `TrustRoots`/`AdditionalTrustRoots`'s own portable methods call directly for their
-        /// multi-certificate `.bytes`/`.file` cases (both, unlike `Certificate.resolvedDERBytes()`'s
-        /// own `.bytes` case; see that method's doc comment for why `Certificate` alone truncates
-        /// a single-certificate `.bytes` source there).
+        /// multi-certificate `.bytes`/`.file` cases.
         package static func resolvedPEMCertificateDERBytes(of pemData: Data) throws -> [Data] {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
                 throw MalformedPEMError()
@@ -125,7 +113,12 @@ extension Internals {
         package func build() throws -> [NIOSSLCertificate] {
             switch source {
             case .bytes(let bytes):
-                return try [NIOSSLCertificate(bytes: bytes, format: format.build())]
+                switch format {
+                case .der:
+                    return try [NIOSSLCertificate(bytes: bytes, format: format.build())]
+                case .pem:
+                    return try NIOSSLCertificate.fromPEMBytes(bytes)
+                }
             case .file(let file):
                 do {
                     switch format {

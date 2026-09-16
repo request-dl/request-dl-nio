@@ -207,12 +207,11 @@ struct InternalsCertificateTests {
         }
     }
 
-    /// `Certificate.build()`'s `.bytes` case constructs a single `NIOSSLCertificate(bytes:
-    /// format:)` rather than calling `.fromPEMBytes`, so a multi-certificate PEM bundle sourced
-    /// from `.bytes` silently keeps only the first certificate. Confirmed here, not assumed.
-    /// `resolvedDERBytes()` deliberately reproduces the same asymmetry (see its own doc comment).
+    /// `Certificate.build()`'s `.bytes` case calls `NIOSSLCertificate.fromPEMBytes`, so a
+    /// multi-certificate PEM bundle sourced from `.bytes` reads every certificate, matching
+    /// `.file`'s own behavior. Confirmed here, not assumed.
     @Test
-    func resolvedDERBytes_whenPEMBundleBytesHasMultipleCertificates_matchesBuildsSingleCertificateBehavior()
+    func resolvedDERBytes_whenPEMBundleBytesHasMultipleCertificates_returnsOneEntryPerCertificate()
         async throws
     {
         // Given
@@ -229,7 +228,7 @@ struct InternalsCertificateTests {
         let expected = try Internals.Certificate(Array(bundle), format: .pem).build().map {
             Data(try $0.toDERBytes())
         }
-        #expect(resolved.count == 1)
+        #expect(resolved.count == 2)
         #expect(resolved == expected)
     }
 

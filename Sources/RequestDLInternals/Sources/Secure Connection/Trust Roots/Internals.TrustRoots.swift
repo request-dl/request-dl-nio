@@ -45,10 +45,6 @@ extension Internals {
         /// this configuration resolves to, without NIOSSL. What `ServerTrustPolicy.resolve(from:)`
         /// (the `.urlSession` trust-root consumer) uses instead of `resolvedCertificates()` +
         /// `.toDERBytes()`.
-        ///
-        /// - Important: `.bytes` matches `resolvedCertificates()`'s own single-certificate
-        /// `Certificate(bytes, format: .pem).build()` call. See `Certificate.resolvedDERBytes()`'s
-        /// doc comment for why `.bytes` truncates to the first certificate.
         package func resolvedDERBytes() throws -> [Data] {
             switch self {
             case .file(let file):
