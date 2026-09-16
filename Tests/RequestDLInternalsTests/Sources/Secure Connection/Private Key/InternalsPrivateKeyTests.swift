@@ -48,7 +48,7 @@ struct InternalsPrivateKeyTests {
     @Test
     func private_whenPEMWithPassword_shouldBeValid() async throws {
         // Given
-        let password = NIOSSLSecureBytes("password123".utf8)
+        let password = Internals.SecureBytes("password123".utf8)
         let certificates = Certificates().client(password: true)
 
         let data = try Data(contentsOf: certificates.privateKeyURL)
@@ -70,7 +70,7 @@ struct InternalsPrivateKeyTests {
     @Test
     func private_whenDERWithPassword_shouldBeValid() async throws {
         // Given
-        let password = NIOSSLSecureBytes("password123".utf8)
+        let password = Internals.SecureBytes("password123".utf8)
         let certificates = Certificates(.der).client(password: true)
 
         let data = try Data(contentsOf: certificates.privateKeyURL)
@@ -121,7 +121,7 @@ struct InternalsPrivateKeyTests {
     @Test
     func private_whenPEMFileWithPassword_shouldBeValid() async throws {
         // Given
-        let password = NIOSSLSecureBytes("password123".utf8)
+        let password = Internals.SecureBytes("password123".utf8)
         let certificates = Certificates().client(password: true)
         let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
 
@@ -142,7 +142,7 @@ struct InternalsPrivateKeyTests {
     @Test
     func private_whenDERFileWithPassword_shouldBeValid() async throws {
         // Given
-        let password = NIOSSLSecureBytes("password123".utf8)
+        let password = Internals.SecureBytes("password123".utf8)
         let certificates = Certificates(.der).client(password: true)
         let file = certificates.privateKeyURL.absolutePath(percentEncoded: false)
 
@@ -237,7 +237,7 @@ struct InternalsPrivateKeyTests {
         -----END RSA PRIVATE KEY-----
         """
 
-    private static let genuinelyEncryptedPEMPassword = NIOSSLSecureBytes("testpassword123".utf8)
+    private static let genuinelyEncryptedPEMPassword = Internals.SecureBytes("testpassword123".utf8)
 
     @Test
     func private_whenGenuinelyEncryptedPEMBytesWithPassword_invokesPassphraseClosure() throws {

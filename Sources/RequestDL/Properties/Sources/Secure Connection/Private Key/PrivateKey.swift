@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOSSL
+#endif
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)
@@ -87,6 +89,7 @@ public struct PrivateKey: Property {
     }
     #endif
 
+    #if canImport(NIOCore)
     /// Creates a private key from a file with the specified format, and allows for providing a
     /// `NIOSSLSecureBytes` password..
     ///
@@ -115,7 +118,7 @@ public struct PrivateKey: Property {
                 .init(
                     file,
                     format: format(),
-                    password: password
+                    password: Internals.SecureBytes(password)
                 )
             )
         )
@@ -143,7 +146,7 @@ public struct PrivateKey: Property {
                 .init(
                     bytes,
                     format: format(),
-                    password: password
+                    password: Internals.SecureBytes(password)
                 )
             )
         )
@@ -163,6 +166,78 @@ public struct PrivateKey: Property {
         in bundle: Bundle,
         format: Certificate.Format = .pem,
         password: NIOSSLSecureBytes
+    ) {
+        self.init(
+            format.resolve(for: file, in: bundle),
+            format: format,
+            password: password
+        )
+    }
+    #endif
+    #endif
+
+    /// Creates a private key from a file with the specified format, and allows for providing a
+    /// portable ``SecureBytes`` password — the NIO-independent counterpart to the
+    /// `NIOSSLSecureBytes`-taking overload above; see its doc comment for which password-protected
+    /// key shapes are actually reachable under each executor.
+    ///
+    /// - Parameters:
+    ///   - file: The path to the file containing the private key.
+    ///   - format: The format of the private key file. Default is `.pem`.
+    ///   - password: The password for the private key.
+    public init(
+        _ file: String,
+        format: Certificate.Format = .pem,
+        password: SecureBytes
+    ) {
+        self.init(
+            .privateKey(
+                .init(
+                    file,
+                    format: format(),
+                    password: password.internalValue
+                )
+            )
+        )
+    }
+
+    /// Creates a private key from bytes with the specified format, and allows for providing a
+    /// portable ``SecureBytes`` password. See the `file:format:password:` overload's doc comment.
+    ///
+    /// - Parameters:
+    ///   - bytes: The bytes representing the private key.
+    ///   - format: The format of the private key bytes. Default is `.pem`.
+    ///   - password: The password for the private key.
+    public init(
+        _ bytes: [UInt8],
+        format: Certificate.Format = .pem,
+        password: SecureBytes
+    ) {
+        self.init(
+            .privateKey(
+                .init(
+                    bytes,
+                    format: format(),
+                    password: password.internalValue
+                )
+            )
+        )
+    }
+
+    #if canImport(Darwin)
+    /// Creates a private key from a file in the specified bundle with the specified format, and
+    /// allows for providing a portable ``SecureBytes`` password.
+    ///
+    /// - Parameters:
+    ///   - file: The name of the file containing the private key.
+    ///   - bundle: The bundle containing the file.
+    ///   - format: The format of the private key file. Default is `.pem`.
+    ///   - password: The password for the private key.
+    public init(
+        _ file: String,
+        in bundle: Bundle,
+        format: Certificate.Format = .pem,
+        password: SecureBytes
     ) {
         self.init(
             format.resolve(for: file, in: bundle),

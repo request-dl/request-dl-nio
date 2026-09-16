@@ -2,10 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import Configuration
 import Crypto
-import NIOSSL
 
 /// A property that derives declarative request properties from an external configuration source.
 ///
@@ -295,7 +293,7 @@ public struct Configured: Property {
         let format = try Self.certificateFormat(reader.string(forKey: "format", default: "pem"))
 
         if let password = reader.string(forKey: "password", isSecret: true) {
-            return PrivateKey(file, format: format, password: NIOSSLSecureBytes(password.utf8))
+            return PrivateKey(file, format: format, password: SecureBytes(password.utf8))
         }
 
         return PrivateKey(file, format: format)
@@ -318,7 +316,15 @@ public struct Configured: Property {
         }
 
         if let maximum {
+            #if canImport(NIOCore)
             secureConnection = secureConnection.version(maximum: maximum)
+            #else
+            // No portable equivalent: neither URLSessionConfiguration nor App Transport
+            // Security exposes a maximum-TLS-version key — see `SecureConnection
+            // .version(maximum:)`'s own doc comment. A config that asks for one in a build
+            // without NIO fails loudly here rather than silently ignoring it.
+            throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
+            #endif
         }
 
         return secureConnection
