@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
@@ -46,13 +45,23 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             logger: logger
         )
 
-        let client: Internals.Client
+        // Same dispatch `RawTask.resolveClient(resolved:)` does: `resolvedClient()` is the
+        // executor-aware entry point, so a mock resolves through whichever backend the session
+        // actually picked rather than always the NIO one. `Internals.CacheControl` only needs
+        // the shared `RequestExecutingClient` existential either way.
+        let client: any RequestExecutingClient
 
         do {
-            client = try await Internals.ClientManager.shared.client(
-                provider: resolved.session.provider,
-                sessionConfiguration: resolved.session.configuration
-            )
+            switch try await resolved.session.resolvedClient() {
+            #if canImport(NIOCore)
+            case .nio(let nioClient):
+                client = nioClient
+            #endif
+            #if canImport(Darwin)
+            case .urlSession(let urlSessionClient):
+                client = urlSessionClient
+            #endif
+            }
         } catch let error as Internals.SecureFileLoadError {
             throw SecureFileError(error)
         }
@@ -82,13 +91,6 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
         logger: Internals.TaskLogger?
     ) async throws -> Internals.AsyncResponse {
-        let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(
-            resolved.session.provider,
-            with: SessionProviderOptions(
-                isCompatibleWithNetworkFramework: false
-            )
-        )
-
         let downloadBuffer = await Internals.DownloadBuffer(
             readingMode: resolved.requestConfiguration.readingMode
         )
@@ -101,7 +103,6 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
         if let body = resolved.requestConfiguration.body {
             mockBodyResponse(
-                group: eventLoopGroup,
                 buffer: downloadBuffer,
                 body: body
             )
@@ -119,43 +120,37 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         )
     }
 
+    /// Drives `body` into `buffer`, executor-agnostically: `RequestBody`'s own `AsyncSequence`
+    /// conformance already yields `Data` chunks portably (no `EventLoopGroup`/`HTTPClient.Body`
+    /// needed the way an older revision of this method required), so there's nothing NIO-specific
+    /// left to bridge here for either executor.
+    ///
+    /// - Important: One sequential `for try await` loop inside a single `Task`, not chunks
+    /// dispatched independently. `buffer.append` has to see chunks in order, and awaiting each
+    /// one before appending it, in the same task, is what guarantees that — the same requirement
+    /// `Internals.ClientResponseReceiver.didReceiveBodyPart`'s own synchronous-append discipline
+    /// exists for, just satisfied here by sequencing instead of by staying off a detached task.
     private func mockBodyResponse(
-        group eventLoopGroup: EventLoopGroup,
         buffer: Internals.DownloadBuffer,
         body: RequestBody
     ) {
-        let eventLoop = eventLoopGroup.next()
-        let body = body.build(eventLoop: eventLoop)
-
-        eventLoop.execute {
-            body.stream(
-                .init {
-                    if case .byteBuffer(let byteBuffer) = $0 {
-                        // Synchronous, like the real receiver in
-                        // `Internals.ClientResponseReceiver.didReceiveBodyPart`. The store is
-                        // already in memory, so nothing here suspends, and appending has to
-                        // stay ordered: the download queue preserves submission order and
-                        // submission is synchronous.
-                        buffer.append(
-                            Internals.DataBuffer(
-                                Internals.ByteURL(byteBuffer)
-                            )
-                        )
-                    }
-
-                    return eventLoop.makeSucceededVoidFuture()
+        _Concurrency.Task {
+            do {
+                for try await chunk in body {
+                    let byteURL = Internals.ByteURL()
+                    byteURL.replace(with: chunk)
+                    // The `async` overload, not the synchronous one `Internals
+                    // .ClientResponseReceiver` needs — safe here because this whole loop is one
+                    // sequential path in a single `Task`, not chunks dispatched independently
+                    // from a delegate callback, so there is nothing else racing to append out of
+                    // order while this `await` suspends.
+                    buffer.append(await Internals.DataBuffer(byteURL))
                 }
-            ).whenComplete { result in
-                // A failed stream is reported, not swallowed. `whenComplete { _ in }` closed the
-                // download as though it had ended normally, so a mock configured to fail
-                // mid-body looked to the caller like a short but successful response, which is
-                // the one thing a mock of a failure has to get right.
-                if case .failure(let error) = result {
-                    buffer.failed(error)
-                }
-
-                buffer.close()
+            } catch {
+                buffer.failed(error)
             }
+
+            buffer.close()
         }
     }
 
