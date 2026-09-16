@@ -26,7 +26,20 @@ struct InternalsCompressionAlgorithmAdapter: Internals.CompressionAlgorithm {
     // MARK: - Internal methods
 
     func callAsFunction() throws -> any Internals.CompressorStream {
-        InternalsCompressorStreamAdapter(stream: try algorithm())
+        let stream = try algorithm()
+
+        // The built-in gzip/deflate compressors are `NIOHTTPCompressorStreamBridge` under the
+        // public `Compressor` API only so a custom compressor can be written the same way they
+        // are; driven from here, they already have an `Internals.Bytes`-native stream to give
+        // back directly, skipping `InternalsCompressorStreamAdapter`'s `[UInt8]`/`Data` round
+        // trip on every chunk. A genuinely custom, `[UInt8]`-based `Compressor` still needs it.
+        #if canImport(NIOCore)
+        if let bridge = stream as? NIOHTTPCompressorStreamBridge {
+            return bridge.nativeStream
+        }
+        #endif
+
+        return InternalsCompressorStreamAdapter(stream: stream)
     }
 }
 

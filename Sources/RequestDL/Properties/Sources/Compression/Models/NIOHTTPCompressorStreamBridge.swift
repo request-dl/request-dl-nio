@@ -27,6 +27,15 @@ struct NIOHTTPCompressorStreamBridge: CompressorStream {
 
     private var stream: Internals.NIOHTTPCompressorStream
 
+    // MARK: - Internal properties
+
+    /// The `Internals.Bytes`-native stream this bridges to the public `[UInt8]`-based
+    /// `CompressorStream`. `InternalsCompressionAlgorithmAdapter` reaches for this directly
+    /// instead of going through `callAsFunction(compressing:)` below, so driving gzip/deflate
+    /// from inside the package skips the round trip through `[UInt8]`/`Data` entirely — that
+    /// conversion only exists for a genuinely custom, `[UInt8]`-based `Compressor`.
+    var nativeStream: Internals.NIOHTTPCompressorStream { stream }
+
     // MARK: - Inits
 
     init(algorithm: Internals.Compression.Algorithm) throws {
