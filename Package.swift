@@ -26,7 +26,10 @@ let package = Package(
                 request compression. Disabling it (`--disable-default-traits`) drops that whole \
                 dependency subgraph from the build and leaves RequestDL running .urlSession-only, \
                 over the portable mirrors every `#if canImport(NIOCore)` gate in this package \
-                falls back to.
+                falls back to. Darwin only: `Internals.URLSessionClient` (the whole `.urlSession` \
+                executor implementation) is itself Darwin-exclusive, a pre-existing decision \
+                unrelated to this trait, so disabling `NIOTransport` on any other platform leaves \
+                no executor at all and the package won't build.
                 """
         ),
         .default(enabledTraits: ["NIOTransport"]),

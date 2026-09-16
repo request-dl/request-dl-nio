@@ -381,7 +381,13 @@ extension Internals.Session.Configuration {
         return .urlSession
         #endif
         #else
+        #if canImport(NIOCore)
         return .nio
+        #else
+        // No NIO backend and no Network.framework to fall back to either: `.urlSession` is
+        // `Internals.Executor`'s only remaining case in this build.
+        return .urlSession
+        #endif
         #endif
     }
 

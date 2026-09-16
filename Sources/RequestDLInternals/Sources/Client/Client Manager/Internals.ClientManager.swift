@@ -91,8 +91,8 @@ extension Internals {
             provider: SessionProvider,
             sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.ClientManager.Client {
-            #if canImport(Darwin)
             #if canImport(NIOCore)
+            #if canImport(Darwin)
             let executor = sessionConfiguration.resolveExecutor()
 
             guard executor == .urlSession else {
@@ -104,6 +104,13 @@ extension Internals {
                     )
                 )
             }
+            #else
+            // Off Darwin, `resolveExecutor()` never resolves to `.urlSession` (see its own
+            // implementation): NIOCore being available here means `.nio` unconditionally, same
+            // as this branch always returned before this function had a portable half to fall
+            // through to below.
+            return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
+            #endif
             #endif
 
             let sessionProviderID =
@@ -130,9 +137,6 @@ extension Internals {
                     )
                 )
             }
-            #else
-            return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
-            #endif
         }
 
         // MARK: - Private methods
