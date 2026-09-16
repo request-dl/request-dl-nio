@@ -77,11 +77,16 @@ extension Internals.HTTPHeaders: ExpressibleByDictionaryLiteral {
 extension Internals.HTTPHeaders {
 
     package init(_ headers: NIOHTTP1.HTTPHeaders) {
-        self.init(Array(headers))
+        // `NIOHTTP1.HTTPHeaders.Element` already is `(name: String, value: String)`, so this
+        // is the one copy the conversion needs — going through the generic `init<S: Sequence>`
+        // instead would iterate a second time over an intermediate `Array(headers)`.
+        pairs = Array(headers)
     }
 
     package func build() -> NIOHTTP1.HTTPHeaders {
-        .init(Array(self))
+        // `pairs` directly, not `Array(self)`: `self` is a thin `Sequence` wrapper over
+        // `pairs`, so going through it re-copies what's already a plain array.
+        .init(pairs)
     }
 }
 #endif

@@ -8,6 +8,10 @@ import FoundationEssentials
 import struct Foundation.URL
 #endif
 
+#if canImport(NIOCore)
+import NIOCore
+#endif
+
 extension Internals {
 
     /// Cuts a list of buffers into fixed size chunks for the request body writer.
@@ -36,8 +40,15 @@ extension Internals {
                 self.totalSize = totalSize
                 self.buffers = buffers
                 // Allocated once at full size and then rewound, so the capacity is reused for
-                // every chunk instead of growing again per iteration.
+                // every chunk instead of growing again per iteration. `ByteBuffer`-backed when
+                // NIOCore is available, so every chunk this iterator emits stays on the
+                // zero-copy path through `asByteBuffer()` instead of paying a conversion on the
+                // NIO writer side.
+                #if canImport(NIOCore)
+                self.bytes = Internals.Bytes(NIOCore.ByteBuffer(repeating: .zero, count: chunkSize))
+                #else
                 self.bytes = .init(repeating: .zero, count: chunkSize)
+                #endif
                 bytes.moveReaderIndex(to: .zero)
                 bytes.moveWriterIndex(to: .zero)
             }
