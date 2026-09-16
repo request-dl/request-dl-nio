@@ -8,7 +8,7 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    /// Portable mirror of `HTTPClient.Configuration.ConnectionPool`, matched field for field,
+    /// Portable mirror of `HTTPClient.Configuration.ConnectionPool`, matched field for field:
     /// this configuration is shared by both executors, and `Internals.ClientManager` uses it
     /// (via `Internals.Session.Configuration`'s own `Equatable`) as part of its pooled-client
     /// cache key, so it has to exist regardless of whether NIO does.

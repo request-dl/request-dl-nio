@@ -35,7 +35,7 @@ extension Internals.Session {
         /// silently traced just because some other part of the process bootstrapped a tracer via
         /// `InstrumentationSystem` for unrelated reasons.
         ///
-        /// Excluded from `Equatable`, `any Tracer` isn't `Equatable`, same reasoning as
+        /// Excluded from `Equatable`: `any Tracer` isn't `Equatable`, same reasoning as
         /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
         package var tracer: any Tracer = NoOpTracer()
 

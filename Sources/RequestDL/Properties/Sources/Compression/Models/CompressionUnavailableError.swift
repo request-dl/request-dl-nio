@@ -10,8 +10,8 @@
 /// something the transport already does. Both algorithms drive `NIOHTTPRequestCompressor` when
 /// NIO is available, and fall back to a portable, `zlib`-backed implementation otherwise
 /// (`PortableGzipCompressorStream`/`PortableDeflateCompressorStream`). This error only fires
-/// in the narrowest case: NIO *and* `zlib` both unavailable, which, outside of a build the
-/// package doesn't actually support yet, shouldn't happen in practice.
+/// in the narrowest case: NIO *and* `zlib` both unavailable, which (outside of a build the
+/// package doesn't actually support yet) shouldn't happen in practice.
 public struct CompressionUnavailableError: Error, Sendable {
 
     /// The `Content-Encoding` this algorithm would have compressed with.

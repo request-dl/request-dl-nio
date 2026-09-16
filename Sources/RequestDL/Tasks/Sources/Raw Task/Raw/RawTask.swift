@@ -354,14 +354,14 @@ extension RawTask {
 
     /// Resolves `content` and hands the result to `descriptor`, without executing a request.
     ///
-    /// Not part of the `_result(environment:)` chain, like `RequestTask.result()`'s own default
+    /// Not part of the `_result(environment:)` chain: like `RequestTask.result()`'s own default
     /// (`_result(environment: RequestEnvironmentValues())`), this is an entry point, not
     /// something nested inside another task's `.environment()`.
     ///
     /// `descriptorFormFields` is set on that fresh environment and threaded through
     /// `Resolve.init(root:environment:)` into `_PropertyInputs.environment`, which is how
-    /// `FormNode`, the only node that needs to know a description pass is running, since it's
-    /// the only place per-field structure would otherwise be lost to multipart flattening,
+    /// `FormNode` (the only node that needs to know a description pass is running, since it's
+    /// the only place per-field structure would otherwise be lost to multipart flattening)
     /// receives it: captured by `Form`/`FormGroup`'s own `_makeProperty` at construction time,
     /// not read from inside `make()` itself (nodes have no `environment` of their own to read
     /// there).

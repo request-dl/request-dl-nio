@@ -8,10 +8,10 @@ import NIOHTTP1
 
 extension Internals {
 
-    /// Portable, NIO-free header storage: ordered name/value pairs, duplicates and all, no
+    /// Portable, NIO-free header storage: ordered name/value pairs (duplicates and all), no
     /// case-insensitive lookup or merging, because nothing on this side of the boundary needs
     /// it. The currency `Internals.Proxy.connectHeaders` and `Internals.RedirectRequest.headers`
-    /// carry, both reachable from either executor, converting to `NIOHTTP1.HTTPHeaders` only
+    /// carry (both reachable from either executor), converting to `NIOHTTP1.HTTPHeaders` only
     /// where the `.nio` executor's own APIs actually require one.
     package struct HTTPHeaders: Sendable {
 
@@ -39,8 +39,8 @@ extension Internals {
             pairs.append((name: name, value: value))
         }
 
-        /// The first value stored under `name`, compared case insensitively per RFC 9110, same
-        /// contract as `NIOHTTP1.HTTPHeaders.first(name:)`/`RequestDL.HTTPHeaders.first(name:)`.
+        /// The first value stored under `name`, compared case insensitively per RFC 9110 (same
+        /// contract as `NIOHTTP1.HTTPHeaders.first(name:)`/`RequestDL.HTTPHeaders.first(name:)`).
         package func first(name: String) -> String? {
             let name = name.lowercased()
             return pairs.first { $0.name.lowercased() == name }?.value

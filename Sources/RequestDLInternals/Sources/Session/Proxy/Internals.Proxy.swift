@@ -43,7 +43,7 @@ extension Internals {
         /// Extra headers sent only on the HTTP `CONNECT` request to an `.http` proxy.
         ///
         /// Ignored for `.socks`, which has no `CONNECT` phase. Excluded from `Hashable`, same as
-        /// upstream's own `HTTPClient.Configuration.Proxy`, `NIOHTTP1.HTTPHeaders` isn't `Hashable`.
+        /// upstream's own `HTTPClient.Configuration.Proxy`: `NIOHTTP1.HTTPHeaders` isn't `Hashable`.
         package let connectHeaders: Internals.HTTPHeaders
 
         package init(

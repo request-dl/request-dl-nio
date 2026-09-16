@@ -2,8 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-// This whole extension is the `.nio`/`.nioTransportServices` half of `Internals.ClientManager`,
-// see its own doc comment below, so none of it exists at all without NIO.
+// This whole extension is the `.nio`/`.nioTransportServices` half of `Internals.ClientManager`
+// (see its own doc comment below), so none of it exists at all without NIO.
 #if canImport(NIOCore)
 
 import NIOCore

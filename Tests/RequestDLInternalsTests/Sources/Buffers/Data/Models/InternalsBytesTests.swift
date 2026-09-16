@@ -199,7 +199,7 @@ struct InternalsBytesTests {
     @Test
     func bytes_whenByteBufferBacked_writeRepeatingByteGrowsPastWriterIndexSafely() {
         // `moveWriterIndex(to:)` defers straight to `NIOCore.ByteBuffer` and inherits its
-        // capacity precondition, growing past it that way traps, same as real `ByteBuffer`.
+        // capacity precondition: growing past it that way traps, same as real `ByteBuffer`.
         // `writeRepeatingByte(_:count:)` is the safe, backing-independent way to grow, exactly
         // as `Internals.ByteHandle.write(contentsOf:)` already relies on.
 

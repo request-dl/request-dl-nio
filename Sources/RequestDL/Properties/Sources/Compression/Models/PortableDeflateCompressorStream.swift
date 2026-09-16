@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Only reachable once the future URLSession-only trait exists (see `URLSESSION_ONLY_REPORT.md`
-// at the repo root), NIOCore is always present today, so `#if !canImport(NIOCore)` never
-// evaluates `true` in this build, and `swift build`/`swift test` never type-check this file.
+// Only reachable once the future URLSession-only trait exists. NIOCore is always present today,
+// so `#if !canImport(NIOCore)` never evaluates `true` in this build, and
+// `swift build`/`swift test` never type-check this file.
 // Verified correct by a standalone round-trip script against real zlib `inflate()` (multiple
 // sizes including empty and random binary payloads) before writing this, since the normal test
 // suite can't reach it yet.
@@ -26,7 +26,7 @@ import zlib
 /// - Important: `NSData.compressed(using: .zlib)` (backed by `COMPRESSION_ZLIB`) despite the name
 ///   produces **raw DEFLATE** (RFC 1951), not an actual RFC 1950 zlib stream: no header, no
 ///   trailer. Feeding the assembled output straight back into `NSData.decompressed(using: .zlib)`
-///   fails for exactly that reason, confirmed while writing this, not assumed. The 2-byte header
+///   fails for exactly that reason. Confirmed while writing this, not assumed. The 2-byte header
 ///   below (`0x78, 0x5E`: CMF for a 32K window / deflate method, FLG chosen so the 16-bit pair is
 ///   a multiple of 31, no preset dictionary) plus the big-endian Adler-32 trailer are what turn
 ///   the raw deflate bytes into a real zlib stream any standard HTTP server's `inflate()` can
@@ -34,7 +34,7 @@ import zlib
 ///
 /// - Note: Unlike ``NIOHTTPCompressorStreamBridge`` (which feeds `NIOHTTPRequestCompressor`
 ///   incrementally, in bounded memory), this buffers the entire body and compresses it once in
-///   ``finish()``, the `Compression` framework's buffer-based API has no incremental entry point
+///   ``finish()``: the `Compression` framework's buffer-based API has no incremental entry point
 ///   the way `NIOHTTPRequestCompressor` does. Returning `[]` from every
 ///   `callAsFunction(compressing:)` call is an explicitly valid ``CompressorStream``
 ///   implementation (see that protocol's own doc comment), so this is correct, just not

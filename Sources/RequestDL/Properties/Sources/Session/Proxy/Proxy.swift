@@ -25,8 +25,8 @@ import RequestDLInternals
 /// }
 /// ```
 ///
-/// A HTTP proxy can also carry extra headers on its `CONNECT` request, sent only while
-/// establishing the tunnel, never on the request the tunnel then carries, by composing them
+/// A HTTP proxy can also carry extra headers on its `CONNECT` request (sent only while
+/// establishing the tunnel, never on the request the tunnel then carries) by composing them
 /// the same way ``RequestDL/Form`` composes per-part headers, with any `Property` that resolves
 /// to headers (``RequestDL/CustomHeader``, ``RequestDL/HeaderGroup``, etc):
 ///

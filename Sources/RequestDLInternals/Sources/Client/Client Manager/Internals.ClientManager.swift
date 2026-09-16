@@ -19,8 +19,8 @@ extension Internals {
 
         // MARK: - Internal static properties
 
-        /// Nanoseconds, matching `UnitTime.nanoseconds`, same convention as `Internals.Timeout`/
-        /// `Internals.ConnectionPool`. Kept portable rather than `NIOCore.TimeAmount`: this class
+        /// Nanoseconds, matching `UnitTime.nanoseconds` (same convention as `Internals.Timeout`/
+        /// `Internals.ConnectionPool`). Kept portable rather than `NIOCore.TimeAmount`: this class
         /// caches `.urlSession` clients too, so its own lifetime bookkeeping shouldn't need NIO
         /// to exist at all.
         package static let lifetime: Int64 = 5 * 60 * 1_000_000_000
@@ -32,7 +32,7 @@ extension Internals {
         /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`:
         /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients
         /// serially in one sweep, each a real network drain, so a wide margin is needed to avoid
-        /// flagging a legitimately busy sweep. Development builds only, see
+        /// flagging a legitimately busy sweep. Development builds only. See
         /// `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 45) {
@@ -46,7 +46,7 @@ extension Internals {
 
         // Not `private`: `Internals.ClientManager+NIO.swift`'s extension (a different file, the
         // `.nio`/`.nioTransportServices` half of this class) reaches these too. `internal`
-        // (the default) is as narrow as a member can be while still being visible there, Swift
+        // (the default) is as narrow as a member can be while still being visible there. Swift
         // has no "private to this type across files" access level.
         let lock = AsyncLock(watchdog: watchdog)
         private let lifetime: Int64

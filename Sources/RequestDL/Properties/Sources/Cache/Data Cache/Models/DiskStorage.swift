@@ -85,13 +85,15 @@ struct DiskStorage: Sendable {
             // creates a fresh record for the same key while revalidating an existing one, and
             // two records for the same key landing in the same directory name would otherwise
             // collide; `moveItem` then throws, and the recovery path removes both the old and
-            // the new record, losing the entry outright. Scaling `timeIntervalSinceReferenceDate`
-            // by 1e9 does not avoid that: the interval is already well past `Double`'s 2^53
-            // exact-integer range by the time this runs in 2026, so the scaled product is itself
-            // rounded during the multiply, and reconstructing a `Date` from that rounded value
-            // can land a hair off from the original, enough for `record.date <= date` to
-            // disagree with the `Date` it was built from. The bit pattern round-trips exactly,
-            // with no arithmetic to lose precision on either side.
+            // the new record, losing the entry outright.
+            //
+            // Scaling `timeIntervalSinceReferenceDate` by 1e9 does not avoid that: the interval
+            // is already well past `Double`'s 2^53 exact-integer range by the time this runs in
+            // 2026, so the scaled product is itself rounded during the multiply, and
+            // reconstructing a `Date` from that rounded value can land a hair off from the
+            // original, enough for `record.date <= date` to disagree with the `Date` it was
+            // built from. The bit pattern round-trips exactly, with no arithmetic to lose
+            // precision on either side.
             let bitPattern = date.timeIntervalSinceReferenceDate.bitPattern
             var directoryPathComponent = String(bitPattern, radix: 36)
             directoryPathComponent += ".\(key).\(DiskStorage.Record.pathExtension)"
@@ -125,8 +127,8 @@ struct DiskStorage: Sendable {
         /// around: a stat can intermittently come back negative for a file that was just
         /// written and closed, with nothing thrown and no descriptor left open. A record's own
         /// `response.record`/`data.record` are written and closed synchronously right before
-        /// this runs, so a miss here is that stat flake, not a genuine absence, a single
-        /// unretried check turned a rare stat flake into a lost cache entry.
+        /// this runs, so a miss here is that stat flake, not a genuine absence. Skip the retry
+        /// and it turns a rare stat flake into a lost cache entry.
         private static func isReachableWithRetry(_ url: URL) async -> Bool {
             await DiskStorage.retryingUntilSuccess { await url.isReachable ? true : nil } ?? false
         }
@@ -148,21 +150,21 @@ struct DiskStorage: Sendable {
     ///
     /// A HIT is trusted immediately, with no disk access at all: once a write records a
     /// location for a key, only an explicit, guarded removal ever clears it. A MISS never is.
-    /// `dir.listContents()` racing a burst of very recent creates can come back incomplete,
-    /// the same class of transient filesystem flake `Record.init?`'s own retry loop already
+    ///
+    /// `dir.listContents()` racing a burst of very recent creates can come back incomplete, the
+    /// same class of transient filesystem flake `Record.init?`'s own retry loop already
     /// tolerates for a single file, just one layer up, at the directory-listing level, where
     /// there is nothing to retry against within one scan. Trusting a first scan's absence
-    /// forever would turn that transient gap into a permanent false miss, silently: the
-    /// scan-per-lookup this index replaces was self-healing by accident, since the very next
-    /// lookup simply rescanned and found what the last one missed. So a miss here always
-    /// re-scans before answering, sharing that scan across concurrent callers who miss at the
-    /// same time (e.g. a list of images loading at once, before any of them is cached yet)
-    /// rather than each starting their own, and always merging forward rather than caching a
-    /// negative result.
+    /// forever would turn that transient gap into a permanent false miss, silently.
+    ///
+    /// So a miss here always re-scans before answering: it shares that scan across concurrent
+    /// callers who miss at the same time (e.g. a list of images loading at once, before any of
+    /// them is cached yet) rather than each starting their own, and always merges forward
+    /// rather than caching a negative result.
     ///
     /// - Important: This index only tracks writes and removals made through *this* value's
     /// own methods. A location written by a different `DiskStorage`/process sharing the same
-    /// directory (e.g. via `suiteName`) is invisible to it until the next scan, the same
+    /// directory (e.g. via `suiteName`) is invisible to it until the next scan. That's the same
     /// staleness `Storage._diskUsageEstimate` already tolerates for eviction accounting. A
     /// lookup that misses falls through to a live scan rather than a wrong answer; it never
     /// serves stale *content*, only an occasional avoidable one.
@@ -177,7 +179,7 @@ struct DiskStorage: Sendable {
 
         // MARK: - Internal methods
 
-        /// Looks up `key`, kicking off, or joining, a rescan first if it isn't already known.
+        /// Looks up `key`, kicking off or joining a rescan first if it isn't already known.
         func location(for key: String, scan: @escaping @Sendable () async -> [Record]) async -> URL? {
             if let hit = lock.withLock({ locationsByKey[key] }) {
                 return hit
@@ -193,8 +195,8 @@ struct DiskStorage: Sendable {
 
                     lock.withLock {
                         // Only fills gaps. A write or removal that landed after this scan
-                        // started already knows more than a snapshot taken before it did,
-                        // this must not overwrite that with stale information.
+                        // started already knows more than a snapshot taken before it did; this
+                        // must not overwrite that with stale information.
                         for record in scanned where locationsByKey[record.key] == nil {
                             locationsByKey[record.key] = record.url
                         }
@@ -219,7 +221,7 @@ struct DiskStorage: Sendable {
         /// Removes the mapping for `key` only if it still points at `url`.
         ///
         /// Guards against a slower removal of a stale or superseded directory clobbering a
-        /// newer write that already replaced it in the index, the two can race whenever a
+        /// newer write that already replaced it in the index. The two can race whenever a
         /// duplicate directory for the same key gets cleaned up after a fresher write already
         /// pointed the index elsewhere.
         func remove(_ key: String, ifLocation url: URL) {
@@ -298,16 +300,17 @@ struct DiskStorage: Sendable {
     /// returns rather than racing a detached task against it.
     ///
     /// - Important: Must close on every path, not only when `readToEnd` succeeds. A miss on
-    /// `openFile` is harmless, since nothing has opened yet, but a miss on `readToEnd` is not: if
+    /// `openFile` is harmless, since nothing has opened yet. A miss on `readToEnd` is not: if
     /// `try?` swallows the throw and the `guard` chain fails without closing first, the function
-    /// returns `nil` with the handle still open and now unreachable, exactly the trap NIO
-    /// traps on, for a cache entry whose response record failed to read for any reason.
+    /// returns `nil` with the handle still open and now unreachable. That's exactly the trap NIO
+    /// traps on, for a cache entry whose response record simply failed to read.
     ///
     /// - Note: `openFile` is retried (`retryingUntilSuccess`) rather than attempted once: `url`
     /// only gets here after `Record.init?` already confirmed it reachable, so an `openFile` miss
     /// right after is the same transient stat/open flake `isReachableWithRetry` retries around,
-    /// not a genuine absence. Before this retry, that flake surfaced as this whole method, and
-    /// therefore `subscript(_:)`, returning `nil` for an entry that was just written.
+    /// not a genuine absence. Skipping the retry would surface that flake all the way up
+    /// through this method, and therefore `subscript(_:)`, as `nil` for an entry that was just
+    /// written.
     private func readResponseData(at url: URL) async -> Data? {
         guard
             let handle = await Self.retryingUntilSuccess({
@@ -338,7 +341,7 @@ struct DiskStorage: Sendable {
             return raw
         }
 
-        // Wrong/rotated key, and a corrupted or tampered file, both fail here, `try?` turns
+        // Wrong/rotated key, and a corrupted or tampered file, both fail here; `try?` turns
         // either into a miss, matching every other fault-tolerance path in this type.
         guard
             let sealedBox = try? AES.GCM.SealedBox(combined: raw),
@@ -376,18 +379,13 @@ struct DiskStorage: Sendable {
     /// existence was (or is about to be) confirmed, where a fresh miss is that flake, not a
     /// genuine absence.
     ///
-    /// - Note: 300 attempts, 50ms apart, a 15s budget. The 500ms budget before this (50×10ms,
-    /// itself already raised once from an original 5×2ms sized for a quiet machine) still
-    /// wasn't enough to keep
-    /// `diskStorage_whenFreeingSpaceBelowTotalUsage_shouldEvictOnlyTheOldestEntries` from
-    /// flaking: CI's Apple simulator runners have been observed stalling the entire test
-    /// process for 15-27s under scheduler contention (see the request-dl-nio CI-flakiness
-    /// investigation into `AsyncLock.Watchdog` false positives, the same underlying
-    /// contention, just surfacing here as a missed stat instead of a held lock), which a
-    /// 500ms budget cannot outlast no matter how the delay is split up. 15s matches
-    /// `AsyncLock.Watchdog`'s own threshold for the same reason. The happy path still returns
-    /// on the first attempt; this only changes how long a genuinely slow stat gets before being
-    /// treated as a real miss.
+    /// - Note: 300 attempts, 50ms apart: a 15s budget. CI's Apple simulator runners have been
+    /// observed stalling the entire test process for 15-27s under scheduler contention (see the
+    /// request-dl-nio CI-flakiness investigation into `AsyncLock.Watchdog` false positives, the
+    /// same underlying contention, just surfacing here as a missed stat instead of a held
+    /// lock). 15s matches `AsyncLock.Watchdog`'s own threshold for the same reason. The happy
+    /// path still returns on the first attempt; this only changes how long a genuinely slow
+    /// stat gets before being treated as a real miss.
     private static func retryingUntilSuccess<T>(
         attempts: Int = 300,
         retryDelay: UInt64 = 50_000_000,
@@ -458,7 +456,7 @@ struct DiskStorage: Sendable {
             try await writeAndClose(response, to: newRecord.responseURL)
 
             // `newDataPath` carries whatever protection class it already had across the move
-            // above, renaming within the same volume does not touch a file's contents or its
+            // above: renaming within the same volume does not touch a file's contents or its
             // extended attributes. Only the freshly (re)written response record needs it applied
             // again here.
             #if canImport(Darwin)
@@ -477,7 +475,7 @@ struct DiskStorage: Sendable {
             at: record.url.filePath
         )
         // A no-op when the `do` branch above already repointed `key` at `newRecord.url`; clears
-        // it when the move failed and there is nothing left on disk for this key at all, see
+        // it when the move failed and there is nothing left on disk for this key at all. See
         // the comment on `Record.init(directory:key:at:)` for why a failed revalidation loses
         // the entry outright rather than leaving `record`'s directory in place.
         index.remove(key, ifLocation: record.url)
@@ -485,7 +483,7 @@ struct DiskStorage: Sendable {
 
     /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
     /// decide whether `freeSpace` can skip its directory rescan below. See that method's doc
-    /// for the safety argument, passing a stale or absent estimate never risks correctness,
+    /// for the safety argument: passing a stale or absent estimate never risks correctness,
     /// only an avoidable rescan.
     /// - Returns: The buffer to write through, disk usage immediately after this write (`nil`
     /// when the write didn't happen, e.g. the entry doesn't fit at all) for the caller to keep
@@ -536,14 +534,16 @@ struct DiskStorage: Sendable {
     /// Deletes exactly the record directory at `url`, bypassing `record(_:)`'s completeness
     /// gate entirely.
     ///
-    /// That gate, both `response.record` and `data.record` present, is correct for every
+    /// That gate (both `response.record` and `data.record` present) is correct for every
     /// read path (`subscript`, `updateCached`, eviction), which must never serve or reason
     /// about a write that never finished. But it also means those lookups can never be used to
     /// find and delete such a write's own leftover directory: an entry missing `data.record` is
-    /// invisible to them by design. This exists for the one caller that already knows exactly
-    /// which directory to remove without needing to look it up, the `URL` `allocateBuffer`
-    /// itself just handed back, so cleaning up a cancelled or errored cache write never has to
-    /// go searching for what it already knows.
+    /// invisible to them by design.
+    ///
+    /// This exists for the one caller that already knows exactly which directory to remove
+    /// without needing to look it up: the `URL` `allocateBuffer` itself just handed back. So
+    /// cleaning up a cancelled or errored cache write never has to go searching for what it
+    /// already knows.
     func removeRecord(at url: URL) async {
         _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
     }
@@ -551,9 +551,9 @@ struct DiskStorage: Sendable {
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
     ///
     /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
-    /// `maximumCapacity`, the directory rescan below, a full `listContents()` plus a
-    /// reachability check and a size stat *per existing entry*, is skipped outright, since
-    /// nothing would be evicted anyway. This is the difference between a single cache write
+    /// `maximumCapacity`, the directory rescan below (a full `listContents()` plus a
+    /// reachability check and a size stat *per existing entry*) is skipped outright, since
+    /// nothing would be evicted anyway. That is the difference between a single cache write
     /// costing O(1) versus O(current entry count): the latter turns writing `n` entries into
     /// O(n²) total filesystem operations, cheap enough to hide on a fast local disk but not on
     /// a simulator's slower, host-bridged filesystem, where it has been the underlying cause of
@@ -562,15 +562,14 @@ struct DiskStorage: Sendable {
     /// Skipping is safe regardless of how accurate `knownUsage` is:
     /// - If it undercounts (e.g. another process sharing this directory, via `suiteName`, wrote
     ///   since it was last reconciled here), the result is a transient, bounded overshoot of
-    ///   `maximumCapacity`, never data loss or corruption, that self-corrects the next time
+    ///   `maximumCapacity` (never data loss or corruption) that self-corrects the next time
     ///   this runs without a `knownUsage` that still fits, which forces the real rescan below
     ///   and hands back a freshly reconciled total.
     /// - If it overcounts, this just skips straight to an unnecessary-but-harmless rescan.
     ///
-    /// A missing `knownUsage` always takes the rescan path, so a first call with no estimate
-    /// yet, or one that no longer fits, behaves exactly as before this parameter existed.
+    /// A missing `knownUsage` always takes the rescan path.
     ///
-    /// - Returns: Usage immediately after this call, either the untouched `knownUsage` when
+    /// - Returns: Usage immediately after this call: either the untouched `knownUsage` when
     /// skipped, or the freshly measured total otherwise, for the caller to reuse as its next
     /// `knownUsage`.
     @discardableResult
@@ -634,7 +633,7 @@ struct DiskStorage: Sendable {
     /// try await handle.close()
     /// ```
     ///
-    /// A throw from `write`, a full disk, a permission error, anything, jumps straight to
+    /// A throw from `write` (a full disk, a permission error, anything) jumps straight to
     /// `catch`, and `close()` never runs. The handle is still open, and it is also now
     /// unreachable, which is exactly what NIO traps on. `readResponseData(at:)` a few lines up
     /// closes on every path for the read side; this method gives the write side the same
@@ -655,10 +654,11 @@ struct DiskStorage: Sendable {
         if let encryptionKey {
             // `.combined` bundles a fresh random nonce with the ciphertext and tag in one blob,
             // self-describing, no extra framing needed for a file this small (`response.record`
-            // is metadata/headers, never the response body). `nil` only when a non-default nonce
-            // size was used, which never happens here (no explicit nonce is passed), guarded
-            // rather than force-unwrapped so a future change can't silently start writing
-            // plaintext under this branch; it throws instead, same as any other write failure.
+            // is metadata/headers, never the response body). `nil` only when a non-default
+            // nonce size was used, which never happens here (no explicit nonce is passed). It's
+            // guarded rather than force-unwrapped so a future change can't silently start
+            // writing plaintext under this branch; it throws instead, same as any other write
+            // failure.
             guard let combined = try AES.GCM.seal(data, using: encryptionKey.symmetricKey).combined else {
                 throw SealFailureError()
             }
@@ -685,19 +685,19 @@ struct DiskStorage: Sendable {
     /// Applies `fileProtection` to a freshly written record's `response.record`, and
     /// pre-creates its `data.record` under the same class before anything is streamed into it.
     ///
-    /// - Note: `data.record` does not exist yet at this point, `Internals.FileBuffer` opens it
+    /// - Note: `data.record` does not exist yet at this point. `Internals.FileBuffer` opens it
     /// lazily, on the first byte written through it, which can happen an arbitrary amount of
-    /// time after this call returns and has no single moment this type controls to apply the
+    /// time after this call returns, with no single moment this type controls to apply the
     /// class retroactively. Pre-creating an empty file here, with the class already set, means
     /// the later lazy open (`.modifyFile(createIfNecessary: true, ...)`) just finds it already
-    /// there and writes into it, the same outcome as if the whole file had been created with
+    /// there and writes into it: the same outcome as if the whole file had been created with
     /// the class from the start.
     private func applyFileProtection(to record: Record) async {
         guard let fileProtection else { return }
 
         #if targetEnvironment(simulator)
         // Every Apple Simulator backs its file system with the host Mac's plain APFS volume,
-        // not the per-class, hardware-derived encryption real devices use, a protection class
+        // not the per-class, hardware-derived encryption real devices use. A protection class
         // set here has no effect and does not even round-trip back through
         // `FileManager.attributesOfItem`. Skipping outright avoids paying for syscalls that can
         // never do anything, on the same shared thread pool every other blocking file op in
@@ -720,10 +720,10 @@ struct DiskStorage: Sendable {
         #endif
     }
 
-    /// Applies `fileProtection` to a `response.record` that already exists on disk, the
+    /// Applies `fileProtection` to a `response.record` that already exists on disk: the
     /// revalidation rewrite in `updateCached`, where (unlike `allocateBuffer`) there is no
-    /// `data.record` left to pre-create: it was moved forward from the old record as-is, class
-    /// and all.
+    /// `data.record` left to pre-create, since it was moved forward from the old record as-is,
+    /// class and all.
     private func applyFileProtection(toResponseRecordAt url: URL) async {
         guard let fileProtection else { return }
 
@@ -760,8 +760,8 @@ struct DiskStorage: Sendable {
         }
 
         guard let record = await Record(url) else {
-            // The directory the index pointed to turned out to be gone or unreadable, stale,
-            // so drop it, guarded so a newer write that already replaced this mapping isn't
+            // The directory the index pointed to turned out to be gone or unreadable: stale, so
+            // drop it. Guarded so a newer write that already replaced this mapping isn't
             // clobbered by a check that started against the old one.
             index.remove(key, ifLocation: url)
             return nil
@@ -772,7 +772,7 @@ struct DiskStorage: Sendable {
 
     /// The full, live directory scan `index` exists to keep off the read path. Still the
     /// source of truth for anything that has to see every entry regardless of what `index`
-    /// currently knows, `freeSpace`'s eviction accounting and `removeAll(since:)` call this
+    /// currently knows: `freeSpace`'s eviction accounting and `removeAll(since:)` call this
     /// directly rather than through `index`, so a duplicate directory from a lost write race
     /// (two concurrent writers for the same key) stays visible and gets swept up like any other
     /// entry instead of going untracked once `index` moves on to the newer one.

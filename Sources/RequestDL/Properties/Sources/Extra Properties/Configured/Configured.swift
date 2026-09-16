@@ -8,8 +8,8 @@ import Crypto
 /// A property that derives declarative request properties from an external configuration source.
 ///
 /// Use `Configured` to drive a request's `BaseURL`, `RequestMethod`, `Timeout`, headers and query
-/// parameters from a `ConfigReader`, backed by environment variables, a JSON file, in-memory
-/// defaults, or any other `ConfigProvider`, instead of hardcoding them as Swift literals.
+/// parameters from a `ConfigReader` (backed by environment variables, a JSON file, in-memory
+/// defaults, or any other `ConfigProvider`) instead of hardcoding them as Swift literals.
 ///
 /// ```swift
 /// DataTask {
@@ -30,7 +30,7 @@ import Crypto
 ///   value sets the base URL, same as `BaseURL`) while also accepting a relative value (e.g.
 ///   `"/users/123"`, appended to whatever base URL is otherwise in effect) or a query-only value
 ///   (e.g. `"?active=true"`) in the same field, the same trade-offs `FlexibleURL` documents on its
-///   own. A bare host with no scheme (e.g. `"example.com"`) is **not** recognized as a host here,
+///   own. A bare host with no scheme (e.g. `"example.com"`) is **not** recognized as a host here:
 ///   it has no `://`, so `FlexibleURL` reads it as a relative path instead; write
 ///   `"https://example.com"` for the base URL case.
 /// - `method` (string, optional): uppercased and passed to ``RequestMethod/init(_:)``.
@@ -45,9 +45,9 @@ import Crypto
 ///   `"bearer"` reads `authorization.token`.
 /// - `dnsOverrides` (string array, optional): each entry is a colon-separated `"host:IP"` pair,
 ///   one ``DNSOverride`` per entry.
-/// - `urlOverrides` (string array, optional): each entry is a `"origin|destination"` pair, both
+/// - `urlOverrides` (string array, optional): each entry is a `"origin|destination"` pair (both
 ///   full `"scheme://host[/path]"` strings, so `:`/`/` couldn't serve as the separator the way
-///   they do for `dnsOverrides`/`headers`, collected into a single ``URLOverride``.
+///   they do for `dnsOverrides`/`headers`), collected into a single ``URLOverride``.
 /// - `systemProxy` (bool, optional, default: `false`): includes ``SystemProxy`` when `true`.
 /// - `proxy` (scoped, optional): passed to ``Proxy``. Reads `proxy.enabled` (default `false`;
 ///   skipped entirely when not `true`), `proxy.host` (required), `proxy.port` (required for
@@ -58,19 +58,19 @@ import Crypto
 /// - `cachePolicy` (string, optional): `"memory"`, `"disk"`, or `"all"`, passed to
 ///   ``Property/cachePolicy(_:)``.
 /// - `cacheStrategy` (string, optional): `"ignoreCachedData"`, `"reloadAndValidateCachedData"`,
-///   `"returnCachedDataElseLoad"`, or `"useCachedDataOnly"`, the ``CacheStrategy`` case names
-///   verbatim, passed to ``Property/cacheStrategy(_:)``.
+///   `"returnCachedDataElseLoad"`, or `"useCachedDataOnly"` (the ``CacheStrategy`` case names
+///   verbatim), passed to ``Property/cacheStrategy(_:)``.
 /// - `secureConnection` (scoped, optional): reads `secureConnection.trustRoots`,
 ///   `secureConnection.additionalTrustRoots`, and `secureConnection.certificates` (each a string
 ///   path to a `PEM` file, passed to ``TrustRoots``, ``AdditionalTrustRoots``, and ``Certificates``
-///   respectively, none of these require nesting inside a `SecureConnection`, so each is included
+///   respectively; none of these require nesting inside a `SecureConnection`, so each is included
 ///   independently); `secureConnection.privateKey` (scoped: `.file` required, `.format`
 ///   (`"pem"`/`"der"`, default `"pem"`), `.password` optional, treated as secret) passed to
 ///   ``PrivateKey``; `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
 ///   (`"1.0"`/`"1.1"`/`"1.2"`/`"1.3"`), passed to ``SecureConnection/version(minimum:)``/
-///   ``SecureConnection/version(maximum:)``, these two, unlike the rest, do require a
+///   ``SecureConnection/version(maximum:)`` (these two, unlike the rest, do require a
 ///   `SecureConnection` wrapper, since they configure `SecureConnection` itself rather than a
-///   certificate; and `secureConnection.spkiPinning` (scoped, optional, present only when
+///   certificate); and `secureConnection.spkiPinning` (scoped, optional, present only when
 ///   `secureConnection.spkiPinning.pins` is set), passed to ``SPKIPinning``/``SPKIHash``. Reads
 ///   `secureConnection.spkiPinning.pins` (string array, required, non-empty, each entry a
 ///   Base64-encoded SHA-256 SPKI digest) and `secureConnection.spkiPinning.policy` (`"strict"` or
@@ -86,7 +86,7 @@ import Crypto
 ///   ``Session/maximumConnectionsPerHost(_:)``.
 /// - `maximumConcurrentConnections` (int, optional): passed to
 ///   ``Session/maximumConcurrentConnections(_:)``. Both are read independently and, when either
-///   is present, chained onto the same ``Session`` value, same as declaring
+///   is present, chained onto the same ``Session`` value: same as declaring
 ///   `Session().maximumConnectionsPerHost(x).maximumConcurrentConnections(y)` directly.
 ///
 /// Every key is read independently and is optional: a missing key simply contributes nothing, the

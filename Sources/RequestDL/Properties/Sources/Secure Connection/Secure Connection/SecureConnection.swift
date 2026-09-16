@@ -8,7 +8,7 @@ import RequestDLInternals
 /// Represents a secure connection with various configuration options.
 ///
 /// > Note: ``TrustRoots``, ``Certificates``, ``AdditionalTrustRoots``, ``PrivateKey``,
-/// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection`,
+/// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection`:
 /// each creates the underlying secure connection configuration on its own the first time it's
 /// needed. Nest them here only when also configuring settings that live directly on
 /// `SecureConnection` (`version`, `cipherSuites`, `keyLogger`, ...).
@@ -33,8 +33,8 @@ public struct SecureConnection<Content: Property>: Property {
         // that `_makeProperty` can wrap it in a `SecureConnectionNode`, the same leaf type this
         // node itself searches for and the same one every other secure connection property
         // (`TrustRoots`, `Certificates`, `PrivateKey`, ...) wraps itself in. Without that, a
-        // `SecureConnection` nested inside another `SecureConnection`, via its own
-        // `.leaf(Node(...))` collapsing everything into a private wrapper type, would be
+        // `SecureConnection` nested inside another `SecureConnection` (via its own
+        // `.leaf(Node(...))` collapsing everything into a private wrapper type) would be
         // invisible to the outer one's search, and every certificate/trust root/TLS setting it
         // configured would be silently dropped.
         //
@@ -42,7 +42,7 @@ public struct SecureConnection<Content: Property>: Property {
         // the base wholesale, then apply each found `SecureConnectionNode` on top of it via its
         // own fresh collector. `secureConnection`'s own settings (TLS version, cipher suites,
         // etc.) are not tracked field-by-field the way `trustRoots`/`certificateChain`/
-        // `additionalTrustRoots` are, so nesting still replaces the whole base, only how that
+        // `additionalTrustRoots` are, so nesting still replaces the whole base: only how that
         // replacement becomes reachable when nested has changed here, not what it does.
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection = self.secureConnection
@@ -157,7 +157,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the minimum and maximum TLS versions for the secure connection.
     ///
-    /// - Important: Unavailable in a build without NIO, see ``version(maximum:)``. Use
+    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
     /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameters:
@@ -170,7 +170,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the TLS version range for the secure connection.
     ///
-    /// - Important: Unavailable in a build without NIO, see ``version(maximum:)``. Use
+    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
     /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameter range: The range of TLS versions to use.
@@ -184,7 +184,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the TLS version range for the secure connection, inclusive of both ends.
     ///
-    /// - Important: Unavailable in a build without NIO, see ``version(maximum:)``. Use
+    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
     /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameter range: The closed range of TLS versions to use.
@@ -256,7 +256,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the verify signature algorithms for the secure connection.
     ///
-    /// - Important: Unavailable in a build without NIO, see
+    /// - Important: Unavailable in a build without NIO. See
     /// ``signingSignatureAlgorithms(_:)``.
     ///
     /// - Parameter algorithm: The signature algorithms to use for verification.
@@ -351,7 +351,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the cipher suites for the secure connection using `TLSCipher` values.
     ///
-    /// - Important: Unavailable in a build without NIO, same reasoning as the `String`-based
+    /// - Important: Unavailable in a build without NIO, for the same reason as the `String`-based
     /// `cipherSuites(_:)` overload above.
     ///
     /// - Parameter suites: The cipher suites to use as `TLSCipher` values.

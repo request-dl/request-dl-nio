@@ -195,7 +195,7 @@ extension Internals {
         /// Collects every outbound chunk `NIOHTTPRequestCompressor` produced, then hands it back
         /// as `Data` without copying: the whole point of draining into one contiguous `ByteBuffer`
         /// first is that its storage can then be wrapped, not duplicated, into the `Data` this
-        /// returns, see `NIOFoundationEssentialsCompat`'s own `.noCopy` strategy, which is what
+        /// returns. See `NIOFoundationEssentialsCompat`'s own `.noCopy` strategy, which is what
         /// actually does that (retains this buffer's storage from inside `Data`'s deallocator
         /// instead of `memcpy`-ing it).
         private static func drain(_ channel: EmbeddedChannel) throws -> Data {

@@ -17,8 +17,8 @@ extension Internals {
     /// ## Why not `NIOFileSystem.FileSystem.shared`
     ///
     /// `.shared` runs on `NIOSingletons.posixBlockingThreadPool`, a thread pool shared by the
-    /// whole process and sized to `System.coreCount` by default, the same size class as Swift
-    /// Concurrency's cooperative pool. Under `swift-testing`'s parallel execution, with many
+    /// whole process and sized to `System.coreCount` by default (the same size class as Swift
+    /// Concurrency's cooperative pool). Under `swift-testing`'s parallel execution, with many
     /// suites each opening their own cache/buffer file at once, that pool saturates the same way
     /// the cooperative pool did before `Internals.FileStreamBuffer` moved off it: not because any
     /// single read or write is slow, but because `Internals.Buffer.Storage` budgets 5s for the
@@ -54,9 +54,8 @@ extension Internals {
         /// cooperative thread happens to call in here. See `FileStreamBuffer`'s doc for why that
         /// distinction matters under `swift-testing`'s parallel execution.
         ///
-        /// - Note: Exists for platform-specific calls `NIOFileSystem` has no notion of, Darwin's
-        /// file protection attributes, at the time this was added, that still touch the same
-        /// files this pool already owns.
+        /// - Note: Exists for platform-specific calls `NIOFileSystem` has no notion of (Darwin's
+        /// file protection attributes) that still touch the same files this pool already owns.
         package static func run<T: Sendable>(
             _ body: @escaping @Sendable () throws -> T
         ) async throws -> T {
@@ -71,7 +70,7 @@ extension Internals {
         /// NIO: still never runs a blocking file syscall on whichever Swift Concurrency
         /// cooperative thread happens to call in here, since that is what the watchdog-false-
         /// positive problem this type exists to solve actually turns on, not `NIOThreadPool`
-        /// specifically. `DispatchQueue.global()` is GCD's own elastic worker pool, entirely
+        /// specifically. `DispatchQueue.global()` is GCD's own elastic worker pool: entirely
         /// outside Swift Concurrency's fixed-size cooperative pool already, so no dedicated pool
         /// needs to be built by hand the way `NIOThreadPool(numberOfThreads:)` is above.
         package static func run<T: Sendable>(

@@ -66,7 +66,7 @@ extension Internals {
     /// Internals-layer counterpart to `RequestDL.CompressorStream`, operating on `Data` instead
     /// of `[UInt8]`: the boundary conversion lives in the adapter that wraps a public
     /// `Compressor`/`CompressorStream` into these. The one conformer that does real work
-    /// (`Internals.NIOHTTPCompressorStream`) still runs on `NIOCore.ByteBuffer` internally,
+    /// (`Internals.NIOHTTPCompressorStream`) still runs on `NIOCore.ByteBuffer` internally:
     /// this protocol just doesn't force that on whoever calls it.
     package protocol CompressorStream {
         mutating func callAsFunction(compressing bytes: Data) throws -> Data

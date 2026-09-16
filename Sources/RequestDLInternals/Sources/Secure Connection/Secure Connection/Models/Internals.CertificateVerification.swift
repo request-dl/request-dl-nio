@@ -8,7 +8,7 @@ import NIOSSL
 
 extension Internals {
 
-    /// Portable mirror of `NIOSSL.CertificateVerification`, `Internals.SecureConnection`'s own
+    /// Portable mirror of `NIOSSL.CertificateVerification`: `Internals.SecureConnection`'s own
     /// currency for this knob, since it's read by `Internals.ServerTrustPolicy`/
     /// `Internals.NIOTrustEvaluator` regardless of whether NIO is available.
     package enum CertificateVerification: Sendable, Hashable {

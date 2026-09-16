@@ -101,7 +101,7 @@ extension Internals {
         /// of ``RequestConfiguration/cacheStrategy``.
         ///
         /// - Important: Only ever escalates towards a more network-averse strategy, never
-        /// loosens what `.cacheStrategy(_:)` explicitly configured, order-independent by
+        /// loosens what `.cacheStrategy(_:)` explicitly configured. Order-independent by
         /// construction, since it reads both inputs fresh rather than letting one `PropertyNode`
         /// overwrite what another wrote.
         private var effectiveCacheStrategy: CacheStrategy {
@@ -112,7 +112,7 @@ extension Internals {
             // anything but a plain `HeaderNode` becomes invisible to that search and gets
             // silently dropped whenever it's nested inside one of those. Deriving from the
             // already-serialized header sidesteps the node-graph representation entirely, so it
-            // keeps working no matter how the header got there, `CacheHeader`, a raw
+            // keeps working no matter how the header got there: `CacheHeader`, a raw
             // `Headers { "Cache-Control": ... }`, nested in a group, or anything else.
             let requestDirectives = directives(requestConfiguration.headers["Cache-Control"] ?? [])
                 .map { $0.lowercased() }
@@ -138,7 +138,7 @@ extension Internals {
             return requestConfiguration.cacheStrategy
         }
 
-        /// Whether the outgoing request declares `no-store` (RFC 7234 §5.2.1.5), this response
+        /// Whether the outgoing request declares `no-store` (RFC 7234 §5.2.1.5): this response
         /// must not be persisted to this package's on-disk cache.
         private var requestForbidsStoring: Bool {
             directives(requestConfiguration.headers["Cache-Control"] ?? [])
@@ -252,7 +252,7 @@ extension Internals {
 
             // Conditional request headers. Copying `ETag` and `Last-Modified` straight onto the
             // request tells the server nothing: those are response headers. A server only
-            // answers 304 when it is asked with `If-None-Match` or `If-Modified-Since`, without
+            // answers 304 when it is asked with `If-None-Match` or `If-Modified-Since`: without
             // these the 304 branch below is unreachable and every revalidation downloads the
             // whole body again.
             setConditionalHeader(
@@ -319,7 +319,7 @@ extension Internals {
         /// Folds the freshness directives the server just sent into the cached response.
         ///
         /// - Important: The new value has to win. Must not pass the new headers through the
-        /// `cachedHeaders` parameter of a helper that prefers whatever was already there, that
+        /// `cachedHeaders` parameter of a helper that prefers whatever was already there: that
         /// could only ever add a directive that was missing and never refresh one that existed,
         /// and picking up a fresher `max-age` is the entire point of revalidating.
         private func updateCacheHeaders(
@@ -507,7 +507,7 @@ extension Internals {
         ///
         /// - Important: Must not run through ``directives(_:)``. An HTTP date contains a comma
         /// of its own, right after the day name, so splitting the value on commas tears
-        /// `Sun, 06 Nov 1994 08:49:37 GMT` in half, stitching the pieces back together by
+        /// `Sun, 06 Nov 1994 08:49:37 GMT` in half: stitching the pieces back together by
         /// remembering the last fragment that failed to parse and prepending it to the next one
         /// is not a fix, since `Expires` is a single date, not a list, and splitting is never
         /// appropriate here.
@@ -540,7 +540,7 @@ extension Internals {
         /// Flattens header values into individual directives.
         ///
         /// - Note: Trimming goes through the package's own `trimming(where:)`, not
-        /// `trimmingCharacters(in: .whitespaces)`, that needs `Foundation.CharacterSet`, which
+        /// `trimmingCharacters(in: .whitespaces)`: that needs `Foundation.CharacterSet`, which
         /// this file has no import for.
         private func directives(_ headers: [String]) -> some Sequence<String> {
             headers
