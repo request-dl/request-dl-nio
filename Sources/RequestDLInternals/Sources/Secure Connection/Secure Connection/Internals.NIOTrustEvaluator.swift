@@ -10,6 +10,11 @@
 // own the accept/reject decision. This type is what plugs RequestDL's own trust-root + SPKI pinning
 // logic into those hooks, so `.nio` keeps working exactly as before from a caller's perspective.
 
+// The whole file is .nio/.nioTransportServices-only (see the header comment above): .urlSession
+// has Internals.ServerTrustPolicy instead. Not previously gated despite already being classified
+// as such — closed here.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOSSL
 
@@ -107,3 +112,5 @@ extension Internals {
         }
     }
 }
+
+#endif
