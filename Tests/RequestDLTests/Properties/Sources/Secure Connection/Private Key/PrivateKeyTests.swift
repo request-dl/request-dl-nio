@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import RequestDLInternals
 import Testing
 
@@ -155,7 +154,7 @@ struct PrivateKeyTests {
     func privateKey_whenInitPEMFileWithPasswordBytes() async throws {
         // Given
         let resource = Certificates(.pem).client(password: true)
-        let password = NIOSSLSecureBytes("password".utf8)
+        let password = SecureBytes("password".utf8)
 
         // When
         let resolved = try await resolve(
@@ -177,7 +176,7 @@ struct PrivateKeyTests {
                     Internals.PrivateKey(
                         resource.privateKeyURL.absolutePath(percentEncoded: false),
                         format: .pem,
-                        password: .init(password)
+                        password: password
                     )
                 )
         )
@@ -187,7 +186,7 @@ struct PrivateKeyTests {
     func privateKey_whenInitDERFileWithPasswordBytes() async throws {
         // Given
         let resource = Certificates(.der).client()
-        let password = NIOSSLSecureBytes("password".utf8)
+        let password = SecureBytes("password".utf8)
 
         // When
         let resolved = try await resolve(
@@ -209,7 +208,7 @@ struct PrivateKeyTests {
                     Internals.PrivateKey(
                         resource.privateKeyURL.absolutePath(percentEncoded: false),
                         format: .der,
-                        password: .init(password)
+                        password: password
                     )
                 )
         )
@@ -220,7 +219,7 @@ struct PrivateKeyTests {
         // Given
         let resource = Certificates(.pem).client(password: true)
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
-        let password = NIOSSLSecureBytes("password".utf8)
+        let password = SecureBytes("password".utf8)
 
         // When
         let resolved = try await resolve(
@@ -242,7 +241,7 @@ struct PrivateKeyTests {
                     Internals.PrivateKey(
                         bytes,
                         format: .pem,
-                        password: .init(password)
+                        password: password
                     )
                 )
         )
@@ -253,7 +252,7 @@ struct PrivateKeyTests {
         // Given
         let resource = Certificates(.der).client()
         let bytes = try Array(Data(contentsOf: resource.privateKeyURL))
-        let password = NIOSSLSecureBytes("password".utf8)
+        let password = SecureBytes("password".utf8)
 
         // When
         let resolved = try await resolve(
@@ -275,7 +274,7 @@ struct PrivateKeyTests {
                     Internals.PrivateKey(
                         bytes,
                         format: .der,
-                        password: .init(password)
+                        password: password
                     )
                 )
         )
@@ -287,7 +286,7 @@ struct PrivateKeyTests {
     func privateKey_whenInitPEMFileWithPasswordBytesInBundle() async throws {
         // Given
         let resource = Certificates(.pem).client(password: true)
-        let password = NIOSSLSecureBytes("password".utf8)
+        let password = SecureBytes("password".utf8)
 
         let file = resource.privateKeyURL.lastPathComponent
 
@@ -313,7 +312,7 @@ struct PrivateKeyTests {
                         Internals.PrivateKey(
                             $0.absolutePath(percentEncoded: false),
                             format: .pem,
-                            password: .init(password)
+                            password: password
                         )
                     )
                 }

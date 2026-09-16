@@ -11,7 +11,6 @@
 #if canImport(Darwin)
 
 import CryptoKit
-import NIOSSL
 import Security
 import _CryptoExtras
 
@@ -147,7 +146,7 @@ extension Internals {
         /// entry point can't parse: a wrong passphrase, an EC key, or a PKCS#8-encrypted one.
         private static func decryptedRSAPrivateKeyDER(
             fromEncryptedPEM pemData: Data,
-            password: NIOSSLSecureBytes
+            password: SecureBytes
         ) throws -> Data {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
                 throw Error.unsupportedKeyFormat("non-UTF8 input")

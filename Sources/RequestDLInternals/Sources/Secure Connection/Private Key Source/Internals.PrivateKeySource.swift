@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOSSL
+#endif
 
 extension Internals {
 
@@ -12,11 +14,13 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() throws -> NIOSSL.NIOSSLPrivateKeySource {
             switch self {
             case .privateKey(let privateKey):
                 return try .privateKey(privateKey.build())
             }
         }
+        #endif
     }
 }

@@ -5,7 +5,6 @@
 #if canImport(Darwin)
 
 import CryptoKit
-import NIOSSL
 import Security
 import Testing
 
@@ -93,7 +92,7 @@ struct InternalsRawBytesIdentityBuilderTests {
             .init(
                 Array(Self.encryptedRSAPEM.utf8),
                 format: .pem,
-                password: NIOSSLSecureBytes(Self.encryptedRSAPassword.utf8)
+                password: SecureBytes(Self.encryptedRSAPassword.utf8)
             )
         )
 
@@ -114,7 +113,7 @@ struct InternalsRawBytesIdentityBuilderTests {
             .init(
                 Array(Self.encryptedRSAPEM.utf8),
                 format: .pem,
-                password: NIOSSLSecureBytes("not the right password".utf8)
+                password: SecureBytes("not the right password".utf8)
             )
         )
 
@@ -134,7 +133,7 @@ struct InternalsRawBytesIdentityBuilderTests {
             .init(
                 [UInt8](plainDER),
                 format: .der,
-                password: NIOSSLSecureBytes(Self.encryptedRSAPassword.utf8)
+                password: SecureBytes(Self.encryptedRSAPassword.utf8)
             )
         )
 

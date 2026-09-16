@@ -4,7 +4,6 @@
 
 import Configuration
 import Crypto
-import NIOSSL
 import RequestDLInternals
 import Testing
 
@@ -979,7 +978,7 @@ struct ConfiguredTests {
         #expect(
             resolved.session.configuration.secureConnection?.privateKey
                 == .privateKey(
-                    .init(file, format: .pem, password: NIOSSLSecureBytes(password.utf8))
+                    .init(file, format: .pem, password: SecureBytes(password.utf8))
                 )
         )
     }
