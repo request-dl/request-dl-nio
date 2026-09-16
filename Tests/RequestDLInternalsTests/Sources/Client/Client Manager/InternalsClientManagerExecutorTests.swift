@@ -27,7 +27,7 @@ struct InternalsClientManagerExecutorTests {
     @Test
     func resolvedClient_whenConfigurationHasNoExecutorPreference_actuallyRunsOverURLSession() async throws {
         // Given
-        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
 
@@ -73,7 +73,7 @@ struct InternalsClientManagerExecutorTests {
     @Test
     func resolvedClient_whenCalledTwice_reusesTheSameURLSessionClient() async throws {
         // Given
-        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
 
@@ -108,7 +108,7 @@ struct InternalsClientManagerExecutorTests {
         // than a `.urlSession` one. (A SOCKS proxy used to be this test's example, but it's no
         // longer incompatible; see `InternalsSessionConfigurationExecutorTests
         // .configuration_whenSOCKSProxySet_doesNotContainReason`.)
-        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
 
         var sessionConfiguration = Internals.Session.Configuration()
@@ -144,7 +144,7 @@ struct InternalsClientManagerExecutorTests {
         async throws
     {
         // Given
-        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
 
         var configuration = Internals.Session.Configuration()
@@ -174,7 +174,7 @@ struct InternalsClientManagerExecutorTests {
     @Test
     func resolvedClient_whenNIORequired_doesNotUseNIOTransportServicesEventLoopGroup() async throws {
         // Given
-        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
 
         var configuration = Internals.Session.Configuration()

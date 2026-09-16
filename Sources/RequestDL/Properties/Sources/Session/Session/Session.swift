@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOCore
+#endif
 import RequestDLInternals
 import Tracing
 
@@ -68,9 +70,15 @@ public struct Session: Property {
         provider = .identified(identifier, numberOfThreads: numberOfThreads)
     }
 
+    #if canImport(NIOCore)
+    /// Initializes a new Session object backed by a caller-supplied `EventLoopGroup`.
+    ///
+    /// Only meaningful for the `.nio`/`.nioTransportServices` executors — this initializer
+    /// doesn't exist at all in a build where NIO isn't available.
     public init(_ customLoopGroup: NIOCore.EventLoopGroup) {
         provider = .custom(customLoopGroup)
     }
+    #endif
 
     // MARK: - Public static methods
 

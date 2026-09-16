@@ -15,7 +15,7 @@ extension Internals.Session {
         package var secureConnection: Internals.SecureConnection?
         package var redirectConfiguration: Internals.RedirectConfiguration?
         package var timeout: Internals.Timeout = .init()
-        package var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
+        package var connectionPool: Internals.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
         package var ignoreUncleanSSLShutdown: Bool = false
 
@@ -101,7 +101,7 @@ extension Internals.Session {
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
-                connectionPool: connectionPool,
+                connectionPool: connectionPool.build(),
                 proxy: proxy?.build(),
                 decompression: decompression.build(),
                 tracing: .init()
@@ -333,6 +333,7 @@ extension Internals.Session.Configuration {
         }
 
         #if canImport(Darwin)
+        #if canImport(NIOCore)
         let isURLSessionCompatible = urlSessionIncompatibilityReasons().isEmpty
         let isNetworkFrameworkCompatible = secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true
 
@@ -360,8 +361,15 @@ extension Internals.Session.Configuration {
         if isNetworkFrameworkCompatible {
             return .nioTransportServices
         }
-        #endif
         return .nio
+        #else
+        // No NIO backend to fall back to at all: `.urlSession` is `Internals.Executor`'s only
+        // remaining case in this build, so there is nothing left to decide between.
+        return .urlSession
+        #endif
+        #else
+        return .nio
+        #endif
     }
 
     /// Hard-pins execution to `executor`, throwing rather than silently falling back when this
@@ -377,12 +385,14 @@ extension Internals.Session.Configuration {
         switch executor {
         case .urlSession:
             reasons = urlSessionIncompatibilityReasons()
+        #if canImport(NIOCore)
         case .nioTransportServices:
             reasons =
                 (secureConnection?.networkFrameworkIncompatibilityReasons() ?? [])
                 + nonURLSessionExecutorIncompatibilityReasons()
         case .nio:
             reasons = nonURLSessionExecutorIncompatibilityReasons()
+        #endif
         }
 
         guard reasons.isEmpty else {
@@ -490,11 +500,11 @@ extension Internals.Session.Configuration {
 
         #if canImport(Network)
         if let minimumTLSVersion = secureConnection?.minimumTLSVersion {
-            configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.urlSessionProtocolVersion
+            configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.build().urlSessionProtocolVersion
         }
 
         if let maximumTLSVersion = secureConnection?.maximumTLSVersion {
-            configuration.tlsMaximumSupportedProtocolVersion = maximumTLSVersion.urlSessionProtocolVersion
+            configuration.tlsMaximumSupportedProtocolVersion = maximumTLSVersion.build().urlSessionProtocolVersion
         }
         #endif
 

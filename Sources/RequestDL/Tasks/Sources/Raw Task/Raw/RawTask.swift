@@ -135,8 +135,10 @@ struct RawTask<Content: Property>: RequestTask {
     ) async throws -> (client: any RequestExecutingClient, isURLSessionExecutor: Bool) {
         do {
             switch try await resolved.session.resolvedClient() {
+            #if canImport(NIOCore)
             case .nio(let nioClient):
                 return (nioClient, false)
+            #endif
             #if canImport(Darwin)
             case .urlSession(let urlSessionClient):
                 return (urlSessionClient, true)
