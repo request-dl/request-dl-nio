@@ -3,14 +3,18 @@
 //
 
 import Crypto
+#if canImport(NIOCore)
 import NIOCore
 import NIOFileSystem
+#endif
 import RequestDLInternals
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
+#if canImport(NIOCore)
 import NIOFoundationEssentialsCompat
+#endif
 #else
 import struct Foundation.URL
 import struct Foundation.Date
@@ -320,11 +324,15 @@ struct DiskStorage: Sendable {
             return nil
         }
 
+        #if canImport(NIOCore)
         let raw =
             buffer.getData(
                 at: buffer.readerIndex,
                 length: buffer.readableBytes
             ) ?? Data()
+        #else
+        let raw = buffer
+        #endif
 
         guard let encryptionKey else {
             return raw

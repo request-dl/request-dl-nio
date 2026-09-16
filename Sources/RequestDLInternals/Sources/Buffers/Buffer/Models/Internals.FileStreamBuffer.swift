@@ -2,8 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOCore
 import NIOFileSystem
+#endif
 import SwiftAsyncStream
 import SystemPackage
 
@@ -42,11 +44,22 @@ extension Internals {
         // MARK: - Private types
 
         /// A file is opened for reading or for writing, never both, matching the two inits
-        /// below. `NIOFileSystem` hands back a different concrete handle type per direction.
+        /// below. Whichever backend is active hands back a different concrete handle type per
+        /// direction — `NIOFileSystem`'s own `ReadFileHandle`/`WriteFileHandle` with NIO, or
+        /// `Internals.PortableFileSystem`'s lookalikes without it (see that type's own doc
+        /// comment). Every method below reads identically either way: only the two case payload
+        /// types actually differ.
+        #if canImport(NIOCore)
         private enum Handle: Sendable {
             case read(ReadFileHandle)
             case write(WriteFileHandle)
         }
+        #else
+        private enum Handle: Sendable {
+            case read(Internals.PortableFileSystem.ReadHandle)
+            case write(Internals.PortableFileSystem.WriteHandle)
+        }
+        #endif
 
         // MARK: - Internal properties
 

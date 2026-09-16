@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOFileSystem
+#endif
 import SystemPackage
 
 #if canImport(FoundationEssentials)
@@ -136,7 +138,11 @@ extension URL {
         do {
             let buffer = try await handle.readToEnd(maximumSizeAllowed: .unlimited)
             try await handle.close()
+            #if canImport(NIOCore)
             return Data(buffer.readableBytesView)
+            #else
+            return buffer
+            #endif
         } catch {
             try? await handle.close()
             throw error

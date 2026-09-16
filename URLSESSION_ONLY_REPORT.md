@@ -188,6 +188,7 @@ behavior it used to be.
 | — | `Internals.ServerTrustPolicy` (own `certificateVerification` copy) | Fully removed (`import NIOSSL` gone entirely) |
 | — | `SSLKeyLogger`/`SSLPSKIdentityResolver` protocols (public + internal) + `PSKIdentity` Property + `Internals.SecureConnection.keyLogger`/`pskHint`/`pskIdentityResolver` fields + the 12 NIO-exclusive `SecureConnection` builder methods | Fully gated |
 | — | `DeflateAlgorithm`/`GzipAlgorithm`'s `Compressor` (outbound request-body compression) → `PortableDeflateCompressorStream`/`PortableGzipCompressorStream`, both gated on `!canImport(NIOCore) && canImport(zlib)`, falling back to `CompressionUnavailableError` only if even `zlib` is missing | Fully gated (both algorithms) |
+| — | `Internals.fileSystem`/`FileSystemManager.run` → `Internals.PortableFileSystem` (`FileManager`/`FileHandle`, offloaded via `DispatchQueue.global()`), consumed unchanged by `FileStreamBuffer`/`FileBufferURL`/`URL+Extensions.swift`/`DiskStorage.swift` | Fully gated — see "Disk I/O" writeup below |
 
 ### Compression codec (closed out this session)
 
@@ -249,6 +250,71 @@ locally, never committed) against the real `CompressorStream` protocol, followed
 suite, since `swift build`/`swift test` can't reach any of this normally — none of it is exercised
 until the trait exists, same as everything else in this file.
 
+### Disk I/O (closed out this session)
+
+`Internals.FileBufferURL.swift`/`Internals.FileStreamBuffer.swift`/`Internals.FileSystemManager
+.swift` were 100% `NIOFileSystem`/`NIOPosix`/`NIOThreadPool` at the start of this session. Two
+questions had to be answered before writing any portable replacement, per the original audit's
+own instruction not to reintroduce whatever `NIOFileSystem` was adopted to fix:
+
+1. **Why `NIOFileSystem` over `SystemPackage.FileDescriptor`?** Answered by
+   `Internals.FileStreamBuffer.swift`'s own doc comment, corroborated by nearby git history
+   (`7c4eab9c` "Fix cancellation handling and add lock watchdogs...", `7ed46171` "Relax
+   AsyncLock.Watchdog thresholds..."): a prior `FileDescriptor`-based revision ran the blocking
+   syscall in place on whichever Swift Concurrency cooperative thread called in, and under
+   `swift-testing`'s parallel execution enough concurrent callers saturated that fixed-size pool
+   that a critical section merely waiting for a worker thread looked identical to one genuinely
+   stuck to `AsyncLock.Watchdog` (wall time, not CPU time). `NIOFileSystem` fixed this by running
+   the syscall on its own dedicated `NIOThreadPool` instead.
+2. **Is that benefit unique to `NIOFileSystem`?** No — it is "don't block the cooperative pool
+   with a syscall," which `DispatchQueue.global()` (GCD's own elastic worker pool, entirely
+   outside Swift Concurrency's cooperative pool already) solves equally well with no NIO at all.
+   The actual offset/lock bookkeeping around every read/write was already this package's own
+   (`AsyncLock` + `_offset` in `FileStreamBuffer`), not delegated to `NIOFileSystem`'s API surface
+   — so swapping the backend couldn't regress that property either way.
+
+The real surface turned out wider than those three files: `DiskStorage.swift` and
+`Extensions/URL+Extensions.swift` also call `Internals.fileSystem.*` directly (`info`,
+`createDirectory`, `openFile`, `removeItem`, `moveItem`, `withDirectoryHandle`) — found by
+grepping for every `Internals.fileSystem`/`NIOFileSystem` reference outside the three originally
+flagged files, not assumed from the audit's file list.
+
+**Applied**: [`Internals.PortableFileSystem`](Sources/RequestDLInternals/Sources/File%20System%20Manager/Internals.PortableFileSystem.swift)
+mirrors the subset of `NIOFileSystem.FileSystem`'s API this package actually calls — `info`,
+`createDirectory`, `openFile` (read/write), `removeItem`, `moveItem`, `withDirectoryHandle` — each
+backed by `FileManager`/`FileHandle`, every blocking call routed through
+`Internals.FileSystemManager.run` (also made portable: `NIOThreadPool` under NIO,
+`DispatchQueue.global(qos: .utility)` without it). `Internals.fileSystem` itself resolves to
+whichever backend is active (`NIOFileSystem.FileSystem` vs `PortableFileSystem.Type`), the same
+"one symbol, `#if`-gated type" pattern used everywhere else in this effort.
+
+The portable types (`WriteOptions`, `ReadLength`, `ReadLimit`, `Chunk`, `DirectoryEntry`) were
+deliberately shaped to match real call-site syntax (`.newFile(replaceExisting:)`, `.bytes(_:)`,
+`.unlimited`, `chunk.readableBytes`/`.readableBytesView`, `entry.name.string`) rather than
+introducing a cleaner-looking but different API. The payoff: `FileStreamBuffer`'s `Handle` enum
+is the *only* thing gated in that file — every method that touches it (`init`, `writeData`,
+`readData`, `close`) compiles completely unchanged against either backend, so the correctness-
+critical short-read/short-write retry loops and cancellation checks are never duplicated between
+the two implementations. `FileBufferURL.swift` needed zero body changes at all, only its
+`import NIOFileSystem` gated. `URL+Extensions.swift`/`DiskStorage.swift` needed exactly one small
+`#if` each, at the single point where a `NIOFileSystem`-returned buffer's shape
+(`.readableBytesView`/`NIOFoundationEssentialsCompat.getData(at:length:)`) differs from the
+portable handle's plain `Data` return.
+
+**Verified far more thoroughly than a compile check**: after force-compiling the portable branch
+across all six touched files simultaneously (temporarily replacing every `#if canImport(NIOCore)`
+with `#if false` and `Internals.PortableFileSystem`'s own `#if !canImport(NIOCore)` with
+`#if true`, never committed), the **entire test suite was run against it**, not just typechecked —
+this is a stronger verification than anything else in this file, since disk I/O is exercised by
+real logic (offsets, short reads/writes, thread-pool offload), not just a synthetic script. All
+1220 + 560 tests passed, including
+`manyInstances_whenRunningConcurrently_shouldAllCompleteWithoutStallingTheCooperativePool` — the
+regression test for the exact watchdog-false-positive problem `NIOFileSystem` was originally
+adopted to fix — against the `DispatchQueue`-backed implementation. One real bug was caught this
+way before it could ship dead: the first draft of `PortableFileSystem.WriteOptions.modifyFile`
+was missing its `permissions` parameter entirely, a hard compile error invisible to normal
+`swift build`/`swift test` since this branch never type-checks in today's build.
+
 ## Open
 
 ### 1. Finish `Internals.SecureConnection` — the actual remaining blocker
@@ -291,20 +357,6 @@ whether it's already NIO-free (it was, in the original audit); re-verify since t
 didn't re-touch it. `Internals.RawBytesIdentityBuilder.swift`/`Internals.URLSessionIdentityPolicy.swift`
 are bucket C (thin coupling), likely resolve mostly on their own once the fields above are fixed,
 since their own NIOSSL touches are largely re-using vocabulary that becomes portable.
-
-### 2. Disk I/O — not started, needs investigation before any code change
-
-`Internals.FileBufferURL.swift`/`Internals.FileStreamBuffer.swift`/`Internals.FileSystemManager.swift`
-are 100% `NIOFileSystem`/`NIOPosix`/`NIOThreadPool`, untouched. **Before writing a portable
-replacement**, find out *why* — a comment in `Internals.FileStreamBuffer.swift` (as of the
-original audit) says a prior revision used `SystemPackage.FileDescriptor` directly for this and
-was replaced by `NIOFileSystem`. `SystemPackage` is already a package dependency (only `FilePath`
-is used from it today, confirmed no other file touches `FileDescriptor`). Read `git log`/`git
-blame` on this area first — if the earlier `FileDescriptor`-based approach was reverted for a
-real reason (missing async thread-pool offload, a correctness bug, a performance regression),
-that reason has to be solved, not silently reintroduced. If it was just an incidental cleanup
-during some other refactor, reverting toward `FileDescriptor` (or building a small async wrapper
-over it) is the natural path, since it needs no NIO at all.
 
 ## Gotchas hit this session (worth knowing before continuing)
 

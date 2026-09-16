@@ -2,9 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOCore
 import NIOFileSystem
 import NIOPosix
+#else
+import Foundation
+#endif
 
 extension Internals {
 
@@ -26,6 +30,8 @@ extension Internals {
     /// one-shot, process-global setting a library has no business imposing on whatever else the
     /// host application uses NIO's shared pool for.
     package enum FileSystemManager {
+
+        #if canImport(NIOCore)
 
         // MARK: - Private static properties
 
@@ -56,10 +62,43 @@ extension Internals {
         ) async throws -> T {
             try await threadPool.runIfActive(body)
         }
+
+        #else
+
+        // MARK: - Internal static methods
+
+        /// Same contract as the `NIOThreadPool`-backed overload above, ported to a build without
+        /// NIO: still never runs a blocking file syscall on whichever Swift Concurrency
+        /// cooperative thread happens to call in here, since that is what the watchdog-false-
+        /// positive problem this type exists to solve actually turns on, not `NIOThreadPool`
+        /// specifically. `DispatchQueue.global()` is GCD's own elastic worker pool — entirely
+        /// outside Swift Concurrency's fixed-size cooperative pool already, so no dedicated pool
+        /// needs to be built by hand the way `NIOThreadPool(numberOfThreads:)` is above.
+        package static func run<T: Sendable>(
+            _ body: @escaping @Sendable () throws -> T
+        ) async throws -> T {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        continuation.resume(returning: try body())
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
+
+        #endif
     }
 
     /// The file system every blocking file operation in `Internals` goes through.
+    #if canImport(NIOCore)
     package static var fileSystem: NIOFileSystem.FileSystem {
         FileSystemManager.shared
     }
+    #else
+    package static var fileSystem: PortableFileSystem.Type {
+        PortableFileSystem.self
+    }
+    #endif
 }
