@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -20,7 +19,11 @@ extension Internals {
 
         // MARK: - Internal static properties
 
-        package static let lifetime = TimeAmount.seconds(5 * 60)
+        /// Nanoseconds, matching `UnitTime.nanoseconds` — same convention as `Internals.Timeout`/
+        /// `Internals.ConnectionPool`. Kept portable rather than `NIOCore.TimeAmount`: this class
+        /// caches `.urlSession` clients too, so its own lifetime bookkeeping shouldn't need NIO
+        /// to exist at all.
+        package static let lifetime: Int64 = 5 * 60 * 1_000_000_000
         package static let shared = ClientManager(lifetime: lifetime)
 
         // MARK: - Private static properties
@@ -41,34 +44,27 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let lock = AsyncLock(watchdog: watchdog)
-        private let lifetime: TimeAmount
+        // Not `private`: `Internals.ClientManager+NIO.swift`'s extension (a different file, the
+        // `.nio`/`.nioTransportServices` half of this class) reaches these too. `internal`
+        // (the default) is as narrow as a member can be while still being visible there — Swift
+        // has no "private to this type across files" access level.
+        let lock = AsyncLock(watchdog: watchdog)
+        private let lifetime: Int64
 
-        private let tableLock = Lock()
+        let tableLock = Lock()
 
         // MARK: - Unsafe properties
 
-        private var _table = [String: [Item]]()
+        var _table = [String: [Item]]()
 
         // MARK: - Inits
 
-        package init(lifetime: TimeAmount) {
+        package init(lifetime: Int64) {
             self.lifetime = lifetime
             scheduleCleanup()
         }
 
         // MARK: - Internals methods
-
-        package func client(
-            provider: SessionProvider,
-            sessionConfiguration: Internals.Session.Configuration
-        ) async throws -> Internals.Client {
-            try await _nioClient(
-                provider: provider,
-                sessionConfiguration: sessionConfiguration,
-                isCompatibleWithNetworkFramework: sessionConfiguration.isCompatibleWithNetworkFramework
-            )
-        }
 
         /// Executor-aware counterpart to `client(provider:sessionConfiguration:)`: resolves
         /// `sessionConfiguration.resolveExecutor()` and actually builds/caches the client that
@@ -78,8 +74,9 @@ extension Internals {
         /// `requiredExecutor(.nioTransportServices)` actually decide which event loop group a real
         /// request gets, not just `enableNetworkFramework`.
         ///
-        /// Shares this manager's own `_table` with the NIO-only `client(provider:sessionConfiguration:)`
-        /// above: a `.urlSession` entry is keyed apart from a `.nio`/NIOTransportServices one for
+        /// Shares this manager's own `_table` with `Internals.ClientManager+NIO.swift`'s
+        /// NIO-only `client(provider:sessionConfiguration:)`: a `.urlSession` entry is keyed
+        /// apart from a `.nio`/NIOTransportServices one for
         /// the same provider (see `_createNewURLSessionClient`'s `id`), so the two can never
         /// collide or be handed back for each other.
         ///
@@ -95,6 +92,7 @@ extension Internals {
             sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.ClientManager.Client {
             #if canImport(Darwin)
+            #if canImport(NIOCore)
             let executor = sessionConfiguration.resolveExecutor()
 
             guard executor == .urlSession else {
@@ -106,6 +104,7 @@ extension Internals {
                     )
                 )
             }
+            #endif
 
             let sessionProviderID =
                 "URLSession."
@@ -138,55 +137,11 @@ extension Internals {
 
         // MARK: - Private methods
 
-        /// Shared body for `client(provider:sessionConfiguration:)` and `resolvedClient(provider:sessionConfiguration:)`'s
-        /// `.nio`/`.nioTransportServices` branch: the two differ only in *how* they decide
-        /// `isCompatibleWithNetworkFramework` (the `enableNetworkFramework` flag directly, vs.
-        /// `resolveExecutor()`'s own answer), never in what happens once that's decided.
-        private func _nioClient(
-            provider: SessionProvider,
-            sessionConfiguration: Internals.Session.Configuration,
-            isCompatibleWithNetworkFramework: Bool
-        ) async throws -> Internals.Client {
-            let options = SessionProviderOptions(
-                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
-            )
-
-            let sessionProviderID = provider.uniqueIdentifier(with: options)
-
-            return try await lock.withLock {
-                // `AsyncLock` never aborts acquisition, so a task cancelled while queued behind
-                // a cleanup sweep would otherwise still pay for (or trigger) client creation and
-                // go on to fire a request nobody wants anymore. Checked first, before touching
-                // the table, so a cancelled caller does no work at all here.
-                try Task.checkCancellation()
-
-                // `withLock` rather than a manual lock and unlock pair with a return in the
-                // middle of it, which balances today and stops balancing on the next edit.
-                if case .nio(let client) = tableLock.withLock({
-                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-                }) {
-                    return client
-                }
-
-                let eventLoopGroup = await EventLoopGroupManager.shared.provider(
-                    provider,
-                    with: options
-                )
-
-                return try _createNewClient(
-                    id: sessionProviderID,
-                    eventLoopGroup: eventLoopGroup,
-                    sessionConfiguration: sessionConfiguration,
-                    isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
-                )
-            }
-        }
-
         private func scheduleCleanup() {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
                 while true {
                     do {
-                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds))
+                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
                     } catch {
                         // Sleeping fails on cancellation and nothing else. Yielding and looping
                         // meant the next sleep failed immediately too, turning this into a
@@ -227,9 +182,9 @@ extension Internals {
 
                         let isExpired: Bool = {
                             #if canImport(Darwin)
-                            now - item.readAt > lifetime.nanoseconds
+                            now - item.readAt > lifetime
                             #else
-                            item.readAt.duration(to: .now) > .nanoseconds(lifetime.nanoseconds)
+                            item.readAt.duration(to: .now) > .nanoseconds(lifetime)
                             #endif
                         }()
 
@@ -255,10 +210,11 @@ extension Internals {
         /// - Warning: Lockless. The caller must be holding ``tableLock``.
         ///
         /// Returns the cached `Internals.ClientManager.Client` regardless of which backend it
-        /// wraps: shared by both `client(provider:sessionConfiguration:)` (NIO-only, unwraps
+        /// wraps: shared by both `Internals.ClientManager+NIO.swift`'s `_nioClient` (unwraps
         /// `.nio`) and `resolvedClient(provider:sessionConfiguration:)` (unwraps `.urlSession`),
-        /// so the age/reuse logic below is written once rather than duplicated per backend.
-        private func _reusableItem(
+        /// so the age/reuse logic below is written once rather than duplicated per backend. Not
+        /// `private`, for the same cross-file reason as ``lock``/``tableLock``/``_table``.
+        func _reusableItem(
             id: String,
             sessionConfiguration: Internals.Session.Configuration
         ) -> Internals.ClientManager.Client? {
@@ -281,9 +237,9 @@ extension Internals {
                     item.sessionConfiguration == sessionConfiguration
                         && {
                             #if canImport(Darwin)
-                            now - item.readAt <= lifetime.nanoseconds
+                            now - item.readAt <= lifetime
                             #else
-                            item.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
+                            item.readAt.duration(to: .now) <= .nanoseconds(lifetime)
                             #endif
                         }()
                 })
@@ -295,47 +251,6 @@ extension Internals {
             _table[id] = items
 
             return item.client
-        }
-
-        /// - Warning: Lockless with respect to ``tableLock``, which it takes itself.
-        private func _createNewClient(
-            id: String,
-            eventLoopGroup: EventLoopGroup,
-            sessionConfiguration: Internals.Session.Configuration,
-            isCompatibleWithNetworkFramework: Bool
-        ) throws -> Internals.Client {
-            let output = try sessionConfiguration.build(
-                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
-            )
-            #if canImport(Darwin)
-            let client = Internals.Client(
-                eventLoopGroupProvider: .shared(eventLoopGroup),
-                configuration: output.httpClientConfiguration,
-                localIdentityHandle: output.localIdentityHandle,
-                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
-            )
-            #else
-            let client = Internals.Client(
-                eventLoopGroupProvider: .shared(eventLoopGroup),
-                configuration: output.httpClientConfiguration,
-                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
-            )
-            #endif
-
-            tableLock.withLock {
-                var items = _table[id] ?? []
-
-                items.append(
-                    .createNew(
-                        sessionConfiguration: sessionConfiguration,
-                        client: .nio(client)
-                    )
-                )
-
-                _table[id] = items
-            }
-
-            return client
         }
 
         #if canImport(Darwin)
