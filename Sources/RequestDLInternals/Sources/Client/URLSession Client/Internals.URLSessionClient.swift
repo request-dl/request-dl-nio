@@ -8,7 +8,6 @@
 
 #if canImport(Darwin)
 
-import NIOCore
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -944,7 +943,8 @@ extension Internals.URLSessionClient {
             // NIO delegate callback as the original motivating case; this is the same shape of
             // problem one layer up, for `URLSessionDataDelegate` instead of
             // `HTTPClientResponseDelegate`).
-            let byteURL = Internals.ByteURL(ByteBuffer(bytes: data))
+            let byteURL = Internals.ByteURL()
+            byteURL.replace(with: data)
             downloadBuffer.append(Internals.DataBuffer(byteURL))
         }
 

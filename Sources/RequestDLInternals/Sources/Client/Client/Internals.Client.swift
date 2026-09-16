@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Entirely NIO-only: this is the AsyncHTTPClient-backed client for the .nio/.nioTransportServices
+// executors. .urlSession has its own separate implementation, Internals.URLSessionClient, which
+// imports none of this.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import Logging
 import NIOCore
@@ -305,3 +310,5 @@ extension Internals.Client {
         throttledExecutor.semaphoreForTesting
     }
 }
+
+#endif

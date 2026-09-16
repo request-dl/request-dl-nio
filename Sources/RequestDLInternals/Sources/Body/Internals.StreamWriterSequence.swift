@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Feeds HTTPClient.Body.StreamWriter directly: entirely .nio/.nioTransportServices-only. Only
+// reachable via RequestBody.connect(writer:body:eventLoop:), itself NIOCore-gated.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOFoundationEssentialsCompat
@@ -81,3 +85,5 @@ extension Internals {
         }
     }
 }
+
+#endif

@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Only used by Internals.ClientManager+NIO.swift, itself NIO-only.
+#if canImport(NIOCore)
+
 import NIOCore
 import SwiftAsyncStream
 
@@ -60,3 +63,5 @@ extension Internals {
         }
     }
 }
+
+#endif

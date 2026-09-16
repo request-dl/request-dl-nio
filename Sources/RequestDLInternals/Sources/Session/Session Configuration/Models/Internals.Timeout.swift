@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
+#endif
 
 extension Internals {
 
@@ -25,11 +27,13 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() -> HTTPClient.Configuration.Timeout {
             .init(
                 connect: connect.map { .nanoseconds($0) },
                 read: read.map { .nanoseconds($0) }
             )
         }
+        #endif
     }
 }

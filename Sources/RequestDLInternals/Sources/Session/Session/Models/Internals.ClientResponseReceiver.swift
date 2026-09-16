@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// HTTPClientResponseDelegate conformance: entirely .nio/.nioTransportServices-only.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOHTTP1
@@ -326,3 +329,5 @@ extension Internals.ClientResponseReceiver {
         }
     }
 }
+
+#endif

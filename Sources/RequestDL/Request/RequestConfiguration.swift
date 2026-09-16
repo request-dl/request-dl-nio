@@ -2,8 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
+#endif
 import RequestDLInternals
 import Tracing
 
@@ -146,6 +148,7 @@ public struct RequestConfiguration: Sendable {
         hasDefaultUserAgent = false
     }
 
+    #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``RequestBody/connect(writer:body:eventLoop:)``.
     func build(eventLoop: EventLoop) throws -> HTTPClient.Request {
@@ -156,6 +159,7 @@ public struct RequestConfiguration: Sendable {
             body: body?.build(eventLoop: eventLoop)
         )
     }
+    #endif
 }
 
 #if canImport(Darwin)

@@ -111,15 +111,7 @@ extension Internals {
         package func makeIdentity() throws -> (
             handle: Internals.IdentityHandle, intermediates: [SecCertificate]
         ) {
-            let derCertificates = try Internals.CertificateChain.file(certificateChainFilePath).build().map {
-                source -> Data in
-                guard case .certificate(let certificate) = source else {
-                    preconditionFailure(
-                        "Internals.CertificateChain.build() unexpectedly produced a non-certificate source"
-                    )
-                }
-                return Data(try certificate.toDERBytes())
-            }
+            let derCertificates = try Internals.CertificateChain.file(certificateChainFilePath).resolvedDERBytes()
 
             guard let leaf = derCertificates.first else {
                 throw ResolutionError.incompleteClientIdentity

@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
+#endif
 
 extension Internals {
 
@@ -13,6 +15,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() -> HTTPClient.Configuration.HTTPVersion {
             switch self {
             case .http1Only:
@@ -21,5 +24,6 @@ extension Internals {
                 return .automatic
             }
         }
+        #endif
     }
 }

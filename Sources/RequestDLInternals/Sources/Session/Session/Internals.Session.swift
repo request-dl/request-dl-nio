@@ -2,10 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
-import Logging
 import NIOCore
 import NIOPosix
+#endif
+import Logging
 
 extension Internals {
 
@@ -30,12 +32,14 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func client() async throws -> Internals.Client {
             try await manager.client(
                 provider: provider,
                 sessionConfiguration: configuration
             )
         }
+        #endif
 
         /// Executor-aware counterpart to `client()`. Returns whichever backend
         /// `configuration.resolveExecutor()` actually points to, rather than always the NIO one
@@ -53,6 +57,7 @@ extension Internals {
             )
         }
 
+        #if canImport(NIOCore)
         /// Forwards to `Internals.Client.execute(request:url:readingMode:uploadingBytes:cache:logger:)`.
         /// Kept here, with this exact signature, only because it already has direct test
         /// callers (`SessionExecutionTests`, `LocalServerConcurrencyTests`,
@@ -81,5 +86,6 @@ extension Internals {
                 logger: logger
             )
         }
+        #endif
     }
 }
