@@ -59,6 +59,30 @@ extension Internals {
 
         private var storage: Storage
 
+        /// Runs `body` with exclusive access to the `.data` case's payload, `nil` if `storage`
+        /// isn't `.data`-backed.
+        ///
+        /// `storage` is overwritten with an empty placeholder *before* `body` runs, dropping its
+        /// reference to the old `DataStorage` so `body`'s own copy is the only one left. Skipping
+        /// that step (matching `case .data(var dataStorage):` and mutating `dataStorage` in place
+        /// with `storage` still holding the original) leaves both alive for the duration of the
+        /// call: `Data` sees itself referenced twice, so every `append`/`replaceSubrange` copies
+        /// everything written so far before it can mutate, turning what looks like an amortized
+        /// O(1) write into an O(n) one and a build-up of writes into O(n²). This is the same
+        /// discipline `Internals.ByteURL.withStorage(_:)` relies on to keep repeated writes to a
+        /// single instance linear, extended one level down so it isn't undone by aliasing this
+        /// type introduces internally.
+        private mutating func withDataStorage<Result>(_ body: (inout DataStorage) -> Result) -> Result? {
+            guard case .data(var dataStorage) = storage else {
+                return nil
+            }
+
+            storage = .data(DataStorage(data: Data(), readerIndex: .zero, writerIndex: .zero))
+
+            defer { storage = .data(dataStorage) }
+            return body(&dataStorage)
+        }
+
         // MARK: - Inits
 
         package init() {
@@ -150,14 +174,15 @@ extension Internals {
             precondition(index >= readerIndex, "Writer index \(index) is behind the reader index \(readerIndex)")
 
             switch storage {
-            case .data(var dataStorage):
-                if index > dataStorage.data.count {
-                    dataStorage.data.append(
-                        contentsOf: repeatElement(UInt8.zero, count: index - dataStorage.data.count)
-                    )
+            case .data:
+                withDataStorage { dataStorage in
+                    if index > dataStorage.data.count {
+                        dataStorage.data.append(
+                            contentsOf: repeatElement(UInt8.zero, count: index - dataStorage.data.count)
+                        )
+                    }
+                    dataStorage.writerIndex = index
                 }
-                dataStorage.writerIndex = index
-                storage = .data(dataStorage)
             #if canImport(NIOCore)
             case .byteBuffer(var buffer):
                 buffer.moveWriterIndex(to: index)
@@ -168,11 +193,12 @@ extension Internals {
 
         package mutating func clear() {
             switch storage {
-            case .data(var dataStorage):
-                dataStorage.data.removeAll(keepingCapacity: true)
-                dataStorage.readerIndex = .zero
-                dataStorage.writerIndex = .zero
-                storage = .data(dataStorage)
+            case .data:
+                withDataStorage { dataStorage in
+                    dataStorage.data.removeAll(keepingCapacity: true)
+                    dataStorage.readerIndex = .zero
+                    dataStorage.writerIndex = .zero
+                }
             #if canImport(NIOCore)
             case .byteBuffer(var buffer):
                 buffer.clear()
@@ -199,21 +225,22 @@ extension Internals {
             let count = bytes.count
 
             switch storage {
-            case .data(var dataStorage):
-                let overlapEnd = Swift.min(dataStorage.writerIndex + count, dataStorage.data.count)
-                let overlapLength = Swift.max(.zero, overlapEnd - dataStorage.writerIndex)
+            case .data:
+                withDataStorage { dataStorage in
+                    let overlapEnd = Swift.min(dataStorage.writerIndex + count, dataStorage.data.count)
+                    let overlapLength = Swift.max(.zero, overlapEnd - dataStorage.writerIndex)
 
-                if overlapLength > .zero {
-                    let range = dataStorage.writerIndex..<(dataStorage.writerIndex + overlapLength)
-                    dataStorage.data.replaceSubrange(range, with: bytes.prefix(overlapLength))
+                    if overlapLength > .zero {
+                        let range = dataStorage.writerIndex..<(dataStorage.writerIndex + overlapLength)
+                        dataStorage.data.replaceSubrange(range, with: bytes.prefix(overlapLength))
+                    }
+
+                    if count > overlapLength {
+                        dataStorage.data.append(contentsOf: bytes.dropFirst(overlapLength))
+                    }
+
+                    dataStorage.writerIndex += count
                 }
-
-                if count > overlapLength {
-                    dataStorage.data.append(contentsOf: bytes.dropFirst(overlapLength))
-                }
-
-                dataStorage.writerIndex += count
-                storage = .data(dataStorage)
                 return count
             #if canImport(NIOCore)
             case .byteBuffer(var buffer):
