@@ -98,6 +98,11 @@ struct AlwaysPrintInterceptor<Element>: RequestTaskInterceptor {
 - ``RequestDL/InterceptedRequestTask``
 - ``RequestDL/RequestTask/interceptor(_:)``
 
+### Retrying a failed request
+
+- ``RequestDL/RetryPolicy``
+- ``RequestDL/RequestTask/retry(_:)``
+
 ### Exploring the available modifiers
 
 - ``RequestDL/Modifiers``

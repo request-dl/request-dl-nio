@@ -62,3 +62,9 @@ In addition, each received element is inserted into a queue that remains availab
 
 - ``RequestDL/AsyncResponse``
 - ``RequestDL/AsyncBytes``
+
+### Server-Sent Events
+
+- ``RequestDL/AsyncBytes/events()``
+- ``RequestDL/ServerSentEvents``
+- ``RequestDL/ServerSentEvent``
