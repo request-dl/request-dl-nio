@@ -130,6 +130,45 @@ struct PathTests {
     }
 
     @Test
+    func pathWithEmbeddedQuery() async throws {
+        // Given
+        let host = "google.com"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path("api/v1/search?item=1&item=2")
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.url == "https://\(host)/api/v1/search?item=1&item=2"
+        )
+    }
+
+    @Test
+    func pathWithEmbeddedQueryCombinedWithExplicitQuery() async throws {
+        // Given
+        let host = "google.com"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL(host)
+                Path("api/v1/search?item=1&item=2")
+                Query(name: "query", value: "123")
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.url == "https://\(host)/api/v1/search?item=1&item=2&query=123"
+        )
+    }
+
+    @Test
     func neverBody() async throws {
         // Given
         let property = Path("")

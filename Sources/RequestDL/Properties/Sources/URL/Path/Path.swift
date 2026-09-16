@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URLComponents
+#endif
+
 /// The `Path` is used to specify the URL path to reach the endpoint of the request.
 ///
 /// ## Overview
@@ -37,7 +43,30 @@ public struct Path: Property {
                 return
             }
 
-            make.requestConfiguration.pathComponents.append(path)
+            // A `?` embedded in the path (e.g. `Path("search?item=1&item=2")`) is query syntax,
+            // not a literal path character — `isURLPathAllowed` deliberately excludes it. Split
+            // it off here and merge it into `queries` the same way `FlexibleURLNode` does for its
+            // relative-path case, or it survives verbatim into `pathComponents` and the resolved
+            // `url` ends up with a second, malformed `?` once an explicit `Query` also contributes.
+            guard let questionMarkIndex = path.firstIndex(of: "?") else {
+                make.requestConfiguration.pathComponents.append(path)
+                return
+            }
+
+            let pathComponent = String(path[path.startIndex..<questionMarkIndex])
+            let queryString = String(path[path.index(after: questionMarkIndex)...])
+
+            if !pathComponent.isEmpty {
+                make.requestConfiguration.pathComponents.append(pathComponent)
+            }
+
+            make.requestConfiguration.queries += Self.queryItems(from: queryString)
+        }
+
+        private static func queryItems(from queryString: String) -> [QueryItem] {
+            URLComponents(string: "?\(queryString)")?.queryItems?.map {
+                QueryItem(name: $0.name, value: $0.value ?? "")
+            } ?? []
         }
     }
 
