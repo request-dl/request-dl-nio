@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Reachable under `.nio` only` (see below) means this protocol's own signature is unusable
+// without NIOCore too: `callAsFunction(_:)` takes a `ByteBuffer`, so gating it here, rather than
+// letting a NIOCore-less build fail deep inside this file with a "cannot find type" error, gives
+// a conformer a clean "this protocol doesn't exist" instead.
+#if canImport(NIOCore)
+
 import NIOCore
 
 /// A protocol for implementing `SSLKEYLOGFILE` support.
@@ -28,3 +34,5 @@ public protocol SSLKeyLogger: Sendable, AnyObject {
     ///
     func callAsFunction(_ bytes: ByteBuffer)
 }
+
+#endif
