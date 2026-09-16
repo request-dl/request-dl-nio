@@ -73,13 +73,18 @@ extension Internals {
         /// narrowed to the two members `Internals.FileStreamBuffer.readData(length:)` reads off
         /// it (`.readableBytes`/`.readableBytesView`), so that method's short-read loop compiles
         /// unchanged against either backend.
+        ///
+        /// `readableBytesView` is `Data`, not `[UInt8]`: the one call site only ever hands it to
+        /// `Data.append(contentsOf:)`, which `Data` itself already satisfies as a `Sequence`, so
+        /// there is no need to pay for an `Array` copy of every chunk read just to match
+        /// `ByteBufferView`'s name.
         package struct Chunk: Sendable {
             package let readableBytes: Int
-            package let readableBytesView: [UInt8]
+            package let readableBytesView: Data
 
             fileprivate init(_ data: Data) {
                 readableBytes = data.count
-                readableBytesView = Array(data)
+                readableBytesView = data
             }
         }
 
