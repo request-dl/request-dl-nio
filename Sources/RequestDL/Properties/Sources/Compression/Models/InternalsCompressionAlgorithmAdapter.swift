@@ -30,7 +30,9 @@ struct InternalsCompressionAlgorithmAdapter: Internals.CompressionAlgorithm {
     }
 }
 
-/// Adapts a `RequestDL.CompressorStream` to `Internals.CompressorStream`.
+/// Adapts a `RequestDL.CompressorStream` to `Internals.CompressorStream`. Always `Data`-backed
+/// on the way out: a custom, `[UInt8]`-based compressor has no `ByteBuffer` to preserve, unlike
+/// `Internals.NIOHTTPCompressorStream`'s own conformance.
 private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
 
     // MARK: - Private properties
@@ -45,11 +47,12 @@ private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
 
     // MARK: - Internal methods
 
-    mutating func callAsFunction(compressing bytes: Data) throws -> Data {
-        Data(try stream(compressing: Array(bytes)))
+    mutating func callAsFunction(compressing bytes: Internals.Bytes) throws -> Internals.Bytes {
+        var bytes = bytes
+        return Internals.Bytes(Data(try stream(compressing: Array(bytes.asData()))))
     }
 
-    mutating func finish() throws -> Data {
-        Data(try stream.finish())
+    mutating func finish() throws -> Internals.Bytes {
+        Internals.Bytes(Data(try stream.finish()))
     }
 }

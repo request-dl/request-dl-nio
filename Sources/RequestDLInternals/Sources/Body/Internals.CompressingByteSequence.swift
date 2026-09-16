@@ -49,17 +49,17 @@ extension Internals {
                 var stream = try self.stream ?? algorithm()
                 defer { self.stream = stream }
 
-                while var chunk = try await sourceIterator.next() {
-                    let compressed = try stream(compressing: chunk.asData())
+                while let chunk = try await sourceIterator.next() {
+                    let compressed = try stream(compressing: chunk)
 
-                    if !compressed.isEmpty {
-                        return Internals.Bytes(compressed)
+                    if compressed.readableBytes > .zero {
+                        return compressed
                     }
                 }
 
                 isFinished = true
                 let tail = try stream.finish()
-                return !tail.isEmpty ? Internals.Bytes(tail) : nil
+                return tail.readableBytes > .zero ? tail : nil
             }
         }
 

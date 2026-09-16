@@ -36,11 +36,13 @@ struct NIOHTTPCompressorStreamBridge: CompressorStream {
     // MARK: - Internal methods
 
     mutating func callAsFunction(compressing bytes: [UInt8]) throws -> [UInt8] {
-        Array(try stream(compressing: Data(bytes)))
+        var result = try stream(compressing: Internals.Bytes(Data(bytes)))
+        return Array(result.asData())
     }
 
     mutating func finish() throws -> [UInt8] {
-        Array(try stream.finish())
+        var result = try stream.finish()
+        return Array(result.asData())
     }
 }
 

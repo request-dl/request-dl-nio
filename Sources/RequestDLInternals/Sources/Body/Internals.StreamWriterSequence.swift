@@ -8,13 +8,6 @@
 
 import AsyncHTTPClient
 import NIOCore
-import NIOFoundationEssentialsCompat
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-#endif
 
 extension Internals {
 
@@ -23,12 +16,14 @@ extension Internals {
     /// final size, and whose ability to fail mid-stream if a custom `Compressor` throws, are both
     /// only known once the whole thing has been pulled through).
     ///
-    /// `Body.Element` is `Data`, matching the public `RequestBody`'s own currency. This type is
-    /// the one place that actually needs a `ByteBuffer` (`HTTPClient.Body.StreamWriter` wants
-    /// one), so the conversion happens right here, once per chunk, rather than forcing NIO onto
-    /// `RequestBody`'s public surface.
+    /// `Body.Element` is `Internals.Bytes`, not the public `RequestBody`'s own `Data` currency:
+    /// this is fed from `RequestBody.bytesSequence`, not `RequestBody` itself, specifically so a
+    /// chunk that started life as a `NIOCore.ByteBuffer` (a file read, say) reaches
+    /// `HTTPClient.Body.StreamWriter` via `asByteBuffer()`'s cached, zero-copy path instead of
+    /// paying a `ByteBuffer` -> `Data` -> `ByteBuffer` round trip through `RequestBody`'s public,
+    /// `Data`-typed `AsyncSequence` conformance.
     package struct StreamWriterSequence<Body: AsyncSequence & Sendable>: Sendable, AsyncSequence
-    where Body.Element == Data {
+    where Body.Element == Internals.Bytes {
 
         package struct AsyncIterator: AsyncIteratorProtocol {
 
@@ -53,11 +48,11 @@ extension Internals {
             // MARK: - Methods
 
             package mutating func next() async throws -> Element? {
-                guard let item = try await _iterator.next() else {
+                guard var item = try await _iterator.next() else {
                     return nil
                 }
 
-                return writer.write(.byteBuffer(ByteBuffer(data: item)))
+                return writer.write(.byteBuffer(item.asByteBuffer()))
             }
         }
 

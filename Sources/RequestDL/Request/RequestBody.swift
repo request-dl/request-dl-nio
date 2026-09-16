@@ -175,7 +175,7 @@ public struct RequestBody: Sendable {
         eventLoop.makeFutureWithTask {
             var iterator = Internals.StreamWriterSequence(
                 writer: writer,
-                body: body
+                body: body.bytesSequence
             ).makeAsyncIterator()
 
             while let next = try await iterator.next() {
@@ -210,18 +210,51 @@ extension RequestBody: AsyncSequence {
         /// don't need to know which kind of `RequestBody` they were handed.
         ///
         public mutating func next() async throws -> Data? {
+            var bytesIterator = BytesIterator(backing: backing)
+            var element = try await bytesIterator.next()
+            backing = bytesIterator.backing
+            return element?.asData()
+        }
+    }
+
+    /// Yields the same chunks as ``AsyncIterator`` but as `Internals.Bytes`, not yet downgraded
+    /// to `Data`. Not public: exists only so `connect(writer:body:eventLoop:)` can feed
+    /// `Internals.StreamWriterSequence` a chunk that may still be `NIOCore.ByteBuffer`-backed
+    /// (a file read, say) without first forcing it through ``AsyncIterator``'s own `Data`
+    /// conversion only to convert it right back for `HTTPClient.Body.StreamWriter`.
+    struct BytesIterator: AsyncIteratorProtocol {
+
+        fileprivate var backing: AsyncIterator.Backing
+
+        mutating func next() async throws -> Internals.Bytes? {
             switch backing {
             case .fixed(var iterator):
-                var element = await iterator.next()
+                let element = await iterator.next()
                 backing = .fixed(iterator)
-                return element?.asData()
+                return element
 
             case .compressing(var iterator):
-                var element = try await iterator.next()
+                let element = try await iterator.next()
                 backing = .compressing(iterator)
-                return element?.asData()
+                return element
             }
         }
+    }
+
+    /// See ``BytesIterator``'s own doc comment.
+    struct BytesSequence: AsyncSequence, Sendable {
+        typealias Element = Internals.Bytes
+
+        fileprivate let body: RequestBody
+
+        func makeAsyncIterator() -> BytesIterator {
+            BytesIterator(backing: body.makeAsyncIterator().backing)
+        }
+    }
+
+    /// See ``BytesIterator``'s own doc comment.
+    var bytesSequence: BytesSequence {
+        BytesSequence(body: self)
     }
 
     ///

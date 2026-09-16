@@ -6,12 +6,6 @@
 import NIOHTTPCompression
 #endif
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import struct Foundation.Data
-#endif
-
 extension Internals {
 
     /// Namespace only: compression is per-request/environment-driven, carried on
@@ -67,13 +61,14 @@ extension Internals {
         func callAsFunction() throws -> any Internals.CompressorStream
     }
 
-    /// Internals-layer counterpart to `RequestDL.CompressorStream`, operating on `Data` instead
-    /// of `[UInt8]`: the boundary conversion lives in the adapter that wraps a public
-    /// `Compressor`/`CompressorStream` into these. The one conformer that does real work
-    /// (`Internals.NIOHTTPCompressorStream`) still runs on `NIOCore.ByteBuffer` internally:
-    /// this protocol just doesn't force that on whoever calls it.
+    /// Internals-layer counterpart to `RequestDL.CompressorStream`, operating on
+    /// `Internals.Bytes` instead of `[UInt8]`: the boundary conversion lives in the adapter that
+    /// wraps a public `Compressor`/`CompressorStream` into these. The one conformer that does
+    /// real work (`Internals.NIOHTTPCompressorStream`) runs on `NIOCore.ByteBuffer` internally
+    /// and hands back a `ByteBuffer`-backed `Internals.Bytes`, so a chunk that arrived already
+    /// `ByteBuffer`-backed crosses this boundary without a copy.
     package protocol CompressorStream {
-        mutating func callAsFunction(compressing bytes: Data) throws -> Data
-        mutating func finish() throws -> Data
+        mutating func callAsFunction(compressing bytes: Internals.Bytes) throws -> Internals.Bytes
+        mutating func finish() throws -> Internals.Bytes
     }
 }
