@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Wraps HTTPClient.Task: only ever constructed by Internals.Client, itself NIO-only.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import SwiftAsyncStream
@@ -115,3 +118,5 @@ extension Internals {
         }
     }
 }
+
+#endif

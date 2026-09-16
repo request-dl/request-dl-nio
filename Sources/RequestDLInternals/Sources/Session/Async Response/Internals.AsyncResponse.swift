@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 extension Internals {
 
     package struct AsyncResponse: Sendable, AsyncSequence {

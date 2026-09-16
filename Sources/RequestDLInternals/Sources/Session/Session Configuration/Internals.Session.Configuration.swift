@@ -2,8 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
+#endif
 import Tracing
 
 extension Internals.Session {
@@ -83,6 +85,12 @@ extension Internals.Session {
 
         // MARK: - Internal methods
 
+        // build(isCompatibleWithNetworkFramework:) produces an HTTPClient.Configuration
+        // (Output), consumed only by Internals.ClientManager+NIO.swift — the .nio/
+        // .nioTransportServices client builder. .urlSession has its own separate
+        // buildURLSessionConfiguration() below, so none of this needs a portable counterpart.
+        #if canImport(NIOCore)
+
         /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
         /// actually run over Network.framework (`.nioTransportServices`). Forwarded to
         /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
@@ -134,9 +142,12 @@ extension Internals.Session {
             return Output(httpClientConfiguration: configuration)
             #endif
         }
+
+        #endif
     }
 }
 
+#if canImport(NIOCore)
 extension Internals.Session.Configuration {
 
     /// `build()`'s result: the `HTTPClient.Configuration` to hand `AsyncHTTPClient.HTTPClient`,
@@ -165,6 +176,7 @@ extension Internals.Session.Configuration {
         #endif
     }
 }
+#endif
 
 extension Internals.Session.Configuration {
 
@@ -418,30 +430,6 @@ import Foundation
 import Network
 #endif
 
-#if canImport(Network)
-extension NIOSSL.TLSVersion {
-
-    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
-    /// `tlsMaximumSupportedProtocolVersion`'s type. Present unconditionally on every platform
-    /// this package targets (iOS 13/macOS 10.15, both below this package's own deployment
-    /// floor), so there's no availability branch to take here the way AsyncHTTPClient's own
-    /// NIOTransportServices bridge still needs for its pre-iOS-13 `SSLProtocol` fallback.
-    ///
-    /// - Note: `.TLSv10`/`.TLSv11` are deprecated (macOS 12+) but not unavailable, and are
-    /// mirrored here anyway, deliberately: a caller who explicitly asked NIOSSL for TLS 1.0/1.1
-    /// (interop with a legacy server, say) gets the same answer under `.urlSession`, not a
-    /// silent upgrade to whatever Apple currently recommends instead.
-    var urlSessionProtocolVersion: tls_protocol_version_t {
-        switch self {
-        case .tlsv1: return .TLSv10
-        case .tlsv11: return .TLSv11
-        case .tlsv12: return .TLSv12
-        case .tlsv13: return .TLSv13
-        }
-    }
-}
-#endif
-
 extension Internals.Session.Configuration {
 
     /// `URLSession` counterpart to `build() -> HTTPClient.Configuration`: built fresh per
@@ -500,11 +488,11 @@ extension Internals.Session.Configuration {
 
         #if canImport(Network)
         if let minimumTLSVersion = secureConnection?.minimumTLSVersion {
-            configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.build().urlSessionProtocolVersion
+            configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.urlSessionProtocolVersion
         }
 
         if let maximumTLSVersion = secureConnection?.maximumTLSVersion {
-            configuration.tlsMaximumSupportedProtocolVersion = maximumTLSVersion.build().urlSessionProtocolVersion
+            configuration.tlsMaximumSupportedProtocolVersion = maximumTLSVersion.urlSessionProtocolVersion
         }
         #endif
 

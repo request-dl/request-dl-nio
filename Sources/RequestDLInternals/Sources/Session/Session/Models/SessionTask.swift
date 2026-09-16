@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 /// A completed session's cancellation seed together with its response.
 ///
 /// Holds `Internals.AsyncResponse` rather than converting it into `RequestDL`'s

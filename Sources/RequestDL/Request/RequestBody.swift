@@ -2,8 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
+#endif
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)
@@ -125,6 +127,7 @@ public struct RequestBody: Sendable {
         }
     }
 
+    #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``connect(writer:body:eventLoop:)``.
     func build(eventLoop: EventLoop) -> HTTPClient.Body {
@@ -136,9 +139,11 @@ public struct RequestBody: Sendable {
             )
         }
     }
+    #endif
 
     // MARK: - Private static methods
 
+    #if canImport(NIOCore)
     /// Drives the body into `writer`.
     ///
     /// ## Why the loop is passed in
@@ -177,6 +182,7 @@ public struct RequestBody: Sendable {
             }
         }
     }
+    #endif
 }
 
 extension RequestBody: AsyncSequence {

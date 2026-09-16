@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import RequestDLInternals
 
@@ -59,3 +61,5 @@ extension Internals.Client: RequestExecutingClient {
         )
     }
 }
+
+#endif

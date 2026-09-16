@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Adapts to AsyncHTTPClient.HTTPClientRedirectStrategy: entirely .nio/.nioTransportServices-only.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOHTTP1
 
@@ -93,3 +96,5 @@ extension Internals.RedirectHistoryEntry {
         )
     }
 }
+
+#endif
