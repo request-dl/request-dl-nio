@@ -320,7 +320,7 @@ public struct Configured: Property {
             secureConnection = secureConnection.version(maximum: maximum)
             #else
             // No portable equivalent: neither URLSessionConfiguration nor App Transport
-            // Security exposes a maximum-TLS-version key — see `SecureConnection
+            // Security exposes a maximum-TLS-version key. See `SecureConnection
             // .version(maximum:)`'s own doc comment. A config that asks for one in a build
             // without NIO fails loudly here rather than silently ignoring it.
             throw ConfiguredError(context: .invalidSecureConnectionConfiguration)

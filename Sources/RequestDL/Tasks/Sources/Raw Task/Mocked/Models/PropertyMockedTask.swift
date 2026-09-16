@@ -127,7 +127,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     ///
     /// - Important: One sequential `for try await` loop inside a single `Task`, not chunks
     /// dispatched independently. `buffer.append` has to see chunks in order, and awaiting each
-    /// one before appending it, in the same task, is what guarantees that — the same requirement
+    /// one before appending it, in the same task, is what guarantees that. It is the same requirement
     /// `Internals.ClientResponseReceiver.didReceiveBodyPart`'s own synchronous-append discipline
     /// exists for, just satisfied here by sequencing instead of by staying off a detached task.
     private func mockBodyResponse(
@@ -140,7 +140,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
                     let byteURL = Internals.ByteURL()
                     byteURL.replace(with: chunk)
                     // The `async` overload, not the synchronous one `Internals
-                    // .ClientResponseReceiver` needs — safe here because this whole loop is one
+                    // .ClientResponseReceiver` needs. Safe here because this whole loop is one
                     // sequential path in a single `Task`, not chunks dispatched independently
                     // from a delegate callback, so there is nothing else racing to append out of
                     // order while this `await` suspends.

@@ -81,10 +81,8 @@ extension Internals {
         // (`Internals.SecureConnection.makeLocalIdentityForNetworkFramework()`) alike.
 
         /// The leaf certificate (index 0) plus any intermediates, as DER bytes. Built on
-        /// `Internals.CertificateChain.resolvedDERBytes()` (portable, `SwiftASN1`-backed) rather
-        /// than `build()` + NIOSSL's own `.toDERBytes()` — this used to round-trip through NIOSSL
-        /// just to get back DER bytes that were already available, which also meant this
-        /// Darwin-only, `.urlSession`-reachable file secretly depended on NIOSSL. See
+        /// `Internals.CertificateChain.resolvedDERBytes()` (portable, `SwiftASN1`-backed), which
+        /// keeps this Darwin-only, `.urlSession`-reachable file free of any NIOSSL dependency. See
         /// `Internals.Certificate.resolvedDERBytes()`'s doc comment for the technique.
         package static func certificateDERs(from certificateChain: Internals.CertificateChain) throws -> [Data] {
             try certificateChain.resolvedDERBytes()

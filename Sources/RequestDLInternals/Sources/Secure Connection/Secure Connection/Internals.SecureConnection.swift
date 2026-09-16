@@ -158,12 +158,12 @@ extension Internals {
         // `build()`/`Output`/`makeTLSConfigurationByContext(_:)`/
         // `makeLocalIdentityForNetworkFramework()` produce an AsyncHTTPClient `TLSConfiguration`,
         // consumed by exactly one caller: `Internals.Session.Configuration.build()`, which itself
-        // only exists to build an `HTTPClient.Configuration` — a NIOCore/AsyncHTTPClient-only
+        // only exists to build an `HTTPClient.Configuration`. That is a NIOCore/AsyncHTTPClient-only
         // type used solely by the `.nio`/`.nioTransportServices` executors. `.urlSession` never
         // calls any of this: it reads `certificateChain`/`privateKey`/`trustRoots`/etc. straight
         // off `Internals.SecureConnection`'s own portable fields, via `ServerTrustPolicy`/
         // `URLSessionIdentityPolicy`/`RawBytesIdentityBuilder` instead. So none of this needs a
-        // portable counterpart at all — narrowed away entirely without NIOCore, the same as
+        // portable counterpart at all, and is narrowed away entirely without NIOCore, the same as
         // `Internals.Executor`'s `.nio` cases.
         #if canImport(NIOCore)
 

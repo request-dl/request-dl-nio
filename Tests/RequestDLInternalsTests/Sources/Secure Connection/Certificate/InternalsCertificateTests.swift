@@ -187,7 +187,7 @@ struct InternalsCertificateTests {
     @Test
     func resolvedDERBytes_whenPEMBundleFileHasMultipleCertificates_returnsOneEntryPerCertificate() async throws {
         // Given: the client and server fixtures concatenated into one PEM bundle file, mirroring
-        // a leaf-plus-intermediate chain file. `.file`, not `.bytes` — see the asymmetry test
+        // a leaf-plus-intermediate chain file. `.file`, not `.bytes`. See the asymmetry test
         // right below for why that distinction matters here.
         try await withTemporaryFileURL("bundle.pem") { url in
             let client = Certificates().client()
@@ -209,7 +209,7 @@ struct InternalsCertificateTests {
 
     /// `Certificate.build()`'s `.bytes` case constructs a single `NIOSSLCertificate(bytes:
     /// format:)` rather than calling `.fromPEMBytes`, so a multi-certificate PEM bundle sourced
-    /// from `.bytes` silently keeps only the first certificate — confirmed here, not assumed, and
+    /// from `.bytes` silently keeps only the first certificate. Confirmed here, not assumed.
     /// `resolvedDERBytes()` deliberately reproduces the same asymmetry (see its own doc comment).
     @Test
     func resolvedDERBytes_whenPEMBundleBytesHasMultipleCertificates_matchesBuildsSingleCertificateBehavior()

@@ -42,7 +42,7 @@ extension Internals {
         }
 
         /// Portable counterpart to `resolvedCertificates()`. See `TrustRoots.resolvedDERBytes()`'s
-        /// own doc comment — same shape, same `.bytes` single-certificate behavior.
+        /// own doc comment: same shape, same `.bytes` single-certificate behavior.
         package func resolvedDERBytes() throws -> [Data] {
             switch self {
             case .file(let file):

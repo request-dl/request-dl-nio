@@ -6,16 +6,16 @@
 import NIOSSL
 #endif
 
-/// A byte sequence for a password/passphrase — for instance, ``Internals/PrivateKey``'s
-/// `password` — that stays constructible without NIO, while still storing straight into NIOSSL's
-/// own `NIOSSLSecureBytes` (auto-zeroing storage included) whenever NIOSSL is actually available.
+/// A byte sequence for a password/passphrase, such as ``Internals/PrivateKey``'s `password`,
+/// that stays constructible without NIO. When NIOSSL is available, it stores straight into
+/// NIOSSL's own `NIOSSLSecureBytes` (auto-zeroing storage included).
 ///
 /// The single ``init(_:)`` behaves identically on every platform; only what it stores into
 /// differs, gated by `#if canImport(NIOCore)`:
 /// - `.nio`: a real `NIOSSLSecureBytes`, so this value gets NIOSSL's own zero-on-deallocation
 ///   guarantee for free, and ``build()`` returns it directly with no copy.
 /// - `.bytes`: a plain `[UInt8]` fallback where NIOSSL isn't available. This does **not** zero
-///   its storage on deallocation — a real, deliberate simplification for that path, not an
+///   its storage on deallocation. That is a deliberate simplification for that path, not an
 ///   oversight: the data this carries is a caller-supplied password/passphrase, not derived key
 ///   material, and the actual cryptographic keys built from it are still handled by
 ///   `Crypto`/NIOSSL/BoringSSL, which already zero what they own internally.

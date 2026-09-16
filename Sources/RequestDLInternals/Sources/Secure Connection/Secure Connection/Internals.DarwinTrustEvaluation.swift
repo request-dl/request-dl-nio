@@ -152,14 +152,14 @@ extension Internals {
 
         /// Every certificate's SPKI (SubjectPublicKeyInfo) structure in `trust`'s chain,
         /// DER-encoded: what a pin's digest is computed over. Parses each certificate's DER bytes
-        /// with `X509.Certificate(derEncoded:)` and re-serializes just its `publicKey` — the same
+        /// with `X509.Certificate(derEncoded:)` and re-serializes just its `publicKey`, the same
         /// technique `Internals.NIOTrustEvaluator+Portable.swift` already uses for the non-Darwin
-        /// trust evaluator — rather than reconstructing the SPKI ASN.1 wrapper from a bare
-        /// `SecKey` export by hand, so a pin configured once produces the identical digest
+        /// trust evaluator, rather than reconstructing the SPKI ASN.1 wrapper from a bare
+        /// `SecKey` export by hand. That way a pin configured once produces the identical digest
         /// regardless of which executor (`.urlSession`, `.nio`, `.nioTransportServices`) ends up
-        /// carrying the connection. `X509`/`SwiftASN1` are portable already (no NIOCore in their
-        /// own dependency graph — confirmed by reading `swift-certificates`'s own `Package.swift`
-        /// rather than assumed), unlike the `NIOSSLCertificate`-based version this replaced.
+        /// carrying the connection. `X509`/`SwiftASN1` are portable (no NIOCore in their own
+        /// dependency graph, confirmed by reading `swift-certificates`'s own `Package.swift`
+        /// rather than assumed).
         ///
         /// Certificates that don't parse are dropped rather than failing the whole chain; that
         /// isn't expected in practice for a trust `SecTrustEvaluate...` already accepted moments

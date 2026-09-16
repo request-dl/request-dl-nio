@@ -15,7 +15,7 @@ extension Internals {
     /// Portable mirror of `NIOSSL.TLSVersion`, named to match it directly (`.tlsv12`, not
     /// `RequestDL.TLSVersion`'s own `.v1_2`) since this type's two consumers are
     /// `Internals.SecureConnection`'s NIO-only `build()` and `.urlSession`'s own
-    /// `buildURLSessionConfiguration()` — both convert this back, to a different target type each.
+    /// `buildURLSessionConfiguration()`, and each converts this back to a different target type.
     package enum TLSVersion: Sendable, Hashable {
         case tlsv1
         case tlsv11
@@ -39,10 +39,9 @@ extension Internals {
 
         #if canImport(Network)
         /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
-        /// `tlsMaximumSupportedProtocolVersion`'s type, straight from this portable mirror —
-        /// no detour through `NIOSSL.TLSVersion` first, unlike an earlier revision of this
-        /// conversion (`.build().urlSessionProtocolVersion`), which meant `.urlSession`'s own
-        /// config-building path secretly needed NIOSSL just to reach a Network.framework enum.
+        /// `tlsMaximumSupportedProtocolVersion`'s type, converted straight from this portable
+        /// mirror with no detour through `NIOSSL.TLSVersion`, so `.urlSession`'s own
+        /// config-building path never needs NIOSSL just to reach a Network.framework enum.
         /// Present unconditionally on every platform this package targets (iOS 13/macOS 10.15,
         /// both below this package's own deployment floor), so there's no availability branch to
         /// take here the way AsyncHTTPClient's own NIOTransportServices bridge still needs for

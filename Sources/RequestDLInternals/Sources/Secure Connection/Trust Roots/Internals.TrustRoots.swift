@@ -47,7 +47,7 @@ extension Internals {
         /// `.toDERBytes()`.
         ///
         /// - Important: `.bytes` matches `resolvedCertificates()`'s own single-certificate
-        /// `Certificate(bytes, format: .pem).build()` call — see `Certificate.resolvedDERBytes()`'s
+        /// `Certificate(bytes, format: .pem).build()` call. See `Certificate.resolvedDERBytes()`'s
         /// doc comment for why `.bytes` truncates to the first certificate.
         package func resolvedDERBytes() throws -> [Data] {
             switch self {

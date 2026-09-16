@@ -43,11 +43,11 @@ extension Internals {
         }
 
         /// Portable counterpart to `build()`, built on `Internals.Certificate`'s own DER
-        /// extraction — see that type's `resolvedDERBytes()`/`resolvedPEMCertificateDERBytes(of:)`
+        /// extraction. See that type's `resolvedDERBytes()`/`resolvedPEMCertificateDERBytes(of:)`
         /// doc comments. `.bytes` and `.file` both read every certificate in the bundle here,
-        /// matching `build()`'s own `NIOSSLCertificate.fromPEMBytes`/`.fromPEMFile` calls — unlike
-        /// the single-certificate `Certificate.resolvedDERBytes()`, this type's `build()` never
-        /// had that asymmetry to begin with.
+        /// matching `build()`'s own `NIOSSLCertificate.fromPEMBytes`/`.fromPEMFile` calls. This
+        /// type has no single-certificate asymmetry to worry about the way
+        /// `Certificate.resolvedDERBytes()` does.
         package func resolvedDERBytes() throws -> [Data] {
             switch self {
             case .certificates(let certificates):

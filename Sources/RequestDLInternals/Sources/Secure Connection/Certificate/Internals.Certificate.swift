@@ -43,28 +43,25 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// The DER bytes of every certificate this configuration resolves to — one for `.der`
+        /// The DER bytes of every certificate this configuration resolves to: one for `.der`
         /// (which can only ever hold a single certificate), one per `-----BEGIN CERTIFICATE-----`
         /// block for `.pem` (a bundle can hold a leaf plus intermediates).
         ///
-        /// Portable counterpart to `build()`: reads the exact same bytes, just without NIOSSL
-        /// parsing them into a `NIOSSLCertificate` first only to export the DER right back out
-        /// again — the pattern `RawBytesIdentityBuilder.certificateDERs(from:)`/
-        /// `ServerTrustPolicy.resolve(from:)` used to round-trip through before this existed.
+        /// Portable counterpart to `build()`: reads the exact same bytes, without NIOSSL parsing
+        /// them into a `NIOSSLCertificate` first only to export the DER right back out again.
         /// Built on `SwiftASN1`'s own `PEMDocument.parseMultiple(pemString:)`, not a hand-rolled
-        /// PEM splitter — already a portable dependency of this package (`X509`'s own non-Darwin
-        /// trust evaluator uses it), and it already handles what a hand-rolled version would have
-        /// to get right itself: locating every `-----BEGIN/END-----` pair and base64-decoding
-        /// each one. Verified against `NIOSSLCertificate.fromPEMFile`'s own DER output for
-        /// byte-for-byte equality — see `InternalsCertificateTests`.
+        /// PEM splitter. `SwiftASN1` is already a portable dependency of this package (`X509`'s
+        /// own non-Darwin trust evaluator uses it), and it already handles what a hand-rolled
+        /// version would have to get right itself: locating every `-----BEGIN/END-----` pair and
+        /// base64-decoding each one. Verified against `NIOSSLCertificate.fromPEMFile`'s own DER
+        /// output for byte-for-byte equality. See `InternalsCertificateTests`.
         ///
         /// - Important: Deliberately matches `build()`'s own asymmetry between the two `.pem`
         /// sources, confirmed by that same test suite, not assumed: `.file` reads every
         /// certificate in the bundle (`NIOSSLCertificate.fromPEMFile`'s own behavior), but
         /// `.bytes` only ever reads the *first* one, since `build()`'s `.bytes` case constructs a
         /// single `NIOSSLCertificate(bytes:format:)` rather than calling `.fromPEMBytes`. Fixing
-        /// that asymmetry is a real behavior change worth its own decision, not something to
-        /// introduce silently while porting this method — see `URLSESSION_ONLY_REPORT.md`.
+        /// that asymmetry would be a real behavior change, so it is left alone here on purpose.
         package func resolvedDERBytes() throws -> [Data] {
             let raw: Data
 
@@ -101,12 +98,12 @@ extension Internals {
             }
         }
 
-        /// Every certificate's DER bytes found in a `.pem`-format blob, in order — the shared
-        /// parsing step `resolvedDERBytes()` builds on, and that `CertificateChain`/`TrustRoots`/
-        /// `AdditionalTrustRoots`'s own portable methods call directly for their multi-certificate
-        /// `.bytes`/`.file` cases (both, unlike `Certificate.resolvedDERBytes()`'s own `.bytes`
-        /// case — see that method's doc comment for why `Certificate` alone single-certificate
-        /// truncates there).
+        /// Every certificate's DER bytes found in a `.pem`-format blob, in order. This is the
+        /// shared parsing step `resolvedDERBytes()` builds on, and that `CertificateChain`/
+        /// `TrustRoots`/`AdditionalTrustRoots`'s own portable methods call directly for their
+        /// multi-certificate `.bytes`/`.file` cases (both, unlike `Certificate.resolvedDERBytes()`'s
+        /// own `.bytes` case; see that method's doc comment for why `Certificate` alone truncates
+        /// a single-certificate `.bytes` source there).
         package static func resolvedPEMCertificateDERBytes(of pemData: Data) throws -> [Data] {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
                 throw MalformedPEMError()

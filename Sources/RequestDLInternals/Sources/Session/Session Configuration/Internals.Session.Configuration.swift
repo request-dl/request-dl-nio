@@ -86,7 +86,7 @@ extension Internals.Session {
         // MARK: - Internal methods
 
         // build(isCompatibleWithNetworkFramework:) produces an HTTPClient.Configuration
-        // (Output), consumed only by Internals.ClientManager+NIO.swift — the .nio/
+        // (Output), consumed only by Internals.ClientManager+NIO.swift, the .nio/
         // .nioTransportServices client builder. .urlSession has its own separate
         // buildURLSessionConfiguration() below, so none of this needs a portable counterpart.
         #if canImport(NIOCore)
