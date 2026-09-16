@@ -3,7 +3,6 @@
 //
 
 import NIOCore
-import NIOSSL
 import RequestDLInternals
 import Testing
 
@@ -137,7 +136,7 @@ struct SecureConnectionTests {
     @Test
     func secure_whenUpdatesRenegotiationSupport_shouldBeValid() async throws {
         // Given
-        let renegotiationSupport: NIORenegotiationSupport = .always
+        let renegotiationSupport: Internals.RenegotiationSupport = .always
 
         // When
         let resolved = try await resolve(
@@ -156,7 +155,7 @@ struct SecureConnectionTests {
     @Test
     func secure_whenUpdatesRenegotiationSupportToNone_shouldBeValid() async throws {
         // Given
-        let renegotiationSupport: NIORenegotiationSupport = .none
+        let renegotiationSupport: Internals.RenegotiationSupport = .none
 
         // When
         let resolved = try await resolve(
@@ -175,7 +174,7 @@ struct SecureConnectionTests {
     @Test
     func secure_whenUpdatesRenegotiationSupportToOnce_shouldBeValid() async throws {
         // Given
-        let renegotiationSupport: NIORenegotiationSupport = .once
+        let renegotiationSupport: Internals.RenegotiationSupport = .once
 
         // When
         let resolved = try await resolve(
@@ -207,7 +206,7 @@ struct SecureConnectionTests {
         let sut = resolved.session.configuration.secureConnection
 
         // Then
-        #expect(sut?.shutdownTimeout == timeout.build())
+        #expect(sut?.shutdownTimeout == timeout.nanoseconds)
     }
 
     @Test

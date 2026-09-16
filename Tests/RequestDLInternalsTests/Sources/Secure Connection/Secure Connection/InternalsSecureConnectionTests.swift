@@ -77,7 +77,7 @@ struct InternalsSecureConnectionTests {
     func secureConnection_whenCertificateVerification_shouldBeValid() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
-        let certificateVerification: NIOSSL.CertificateVerification = .noHostnameVerification
+        let certificateVerification: Internals.CertificateVerification = .noHostnameVerification
 
         // When
         secureConnection.certificateVerification = certificateVerification
@@ -85,7 +85,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.tlsConfiguration.certificateVerification == certificateVerification)
+        #expect(sut.tlsConfiguration.certificateVerification == certificateVerification.build())
     }
 
     @Test
@@ -93,7 +93,7 @@ struct InternalsSecureConnectionTests {
         // Given
         var secureConnection = Internals.SecureConnection()
 
-        let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
+        let signatureAlgorithms: [Internals.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
             .ecdsaSecp384R1Sha384,
         ]
@@ -104,7 +104,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.tlsConfiguration.signingSignatureAlgorithms == signatureAlgorithms)
+        #expect(sut.tlsConfiguration.signingSignatureAlgorithms == signatureAlgorithms.map { $0.build() })
     }
 
     @Test
@@ -112,7 +112,7 @@ struct InternalsSecureConnectionTests {
         // Given
         var secureConnection = Internals.SecureConnection()
 
-        let signatureAlgorithms: [NIOSSL.SignatureAlgorithm] = [
+        let signatureAlgorithms: [Internals.SignatureAlgorithm] = [
             .ecdsaSecp256R1Sha256,
             .ecdsaSecp384R1Sha384,
         ]
@@ -123,7 +123,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.tlsConfiguration.verifySignatureAlgorithms == signatureAlgorithms)
+        #expect(sut.tlsConfiguration.verifySignatureAlgorithms == signatureAlgorithms.map { $0.build() })
     }
 
     @Test
@@ -145,7 +145,7 @@ struct InternalsSecureConnectionTests {
     func secureConnection_whenRenegotiationSupport_shouldBeValid() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
-        let renegotiationSupport: NIORenegotiationSupport = .once
+        let renegotiationSupport: Internals.RenegotiationSupport = .once
 
         // When
         secureConnection.renegotiationSupport = renegotiationSupport
@@ -153,14 +153,14 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.tlsConfiguration.renegotiationSupport == renegotiationSupport)
+        #expect(sut.tlsConfiguration.renegotiationSupport == renegotiationSupport.build())
     }
 
     @Test
     func secureConnection_whenShutdownTimeout_shouldBeValid() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
-        let timeout = NIOCore.TimeAmount.seconds(50)
+        let timeout: Int64 = 50_000_000_000
 
         // When
         secureConnection.shutdownTimeout = timeout
@@ -168,7 +168,7 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.tlsConfiguration.shutdownTimeout == timeout)
+        #expect(sut.tlsConfiguration.shutdownTimeout == .nanoseconds(timeout))
     }
 
     @Test
@@ -206,8 +206,8 @@ struct InternalsSecureConnectionTests {
         // Given
         var secureConnection = Internals.SecureConnection()
 
-        let minimumVersion = TLSVersion.tlsv11
-        let maximumVersion = TLSVersion.tlsv13
+        let minimumVersion = Internals.TLSVersion.tlsv11
+        let maximumVersion = Internals.TLSVersion.tlsv13
 
         // When
         secureConnection.minimumTLSVersion = minimumVersion
@@ -216,8 +216,8 @@ struct InternalsSecureConnectionTests {
         let sut = try secureConnection.build()
 
         // Then
-        #expect(sut.tlsConfiguration.minimumTLSVersion == minimumVersion)
-        #expect(sut.tlsConfiguration.maximumTLSVersion == maximumVersion)
+        #expect(sut.tlsConfiguration.minimumTLSVersion == minimumVersion.build())
+        #expect(sut.tlsConfiguration.maximumTLSVersion == maximumVersion.build())
     }
 
     @Test
@@ -225,7 +225,7 @@ struct InternalsSecureConnectionTests {
         // Given
         var secureConnection = Internals.SecureConnection()
 
-        let cipherSuitesValues: [NIOTLSCipher] = [
+        let cipherSuitesValues: [Internals.TLSCipher] = [
             .TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
             .TLS_RSA_WITH_AES_256_GCM_SHA384,
         ]
@@ -243,7 +243,7 @@ struct InternalsSecureConnectionTests {
 
         // Then
         #expect(sut.tlsConfiguration.cipherSuites == cipherSuites)
-        #expect(sut.tlsConfiguration.cipherSuiteValues == cipherSuitesValues)
+        #expect(sut.tlsConfiguration.cipherSuiteValues == cipherSuitesValues.map { $0.build() })
     }
 
     @Test
@@ -409,7 +409,7 @@ extension InternalsSecureConnectionTests {
                 secureConnection.sendCANameList = true
             },
             { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.shutdownTimeout = .seconds(5)
+                secureConnection.shutdownTimeout = 5_000_000_000
             },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.pskHint = "hint"
@@ -502,7 +502,7 @@ extension InternalsSecureConnectionTests {
                 secureConnection.renegotiationSupport = .once
             },
             { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.shutdownTimeout = .seconds(5)
+                secureConnection.shutdownTimeout = 5_000_000_000
             },
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.pskHint = "hint"

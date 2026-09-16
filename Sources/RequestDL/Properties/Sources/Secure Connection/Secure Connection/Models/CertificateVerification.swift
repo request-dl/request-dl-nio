@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
+import RequestDLInternals
 
 /// An enumeration that represents different modes of certificate verification.
 ///
@@ -22,7 +22,7 @@ public enum CertificateVerification: Sendable, Hashable {
 
     // MARK: - Internal methods
 
-    func build() -> NIOSSL.CertificateVerification {
+    func build() -> Internals.CertificateVerification {
         switch self {
         case .none:
             return .none

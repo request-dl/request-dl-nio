@@ -51,7 +51,7 @@ extension Internals {
         }
 
         package var certificateChain: CertificateChain?
-        package var certificateVerification: NIOSSL.CertificateVerification?
+        package var certificateVerification: Internals.CertificateVerification?
         package var useDefaultTrustRoots: Bool = false
         package var trustRoots: TrustRoots?
         package var additionalTrustRoots: [AdditionalTrustRoots]?
@@ -60,19 +60,29 @@ extension Internals {
         package var revocationPolicy: Internals.RevocationPolicy?
         package var trustDecisionObserver: (any TrustDecisionObserver)?
         package var privateKey: PrivateKeySource?
-        package var signingSignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
-        package var verifySignatureAlgorithms: [NIOSSL.SignatureAlgorithm]?
+        package var signingSignatureAlgorithms: [Internals.SignatureAlgorithm]?
+        package var verifySignatureAlgorithms: [Internals.SignatureAlgorithm]?
         package var sendCANameList: Bool?
-        package var renegotiationSupport: NIOSSL.NIORenegotiationSupport?
-        package var shutdownTimeout: TimeAmount?
+        package var renegotiationSupport: Internals.RenegotiationSupport?
+        /// Nanoseconds, matching `UnitTime.nanoseconds` — same convention as `Internals.Timeout`/
+        /// `Internals.ConnectionPool`/`Internals.ClientManager.lifetime`.
+        package var shutdownTimeout: Int64?
+        #if canImport(NIOCore)
+        /// Only ever settable via ``PSKIdentity``, itself gated the same way: paired 1:1 with
+        /// ``pskIdentityResolver``, which can't exist without NIOCore (`SSLPSKIdentityResolver`
+        /// itself needs `NIOSSL`), so this stays alongside it rather than lingering as a dead,
+        /// unreachable `String?` on its own.
         package var pskHint: String?
+        #endif
         package var applicationProtocols: [String]?
+        #if canImport(NIOCore)
         package var keyLogger: SSLKeyLogger?
         package var pskIdentityResolver: SSLPSKIdentityResolver?
-        package var minimumTLSVersion: NIOSSL.TLSVersion?
-        package var maximumTLSVersion: NIOSSL.TLSVersion?
+        #endif
+        package var minimumTLSVersion: Internals.TLSVersion?
+        package var maximumTLSVersion: Internals.TLSVersion?
         package var cipherSuites: String?
-        package var cipherSuiteValues: [NIOSSL.NIOTLSCipher]?
+        package var cipherSuiteValues: [Internals.TLSCipher]?
 
         // MARK: - Inits
 
@@ -85,7 +95,9 @@ extension Internals {
         package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
+            #if canImport(NIOCore)
             if keyLogger != nil { reasons.append(.keyLogger) }
+            #endif
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
             if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
@@ -93,8 +105,10 @@ extension Internals {
             if verifySignatureAlgorithms != nil { reasons.append(.verifySignatureAlgorithms) }
             if sendCANameList != nil { reasons.append(.sendCANameList) }
             if shutdownTimeout != nil { reasons.append(.shutdownTimeout) }
+            #if canImport(NIOCore)
             if pskHint != nil { reasons.append(.pskHint) }
             if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
+            #endif
 
             return reasons
         }
@@ -126,9 +140,11 @@ extension Internals {
             if sendCANameList != nil { reasons.append(.sendCANameList) }
             if renegotiationSupport != nil { reasons.append(.renegotiationSupport) }
             if shutdownTimeout != nil { reasons.append(.shutdownTimeout) }
+            #if canImport(NIOCore)
             if pskHint != nil { reasons.append(.pskHint) }
             if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
             if keyLogger != nil { reasons.append(.keyLogger) }
+            #endif
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
             if maximumTLSVersion != nil { reasons.append(.maximumTLSVersionUnderURLSession) }
@@ -164,11 +180,11 @@ extension Internals {
             )
 
             if let minimumTLSVersion {
-                tlsConfiguration.minimumTLSVersion = minimumTLSVersion
+                tlsConfiguration.minimumTLSVersion = minimumTLSVersion.build()
             }
 
             if let maximumTLSVersion {
-                tlsConfiguration.maximumTLSVersion = maximumTLSVersion
+                tlsConfiguration.maximumTLSVersion = maximumTLSVersion.build()
             }
 
             if let cipherSuites {
@@ -176,7 +192,7 @@ extension Internals {
             }
 
             if let cipherSuiteValues {
-                tlsConfiguration.cipherSuiteValues = cipherSuiteValues
+                tlsConfiguration.cipherSuiteValues = cipherSuiteValues.map { $0.build() }
             }
 
             if useDefaultTrustRoots {
@@ -192,15 +208,15 @@ extension Internals {
             }
 
             if let certificateVerification {
-                tlsConfiguration.certificateVerification = certificateVerification
+                tlsConfiguration.certificateVerification = certificateVerification.build()
             }
 
             if let signingSignatureAlgorithms {
-                tlsConfiguration.signingSignatureAlgorithms = signingSignatureAlgorithms
+                tlsConfiguration.signingSignatureAlgorithms = signingSignatureAlgorithms.map { $0.build() }
             }
 
             if let verifySignatureAlgorithms {
-                tlsConfiguration.verifySignatureAlgorithms = verifySignatureAlgorithms
+                tlsConfiguration.verifySignatureAlgorithms = verifySignatureAlgorithms.map { $0.build() }
             }
 
             if let sendCANameList {
@@ -208,11 +224,11 @@ extension Internals {
             }
 
             if let renegotiationSupport {
-                tlsConfiguration.renegotiationSupport = renegotiationSupport
+                tlsConfiguration.renegotiationSupport = renegotiationSupport.build()
             }
 
             if let shutdownTimeout {
-                tlsConfiguration.shutdownTimeout = shutdownTimeout
+                tlsConfiguration.shutdownTimeout = .nanoseconds(shutdownTimeout)
             }
 
             if let pskHint {
@@ -334,10 +350,19 @@ extension Internals.SecureConnection: Equatable {
         let isSecurityPropertiesEqual =
             lhs.certificateChain == rhs.certificateChain
             && lhs.privateKey == rhs.privateKey
-            && lhs.keyLogger === rhs.keyLogger
             && lhs.cipherSuites == rhs.cipherSuites
 
+        #if canImport(NIOCore)
+        let isKeyLoggerAndPSKEqual =
+            lhs.keyLogger === rhs.keyLogger
+            && lhs.pskHint == rhs.pskHint
+            && lhs.pskIdentityResolver === rhs.pskIdentityResolver
+        #else
+        let isKeyLoggerAndPSKEqual = true
+        #endif
+
         return isSecurityPropertiesEqual
+            && isKeyLoggerAndPSKEqual
             && lhs.certificateVerification == rhs.certificateVerification
             && lhs.trustRoots == rhs.trustRoots
             && lhs.additionalTrustRoots == rhs.additionalTrustRoots
@@ -346,9 +371,7 @@ extension Internals.SecureConnection: Equatable {
             && lhs.sendCANameList == rhs.sendCANameList
             && lhs.renegotiationSupport == rhs.renegotiationSupport
             && lhs.shutdownTimeout == rhs.shutdownTimeout
-            && lhs.pskHint == rhs.pskHint
             && lhs.applicationProtocols == rhs.applicationProtocols
-            && lhs.pskIdentityResolver === rhs.pskIdentityResolver
             && lhs.minimumTLSVersion == rhs.minimumTLSVersion
             && lhs.maximumTLSVersion == rhs.maximumTLSVersion
             && lhs.cipherSuiteValues == rhs.cipherSuiteValues

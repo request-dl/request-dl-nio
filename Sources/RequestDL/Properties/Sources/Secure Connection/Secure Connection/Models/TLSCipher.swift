@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
+import RequestDLInternals
 
 /// Represents a TLS cipher suite.
 ///
@@ -106,13 +106,13 @@ public struct TLSCipher: Sendable, RawRepresentable, Hashable {
         self.rawValue = rawValue
     }
 
-    init(_ cipher: NIOSSL.NIOTLSCipher) {
+    init(_ cipher: Internals.TLSCipher) {
         self.init(rawValue: cipher.rawValue)
     }
 
     // MARK: - Internal methods
 
-    func build() -> NIOSSL.NIOTLSCipher {
+    func build() -> Internals.TLSCipher {
         .init(rawValue: rawValue)
     }
 }
