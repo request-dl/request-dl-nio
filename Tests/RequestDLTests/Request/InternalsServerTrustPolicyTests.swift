@@ -53,13 +53,13 @@ struct InternalsServerTrustPolicyTests {
 
     @Test(
         arguments: [
-            (NIOSSL.CertificateVerification.none, Internals.ServerTrustPolicy.Descriptor.Verification.none),
+            (Internals.CertificateVerification.none, Internals.ServerTrustPolicy.Descriptor.Verification.none),
             (.fullVerification, .fullVerification),
             (.noHostnameVerification, .noHostnameVerification),
         ]
     )
     func resolve_capturesConfiguredVerificationMode(
-        _ pair: (NIOSSL.CertificateVerification, Internals.ServerTrustPolicy.Descriptor.Verification)
+        _ pair: (Internals.CertificateVerification, Internals.ServerTrustPolicy.Descriptor.Verification)
     ) async throws {
         // Given
         var secureConnection = Internals.SecureConnection()

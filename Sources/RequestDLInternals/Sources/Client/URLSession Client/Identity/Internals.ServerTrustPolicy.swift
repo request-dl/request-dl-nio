@@ -11,7 +11,6 @@
 
 import AsyncHTTPClient
 import Crypto
-import NIOSSL
 import Security
 
 #if canImport(FoundationEssentials)
@@ -40,7 +39,7 @@ extension Internals {
                 case fullVerification
                 case noHostnameVerification
 
-                package init(_ verification: NIOSSL.CertificateVerification) {
+                package init(_ verification: Internals.CertificateVerification) {
                     switch verification {
                     case .none:
                         self = .none
@@ -48,12 +47,10 @@ extension Internals {
                         self = .noHostnameVerification
                     case .fullVerification:
                         self = .fullVerification
-                    @unknown default:
-                        self = .fullVerification
                     }
                 }
 
-                package var nioSSLValue: NIOSSL.CertificateVerification {
+                package var internalValue: Internals.CertificateVerification {
                     switch self {
                     case .none: return .none
                     case .fullVerification: return .fullVerification
@@ -153,14 +150,14 @@ extension Internals {
         /// This type only owns what's specific to a `URLAuthenticationChallenge`: the `.none`
         /// bypass, and `Descriptor` persistence for `BackgroundDownloadTask`.
         private let evaluation: Internals.DarwinTrustEvaluation
-        private let certificateVerification: NIOSSL.CertificateVerification
+        private let certificateVerification: Internals.CertificateVerification
         private let spkiPinningDescriptor: Descriptor.SPKIPinning?
 
         // MARK: - Inits
 
         private init(
             trustedRootCertificates: [SecCertificate],
-            certificateVerification: NIOSSL.CertificateVerification,
+            certificateVerification: Internals.CertificateVerification,
             spkiPins: [Internals.ResolvedSPKIPin],
             spkiPinningIsStrict: Bool,
             spkiPinningDescriptor: Descriptor.SPKIPinning?,
@@ -192,7 +189,7 @@ extension Internals {
                 trustedRootCertificates: descriptor.trustedRootCertificatesDER.compactMap {
                     SecCertificateCreateWithData(nil, $0 as CFData)
                 },
-                certificateVerification: descriptor.verification.nioSSLValue,
+                certificateVerification: descriptor.verification.internalValue,
                 spkiPins: (descriptor.spkiPinning?.pins ?? []).map { pin in
                     Internals.ResolvedSPKIPin { spkiDERBytes in
                         Self.digest(spkiDERBytes, algorithm: pin.algorithm) == pin.digest
