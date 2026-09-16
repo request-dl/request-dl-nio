@@ -4,9 +4,16 @@
 
 import NIOCore
 import NIOEmbedded
+import NIOFoundationEssentialsCompat
 import NIOHTTP1
 import NIOHTTPCompression
 import NIOPosix
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension Internals.Compression.Algorithm {
 
@@ -154,18 +161,18 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        package func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer {
+        package func callAsFunction(compressing bytes: Data) throws -> Data {
             try box.eventLoop.submit { [box] in
                 guard let channel = box.channel else {
                     throw ChannelAlreadyFinishedError()
                 }
 
-                try channel.writeOutbound(HTTPClientRequestPart.body(.byteBuffer(bytes)))
+                try channel.writeOutbound(HTTPClientRequestPart.body(.byteBuffer(ByteBuffer(data: bytes))))
                 return try Self.drain(channel)
             }.wait()
         }
 
-        package func finish() throws -> ByteBuffer {
+        package func finish() throws -> Data {
             try box.eventLoop.submit { [box] in
                 guard let channel = box.channel else {
                     throw ChannelAlreadyFinishedError()
@@ -185,7 +192,13 @@ extension Internals {
 
         // MARK: - Private methods
 
-        private static func drain(_ channel: EmbeddedChannel) throws -> ByteBuffer {
+        /// Collects every outbound chunk `NIOHTTPRequestCompressor` produced, then hands it back
+        /// as `Data` without copying: the whole point of draining into one contiguous `ByteBuffer`
+        /// first is that its storage can then be wrapped, not duplicated, into the `Data` this
+        /// returns — see `NIOFoundationEssentialsCompat`'s own `.noCopy` strategy, which is what
+        /// actually does that (retains this buffer's storage from inside `Data`'s deallocator
+        /// instead of `memcpy`-ing it).
+        private static func drain(_ channel: EmbeddedChannel) throws -> Data {
             var output = channel.allocator.buffer(capacity: .zero)
 
             while let part = try channel.readOutbound(as: HTTPClientRequestPart.self) {
@@ -196,7 +209,11 @@ extension Internals {
                 output.writeBuffer(&chunk)
             }
 
-            return output
+            return output.getData(
+                at: output.readerIndex,
+                length: output.readableBytes,
+                byteTransferStrategy: .noCopy
+            ) ?? Data()
         }
     }
 }

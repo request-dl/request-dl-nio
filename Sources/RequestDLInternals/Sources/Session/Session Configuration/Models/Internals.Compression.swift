@@ -2,8 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import NIOHTTPCompression
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension Internals {
 
@@ -58,11 +63,13 @@ extension Internals {
         func callAsFunction() throws -> any Internals.CompressorStream
     }
 
-    /// Internals-layer counterpart to `RequestDL.CompressorStream`, operating on `ByteBuffer`
-    /// instead of `[UInt8]`: the boundary conversion lives in the adapter that wraps a public
-    /// `Compressor`/`CompressorStream` into these.
+    /// Internals-layer counterpart to `RequestDL.CompressorStream`, operating on `Data` instead
+    /// of `[UInt8]`: the boundary conversion lives in the adapter that wraps a public
+    /// `Compressor`/`CompressorStream` into these. The one conformer that does real work
+    /// (`Internals.NIOHTTPCompressorStream`) still runs on `NIOCore.ByteBuffer` internally —
+    /// this protocol just doesn't force that on whoever calls it.
     package protocol CompressorStream {
-        mutating func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer
-        mutating func finish() throws -> ByteBuffer
+        mutating func callAsFunction(compressing bytes: Data) throws -> Data
+        mutating func finish() throws -> Data
     }
 }

@@ -2,12 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 /// Adapts a `RequestDL.Decompressor` to `Internals.DecompressionAlgorithm`, converting between
-/// this module's public `[UInt8]`-based protocols and the `ByteBuffer`-based ones `Internals`
-/// (shared by both transports) can reference without depending back on this module.
+/// this module's public `[UInt8]`-based protocols and the `Data`-based ones `Internals` (shared
+/// by both transports) can reference without depending back on this module.
 struct InternalsDecompressionAlgorithmAdapter: Internals.DecompressionAlgorithm {
 
     // MARK: - Internal properties
@@ -67,11 +72,11 @@ private struct InternalsDecompressorStreamAdapter: Internals.DecompressorStream 
 
     // MARK: - Internal methods
 
-    mutating func callAsFunction(decompressing bytes: ByteBuffer) throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream(decompressing: Array(bytes.readableBytesView)))
+    mutating func callAsFunction(decompressing bytes: Data) throws -> Data {
+        Data(try stream(decompressing: Array(bytes)))
     }
 
-    mutating func finish() throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream.finish())
+    mutating func finish() throws -> Data {
+        Data(try stream.finish())
     }
 }

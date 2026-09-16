@@ -2,12 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 /// Adapts a `RequestDL.Compressor` to `Internals.CompressionAlgorithm`, converting between this
-/// module's public `[UInt8]`-based protocols and the `ByteBuffer`-based ones `Internals`
-/// (shared by both transports) can reference without depending back on this module.
+/// module's public `[UInt8]`-based protocols and the `Data`-based ones `Internals` (shared by
+/// both transports) can reference without depending back on this module.
 struct InternalsCompressionAlgorithmAdapter: Internals.CompressionAlgorithm {
 
     // MARK: - Internal properties
@@ -40,11 +45,11 @@ private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
 
     // MARK: - Internal methods
 
-    mutating func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream(compressing: Array(bytes.readableBytesView)))
+    mutating func callAsFunction(compressing bytes: Data) throws -> Data {
+        Data(try stream(compressing: Array(bytes)))
     }
 
-    mutating func finish() throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream.finish())
+    mutating func finish() throws -> Data {
+        Data(try stream.finish())
     }
 }
