@@ -132,7 +132,7 @@ extension Internals {
                 }
 
                 return .urlSession(
-                    try _createNewURLSessionClient(
+                    try await _createNewURLSessionClient(
                         id: sessionProviderID,
                         sessionConfiguration: sessionConfiguration
                     )
@@ -265,18 +265,30 @@ extension Internals {
         /// `id` is expected to already carry `resolvedClient(provider:sessionConfiguration:)`'s
         /// `"URLSession."` prefix, keeping this entry apart from any `.nio` one the same provider
         /// might also have cached under its bare (or `"NTW."`-prefixed) id.
+        ///
+        /// `Internals.URLSessionClient.init` is routed through `Internals.FileSystemManager.run`
+        /// rather than called directly: it reads the certificate/private-key files a
+        /// `SecureConnection` names (`Internals.Certificate.resolvedDERBytes()`, portable and
+        /// NIOSSL-backed alike) and, for mTLS, makes synchronous Keychain calls
+        /// (`Internals.RawBytesIdentityBuilder`/`Internals.IdentityManager`) — none of which are
+        /// `async`, since Keychain's own API isn't. Calling it inline here would block whichever
+        /// Swift Concurrency cooperative thread reached this cache miss for as long as that takes;
+        /// `FileSystemManager.run` is the same escape hatch every other blocking file operation in
+        /// `Internals` already uses for exactly that reason (see its own doc comment).
         private func _createNewURLSessionClient(
             id: String,
             sessionConfiguration: Internals.Session.Configuration
-        ) throws -> Internals.URLSessionClient {
-            let client = try Internals.URLSessionClient(
-                configuration: sessionConfiguration.buildURLSessionConfiguration(),
-                secureConnection: sessionConfiguration.secureConnection,
-                redirectConfiguration: sessionConfiguration.redirectConfiguration
-                    ?? .follow(max: 5, allowCycles: false),
-                proxy: sessionConfiguration.proxy,
-                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
-            )
+        ) async throws -> Internals.URLSessionClient {
+            let client = try await Internals.FileSystemManager.run {
+                try Internals.URLSessionClient(
+                    configuration: sessionConfiguration.buildURLSessionConfiguration(),
+                    secureConnection: sessionConfiguration.secureConnection,
+                    redirectConfiguration: sessionConfiguration.redirectConfiguration
+                        ?? .follow(max: 5, allowCycles: false),
+                    proxy: sessionConfiguration.proxy,
+                    maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+                )
+            }
 
             tableLock.withLock {
                 var items = _table[id] ?? []
