@@ -10,11 +10,40 @@ struct ZeroingBytesTests {
 
     @Test
     func zeroingBytes_whenGivenBytes_preservesContentsAndCount() async throws {
-        // Given
+        // Given: `[UInt8]` offers contiguous storage, exercising `init`'s
+        // `withContiguousStorageIfAvailable` fast path.
         let bytes: [UInt8] = [1, 2, 3, 4, 5]
 
         // When
         let zeroingBytes = ZeroingBytes(bytes)
+
+        // Then
+        #expect(zeroingBytes.count == bytes.count)
+        #expect(Array(zeroingBytes) == bytes)
+    }
+
+    @Test
+    func zeroingBytes_whenGivenStringUTF8_preservesContentsAndCount() async throws {
+        // Given: the realistic call shape (`SecureBytes("password".utf8)`); a native `String`'s
+        // `.utf8` view also offers contiguous storage.
+        let password = "hunter2"
+
+        // When
+        let zeroingBytes = ZeroingBytes(password.utf8)
+
+        // Then
+        #expect(zeroingBytes.count == password.utf8.count)
+        #expect(Array(zeroingBytes) == Array(password.utf8))
+    }
+
+    @Test
+    func zeroingBytes_whenGivenNonContiguousSequence_preservesContentsAndCount() async throws {
+        // Given: `AnySequence` erases whatever contiguous storage the wrapped collection might
+        // otherwise offer, forcing `init`'s `Array(bytes)` fallback path.
+        let bytes: [UInt8] = [1, 2, 3, 4, 5]
+
+        // When
+        let zeroingBytes = ZeroingBytes(AnySequence(bytes))
 
         // Then
         #expect(zeroingBytes.count == bytes.count)

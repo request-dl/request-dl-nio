@@ -128,11 +128,28 @@ package final class ZeroingBytes: @unchecked Sendable {
 
     // MARK: - Inits
 
+    /// - Note: `PrivateKey`'s `password:` initializers construct a fresh ``SecureBytes`` (hence
+    /// a fresh instance of this type where NIOSSL isn't available) every time their owning
+    /// `Property` body is rebuilt, i.e. on every request. `withContiguousStorageIfAvailable`
+    /// copies straight from `bytes`'s own storage into the buffer this type allocates when it
+    /// has one to offer (true for the common case, a `String`'s `.utf8` view or an `[UInt8]`
+    /// literal), skipping the intermediate `Array(bytes)` copy the generic fallback below still
+    /// needs for a `Sequence` that can't expose contiguous storage.
     package init(_ bytes: some Sequence<UInt8>) {
-        let bytes = Array(bytes)
-        let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: bytes.count)
-        _ = buffer.initialize(fromContentsOf: bytes)
-        self.buffer = buffer
+        let fromContiguousStorage = bytes.withContiguousStorageIfAvailable { source in
+            let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: source.count)
+            _ = buffer.initialize(fromContentsOf: source)
+            return buffer
+        }
+
+        if let fromContiguousStorage {
+            self.buffer = fromContiguousStorage
+        } else {
+            let bytes = Array(bytes)
+            let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: bytes.count)
+            _ = buffer.initialize(fromContentsOf: bytes)
+            self.buffer = buffer
+        }
     }
 
     deinit {
