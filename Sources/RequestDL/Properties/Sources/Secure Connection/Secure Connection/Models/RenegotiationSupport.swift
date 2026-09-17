@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
+import RequestDLInternals
 
 /// An enumeration that represents different options for renegotiation support in the context of TLS.
 ///
@@ -21,7 +21,7 @@ public enum RenegotiationSupport: Sendable, Hashable {
 
     // MARK: - Internal methods
 
-    func build() -> NIOSSL.NIORenegotiationSupport {
+    func build() -> Internals.RenegotiationSupport {
         switch self {
         case .none:
             return .none

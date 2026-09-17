@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)
@@ -88,7 +87,7 @@ public struct PrivateKey: Property {
     #endif
 
     /// Creates a private key from a file with the specified format, and allows for providing a
-    /// `NIOSSLSecureBytes` password..
+    /// ``SecureBytes`` password.
     ///
     /// - Important: Reachable under ``Session/Executor/nio`` unconditionally: NIOSSL/BoringSSL
     /// decrypts the key itself, straight from this password. Under
@@ -108,7 +107,7 @@ public struct PrivateKey: Property {
     public init(
         _ file: String,
         format: Certificate.Format = .pem,
-        password: NIOSSLSecureBytes
+        password: SecureBytes
     ) {
         self.init(
             .privateKey(
@@ -122,7 +121,7 @@ public struct PrivateKey: Property {
     }
 
     /// Creates a private key from bytes with the specified format, and allows for providing a
-    /// `NIOSSLSecureBytes` password.
+    /// ``SecureBytes`` password.
     ///
     /// - Important: See the `file:format:password:` initializer's own doc comment for exactly
     /// which password-protected key shapes are reachable under
@@ -136,7 +135,7 @@ public struct PrivateKey: Property {
     public init(
         _ bytes: [UInt8],
         format: Certificate.Format = .pem,
-        password: NIOSSLSecureBytes
+        password: SecureBytes
     ) {
         self.init(
             .privateKey(
@@ -151,7 +150,7 @@ public struct PrivateKey: Property {
 
     #if canImport(Darwin)
     /// Creates a private key from a file in the specified bundle with the specified format, and allows for
-    /// providing a `NIOSSLSecureBytes` password.
+    /// providing a ``SecureBytes`` password.
     ///
     /// - Parameters:
     ///   - file: The name of the file containing the private key.
@@ -162,7 +161,7 @@ public struct PrivateKey: Property {
         _ file: String,
         in bundle: Bundle,
         format: Certificate.Format = .pem,
-        password: NIOSSLSecureBytes
+        password: SecureBytes
     ) {
         self.init(
             format.resolve(for: file, in: bundle),

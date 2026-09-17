@@ -5,12 +5,11 @@
 #if canImport(Darwin)
 
 import Foundation
-import NIOHTTP1
 
 extension Internals.RedirectRequest {
 
     init(_ request: URLRequest) {
-        var headers = NIOHTTP1.HTTPHeaders()
+        var headers = Internals.HTTPHeaders()
 
         for (name, value) in request.allHTTPHeaderFields ?? [:] {
             headers.add(name: name, value: value)

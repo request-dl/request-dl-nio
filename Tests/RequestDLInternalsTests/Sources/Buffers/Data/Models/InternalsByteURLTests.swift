@@ -16,8 +16,8 @@ struct InternalsByteURLTests {
         let url = Internals.ByteURL()
 
         // Then
-        #expect(url.buffer.writerIndex == .zero)
-        #expect(url.buffer.readerIndex == .zero)
+        #expect(url.bytes.writerIndex == .zero)
+        #expect(url.bytes.readerIndex == .zero)
         #expect(url.writtenBytes == .zero)
     }
 
@@ -30,8 +30,8 @@ struct InternalsByteURLTests {
         let url = Internals.ByteURL(buffer)
 
         // Then
-        #expect(url.buffer.writerIndex == 64)
-        #expect(url.buffer.readerIndex == .zero)
+        #expect(url.bytes.writerIndex == 64)
+        #expect(url.bytes.readerIndex == .zero)
         #expect(url.writtenBytes == 64)
     }
 
@@ -46,8 +46,8 @@ struct InternalsByteURLTests {
         let url = Internals.ByteURL(buffer)
 
         // Then
-        #expect(url.buffer.writerIndex == 64)
-        #expect(url.buffer.readerIndex == .zero)
+        #expect(url.bytes.writerIndex == 64)
+        #expect(url.bytes.readerIndex == .zero)
         #expect(url.writtenBytes == 64)
     }
 

@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -10,6 +9,10 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 import protocol Foundation.DataProtocol
+#endif
+
+#if canImport(NIOCore)
+import NIOCore
 #endif
 
 extension Internals {
@@ -24,11 +27,11 @@ extension Internals {
 
         /// A copy of the current bytes.
         ///
-        /// - Warning: Reading this hands out a second reference to the buffer's storage, so the
+        /// - Warning: Reading this hands out a second reference to the store's storage, so the
         /// next write has to copy it before it can mutate. Use ``withStorage(_:)`` for anything
         /// that touches the buffer rather than just inspecting it.
-        package var buffer: NIOCore.ByteBuffer {
-            lock.withLock { _buffer }
+        package var bytes: Internals.Bytes {
+            lock.withLock { _bytes }
         }
 
         /// High water mark of the writer index, which is the size of the store.
@@ -46,22 +49,24 @@ extension Internals {
         // MARK: - Unsafe properties
 
         // Deliberately not `lazy`. A lazy var is reached through a getter and a setter, so
-        // `&_buffer` would become a read, a modify and a write, which is exactly what
+        // `&_bytes` would become a read, a modify and a write, which is exactly what
         // ``withStorage(_:)`` exists to avoid.
-        private var _buffer = NIOCore.ByteBuffer()
+        private var _bytes = Internals.Bytes()
         private var _writtenBytes: Int = .zero
 
         // MARK: - Inits
 
         package init() {}
 
+        #if canImport(NIOCore)
         /// - Important: Only for a `ByteBuffer` that this instance will own exclusively from
         /// here on. The slice is taken, not copied.
         package init(_ buffer: NIOCore.ByteBuffer) {
-            let buffer = buffer.slice()
-            self._buffer = buffer
-            self._writtenBytes = buffer.readableBytes
+            let bytes = Internals.Bytes(buffer).slice()
+            self._bytes = bytes
+            self._writtenBytes = bytes.readableBytes
         }
+        #endif
 
         // MARK: - Internal methods
 
@@ -74,15 +79,15 @@ extension Internals {
         /// through a computed property makes every line a separate critical section, and the
         /// two handles interleave between them.
         ///
-        /// Cost: `ByteBuffer` is copy on write. Reading it out of a getter leaves the storage
+        /// Cost: the store is copy on write. Reading it out of a getter leaves the storage
         /// referenced twice, so every write copies everything written so far before appending.
         /// Mutating it in place through `inout` keeps the reference unique, which turns filling
         /// a buffer from quadratic back into linear.
         package func withStorage<Result>(
-            _ body: (inout NIOCore.ByteBuffer, inout Int) -> Result
+            _ body: (inout Internals.Bytes, inout Int) -> Result
         ) -> Result {
             lock.withLock {
-                body(&_buffer, &_writtenBytes)
+                body(&_bytes, &_writtenBytes)
             }
         }
 
@@ -92,14 +97,23 @@ extension Internals {
         /// smaller. A handle seeks and overwrites, and the written count only ever rises, so
         /// the tail of the previous content survives and keeps counting as written.
         package func replace<Bytes: DataProtocol>(with data: Bytes) {
-            withStorage { buffer, writtenBytes in
-                buffer.clear()
+            withStorage { bytes, writtenBytes in
+                bytes.clear()
+                bytes.writeBytes(data)
+                writtenBytes = bytes.writerIndex
+            }
+        }
 
-                // `writeBytes`, not `writeData`. The latter comes from `NIOFoundationCompat`,
-                // which imports the whole of `Foundation`.
-                _ = buffer.writeBytes(data)
-
-                writtenBytes = buffer.writerIndex
+        /// Same contract as ``replace(with:)`` above, for a caller that already holds an
+        /// ``Internals/Bytes`` chunk (a `RequestBody`'s internal, `Data`-agnostic sequence, say):
+        /// adopts its readable range directly as the new store instead of writing through
+        /// `DataProtocol`, which for a `Data`-backed chunk would force a redundant copy on top
+        /// of this store's own, and for a `ByteBuffer`-backed one would first force a `Data`
+        /// materialization that has nothing to do with what this store actually needs.
+        package func replace(with bytes: Internals.Bytes) {
+            withStorage { storage, writtenBytes in
+                storage = bytes.slice()
+                writtenBytes = storage.writerIndex
             }
         }
     }

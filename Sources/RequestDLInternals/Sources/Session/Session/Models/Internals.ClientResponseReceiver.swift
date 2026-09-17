@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// HTTPClientResponseDelegate conformance: entirely .nio/.nioTransportServices-only.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOHTTP1
@@ -212,7 +215,7 @@ extension Internals {
                     effects.append { self.download.failed(error) }
                 case .end, .failure:
                     // Reported, not trapped. Must not call `_unexpectedStateOrPhase` here, which
-                    // is `Never` and ends the process — reaching this branch does not require a
+                    // is `Never` and ends the process: reaching this branch does not require a
                     // bug on this side. The delegate is driven by the network stack, and an error
                     // arriving after `didFinishRequest`, or a second error after the first, lands
                     // here. The cascade below can also walk into it on its own, since
@@ -326,3 +329,5 @@ extension Internals.ClientResponseReceiver {
         }
     }
 }
+
+#endif

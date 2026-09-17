@@ -17,6 +17,23 @@ let package = Package(
             targets: ["RequestDL"]
         )
     ],
+    traits: [
+        .trait(
+            name: "NIOTransport",
+            description: """
+                Pulls in AsyncHTTPClient/SwiftNIO/NIOSSL, backing the .nio/.nioTransportServices \
+                executors plus the NIOFileSystem-based disk I/O and the built-in gzip/deflate \
+                request compression. Disabling it (`--disable-default-traits`) drops that whole \
+                dependency subgraph from the build and leaves RequestDL running .urlSession-only, \
+                over the portable mirrors every `#if canImport(NIOCore)` gate in this package \
+                falls back to. Darwin only: `Internals.URLSessionClient` (the whole `.urlSession` \
+                executor implementation) is itself Darwin-exclusive, a pre-existing decision \
+                unrelated to this trait, so disabling `NIOTransport` on any other platform leaves \
+                no executor at all and the package won't build.
+                """
+        ),
+        .default(enabledTraits: ["NIOTransport"]),
+    ],
     dependencies: [
         .package(
             url: "https://github.com/request-dl/async-http-client",
@@ -80,18 +97,38 @@ let package = Package(
         .target(
             name: "RequestDLInternals",
             dependencies: [
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-                .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOEmbedded", package: "swift-nio"),
-                .product(name: "_NIOFileSystem", package: "swift-nio"),
-                .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "NIO", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOConcurrencyHelpers",
+                    package: "swift-nio",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(
+                    name: "NIOFoundationEssentialsCompat",
+                    package: "swift-nio",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "NIOEmbedded", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "_NIOFileSystem", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOHTTPCompression",
+                    package: "swift-nio-extras",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOTransportServices",
+                    package: "swift-nio-transport-services",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
@@ -106,17 +143,37 @@ let package = Package(
             name: "RequestDL",
             dependencies: [
                 "RequestDLInternals",
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-                .product(name: "NIOFoundationEssentialsCompat", package: "swift-nio"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "_NIOFileSystem", package: "swift-nio"),
-                .product(name: "NIOHTTPCompression", package: "swift-nio-extras"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "NIO", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOConcurrencyHelpers",
+                    package: "swift-nio",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(
+                    name: "NIOFoundationEssentialsCompat",
+                    package: "swift-nio",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "_NIOFileSystem", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOHTTPCompression",
+                    package: "swift-nio-extras",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOTransportServices",
+                    package: "swift-nio-transport-services",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
@@ -132,14 +189,26 @@ let package = Package(
             dependencies: [
                 "RequestDLInternals",
                 "RequestDL",
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "SwiftAsyncStream", package: "swift-async-stream"),
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "NIO", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOConcurrencyHelpers",
+                    package: "swift-nio",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["NIOTransport"])),
+                .product(
+                    name: "NIOTransportServices",
+                    package: "swift-nio-transport-services",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "Logging", package: "swift-log"),
             ],
             path: "Tests/RequestDLTestSupport",

@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Only ever meaningful under `.nio`: a PSK identity resolver is a TLS handshake hook with no
+// Network.framework/URLSession equivalent, same reasoning as `SSLKeyLogger`'s own gate. This
+// whole type only exists to set `Internals.SecureConnection.pskHint`/`.pskIdentityResolver`,
+// which are themselves gated the same way.
+#if canImport(NIOCore)
+
 import NIOSSL
 import RequestDLInternals
 
@@ -78,3 +84,5 @@ public struct PSKIdentity: Property {
         return mutableSelf
     }
 }
+
+#endif

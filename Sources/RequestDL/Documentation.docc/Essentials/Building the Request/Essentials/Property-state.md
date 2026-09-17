@@ -79,7 +79,7 @@ struct GithubAPI: Property {
 
 ``RequestDL/PropertyNamespace`` directly influences the runtime memory reference where the state objects of ``RequestDL/Property`` are stored.
 
-Due to a series of optimizations related to the functioning of SwiftNIO and AsyncHTTPClient, defining a Namespace helps RequestDL determine whether it needs to create new objects from scratch or use those that are cached in memory.
+Due to a series of internal performance optimizations, defining a Namespace helps RequestDL determine whether it needs to create new objects from scratch or use those that are cached in memory.
 
 > Warning: The memory cache referred to here is related to Swift objects and not request caching.
 
@@ -89,9 +89,11 @@ For each `@PropertyNamespace` defined, RequestDL combines the values to form a u
 
 ### Meet the environment
 
+- ``RequestDL/RequestEnvironment``
 - ``RequestDL/RequestEnvironmentKey``
 - ``RequestDL/RequestEnvironmentValues``
 - ``RequestDL/PropertyEnvironment``
+- ``RequestDL/TaskEnvironment``
 - ``RequestDL/Property/environment(_:_:)``
 
 ### Keep objects in memory

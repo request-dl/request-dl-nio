@@ -5,7 +5,6 @@
 #if canImport(Darwin)
 
 import Crypto
-import NIOSSL
 import Testing
 
 @testable import RequestDL
@@ -79,7 +78,7 @@ struct BackgroundDownloadTaskTests {
                 RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
                 PrivateKey(
                     client.privateKeyURL.absolutePath(percentEncoded: false),
-                    password: NIOSSLSecureBytes("password".utf8)
+                    password: SecureBytes("password".utf8)
                 )
             }
         }

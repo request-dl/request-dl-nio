@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// This whole type only exists to wrap a caller-supplied `NIOCore.EventLoopGroup` (see
+// `RequestDL.Session.init(_:)`), so there's nothing here that makes sense without NIO.
+#if canImport(NIOCore)
+
 import NIOCore
 
 extension Internals {
@@ -44,3 +48,5 @@ extension SessionProvider where Self == Internals.CustomSessionProvider {
         Internals.CustomSessionProvider(group)
     }
 }
+
+#endif

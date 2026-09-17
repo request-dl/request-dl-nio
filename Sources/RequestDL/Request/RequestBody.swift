@@ -2,13 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
+#if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
-import RequestDLInternals
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.Data
 import struct Foundation.URL
 #endif
 
@@ -124,6 +128,7 @@ public struct RequestBody: Sendable {
         }
     }
 
+    #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``connect(writer:body:eventLoop:)``.
     func build(eventLoop: EventLoop) -> HTTPClient.Body {
@@ -135,9 +140,11 @@ public struct RequestBody: Sendable {
             )
         }
     }
+    #endif
 
     // MARK: - Private static methods
 
+    #if canImport(NIOCore)
     /// Drives the body into `writer`.
     ///
     /// ## Why the loop is passed in
@@ -168,7 +175,7 @@ public struct RequestBody: Sendable {
         eventLoop.makeFutureWithTask {
             var iterator = Internals.StreamWriterSequence(
                 writer: writer,
-                body: body
+                body: body.bytesSequence
             ).makeAsyncIterator()
 
             while let next = try await iterator.next() {
@@ -176,13 +183,14 @@ public struct RequestBody: Sendable {
             }
         }
     }
+    #endif
 }
 
 extension RequestBody: AsyncSequence {
 
     ///
     /// An iterator for traversing the `RequestBody`'s underlying buffer sequence.
-    /// This allows the body to be treated as a sequence of `ByteBuffer` chunks.
+    /// This allows the body to be treated as a sequence of `Data` chunks.
     ///
     public struct AsyncIterator: AsyncIteratorProtocol {
 
@@ -196,12 +204,40 @@ extension RequestBody: AsyncSequence {
         ///
         /// Advances to the next element in the sequence of buffer chunks.
         ///
-        /// - Returns: The next `ByteBuffer` in the sequence, or `nil` if there are no more elements.
+        /// - Returns: The next `Data` chunk in the sequence, or `nil` if there are no more elements.
         /// - Throws: Whatever a configured ``Compressor``'s ``CompressorStream`` throws, for a
         /// compressing body. A fixed body never throws, but shares this signature so callers
         /// don't need to know which kind of `RequestBody` they were handed.
         ///
-        public mutating func next() async throws -> NIOCore.ByteBuffer? {
+        /// - Note: `.noCopy`, not the default `.automatic`: `asData(byteTransferStrategy:)`'s
+        /// `.automatic` heuristic (`NIOCore.ByteBuffer.getData`'s own) copies any chunk at or
+        /// under 256 KiB, which is every chunk `Internals.BodySequence`/`CompressingByteSequence`
+        /// ever produce in practice (`BodySequence`'s own chunk size tops out at 1 MiB only for
+        /// bodies large enough that `.automatic` would already skip the copy anyway). Each chunk
+        /// here is already its own right-sized buffer, not a slice of a larger one `.noCopy`
+        /// would keep needlessly resident, so there is no downside to sharing it as is: the
+        /// underlying `ByteBuffer`'s own copy-on-write still protects correctness the moment
+        /// `BodySequence`'s reused buffer is next written into while this call's `Data` is still
+        /// alive, exactly as it already does for two `Internals.Bytes` values sharing storage
+        /// anywhere else in this package.
+        public mutating func next() async throws -> Data? {
+            var bytesIterator = BytesIterator(backing: backing)
+            var element = try await bytesIterator.next()
+            backing = bytesIterator.backing
+            return element?.asData(byteTransferStrategy: .noCopy)
+        }
+    }
+
+    /// Yields the same chunks as ``AsyncIterator`` but as `Internals.Bytes`, not yet downgraded
+    /// to `Data`. Not public: exists only so `connect(writer:body:eventLoop:)` can feed
+    /// `Internals.StreamWriterSequence` a chunk that may still be `NIOCore.ByteBuffer`-backed
+    /// (a file read, say) without first forcing it through ``AsyncIterator``'s own `Data`
+    /// conversion only to convert it right back for `HTTPClient.Body.StreamWriter`.
+    struct BytesIterator: AsyncIteratorProtocol {
+
+        fileprivate var backing: AsyncIterator.Backing
+
+        mutating func next() async throws -> Internals.Bytes? {
             switch backing {
             case .fixed(var iterator):
                 let element = await iterator.next()
@@ -214,6 +250,22 @@ extension RequestBody: AsyncSequence {
                 return element
             }
         }
+    }
+
+    /// See ``BytesIterator``'s own doc comment.
+    struct BytesSequence: AsyncSequence, Sendable {
+        typealias Element = Internals.Bytes
+
+        fileprivate let body: RequestBody
+
+        func makeAsyncIterator() -> BytesIterator {
+            BytesIterator(backing: body.makeAsyncIterator().backing)
+        }
+    }
+
+    /// See ``BytesIterator``'s own doc comment.
+    var bytesSequence: BytesSequence {
+        BytesSequence(body: self)
     }
 
     ///

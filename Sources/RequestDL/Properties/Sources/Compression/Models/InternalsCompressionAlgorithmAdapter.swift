@@ -2,12 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 /// Adapts a `RequestDL.Compressor` to `Internals.CompressionAlgorithm`, converting between this
-/// module's public `[UInt8]`-based protocols and the `ByteBuffer`-based ones `Internals`
-/// (shared by both transports) can reference without depending back on this module.
+/// module's public `[UInt8]`-based protocols and the `Data`-based ones `Internals` (shared by
+/// both transports) can reference without depending back on this module.
 struct InternalsCompressionAlgorithmAdapter: Internals.CompressionAlgorithm {
 
     // MARK: - Internal properties
@@ -21,11 +26,38 @@ struct InternalsCompressionAlgorithmAdapter: Internals.CompressionAlgorithm {
     // MARK: - Internal methods
 
     func callAsFunction() throws -> any Internals.CompressorStream {
-        InternalsCompressorStreamAdapter(stream: try algorithm())
+        let stream = try algorithm()
+
+        // The built-in gzip/deflate compressors are `NIOHTTPCompressorStreamBridge` (with NIO)
+        // or `PortableGzipCompressorStream`/`PortableDeflateCompressorStream` (without it) under
+        // the public `Compressor` API only so a custom compressor can be written the same way
+        // they are; driven from here, each already has an `Internals.Bytes`-native stream to
+        // give back directly, skipping `InternalsCompressorStreamAdapter`'s `[UInt8]`/`Data`
+        // round trip on every chunk. A genuinely custom, `[UInt8]`-based `Compressor` still
+        // needs it.
+        #if canImport(NIOCore)
+        if let bridge = stream as? NIOHTTPCompressorStreamBridge {
+            return bridge.nativeStream
+        }
+        #endif
+
+        #if canImport(zlib)
+        if let bridge = stream as? PortableGzipCompressorStream {
+            return bridge.nativeStream
+        }
+
+        if let bridge = stream as? PortableDeflateCompressorStream {
+            return bridge.nativeStream
+        }
+        #endif
+
+        return InternalsCompressorStreamAdapter(stream: stream)
     }
 }
 
-/// Adapts a `RequestDL.CompressorStream` to `Internals.CompressorStream`.
+/// Adapts a `RequestDL.CompressorStream` to `Internals.CompressorStream`. Always `Data`-backed
+/// on the way out: a custom, `[UInt8]`-based compressor has no `ByteBuffer` to preserve, unlike
+/// `Internals.NIOHTTPCompressorStream`'s own conformance.
 private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
 
     // MARK: - Private properties
@@ -40,11 +72,11 @@ private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
 
     // MARK: - Internal methods
 
-    mutating func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream(compressing: Array(bytes.readableBytesView)))
+    mutating func callAsFunction(compressing bytes: Internals.Bytes) throws -> Internals.Bytes {
+        Internals.Bytes(Data(try stream(compressing: bytes.asBytes())))
     }
 
-    mutating func finish() throws -> ByteBuffer {
-        ByteBuffer(bytes: try stream.finish())
+    mutating func finish() throws -> Internals.Bytes {
+        Internals.Bytes(Data(try stream.finish()))
     }
 }

@@ -220,7 +220,7 @@ struct RequestConfigurationCompressionTests {
         if let body = configuration.body {
             for try await chunk in body {
                 chunkCount += 1
-                compressed.append(contentsOf: chunk.readableBytesView)
+                compressed.append(chunk)
             }
         }
 
@@ -239,7 +239,7 @@ extension RequestConfigurationCompressionTests {
 
         var data = Data()
         for try await chunk in body {
-            data.append(contentsOf: chunk.readableBytesView)
+            data.append(chunk)
         }
         return data
     }

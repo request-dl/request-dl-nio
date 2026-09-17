@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(Darwin)
+#if canImport(Darwin) && canImport(NIOCore)
 
 import Dispatch
 import NIOCore

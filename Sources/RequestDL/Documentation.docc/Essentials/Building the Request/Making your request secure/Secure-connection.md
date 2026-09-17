@@ -165,13 +165,16 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 ### SPKI Pinning
 - ``RequestDL/SPKIPinning``
 - ``RequestDL/SPKIHash``
+- ``RequestDL/SPKIPinningPolicy``
 
 ### Client authorization
 - ``RequestDL/Certificates``
 - ``RequestDL/PrivateKey``
+- ``RequestDL/SecureBytes``
 
 ### PSK authentication
 - ``RequestDL/PSKIdentity``
+- ``RequestDL/SSLPSKIdentityResolver``
 
 ### TLS configuration
 - ``RequestDL/SecureConnection``
@@ -181,6 +184,7 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 - ``RequestDL/SignatureAlgorithm``
 - ``RequestDL/RenegotiationSupport``
 - ``RequestDL/RevocationPolicy``
+- ``RequestDL/SSLKeyLogger``
 
 ### Trust decision observability
 - ``RequestDL/TrustDecisionObserver``

@@ -2,6 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.DarwinTrustEvaluation.chainSPKIDERBytes(of:)` prefers this, BoringSSL-backed path
+// over its own `X509`/`SwiftASN1` one whenever NIOSSL is available: BoringSSL's ASN.1 parser is
+// the one every TLS handshake in this package already trusts, and is far more battle-tested
+// against oddly-but-validly-encoded real-world certificates than `swift-certificates`'s own. The
+// `X509`-based path exists only for a build without NIOSSL, not as the default.
+#if canImport(NIOCore)
+
 import NIOSSL
 
 #if canImport(FoundationEssentials)
@@ -26,3 +33,5 @@ extension NIOSSLCertificate {
         return Data(spkiBytes)
     }
 }
+
+#endif

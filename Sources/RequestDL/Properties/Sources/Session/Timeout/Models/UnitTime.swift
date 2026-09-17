@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOCore
+#endif
 
 /// A unit of time represented in nanoseconds.
 ///
@@ -93,9 +95,11 @@ public struct UnitTime: Sendable, Hashable {
     }
 
     // MARK: - Internal methods
+    #if canImport(NIOCore)
     func build() -> NIOCore.TimeAmount {
         .nanoseconds(Int64(nanoseconds))
     }
+    #endif
 }
 
 // MARK: - ExpressibleByIntegerLiteral

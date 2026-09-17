@@ -2,9 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Tracing
+
+#if canImport(NIOCore)
 import AsyncHTTPClient
 import NIOCore
-import Tracing
+#endif
 
 extension Internals.Session {
 
@@ -15,7 +18,7 @@ extension Internals.Session {
         package var secureConnection: Internals.SecureConnection?
         package var redirectConfiguration: Internals.RedirectConfiguration?
         package var timeout: Internals.Timeout = .init()
-        package var connectionPool: HTTPClient.Configuration.ConnectionPool = .init()
+        package var connectionPool: Internals.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
         package var ignoreUncleanSSLShutdown: Bool = false
 
@@ -33,7 +36,7 @@ extension Internals.Session {
         /// silently traced just because some other part of the process bootstrapped a tracer via
         /// `InstrumentationSystem` for unrelated reasons.
         ///
-        /// Excluded from `Equatable` — `any Tracer` isn't `Equatable`, same reasoning as
+        /// Excluded from `Equatable`: `any Tracer` isn't `Equatable`, same reasoning as
         /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
         package var tracer: any Tracer = NoOpTracer()
 
@@ -83,6 +86,12 @@ extension Internals.Session {
 
         // MARK: - Internal methods
 
+        // build(isCompatibleWithNetworkFramework:) produces an HTTPClient.Configuration
+        // (Output), consumed only by Internals.ClientManager+NIO.swift, the .nio/
+        // .nioTransportServices client builder. .urlSession has its own separate
+        // buildURLSessionConfiguration() below, so none of this needs a portable counterpart.
+        #if canImport(NIOCore)
+
         /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
         /// actually run over Network.framework (`.nioTransportServices`). Forwarded to
         /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
@@ -101,7 +110,7 @@ extension Internals.Session {
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
                 redirectConfiguration: redirectConfiguration?.build(),
                 timeout: timeout.build(),
-                connectionPool: connectionPool,
+                connectionPool: connectionPool.build(),
                 proxy: proxy?.build(),
                 decompression: decompression.build(),
                 tracing: .init()
@@ -134,9 +143,12 @@ extension Internals.Session {
             return Output(httpClientConfiguration: configuration)
             #endif
         }
+
+        #endif
     }
 }
 
+#if canImport(NIOCore)
 extension Internals.Session.Configuration {
 
     /// `build()`'s result: the `HTTPClient.Configuration` to hand `AsyncHTTPClient.HTTPClient`,
@@ -165,6 +177,7 @@ extension Internals.Session.Configuration {
         #endif
     }
 }
+#endif
 
 extension Internals.Session.Configuration {
 
@@ -333,6 +346,7 @@ extension Internals.Session.Configuration {
         }
 
         #if canImport(Darwin)
+        #if canImport(NIOCore)
         let isURLSessionCompatible = urlSessionIncompatibilityReasons().isEmpty
         let isNetworkFrameworkCompatible = secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true
 
@@ -360,8 +374,21 @@ extension Internals.Session.Configuration {
         if isNetworkFrameworkCompatible {
             return .nioTransportServices
         }
-        #endif
         return .nio
+        #else
+        // No NIO backend to fall back to at all: `.urlSession` is `Internals.Executor`'s only
+        // remaining case in this build, so there is nothing left to decide between.
+        return .urlSession
+        #endif
+        #else
+        #if canImport(NIOCore)
+        return .nio
+        #else
+        // No NIO backend and no Network.framework to fall back to either: `.urlSession` is
+        // `Internals.Executor`'s only remaining case in this build.
+        return .urlSession
+        #endif
+        #endif
     }
 
     /// Hard-pins execution to `executor`, throwing rather than silently falling back when this
@@ -377,12 +404,14 @@ extension Internals.Session.Configuration {
         switch executor {
         case .urlSession:
             reasons = urlSessionIncompatibilityReasons()
+        #if canImport(NIOCore)
         case .nioTransportServices:
             reasons =
                 (secureConnection?.networkFrameworkIncompatibilityReasons() ?? [])
                 + nonURLSessionExecutorIncompatibilityReasons()
         case .nio:
             reasons = nonURLSessionExecutorIncompatibilityReasons()
+        #endif
         }
 
         guard reasons.isEmpty else {
@@ -396,8 +425,6 @@ extension Internals.Session.Configuration {
 
 #if canImport(Darwin)
 
-import NIOSSL
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -406,30 +433,6 @@ import Foundation
 
 #if canImport(Network)
 import Network
-#endif
-
-#if canImport(Network)
-extension NIOSSL.TLSVersion {
-
-    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
-    /// `tlsMaximumSupportedProtocolVersion`'s type. Present unconditionally on every platform
-    /// this package targets (iOS 13/macOS 10.15, both below this package's own deployment
-    /// floor), so there's no availability branch to take here the way AsyncHTTPClient's own
-    /// NIOTransportServices bridge still needs for its pre-iOS-13 `SSLProtocol` fallback.
-    ///
-    /// - Note: `.TLSv10`/`.TLSv11` are deprecated (macOS 12+) but not unavailable, and are
-    /// mirrored here anyway, deliberately: a caller who explicitly asked NIOSSL for TLS 1.0/1.1
-    /// (interop with a legacy server, say) gets the same answer under `.urlSession`, not a
-    /// silent upgrade to whatever Apple currently recommends instead.
-    var urlSessionProtocolVersion: tls_protocol_version_t {
-        switch self {
-        case .tlsv1: return .TLSv10
-        case .tlsv11: return .TLSv11
-        case .tlsv12: return .TLSv12
-        case .tlsv13: return .TLSv13
-        }
-    }
-}
 #endif
 
 extension Internals.Session.Configuration {

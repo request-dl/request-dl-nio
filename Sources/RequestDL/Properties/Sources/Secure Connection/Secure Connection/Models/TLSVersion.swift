@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
+import RequestDLInternals
 
 /// An enumeration that represents different versions of the Transport Layer Security (TLS) protocol.
 ///
@@ -42,7 +42,7 @@ extension TLSVersion: Comparable {
 
 extension TLSVersion {
 
-    func build() -> NIOSSL.TLSVersion {
+    func build() -> Internals.TLSVersion {
         switch self {
         case .v1:
             return .tlsv1

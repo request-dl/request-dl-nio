@@ -2,7 +2,18 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftASN1
+
+#if canImport(NIOCore)
 import NIOSSL
+#endif
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.URL
+#endif
 
 extension Internals {
 
@@ -32,10 +43,82 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// The DER bytes of every certificate this configuration resolves to: one for `.der`
+        /// (which can only ever hold a single certificate), one per `-----BEGIN CERTIFICATE-----`
+        /// block for `.pem` (a bundle can hold a leaf plus intermediates).
+        ///
+        /// Portable counterpart to `build()`: reads the exact same bytes, without NIOSSL parsing
+        /// them into a `NIOSSLCertificate` first only to export the DER right back out again.
+        /// Built on `SwiftASN1`'s own `PEMDocument.parseMultiple(pemString:)`, not a hand-rolled
+        /// PEM splitter. `SwiftASN1` is already a portable dependency of this package (`X509`'s
+        /// own non-Darwin trust evaluator uses it), and it already handles what a hand-rolled
+        /// version would have to get right itself: locating every `-----BEGIN/END-----` pair and
+        /// base64-decoding each one. Verified against `NIOSSLCertificate.fromPEMFile`'s own DER
+        /// output for byte-for-byte equality. See `InternalsCertificateTests`.
+        ///
+        /// - Important: Matches `build()`'s own behavior for both `.pem` sources: `.file` and
+        /// `.bytes` each read every certificate in the bundle, matching
+        /// `NIOSSLCertificate.fromPEMFile`/`.fromPEMBytes`'s own behavior.
+        package func resolvedDERBytes() throws -> [Data] {
+            let raw: Data
+
+            switch source {
+            case .bytes(let bytes):
+                raw = Data(bytes)
+            case .file(let file):
+                do {
+                    raw = try Data(contentsOf: URL(fileURLWithPath: file))
+                } catch {
+                    throw SecureFileLoadError(resource: .certificate, path: file, underlying: error)
+                }
+            }
+
+            switch format {
+            case .der:
+                return [raw]
+            case .pem:
+                do {
+                    return try Self.resolvedPEMCertificateDERBytes(of: raw)
+                } catch {
+                    if case .file(let file) = source {
+                        throw SecureFileLoadError(resource: .certificate, path: file, underlying: error)
+                    }
+                    throw error
+                }
+            }
+        }
+
+        /// Every certificate's DER bytes found in a `.pem`-format blob, in order. This is the
+        /// shared parsing step `resolvedDERBytes()` builds on, and that `CertificateChain`/
+        /// `TrustRoots`/`AdditionalTrustRoots`'s own portable methods call directly for their
+        /// multi-certificate `.bytes`/`.file` cases.
+        package static func resolvedPEMCertificateDERBytes(of pemData: Data) throws -> [Data] {
+            guard let pemString = String(data: pemData, encoding: .utf8) else {
+                throw MalformedPEMError()
+            }
+
+            let documents = try PEMDocument.parseMultiple(pemString: pemString)
+                .filter { $0.discriminator == "CERTIFICATE" }
+
+            guard !documents.isEmpty else {
+                throw MalformedPEMError()
+            }
+
+            return documents.map { Data($0.derBytes) }
+        }
+
+        // MARK: - Internal methods (build)
+
+        #if canImport(NIOCore)
         package func build() throws -> [NIOSSLCertificate] {
             switch source {
             case .bytes(let bytes):
-                return try [NIOSSLCertificate(bytes: bytes, format: format.build())]
+                switch format {
+                case .der:
+                    return try [NIOSSLCertificate(bytes: bytes, format: format.build())]
+                case .pem:
+                    return try NIOSSLCertificate.fromPEMBytes(bytes)
+                }
             case .file(let file):
                 do {
                     switch format {
@@ -49,5 +132,10 @@ extension Internals {
                 }
             }
         }
+        #endif
     }
+
+    /// A PEM string that isn't valid UTF-8, or that `PEMDocument.parseMultiple(pemString:)`
+    /// couldn't make sense of (no `-----BEGIN-----` marker, malformed base64, ...).
+    package struct MalformedPEMError: Error, Sendable {}
 }

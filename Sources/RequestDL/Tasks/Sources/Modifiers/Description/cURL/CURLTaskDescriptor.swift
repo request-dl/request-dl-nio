@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -37,11 +35,11 @@ import struct Foundation.Data
 /// .result()
 /// ```
 ///
-/// `-H`/URL/method/a plain body all come straight from ``TaskDescriptorContext/requestConfiguration``
-/// — nothing is lost reading those back after resolution. `-u` is recovered by decoding a `Basic`
+/// `-H`/URL/method/a plain body all come straight from ``TaskDescriptorContext/requestConfiguration``:
+/// nothing is lost reading those back after resolution. `-u` is recovered by decoding a `Basic`
 /// `Authorization` header back to `user:pass`. `-F` is the one thing that couldn't be
-/// reconstructed from the final configuration alone — a resolved multipart body is already one
-/// opaque byte stream with a boundary — so it's built from ``TaskDescriptorContext/formFields``
+/// reconstructed from the final configuration alone (a resolved multipart body is already one
+/// opaque byte stream with a boundary), so it's built from ``TaskDescriptorContext/formFields``
 /// instead, which is captured earlier, before that flattening happens.
 public struct CURLTaskDescriptor: TaskDescriptor {
 
@@ -66,7 +64,7 @@ public struct CURLTaskDescriptor: TaskDescriptor {
         var basicCredentialsFragment: String?
 
         for (name, value) in configuration.headers {
-            // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)` — this file otherwise
+            // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)`: this file otherwise
             // needs nothing beyond `Data`/`NIOCore`, which `FoundationEssentials` already covers.
 
             // curl computes this itself; passing it by hand risks disagreeing with what curl
@@ -76,7 +74,7 @@ public struct CURLTaskDescriptor: TaskDescriptor {
             }
 
             // curl derives its own `Content-Type` (with its own multipart boundary) from `-F`
-            // flags — the one captured here still carries the boundary from the body this
+            // flags. The one captured here still carries the boundary from the body this
             // description pass isn't using, which would be actively misleading to print.
             if hasFormFields, name.lowercased() == "content-type" {
                 continue
@@ -104,8 +102,8 @@ public struct CURLTaskDescriptor: TaskDescriptor {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for try await buffer in body {
-                data.append(contentsOf: buffer.readableBytesView)
+            for try await chunk in body.bytesSequence {
+                chunk.append(to: &data)
             }
 
             fragments.append("--data-raw " + curlShellQuote(Array(data)))
@@ -117,11 +115,11 @@ public struct CURLTaskDescriptor: TaskDescriptor {
     // MARK: - Private methods
 
     /// - Note: The original source path isn't recoverable once a field has already gone through
-    /// its `PayloadFactory` — `filename` here is the name curl would show a server, not
+    /// its `PayloadFactory`: `filename` here is the name curl would show a server, not
     /// necessarily a path that exists on this machine. Round-tripping this description back
     /// through a real upload needs that filename to point at a real file first.
     ///
-    /// - Important: Builds this at the byte level, not through `String(decoding:as:)` — a plain
+    /// - Important: Builds this at the byte level, not through `String(decoding:as:)`: a plain
     /// (no `filename`) field's `content` is arbitrary bytes, not necessarily valid UTF-8 (e.g. a
     /// `Form(data:)` field with no filename). Decoding it into a `String` before it ever reaches
     /// `curlShellQuote` would replace anything invalid with U+FFFD *before* that function's own
@@ -141,7 +139,7 @@ public struct CURLTaskDescriptor: TaskDescriptor {
     /// - Important: Returns bytes, not a `String` split into username/password and rejoined.
     /// RFC 7617 doesn't guarantee `user:pass` is valid UTF-8 (it names a caller-declared charset,
     /// historically ISO-8859-1), and curl's own `-u` argument is exactly this decoded `user:pass`
-    /// form already — there's nothing to reformat, only something to avoid corrupting by
+    /// form already: there's nothing to reformat, only something to avoid corrupting by
     /// round-tripping through a lossy `String(decoding:as:)` the way `formFragmentBytes(_:)`
     /// above already has to avoid.
     private func basicCredentialBytes(from headerValue: String) -> [UInt8]? {

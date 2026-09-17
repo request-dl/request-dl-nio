@@ -189,6 +189,10 @@ Learn more in:
 
 - ``RequestDL/CustomHeader``
 - ``RequestDL/AcceptHeader``
+- ``RequestDL/AcceptEncodingHeader``
+- ``RequestDL/ContentCoding``
+- ``RequestDL/AcceptLanguageHeader``
+- ``RequestDL/LanguageTag``
 - ``RequestDL/HostHeader``
 - ``RequestDL/OriginHeader``
 - ``RequestDL/RefererHeader``
@@ -222,6 +226,21 @@ Learn more in:
 - ``RequestDL/URLOverrideError``
 - ``RequestDL/NetworkAvailabilityError``
 
+### Compressing the request body and decompressing the response
+
+- ``RequestDL/Compressor``
+- ``RequestDL/CompressorStream``
+- ``RequestDL/Decompressor``
+- ``RequestDL/DecompressorStream``
+- ``RequestDL/GzipAlgorithm``
+- ``RequestDL/DeflateAlgorithm``
+- ``RequestDL/BrotliURLSessionOnlyAlgorithm``
+- ``RequestDL/CompressionDuplicateHeaderBehavior``
+- ``RequestDL/CompressionUnavailableError``
+- ``RequestDL/DuplicateContentEncodingError``
+- ``RequestDL/NativeOnlyAlgorithmError``
+- ``RequestDL/UnsupportedContentEncodingError``
+
 ### Customizing redirect handling
 
 - ``RequestDL/RedirectStrategy``
@@ -234,6 +253,7 @@ Learn more in:
 
 - ``RequestDL/Timeout``
 - ``RequestDL/UnitTime``
+- ``RequestDL/ResourceTimeoutError``
 
 ### Modifying the properties
 

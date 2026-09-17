@@ -2,10 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-import NIOFileSystem
 import SwiftAsyncStream
 import SystemPackage
+
+#if canImport(NIOCore)
+import NIOCore
+import NIOFileSystem
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -30,7 +33,7 @@ extension Internals {
     /// `NIOFileSystem` runs the underlying syscall on its own `NIOThreadPool`, not on whichever
     /// Swift Concurrency cooperative thread called in here. A prior revision called
     /// `SystemPackage.FileDescriptor` directly, which ran the syscall in place on that
-    /// cooperative thread — harmless for one caller, but under `swift-testing`'s parallel test
+    /// cooperative thread, harmless for one caller, but under `swift-testing`'s parallel test
     /// execution enough concurrent callers saturate the fixed-size cooperative pool, and a
     /// critical section merely waiting for a worker thread looks identical to one genuinely
     /// stuck to `AsyncLock.Watchdog`, which measures wall time, not CPU time. `DiskStorage`
@@ -42,11 +45,22 @@ extension Internals {
         // MARK: - Private types
 
         /// A file is opened for reading or for writing, never both, matching the two inits
-        /// below. `NIOFileSystem` hands back a different concrete handle type per direction.
+        /// below. Whichever backend is active hands back a different concrete handle type per
+        /// direction: `NIOFileSystem`'s own `ReadFileHandle`/`WriteFileHandle` with NIO, or
+        /// `Internals.PortableFileSystem`'s lookalikes without it (see that type's own doc
+        /// comment). Every method below reads identically either way: only the two case payload
+        /// types actually differ.
+        #if canImport(NIOCore)
         private enum Handle: Sendable {
             case read(ReadFileHandle)
             case write(WriteFileHandle)
         }
+        #else
+        private enum Handle: Sendable {
+            case read(Internals.PortableFileSystem.ReadHandle)
+            case write(Internals.PortableFileSystem.WriteHandle)
+        }
+        #endif
 
         // MARK: - Internal properties
 
@@ -59,7 +73,7 @@ extension Internals {
         // MARK: - Private static properties
 
         /// Flags a seek/read/write/close that is still running after 15s. Development builds
-        /// only — see `AsyncLock.Watchdog`.
+        /// only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 15) {
             Internals.assertionFailure($0)
@@ -88,7 +102,7 @@ extension Internals {
 
         /// Opens for writing, creating the file when it does not exist.
         ///
-        /// - Important: Must not pass `.newFile(replaceExisting: true)` — that would empty the
+        /// - Important: Must not pass `.newFile(replaceExisting: true)`: that would empty the
         /// file every time the storage lazily opens its output stream, so the first write to an
         /// existing file would destroy it and then leave a zero filled gap where the old content
         /// had been. `.modifyFile` opens an existing file untouched and only creates one that is
@@ -152,7 +166,7 @@ extension Internals {
 
         /// Reads up to `length` bytes, looping over short reads until EOF.
         ///
-        /// - Important: Must not issue a single read and return whatever comes back — a short
+        /// - Important: Must not issue a single read and return whatever comes back: a short
         /// read would then silently deliver less than the caller asked for.
         ///
         /// - Returns: `nil` at EOF, otherwise the bytes actually read, which may be fewer than
@@ -230,7 +244,7 @@ extension Internals.FileStreamBuffer {
     /// package code reaches for by accident. Exposed so a test can wait for a task to actually
     /// be queued behind the lock (via `AsyncLock.waitForPendingOperations(_:timeout:)`) before
     /// cancelling it, rather than creating the task and hoping cancellation wins a race against
-    /// it starting — under CI scheduler contention, it does not always.
+    /// it starting. Under CI scheduler contention, it does not always.
     public var lockForTesting: AsyncLock {
         lock
     }

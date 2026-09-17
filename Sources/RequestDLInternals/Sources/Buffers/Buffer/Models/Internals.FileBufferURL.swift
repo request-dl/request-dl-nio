@@ -2,8 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOFileSystem
 import SystemPackage
+
+#if canImport(NIOCore)
+import NIOFileSystem
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -44,7 +47,7 @@ extension Internals {
         /// The path the streams open against.
         ///
         /// - Important: Must be derived once, at init, not rebuilt from a `String` on every
-        /// call — including inside the open path of both streams.
+        /// call, including inside the open path of both streams.
         package let path: FilePath
 
         /// - Important: This is a stat call, not a stored value.

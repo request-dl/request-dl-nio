@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.NIOHTTPCompressorStream` drives `NIOHTTPRequestCompressor` directly, so this whole
+// file is NIO-only: there's no portable equivalent here the way `Internals.PrivateKey`/
+// `Internals.Certificate` have one. `PortableGzipCompressorStream`/`PortableDeflateCompressorStream`
+// (in the `RequestDL` module) are what stand in for it when NIOCore isn't available.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOEmbedded
 import NIOHTTP1
@@ -154,18 +160,21 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        package func callAsFunction(compressing bytes: ByteBuffer) throws -> ByteBuffer {
-            try box.eventLoop.submit { [box] in
+        package func callAsFunction(compressing bytes: Internals.Bytes) throws -> Internals.Bytes {
+            var bytes = bytes
+            let buffer = bytes.asByteBuffer()
+
+            return try box.eventLoop.submit { [box] in
                 guard let channel = box.channel else {
                     throw ChannelAlreadyFinishedError()
                 }
 
-                try channel.writeOutbound(HTTPClientRequestPart.body(.byteBuffer(bytes)))
-                return try Self.drain(channel)
+                try channel.writeOutbound(HTTPClientRequestPart.body(.byteBuffer(buffer)))
+                return Internals.Bytes(try Self.drain(channel))
             }.wait()
         }
 
-        package func finish() throws -> ByteBuffer {
+        package func finish() throws -> Internals.Bytes {
             try box.eventLoop.submit { [box] in
                 guard let channel = box.channel else {
                     throw ChannelAlreadyFinishedError()
@@ -179,12 +188,16 @@ extension Internals {
                 // leaving it for whenever/wherever this value's box eventually gets deallocated;
                 // see the type's own doc comment.
                 box.channel = nil
-                return result
+                return Internals.Bytes(result)
             }.wait()
         }
 
         // MARK: - Private methods
 
+        /// Collects every outbound chunk `NIOHTTPRequestCompressor` produced into one contiguous
+        /// `ByteBuffer`. Handed back as is, not as `Data`: the caller wraps it into an
+        /// `Internals.Bytes` that stays `ByteBuffer`-backed until something downstream actually
+        /// asks for `Data`, rather than converting here on the chance it might.
         private static func drain(_ channel: EmbeddedChannel) throws -> ByteBuffer {
             var output = channel.allocator.buffer(capacity: .zero)
 
@@ -200,3 +213,5 @@ extension Internals {
         }
     }
 }
+
+#endif

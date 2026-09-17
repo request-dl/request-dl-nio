@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
+import RequestDLInternals
 
 /// Represents the signature algorithms used in `SecureConnection` configuration.
 public struct SignatureAlgorithm: Sendable, RawRepresentable, Hashable {
@@ -55,13 +55,13 @@ public struct SignatureAlgorithm: Sendable, RawRepresentable, Hashable {
         self.rawValue = rawValue
     }
 
-    private init(_ signatureAlgorithm: NIOSSL.SignatureAlgorithm) {
+    private init(_ signatureAlgorithm: Internals.SignatureAlgorithm) {
         self.init(rawValue: signatureAlgorithm.rawValue)
     }
 
     // MARK: - Internal methods
 
-    func build() -> NIOSSL.SignatureAlgorithm {
+    func build() -> Internals.SignatureAlgorithm {
         .init(rawValue: rawValue)
     }
 }

@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 extension Internals {
 
     /// Wraps `source` so each chunk is compressed as it's pulled, instead of draining the whole
@@ -15,7 +13,7 @@ extension Internals {
     /// `RequestDLInternals` cannot depend back on `RequestDL`, where `RequestBody`, the actual
     /// source this wraps in practice, is defined.
     package struct CompressingByteSequence<Source: AsyncSequence & Sendable>: Sendable, AsyncSequence
-    where Source.Element == ByteBuffer {
+    where Source.Element == Internals.Bytes {
 
         package struct AsyncIterator: AsyncIteratorProtocol {
 
@@ -39,7 +37,7 @@ extension Internals {
             /// `AsyncIteratorProtocol.makeAsyncIterator()` isn't `throws`, and creating a
             /// `Compressor`'s stream (`Decompressor`'s own `callAsFunction()` counterpart) is
             /// allowed to fail.
-            package mutating func next() async throws -> ByteBuffer? {
+            package mutating func next() async throws -> Internals.Bytes? {
                 guard !isFinished else {
                     return nil
                 }
@@ -65,7 +63,7 @@ extension Internals {
             }
         }
 
-        package typealias Element = ByteBuffer
+        package typealias Element = Internals.Bytes
 
         // MARK: - Internal properties
 

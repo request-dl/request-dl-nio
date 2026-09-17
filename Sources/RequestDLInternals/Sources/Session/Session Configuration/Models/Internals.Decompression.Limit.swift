@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOHTTPCompression
+#endif
 
 extension Internals.Decompression {
 
@@ -14,6 +16,7 @@ extension Internals.Decompression {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() -> NIOHTTPDecompression.DecompressionLimit {
             switch self {
             case .none:
@@ -24,5 +27,6 @@ extension Internals.Decompression {
                 return .size(value)
             }
         }
+        #endif
     }
 }

@@ -2,13 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
 /// Represents a secure connection with various configuration options.
 ///
 /// > Note: ``TrustRoots``, ``Certificates``, ``AdditionalTrustRoots``, ``PrivateKey``,
-/// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection` —
+/// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection`:
 /// each creates the underlying secure connection configuration on its own the first time it's
 /// needed. Nest them here only when also configuring settings that live directly on
 /// `SecureConnection` (`version`, `cipherSuites`, `keyLogger`, ...).
@@ -33,8 +32,8 @@ public struct SecureConnection<Content: Property>: Property {
         // that `_makeProperty` can wrap it in a `SecureConnectionNode`, the same leaf type this
         // node itself searches for and the same one every other secure connection property
         // (`TrustRoots`, `Certificates`, `PrivateKey`, ...) wraps itself in. Without that, a
-        // `SecureConnection` nested inside another `SecureConnection` — via its own
-        // `.leaf(Node(...))` collapsing everything into a private wrapper type — would be
+        // `SecureConnection` nested inside another `SecureConnection` (via its own
+        // `.leaf(Node(...))` collapsing everything into a private wrapper type) would be
         // invisible to the outer one's search, and every certificate/trust root/TLS setting it
         // configured would be silently dropped.
         //
@@ -42,7 +41,7 @@ public struct SecureConnection<Content: Property>: Property {
         // the base wholesale, then apply each found `SecureConnectionNode` on top of it via its
         // own fresh collector. `secureConnection`'s own settings (TLS version, cipher suites,
         // etc.) are not tracked field-by-field the way `trustRoots`/`certificateChain`/
-        // `additionalTrustRoots` are, so nesting still replaces the whole base — only how that
+        // `additionalTrustRoots` are, so nesting still replaces the whole base: only how that
         // replacement becomes reachable when nested has changed here, not what it does.
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
             secureConnection = self.secureConnection
@@ -81,7 +80,7 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Initializes a secure connection with no additional content, for chaining its fluent
-    /// modifiers directly — the same way `Session()` is used.
+    /// modifiers directly, the same way `Session()` is used.
     ///
     /// ```swift
     /// DataTask {
@@ -138,13 +137,15 @@ public struct SecureConnection<Content: Property>: Property {
         edit { $0.secureConnection.minimumTLSVersion = minimum.build() }
     }
 
+    #if canImport(NIOCore)
     /// Sets the maximum TLS version for the secure connection.
     ///
-    /// > Important: `URLSessionConfiguration` has no maximum-TLS-version API, and App Transport
-    /// Security has no `Info.plist` key for one either, so this is treated as incompatible with
-    /// ``Session/Executor/urlSession``: automatic executor resolution skips it in favor of a
-    /// NIO-based executor, and pinning to `.urlSession` via ``Session/requiredExecutor(_:)``
-    /// throws ``ExecutorRequirementError``. See
+    /// - Important: Unavailable in a build without NIO: `URLSessionConfiguration` has no
+    /// maximum-TLS-version API, and App Transport Security has no `Info.plist` key for one
+    /// either, so there is no executor left this could ever take effect on. In a build where NIO
+    /// is available, this is treated as incompatible with ``Session/Executor/urlSession``:
+    /// automatic executor resolution skips it in favor of a NIO-based executor, and pinning to
+    /// `.urlSession` via ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``. See
     /// <doc:Configuring-App-Transport-Security-for-URLSession>.
     ///
     /// - Parameter maximum: The maximum TLS version to use.
@@ -154,6 +155,9 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the minimum and maximum TLS versions for the secure connection.
+    ///
+    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
+    /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameters:
     ///   - minimum: The minimum TLS version to use.
@@ -165,6 +169,9 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the TLS version range for the secure connection.
     ///
+    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
+    /// ``version(minimum:)`` alone there instead.
+    ///
     /// - Parameter range: The range of TLS versions to use.
     /// - Returns: A modified `SecureConnection` with the TLS version range set.
     public func version(_ range: Range<TLSVersion>) -> Self {
@@ -175,6 +182,9 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the TLS version range for the secure connection, inclusive of both ends.
+    ///
+    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
+    /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameter range: The closed range of TLS versions to use.
     /// - Returns: A modified `SecureConnection` with the TLS version range set.
@@ -189,7 +199,9 @@ public struct SecureConnection<Content: Property>: Property {
     ///
     /// - Important: Reachable under ``Session/Executor/nio`` only. This is a **permanent**
     /// limitation of the underlying platforms, not a gap awaiting a fix. Neither Network.framework
-    /// nor `URLSession` exposes any public API for observing per-session TLS secrets.
+    /// nor `URLSession` exposes any public API for observing per-session TLS secrets, which is
+    /// also why this method, and ``SSLKeyLogger`` itself, don't exist at all in a build without
+    /// NIO.
     ///
     /// ``Session/requiredExecutor(_:)``/``Session/preferredExecutor(_:)`` steer a session with a
     /// key logger configured away from both ``Session/Executor/nioTransportServices`` and
@@ -206,13 +218,19 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the timeout for shutting down the secure connection.
     ///
+    /// - Important: Unavailable in a build without NIO: NIOSSL is what shuts down, so there's
+    /// nothing for this to configure there.
+    ///
     /// - Parameter timeout: The timeout for shutting down the secure connection.
     /// - Returns: A modified `SecureConnection` with the shutdown timeout set.
     public func shutdownTimeout(_ timeout: UnitTime) -> Self {
-        edit { $0.secureConnection.shutdownTimeout = timeout.build() }
+        edit { $0.secureConnection.shutdownTimeout = timeout.nanoseconds }
     }
 
     /// Sets the renegotiation support for the secure connection.
+    ///
+    /// - Important: Unavailable in a build without NIO: TLS renegotiation is a NIOSSL-specific
+    /// concept with no Network.framework/URLSession equivalent.
     ///
     /// - Parameter renegotiationSupport: The renegotiation support setting.
     /// - Returns: A modified `SecureConnection` with the renegotiation support set.
@@ -221,6 +239,9 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the signing signature algorithms for the secure connection.
+    ///
+    /// - Important: Unavailable in a build without NIO: neither Network.framework nor
+    /// `URLSession` exposes a signing-signature-algorithm restriction API.
     ///
     /// - Parameter algorithm: The signature algorithms to use for signing.
     /// - Returns: A modified `SecureConnection` with the signing signature algorithms set.
@@ -234,6 +255,9 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the verify signature algorithms for the secure connection.
     ///
+    /// - Important: Unavailable in a build without NIO. See
+    /// ``signingSignatureAlgorithms(_:)``.
+    ///
     /// - Parameter algorithm: The signature algorithms to use for verification.
     /// - Returns: A modified `SecureConnection` with the verify signature algorithms set.
     public func verifySignatureAlgorithms(_ algorithm: SignatureAlgorithm...) -> Self {
@@ -243,6 +267,7 @@ public struct SecureConnection<Content: Property>: Property {
             }
         }
     }
+    #endif
 
     /// Sets the certificate verification setting for the secure connection.
     ///
@@ -277,13 +302,16 @@ public struct SecureConnection<Content: Property>: Property {
         edit { $0.secureConnection.trustDecisionObserver = observer }
     }
 
+    #if canImport(NIOCore)
     /// Sets the application protocols for the secure connection.
     ///
-    /// > Important: `URLSession` negotiates ALPN automatically and `Info.plist` has no key to
-    /// override it, so this is treated as incompatible with ``Session/Executor/urlSession``:
-    /// automatic executor resolution skips it in favor of a NIO-based executor, and pinning to
-    /// `.urlSession` via ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``.
-    /// See <doc:Configuring-App-Transport-Security-for-URLSession>.
+    /// - Important: Unavailable in a build without NIO: `URLSession` negotiates ALPN
+    /// automatically and `Info.plist` has no key to override it, so there is no executor left
+    /// this could ever take effect on. In a build where NIO is available, this is treated as
+    /// incompatible with ``Session/Executor/urlSession``: automatic executor resolution skips it
+    /// in favor of a NIO-based executor, and pinning to `.urlSession` via
+    /// ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``. See
+    /// <doc:Configuring-App-Transport-Security-for-URLSession>.
     ///
     /// - Parameter protocols: The application protocols to use.
     /// - Returns: A modified `SecureConnection` with the application protocols set.
@@ -293,6 +321,9 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Disables or enables sending the CA name list during handshake for the secure connection.
     ///
+    /// - Important: Unavailable in a build without NIO: this is a NIOSSL handshake detail with
+    /// no Network.framework/URLSession equivalent.
+    ///
     /// - Parameter isDisabled: A boolean value indicating whether to disable or enable sending the CA name list.
     /// - Returns: A modified `SecureConnection` with the CA name list setting set.
     public func sendCANameListDisabled(_ isDisabled: Bool) -> Self {
@@ -301,11 +332,12 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the cipher suites for the secure connection using string representations.
     ///
-    /// > Important: `URLSessionConfiguration` has no cipher suite list API, so this is treated as
-    /// incompatible with ``Session/Executor/urlSession``: automatic executor resolution skips it
-    /// in favor of a NIO-based executor, and pinning to `.urlSession` via
-    /// ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError`` instead of silently
-    /// dropping it.
+    /// - Important: Unavailable in a build without NIO: `URLSessionConfiguration` has no cipher
+    /// suite list API, so there is no executor left this could ever take effect on. In a build
+    /// where NIO is available, this is treated as incompatible with ``Session/Executor/urlSession``:
+    /// automatic executor resolution skips it in favor of a NIO-based executor, and pinning to
+    /// `.urlSession` via ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``
+    /// instead of silently dropping it.
     ///
     /// - Parameter suites: The cipher suites to use as string representations.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
@@ -318,11 +350,8 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the cipher suites for the secure connection using `TLSCipher` values.
     ///
-    /// > Important: `URLSessionConfiguration` has no cipher suite list API, so this is treated as
-    /// incompatible with ``Session/Executor/urlSession``: automatic executor resolution skips it
-    /// in favor of a NIO-based executor, and pinning to `.urlSession` via
-    /// ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError`` instead of silently
-    /// dropping it.
+    /// - Important: Unavailable in a build without NIO, for the same reason as the `String`-based
+    /// `cipherSuites(_:)` overload above.
     ///
     /// - Parameter suites: The cipher suites to use as `TLSCipher` values.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
@@ -333,6 +362,7 @@ public struct SecureConnection<Content: Property>: Property {
             }
         }
     }
+    #endif
 
     // MARK: - Internal methods
 

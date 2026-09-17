@@ -18,8 +18,6 @@
 
 #if canImport(Darwin)
 
-import NIOCore
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -29,8 +27,8 @@ import struct Foundation.URL
 
 extension Internals {
 
-    /// Materializes an upload body (`Internals.BodySequence`, or `RequestBody` itself from the
-    /// `RequestDL` module, both conform to `AsyncSequence<ByteBuffer>`) into whichever of
+    /// Materializes an upload body (`Internals.BodySequence`, or `RequestBody.bytesSequence` from
+    /// the `RequestDL` module, both conform to `AsyncSequence<Internals.Bytes>`) into whichever of
     /// `URLSession`'s two non-`InputStream` upload shapes fits, so `Internals.URLSessionClient`
     /// never has to stream through a custom `InputStream`. See this file's header comment for why
     /// that matters.
@@ -75,7 +73,7 @@ extension Internals {
         static func write<Body: AsyncSequence & Sendable>(
             body: Body,
             inMemoryThreshold: Int = Self.inMemoryThreshold
-        ) async throws -> Materialized where Body.Element == ByteBuffer {
+        ) async throws -> Materialized where Body.Element == Internals.Bytes {
             var iterator = body.makeAsyncIterator()
             var buffered = Data()
             var reachedEnd = false
@@ -85,7 +83,7 @@ extension Internals {
                     reachedEnd = true
                     break
                 }
-                buffered.append(contentsOf: chunk.readableBytesView)
+                chunk.append(to: &buffered)
             }
 
             guard !reachedEnd else {
@@ -99,7 +97,9 @@ extension Internals {
                 try await stream.writeData(buffered)
 
                 while let chunk = try await iterator.next() {
-                    try await stream.writeData(Data(chunk.readableBytesView))
+                    var chunkData = Data()
+                    chunk.append(to: &chunkData)
+                    try await stream.writeData(chunkData)
                 }
 
                 try await stream.close()

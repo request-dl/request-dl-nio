@@ -2,11 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOCore
 import NIOPosix
 
 #if canImport(Darwin)
 import NIOTransportServices
+#endif
 #endif
 
 extension Internals {
@@ -30,6 +32,7 @@ extension Internals {
             return id
         }
 
+        #if canImport(NIOCore)
         package func group(with options: SessionProviderOptions) -> EventLoopGroup {
             #if canImport(Darwin)
             if options.isCompatibleWithNetworkFramework {
@@ -38,6 +41,7 @@ extension Internals {
             #endif
             return MultiThreadedEventLoopGroup.shared
         }
+        #endif
     }
 }
 

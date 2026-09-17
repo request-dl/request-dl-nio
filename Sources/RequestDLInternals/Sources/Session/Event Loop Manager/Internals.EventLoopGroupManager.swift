@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Only used by Internals.ClientManager+NIO.swift, itself NIO-only.
+#if canImport(NIOCore)
+
 import NIOCore
 import SwiftAsyncStream
 
@@ -16,7 +19,7 @@ extension Internals {
         // MARK: - Private static properties
 
         /// Flags a `provider(_:with:)` that is still running after 15s. Development builds
-        /// only — see `AsyncLock.Watchdog`.
+        /// only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 15) {
             Internals.assertionFailure($0)
@@ -60,3 +63,5 @@ extension Internals {
         }
     }
 }
+
+#endif

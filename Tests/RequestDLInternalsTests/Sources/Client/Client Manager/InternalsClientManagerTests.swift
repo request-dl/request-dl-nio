@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncTesting
 import Testing
 
@@ -63,7 +62,7 @@ struct InternalsClientManagerTests {
     @Test
     func manager_expiringClients() async throws {
         // Given
-        let lifetime = TimeAmount.seconds(2) + .milliseconds(500)
+        let lifetime: Int64 = 2_500_000_000
         let manager = Internals.ClientManager(lifetime: lifetime)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
@@ -74,7 +73,7 @@ struct InternalsClientManagerTests {
             sessionConfiguration: sessionConfiguration
         )
 
-        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds) * 3)
+        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime) * 3)
 
         let sut2 = try await manager.client(
             provider: provider,
@@ -88,7 +87,7 @@ struct InternalsClientManagerTests {
     @Test
     func manager_whenCallingTaskIsCancelledBeforeItRuns_shouldThrowCancellationError() async throws {
         // Given
-        let manager = Internals.ClientManager(lifetime: .seconds(5 * 60))
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
 

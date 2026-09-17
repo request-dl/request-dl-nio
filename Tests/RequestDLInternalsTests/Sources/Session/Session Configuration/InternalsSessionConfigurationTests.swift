@@ -100,7 +100,8 @@ struct InternalsSessionConfigurationTests {
         // Given
         var configuration = Internals.Session.Configuration()
 
-        let connectionPool = HTTPClient.Configuration.ConnectionPool(idleTimeout: .seconds(16))
+        var connectionPool = Internals.ConnectionPool()
+        connectionPool.idleTimeout = 16_000_000_000
 
         // When
         configuration.connectionPool = connectionPool
@@ -108,7 +109,7 @@ struct InternalsSessionConfigurationTests {
         let builtConfiguration = try configuration.build().httpClientConfiguration
 
         // Then
-        #expect(builtConfiguration.connectionPool == connectionPool)
+        #expect(builtConfiguration.connectionPool == connectionPool.build())
     }
 
     @Test

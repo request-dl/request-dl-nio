@@ -2,10 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
-import NIOCore
 import RequestDLInternals
 import Tracing
+
+#if canImport(NIOCore)
+import AsyncHTTPClient
+import NIOCore
+#endif
 
 /// Configuration object used to define the parameters for an HTTP request.
 /// This structure holds details like the base URL, path components, query items,
@@ -59,7 +62,7 @@ public struct RequestConfiguration: Sendable {
     public internal(set) var cacheStrategy: CacheStrategy
 
     /// The `ServiceContext` to bind while this request executes. Defaults to `nil`, which leaves
-    /// whatever `ServiceContext.current` task-local is already ambient untouched — only set this
+    /// whatever `ServiceContext.current` task-local is already ambient untouched. Only set this
     /// to explicitly override it for this request, independent of the calling task's own state.
     public internal(set) var serviceContext: ServiceContext?
 
@@ -68,7 +71,7 @@ public struct RequestConfiguration: Sendable {
     /// Only a bodyless GET is cacheable.
     ///
     /// - Important: Must compare the method uppercased. It comes from the caller as a free
-    /// string — without normalizing, `.method("get")` disables caching outright while still
+    /// string: without normalizing, `.method("get")` disables caching outright while still
     /// behaving as a GET everywhere else. Same normalisation as the query-versus-body decision
     /// in `PayloadNode`.
     var isCacheEnabled: Bool {
@@ -79,17 +82,17 @@ public struct RequestConfiguration: Sendable {
     var readingMode: Internals.DownloadStep.ReadingMode
 
     /// `true` only when the `User-Agent` currently in ``headers`` is exactly RequestDL's own
-    /// untouched default (``UserAgentHeader/init()``) — no other `User-Agent` node has written
+    /// untouched default (``UserAgentHeader/init()``): no other `User-Agent` node has written
     /// to it since. Kept up to date by `markUserAgentWritten(isDefault:)` as `HeaderNode`s fold
     /// into this configuration.
     ///
     /// Lets `.urlSession` drop the header and defer to URLSession's own native
-    /// `CFNetwork`/`Darwin` report — see `dropDefaultUserAgentForNativeReporting()` — without
+    /// `CFNetwork`/`Darwin` report (see `dropDefaultUserAgentForNativeReporting()`) without
     /// ever touching a value the caller actually asked for.
     private(set) var hasDefaultUserAgent = false
 
-    /// Whether any `User-Agent` node has folded in yet. Once true, a second write — default or
-    /// not — means the header is no longer purely RequestDL's untouched default, so
+    /// Whether any `User-Agent` node has folded in yet. Once true, a second write (default or
+    /// not) means the header is no longer purely RequestDL's untouched default, so
     /// `hasDefaultUserAgent` latches to `false` for the rest of resolution.
     private var didWriteUserAgent = false
 
@@ -134,7 +137,7 @@ public struct RequestConfiguration: Sendable {
     /// accurate `AppName/version Darwin/version CFNetwork/version` header whenever a request
     /// carries none at all, and RequestDL's neutral default would otherwise suppress that native
     /// report. NIO and NIOTransportServices never synthesize a `User-Agent` of their own, so
-    /// dropping it there would just send the request with none — worse than RequestDL's
+    /// dropping it there would just send the request with none: worse than RequestDL's
     /// transport-agnostic default, not more honest. A no-op whenever the caller supplied their
     /// own value: only the untouched default is eligible.
     mutating func dropDefaultUserAgentForNativeReporting() {
@@ -146,6 +149,7 @@ public struct RequestConfiguration: Sendable {
         hasDefaultUserAgent = false
     }
 
+    #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``RequestBody/connect(writer:body:eventLoop:)``.
     func build(eventLoop: EventLoop) throws -> HTTPClient.Request {
@@ -156,6 +160,7 @@ public struct RequestConfiguration: Sendable {
             body: body?.build(eventLoop: eventLoop)
         )
     }
+    #endif
 }
 
 #if canImport(Darwin)
@@ -169,8 +174,16 @@ import Foundation
 extension RequestConfiguration {
 
     /// `URLSession` counterpart to `build(eventLoop:)`. It needs no `EventLoop`, since it drains
-    /// `RequestBody` through its `AsyncSequence` conformance rather than the
-    /// `EventLoopFuture`-driven streaming path `build(eventLoop:)` uses.
+    /// `RequestBody` through its internal `bytesSequence`, not its public, `Data`-yielding
+    /// `AsyncSequence` conformance, the `EventLoopFuture`-driven streaming path `build(eventLoop:)`
+    /// uses.
+    ///
+    /// `bytesSequence` plus ``Internals/Bytes/append(to:)``, not `for try await chunk in body`
+    /// plus `data.append(chunk)`. The public sequence would force every chunk through
+    /// `Internals.Bytes.asData()` first, materializing (and, for a `ByteBuffer`-backed chunk,
+    /// caching) a standalone `Data` only for `Data.append(contentsOf:)` to copy out of right
+    /// after, paying the copy twice for a body this method is about to fully drain anyway.
+    /// `append(to:)` copies each chunk into `data` directly, once.
     ///
     /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See
     /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart, which drains `body`
@@ -183,8 +196,8 @@ extension RequestConfiguration {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for try await buffer in body {
-                data.append(contentsOf: buffer.readableBytesView)
+            for try await chunk in body.bytesSequence {
+                chunk.append(to: &data)
             }
 
             request.httpBody = data
@@ -267,7 +280,7 @@ extension String {
     /// slash, and everything inside is left alone.
     ///
     /// - Important: Must not narrow this down to `.trimmingCharacters(in: .urlHostAllowed.inverted)`
-    /// approximated by hand as "alphanumerics and `-._~`" — that set is much narrower than
+    /// approximated by hand as "alphanumerics and `-._~`": that set is much narrower than
     /// `urlHostAllowed`, which also carries `[` and `]`, so a base URL with an IPv6 literal would
     /// get mangled: `http://[::1]` coming back as `http://[::1`. Naming what is actually being
     /// removed (whitespace and slashes) is both correct and impossible to get wrong the same way.

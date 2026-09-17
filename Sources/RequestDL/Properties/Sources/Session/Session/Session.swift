@@ -2,9 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 import Tracing
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 /// The Session object is used to set various properties related to the request context.
 ///
@@ -68,9 +71,15 @@ public struct Session: Property {
         provider = .identified(identifier, numberOfThreads: numberOfThreads)
     }
 
+    #if canImport(NIOCore)
+    /// Initializes a new Session object backed by a caller-supplied `EventLoopGroup`.
+    ///
+    /// Only meaningful for the `.nio`/`.nioTransportServices` executors: this initializer
+    /// doesn't exist at all in a build where NIO isn't available.
     public init(_ customLoopGroup: NIOCore.EventLoopGroup) {
         provider = .custom(customLoopGroup)
     }
+    #endif
 
     // MARK: - Public static methods
 
@@ -94,10 +103,9 @@ public struct Session: Property {
     /// Set whether the session should wait for connectivity before making a request.
     ///
     /// Checked once, right before the request is dispatched, against the device's current
-    /// network path — the same way `URLSession`'s own `waitsForConnectivity` only covers a
+    /// network path: the same way `URLSession`'s own `waitsForConnectivity` only covers a
     /// task's initial connection phase, never a network change mid-transfer. Effective across
-    /// every executor (previously this only had any effect when Network framework backed the
-    /// connection).
+    /// every executor.
     ///
     /// - Parameter flag: `true` to wait for connectivity or `false` to not wait for it.
     /// - Returns: The modified `Session` instance with the waiting for connectivity flag configured.
@@ -110,7 +118,7 @@ public struct Session: Property {
     /// Set whether the session may send requests over a cellular network path.
     ///
     /// Enforced with a pre-flight check against the device's current network path, mirroring
-    /// `URLSessionConfiguration.allowsCellularAccess` — see ``NetworkAvailabilityError``.
+    /// `URLSessionConfiguration.allowsCellularAccess`. See ``NetworkAvailabilityError``.
     ///
     /// - Parameter flag: `true` to allow cellular access, `false` to require a non-cellular path.
     /// - Returns: The modified `Session` instance with the cellular-access flag configured.
@@ -124,7 +132,7 @@ public struct Session: Property {
     /// personal hotspot or a metered connection).
     ///
     /// Enforced with a pre-flight check against the device's current network path, mirroring
-    /// `URLSessionConfiguration.allowsExpensiveNetworkAccess` — see ``NetworkAvailabilityError``.
+    /// `URLSessionConfiguration.allowsExpensiveNetworkAccess`. See ``NetworkAvailabilityError``.
     ///
     /// - Parameter flag: `true` to allow expensive access, `false` to require a non-expensive path.
     /// - Returns: The modified `Session` instance with the expensive-access flag configured.
@@ -138,7 +146,7 @@ public struct Session: Property {
     /// when the user has enabled Low Data Mode).
     ///
     /// Enforced with a pre-flight check against the device's current network path, mirroring
-    /// `URLSessionConfiguration.allowsConstrainedNetworkAccess` — see ``NetworkAvailabilityError``.
+    /// `URLSessionConfiguration.allowsConstrainedNetworkAccess`. See ``NetworkAvailabilityError``.
     ///
     /// - Parameter flag: `true` to allow constrained access, `false` to require an unconstrained path.
     /// - Returns: The modified `Session` instance with the constrained-access flag configured.
@@ -195,10 +203,10 @@ public struct Session: Property {
     /// This is a tiebreaker, not an override: it never forces an executor onto a configuration
     /// that can't actually run on it. For example, preferring ``Session/Executor/nioTransportServices``
     /// on a session that also sets `PSKIdentityResolver` (unsupported under Network.framework)
-    /// has no effect — that field already rules `.nioTransportServices` out on its own, so
+    /// has no effect: that field already rules `.nioTransportServices` out on its own, so
     /// resolution falls through to whatever is next in line. If you need a guarantee instead of a
-    /// hint — so an incompatible configuration fails loudly instead of silently landing somewhere
-    /// else — use ``requiredExecutor(_:)``.
+    /// hint (so an incompatible configuration fails loudly instead of silently landing somewhere
+    /// else), use ``requiredExecutor(_:)``.
     ///
     /// - Parameter executor: The executor to prefer when this session's configuration supports it.
     /// - Returns: The modified `Session` instance with the executor preference configured.
@@ -212,8 +220,8 @@ public struct Session: Property {
     /// when the rest of its configuration can't actually run on it.
     ///
     /// Unlike ``preferredExecutor(_:)``, this is a guarantee: if any configured field is
-    /// unsupported under `executor` — a client certificate under `.nioTransportServices`, a
-    /// bearer-token proxy authorization under `.urlSession`, and so on — the request throws
+    /// unsupported under `executor` (a client certificate under `.nioTransportServices`, a
+    /// bearer-token proxy authorization under `.urlSession`, and so on), the request throws
     /// ``ExecutorRequirementError``
     /// instead of quietly running on a different executor than the one you pinned. Useful for
     /// debugging, benchmarking a specific transport, or a deployment target where only one
@@ -224,7 +232,7 @@ public struct Session: Property {
     /// ``ExecutorRequirementError`` can't check ahead of time: building that certificate into a
     /// `URLSession`-presentable identity is a Keychain round-trip that needs the Keychain Sharing
     /// capability, a one-time Xcode project setting. A request missing it throws
-    /// ``ClientIdentityError`` instead — see <doc:Using-a-Client-Certificate-with-URLSession>
+    /// ``ClientIdentityError`` instead. See <doc:Using-a-Client-Certificate-with-URLSession>
     /// for the full walkthrough. This also applies without pinning anything, since `.urlSession`
     /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
     /// the configuration supports it.
@@ -384,7 +392,7 @@ public struct Session: Property {
     /// Sets the tracer used to record distributed tracing spans for requests made through this
     /// session.
     ///
-    /// When not set, no tracing is performed — the session uses a no-op tracer, regardless of
+    /// When not set, no tracing is performed: the session uses a no-op tracer, regardless of
     /// whether some other part of the process has globally bootstrapped one via
     /// `InstrumentationSystem.bootstrap(_:)`. Tracing is opt-in per session, not ambient.
     ///

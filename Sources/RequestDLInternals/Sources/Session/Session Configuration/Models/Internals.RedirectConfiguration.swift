@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import AsyncHTTPClient
+#endif
 
 extension Internals {
 
@@ -20,6 +22,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() -> HTTPClient.Configuration.RedirectConfiguration {
             switch self {
             case .disallow:
@@ -30,6 +33,7 @@ extension Internals {
                 return .strategy(Internals.NIORedirectStrategyAdapter(strategy: strategy))
             }
         }
+        #endif
     }
 }
 

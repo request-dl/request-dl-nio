@@ -94,7 +94,7 @@ struct InternalsProxyTests {
         let host = UUID().uuidString
         let port = 1_090
 
-        var connectHeaders = HTTPHeaders()
+        var connectHeaders = Internals.HTTPHeaders()
         connectHeaders.add(name: "X-Proxy-Token", value: "first")
         connectHeaders.add(name: "X-Proxy-Token", value: "second")
 
@@ -119,7 +119,7 @@ struct InternalsProxyTests {
         let host = UUID().uuidString
         let port = 1_090
 
-        var connectHeaders = HTTPHeaders()
+        var connectHeaders = Internals.HTTPHeaders()
         connectHeaders.add(name: "X-Proxy-Token", value: "abc123")
 
         // When

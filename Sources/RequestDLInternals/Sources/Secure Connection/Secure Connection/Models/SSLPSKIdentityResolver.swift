@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// This protocol's own signature needs NIOSSL (`PSKClientContext`/`PSKClientIdentityResponse`),
+// same reasoning as `SSLKeyLogger`'s own gate.
+#if canImport(NIOCore)
+
 import NIOSSL
 
 /// A protocol for resolving pre-shared key client identities.
@@ -21,3 +25,5 @@ public protocol SSLPSKIdentityResolver: Sendable, AnyObject {
     ///
     func callAsFunction(_ context: PSKClientContext) throws -> PSKClientIdentityResponse
 }
+
+#endif

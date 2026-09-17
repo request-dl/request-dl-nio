@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -103,17 +101,17 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                 for try await chunk in source {
                     var chunk = chunk
                     let data = await chunk.readData(chunk.readableBytes) ?? Data()
-                    let decoded = try stream(decompressing: ByteBuffer(bytes: Array(data)))
+                    let decoded = try stream(decompressing: data)
 
-                    if decoded.readableBytes > 0 {
-                        output.append(.success(await Internals.DataBuffer(Data(decoded.readableBytesView))))
+                    if !decoded.isEmpty {
+                        output.append(.success(await Internals.DataBuffer(decoded)))
                     }
                 }
 
                 let tail = try stream.finish()
 
-                if tail.readableBytes > 0 {
-                    output.append(.success(await Internals.DataBuffer(Data(tail.readableBytesView))))
+                if !tail.isEmpty {
+                    output.append(.success(await Internals.DataBuffer(tail)))
                 }
 
                 output.close()

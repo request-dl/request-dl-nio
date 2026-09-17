@@ -2,12 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.URL
+#endif
+
+#if canImport(NIOCore)
+import NIOCore
 #endif
 
 extension Internals {
@@ -25,7 +27,7 @@ extension Internals {
 
             // MARK: - Private properties
 
-            private var bytes: NIOCore.ByteBuffer
+            private var bytes: Internals.Bytes
 
             // MARK: - Inits
 
@@ -38,8 +40,15 @@ extension Internals {
                 self.totalSize = totalSize
                 self.buffers = buffers
                 // Allocated once at full size and then rewound, so the capacity is reused for
-                // every chunk instead of growing again per iteration.
+                // every chunk instead of growing again per iteration. `ByteBuffer`-backed when
+                // NIOCore is available, so every chunk this iterator emits stays on the
+                // zero-copy path through `asByteBuffer()` instead of paying a conversion on the
+                // NIO writer side.
+                #if canImport(NIOCore)
+                self.bytes = Internals.Bytes(NIOCore.ByteBuffer(repeating: .zero, count: chunkSize))
+                #else
                 self.bytes = .init(repeating: .zero, count: chunkSize)
+                #endif
                 bytes.moveReaderIndex(to: .zero)
                 bytes.moveWriterIndex(to: .zero)
             }
@@ -51,7 +60,7 @@ extension Internals {
             /// Iterative on purpose. Recursing once per source buffer meant the stack depth
             /// tracked the number of buffers feeding a single chunk, which a body assembled
             /// from many small parts turns into an overflow.
-            package mutating func next() async -> NIOCore.ByteBuffer? {
+            package mutating func next() async -> Internals.Bytes? {
                 guard chunkSize > .zero else {
                     return nil
                 }
@@ -103,7 +112,9 @@ extension Internals {
                     return nil
                 }
 
-                let chunk = ByteBuffer(buffer: bytes)
+                // Value semantics, not a copy constructor: `bytes` is a struct, so this is
+                // already an independent snapshot before it gets rewound below.
+                let chunk = bytes
 
                 bytes.moveReaderIndex(to: .zero)
                 bytes.moveWriterIndex(to: .zero)

@@ -8,7 +8,6 @@
 
 #if canImport(Darwin)
 
-import NIOCore
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -181,11 +180,11 @@ extension Internals {
         }
 
         /// Executes `request` with a body drained from `body` rather than buffered into `Data` up
-        /// front. Materializes `body` (any `AsyncSequence` of `ByteBuffer`; in practice
-        /// `Internals.BodySequence`, or `RequestBody` itself from the `RequestDL` module, both of
-        /// which conform) via `Internals.URLSessionUploadFile`, then uploads from whichever shape
-        /// that produced: `uploadTask(with:from:)` for a body small enough to just hold in
-        /// memory, `uploadTask(with:fromFile:)` for one that spilled to disk.
+        /// front. Materializes `body` (any `AsyncSequence` of `Internals.Bytes`; in practice
+        /// `Internals.BodySequence`, or `RequestBody.bytesSequence` from the `RequestDL` module,
+        /// both of which conform) via `Internals.URLSessionUploadFile`, then uploads from
+        /// whichever shape that produced: `uploadTask(with:from:)` for a body small enough to
+        /// just hold in memory, `uploadTask(with:fromFile:)` for one that spilled to disk.
         ///
         /// Deliberately does not drive `uploadTask(withStreamedRequest:)` + `needNewBodyStream`
         /// via a custom `InputStream`: that path has a confirmed CFNetwork bug where no custom
@@ -211,7 +210,7 @@ extension Internals {
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil,
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil
-        ) async throws -> (head: Internals.ResponseHead, body: Data) where Body.Element == ByteBuffer {
+        ) async throws -> (head: Internals.ResponseHead, body: Data) where Body.Element == Internals.Bytes {
             let release = await throttledExecutor.acquire()
             defer { release() }
 
@@ -384,7 +383,7 @@ extension Internals {
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil
-        ) async throws -> SessionTask where Body.Element == ByteBuffer {
+        ) async throws -> SessionTask where Body.Element == Internals.Bytes {
             try await executeSessionTask(
                 request: request,
                 readingMode: readingMode,
@@ -944,7 +943,8 @@ extension Internals.URLSessionClient {
             // NIO delegate callback as the original motivating case; this is the same shape of
             // problem one layer up, for `URLSessionDataDelegate` instead of
             // `HTTPClientResponseDelegate`).
-            let byteURL = Internals.ByteURL(ByteBuffer(bytes: data))
+            let byteURL = Internals.ByteURL()
+            byteURL.replace(with: data)
             downloadBuffer.append(Internals.DataBuffer(byteURL))
         }
 

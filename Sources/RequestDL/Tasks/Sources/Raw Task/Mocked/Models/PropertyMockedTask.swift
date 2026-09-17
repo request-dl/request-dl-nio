@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
 struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
@@ -46,13 +45,23 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             logger: logger
         )
 
-        let client: Internals.Client
+        // Same dispatch `RawTask.resolveClient(resolved:)` does: `resolvedClient()` is the
+        // executor-aware entry point, so a mock resolves through whichever backend the session
+        // actually picked rather than always the NIO one. `Internals.CacheControl` only needs
+        // the shared `RequestExecutingClient` existential either way.
+        let client: any RequestExecutingClient
 
         do {
-            client = try await Internals.ClientManager.shared.client(
-                provider: resolved.session.provider,
-                sessionConfiguration: resolved.session.configuration
-            )
+            switch try await resolved.session.resolvedClient() {
+            #if canImport(NIOCore)
+            case .nio(let nioClient):
+                client = nioClient
+            #endif
+            #if canImport(Darwin)
+            case .urlSession(let urlSessionClient):
+                client = urlSessionClient
+            #endif
+            }
         } catch let error as Internals.SecureFileLoadError {
             throw SecureFileError(error)
         }
@@ -82,13 +91,6 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
         logger: Internals.TaskLogger?
     ) async throws -> Internals.AsyncResponse {
-        let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(
-            resolved.session.provider,
-            with: SessionProviderOptions(
-                isCompatibleWithNetworkFramework: false
-            )
-        )
-
         let downloadBuffer = await Internals.DownloadBuffer(
             readingMode: resolved.requestConfiguration.readingMode
         )
@@ -101,7 +103,6 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
         if let body = resolved.requestConfiguration.body {
             mockBodyResponse(
-                group: eventLoopGroup,
                 buffer: downloadBuffer,
                 body: body
             )
@@ -119,49 +120,57 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         )
     }
 
+    /// Drives `body` into `buffer`, executor-agnostically: `RequestBody`'s internal
+    /// `bytesSequence` already yields `Internals.Bytes` chunks portably (no
+    /// `EventLoopGroup`/`HTTPClient.Body` needed the way an older revision of this method
+    /// required), so there's nothing NIO-specific left to bridge here for either executor.
+    /// `bytesSequence`, not the public, `Data`-yielding `AsyncSequence` conformance: the public
+    /// one forces every chunk through `Internals.Bytes.asData()` before handing it back, a
+    /// conversion `Internals.ByteURL.replace(with:)`'s own `Internals.Bytes` overload has no use
+    /// for and would otherwise pay for nothing, exactly the round trip `RequestBody
+    /// .connect(writer:body:eventLoop:)` already avoids the same way on the `.nio` side.
+    ///
+    /// - Important: One sequential `for try await` loop inside a single `Task`, not chunks
+    /// dispatched independently. `buffer.append` has to see chunks in order, and awaiting each
+    /// one before appending it, in the same task, is what guarantees that. It is the same requirement
+    /// `Internals.ClientResponseReceiver.didReceiveBodyPart`'s own synchronous-append discipline
+    /// exists for, just satisfied here by sequencing instead of by staying off a detached task.
     private func mockBodyResponse(
-        group eventLoopGroup: EventLoopGroup,
         buffer: Internals.DownloadBuffer,
         body: RequestBody
     ) {
-        let eventLoop = eventLoopGroup.next()
-        let body = body.build(eventLoop: eventLoop)
-
-        eventLoop.execute {
-            body.stream(
-                .init {
-                    if case .byteBuffer(let byteBuffer) = $0 {
-                        // Synchronous, like the real receiver in
-                        // `Internals.ClientResponseReceiver.didReceiveBodyPart`. The store is
-                        // already in memory, so nothing here suspends, and appending has to
-                        // stay ordered: the download queue preserves submission order and
-                        // submission is synchronous.
-                        buffer.append(
-                            Internals.DataBuffer(
-                                Internals.ByteURL(byteBuffer)
-                            )
-                        )
-                    }
-
-                    return eventLoop.makeSucceededVoidFuture()
+        _Concurrency.Task {
+            do {
+                for try await chunk in body.bytesSequence {
+                    let byteURL = Internals.ByteURL()
+                    byteURL.replace(with: chunk)
+                    // Routed through `makeMockedDataBuffer`, not called inline. Swift's
+                    // async-overload resolution commits to `Internals.DataBuffer(_ url:) async`
+                    // for any call made from an `async` context, whether or not it awaits. Only
+                    // a genuinely non-`async` context leaves that overload out of the running and
+                    // falls back to the synchronous one `Internals.ClientResponseReceiver
+                    // .didReceiveBodyPart` already relies on, which for a `ByteURL` has nothing
+                    // to suspend for in the first place (see that init's own doc comment).
+                    // `makeMockedDataBuffer` is that non-`async` context.
+                    buffer.append(makeMockedDataBuffer(byteURL))
                 }
-            ).whenComplete { result in
-                // A failed stream is reported, not swallowed. `whenComplete { _ in }` closed the
-                // download as though it had ended normally, so a mock configured to fail
-                // mid-body looked to the caller like a short but successful response, which is
-                // the one thing a mock of a failure has to get right.
-                if case .failure(let error) = result {
-                    buffer.failed(error)
-                }
-
-                buffer.close()
+            } catch {
+                buffer.failed(error)
             }
+
+            buffer.close()
         }
     }
 
+    /// Calls `Internals.DataBuffer`'s synchronous, suspension-free `init(_ url:)` overload. See
+    /// ``mockBodyResponse(buffer:body:)``'s own comment for why this can't just be inlined there.
+    private func makeMockedDataBuffer(_ byteURL: Internals.ByteURL) -> Internals.DataBuffer {
+        Internals.DataBuffer(byteURL)
+    }
+
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {
-        // Mirrors every header the resolved request would carry — `Headers`, `AcceptHeader`,
-        // `Authorization`, `Payload`'s `Content-Type`/`Content-Length`, and so on — so the mocked
+        // Mirrors every header the resolved request would carry, `Headers`, `AcceptHeader`,
+        // `Authorization`, `Payload`'s `Content-Type`/`Content-Length`, and so on, so the mocked
         // response doubles as a way to inspect exactly what the request would have looked like.
         // `headers` overlays on top, for anything that isn't part of the request itself.
         var responseHeaders = resolved.requestConfiguration.headers

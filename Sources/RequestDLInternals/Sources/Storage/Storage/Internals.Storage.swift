@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -50,7 +49,7 @@ extension Internals {
 
         // MARK: - Internal static properties
 
-        package static let lifetime = TimeAmount.seconds(5 * 60)
+        package static let lifetime: Int64 = 5 * 60 * 1_000_000_000
 
         /// A ceiling, not a working limit.
         ///
@@ -71,7 +70,7 @@ extension Internals {
         // MARK: - Private properties
 
         private let lock = Lock()
-        private let lifetime: TimeAmount
+        private let lifetime: Int64
         private let maximumCount: Int
 
         // MARK: - Unsafe properties
@@ -80,7 +79,7 @@ extension Internals {
 
         // MARK: - Inits
 
-        package init(lifetime: TimeAmount, maximumCount: Int = Storage.maximumCount) {
+        package init(lifetime: Int64, maximumCount: Int = Storage.maximumCount) {
             precondition(maximumCount >= 1, "Storage needs room for at least one entry")
 
             self.lifetime = lifetime
@@ -109,9 +108,9 @@ extension Internals {
 
                 let isValid = {
                     #if canImport(Darwin)
-                    DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime.nanoseconds
+                    DispatchTime.now().uptimeNanoseconds - register.readAt <= lifetime
                     #else
-                    register.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
+                    register.readAt.duration(to: .now) <= .nanoseconds(lifetime)
                     #endif
                 }()
                 // Age checked here, not only in the sweep. The sweep runs every `lifetime` and
@@ -177,7 +176,7 @@ extension Internals {
             _Concurrency.Task.detached(priority: .utility) { [weak self, lifetime] in
                 while true {
                     do {
-                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime.nanoseconds))
+                        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime))
                     } catch {
                         // Sleeping fails on cancellation and nothing else. Yielding and looping
                         // meant the next sleep failed immediately too, turning this into a
@@ -206,9 +205,9 @@ extension Internals {
 
                 _table = _table.filter {
                     #if canImport(Darwin)
-                    now - $1.readAt <= lifetime.nanoseconds
+                    now - $1.readAt <= lifetime
                     #else
-                    $1.readAt.duration(to: .now) <= .nanoseconds(lifetime.nanoseconds)
+                    $1.readAt.duration(to: .now) <= .nanoseconds(lifetime)
                     #endif
                 }
 

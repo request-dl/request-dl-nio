@@ -80,7 +80,7 @@ struct InternalsSessionConfigurationExecutorTests {
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
 
-        var connectHeaders = HTTPHeaders()
+        var connectHeaders = Internals.HTTPHeaders()
         connectHeaders.add(name: "X-Proxy-Token", value: "abc123")
 
         // When

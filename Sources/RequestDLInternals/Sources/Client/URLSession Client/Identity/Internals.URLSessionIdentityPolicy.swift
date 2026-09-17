@@ -8,7 +8,6 @@
 
 #if canImport(Darwin)
 
-import NIOSSL
 import Security
 
 #if canImport(FoundationEssentials)

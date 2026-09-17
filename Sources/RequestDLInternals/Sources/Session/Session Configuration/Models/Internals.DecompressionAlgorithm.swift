@@ -2,7 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 extension Internals {
 
@@ -53,12 +57,12 @@ extension Internals {
         func callAsFunction() throws -> any Internals.DecompressorStream
     }
 
-    /// Internals-layer counterpart to `RequestDL.DecompressorStream`, operating on `ByteBuffer`
-    /// instead of `[UInt8]`; the boundary conversion lives in the adapter that wraps a public
+    /// Internals-layer counterpart to `RequestDL.DecompressorStream`, operating on `Data` instead
+    /// of `[UInt8]`; the boundary conversion lives in the adapter that wraps a public
     /// `Decompressor`/`DecompressorStream` into these.
     package protocol DecompressorStream {
-        mutating func callAsFunction(decompressing bytes: ByteBuffer) throws -> ByteBuffer
-        mutating func finish() throws -> ByteBuffer
+        mutating func callAsFunction(decompressing bytes: Data) throws -> Data
+        mutating func finish() throws -> Data
     }
 }
 

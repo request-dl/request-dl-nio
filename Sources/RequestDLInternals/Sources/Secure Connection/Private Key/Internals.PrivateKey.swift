@@ -2,7 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIOSSL
+#endif
 
 extension Internals {
 
@@ -17,7 +19,7 @@ extension Internals {
 
         package let source: Source
         package let format: Internals.Certificate.Format
-        package let password: NIOSSLSecureBytes?
+        package let password: SecureBytes?
 
         // MARK: - Inits
 
@@ -33,13 +35,13 @@ extension Internals {
             self.password = nil
         }
 
-        package init(_ file: String, format: Internals.Certificate.Format, password: NIOSSLSecureBytes) {
+        package init(_ file: String, format: Internals.Certificate.Format, password: SecureBytes) {
             self.source = .file(file)
             self.format = format
             self.password = password
         }
 
-        package init(_ bytes: [UInt8], format: Internals.Certificate.Format, password: NIOSSLSecureBytes) {
+        package init(_ bytes: [UInt8], format: Internals.Certificate.Format, password: SecureBytes) {
             self.source = .bytes(bytes)
             self.format = format
             self.password = password
@@ -47,6 +49,7 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        #if canImport(NIOCore)
         package func build() throws -> NIOSSLPrivateKey {
             let format = format.build()
 
@@ -73,5 +76,6 @@ extension Internals {
                 }
             }
         }
+        #endif
     }
 }

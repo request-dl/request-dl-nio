@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Entirely NIO-only: this is the AsyncHTTPClient-backed client for the .nio/.nioTransportServices
+// executors. .urlSession has its own separate implementation, Internals.URLSessionClient, which
+// imports none of this.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import Logging
 import NIOCore
@@ -30,9 +35,9 @@ extension Internals {
 
         // MARK: - Private static properties
 
-        /// Flags a `shutdown()` that is still running after 20s — draining real, in-flight
+        /// Flags a `shutdown()` that is still running after 20s: draining real, in-flight
         /// connections can legitimately take a few seconds under load, longer than the other
-        /// `AsyncLock`s in `Internals`. Development builds only — see `AsyncLock.Watchdog`.
+        /// `AsyncLock`s in `Internals`. Development builds only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 20) {
             Internals.assertionFailure($0)
@@ -298,10 +303,12 @@ extension Internals.Client {
     /// Gated behind `@_spi(Testing)` on top of `package` so this reads as a deliberate escape
     /// hatch and not something ordinary package code reaches for by accident. Exposed so a test
     /// can wait for an exact ``AsyncSemaphore/waitingCount`` instead of sleeping a fixed duration
-    /// and hoping the right number of requests reached the semaphore by then — sleep-based
+    /// and hoping the right number of requests reached the semaphore by then: sleep-based
     /// synchronization races under CI scheduler contention the same way `AsyncLock.Watchdog`
     /// false positives do.
     public var connectionSemaphoreForTesting: AsyncSemaphore? {
         throttledExecutor.semaphoreForTesting
     }
 }
+
+#endif

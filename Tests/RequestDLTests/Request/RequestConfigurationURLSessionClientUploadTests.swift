@@ -116,7 +116,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
         let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
         let result = try await client.execute(
             request: request,
-            streaming: body,
+            streaming: body.bytesSequence,
             delegate: AcceptAnyServerTrustDelegate()
         )
 
@@ -183,7 +183,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
         let client = try Internals.URLSessionClient(configuration: Self.shortTimeoutConfiguration)
         let result = try await client.execute(
             request: request,
-            streaming: body,
+            streaming: body.bytesSequence,
             delegate: AcceptAnyServerTrustDelegate(),
             existingUploadFile: body.wholeFileURL
         )
@@ -245,7 +245,7 @@ struct RequestConfigurationURLSessionClientUploadTests {
 
         _ = try await client.execute(
             request: request,
-            streaming: body,
+            streaming: body.bytesSequence,
             delegate: AcceptAnyServerTrustDelegate(),
             onUploadProgress: { bytesSent, totalBytesExpectedToSend in
                 progress.record(bytesSent: bytesSent, total: totalBytesExpectedToSend)

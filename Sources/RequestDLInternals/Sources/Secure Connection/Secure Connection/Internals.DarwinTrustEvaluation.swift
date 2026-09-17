@@ -15,8 +15,14 @@
 
 #if canImport(Darwin)
 
-import NIOSSL
 import Security
+
+#if canImport(NIOCore)
+import NIOSSL
+#else
+import SwiftASN1
+import X509
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -150,15 +156,19 @@ extension Internals {
         // MARK: - Private methods
 
         /// Every certificate's SPKI (SubjectPublicKeyInfo) structure in `trust`'s chain,
-        /// DER-encoded: what a pin's digest is computed over. Reuses NIOSSL's own
-        /// `NIOSSLPublicKey.toSPKIBytes()` on each certificate's DER bytes rather than
-        /// reconstructing the SPKI ASN.1 wrapper from a bare `SecKey` export by hand, so a pin
-        /// configured once produces the identical digest regardless of which executor
-        /// (`.urlSession`, `.nio`, `.nioTransportServices`) ends up carrying the connection.
+        /// DER-encoded: what a pin's digest is computed over. That way a pin configured once
+        /// produces the identical digest regardless of which executor (`.urlSession`, `.nio`,
+        /// `.nioTransportServices`) ends up carrying the connection: this is shared by both
+        /// `.urlSession` (`ServerTrustPolicy`) and `.nio`/`.nioTransportServices`
+        /// (`NIOTrustEvaluator+Darwin`).
         ///
-        /// Certificates that don't round-trip through NIOSSL are dropped rather than failing the
-        /// whole chain; that isn't expected in practice for a trust `SecTrustEvaluate...` already
-        /// accepted moments earlier.
+        /// Certificates that don't parse are dropped from the pin-matching candidates rather than
+        /// failing the whole chain outright: `evaluate(chain:chainIsTrusted:)` still folds their
+        /// absence into an ordinary pin mismatch, which `isStrict` already rejects. But that isn't
+        /// expected in practice for a trust `SecTrustEvaluate...` already accepted moments
+        /// earlier, so it is `Internals.assertionFailure`-reported, not silently swallowed:
+        /// without this, a parser bug and a real pin mismatch are indistinguishable to whoever is
+        /// debugging a rejected connection.
         private static func chainSPKIDERBytes(of trust: SecTrust) -> [Data] {
             guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate] else {
                 return []
@@ -166,7 +176,52 @@ extension Internals {
 
             return chain.compactMap { certificate in
                 let derBytes = [UInt8](SecCertificateCopyData(certificate) as Data)
-                return (try? NIOSSLCertificate(bytes: derBytes, format: .der))?.spkiDERBytes()
+
+                #if canImport(NIOCore)
+                // BoringSSL, via NIOSSL: the same parser every TLS handshake in this package
+                // already trusts, and more tolerant of oddly-but-validly-encoded real-world
+                // certificates than `swift-certificates`'s own ASN.1 parser below.
+                guard
+                    let nioSSLCertificate = try? NIOSSLCertificate(bytes: derBytes, format: .der),
+                    let spkiDERBytes = nioSSLCertificate.spkiDERBytes()
+                else {
+                    Internals.assertionFailure(
+                        "NIOSSLCertificate(bytes:format:)/spkiDERBytes() failed for a certificate "
+                            + "SecTrust already accepted; its SPKI is missing from this chain's pin "
+                            + "candidates, which can surface as a spurious pin mismatch"
+                    )
+                    return nil
+                }
+
+                return spkiDERBytes
+                #else
+                // No NIOSSL in this build: falls back to `swift-certificates`'s own ASN.1 parser,
+                // re-serializing just the parsed certificate's `publicKey`, rather than
+                // reconstructing the SPKI ASN.1 wrapper from a bare `SecKey` export by hand.
+                // `X509`/`SwiftASN1` are portable (no NIOCore in their own dependency graph,
+                // confirmed by reading `swift-certificates`'s own `Package.swift` rather than
+                // assumed).
+                guard let parsed = try? X509.Certificate(derEncoded: derBytes) else {
+                    Internals.assertionFailure(
+                        "X509.Certificate(derEncoded:) failed to parse a certificate SecTrust "
+                            + "already accepted; its SPKI is missing from this chain's pin candidates, "
+                            + "which can surface as a spurious pin mismatch"
+                    )
+                    return nil
+                }
+
+                var serializer = DER.Serializer()
+                guard (try? parsed.publicKey.serialize(into: &serializer)) != nil else {
+                    Internals.assertionFailure(
+                        "X509.PublicKey.serialize(into:) failed for a certificate SecTrust already "
+                            + "accepted; its SPKI is missing from this chain's pin candidates, which can "
+                            + "surface as a spurious pin mismatch"
+                    )
+                    return nil
+                }
+
+                return Data(serializer.serializedBytes)
+                #endif
             }
         }
     }
