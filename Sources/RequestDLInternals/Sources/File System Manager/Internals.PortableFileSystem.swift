@@ -95,6 +95,16 @@ extension Internals {
 
             fileprivate let fileHandle: FileHandle
 
+            /// - Note: Loops over `FileHandle.read(upToCount:)` internally, inside the single
+            /// `Internals.FileSystemManager.run` dispatch, until either `requested` bytes have
+            /// been read or a read comes back empty (EOF). `read(upToCount:)` is free to return
+            /// fewer bytes than asked without that meaning EOF, and `Internals.FileStreamBuffer
+            /// .readData(length:)`'s own short-read loop calls back in here for whatever is
+            /// still missing — leaving that loop to drive every retry would pay a fresh
+            /// continuation + `DispatchQueue.global` hop per short read instead of one for the
+            /// whole logical read. Matches ``WriteHandle/write(contentsOf:toAbsoluteOffset:)``'s
+            /// own already-loops-internally behavior on the write side (there, courtesy of
+            /// `FileHandle.write(contentsOf:)` itself).
             package func readChunk(
                 fromAbsoluteOffset offset: Int64,
                 length: ReadLength
@@ -107,7 +117,20 @@ extension Internals {
 
                 return try await Internals.FileSystemManager.run {
                     try fileHandle.seek(toOffset: UInt64(offset))
-                    let data = try fileHandle.read(upToCount: Int(requested)) ?? Data()
+
+                    var data = Data()
+
+                    while data.count < requested {
+                        guard
+                            let next = try fileHandle.read(upToCount: Int(requested) - data.count),
+                            !next.isEmpty
+                        else {
+                            break
+                        }
+
+                        data.append(next)
+                    }
+
                     return Chunk(data)
                 }
             }
