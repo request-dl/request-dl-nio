@@ -16,6 +16,7 @@ import Security
 /// Covers `.strategy` mode over `.urlSession`, plus the cross-origin header stripping shared by
 /// both `.follow` and `.strategy`; see the doc comment on `TaskDelegate.urlSession(_:task:
 /// willPerformHTTPRedirection:newRequest:completionHandler:)`.
+@Suite(.knownLocalServerIdentityIssue)
 struct InternalsURLSessionClientRedirectStrategyTests {
 
     @Test

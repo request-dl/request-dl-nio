@@ -18,6 +18,7 @@ import struct Foundation.UUID
 /// to prove that `CURLTask` actually delegates to `CURLCommandParser`: a parsing failure has to
 /// surface as `CURLParsingError` before any network I/O is attempted, which needs no
 /// `LocalServer`.
+@Suite(.knownLocalServerIdentityIssue)
 struct CURLTaskTests {
 
     @Test

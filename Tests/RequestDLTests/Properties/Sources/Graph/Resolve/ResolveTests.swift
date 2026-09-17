@@ -232,7 +232,7 @@ extension ResolveTests {
     }
 
     static var secureConnectionOutput: String {
-        """
+        let output = """
         Resolve {
             ChildrenNode {
                 LeafNode<Node> {
@@ -397,5 +397,23 @@ extension ResolveTests {
             }
         }
         """
+
+        #if canImport(NIOCore)
+        return output
+        #else
+        // `SecureConnection`'s `pskHint`/`keyLogger`/`pskIdentityResolver` (PSK and SSLKeyLogger
+        // support generally) only exist `#if canImport(NIOCore)`, so `Resolve`'s debug dump of a
+        // `SecureConnectionNode` has nothing to print for them under `NIOTransport`-off.
+        // Filtering them out of the literal above at runtime keeps one string as the source of
+        // truth for both builds, instead of two copies to keep in sync by hand.
+        return output
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { line in
+                !line.contains("pskHint = nil,")
+                    && !line.contains("keyLogger = nil,")
+                    && !line.contains("pskIdentityResolver = nil,")
+            }
+            .joined(separator: "\n")
+        #endif
     }
 }

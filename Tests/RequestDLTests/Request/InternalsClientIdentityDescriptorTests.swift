@@ -16,6 +16,7 @@ import Security
 /// Covers `Internals.ClientIdentityDescriptor`: what `BackgroundDownloadTask` persists for a
 /// client certificate (mTLS), and rebuilds fresh from disk on every challenge, live or after a
 /// relaunch alike.
+@Suite(.knownLocalServerIdentityIssue)
 struct InternalsClientIdentityDescriptorTests {
 
     // MARK: - resolve(from:)

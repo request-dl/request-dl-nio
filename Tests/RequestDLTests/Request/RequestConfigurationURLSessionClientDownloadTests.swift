@@ -35,6 +35,7 @@ import Security
 /// its *input* happened to be fragmented, so it should hold across executors, not just on NIO;
 /// these tests are what confirm that design assumption rather than just asserting the loosest
 /// possible bar.
+@Suite(.knownLocalServerIdentityIssue)
 struct RequestConfigurationURLSessionClientDownloadTests {
 
     @Test

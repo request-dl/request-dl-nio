@@ -71,7 +71,7 @@ import Security
 /// in the same job (this suite adding to the unthrottled concurrent load) can trip a watchdog
 /// fatally and crash the whole test process mid-run, taking every other in-flight test down with
 /// it, rather than surfacing as this suite's own (real, informative) timeout.
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog, .knownLocalServerIdentityIssue)
 struct RequestConfigurationURLSessionClientUploadTests {
 
     private static var shortTimeoutConfiguration: URLSessionConfiguration {

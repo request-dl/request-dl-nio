@@ -16,6 +16,7 @@ import Security
 /// exercises `Internals.URLSessionClient` directly, with a hand-built `URLRequest` rather than
 /// one produced through `RequestConfiguration.buildURLRequest()` (a `RequestDL`-module type this
 /// target does not depend on).
+@Suite(.knownLocalServerIdentityIssue)
 struct InternalsURLSessionClientTests {
 
     @Test

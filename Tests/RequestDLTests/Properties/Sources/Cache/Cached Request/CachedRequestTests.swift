@@ -21,7 +21,7 @@ import struct Foundation.Date
 import class Foundation.JSONEncoder
 #endif
 
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog, .knownLocalServerIdentityIssue)
 struct CachedRequestTests {
 
     final class TestState: Sendable {

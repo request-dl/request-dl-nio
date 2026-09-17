@@ -32,6 +32,7 @@ private struct URLAndMethodDescriptor: TaskDescriptor {
     }
 }
 
+@Suite(.knownLocalServerIdentityIssue)
 struct TaskDescriptorTests {
 
     @Test

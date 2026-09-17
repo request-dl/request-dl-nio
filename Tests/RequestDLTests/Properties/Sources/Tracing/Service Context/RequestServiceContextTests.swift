@@ -26,6 +26,7 @@ extension ServiceContext {
     }
 }
 
+@Suite(.knownLocalServerIdentityIssue)
 struct RequestServiceContextTests {
 
     @Test

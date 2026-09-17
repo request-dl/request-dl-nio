@@ -21,7 +21,7 @@ import Foundation
 /// documents as prone to scheduler-contention `AsyncLock.Watchdog` false positives; see
 /// `RequestConfigurationURLSessionClientUploadTests`'s own copy of this note for the failure mode
 /// these two traits avoid.
-@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog, .knownLocalServerIdentityIssue)
 struct InternalsURLSessionClientSessionTaskTests {
 
     @Test

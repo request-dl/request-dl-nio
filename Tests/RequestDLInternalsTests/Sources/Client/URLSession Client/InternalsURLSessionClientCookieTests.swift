@@ -21,6 +21,7 @@ import Security
 /// (`HTTPResult.receivedCookieHeader`): the only way to prove the *second* request didn't
 /// resend a cookie the *first* response set is to ask the server what it saw, not just what the
 /// client sent (which this test has no independent way to inspect).
+@Suite(.knownLocalServerIdentityIssue)
 struct InternalsURLSessionClientCookieTests {
 
     @Test

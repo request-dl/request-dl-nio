@@ -30,6 +30,7 @@ import struct Foundation.UUID
 /// bridge in between: `InternalsRedirectStrategyAdapter`/`ClosureRedirectStrategy`, and the
 /// public `RedirectContext`/`RedirectRequest`/`RedirectHistoryEntry` themselves. A caller
 /// only ever reaches those through `Session`, not through `Internals` directly.
+@Suite(.knownLocalServerIdentityIssue)
 struct RedirectStrategyDataTaskTests {
 
     @Test

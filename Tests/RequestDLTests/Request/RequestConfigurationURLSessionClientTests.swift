@@ -22,6 +22,7 @@ import Security
 /// + `Internals.URLSessionClient` directly instead of `DataTask`, and skips `SecureConnection`
 /// entirely: no TLS customization is in scope here, so trusting `LocalServer`'s self-signed
 /// certificate is handled by a test-only `URLSessionTaskDelegate` instead.
+@Suite(.knownLocalServerIdentityIssue)
 struct RequestConfigurationURLSessionClientTests {
 
     @Test
@@ -101,6 +102,7 @@ struct RequestConfigurationURLSessionClientTests {
 /// (`canImport(Darwin)`-gated) by design, so this whole test file compiles to nothing on Linux;
 /// only `CertificateFixturesExpirationTests` (fixture-only, no TLS handshake) runs there, and
 /// does.
+@Suite(.knownLocalServerIdentityIssue)
 struct RequestConfigurationURLSessionClientMTLSTests {
 
     /// Direct port of `DataTaskTests.dataTask_whenCAEnabled`: same `LocalServer`/`Certificates`

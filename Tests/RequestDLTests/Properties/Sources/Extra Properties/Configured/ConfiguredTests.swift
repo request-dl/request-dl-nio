@@ -1005,6 +1005,10 @@ struct ConfiguredTests {
         }
     }
 
+    // `tlsMaximumVersion` has no portable equivalent (see `Configured.secureConnectionVersion(_:)`'s
+    // own comment): a config that sets it fails loudly under `NIOTransport`-off instead of
+    // silently ignoring it, so a range that sets both bounds only resolves successfully here.
+    #if canImport(NIOCore)
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func secureConnectionTLSVersionRange() async throws {
@@ -1027,6 +1031,7 @@ struct ConfiguredTests {
         #expect(resolved.session.configuration.secureConnection?.minimumTLSVersion == TLSVersion.v1_2.build())
         #expect(resolved.session.configuration.secureConnection?.maximumTLSVersion == TLSVersion.v1_3.build())
     }
+    #endif
 
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)

@@ -13,6 +13,7 @@ import FoundationEssentials
 import struct Foundation.UUID
 #endif
 
+@Suite(.knownLocalServerIdentityIssue)
 struct ModifiersCollectDataTests {
 
     @Test

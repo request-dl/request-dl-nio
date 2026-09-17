@@ -14,6 +14,7 @@ import struct Foundation.Data
 import struct Foundation.UUID
 #endif
 
+@Suite(.knownLocalServerIdentityIssue)
 struct ModifiersCollectBytesTests {
 
     @Test

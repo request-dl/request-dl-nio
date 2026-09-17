@@ -19,6 +19,7 @@ import struct Foundation.UUID
 import struct Foundation.Data
 #endif
 
+@Suite(.knownLocalServerIdentityIssue)
 struct DataTaskTests {
 
     @Test

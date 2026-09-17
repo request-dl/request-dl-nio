@@ -15,6 +15,7 @@ import struct Foundation.Data
 import struct Foundation.UUID
 #endif
 
+@Suite(.knownLocalServerIdentityIssue)
 struct ModifiersProgressTests {
 
     final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {

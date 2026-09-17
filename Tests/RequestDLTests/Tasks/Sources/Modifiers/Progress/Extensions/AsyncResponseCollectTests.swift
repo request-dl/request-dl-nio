@@ -17,6 +17,7 @@ import struct Foundation.Data
 import struct Foundation.UUID
 #endif
 
+@Suite(.knownLocalServerIdentityIssue)
 struct AsyncResponseCollectTests {
 
     final class UploadProgressMonitor: UploadProgress, @unchecked Sendable {

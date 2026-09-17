@@ -22,6 +22,7 @@ import Security
 /// `RedirectState.swift`), which `RedirectEnforcingURLSessionTaskDelegate` ports: `visited` starts
 /// at `[initialURL]`, a redirect is refused once `visited.count > max`, and cycle detection
 /// compares the target against every URL visited so far, including the initial one.
+@Suite(.knownLocalServerIdentityIssue)
 struct InternalsURLSessionClientRedirectTests {
 
     @Test
