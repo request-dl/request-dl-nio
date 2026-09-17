@@ -104,3 +104,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build RequestDL with the NIOTransport trait disabled
         run: swift build --disable-default-traits --target RequestDL
+      - name: Test RequestDL with the NIOTransport trait disabled
+        run: swift test --disable-default-traits
