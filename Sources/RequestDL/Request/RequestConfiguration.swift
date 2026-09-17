@@ -174,8 +174,16 @@ import Foundation
 extension RequestConfiguration {
 
     /// `URLSession` counterpart to `build(eventLoop:)`. It needs no `EventLoop`, since it drains
-    /// `RequestBody` through its `AsyncSequence` conformance rather than the
-    /// `EventLoopFuture`-driven streaming path `build(eventLoop:)` uses.
+    /// `RequestBody` through its internal `bytesSequence`, not its public, `Data`-yielding
+    /// `AsyncSequence` conformance, the `EventLoopFuture`-driven streaming path `build(eventLoop:)`
+    /// uses.
+    ///
+    /// `bytesSequence` plus ``Internals/Bytes/append(to:)``, not `for try await chunk in body`
+    /// plus `data.append(chunk)`: the public sequence would force every chunk through
+    /// `Internals.Bytes.asData()` first, materializing (and, for a `ByteBuffer`-backed chunk,
+    /// caching) a standalone `Data` only for `Data.append(contentsOf:)` to copy out of right
+    /// after — paying the copy twice for a body this method is about to fully drain anyway.
+    /// `append(to:)` copies each chunk into `data` directly, once.
     ///
     /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See
     /// `buildURLRequestWithoutBody()` for the streamed-upload counterpart, which drains `body`
@@ -188,8 +196,8 @@ extension RequestConfiguration {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for try await chunk in body {
-                data.append(chunk)
+            for try await chunk in body.bytesSequence {
+                chunk.append(to: &data)
             }
 
             request.httpBody = data

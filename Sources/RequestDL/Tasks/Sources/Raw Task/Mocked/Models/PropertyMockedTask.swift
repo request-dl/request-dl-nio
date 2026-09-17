@@ -120,10 +120,15 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         )
     }
 
-    /// Drives `body` into `buffer`, executor-agnostically: `RequestBody`'s own `AsyncSequence`
-    /// conformance already yields `Data` chunks portably (no `EventLoopGroup`/`HTTPClient.Body`
-    /// needed the way an older revision of this method required), so there's nothing NIO-specific
-    /// left to bridge here for either executor.
+    /// Drives `body` into `buffer`, executor-agnostically: `RequestBody`'s internal
+    /// `bytesSequence` already yields `Internals.Bytes` chunks portably (no
+    /// `EventLoopGroup`/`HTTPClient.Body` needed the way an older revision of this method
+    /// required), so there's nothing NIO-specific left to bridge here for either executor.
+    /// `bytesSequence`, not the public, `Data`-yielding `AsyncSequence` conformance: the public
+    /// one forces every chunk through `Internals.Bytes.asData()` before handing it back, a
+    /// conversion `Internals.ByteURL.replace(with:)`'s own `Internals.Bytes` overload has no use
+    /// for and would otherwise pay for nothing, exactly the round trip `RequestBody
+    /// .connect(writer:body:eventLoop:)` already avoids the same way on the `.nio` side.
     ///
     /// - Important: One sequential `for try await` loop inside a single `Task`, not chunks
     /// dispatched independently. `buffer.append` has to see chunks in order, and awaiting each
@@ -136,7 +141,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
     ) {
         _Concurrency.Task {
             do {
-                for try await chunk in body {
+                for try await chunk in body.bytesSequence {
                     let byteURL = Internals.ByteURL()
                     byteURL.replace(with: chunk)
                     // The `async` overload, not the synchronous one `Internals

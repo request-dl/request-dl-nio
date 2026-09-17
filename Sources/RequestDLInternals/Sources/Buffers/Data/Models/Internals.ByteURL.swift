@@ -103,6 +103,19 @@ extension Internals {
                 writtenBytes = bytes.writerIndex
             }
         }
+
+        /// Same contract as ``replace(with:)`` above, for a caller that already holds an
+        /// ``Internals/Bytes`` chunk (a `RequestBody`'s internal, `Data`-agnostic sequence, say):
+        /// adopts its readable range directly as the new store instead of writing through
+        /// `DataProtocol`, which for a `Data`-backed chunk would force a redundant copy on top
+        /// of this store's own, and for a `ByteBuffer`-backed one would first force a `Data`
+        /// materialization that has nothing to do with what this store actually needs.
+        package func replace(with bytes: Internals.Bytes) {
+            withStorage { storage, writtenBytes in
+                storage = bytes.slice()
+                writtenBytes = storage.writerIndex
+            }
+        }
     }
 }
 
