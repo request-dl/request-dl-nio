@@ -60,4 +60,15 @@ struct ZeroingBytesTests {
         #expect(zeroingBytes.count == 0)
         #expect(Array(zeroingBytes).isEmpty)
     }
+
+    @Test
+    func zeroingBytes_whenBothEmpty_areEqual() async throws {
+        // Given: `baseAddress` is `nil` for both, the one case `==`'s `memcmp` fast path can't
+        // pass straight into `memcmp` itself.
+        let lhs = ZeroingBytes([UInt8]())
+        let rhs = ZeroingBytes([UInt8]())
+
+        // Then
+        #expect(lhs == rhs)
+    }
 }

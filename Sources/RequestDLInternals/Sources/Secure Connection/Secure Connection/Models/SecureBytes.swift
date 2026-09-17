@@ -167,7 +167,26 @@ extension ZeroingBytes: RandomAccessCollection {}
 
 extension ZeroingBytes: Equatable {
 
+    /// `_reusableItem(id:sessionConfiguration:)` runs this on every client-pool lookup for a
+    /// `PrivateKey` with a password, so it needs to be an actual byte compare, not the default
+    /// `RandomAccessCollection` witness `elementsEqual(_:)` would fall back to: that dispatches
+    /// through `buffer`'s subscript one element at a time, with none of the single-call `memcmp`
+    /// a contiguous, fixed-width buffer like this one can use instead.
     package static func == (_ lhs: ZeroingBytes, _ rhs: ZeroingBytes) -> Bool {
-        lhs.buffer.count == rhs.buffer.count && lhs.buffer.elementsEqual(rhs.buffer)
+        guard lhs.buffer.count == rhs.buffer.count else {
+            return false
+        }
+
+        guard let lhsBase = lhs.buffer.baseAddress, let rhsBase = rhs.buffer.baseAddress else {
+            // Both empty: `baseAddress` is `nil` exactly when `count == 0`, already checked equal
+            // above.
+            return true
+        }
+
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl)
+        return memcmp(lhsBase, rhsBase, lhs.buffer.count) == .zero
+        #else
+        return lhs.buffer.elementsEqual(rhs.buffer)
+        #endif
     }
 }
