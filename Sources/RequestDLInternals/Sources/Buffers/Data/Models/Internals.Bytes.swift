@@ -335,8 +335,8 @@ extension Internals {
         /// into one growing buffer: `asData()` pays to materialize (and, for the `.byteBuffer`
         /// case, cache) an intermediate `Data` before `append` can copy from it, paying the copy
         /// twice. This copies once, straight from whichever storage backs this value into
-        /// `data`'s own storage — matching what appending `NIOCore.ByteBuffer.readableBytesView`
-        /// directly used to cost before this type existed.
+        /// `data`'s own storage, the same cost as appending `NIOCore.ByteBuffer.readableBytesView`
+        /// directly.
         package func append(to data: inout Data) {
             switch storage {
             case .data(let dataStorage):

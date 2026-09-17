@@ -53,9 +53,9 @@ extension Internals {
         // MARK: - Private static methods
 
         /// HTTP header names are ASCII tokens (RFC 9110 §5.1), so this folds case byte by byte
-        /// instead of calling `String.lowercased()` on each side — Unicode-aware and allocates
-        /// a full lowercased copy per call, neither of which a name comparison needs, and a scan
-        /// over every stored pair otherwise pays that allocation once per pair, per lookup.
+        /// instead of calling `String.lowercased()` on each side. That call is Unicode-aware and
+        /// allocates a full lowercased copy, neither of which a name comparison needs, and a scan
+        /// over every stored pair would otherwise pay that allocation once per pair, per lookup.
         private static func namesEqual(_ lhs: String, _ rhs: String) -> Bool {
             lhs.utf8.elementsEqual(rhs.utf8) { asciiLowercased($0) == asciiLowercased($1) }
         }
@@ -91,7 +91,7 @@ extension Internals.HTTPHeaders {
 
     package init(_ headers: NIOHTTP1.HTTPHeaders) {
         // `NIOHTTP1.HTTPHeaders.Element` already is `(name: String, value: String)`, so this
-        // is the one copy the conversion needs — going through the generic `init<S: Sequence>`
+        // is the one copy the conversion needs. Going through the generic `init<S: Sequence>`
         // instead would iterate a second time over an intermediate `Array(headers)`.
         pairs = Array(headers)
     }

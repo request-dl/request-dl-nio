@@ -18,8 +18,8 @@ extension Internals {
 
         /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time),
         /// same convention as `Internals.Timeout`. Defaults to `AsyncHTTPClient`'s own default
-        /// (60 seconds) so a configuration nobody touched builds identically to before this
-        /// existed.
+        /// (60 seconds), so a configuration nobody touched behaves the same as calling
+        /// `AsyncHTTPClient` directly.
         package var idleTimeout: Int64 = 60_000_000_000
 
         package var concurrentHTTP1ConnectionsPerHostSoftLimit: Int = 8

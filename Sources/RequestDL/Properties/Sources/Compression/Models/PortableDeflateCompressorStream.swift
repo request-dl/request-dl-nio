@@ -5,7 +5,7 @@
 // Only actually chosen once the future URLSession-only trait exists: `DeflateAlgorithm.callAsFunction()`
 // only reaches the `#elseif canImport(zlib)` branch that constructs this when `canImport(NIOCore)`
 // is false. The type itself compiles (and is covered by `InternalsPortableZlibCompressorStreamTests`)
-// in every build, gated only on `canImport(zlib)` — see `PortableZlibCompressorStream`'s own doc
+// in every build, gated only on `canImport(zlib)`. See `PortableZlibCompressorStream`'s own doc
 // comment for why that's a wider gate than "chosen at runtime" needs.
 #if canImport(zlib)
 

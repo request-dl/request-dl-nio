@@ -2,13 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Gated on `canImport(zlib)` alone, not also `!canImport(NIOCore)`: `DeflateAlgorithm`/
-// `GzipAlgorithm` (this type's only callers, through `PortableDeflateCompressorStream`/
+// Gated on `canImport(zlib)` alone, not also `!canImport(NIOCore)`. `DeflateAlgorithm` and
+// `GzipAlgorithm` (this type's only callers, through `PortableDeflateCompressorStream` and
 // `PortableGzipCompressorStream`) already decide which stream to hand back based on whether
 // NIOCore is available, so this file doesn't need to repeat that condition to stay unused
-// whenever NIO is around. Compiling it in every build, not just a future NIOCore-less one, is
-// what lets the normal test suite actually exercise it, rather than relying on a standalone
-// verification script the way the two callers' history did before this file existed.
+// whenever NIO is around. Compiling it in every build, not just a future NIOCore-less one,
+// lets the normal test suite exercise it directly instead of relying on a standalone script.
 #if canImport(zlib)
 
 import RequestDLInternals
@@ -20,12 +19,12 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-/// Drives zlib's own incremental `deflate()` C API: genuinely streaming, bounded-memory
-/// compression, backing both ``PortableDeflateCompressorStream`` (RFC 1950 zlib wrapper) and
-/// ``PortableGzipCompressorStream`` (RFC 1952 gzip wrapper) — the two differ only in the
-/// `windowBits` passed to ``init(windowBits:)``, which also makes zlib generate the right
-/// header/trailer/checksum itself, unlike the `Compression`-framework-plus-hand-rolled-wrapper
-/// approach this replaces.
+/// Drives zlib's own incremental `deflate()` C API for genuinely streaming, bounded-memory
+/// compression. It backs both ``PortableDeflateCompressorStream`` (RFC 1950 zlib wrapper) and
+/// ``PortableGzipCompressorStream`` (RFC 1952 gzip wrapper), which differ only in the
+/// `windowBits` passed to ``init(windowBits:)``. That also lets zlib generate the right
+/// header, trailer and checksum itself, instead of hand-rolling a wrapper around Apple's
+/// `Compression` framework.
 ///
 /// - Note: `z_stream`'s `state` field is a zlib-owned, heap-allocated pointer for the lifetime
 /// between `deflateInit2_` and `deflateEnd`. Wrapped in a `final class`, not held as a `struct`
@@ -88,14 +87,12 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
     /// produced so far. May return empty `Data`: zlib is free to buffer internally until it has
     /// enough to emit a block, exactly as ``CompressorStream``'s own doc comment allows.
     ///
-    /// - Note: `Data`, not `[UInt8]`: `PortableGzipCompressorStream`/`PortableDeflateCompressorStream`
-    /// convert to and from `[UInt8]` at their own boundary, only because the public `Compressor`
-    /// API they conform to is `[UInt8]`-based. Operating on `Data` here instead lets
-    /// ``PortableZlibCompressorNativeStream`` drive this type straight from an `Internals.Bytes`
-    /// chunk's own `Data` (`asData()`, no `Array` materialization) and hand the result straight
-    /// back as `Internals.Bytes` (`Internals.Bytes(_:)`, no intermediate wrap), instead of paying
-    /// an `Internals.Bytes` ⇄ `[UInt8]` round trip that a `[UInt8]`-shaped engine would force on
-    /// every chunk even when nothing outside this package ever touches it as `[UInt8]`.
+    /// - Note: `Data`, not `[UInt8]`. `PortableGzipCompressorStream` and
+    /// `PortableDeflateCompressorStream` convert to and from `[UInt8]` at their own boundary,
+    /// only because the public `Compressor` API they conform to is `[UInt8]`-based. Operating on
+    /// `Data` here lets ``PortableZlibCompressorNativeStream`` drive this type straight from and
+    /// back to `Internals.Bytes`, avoiding an `Internals.Bytes` ⇄ `[UInt8]` round trip on every
+    /// chunk even though nothing outside this package ever touches it as `[UInt8]`.
     func compress(_ bytes: Data) throws -> Data {
         var bytes = bytes
         return try bytes.withUnsafeMutableBytes { (input: UnsafeMutableRawBufferPointer) in
@@ -151,8 +148,8 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
 /// `PortableDeflateCompressorStream` bridge to the public, `[UInt8]`-based `CompressorStream`
 /// through their own `nativeStream` property. `InternalsCompressionAlgorithmAdapter` reaches for
 /// this directly instead of going through `callAsFunction(compressing:)`, so driving the portable
-/// gzip/deflate compressors from inside the package skips the `[UInt8]` conversion entirely —
-/// mirrors `NIOHTTPCompressorStreamBridge.nativeStream`'s own reasoning, adapted to a
+/// gzip/deflate compressors from inside the package skips the `[UInt8]` conversion entirely.
+/// This mirrors `NIOHTTPCompressorStreamBridge.nativeStream`'s own reasoning, adapted to a
 /// `Data`-based engine instead of a `ByteBuffer`-based one.
 struct PortableZlibCompressorNativeStream: Internals.CompressorStream {
 

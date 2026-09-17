@@ -106,9 +106,7 @@ extension Internals {
             }
             #else
             // Off Darwin, `resolveExecutor()` never resolves to `.urlSession` (see its own
-            // implementation): NIOCore being available here means `.nio` unconditionally, same
-            // as this branch always returned before this function had a portable half to fall
-            // through to below.
+            // implementation), so NIOCore being available here means `.nio` unconditionally.
             return .nio(try await client(provider: provider, sessionConfiguration: sessionConfiguration))
             #endif
             #endif
@@ -270,7 +268,7 @@ extension Internals {
         /// rather than called directly: it reads the certificate/private-key files a
         /// `SecureConnection` names (`Internals.Certificate.resolvedDERBytes()`, portable and
         /// NIOSSL-backed alike) and, for mTLS, makes synchronous Keychain calls
-        /// (`Internals.RawBytesIdentityBuilder`/`Internals.IdentityManager`) — none of which are
+        /// (`Internals.RawBytesIdentityBuilder`/`Internals.IdentityManager`), none of which are
         /// `async`, since Keychain's own API isn't. Calling it inline here would block whichever
         /// Swift Concurrency cooperative thread reached this cache miss for as long as that takes;
         /// `FileSystemManager.run` is the same escape hatch every other blocking file operation in

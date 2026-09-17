@@ -79,7 +79,7 @@ struct InternalsCompressionAlgorithmAdapterTests {
 
     // `PortableGzipCompressorStream`/`PortableDeflateCompressorStream`/
     // `PortableZlibCompressorNativeStream` only exist where `canImport(zlib)` holds (see their
-    // own files' doc comments) — `true` on every Apple platform, not on Linux without a
+    // own files' doc comments). That's true on every Apple platform, but not on Linux without a
     // dedicated system-library target this package doesn't declare.
     #if canImport(zlib)
 

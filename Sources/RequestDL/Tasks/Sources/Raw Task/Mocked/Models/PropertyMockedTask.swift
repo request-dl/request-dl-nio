@@ -144,10 +144,10 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
                 for try await chunk in body.bytesSequence {
                     let byteURL = Internals.ByteURL()
                     byteURL.replace(with: chunk)
-                    // Routed through `makeMockedDataBuffer`, not called inline: Swift's
+                    // Routed through `makeMockedDataBuffer`, not called inline. Swift's
                     // async-overload resolution commits to `Internals.DataBuffer(_ url:) async`
-                    // for any call made from an `async` context, `await` or not — only a
-                    // genuinely non-`async` context leaves that overload out of the running and
+                    // for any call made from an `async` context, whether or not it awaits. Only
+                    // a genuinely non-`async` context leaves that overload out of the running and
                     // falls back to the synchronous one `Internals.ClientResponseReceiver
                     // .didReceiveBodyPart` already relies on, which for a `ByteURL` has nothing
                     // to suspend for in the first place (see that init's own doc comment).

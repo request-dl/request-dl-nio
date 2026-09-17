@@ -179,10 +179,10 @@ extension RequestConfiguration {
     /// uses.
     ///
     /// `bytesSequence` plus ``Internals/Bytes/append(to:)``, not `for try await chunk in body`
-    /// plus `data.append(chunk)`: the public sequence would force every chunk through
+    /// plus `data.append(chunk)`. The public sequence would force every chunk through
     /// `Internals.Bytes.asData()` first, materializing (and, for a `ByteBuffer`-backed chunk,
     /// caching) a standalone `Data` only for `Data.append(contentsOf:)` to copy out of right
-    /// after — paying the copy twice for a body this method is about to fully drain anyway.
+    /// after, paying the copy twice for a body this method is about to fully drain anyway.
     /// `append(to:)` copies each chunk into `data` directly, once.
     ///
     /// Non-streaming: the whole body is buffered into `Data` before the request is returned. See

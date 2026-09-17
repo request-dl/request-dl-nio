@@ -5,7 +5,7 @@
 // Only actually chosen once the future URLSession-only trait exists: `GzipAlgorithm.callAsFunction()`
 // only reaches the `#elseif canImport(zlib)` branch that constructs this when `canImport(NIOCore)`
 // is false. The type itself compiles (and is covered by `InternalsPortableZlibCompressorStreamTests`)
-// in every build, gated only on `canImport(zlib)` — see `PortableZlibCompressorStream`'s own doc
+// in every build, gated only on `canImport(zlib)`. See `PortableZlibCompressorStream`'s own doc
 // comment for why that's a wider gate than "chosen at runtime" needs.
 #if canImport(zlib)
 
@@ -18,12 +18,12 @@ import struct Foundation.Data
 /// Portable ``CompressorStream`` behind ``GzipAlgorithm`` when NIO isn't available, producing the
 /// same wire format (`Content-Encoding: gzip`, i.e. an RFC 1952 gzip stream) that
 /// ``NIOHTTPCompressorStreamBridge`` produces through `NIOHTTPRequestCompressor`, using zlib's
-/// own incremental `deflate()` API (via ``PortableZlibCompressorStream``) instead: the gzip
+/// own incremental `deflate()` API (via ``PortableZlibCompressorStream``) instead. It's the gzip
 /// counterpart of ``PortableDeflateCompressorStream``.
 ///
 /// `windowBits + 16` (rather than `PortableDeflateCompressorStream`'s plain `windowBits`) is
-/// zlib's own documented switch for producing an RFC 1952 gzip container — magic number, flags,
-/// mtime, CRC-32 trailer and all — instead of an RFC 1950 zlib one, around the identical raw
+/// zlib's own documented switch for producing an RFC 1952 gzip container, with its magic number,
+/// flags, mtime and CRC-32 trailer, instead of an RFC 1950 zlib one, wrapping the same raw
 /// deflate bytes either way.
 struct PortableGzipCompressorStream: CompressorStream {
 

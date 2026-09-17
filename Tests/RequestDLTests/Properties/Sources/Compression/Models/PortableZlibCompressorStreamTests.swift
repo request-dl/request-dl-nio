@@ -21,11 +21,9 @@ import struct Foundation.Data
 #endif
 
 /// Round-trips `PortableZlibCompressorStream`'s output back through zlib's own incremental
-/// `inflate()` — the authoritative decoder for both the RFC 1950 (`windowBits: 15`) and RFC 1952
+/// `inflate()`, the authoritative decoder for both the RFC 1950 (`windowBits: 15`) and RFC 1952
 /// (`windowBits: 15 + 16`) wire formats `PortableDeflateCompressorStream`/
-/// `PortableGzipCompressorStream` produce. Previously this whole subsystem was gated on
-/// `!canImport(NIOCore)`, so nothing here ever type-checked under the normal test suite; it's
-/// only verified by a standalone script. `PortableZlibCompressorStream` itself is gated on
+/// `PortableGzipCompressorStream` produce. `PortableZlibCompressorStream` itself is gated on
 /// `canImport(zlib)` alone (see its own doc comment), so this suite runs for real, every time.
 struct PortableZlibCompressorStreamTests {
 
@@ -116,10 +114,10 @@ struct PortableZlibCompressorStreamTests {
 
     @Test
     func compress_whenManySmallChunks_reassemblesExactlyInOrder() throws {
-        // Given: forces `drain(flush:)`'s output loop to run across many `compress(_:)` calls
-        // and, since the output buffer is much larger than any one input chunk here, several
-        // `avail_out == 0` iterations don't apply — this instead stresses accumulation across
-        // many separate `compress(_:)` calls feeding the same live stream.
+        // Given: forces `drain(flush:)`'s output loop to run across many `compress(_:)` calls.
+        // Since the output buffer is much larger than any one input chunk here, the
+        // `avail_out == 0` repeat case doesn't come up; this instead stresses accumulation
+        // across many separate `compress(_:)` calls feeding the same live stream.
         let original = (0..<5_000).map { UInt8($0 % 251) }
         let chunks = original.map { [$0] }
 
@@ -134,8 +132,8 @@ struct PortableZlibCompressorStreamTests {
     func compress_whenOutputExceedsOneChunkBuffer_drainLoopReassemblesExactly() throws {
         // Given: larger than `PortableZlibCompressorStream`'s internal 32 KiB output-draining
         // buffer, and incompressible (random-ish, via a simple LCG) so the compressed output
-        // itself also exceeds one internal buffer — exercises the `avail_out == 0` repeat loop
-        // inside a single `drain(flush:)` call, not just repeated calls.
+        // itself also exceeds one internal buffer. This exercises the `avail_out == 0` repeat
+        // loop inside a single `drain(flush:)` call, not just repeated calls.
         var state: UInt64 = 0x2545_F491_4F6C_DD1D
         let original: [UInt8] = (0..<200_000).map { _ in
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407

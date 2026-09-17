@@ -100,7 +100,7 @@ extension Internals {
             /// been read or a read comes back empty (EOF). `read(upToCount:)` is free to return
             /// fewer bytes than asked without that meaning EOF, and `Internals.FileStreamBuffer
             /// .readData(length:)`'s own short-read loop calls back in here for whatever is
-            /// still missing — leaving that loop to drive every retry would pay a fresh
+            /// still missing. Leaving that loop to drive every retry would pay a fresh
             /// continuation + `DispatchQueue.global` hop per short read instead of one for the
             /// whole logical read. Matches ``WriteHandle/write(contentsOf:toAbsoluteOffset:)``'s
             /// own already-loops-internally behavior on the write side (there, courtesy of
