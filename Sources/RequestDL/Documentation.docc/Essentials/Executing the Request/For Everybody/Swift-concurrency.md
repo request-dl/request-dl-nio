@@ -6,9 +6,9 @@ Discover all the available resources to use async/await from the beginning.
 
 Built from the ground up with async/await in mind, RequestDL always internally uses asynchronous operations, thread locks, and Sendable.
 
-SwiftNIO and AsyncHTTPClient also constantly send and receive request data in packets, including both headers and the body.
+Requests send and receive data in packets, including both headers and the body, regardless of which transport handles them: `URLSession` or SwiftNIO.
 
-By combining the concepts of async/await with the tools provided by SwiftNIO and AsyncHTTPClient, the concept of steps represented by ``RequestDL/UploadStep``, ``RequestDL/DownloadStep``, and ``RequestDL/ResponseStep`` was implemented.
+By combining the concepts of async/await with that packet-by-packet delivery, the concept of steps represented by ``RequestDL/UploadStep``, ``RequestDL/DownloadStep``, and ``RequestDL/ResponseStep`` was implemented.
 
 ### Building the request
 

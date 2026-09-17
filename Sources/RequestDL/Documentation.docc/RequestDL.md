@@ -21,9 +21,9 @@ A network layer written in Swift based on the declarative programming paradigm.
 
 ## Overview
 
-RequestDL aims to provide a comprehensive API for developing applications that consume network services. At its core, RequestDL is built on Apple's **AsyncHTTPClient**, which in turn is based on **SwiftNIO**.
+RequestDL aims to provide a comprehensive API for developing applications that consume network services. Requests run over Apple's **URLSession**, or over **SwiftNIO** (plain `NIO` or `NIOTransportServices`), so you can pick whichever transport best fits your platform and deployment target.
 
-With these foundations and leveraging modern networking techniques, along with extensive integration provided by Apple through these two modules, RequestDL can accomplish a great deal. All of this is achieved using a simplified and concise syntax.
+Leveraging modern networking techniques and extensive integration provided by Apple, RequestDL can accomplish a great deal, all of it through a simplified and concise syntax. On Apple platforms, SwiftNIO and AsyncHTTPClient are themselves optional: see <doc:Disabling-the-NIOTransport-Trait> for building `.urlSession`-only.
 
 ### Installation
 
@@ -79,6 +79,7 @@ try await DataTask {
 - [x] [Combine support](<doc:Exploring-combine>) (Apple platforms only);
 - [x] [Image loading for SwiftUI, UIKit, AppKit and watchOS](<doc:Loading-images>) (Apple platforms only);
 - [x] [Downloading in the background](<doc:Downloading-in-the-Background>) (Apple platforms only);
+- [x] [Building without SwiftNIO](<doc:Disabling-the-NIOTransport-Trait>) (Apple platforms only);
 - [x] [Distributed tracing](<doc:Distributed-tracing>);
 - [x] [Configuration-driven requests](<doc:Configuration-driven-requests>) (via swift-configuration);
 - [x] [cURL support](<doc:CURL-support>) — parse a curl command into a request, or describe a request as one;
@@ -103,3 +104,4 @@ We are excited to expand this list with many other features. Start by making you
 - <doc:Using-a-Client-Certificate-with-URLSession>
 - <doc:Configuring-App-Transport-Security-for-URLSession>
 - <doc:Downloading-in-the-Background>
+- <doc:Disabling-the-NIOTransport-Trait>
