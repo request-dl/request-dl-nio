@@ -14,9 +14,9 @@
 /// compressing an outgoing body the way there is for decoding an incoming one. With NIO
 /// available, `callAsFunction()` drives `NIOHTTPRequestCompressor`, streaming in bounded memory;
 /// without it, `PortableDeflateCompressorStream` produces the same zlib-wrapped wire format
-/// using Foundation + the `Compression` framework instead, buffering the whole body rather than
-/// streaming it. See that type's own doc comment for why. If even `zlib` isn't importable, this
-/// falls back to ``CompressionUnavailableError`` like ``GzipAlgorithm`` always does.
+/// using zlib's own incremental `deflate()` API instead, also streaming in bounded memory. If
+/// even `zlib` isn't importable, this falls back to ``CompressionUnavailableError`` like
+/// ``GzipAlgorithm`` always does.
 public struct DeflateAlgorithm: Compressor, Decompressor {
 
     // MARK: - Public properties
@@ -33,7 +33,7 @@ public struct DeflateAlgorithm: Compressor, Decompressor {
         #if canImport(NIOCore)
         try NIOHTTPCompressorStreamBridge(algorithm: .deflate)
         #elseif canImport(zlib)
-        PortableDeflateCompressorStream()
+        try PortableDeflateCompressorStream()
         #else
         throw CompressionUnavailableError(contentEncodingValue: contentEncodingValue)
         #endif
