@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Only actually chosen once the future URLSession-only trait exists: `DeflateAlgorithm.callAsFunction()`
+// Only actually chosen with the `NIOTransport` trait disabled. `DeflateAlgorithm.callAsFunction()`
 // only reaches the `#elseif canImport(zlib)` branch that constructs this when `canImport(NIOCore)`
 // is false. The type itself compiles (and is covered by `InternalsPortableZlibCompressorStreamTests`)
 // in every build, gated only on `canImport(zlib)`. See `PortableZlibCompressorStream`'s own doc

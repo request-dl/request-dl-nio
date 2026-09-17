@@ -2,12 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Only reachable once the future URLSession-only trait exists. NIOCore is always present today,
-// so `#if !canImport(NIOCore)` never evaluates `true` in this build, and
-// `swift build`/`swift test` never type-check this file.
-// Verified by temporarily forcing this branch to compile against every real call site
-// (`Internals.FileStreamBuffer`, `Internals.FileBufferURL`, `URL+Extensions.swift`,
-// `DiskStorage.swift`) before reverting, since the normal test suite can't reach it yet.
+// Only reachable with the `NIOTransport` trait disabled. `#if !canImport(NIOCore)` never
+// evaluates `true` under the default build, since NIOCore is present by default; it does under
+// `swift build --disable-default-traits`, which the "URLSession-only Build" CI job
+// (`.github/workflows/swift-ci.yaml`) runs on every push, type-checking this file for real.
 #if !canImport(NIOCore)
 
 import Foundation

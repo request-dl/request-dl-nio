@@ -6,8 +6,8 @@
 // `GzipAlgorithm` (this type's only callers, through `PortableDeflateCompressorStream` and
 // `PortableGzipCompressorStream`) already decide which stream to hand back based on whether
 // NIOCore is available, so this file doesn't need to repeat that condition to stay unused
-// whenever NIO is around. Compiling it in every build, not just a future NIOCore-less one,
-// lets the normal test suite exercise it directly instead of relying on a standalone script.
+// whenever NIO is around. Compiling it in every build, not just a NIOCore-less one, lets the
+// normal test suite exercise it directly instead of relying on a standalone script.
 #if canImport(zlib)
 
 import RequestDLInternals
