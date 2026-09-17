@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import Testing
 
 @testable import RequestDLInternals
@@ -186,5 +188,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
     }
 }
+
+#endif
 
 #endif

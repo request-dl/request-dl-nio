@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Same reasoning as `LocalHTTPConnectProxy`: `.urlSession` proxies through the OS's own network
+// stack, so a `NIOTransport`-off build has no RequestDL-owned connection for this fixture to
+// intercept.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import SwiftAsyncStream
@@ -336,3 +341,5 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         }
     }
 }
+
+#endif

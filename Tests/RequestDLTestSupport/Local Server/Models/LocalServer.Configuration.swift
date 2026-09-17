@@ -2,10 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIO
-import NIOHTTP1
-import NIOSSL
-
 @testable import RequestDL
 
 extension LocalServer {

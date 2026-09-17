@@ -2,12 +2,16 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOConcurrencyHelpers
 import RequestDLInternals
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOConcurrencyHelpers
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -54,7 +58,7 @@ struct RedirectStrategyDataTaskTests {
             localServer.cleanup(at: destination)
         }
 
-        let capturedContext = NIOLockedValueBox<RedirectContext?>(nil)
+        let capturedContext = LockedBox<RedirectContext?>(nil)
 
         // When
         let data = try await DataTask {
@@ -86,6 +90,7 @@ struct RedirectStrategyDataTaskTests {
         #expect(context.redirectCount == 0)
     }
 
+    #if canImport(NIOCore)
     /// `.redirectStrategy`/`.onRedirect` over the `.nio`/`.nioTransportServices` executors drive
     /// AsyncHTTPClient's delegate-based `execute(request:delegate:...)` API, as opposed to its
     /// Concurrency `execute(_:deadline:logger:)` family that the `.urlSession` executor has no
@@ -156,6 +161,7 @@ struct RedirectStrategyDataTaskTests {
         #expect(context.history.count == 1)
         #expect(context.redirectCount == 0)
     }
+    #endif
 
     @Test
     func dataTask_whenRedirectStrategyDoesNotFollowOverURLSession_returnsRedirectResponseUnfollowed() async throws {
@@ -197,6 +203,7 @@ struct RedirectStrategyDataTaskTests {
         #expect(result.head.status.code == 302)
     }
 
+    #if canImport(NIOCore)
     /// AsyncHTTPClient's delegate-based path used to fail the whole task for `.doNotFollow`
     /// (resuming normal delivery of the response that triggered the redirect had no route back
     /// from the state its response-delivery state machine had already committed to). Fixed by
@@ -240,5 +247,22 @@ struct RedirectStrategyDataTaskTests {
 
         // Then
         #expect(result.head.status.code == 302)
+    }
+    #endif
+}
+
+/// Portable counterpart to `NIOLockedValueBox`, for the tests above that aren't gated behind
+/// `#if canImport(NIOCore)`.
+private final class LockedBox<Value: Sendable>: @unchecked Sendable {
+
+    private let lock = SwiftAsyncStream.Lock()
+    private var _value: Value
+
+    init(_ value: Value) {
+        _value = value
+    }
+
+    func withLockedValue<T>(_ body: (inout Value) -> T) -> T {
+        lock.withLock { body(&_value) }
     }
 }

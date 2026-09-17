@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import RequestDLInternals
 import Testing
 
@@ -36,3 +38,5 @@ struct SessionExecutorTests {
         #expect(cases.count == 3)
     }
 }
+
+#endif

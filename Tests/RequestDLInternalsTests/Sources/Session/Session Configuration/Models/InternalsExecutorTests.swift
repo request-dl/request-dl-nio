@@ -18,6 +18,7 @@ struct InternalsExecutorTests {
         #expect(lhs == rhs)
     }
 
+    #if canImport(NIOCore)
     @Test
     func executor_whenNotEquals() {
         // Given
@@ -40,4 +41,5 @@ struct InternalsExecutorTests {
         // Then
         #expect(cases.count == 3)
     }
+    #endif
 }

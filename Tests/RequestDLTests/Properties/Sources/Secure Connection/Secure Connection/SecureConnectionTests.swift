@@ -2,12 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
+#if canImport(NIOCore)
+
 import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
+
+import NIOCore
 
 struct SecureConnectionTests {
 
@@ -455,3 +458,5 @@ struct SecureConnectionTests {
         #expect(sut?.certificateVerification == verification.build())
     }
 }
+
+#endif

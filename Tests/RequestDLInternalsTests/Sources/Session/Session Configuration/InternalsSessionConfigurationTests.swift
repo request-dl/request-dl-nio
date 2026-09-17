@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import Crypto
 import NIOCore
@@ -533,3 +535,5 @@ private struct RecordingTracer: Tracer, Sendable {
     func extract<Carrier, Extract>(_ carrier: Carrier, into context: inout ServiceContext, using extractor: Extract)
     where Extract: Extractor, Carrier == Extract.Carrier {}
 }
+
+#endif

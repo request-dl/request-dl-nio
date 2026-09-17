@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
@@ -218,3 +220,5 @@ private final class ScriptedServerHandler: ChannelInboundHandler, @unchecked Sen
         }
     }
 }
+
+#endif

@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOConcurrencyHelpers
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDLInternals
@@ -224,16 +224,17 @@ struct InternalsURLSessionClientRedirectStrategyTests {
 /// Synchronous by design: `Internals.RedirectStrategy.redirectDecision(for:)` isn't `async`, so
 /// capturing what it saw for later assertions must not go through anything that would let the
 /// test read it before the callback (called from URLSession's own delegate queue) has finished.
-private final class CapturedContext: Sendable {
+private final class CapturedContext: @unchecked Sendable {
 
-    private let box = NIOLockedValueBox<Internals.RedirectContext?>(nil)
+    private let lock = SwiftAsyncStream.Lock()
+    private var _context: Internals.RedirectContext?
 
     var context: Internals.RedirectContext? {
-        box.withLockedValue { $0 }
+        lock.withLock { _context }
     }
 
     func record(_ context: Internals.RedirectContext) {
-        box.withLockedValue { $0 = context }
+        lock.withLock { _context = context }
     }
 }
 

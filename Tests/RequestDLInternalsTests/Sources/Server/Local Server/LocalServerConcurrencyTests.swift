@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import SwiftAsyncTesting
 import Testing
@@ -108,3 +110,5 @@ struct LocalServerConcurrencyTests {
         #expect(elapsed < .seconds(180))
     }
 }
+
+#endif

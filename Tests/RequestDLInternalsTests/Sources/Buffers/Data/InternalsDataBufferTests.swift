@@ -2,9 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncTesting
 import Testing
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
@@ -592,6 +595,7 @@ struct InternalsDataBufferTests {
         #expect(bytes == nil)
     }
 
+    #if canImport(NIOCore)
     @Test
     func dataBuffer_whenInitWithByteURLAlreadySetByteBuffer() async throws {
         // Given
@@ -607,6 +611,7 @@ struct InternalsDataBufferTests {
         let readData = await dataBuffer.readData(data.count)
         #expect(readData == data)
     }
+    #endif
 
     @Test
     func dataBuffer_whenGetData() async throws {

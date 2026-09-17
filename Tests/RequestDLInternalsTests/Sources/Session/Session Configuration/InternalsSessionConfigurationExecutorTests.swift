@@ -2,8 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOHTTP1
-import NIOSSL
+#if canImport(NIOCore)
+
 import Testing
 
 @testable import RequestDLInternals
@@ -855,3 +855,5 @@ struct InternalsSessionConfigurationExecutorTests {
         #endif
     }
 }
+
+#endif

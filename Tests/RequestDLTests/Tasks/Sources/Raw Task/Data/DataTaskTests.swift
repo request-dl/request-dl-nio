@@ -2,12 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOSSL
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -123,6 +126,12 @@ struct DataTaskTests {
         // Then
         #expect(result.response == output)
     }
+
+    // Every test below this point pins `.nio`/`.nioTransportServices` explicitly, to exercise
+    // secure-connection/executor interactions (mTLS, trust roots, hostname verification) that
+    // only apply to those executors in the first place; nothing here has a `.urlSession`
+    // counterpart to fall back to under `NIOTransport`-off.
+    #if canImport(NIOCore)
 
     /// Pinned to `.nio`: a real client-certificate handshake over `.urlSession` is a confirmed,
     /// unconditional `withKnownIssue` on this SwiftPM test harness (no Keychain Sharing
@@ -417,10 +426,12 @@ struct DataTaskTests {
             .result()
         }
     }
+    #endif
 }
 
 extension DataTaskTests {
 
+    #if canImport(NIOCore)
     private final class PSKClientIdentityResolver: SSLPSKIdentityResolver {
 
         let key: String
@@ -495,6 +506,7 @@ extension DataTaskTests {
         // Then
         #expect(result.response == output)
     }
+    #endif
 
     /// `Session.requiredExecutor(_:)` must fail loudly at request time, not silently run on a
     /// different executor: this is `RawTask`'s own validation throwing `ExecutorRequirementError`,
@@ -504,6 +516,10 @@ extension DataTaskTests {
     ///
     /// No `LocalServer` needed: the throw happens before any client is built or network I/O
     /// starts.
+    ///
+    /// Both this test and the one below it pin `.nioTransportServices`/`.nio` explicitly, so
+    /// neither exists under `NIOTransport`-off.
+    #if canImport(NIOCore)
     @Test
     func dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO() async throws {
         // Given: a custom cipher suite has no Network.framework equivalent at all (silently
@@ -575,4 +591,5 @@ extension DataTaskTests {
         // Then
         #expect(result.response == output)
     }
+    #endif
 }

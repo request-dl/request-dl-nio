@@ -2,19 +2,23 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIO
-import NIOHTTP1
-import NIOSSL
 import SwiftAsyncStream
 
 @testable import RequestDL
 
+#if canImport(NIOCore)
+import NIO
+import NIOHTTP1
+import NIOSSL
+
 #if canImport(Darwin)
 import NIOTransportServices
+#endif
 #endif
 
 struct LocalServer: Sendable {
 
+    #if canImport(NIOCore)
     final class ServerManager: @unchecked Sendable {
 
         // MARK: - Internal static properties
@@ -106,6 +110,13 @@ struct LocalServer: Sendable {
             }
         }
     }
+    #else
+    /// The NIO backend keys its own `ServerManager` by ``Configuration``; the Network.framework
+    /// backend (``PortableServerManager``) does the same, one `NWListener` per port. Aliased
+    /// under this name so `manager: ServerManager = .shared`/`.stress` below, and every test call
+    /// site that writes `manager: .stress`, need no `#if` of their own.
+    typealias ServerManager = PortableServerManager
+    #endif
 
     final class ResponseQueue: @unchecked Sendable {
 
@@ -151,16 +162,25 @@ struct LocalServer: Sendable {
     // MARK: - Private properties
 
     private let serverConfiguration: Configuration
+    #if canImport(NIOCore)
     private let channel: Channel
+    #else
+    private let listener: PortableListener
+    #endif
     private let responseQueue: ResponseQueue
 
     // MARK: - Inits
 
     init(_ serverConfiguration: Configuration, manager: ServerManager = .shared) async throws {
+        #if canImport(NIOCore)
         let (channel, responseQueue) = try await manager.channel(serverConfiguration)
+        self.channel = channel
+        #else
+        let (listener, responseQueue) = try await manager.listener(serverConfiguration)
+        self.listener = listener
+        #endif
 
         self.serverConfiguration = serverConfiguration
-        self.channel = channel
         self.responseQueue = responseQueue
     }
 

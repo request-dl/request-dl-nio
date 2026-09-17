@@ -201,6 +201,7 @@ struct CustomDecompressorIntegrationTests {
         #expect(String(data: data, encoding: .utf8) == original)
     }
 
+    #if canImport(NIOCore)
     @Test
     func decompressionAlgorithms_whenOnlyNativeAlgorithmConfigured_bypassesManualDispatchUnderNIO() async throws {
         // Given: the `.nio` counterpart to the test above, regression coverage for a real bug.
@@ -238,6 +239,7 @@ struct CustomDecompressorIntegrationTests {
         // Then
         #expect(String(data: data, encoding: .utf8) == original)
     }
+    #endif
 
     @Test
     func decompressionAlgorithms_whenServerSendsMatchingCustomEncoding_decodesCorrectly() async throws {
@@ -304,6 +306,7 @@ struct CustomDecompressorIntegrationTests {
     /// BrotliURLSessionOnlyAlgorithm` check actually fires for it, end to end through the public
     /// API: pinning `.nio` while it's configured must fail before ever touching the network,
     /// rather than only once a `br` response actually arrived.
+    #if canImport(NIOCore)
     @Test
     func decompressionAlgorithms_whenBrotliURLSessionOnlyConfiguredAndNIORequired_throwsExecutorRequirementError()
         async throws
@@ -321,4 +324,5 @@ struct CustomDecompressorIntegrationTests {
             .result()
         }
     }
+    #endif
 }

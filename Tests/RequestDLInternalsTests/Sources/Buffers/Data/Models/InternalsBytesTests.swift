@@ -2,11 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import Testing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -187,6 +190,7 @@ struct InternalsBytesTests {
 
     // MARK: - ByteBuffer-backed
 
+    #if canImport(NIOCore)
     @Test
     func bytes_whenInitFromByteBuffer() {
         // Given
@@ -273,4 +277,5 @@ struct InternalsBytesTests {
         #expect(result == Array("hello".utf8))
         #expect(bytes.readerIndex == .zero)
     }
+    #endif
 }

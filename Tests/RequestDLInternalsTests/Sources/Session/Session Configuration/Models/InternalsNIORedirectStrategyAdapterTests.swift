@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOHTTP1
@@ -134,3 +136,5 @@ private final class RecordingStrategy: Internals.RedirectStrategy, @unchecked Se
         return try handler(context)
     }
 }
+
+#endif

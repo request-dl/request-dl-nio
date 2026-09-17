@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import Crypto
 import NIOSSL
 import RequestDLInternals
@@ -589,5 +591,7 @@ private final class RecordingTrustDecisionObserver: TrustDecisionObserver, @unch
         decisions.append(decision)
     }
 }
+
+#endif
 
 #endif

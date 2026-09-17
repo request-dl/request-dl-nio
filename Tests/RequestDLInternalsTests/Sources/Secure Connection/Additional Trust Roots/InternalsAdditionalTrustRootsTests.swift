@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import NIOSSL
 import Testing
 
@@ -80,3 +82,5 @@ struct InternalsAdditionalTrustRootsTests {
         #expect(sut == expectedAdditionalTrustRoots)
     }
 }
+
+#endif

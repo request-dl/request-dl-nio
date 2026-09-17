@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import NIOHTTP1
 import Testing
 
@@ -137,3 +139,5 @@ struct InternalsProxyTests {
         #expect(lhs.hashValue == rhs.hashValue)
     }
 }
+
+#endif

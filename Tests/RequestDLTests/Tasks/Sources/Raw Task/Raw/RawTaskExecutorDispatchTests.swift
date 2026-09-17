@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import Testing
@@ -752,5 +754,7 @@ private final class CompleteResponseHandler: ChannelInboundHandler, @unchecked S
         context.writeAndFlush(wrapOutboundOut(buffer), promise: nil)
     }
 }
+
+#endif
 
 #endif

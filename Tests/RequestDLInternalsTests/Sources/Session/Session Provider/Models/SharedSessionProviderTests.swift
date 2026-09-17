@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import SwiftAsyncTesting
@@ -50,3 +52,5 @@ struct SharedSessionProviderTests {
         #expect(Internals.SharedSessionProvider().id == Internals.SharedSessionProvider().id)
     }
 }
+
+#endif

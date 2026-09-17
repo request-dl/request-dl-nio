@@ -2,9 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIO
-import NIOHTTP1
-import NIOSSL
+import RequestDLInternals
 
 @testable import RequestDL
 
@@ -19,22 +17,22 @@ extension LocalServer {
 
     struct ResponseConfiguration: Sendable {
 
-        let status: NIOHTTP1.HTTPResponseStatus
-        let headers: NIOHTTP1.HTTPHeaders
+        let status: HTTPStatus
+        let headers: Internals.HTTPHeaders
         let data: Data
 
-        init(status: NIOHTTP1.HTTPResponseStatus = .ok, headers: NIOHTTP1.HTTPHeaders = .init(), data: Data) {
+        init(status: HTTPStatus = .ok, headers: Internals.HTTPHeaders = .init(), data: Data) {
             self.status = status
             self.headers = headers
             self.data = data
         }
 
-        /// - Note: `Value: Encodable`, not `Any` plus `JSONSerialization` — every call site
-        /// passes a `String`, and `JSONEncoder` handles a bare top-level value the same way
-        /// `JSONSerialization`'s `.fragmentsAllowed` used to, without needing `Foundation`.
+        /// Every call site passes a plain `String`, and `JSONEncoder` handles a bare top-level
+        /// value the same way `JSONSerialization`'s `.fragmentsAllowed` used to, without needing
+        /// `Foundation`.
         init<Value: Encodable>(
-            status: NIOHTTP1.HTTPResponseStatus = .ok,
-            headers: NIOHTTP1.HTTPHeaders = .init(),
+            status: HTTPStatus = .ok,
+            headers: Internals.HTTPHeaders = .init(),
             jsonObject: Value
         ) throws {
             self.status = status

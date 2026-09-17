@@ -2,11 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 import Testing
 
 @testable import RequestDL
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -61,6 +64,7 @@ struct InternalsCompressionAlgorithmAdapterTests {
         #expect(trailer.asData() == Data([0xFF, 0xFE]))
     }
 
+    #if canImport(NIOCore)
     @Test
     func callAsFunction_whenByteBufferBackedInput_streamsBytesThroughReversed() throws {
         // Given: exercises `Internals.Bytes.asBytes()`'s `.byteBuffer`-backed branch, not just
@@ -74,6 +78,7 @@ struct InternalsCompressionAlgorithmAdapterTests {
         // Then
         #expect(compressed.asData() == Data(Array("hi".utf8).reversed()))
     }
+    #endif
 
     // MARK: - Portable gzip/deflate fast path
 

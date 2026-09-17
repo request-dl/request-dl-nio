@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import SwiftAsyncTesting
 import Testing
 
@@ -337,3 +339,5 @@ struct SessionExecutionTests {
         #expect(receivedBytes < payload.count / 2)
     }
 }
+
+#endif

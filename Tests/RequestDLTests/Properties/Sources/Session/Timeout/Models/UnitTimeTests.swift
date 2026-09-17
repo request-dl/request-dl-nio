@@ -9,6 +9,10 @@ import Testing
 
 struct UnitTimeTests {
 
+    // The six tests below compare `UnitTime.build()` against `NIOCore.TimeAmount` directly, so
+    // they only exist where NIOCore does; `UnitTime` itself, and its portable arithmetic, is
+    // covered regardless further down this file.
+    #if canImport(NIOCore)
     @Test
     func unitTime_whenNanoseconds_shouldBeValid() async throws {
         // Given
@@ -80,6 +84,7 @@ struct UnitTimeTests {
         // Then
         #expect(sut.build() == .hours(hours))
     }
+    #endif
 
     @Test
     func unitTime_whenInteger_shouldBeValid() async throws {
@@ -110,6 +115,7 @@ struct UnitTimeTests {
         #expect(lhs < rhs)
     }
 
+    #if canImport(NIOCore)
     @Test
     func unitTime_whenAddSecondsToHours_shouldValid() async throws {
         // Given
@@ -133,6 +139,7 @@ struct UnitTimeTests {
             (lhs - rhs).nanoseconds == (lhs.build() - rhs.build()).nanoseconds
         )
     }
+    #endif
 
     @Test
     func unitTime_whenHashable_shouldValid() async throws {

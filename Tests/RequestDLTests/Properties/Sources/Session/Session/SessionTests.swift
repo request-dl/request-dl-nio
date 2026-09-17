@@ -2,11 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
-import NIOPosix
 import RequestDLInternals
 import Testing
 import Tracing
+
+#if canImport(NIOCore)
+import AsyncHTTPClient
+import NIOPosix
+#endif
 
 @testable import RequestDL
 
@@ -60,6 +63,7 @@ struct SessionTests {
         #expect(sut is Internals.IdentifiedSessionProvider)
     }
 
+    #if canImport(NIOCore)
     @Test
     func session_whenInitWithEventLoopGroup_shouldBeValid() async throws {
         // Given
@@ -76,6 +80,7 @@ struct SessionTests {
         #expect(sut.uniqueIdentifier(with: options) == String(describing: ObjectIdentifier(eventLoopGroup)))
         #expect(sut.group(with: .init(isCompatibleWithNetworkFramework: true)) === eventLoopGroup)
     }
+    #endif
 
     @Test
     func session_whenWaitsForConnectivity_shouldBeValid() async throws {
@@ -282,6 +287,7 @@ struct SessionTests {
         }
     }
 
+    #if canImport(NIOCore)
     @Test
     func session_whenDecompressionDisabled_shouldBeValid() async throws {
         // Given
@@ -301,6 +307,7 @@ struct SessionTests {
                 )
         )
     }
+    #endif
 
     @Test
     func session_whenDecompressionAlgorithms_shouldBeValid() async throws {
@@ -381,6 +388,7 @@ struct SessionTests {
     // Compression moved off `Session` entirely. See `CompressionEnvironmentTests` for its
     // coverage now that it's environment/`Payload`-driven instead.
 
+    #if canImport(NIOCore)
     @Test
     func session_whenPreferredExecutor_shouldBeValid() async throws {
         // Given
@@ -394,6 +402,7 @@ struct SessionTests {
         #expect(resolved.session.configuration.preferredExecutor == .nioTransportServices)
         #expect(resolved.session.configuration.requiredExecutor == nil)
     }
+    #endif
 
     @Test
     func session_whenRequiredExecutor_shouldBeValid() async throws {
@@ -435,11 +444,13 @@ struct SessionTests {
         // Then
         #expect((resolved.session.configuration.tracer as? RecordingTracer) != nil)
 
+        #if canImport(NIOCore)
         // `async-http-client`'s own built-in tracing is always suppressed; RequestDL owns the
         // span lifecycle itself, in `RawTask.result()`, using `resolved.session.configuration
         // .tracer` directly.
         let builtTracer = try resolved.session.configuration.build().httpClientConfiguration.tracing.tracer
         #expect((builtTracer as? NoOpTracer) != nil)
+        #endif
     }
 
     @Test

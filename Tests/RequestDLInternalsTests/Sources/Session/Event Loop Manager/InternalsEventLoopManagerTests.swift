@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import SwiftAsyncTesting
@@ -76,3 +78,5 @@ struct InternalsEventLoopManagerTests {
         #expect(sut === provider.group(with: options))
     }
 }
+
+#endif

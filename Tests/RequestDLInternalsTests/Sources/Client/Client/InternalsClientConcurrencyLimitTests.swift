@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
@@ -79,3 +81,5 @@ private actor StartedCounter {
         value += 1
     }
 }
+
+#endif

@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import Testing
 
@@ -53,3 +55,5 @@ struct InternalsHTTPVersionTests {
         #expect(lhs != rhs)
     }
 }
+
+#endif

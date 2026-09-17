@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import Crypto
 import NIOCore
 import NIOSSL
@@ -686,3 +688,5 @@ extension InternalsSecureConnectionTests {
         #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 }
+
+#endif

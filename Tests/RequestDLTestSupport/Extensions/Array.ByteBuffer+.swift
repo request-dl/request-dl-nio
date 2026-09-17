@@ -2,16 +2,22 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
+#if canImport(NIOCore)
 import NIOFoundationEssentialsCompat
+#endif
 #else
 import struct Foundation.Data
 #endif
 
+#if canImport(NIOCore)
 extension [ByteBuffer] {
 
     func resolveData() -> [Data] {
@@ -21,6 +27,7 @@ extension [ByteBuffer] {
         }
     }
 }
+#endif
 
 extension [Internals.Bytes] {
 

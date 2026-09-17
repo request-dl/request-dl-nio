@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOConcurrencyHelpers
+import SwiftAsyncStream
 import Testing
 import Tracing
 
@@ -111,12 +111,13 @@ struct RequestServiceContextTests {
     }
 }
 
-private final class ContextCapturingTracer: Tracer, Sendable {
+private final class ContextCapturingTracer: Tracer, @unchecked Sendable {
 
-    private let box = NIOLockedValueBox<String?>(nil)
+    private let lock = SwiftAsyncStream.Lock()
+    private var _capturedTestID: String?
 
     var capturedTestID: String? {
-        box.withLockedValue { $0 }
+        lock.withLock { _capturedTestID }
     }
 
     func startSpan<Instant: TracerInstant>(
@@ -129,7 +130,7 @@ private final class ContextCapturingTracer: Tracer, Sendable {
         line: UInt
     ) -> NoOpTracer.NoOpSpan {
         let resolvedContext = context()
-        box.withLockedValue { $0 = resolvedContext.testID }
+        lock.withLock { _capturedTestID = resolvedContext.testID }
         return NoOpTracer.NoOpSpan(context: resolvedContext)
     }
 

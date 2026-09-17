@@ -2,9 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
 import NIO
 import NIOHTTP1
 import NIOSSL
+#endif
+
+import RequestDLInternals
 
 @testable import RequestDL
 
@@ -21,6 +25,7 @@ extension LocalServer {
         case client(CertificateResource)
         case psk(Data, String)
 
+        #if canImport(NIOCore)
         static func makeDefaultConfiguration() throws -> NIOSSL.TLSConfiguration {
             let server = Certificates().server()
 
@@ -66,5 +71,36 @@ extension LocalServer {
                 return tlsConfiguration
             }
         }
+        #endif
+
+        #if canImport(Darwin)
+        /// The `SecIdentity` ``PortableServer`` presents for every ``TLSOption`` case: there is
+        /// no public Network.framework API for a PSK provider the way NIOSSL's
+        /// `pskServerProvider` is, and none for requiring/verifying a client certificate against
+        /// an arbitrary trust root either, so `.psk`/`.client` can't be told apart from `.none`
+        /// down here. A ``TLSOption`` that actually needs either of those stays
+        /// `#if canImport(NIOCore)`-gated at the call site instead of pretending to work here.
+        func serverIdentity() throws -> Internals.IdentityHandle {
+            let server = Certificates().server()
+
+            let certificateDER = try Internals.CertificateChain.file(
+                server.certificateURL.absolutePath(percentEncoded: false)
+            ).resolvedDERBytes()[0]
+
+            let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(
+                from: .privateKey(
+                    .init(
+                        server.privateKeyURL.absolutePath(percentEncoded: false),
+                        format: server.format
+                    )
+                )
+            )
+
+            return try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+        }
+        #endif
     }
 }

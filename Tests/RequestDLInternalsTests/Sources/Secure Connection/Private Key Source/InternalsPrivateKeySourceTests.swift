@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(NIOCore)
+
 import NIOSSL
 import Testing
 
@@ -26,3 +28,5 @@ struct InternalsPrivateKeySourceTests {
         #expect(resolved == expectedSource)
     }
 }
+
+#endif

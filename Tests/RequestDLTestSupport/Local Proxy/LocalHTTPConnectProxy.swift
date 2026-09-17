@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `.urlSession` handles proxying through the OS's own network stack, not a RequestDL-owned
+// connection this local fixture could intercept, so there's nothing for a `NIOTransport`-off
+// build to exercise here. `InternalsProxyTests`/`ProxyTests` (config mapping only, no actual
+// proxied connection either way) stay available; this fixture doesn't need to.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import SwiftAsyncStream
@@ -398,3 +404,5 @@ extension StringProtocol {
         return String(value)
     }
 }
+
+#endif

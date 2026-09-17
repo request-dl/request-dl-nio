@@ -2,11 +2,14 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import Testing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 struct InternalsByteURLTests {
 
@@ -21,6 +24,7 @@ struct InternalsByteURLTests {
         #expect(url.writtenBytes == .zero)
     }
 
+    #if canImport(NIOCore)
     @Test
     func byteURL_whenInitWithBuffer() async {
         // Given
@@ -50,6 +54,7 @@ struct InternalsByteURLTests {
         #expect(url.bytes.readerIndex == .zero)
         #expect(url.writtenBytes == 64)
     }
+    #endif
 
     @Test
     func byteURL_whenEquals() {
