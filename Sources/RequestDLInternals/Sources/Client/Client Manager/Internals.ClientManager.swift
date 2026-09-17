@@ -113,6 +113,7 @@ extension Internals {
             #endif
             #endif
 
+            #if canImport(Darwin)
             let sessionProviderID =
                 "URLSession."
                 + provider.uniqueIdentifier(
@@ -137,6 +138,7 @@ extension Internals {
                     )
                 )
             }
+            #endif
         }
 
         // MARK: - Private methods
