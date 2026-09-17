@@ -209,11 +209,22 @@ extension RequestBody: AsyncSequence {
         /// compressing body. A fixed body never throws, but shares this signature so callers
         /// don't need to know which kind of `RequestBody` they were handed.
         ///
+        /// - Note: `.noCopy`, not the default `.automatic`: `asData(byteTransferStrategy:)`'s
+        /// `.automatic` heuristic (`NIOCore.ByteBuffer.getData`'s own) copies any chunk at or
+        /// under 256 KiB, which is every chunk `Internals.BodySequence`/`CompressingByteSequence`
+        /// ever produce in practice (`BodySequence`'s own chunk size tops out at 1 MiB only for
+        /// bodies large enough that `.automatic` would already skip the copy anyway). Each chunk
+        /// here is already its own right-sized buffer, not a slice of a larger one `.noCopy`
+        /// would keep needlessly resident, so there is no downside to sharing it as is: the
+        /// underlying `ByteBuffer`'s own copy-on-write still protects correctness the moment
+        /// `BodySequence`'s reused buffer is next written into while this call's `Data` is still
+        /// alive, exactly as it already does for two `Internals.Bytes` values sharing storage
+        /// anywhere else in this package.
         public mutating func next() async throws -> Data? {
             var bytesIterator = BytesIterator(backing: backing)
             var element = try await bytesIterator.next()
             backing = bytesIterator.backing
-            return element?.asData()
+            return element?.asData(byteTransferStrategy: .noCopy)
         }
     }
 
