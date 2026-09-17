@@ -40,6 +40,14 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
     private var strm = z_stream()
     private var isOpen = true
 
+    /// `drain(flush:)`'s own output buffer, held here instead of allocated fresh on every call:
+    /// a stream gets one `compress(_:)` call per request body chunk, so a fresh, zero-filled
+    /// 32 KiB `Array` per call adds up to one allocation per chunk for the lifetime of an
+    /// upload. Reusing this one is safe without re-zeroing it between calls: `drain(flush:)`
+    /// only ever reads back the first `produced` bytes it just wrote (`chunk.prefix(produced)`),
+    /// never whatever a previous call left past that point.
+    private var chunk = [UInt8](repeating: .zero, count: PortableZlibCompressorStream.outputChunkSize)
+
     // MARK: - Inits
 
     /// - Parameter windowBits: `15` for an RFC 1950 zlib stream, `15 + 16` for an RFC 1952 gzip
@@ -96,13 +104,12 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
 
     // MARK: - Private methods
 
-    /// Repeatedly calls `deflate`, each time into a fresh, empty output buffer, until it comes
-    /// back not full (`avail_out != 0`): zlib's own documented signal that it has produced
-    /// everything it can for the current `avail_in`/`flush` combination. `strm.next_in`/
-    /// `avail_in` must already be set by the caller; this only drives the output side.
+    /// Repeatedly calls `deflate`, each time into ``chunk``, until it comes back not full
+    /// (`avail_out != 0`): zlib's own documented signal that it has produced everything it can
+    /// for the current `avail_in`/`flush` combination. `strm.next_in`/`avail_in` must already be
+    /// set by the caller; this only drives the output side.
     private func drain(flush: Int32) throws -> [UInt8] {
         var output = [UInt8]()
-        var chunk = [UInt8](repeating: .zero, count: Self.outputChunkSize)
 
         repeat {
             let produced = try chunk.withUnsafeMutableBufferPointer { outBuffer -> Int in
