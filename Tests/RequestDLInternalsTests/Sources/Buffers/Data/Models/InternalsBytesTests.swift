@@ -154,6 +154,22 @@ struct InternalsBytesTests {
         #expect(bytes.readableBytes == .zero)
     }
 
+    @Test
+    func bytes_whenDataBacked_appendsToExistingDataWithoutMovingTheCursor() {
+        // Given
+        var bytes = Internals.Bytes()
+        bytes.writeBytes(Data(" world".utf8))
+        var accumulator = Data("hello".utf8)
+
+        // When
+        bytes.append(to: &accumulator)
+
+        // Then
+        #expect(accumulator == Data("hello world".utf8))
+        #expect(bytes.readerIndex == .zero)
+        #expect(bytes.readableBytes == 6)
+    }
+
     // MARK: - ByteBuffer-backed
 
     @Test
@@ -214,5 +230,19 @@ struct InternalsBytesTests {
         // Then
         #expect(bytes.readableBytes == 5)
         #expect(bytes.asData() == Data([UInt8]("ab".utf8) + [0, 0, 0]))
+    }
+
+    @Test
+    func bytes_whenByteBufferBacked_appendsToExistingDataWithoutMovingTheCursor() {
+        // Given
+        let bytes = Internals.Bytes(ByteBuffer(string: " world"))
+        var accumulator = Data("hello".utf8)
+
+        // When
+        bytes.append(to: &accumulator)
+
+        // Then
+        #expect(accumulator == Data("hello world".utf8))
+        #expect(bytes.readerIndex == .zero)
     }
 }

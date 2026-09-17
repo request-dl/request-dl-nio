@@ -224,10 +224,10 @@ struct InternalsURLSessionClientSessionTaskTests {
         var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
         request.httpMethod = "POST"
 
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
         for start in Swift.stride(from: 0, to: payload.count, by: 4_096) {
             let end = Swift.min(start + 4_096, payload.count)
-            continuation.yield(Data(payload[start..<end]))
+            continuation.yield(Internals.Bytes(Data(payload[start..<end])))
         }
         continuation.finish()
 
@@ -283,8 +283,8 @@ struct InternalsURLSessionClientSessionTaskTests {
         var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
         request.httpMethod = "POST"
 
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
-        continuation.yield(Data(payload))
+        let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
+        continuation.yield(Internals.Bytes(Data(payload)))
         continuation.finish()
 
         // See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`)

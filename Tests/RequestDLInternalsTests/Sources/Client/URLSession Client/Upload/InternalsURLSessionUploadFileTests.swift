@@ -31,10 +31,10 @@ struct InternalsURLSessionUploadFileTests {
         let payload = Data((0..<1_000).map { UInt8($0 % 251) })
         let chunkSize = 77
 
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
         for start in Swift.stride(from: 0, to: payload.count, by: chunkSize) {
             let end = Swift.min(start + chunkSize, payload.count)
-            continuation.yield(Data(payload[start..<end]))
+            continuation.yield(Internals.Bytes(Data(payload[start..<end])))
         }
         continuation.finish()
 
@@ -52,7 +52,7 @@ struct InternalsURLSessionUploadFileTests {
     @Test
     func write_whenBodyIsEmpty_returnsEmptyData() async throws {
         // Given
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
         continuation.finish()
 
         // When
@@ -74,10 +74,10 @@ struct InternalsURLSessionUploadFileTests {
         let payload = Data((0..<10_000).map { UInt8($0 % 251) })
         let chunkSize = 777
 
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
         for start in Swift.stride(from: 0, to: payload.count, by: chunkSize) {
             let end = Swift.min(start + chunkSize, payload.count)
-            continuation.yield(Data(payload[start..<end]))
+            continuation.yield(Internals.Bytes(Data(payload[start..<end])))
         }
         continuation.finish()
 
@@ -101,8 +101,8 @@ struct InternalsURLSessionUploadFileTests {
         // read loop's own error path, which never creates a file at all.
         struct UpstreamError: Error, Equatable {}
 
-        let (stream, continuation) = AsyncThrowingStream<Data, Error>.makeStream()
-        continuation.yield(Data([0, 1, 2, 3]))
+        let (stream, continuation) = AsyncThrowingStream<Internals.Bytes, Error>.makeStream()
+        continuation.yield(Internals.Bytes(Data([0, 1, 2, 3])))
         continuation.finish(throwing: UpstreamError())
 
         // When / Then
@@ -117,8 +117,8 @@ struct InternalsURLSessionUploadFileTests {
         // fails while still draining the remainder into it.
         struct UpstreamError: Error, Equatable {}
 
-        let (stream, continuation) = AsyncThrowingStream<Data, Error>.makeStream()
-        continuation.yield(Data(repeating: 0, count: 4_096))
+        let (stream, continuation) = AsyncThrowingStream<Internals.Bytes, Error>.makeStream()
+        continuation.yield(Internals.Bytes(Data(repeating: 0, count: 4_096)))
         continuation.finish(throwing: UpstreamError())
 
         // When / Then: the failing path never hands back a `FileBufferURL` for the caller to
@@ -132,8 +132,8 @@ struct InternalsURLSessionUploadFileTests {
     @Test
     func removeIfTemporary_afterFileSpillover_deletesTheFile() async throws {
         // Given
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
-        continuation.yield(Data(repeating: 0, count: 4_096))
+        let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
+        continuation.yield(Internals.Bytes(Data(repeating: 0, count: 4_096)))
         continuation.finish()
 
         let materialized = try await Internals.URLSessionUploadFile.write(body: stream, inMemoryThreshold: 2_048)

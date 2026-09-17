@@ -328,6 +328,26 @@ extension Internals {
             }
         }
 
+        /// Appends the readable range straight into `data`, without moving this cursor or
+        /// materializing a standalone ``Bytes``-owned `Data` first.
+        ///
+        /// Prefer this over `data.append(contentsOf: asData())` when accumulating several chunks
+        /// into one growing buffer: `asData()` pays to materialize (and, for the `.byteBuffer`
+        /// case, cache) an intermediate `Data` before `append` can copy from it, paying the copy
+        /// twice. This copies once, straight from whichever storage backs this value into
+        /// `data`'s own storage — matching what appending `NIOCore.ByteBuffer.readableBytesView`
+        /// directly used to cost before this type existed.
+        package func append(to data: inout Data) {
+            switch storage {
+            case .data(let dataStorage):
+                data.append(dataStorage.data[dataStorage.readerIndex..<dataStorage.writerIndex])
+            #if canImport(NIOCore)
+            case .byteBuffer(let buffer):
+                data.append(contentsOf: buffer.readableBytesView)
+            #endif
+            }
+        }
+
         #if canImport(NIOCore)
         /// The readable range as a `NIOCore.ByteBuffer`, without moving this cursor.
         ///

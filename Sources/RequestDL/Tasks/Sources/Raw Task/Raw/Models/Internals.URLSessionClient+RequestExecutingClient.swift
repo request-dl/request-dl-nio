@@ -29,7 +29,7 @@ extension Internals.URLSessionClient: RequestExecutingClient {
         if let body = configuration.body {
             return try await execute(
                 request: try configuration.buildURLRequestWithoutBody(),
-                streaming: body,
+                streaming: body.bytesSequence,
                 readingMode: configuration.readingMode,
                 uploadingBytes: body.totalSize,
                 decompression: decompression,

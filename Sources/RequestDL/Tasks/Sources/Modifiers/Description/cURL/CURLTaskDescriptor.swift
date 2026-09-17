@@ -102,8 +102,8 @@ public struct CURLTaskDescriptor: TaskDescriptor {
             var data = Data()
             data.reserveCapacity(body.totalSize)
 
-            for try await chunk in body {
-                data.append(chunk)
+            for try await chunk in body.bytesSequence {
+                chunk.append(to: &data)
             }
 
             fragments.append("--data-raw " + curlShellQuote(Array(data)))
