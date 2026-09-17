@@ -77,6 +77,12 @@ struct InternalsCompressionAlgorithmAdapterTests {
 
     // MARK: - Portable gzip/deflate fast path
 
+    // `PortableGzipCompressorStream`/`PortableDeflateCompressorStream`/
+    // `PortableZlibCompressorNativeStream` only exist where `canImport(zlib)` holds (see their
+    // own files' doc comments) — `true` on every Apple platform, not on Linux without a
+    // dedicated system-library target this package doesn't declare.
+    #if canImport(zlib)
+
     /// Constructs `PortableGzipCompressorStream`/`PortableDeflateCompressorStream` directly,
     /// bypassing `GzipAlgorithm`/`DeflateAlgorithm`'s own `#if canImport(NIOCore)` selection
     /// (which, in this test build, always picks `NIOHTTPCompressorStreamBridge` instead): proves
@@ -133,4 +139,6 @@ struct InternalsCompressionAlgorithmAdapterTests {
         // Then: still produces a valid zlib stream through the native path.
         #expect(wholeStream.prefix(2) == Data([0x78, 0x9C]))
     }
+
+    #endif
 }

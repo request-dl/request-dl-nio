@@ -2,6 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `import zlib` (and every type under test here) only exists where `canImport(zlib)` holds, same
+// gate `PortableZlibCompressorStream` itself uses. That's `true` on every Apple platform (the SDK
+// ships a module map for it) but not on Linux without a dedicated system-library target this
+// package doesn't declare, so this file has to stay out of the Linux build entirely rather than
+// just relying on the source side's own guard.
+#if canImport(zlib)
+
 import Testing
 import zlib
 
@@ -196,3 +203,5 @@ struct PortableZlibCompressorStreamTests {
         #expect(compressed.prefix(3) == [0x1F, 0x8B, 0x08])
     }
 }
+
+#endif
