@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(NIOCore)
-
 import Testing
 
 @testable import RequestDLInternals
@@ -202,6 +200,11 @@ struct InternalsSessionConfigurationExecutorTests {
         #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
     }
 
+    // PSK (`pskHint`) only exists `#if canImport(NIOCore)`, same as the rest of this file's
+    // `resolveExecutor()`/`requireExecutor()` coverage below -- unlike those, this one test
+    // happens to fit the `urlSessionIncompatibilityReasons()` family above, so it's gated
+    // individually rather than moving it out of that grouping.
+    #if canImport(NIOCore)
     @Test
     func configuration_whenSecureConnectionIncompatible_reasonsPropagate() async throws {
         // Given
@@ -217,8 +220,11 @@ struct InternalsSessionConfigurationExecutorTests {
         // Then
         #expect(configuration.urlSessionIncompatibilityReasons().contains(.pskHint))
     }
+    #endif
 
     // MARK: - resolveExecutor()
+
+    #if canImport(NIOCore)
 
     @Test
     func resolveExecutor_whenNothingSet_resolvesToURLSessionOnDarwin() async throws {
@@ -854,6 +860,5 @@ struct InternalsSessionConfigurationExecutorTests {
         #expect(sut == .nio)
         #endif
     }
+    #endif
 }
-
-#endif

@@ -2,15 +2,16 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(NIOCore)
-
-import NIOCore
-import NIOPosix
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOCore
+import NIOPosix
+#endif
 
 #if canImport(Darwin)
 
@@ -36,6 +37,7 @@ import class Foundation.ProcessInfo
 /// This file proves the layer above that: a real `DataTask`, resolved through an actual
 /// `Property` tree exactly as an app would build one, and dispatched via the *same* shared pool
 /// `RawTask.result()` itself reads from, not a fresh, test-isolated manager.
+@Suite(.knownLocalServerIdentityIssue)
 struct RawTaskExecutorDispatchTests {
 
     @Test
@@ -86,6 +88,7 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
+    #if canImport(NIOCore)
     @Test
     func dataTask_whenNIORequired_actuallyDispatchesOverNIOEvenThoughURLSessionWouldBeCompatible() async throws {
         // Given: same shape as above (would default to `.urlSession` on Darwin), but this time
@@ -135,6 +138,7 @@ struct RawTaskExecutorDispatchTests {
             return
         }
     }
+    #endif
 
     /// Regression coverage for the gap `Session.compression(_:)` used to have: its
     /// `NIOHTTPRequestCompressor` was spliced into the `.nio` executor's own connection pipeline
@@ -285,6 +289,7 @@ struct RawTaskExecutorDispatchTests {
     /// Companion to both tests above: NIO never synthesizes its own `User-Agent`, so dropping
     /// RequestDL's default there, the way `.urlSession` does, would just send the request
     /// with none. RequestDL's neutral default must survive under `.nio`.
+    #if canImport(NIOCore)
     @Test
     func dataTask_withDefaultUserAgentOverNIO_keepsRequestDLsNeutralDefault() async throws {
         // Given
@@ -318,6 +323,7 @@ struct RawTaskExecutorDispatchTests {
         // Then
         #expect(result.receivedUserAgentHeader == ProcessInfo.processInfo.userAgent)
     }
+    #endif
 
     /// Regression coverage for combining RequestDL's default with a plain `CustomHeader(name:
     /// "user-agent", ...)`, not `UserAgentHeader(_:)`. `HeaderNode.make(_:)` matches "User-Agent"
@@ -366,6 +372,12 @@ struct RawTaskExecutorDispatchTests {
         // `hasDefaultUserAgent`), and both landed on the wire merged into one header.
         #expect(result.receivedUserAgentHeader == "\(ProcessInfo.processInfo.userAgent),ABC")
     }
+
+    // The next two tests both need a server that answers partially or hangs instead of
+    // responding fully and immediately the way `LocalServer` always does, so they drive a raw
+    // NIO server fixture (defined at the bottom of this file) instead, and are gated the same way
+    // it is.
+    #if canImport(NIOCore)
 
     /// Cancellation, validated for real. `Internals.TaskSeed` (transport-agnostic) cancels when
     /// the response is *dropped*, not when the awaiting `_Concurrency.Task` is marked cancelled:
@@ -502,6 +514,7 @@ struct RawTaskExecutorDispatchTests {
             #expect(!stillRunning)
         }
     }
+    #endif
 
     /// Confirms the identity-building failure a real mTLS `DataTask` hits under `.urlSession` on
     /// this SwiftPM test harness (no Keychain Sharing entitlement; see
@@ -578,6 +591,9 @@ struct RawTaskExecutorDispatchTests {
     /// exposes no inspectable count of its own, so this proves it indirectly: with
     /// `maximumConcurrentConnections(1)`, a second request genuinely cannot proceed while the
     /// first still holds the only permit, and does proceed once the first is cancelled.
+    //
+    // Also raw-NIO-server-backed, same reasoning as the two tests above.
+    #if canImport(NIOCore)
     @Test
     func downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest() async throws {
         try await withPartialResponseServer { firstPort in
@@ -639,7 +655,13 @@ struct RawTaskExecutorDispatchTests {
             }
         }
     }
+    #endif
 }
+
+// Everything below backs the three tests above that are gated `#if canImport(NIOCore)`: the raw
+// NIO server standing in for a connection that answers partially or hangs (`LocalServer` always
+// answers immediately, so it can't), and the two actors coordinating the queued-request test.
+#if canImport(NIOCore)
 
 /// Lets a test hold a cancellation at an exact, chosen moment instead of racing a fixed delay
 /// against it. Used by `downloadTask_whenCancelledWhileHoldingTheOnlyPermit_releasesItForAQueuedRequest`
