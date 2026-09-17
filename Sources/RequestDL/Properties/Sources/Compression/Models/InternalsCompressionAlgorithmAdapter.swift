@@ -61,8 +61,7 @@ private struct InternalsCompressorStreamAdapter: Internals.CompressorStream {
     // MARK: - Internal methods
 
     mutating func callAsFunction(compressing bytes: Internals.Bytes) throws -> Internals.Bytes {
-        var bytes = bytes
-        return Internals.Bytes(Data(try stream(compressing: Array(bytes.asData()))))
+        Internals.Bytes(Data(try stream(compressing: bytes.asBytes())))
     }
 
     mutating func finish() throws -> Internals.Bytes {

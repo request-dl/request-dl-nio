@@ -348,6 +348,25 @@ extension Internals {
             }
         }
 
+        /// The readable range as `[UInt8]`, without moving this cursor or materializing a
+        /// standalone `Data` first.
+        ///
+        /// Prefer this over `Array(asData())` for a caller that only needs `[UInt8]` once (e.g.
+        /// handing bytes to a `[UInt8]`-based API like `RequestDL.Compressor`): `asData()` pays
+        /// to materialize (and, for the `.byteBuffer` case, cache) an intermediate `Data` before
+        /// `Array(_:)` can copy from it, paying the copy twice. This copies once, straight from
+        /// whichever storage backs this value.
+        package func asBytes() -> [UInt8] {
+            switch storage {
+            case .data(let dataStorage):
+                return Array(dataStorage.data[dataStorage.readerIndex..<dataStorage.writerIndex])
+            #if canImport(NIOCore)
+            case .byteBuffer(let buffer):
+                return Array(buffer.readableBytesView)
+            #endif
+            }
+        }
+
         #if canImport(NIOCore)
         /// The readable range as a `NIOCore.ByteBuffer`, without moving this cursor.
         ///
