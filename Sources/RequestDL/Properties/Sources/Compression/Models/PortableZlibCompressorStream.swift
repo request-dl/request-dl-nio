@@ -11,7 +11,14 @@
 // verification script the way the two callers' history did before this file existed.
 #if canImport(zlib)
 
+import RequestDLInternals
 import zlib
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 /// Drives zlib's own incremental `deflate()` C API: genuinely streaming, bounded-memory
 /// compression, backing both ``PortableDeflateCompressorStream`` (RFC 1950 zlib wrapper) and
@@ -42,11 +49,11 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
 
     /// `drain(flush:)`'s own output buffer, held here instead of allocated fresh on every call:
     /// a stream gets one `compress(_:)` call per request body chunk, so a fresh, zero-filled
-    /// 32 KiB `Array` per call adds up to one allocation per chunk for the lifetime of an
+    /// 32 KiB buffer per call adds up to one allocation per chunk for the lifetime of an
     /// upload. Reusing this one is safe without re-zeroing it between calls: `drain(flush:)`
     /// only ever reads back the first `produced` bytes it just wrote (`chunk.prefix(produced)`),
     /// never whatever a previous call left past that point.
-    private var chunk = [UInt8](repeating: .zero, count: PortableZlibCompressorStream.outputChunkSize)
+    private var chunk = Data(repeating: .zero, count: PortableZlibCompressorStream.outputChunkSize)
 
     // MARK: - Inits
 
@@ -78,12 +85,21 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
     // MARK: - Internal methods
 
     /// Feeds `bytes` through `deflate(Z_NO_FLUSH)`, returning whatever compressed output zlib
-    /// produced so far. May return an empty array: zlib is free to buffer internally until it
-    /// has enough to emit a block, exactly as ``CompressorStream``'s own doc comment allows.
-    func compress(_ bytes: [UInt8]) throws -> [UInt8] {
+    /// produced so far. May return empty `Data`: zlib is free to buffer internally until it has
+    /// enough to emit a block, exactly as ``CompressorStream``'s own doc comment allows.
+    ///
+    /// - Note: `Data`, not `[UInt8]`: `PortableGzipCompressorStream`/`PortableDeflateCompressorStream`
+    /// convert to and from `[UInt8]` at their own boundary, only because the public `Compressor`
+    /// API they conform to is `[UInt8]`-based. Operating on `Data` here instead lets
+    /// ``PortableZlibCompressorNativeStream`` drive this type straight from an `Internals.Bytes`
+    /// chunk's own `Data` (`asData()`, no `Array` materialization) and hand the result straight
+    /// back as `Internals.Bytes` (`Internals.Bytes(_:)`, no intermediate wrap), instead of paying
+    /// an `Internals.Bytes` ⇄ `[UInt8]` round trip that a `[UInt8]`-shaped engine would force on
+    /// every chunk even when nothing outside this package ever touches it as `[UInt8]`.
+    func compress(_ bytes: Data) throws -> Data {
         var bytes = bytes
-        return try bytes.withUnsafeMutableBufferPointer { input in
-            strm.next_in = input.baseAddress
+        return try bytes.withUnsafeMutableBytes { (input: UnsafeMutableRawBufferPointer) in
+            strm.next_in = input.bindMemory(to: UInt8.self).baseAddress
             strm.avail_in = UInt32(input.count)
             return try drain(flush: Z_NO_FLUSH)
         }
@@ -91,7 +107,7 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
 
     /// Flushes and closes the stream, returning the final compressed bytes (the last block plus
     /// the format's trailer). Must be called exactly once, after the last ``compress(_:)`` call.
-    func finish() throws -> [UInt8] {
+    func finish() throws -> Data {
         defer {
             deflateEnd(&strm)
             isOpen = false
@@ -108,12 +124,12 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
     /// (`avail_out != 0`): zlib's own documented signal that it has produced everything it can
     /// for the current `avail_in`/`flush` combination. `strm.next_in`/`avail_in` must already be
     /// set by the caller; this only drives the output side.
-    private func drain(flush: Int32) throws -> [UInt8] {
-        var output = [UInt8]()
+    private func drain(flush: Int32) throws -> Data {
+        var output = Data()
 
         repeat {
-            let produced = try chunk.withUnsafeMutableBufferPointer { outBuffer -> Int in
-                strm.next_out = outBuffer.baseAddress
+            let produced = try chunk.withUnsafeMutableBytes { (outBuffer: UnsafeMutableRawBufferPointer) -> Int in
+                strm.next_out = outBuffer.bindMemory(to: UInt8.self).baseAddress
                 strm.avail_out = UInt32(outBuffer.count)
 
                 let result = deflate(&strm, flush)
@@ -124,10 +140,41 @@ final class PortableZlibCompressorStream: @unchecked Sendable {
                 return outBuffer.count - Int(strm.avail_out)
             }
 
-            output.append(contentsOf: chunk.prefix(produced))
+            output.append(chunk.prefix(produced))
         } while strm.avail_out == .zero
 
         return output
+    }
+}
+
+/// The `Internals.Bytes`-native stream `PortableGzipCompressorStream`/
+/// `PortableDeflateCompressorStream` bridge to the public, `[UInt8]`-based `CompressorStream`
+/// through their own `nativeStream` property. `InternalsCompressionAlgorithmAdapter` reaches for
+/// this directly instead of going through `callAsFunction(compressing:)`, so driving the portable
+/// gzip/deflate compressors from inside the package skips the `[UInt8]` conversion entirely —
+/// mirrors `NIOHTTPCompressorStreamBridge.nativeStream`'s own reasoning, adapted to a
+/// `Data`-based engine instead of a `ByteBuffer`-based one.
+struct PortableZlibCompressorNativeStream: Internals.CompressorStream {
+
+    // MARK: - Private properties
+
+    private let stream: PortableZlibCompressorStream
+
+    // MARK: - Inits
+
+    init(stream: PortableZlibCompressorStream) {
+        self.stream = stream
+    }
+
+    // MARK: - Internal methods
+
+    mutating func callAsFunction(compressing bytes: Internals.Bytes) throws -> Internals.Bytes {
+        var bytes = bytes
+        return Internals.Bytes(try stream.compress(bytes.asData()))
+    }
+
+    mutating func finish() throws -> Internals.Bytes {
+        Internals.Bytes(try stream.finish())
     }
 }
 

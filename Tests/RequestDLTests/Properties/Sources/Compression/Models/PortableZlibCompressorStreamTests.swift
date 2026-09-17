@@ -7,6 +7,12 @@ import zlib
 
 @testable import RequestDL
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 /// Round-trips `PortableZlibCompressorStream`'s output back through zlib's own incremental
 /// `inflate()` — the authoritative decoder for both the RFC 1950 (`windowBits: 15`) and RFC 1952
 /// (`windowBits: 15 + 16`) wire formats `PortableDeflateCompressorStream`/
@@ -64,13 +70,13 @@ struct PortableZlibCompressorStreamTests {
     ) throws -> [UInt8] {
         let stream = try PortableZlibCompressorStream(windowBits: windowBits)
 
-        var output = [UInt8]()
+        var output = Data()
         for chunk in chunks {
-            output += try stream.compress(chunk)
+            output += try stream.compress(Data(chunk))
         }
         output += try stream.finish()
 
-        return output
+        return Array(output)
     }
 
     // MARK: - Tests

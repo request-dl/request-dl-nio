@@ -9,6 +9,12 @@
 // comment for why that's a wider gate than "chosen at runtime" needs.
 #if canImport(zlib)
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 /// Portable ``CompressorStream`` behind ``GzipAlgorithm`` when NIO isn't available, producing the
 /// same wire format (`Content-Encoding: gzip`, i.e. an RFC 1952 gzip stream) that
 /// ``NIOHTTPCompressorStreamBridge`` produces through `NIOHTTPRequestCompressor`, using zlib's
@@ -25,6 +31,14 @@ struct PortableGzipCompressorStream: CompressorStream {
 
     private let stream: PortableZlibCompressorStream
 
+    // MARK: - Internal properties
+
+    /// The `Internals.Bytes`-native stream this bridges to the public, `[UInt8]`-based
+    /// `CompressorStream`. See ``PortableZlibCompressorNativeStream``'s own doc comment.
+    var nativeStream: PortableZlibCompressorNativeStream {
+        .init(stream: stream)
+    }
+
     // MARK: - Inits
 
     init() throws {
@@ -34,11 +48,11 @@ struct PortableGzipCompressorStream: CompressorStream {
     // MARK: - Internal methods
 
     mutating func callAsFunction(compressing bytes: [UInt8]) throws -> [UInt8] {
-        try stream.compress(bytes)
+        Array(try stream.compress(Data(bytes)))
     }
 
     mutating func finish() throws -> [UInt8] {
-        try stream.finish()
+        Array(try stream.finish())
     }
 }
 
