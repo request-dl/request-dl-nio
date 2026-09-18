@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.Client` (AsyncHTTPClient-backed) only exists under `canImport(NIOCore)`;
+// `.urlSession` has its own separate `Internals.URLSessionClient` with no equivalent
+// `maximumConcurrentConnections` semaphore to test here.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
@@ -79,3 +84,5 @@ private actor StartedCounter {
         value += 1
     }
 }
+
+#endif

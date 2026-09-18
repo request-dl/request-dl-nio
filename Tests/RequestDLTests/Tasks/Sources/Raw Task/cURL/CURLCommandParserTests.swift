@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-import NIOSSL
 import RequestDLInternals
 import Testing
 

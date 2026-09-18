@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Reads expiration via `NIOSSLCertificate.fromPEMFile`, which only exists under
+// `canImport(NIOCore)`; no portable (SwiftASN1-backed) certificate-expiration reader exists yet
+// to cover this fixture check under `.urlSession`-only builds.
+#if canImport(NIOCore)
+
 import NIOSSL
 import RequestDLInternals
 import Testing
@@ -62,3 +67,5 @@ struct CertificateFixturesExpirationTests {
         }
     }
 }
+
+#endif

@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.UnsafeTask` and `Internals.Client` (AsyncHTTPClient-backed) only exist under
+// `canImport(NIOCore)`; `.urlSession` has no equivalent to test here.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
@@ -112,3 +116,5 @@ final class HangingServerHandler: ChannelInboundHandler, @unchecked Sendable {
         // comes, until the test cancels it.
     }
 }
+
+#endif

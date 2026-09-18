@@ -2,13 +2,20 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import Testing
 
 @testable import RequestDLInternals
 
+// Only the two `.build()` tests below need AsyncHTTPClient; `Internals.RedirectConfiguration
+// .build()` only exists under `canImport(NIOCore)` (it returns `HTTPClient.Configuration
+// .RedirectConfiguration`).
+#if canImport(NIOCore)
+import AsyncHTTPClient
+#endif
+
 struct InternalsRedirectConfigurationTests {
 
+    #if canImport(NIOCore)
     @Test
     func redirect_whenDisallow() {
         // Given
@@ -42,6 +49,7 @@ struct InternalsRedirectConfigurationTests {
                 )
         )
     }
+    #endif
 
     @Test
     func redirect_whenEquals() {

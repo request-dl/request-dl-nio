@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Every test here goes through `Internals.PrivateKey.build()`, which only exists under
+// `canImport(NIOCore)` (it returns `NIOSSLPrivateKey`).
+#if canImport(NIOCore)
+
 import NIOSSL
 import Testing
 
@@ -275,3 +279,5 @@ struct InternalsPrivateKeyTests {
         }
     }
 }
+
+#endif

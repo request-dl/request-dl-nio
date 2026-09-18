@@ -3,7 +3,7 @@
 //
 
 import AsyncAlgorithms
-import NIOFileSystem
+import RequestDLInternals
 import SwiftAsyncTesting
 import Testing
 
@@ -664,7 +664,7 @@ extension DataCacheTests {
 
         // Then: no leftover ".cached" directory under this cache's own storage directory.
         var foundOrphan = false
-        try? await FileSystem.shared.withDirectoryHandle(atPath: dataCache.directoryURL.filePath) { dir in
+        try? await Internals.fileSystem.withDirectoryHandle(atPath: dataCache.directoryURL.filePath) { dir in
             for try await entry in dir.listContents() where entry.name.string.hasSuffix(".cached") {
                 foundOrphan = true
             }

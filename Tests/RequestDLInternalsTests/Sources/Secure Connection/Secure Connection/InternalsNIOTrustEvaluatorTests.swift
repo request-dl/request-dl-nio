@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.NIOTrustEvaluator` only exists under `canImport(NIOCore)`; `.urlSession` has its
+// own separate trust-evaluation path (`Internals.DarwinTrustEvaluation`/`ServerTrustPolicy`).
+#if canImport(NIOCore)
+
 import Crypto
 import NIOCore
 import NIOPosix
@@ -184,3 +188,5 @@ struct InternalsNIOTrustEvaluatorTests {
     /// `openssl rand -base64 32`, doesn't match any certificate in the chain, on purpose.
     private static let unrelatedPinBase64 = "tH0BF9jVlk3y2e1huTk41UtsPgrhf4cFbJLczhAfH3g="
 }
+
+#endif

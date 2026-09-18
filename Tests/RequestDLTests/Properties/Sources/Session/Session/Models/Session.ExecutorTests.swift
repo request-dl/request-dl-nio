@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Exercises `.nioTransportServices`/`.nio`, which only exist under `canImport(NIOCore)` (see
+// `Session.Executor`'s own doc comment): under a portable build, `.urlSession` is the only case,
+// so there is nothing left here worth a separate, standalone test.
+#if canImport(NIOCore)
+
 import RequestDLInternals
 import Testing
 
@@ -36,3 +41,5 @@ struct SessionExecutorTests {
         #expect(cases.count == 3)
     }
 }
+
+#endif

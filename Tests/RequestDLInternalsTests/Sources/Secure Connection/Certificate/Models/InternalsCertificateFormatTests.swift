@@ -2,10 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import Testing
 
 @testable import RequestDLInternals
+
+// `Internals.Certificate.Format.build()` only exists under `canImport(NIOCore)` (it returns
+// `NIOSSLSerializationFormats`); `.pathExtension` is the only portable member, and it has no
+// test of its own yet.
+#if canImport(NIOCore)
+import NIOSSL
 
 struct InternalsCertificateFormatTests {
 
@@ -33,3 +38,5 @@ struct InternalsCertificateFormatTests {
         #expect(resolved == .der)
     }
 }
+
+#endif
