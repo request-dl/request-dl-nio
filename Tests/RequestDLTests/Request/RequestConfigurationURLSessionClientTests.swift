@@ -92,68 +92,89 @@ struct RequestConfigurationURLSessionClientMTLSTests {
     /// directly on iOS/tvOS/watchOS Simulator CI runs.
     @Test
     func urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend() async throws {
-        // Given
-        let server = Certificates().server()
-        let client = Certificates().client()
+        // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
+        // construct the `LocalServer` this test drives against) has no Network.framework
+        // equivalent under a NIOCore-free build -- see that type's own doc comment. Under
+        // NIOCore this whole body runs for real; without it, everything from construction
+        // onward is expected to throw, so it is wrapped wholesale rather than gated
+        // piecemeal.
+        func run() async throws {
+            // Given
+            let server = Certificates().server()
+            let client = Certificates().client()
 
-        let uri = "/" + UUID().uuidString
+            let uri = "/" + UUID().uuidString
 
-        let localServer = try await LocalServer(
-            LocalServer.Configuration(
-                host: "localhost",
-                // Dedicated port: 8887/8888/8889 are already claimed by other
-                // LocalServer-backed suites (see LocalServer.Configuration.swift / DataTaskTests.swift).
-                port: 8892,
-                option: .client(client)
+            let localServer = try await LocalServer(
+                LocalServer.Configuration(
+                    host: "localhost",
+                    // Dedicated port: 8887/8888/8889 are already claimed by other
+                    // LocalServer-backed suites (see LocalServer.Configuration.swift / DataTaskTests.swift).
+                    port: 8892,
+                    option: .client(client)
+                )
             )
-        )
 
-        let output = "Hello World"
-        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+            let output = "Hello World"
+            let response = try LocalServer.ResponseConfiguration(jsonObject: output)
 
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
+            localServer.cleanup(at: uri)
+            localServer.insert(response, at: uri)
+            defer { localServer.cleanup(at: uri) }
 
-        let resolved = try await resolve(
-            TestProperty {
-                BaseURL(localServer.baseURL)
-                Path(uri)
+            let resolved = try await resolve(
+                TestProperty {
+                    BaseURL(localServer.baseURL)
+                    Path(uri)
 
-                Session.localServer
+                    Session.localServer
 
-                SecureConnection {
-                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                    SecureConnection {
+                        TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                        RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                        PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                    }
+                    .verification(.fullVerification)
                 }
-                .verification(.fullVerification)
-            }
-        )
-
-        // When / Then
-        try resolved.session.configuration.requireExecutor(.urlSession)
-
-        let request = try await resolved.requestConfiguration.buildURLRequest()
-
-        func verify() async throws {
-            let urlSessionClient = try Internals.URLSessionClient(
-                configuration: .ephemeral,
-                secureConnection: resolved.session.configuration.secureConnection
             )
-            let result = try await urlSessionClient.execute(request: request)
 
-            let decoded = try HTTPResult<String>(result.body)
-            #expect(decoded.response == output)
+            // When / Then
+            try resolved.session.configuration.requireExecutor(.urlSession)
+
+            let request = try await resolved.requestConfiguration.buildURLRequest()
+
+            func verify() async throws {
+                let urlSessionClient = try Internals.URLSessionClient(
+                    configuration: .ephemeral,
+                    secureConnection: resolved.session.configuration.secureConnection
+                )
+                let result = try await urlSessionClient.execute(request: request)
+
+                let decoded = try HTTPResult<String>(result.body)
+                #expect(decoded.response == output)
+            }
+
+            #if os(macOS) || !canImport(Darwin)
+            try await verify()
+            #else
+            await withKnownIssue(
+                "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+            ) {
+                try await verify()
+            }
+            #endif
         }
 
-        #if os(macOS) || !canImport(Darwin)
-        try await verify()
+        #if canImport(NIOCore)
+        try await run()
         #else
         await withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+            """
+            LocalServer.TLSOption.client(_:) (server-side mTLS verification) has no \
+            Network.framework equivalent under a NIOCore-free build
+            """
         ) {
-            try await verify()
+            try await run()
         }
         #endif
     }

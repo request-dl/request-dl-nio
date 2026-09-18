@@ -170,78 +170,100 @@ struct InternalsClientIdentityDescriptorTests {
     /// directly on iOS/tvOS/watchOS Simulator CI runs.
     @Test
     func rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake() async throws {
-        // Given
-        let server = Certificates().server()
-        let client = Certificates().client()
-        let uri = "/" + UUID().uuidString
+        // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
+        // construct the `LocalServer` this test drives against) has no Network.framework
+        // equivalent under a NIOCore-free build -- see that type's own doc comment. Under
+        // NIOCore this whole body runs for real; without it, everything from construction
+        // onward is expected to throw, so it is wrapped wholesale rather than gated
+        // piecemeal.
+        func run() async throws {
+            // Given
+            let server = Certificates().server()
+            let client = Certificates().client()
+            let uri = "/" + UUID().uuidString
 
-        let localServer = try await LocalServer(
-            LocalServer.Configuration(
-                host: "localhost",
-                port: 8890,
-                option: .client(client)
+            let localServer = try await LocalServer(
+                LocalServer.Configuration(
+                    host: "localhost",
+                    port: 8890,
+                    option: .client(client)
+                )
             )
-        )
 
-        let output = "Hello World"
-        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
+            let output = "Hello World"
+            let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+            localServer.cleanup(at: uri)
+            localServer.insert(response, at: uri)
+            defer { localServer.cleanup(at: uri) }
 
-        var secureConnection = Internals.SecureConnection()
-        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
-        secureConnection.privateKey = .privateKey(
-            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
-        )
-        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
-
-        let clientIdentityDescriptor = try #require(
-            try Internals.ClientIdentityDescriptor.resolve(from: secureConnection)
-        )
-        let serverTrustDescriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
-
-        // Simulates a relaunch: the only things carried forward are the two `Descriptor`s, JSON
-        // round-tripped, exactly like `taskDescription`.
-        let rebuiltClientIdentityDescriptor = try JSONDecoder().decode(
-            Internals.ClientIdentityDescriptor.self,
-            from: JSONEncoder().encode(clientIdentityDescriptor)
-        )
-        let rebuiltServerTrustPolicy = Internals.ServerTrustPolicy(
-            descriptor: try JSONDecoder().decode(
-                Internals.ServerTrustPolicy.Descriptor.self,
-                from: JSONEncoder().encode(serverTrustDescriptor)
+            var secureConnection = Internals.SecureConnection()
+            secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+            secureConnection.privateKey = .privateKey(
+                .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
             )
-        )
+            secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
 
-        // When / Then
-        func verify() async throws {
-            let (handle, intermediates) = try rebuiltClientIdentityDescriptor.makeIdentity()
-
-            let delegate = ClientCertificateForwardingDelegate(
-                identity: handle.identity,
-                intermediates: intermediates,
-                serverTrustPolicy: rebuiltServerTrustPolicy
+            let clientIdentityDescriptor = try #require(
+                try Internals.ClientIdentityDescriptor.resolve(from: secureConnection)
             )
-            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            let serverTrustDescriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+                .descriptor()
 
-            var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
-            request.httpMethod = "GET"
+            // Simulates a relaunch: the only things carried forward are the two `Descriptor`s,
+            // JSON round-tripped, exactly like `taskDescription`.
+            let rebuiltClientIdentityDescriptor = try JSONDecoder().decode(
+                Internals.ClientIdentityDescriptor.self,
+                from: JSONEncoder().encode(clientIdentityDescriptor)
+            )
+            let rebuiltServerTrustPolicy = Internals.ServerTrustPolicy(
+                descriptor: try JSONDecoder().decode(
+                    Internals.ServerTrustPolicy.Descriptor.self,
+                    from: JSONEncoder().encode(serverTrustDescriptor)
+                )
+            )
 
-            let (data, response2) = try await session.data(for: request)
+            // When / Then
+            func verify() async throws {
+                let (handle, intermediates) = try rebuiltClientIdentityDescriptor.makeIdentity()
 
-            #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
-            let decodedBody = try HTTPResult<String>(data)
-            #expect(decodedBody.response == output)
+                let delegate = ClientCertificateForwardingDelegate(
+                    identity: handle.identity,
+                    intermediates: intermediates,
+                    serverTrustPolicy: rebuiltServerTrustPolicy
+                )
+                let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+                var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+                request.httpMethod = "GET"
+
+                let (data, response2) = try await session.data(for: request)
+
+                #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
+                let decodedBody = try HTTPResult<String>(data)
+                #expect(decodedBody.response == output)
+            }
+
+            #if os(macOS) || !canImport(Darwin)
+            try await verify()
+            #else
+            await withKnownIssue(
+                "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+            ) {
+                try await verify()
+            }
+            #endif
         }
 
-        #if os(macOS) || !canImport(Darwin)
-        try await verify()
+        #if canImport(NIOCore)
+        try await run()
         #else
         await withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+            """
+            LocalServer.TLSOption.client(_:) (server-side mTLS verification) has no \
+            Network.framework equivalent under a NIOCore-free build
+            """
         ) {
-            try await verify()
+            try await run()
         }
         #endif
     }
