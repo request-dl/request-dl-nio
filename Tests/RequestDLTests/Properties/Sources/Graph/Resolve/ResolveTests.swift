@@ -241,7 +241,8 @@ extension ResolveTests {
         #if canImport(NIOCore)
         return full
         #else
-        return full
+        return
+            full
             .split(separator: "\n", omittingEmptySubsequences: false)
             .filter { line in
                 !["pskHint = nil,", "keyLogger = nil,", "pskIdentityResolver = nil,"]

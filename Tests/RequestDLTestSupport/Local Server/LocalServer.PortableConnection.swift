@@ -86,7 +86,8 @@ extension LocalServer.PortableServer {
         }
 
         private func receiveMore() {
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, isComplete, error in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) {
+                [weak self] data, _, isComplete, error in
                 guard let self else { return }
 
                 if let data, !data.isEmpty {

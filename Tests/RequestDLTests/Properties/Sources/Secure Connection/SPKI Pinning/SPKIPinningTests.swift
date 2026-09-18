@@ -6,15 +6,15 @@ import Crypto
 import RequestDLInternals
 import Testing
 
+@testable import RequestDL
+@testable import RequestDLTestSupport
+
 #if canImport(NIOCore)
 import NIOSSL
 #else
 import SwiftASN1
 import X509
 #endif
-
-@testable import RequestDL
-@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
