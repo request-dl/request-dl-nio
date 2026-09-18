@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import Testing
 
 @testable import RequestDL

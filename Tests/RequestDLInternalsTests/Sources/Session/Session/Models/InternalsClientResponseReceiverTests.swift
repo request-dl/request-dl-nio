@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Drives `Internals.Session.client()`/`.execute()` directly (AsyncHTTPClient's `HTTPClient
+// .Request`), the `.nio`-only low-level plumbing with no `.urlSession` equivalent to take over —
+// same category as `SessionExecutionTests`/`LocalServerConcurrencyTests`.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import NIOCore
 import NIOPosix
@@ -218,3 +223,5 @@ private final class ScriptedServerHandler: ChannelInboundHandler, @unchecked Sen
         }
     }
 }
+
+#endif

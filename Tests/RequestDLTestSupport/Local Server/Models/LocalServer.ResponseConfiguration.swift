@@ -2,11 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIO
+#if canImport(NIOCore)
 import NIOHTTP1
-import NIOSSL
-
-@testable import RequestDL
+#else
+import RequestDLInternals
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -19,11 +19,23 @@ extension LocalServer {
 
     struct ResponseConfiguration: Sendable {
 
-        let status: NIOHTTP1.HTTPResponseStatus
-        let headers: NIOHTTP1.HTTPHeaders
+        // Only ever differ from `NIOHTTP1`'s own types under a build with no NIOCore at all
+        // (`LocalServer.HTTPStatus`/`Internals.HTTPHeaders`, see their own files): every existing
+        // `LocalServer`-backed test still just writes `status: .found`/
+        // `headers: ["...": "..."]`, unaware which pair of types it resolved to.
+        #if canImport(NIOCore)
+        typealias Status = NIOHTTP1.HTTPResponseStatus
+        typealias Headers = NIOHTTP1.HTTPHeaders
+        #else
+        typealias Status = LocalServer.HTTPStatus
+        typealias Headers = Internals.HTTPHeaders
+        #endif
+
+        let status: Status
+        let headers: Headers
         let data: Data
 
-        init(status: NIOHTTP1.HTTPResponseStatus = .ok, headers: NIOHTTP1.HTTPHeaders = .init(), data: Data) {
+        init(status: Status = .ok, headers: Headers = .init(), data: Data) {
             self.status = status
             self.headers = headers
             self.data = data
@@ -33,8 +45,8 @@ extension LocalServer {
         /// passes a `String`, and `JSONEncoder` handles a bare top-level value the same way
         /// `JSONSerialization`'s `.fragmentsAllowed` used to, without needing `Foundation`.
         init<Value: Encodable>(
-            status: NIOHTTP1.HTTPResponseStatus = .ok,
-            headers: NIOHTTP1.HTTPHeaders = .init(),
+            status: Status = .ok,
+            headers: Headers = .init(),
             jsonObject: Value
         ) throws {
             self.status = status

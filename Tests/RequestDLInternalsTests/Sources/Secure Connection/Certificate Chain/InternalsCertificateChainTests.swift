@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import Testing
 
 @testable import RequestDLInternals
@@ -13,6 +12,12 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 #endif
+
+// Every test here goes through `Internals.CertificateChain.build()`, which only exists under
+// `canImport(NIOCore)` (it returns `[NIOSSLCertificateSource]`); the portable counterpart,
+// `resolvedDERBytes()`, has no test of its own yet.
+#if canImport(NIOCore)
+import NIOSSL
 
 struct InternalsCertificateChainTests {
 
@@ -97,3 +102,5 @@ struct InternalsCertificateChainTests {
         #expect(sut == expectedSources)
     }
 }
+
+#endif

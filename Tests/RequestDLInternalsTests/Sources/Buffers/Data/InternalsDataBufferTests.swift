@@ -2,12 +2,17 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
+
+// Only `dataBuffer_whenInitWithByteURLAlreadySetByteBuffer` needs `NIOCore.ByteBuffer`;
+// `Internals.ByteURL.init(_:)` taking one only exists under `canImport(NIOCore)`.
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -592,6 +597,9 @@ struct InternalsDataBufferTests {
         #expect(bytes == nil)
     }
 
+    // `Internals.ByteURL.init(_:)` taking a `NIOCore.ByteBuffer` only exists under
+    // `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func dataBuffer_whenInitWithByteURLAlreadySetByteBuffer() async throws {
         // Given
@@ -607,6 +615,7 @@ struct InternalsDataBufferTests {
         let readData = await dataBuffer.readData(data.count)
         #expect(readData == data)
     }
+    #endif
 
     @Test
     func dataBuffer_whenGetData() async throws {

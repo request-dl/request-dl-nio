@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `PSKIdentity` (and everything else this file exercises) only exists under `canImport(NIOCore)`:
+// PSK has no public Network.framework/URLSession API (`NWProtocolTLS` exposes no hook equivalent
+// to `NIOSSL.pskServerProvider`/`pskClientProvider`), so this is a permanent `.nio`-only feature,
+// not a gap to close. See `RequestDL.PSKIdentity`'s own file.
+#if canImport(NIOCore)
+
 import NIOSSL
 import RequestDLInternals
 import Testing
@@ -122,3 +128,5 @@ extension PSKIdentityTests {
         }
     }
 }
+
+#endif

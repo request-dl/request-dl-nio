@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Every test here goes through `Internals.TrustRoots.build()`, which only exists under
+// `canImport(NIOCore)` (it returns `NIOSSLTrustRoots`); the portable counterpart,
+// `resolvedDERBytes()`, has no test of its own yet.
+#if canImport(NIOCore)
+
 import NIOSSL
 import Testing
 
@@ -85,3 +90,5 @@ struct InternalsTrustRootsTests {
         #expect(sut == expectedTrustRoots)
     }
 }
+
+#endif

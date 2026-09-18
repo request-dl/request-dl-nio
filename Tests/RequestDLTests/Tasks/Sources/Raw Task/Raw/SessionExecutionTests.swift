@@ -2,6 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+// This whole file drives `Internals.Session.client()`/`.execute(client:request:...)` and
+// `RequestConfiguration.build(eventLoop:)` directly -- the `.nio`-only low-level dispatch path
+// `RawTask.executeTraced` itself uses, all three gated `#if canImport(NIOCore)` at their own
+// declarations, with no `.urlSession` equivalent to take over here: that side of the same public
+// API is already covered end to end by `DataTaskTests`/`RawTaskExecutorDispatchTests`.
+#if canImport(NIOCore)
+
 import SwiftAsyncTesting
 import Testing
 
@@ -337,3 +344,5 @@ struct SessionExecutionTests {
         #expect(receivedBytes < payload.count / 2)
     }
 }
+
+#endif

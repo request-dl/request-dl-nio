@@ -2,20 +2,33 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-import NIOPosix
 import SwiftAsyncTesting
 import Testing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+struct SharedSessionProviderTests {
+
+    @Test
+    func sharedSessionProvider_id_isStableAcrossInstances() {
+        #expect(Internals.SharedSessionProvider().id == Internals.SharedSessionProvider().id)
+    }
+}
+
+// `SessionProvider.group(with:)` (and every `EventLoopGroup` conformance it returns) only
+// exists under `canImport(NIOCore)`.
+#if canImport(NIOCore)
+
+import NIOCore
+import NIOPosix
+
 #if canImport(Darwin)
 import NIOTransportServices
 #endif
 
-@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
-struct SharedSessionProviderTests {
+extension SharedSessionProviderTests {
 
     @Test
     func sharedSessionProvider_whenIncompatibleWithNetworkFramework_shouldUseTheMultiThreadedGroup() {
@@ -44,9 +57,6 @@ struct SharedSessionProviderTests {
         #expect(provider.group(with: options) is MultiThreadedEventLoopGroup)
         #endif
     }
-
-    @Test
-    func sharedSessionProvider_id_isStableAcrossInstances() {
-        #expect(Internals.SharedSessionProvider().id == Internals.SharedSessionProvider().id)
-    }
 }
+
+#endif

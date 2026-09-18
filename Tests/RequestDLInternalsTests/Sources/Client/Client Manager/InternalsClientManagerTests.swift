@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.ClientManager.client(provider:sessionConfiguration:)` (and the `Internals.Client`
+// it returns) only exist under `canImport(NIOCore)`; `.urlSession` goes through
+// `resolvedClient(provider:sessionConfiguration:)` instead, covered by
+// `InternalsClientManagerExecutorTests`.
+#if canImport(NIOCore)
+
 import SwiftAsyncTesting
 import Testing
 
@@ -108,3 +114,5 @@ struct InternalsClientManagerTests {
         }
     }
 }
+
+#endif

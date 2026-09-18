@@ -3,9 +3,6 @@
 //
 
 import Logging
-import NIOConcurrencyHelpers
-import NIOCore
-import NIOHTTP1
 import RequestDLInternals
 import SwiftAsyncStream
 import SwiftAsyncTesting
@@ -739,8 +736,8 @@ extension CachedRequestTests {
     /// sleeping exactly two seconds sits right on the boundary. The margin costs nothing and
     /// removes one more reason for these tests to flicker.
     func waitCacheExpiration() async throws {
-        try await _Concurrency.Task
-            .sleep(nanoseconds: UInt64((TimeAmount.seconds(2) + .milliseconds(250)).nanoseconds))
+        let twoSecondsAndAQuarter: UInt64 = 2 * 1_000_000_000 + 250 * 1_000_000
+        try await _Concurrency.Task.sleep(nanoseconds: twoSecondsAndAQuarter)
     }
 
     func mockCachedData(
@@ -807,7 +804,7 @@ extension CachedRequestTests {
     func performCacheRequest(
         testState: TestState,
         headers: [(String, String)],
-        status: NIOHTTP1.HTTPResponseStatus = .ok,
+        status: LocalServer.ResponseConfiguration.Status = .ok,
         cachePolicy: DataCache.Policy.Set = .all,
         cacheStrategy: CacheStrategy,
         memoryCapacity: Int64 = .zero,
@@ -853,7 +850,7 @@ extension CachedRequestTests {
     private func responseConfiguration(
         _ headers: [(String, String)],
         _ output: String,
-        status: NIOHTTP1.HTTPResponseStatus = .ok
+        status: LocalServer.ResponseConfiguration.Status = .ok
     ) throws -> LocalServer.ResponseConfiguration {
         LocalServer.ResponseConfiguration(
             status: status,

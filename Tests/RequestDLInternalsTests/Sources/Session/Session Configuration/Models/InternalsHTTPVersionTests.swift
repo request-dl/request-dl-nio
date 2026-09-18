@@ -2,13 +2,19 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
 import Testing
 
 @testable import RequestDLInternals
 
+// Only the two `.build()` tests below need AsyncHTTPClient; `Internals.HTTPVersion.build()`
+// only exists under `canImport(NIOCore)` (it returns `HTTPClient.Configuration.HTTPVersion`).
+#if canImport(NIOCore)
+import AsyncHTTPClient
+#endif
+
 struct InternalsHTTPVersionTests {
 
+    #if canImport(NIOCore)
     @Test
     func version_whenHTTP1Only() {
         // Given
@@ -32,6 +38,7 @@ struct InternalsHTTPVersionTests {
         // Then
         #expect(sut == .automatic)
     }
+    #endif
 
     @Test
     func version_whenEquals() {

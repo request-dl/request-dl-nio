@@ -44,6 +44,10 @@ struct InternalsURLSessionClientProxyTests {
         #endif
     }
 
+    // `LocalHTTPConnectProxy` (the SOCKS/HTTP-CONNECT proxy fixture) is deliberately NIO-only,
+    // gated `#if canImport(NIOCore)` in `RequestDLTestSupport` — see
+    // `urlsession-only-trait-isolation` memory for why (no Network.framework port attempted).
+    #if canImport(NIOCore)
     @Test
     func execute_whenProxyConfiguredWithoutAuthorization_tunnelsUnlessPlatformBypassesLocalhost() async throws {
         // Given
@@ -139,6 +143,7 @@ struct InternalsURLSessionClientProxyTests {
 
         try await proxy.shutdown()
     }
+    #endif
 
     /// `URLSessionConfiguration.connectionProxyDictionary` left `nil` (its own default) means
     /// "inherit whatever the OS's Network preferences currently say": `Internals.URLSessionClient`

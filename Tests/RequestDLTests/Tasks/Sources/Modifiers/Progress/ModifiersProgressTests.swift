@@ -250,6 +250,8 @@ struct ModifiersProgressTests {
         #expect(downloadMonitor.receivedData.last?.count ?? .zero <= length)
     }
 
+    // Pinned to `.requiredExecutor(.nio)` below, which only exists under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func progress_whenCompleteProgress_shouldBeValid() async throws {
         let testState = try await TestState()
@@ -328,4 +330,5 @@ struct ModifiersProgressTests {
 
         #expect(progressMonitor.download.receivedData.last?.count ?? .zero <= length)
     }
+    #endif
 }

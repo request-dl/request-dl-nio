@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOConcurrencyHelpers
 import Testing
 
 @testable import RequestDLInternals
@@ -226,7 +225,7 @@ struct InternalsURLSessionClientRedirectStrategyTests {
 /// test read it before the callback (called from URLSession's own delegate queue) has finished.
 private final class CapturedContext: Sendable {
 
-    private let box = NIOLockedValueBox<Internals.RedirectContext?>(nil)
+    private let box = LockedValueBox<Internals.RedirectContext?>(nil)
 
     var context: Internals.RedirectContext? {
         box.withLockedValue { $0 }

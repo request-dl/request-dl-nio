@@ -2,13 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
-import AsyncHTTPClient
-import NIOPosix
 import RequestDLInternals
 import Testing
 import Tracing
 
 @testable import RequestDL
+
+#if canImport(NIOCore)
+import NIOPosix
+#endif
 
 struct SessionTests {
 
@@ -60,6 +62,9 @@ struct SessionTests {
         #expect(sut is Internals.IdentifiedSessionProvider)
     }
 
+    // `Session.init(_ eventLoopGroup:)` only exists under `canImport(NIOCore)`: there is no
+    // caller-supplied-`EventLoopGroup` notion at all without NIOCore.
+    #if canImport(NIOCore)
     @Test
     func session_whenInitWithEventLoopGroup_shouldBeValid() async throws {
         // Given
@@ -76,6 +81,7 @@ struct SessionTests {
         #expect(sut.uniqueIdentifier(with: options) == String(describing: ObjectIdentifier(eventLoopGroup)))
         #expect(sut.group(with: .init(isCompatibleWithNetworkFramework: true)) === eventLoopGroup)
     }
+    #endif
 
     @Test
     func session_whenWaitsForConnectivity_shouldBeValid() async throws {
@@ -292,14 +298,7 @@ struct SessionTests {
         let resolved = try await resolve(TestProperty { property })
 
         // Then
-        #expect(
-            String(
-                describing: resolved.session.configuration.decompression
-            )
-                == String(
-                    describing: HTTPClient.Decompression.disabled
-                )
-        )
+        #expect(resolved.session.configuration.decompression == .disabled)
     }
 
     @Test
@@ -381,6 +380,8 @@ struct SessionTests {
     // Compression moved off `Session` entirely. See `CompressionEnvironmentTests` for its
     // coverage now that it's environment/`Payload`-driven instead.
 
+    // `.nioTransportServices` only exists under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func session_whenPreferredExecutor_shouldBeValid() async throws {
         // Given
@@ -394,6 +395,7 @@ struct SessionTests {
         #expect(resolved.session.configuration.preferredExecutor == .nioTransportServices)
         #expect(resolved.session.configuration.requiredExecutor == nil)
     }
+    #endif
 
     @Test
     func session_whenRequiredExecutor_shouldBeValid() async throws {
@@ -437,9 +439,12 @@ struct SessionTests {
 
         // `async-http-client`'s own built-in tracing is always suppressed; RequestDL owns the
         // span lifecycle itself, in `RawTask.result()`, using `resolved.session.configuration
-        // .tracer` directly.
+        // .tracer` directly. `Internals.Session.Configuration.build()` -- which actually builds
+        // the `HTTPClient.Configuration` this checks -- only exists under `canImport(NIOCore)`.
+        #if canImport(NIOCore)
         let builtTracer = try resolved.session.configuration.build().httpClientConfiguration.tracing.tracer
         #expect((builtTracer as? NoOpTracer) != nil)
+        #endif
     }
 
     @Test

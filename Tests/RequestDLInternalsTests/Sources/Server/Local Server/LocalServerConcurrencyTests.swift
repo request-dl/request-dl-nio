@@ -2,6 +2,11 @@
 // See LICENSE for this package's licensing information.
 //
 
+// Drives `Internals.Session.client()`/`.execute()` directly (AsyncHTTPClient's `HTTPClient
+// .Request`), the `.nio`-only low-level plumbing with no `.urlSession` equivalent to take over —
+// same category as `SessionExecutionTests` in `RequestDLTests`.
+#if canImport(NIOCore)
+
 import AsyncHTTPClient
 import SwiftAsyncTesting
 import Testing
@@ -108,3 +113,5 @@ struct LocalServerConcurrencyTests {
         #expect(elapsed < .seconds(180))
     }
 }
+
+#endif

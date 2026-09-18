@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import SwiftAsyncStream
 import Testing
 

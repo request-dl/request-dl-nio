@@ -8,6 +8,8 @@ import Testing
 
 struct InternalsIncompatibleExecutorConfigurationErrorTests {
 
+    // `.nioTransportServices` only exists under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func error_whenHoldingRequiredExecutorAndReasons() {
         // Given
@@ -20,6 +22,7 @@ struct InternalsIncompatibleExecutorConfigurationErrorTests {
         #expect(error.requiredExecutor == .nioTransportServices)
         #expect(error.reasons == [.dnsOverrideUnderURLSession, .keyLogger])
     }
+    #endif
 
     @Test
     func error_whenReasonsEmpty() {
