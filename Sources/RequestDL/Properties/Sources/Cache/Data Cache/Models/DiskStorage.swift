@@ -68,11 +68,17 @@ struct DiskStorage: Sendable {
             let responseURL = url.appendingPathComponent(Self.responsePath)
             let dataURL = url.appendingPathComponent(Self.dataPath)
 
-            // Both files have to be on disk for the record to be usable.
-            let responseExists = await Self.isReachableWithRetry(responseURL)
-            let dataExists = await Self.isReachableWithRetry(dataURL)
-
-            guard responseExists, dataExists else { return nil }
+            // Both files have to be on disk for the record to be usable. Short circuits on the
+            // first miss rather than awaiting both unconditionally: `isReachableWithRetry` pays
+            // up to its full retry budget (300 attempts, 15s) to tell a transient flake apart
+            // from a genuine absence, and awaiting a second one back to back after the first
+            // already came back negative -- the result is `nil` either way -- doubles that
+            // worst case for no reason. Directly observed doubling every one of this
+            // initializer's own genuine-miss tests to ~30s apiece, which is exactly the kind of
+            // aggregate slowdown `AsyncLock.Watchdog`'s CI-flakiness investigation traces stalls
+            // to elsewhere in this same file.
+            guard await Self.isReachableWithRetry(responseURL) else { return nil }
+            guard await Self.isReachableWithRetry(dataURL) else { return nil }
 
             self.date = date
             self.key = key
