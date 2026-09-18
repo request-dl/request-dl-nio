@@ -1005,6 +1005,35 @@ struct ConfiguredTests {
         }
     }
 
+    /// `tlsMinimumVersion` alone has a real, reachable equivalent under every executor (an ATS
+    /// `NSExceptionMinimumTLSVersion` entry under `.urlSession`), unlike `tlsMaximumVersion`
+    /// below, so it must resolve the same way regardless of whether NIOCore is available.
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionTLSMinimumVersion() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.tlsMinimumVersion": "1.2"
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.secureConnection?.minimumTLSVersion == TLSVersion.v1_2.build())
+    }
+
+    // `Configured.secureConnectionVersion(_:)` only resolves `tlsMaximumVersion` under
+    // `canImport(NIOCore)`: no Network.framework/URLSession equivalent exists (no ATS key for a
+    // maximum TLS version), so it deliberately throws instead of silently ignoring the setting
+    // when NIOCore is unavailable -- covered by the `#else` test below, not skipped.
+    #if canImport(NIOCore)
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func secureConnectionTLSVersionRange() async throws {
@@ -1027,6 +1056,30 @@ struct ConfiguredTests {
         #expect(resolved.session.configuration.secureConnection?.minimumTLSVersion == TLSVersion.v1_2.build())
         #expect(resolved.session.configuration.secureConnection?.maximumTLSVersion == TLSVersion.v1_3.build())
     }
+    #else
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionTLSMaximumVersion_hasNoPortableEquivalent_throwsInvalidSecureConnectionConfiguration()
+        async throws
+    {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.tlsMaximumVersion": "1.3"
+            ])
+        )
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+    #endif
 
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)

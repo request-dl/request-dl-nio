@@ -94,7 +94,7 @@ jobs:
     secrets: inherit
 
   urlsession-only-build:
-    name: "🌐 URLSession-only Build"
+    name: "🌐 URLSession-only Build & Test"
     # Skip draft PRs, matching the reusable "Swift CI" job's own guard above.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: macos-26
@@ -104,3 +104,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build RequestDL with the NIOTransport trait disabled
         run: swift build --disable-default-traits --target RequestDL
+      - name: Build the Test targets with the NIOTransport trait disabled
+        run: swift build --disable-default-traits --target RequestDLTests --target RequestDLInternalsTests
+      # Expected to be red on a bare CLI runner until the Keychain-entitlement gap tracked in
+      # this repo's own portability notes is resolved: every test that completes a real TLS
+      # handshake through the portable LocalServer (or client mTLS) hits
+      # `SecItemCopyMatching(identity)` failing with `OSStatus -25300` here, the same way
+      # `RequestConfigurationURLSessionClientMTLSTests` already documents for mTLS. Left as a
+      # hard failure (not continue-on-error) rather than masked, so this stays honest signal
+      # instead of a silently-skipped check.
+      - name: Run the test suite with the NIOTransport trait disabled
+        run: swift test --disable-default-traits
