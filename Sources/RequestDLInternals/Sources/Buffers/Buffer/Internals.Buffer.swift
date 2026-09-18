@@ -311,32 +311,26 @@ extension Internals {
             /// callers are stat-ing the same path at once, which is exactly what happens once
             /// hundreds of reads land on one storage concurrently.
             ///
-            /// The reliable fix for *that* window is not a bigger retry budget, it is not
-            /// re-asking a question this storage already knows the answer to. Once this instance
-            /// has itself created the resource, or a stat has ever come back positive, nothing
-            /// other than ``clear()`` can make it disappear from underneath it — same invariant
+            /// The reliable fix is not a bigger retry budget, it is not re-asking a question
+            /// this storage already knows the answer to. Once this instance has itself created
+            /// the resource, or a stat has ever come back positive, nothing other than
+            /// ``clear()`` can make it disappear from underneath it — same invariant
             /// `_createResourceIfNeeded()` already relies on. So the confirmation is cached and
             /// every read after the first reachable one skips the stat entirely, which is also
             /// what removes it from that concurrent contention going forward.
             ///
-            /// A *different* window the cache above cannot help with: a caller that addresses a
-            /// file through a brand new `Storage` right after some other `Storage` finished
-            /// writing it (this instance has never seen the resource before, so there is nothing
-            /// cached yet). Directly observed on CI macOS runners under the full portable test
-            /// suite's concurrency: every blocking file call this package makes -- this stat
-            /// included -- funnels through one dedicated pool
-            /// (`Internals.FileSystemManager.run`), and a burst of hundreds of suites doing this
-            /// at once can queue every one of a handful of quick retries behind that pool's own
-            /// backlog before any of them gets a turn. A more generous budget directly buys more
-            /// of those turns, which is what actually narrows this window, so it is worth paying
-            /// for here even though it would not have helped the first window above.
+            /// A caller that addresses a file through a brand new `Storage` right after some
+            /// other `Storage` finished writing it -- this instance's own first call, with
+            /// nothing cached yet -- is a related but genuinely different window this cache
+            /// cannot help with at all. See ``Internals/Buffer/init(addressing:)``, the one
+            /// legitimate entry point that reopens content this way, for that fix.
             private func _isResourceAvailable() async -> Bool {
                 guard !_hasConfirmedResource else {
                     return true
                 }
 
-                let attempts = 20
-                let retryDelay: UInt64 = 5_000_000
+                let attempts = 5
+                let retryDelay: UInt64 = 2_000_000
 
                 for attempt in 0..<attempts {
                     if await url.isResourceAvailable() {
@@ -497,8 +491,34 @@ extension Internals {
         /// through `make(from:)` without embedding it in the `Foundation.URL` itself, which must
         /// never happen. This exists for exactly that case — a caller that already has a fully
         /// formed `Stream.URL` in hand skips `make(from:)` entirely.
+        ///
+        /// - Important: In practice this is only ever called with a key already in hand for
+        /// content that either does not exist yet (a fresh cache entry) or was written by some
+        /// entirely separate `Storage` an instant ago (reopening one, the same encrypted file's
+        /// writer and reader are two distinct `Buffer`/`Storage` pairs over the same path -- see
+        /// `Internals.EncryptedFileBufferURL`'s own doc comment). The latter case races this
+        /// brand new `Storage`'s very first size stat against a write it has no way to already
+        /// know about, and under heavy concurrent disk contention that stat has been caught
+        /// reporting zero for a file the other `Storage` had already finished writing and closed.
+        /// A short, bounded retry closes that window; it costs nothing extra for the legitimately
+        /// empty case beyond however many attempts it takes to exhaust the budget, once, since a
+        /// non-zero result short circuits it immediately.
         package init(addressing url: Stream.URL) async {
-            await self.init(storage: .init(url))
+            let storage = Storage(url)
+
+            let attempts = 8
+            let retryDelay: UInt64 = 5_000_000
+
+            var writtenBytes = await storage.writtenBytes
+
+            var attempt = 1
+            while writtenBytes == .zero, attempt < attempts {
+                try? await Task.sleep(nanoseconds: retryDelay)
+                writtenBytes = await storage.writtenBytes
+                attempt += 1
+            }
+
+            self.init(storage: storage, writerIndex: writtenBytes)
         }
 
         private init(storage: Storage) async {
