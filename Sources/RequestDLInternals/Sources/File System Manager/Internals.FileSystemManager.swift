@@ -64,27 +64,36 @@ extension Internals {
 
         #else
 
+        // MARK: - Private static properties
+
+        private static let threadPool = PortableBlockingPool(
+            threadCount: Swift.max(16, ProcessInfo.processInfo.activeProcessorCount * 4)
+        )
+
         // MARK: - Internal static methods
 
         /// Same contract as the `NIOThreadPool`-backed overload above, ported to a build without
         /// NIO: still never runs a blocking file syscall on whichever Swift Concurrency
         /// cooperative thread happens to call in here, since that is what the watchdog-false-
         /// positive problem this type exists to solve actually turns on, not `NIOThreadPool`
-        /// specifically. `DispatchQueue.global()` is GCD's own elastic worker pool: entirely
-        /// outside Swift Concurrency's fixed-size cooperative pool already, so no dedicated pool
-        /// needs to be built by hand the way `NIOThreadPool(numberOfThreads:)` is above.
+        /// specifically.
+        ///
+        /// `DispatchQueue.global()` looked like an equivalent elastic worker pool at first, since
+        /// it is already outside Swift Concurrency's fixed-size cooperative pool, and earlier
+        /// versions of this method dispatched onto it directly instead of building a dedicated
+        /// pool by hand the way `NIOThreadPool(numberOfThreads:)` does above. That queue is
+        /// shared by everything else in the process, though, and under `swift-testing`'s parallel
+        /// execution -- a sudden burst of hundreds of suites each opening their own file at
+        /// once -- its own ramp-up lag was directly observed adding up past
+        /// `Internals.Buffer.Storage`'s per-operation budget in aggregate on CI macOS runners: the
+        /// exact failure mode this comment's first paragraph already describes the NIOCore side
+        /// needing a dedicated pool to avoid. `PortableBlockingPool` below is that same fix,
+        /// ported without NIO: real OS threads that never return to GCD's shared pool for
+        /// anything else, sized the same way (`max(16, coreCount * 4)`).
         package static func run<T: Sendable>(
             _ body: @escaping @Sendable () throws -> T
         ) async throws -> T {
-            try await withCheckedThrowingContinuation { continuation in
-                DispatchQueue.global(qos: .utility).async {
-                    do {
-                        continuation.resume(returning: try body())
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
+            try await threadPool.run(body)
         }
 
         #endif
@@ -101,3 +110,74 @@ extension Internals {
     }
     #endif
 }
+
+#if !canImport(NIOCore)
+
+/// A fixed-size pool of dedicated OS threads for blocking file work, ported without NIO. See
+/// `Internals.FileSystemManager.run`'s doc comment for why this exists instead of
+/// `DispatchQueue.global()`: threads started here only ever run work handed to this pool, so
+/// they cannot be starved by unrelated `.utility`-queue work elsewhere in the process the way a
+/// shared GCD queue's own worker ramp-up was observed to under heavy concurrent test load.
+private final class PortableBlockingPool: @unchecked Sendable {
+
+    // MARK: - Private properties
+
+    private let condition = NSCondition()
+    private var workItems: [() -> Void] = []
+
+    // MARK: - Inits
+
+    init(threadCount: Int) {
+        for index in 0..<threadCount {
+            let thread = Thread { [self] in
+                _runLoop()
+            }
+            thread.name = "com.requestdl.portable-blocking-pool.\(index)"
+            // Matches the default main thread stack size. The work run here is plain,
+            // non-recursive file I/O, so the platform default has never been a constraint; this
+            // just avoids inheriting whatever (possibly much smaller) stack size the thread that
+            // happens to construct this pool was given.
+            thread.stackSize = 1 << 20
+            thread.start()
+        }
+    }
+
+    // MARK: - Internal methods
+
+    /// Runs `body` on this pool and suspends the calling task until it completes.
+    func run<T: Sendable>(_ body: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            condition.lock()
+            workItems.append {
+                do {
+                    continuation.resume(returning: try body())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+            condition.signal()
+            condition.unlock()
+        }
+    }
+
+    // MARK: - Private methods
+
+    /// Body of every thread this pool starts. Never returns, matching every other fixed-size
+    /// thread pool: the thread exists for exactly as long as the process does.
+    private func _runLoop() {
+        while true {
+            condition.lock()
+
+            while workItems.isEmpty {
+                condition.wait()
+            }
+
+            let workItem = workItems.removeFirst()
+            condition.unlock()
+
+            workItem()
+        }
+    }
+}
+
+#endif
