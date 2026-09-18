@@ -6,68 +6,139 @@ import Testing
 
 @testable import RequestDLInternals
 
-// Only the two `.build()` tests below need AsyncHTTPClient; `Internals.RedirectConfiguration
-// .build()` only exists under `canImport(NIOCore)` (it returns `HTTPClient.Configuration
-// .RedirectConfiguration`).
+// Only the `.build()` tests below need AsyncHTTPClient; `Internals.Timeout.build()` only exists
+// under `canImport(NIOCore)` (it returns `HTTPClient.Configuration.Timeout`).
 #if canImport(NIOCore)
 import AsyncHTTPClient
 #endif
 
 struct InternalsTimeoutTests {
 
-    #if canImport(NIOCore)
     @Test
-    func redirect_whenDisallow() {
+    func timeout_whenDefault_allFieldsAreNil() {
         // Given
-        let redirect = Internals.RedirectConfiguration.disallow
-
-        // When
-        let sut = redirect.build()
+        let timeout = Internals.Timeout()
 
         // Then
-        #expect(
-            String(describing: sut)
-                == String(
-                    describing: HTTPClient.Configuration.RedirectConfiguration.disallow
-                )
-        )
+        #expect(timeout.connect == nil)
+        #expect(timeout.read == nil)
+        #expect(timeout.resource == nil)
     }
 
     @Test
-    func redirect_whenFollow() {
+    func timeout_whenConnectSet_holdsItsValue() {
         // Given
-        let redirect = Internals.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
+        var timeout = Internals.Timeout()
 
         // When
-        let sut = redirect.build()
+        timeout.connect = 60_000_000_000
 
         // Then
-        #expect(
-            String(describing: sut)
-                == String(
-                    describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
-                )
-        )
+        #expect(timeout.connect == 60_000_000_000)
+        #expect(timeout.read == nil)
     }
-    #endif
 
     @Test
-    func redirect_whenEquals() {
+    func timeout_whenReadSet_holdsItsValue() {
         // Given
-        let lhs = Internals.RedirectConfiguration.disallow
-        let rhs = Internals.RedirectConfiguration.disallow
+        var timeout = Internals.Timeout()
+
+        // When
+        timeout.read = 30_000_000_000
+
+        // Then
+        #expect(timeout.read == 30_000_000_000)
+        #expect(timeout.connect == nil)
+    }
+
+    @Test
+    func timeout_whenResourceSet_holdsItsValue() {
+        // Given
+        var timeout = Internals.Timeout()
+
+        // When
+        timeout.resource = 120_000_000_000
+
+        // Then
+        #expect(timeout.resource == 120_000_000_000)
+    }
+
+    @Test
+    func timeout_whenEquals() {
+        // Given
+        let lhs = Internals.Timeout(connect: 1_000_000_000, read: 2_000_000_000)
+        let rhs = Internals.Timeout(connect: 1_000_000_000, read: 2_000_000_000)
 
         // Then
         #expect(lhs == rhs)
     }
 
     @Test
-    func redirect_whenNotEquals() {
+    func timeout_whenNotEquals() {
         // Given
-        let lhs = Internals.RedirectConfiguration.disallow
-        let rhs = Internals.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
+        let lhs = Internals.Timeout(connect: 1_000_000_000)
+        let rhs = Internals.Timeout(connect: 2_000_000_000)
 
         // Then
         #expect(lhs != rhs)
     }
+
+    @Test
+    func timeout_whenResourceDiffers_stillNotEquals() {
+        // Given: `resource` participates in `Hashable`/`Equatable` (it's a plain stored
+        // property, not excluded), even though `build()` below never forwards it.
+        let lhs = Internals.Timeout(resource: 1_000_000_000)
+        let rhs = Internals.Timeout(resource: 2_000_000_000)
+
+        // Then
+        #expect(lhs != rhs)
+    }
+
+    #if canImport(NIOCore)
+    @Test
+    func timeout_whenBuild_mapsConnectAndReadToNanoseconds() {
+        // Given
+        let connect: Int64 = 60_000_000_000
+        let read: Int64 = 30_000_000_000
+        let timeout = Internals.Timeout(connect: connect, read: read)
+
+        // When
+        let sut = timeout.build()
+
+        // Then
+        #expect(sut.connect == .nanoseconds(connect))
+        #expect(sut.read == .nanoseconds(read))
+    }
+
+    @Test
+    func timeout_whenBuildWithNilFields_mapsToNil() {
+        // Given
+        let timeout = Internals.Timeout()
+
+        // When
+        let sut = timeout.build()
+
+        // Then
+        #expect(sut.connect == nil)
+        #expect(sut.read == nil)
+    }
+
+    /// `resource` has no `HTTPClient.Configuration.Timeout` counterpart (see `Internals.Timeout
+    /// .resource`'s own doc comment: `RawTask` reads it directly to drive
+    /// `Internals.ResourceDeadline` instead), so `build()` must never forward it regardless of
+    /// what `connect`/`read` are set to.
+    @Test
+    func timeout_whenBuild_doesNotForwardResource() {
+        // Given
+        var timeout = Internals.Timeout()
+        timeout.resource = 120_000_000_000
+
+        // When
+        let sut = timeout.build()
+
+        // Then
+        #expect(sut.connect == nil)
+        #expect(sut.read == nil)
+    }
+    #endif
 }
