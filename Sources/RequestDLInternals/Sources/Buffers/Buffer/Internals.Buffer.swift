@@ -56,13 +56,23 @@ extension Internals {
 
             /// Bytes currently in the resource.
             ///
-            /// - Important: On a file system this is a stat call. It deliberately does not
-            /// take the lock: `url` is immutable and reports either through its own
-            /// synchronization or through the file system, so guarding it here would only
-            /// queue size checks behind whatever read or write is in flight.
+            /// - Important: The file system stat this reads through `url.writtenBytes` runs
+            /// without the lock, so it can race a write this same storage just finished: under
+            /// heavy concurrent disk contention (many buffers writing at once, observed on CI
+            /// macOS runners under the full portable test suite) the stat has been caught
+            /// reporting a file smaller than what this storage already wrote to it and awaited
+            /// the completion of, which made `overwritableBytes` go negative and crashed
+            /// ``moveWriterIndex(to:)`` downstream. `_writtenBytesFloor` is this storage's own
+            /// record of the highest offset it has itself written to -- updated inside `write`'s
+            /// lock, so it is race free with respect to this storage's own writes -- and the
+            /// result can never report less than what this instance already knows landed.
+            /// Reading the floor costs a lock acquisition, not I/O, so operations still never
+            /// queue behind one another here; only the slow stat itself stays lockless.
             package var writtenBytes: Int {
                 get async {
-                    await url.writtenBytes
+                    let floor = await lock.withLock { _writtenBytesFloor }
+                    let stat = await url.writtenBytes
+                    return Swift.max(stat, floor)
                 }
             }
 
@@ -124,6 +134,10 @@ extension Internals {
             /// Whether this storage has already established that its resource exists, either
             /// by creating it or by a prior stat succeeding.
             private var _hasConfirmedResource = false
+
+            /// The highest offset this storage has itself written to, updated inside `write`'s
+            /// lock. See ``writtenBytes`` for why this exists.
+            private var _writtenBytesFloor: Int = .zero
 
             // MARK: - Inits
 
@@ -196,7 +210,9 @@ extension Internals {
                         try await stream.seek(to: index)
                         try await stream.writeData(data)
 
-                        return try await stream.offset
+                        let offset = try await stream.offset
+                        _writtenBytesFloor = Swift.max(_writtenBytesFloor, Int(offset))
+                        return offset
                     } catch {
                         return index
                     }
@@ -249,6 +265,7 @@ extension Internals {
 
                     await url.truncate()
                     _hasConfirmedResource = false
+                    _writtenBytesFloor = .zero
                 }
             }
 
