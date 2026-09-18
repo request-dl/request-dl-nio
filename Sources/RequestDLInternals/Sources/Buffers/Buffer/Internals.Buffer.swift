@@ -311,20 +311,32 @@ extension Internals {
             /// callers are stat-ing the same path at once, which is exactly what happens once
             /// hundreds of reads land on one storage concurrently.
             ///
-            /// The reliable fix is not a bigger retry budget, it is not re-asking a question
-            /// this storage already knows the answer to. Once this instance has itself created
-            /// the resource, or a stat has ever come back positive, nothing other than
-            /// ``clear()`` can make it disappear from underneath it — same invariant
+            /// The reliable fix for *that* window is not a bigger retry budget, it is not
+            /// re-asking a question this storage already knows the answer to. Once this instance
+            /// has itself created the resource, or a stat has ever come back positive, nothing
+            /// other than ``clear()`` can make it disappear from underneath it — same invariant
             /// `_createResourceIfNeeded()` already relies on. So the confirmation is cached and
             /// every read after the first reachable one skips the stat entirely, which is also
             /// what removes it from that concurrent contention going forward.
+            ///
+            /// A *different* window the cache above cannot help with: a caller that addresses a
+            /// file through a brand new `Storage` right after some other `Storage` finished
+            /// writing it (this instance has never seen the resource before, so there is nothing
+            /// cached yet). Directly observed on CI macOS runners under the full portable test
+            /// suite's concurrency: every blocking file call this package makes -- this stat
+            /// included -- funnels through one dedicated pool
+            /// (`Internals.FileSystemManager.run`), and a burst of hundreds of suites doing this
+            /// at once can queue every one of a handful of quick retries behind that pool's own
+            /// backlog before any of them gets a turn. A more generous budget directly buys more
+            /// of those turns, which is what actually narrows this window, so it is worth paying
+            /// for here even though it would not have helped the first window above.
             private func _isResourceAvailable() async -> Bool {
                 guard !_hasConfirmedResource else {
                     return true
                 }
 
-                let attempts = 5
-                let retryDelay: UInt64 = 2_000_000
+                let attempts = 20
+                let retryDelay: UInt64 = 5_000_000
 
                 for attempt in 0..<attempts {
                     if await url.isResourceAvailable() {
