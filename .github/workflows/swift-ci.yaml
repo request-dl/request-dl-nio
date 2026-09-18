@@ -116,5 +116,12 @@ jobs:
         # reports "no data" rather than throwing. Raise the limit before running, matching this
         # process's local ulimit (effectively unbounded) rather than the CI default.
         run: |
-          ulimit -n 10240
+          hard_limit="$(ulimit -Hn)"
+          echo "hard limit: $hard_limit"
+          if [ "$hard_limit" = "unlimited" ]; then
+            ulimit -n 65536
+          else
+            ulimit -n "$hard_limit"
+          fi
+          echo "raised soft limit: $(ulimit -Sn)"
           swift test --disable-default-traits
