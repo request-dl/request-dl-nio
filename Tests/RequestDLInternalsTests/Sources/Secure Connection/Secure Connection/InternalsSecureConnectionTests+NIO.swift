@@ -508,7 +508,7 @@ extension InternalsSecureConnectionTests {
             #expect(sut.tlsConfiguration.privateKey == nil)
         }
 
-        #if os(macOS)
+        #if os(macOS) || !canImport(Darwin)
         try verify()
         #else
         await withKnownIssue(

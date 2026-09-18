@@ -155,7 +155,7 @@ extension DataTaskTests {
             #expect(result.response == output)
         }
 
-        #if os(macOS)
+        #if os(macOS) || !canImport(Darwin)
         try await verify()
         #else
         await withKnownIssue(

@@ -235,7 +235,7 @@ struct InternalsClientIdentityDescriptorTests {
             #expect(decodedBody.response == output)
         }
 
-        #if os(macOS)
+        #if os(macOS) || !canImport(Darwin)
         try await verify()
         #else
         await withKnownIssue(
