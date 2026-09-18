@@ -95,6 +95,17 @@ extension DataTaskTests {
     /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured; nothing in
     /// `networkFrameworkIncompatibilityReasons()` ever stood in the way, since mTLS is genuinely
     /// supported there, just through a different channel.
+    ///
+    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
+    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
+    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
+    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
+    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
+    /// Sharing to at all (there is nowhere in a `Package.swift`-only project to configure one;
+    /// see `Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md`,
+    /// written for a real app target's Signing & Capabilities tab), so `SecItemAdd` there fails
+    /// with `errSecMissingEntitlement` before identity pairing is ever reached -- a genuinely
+    /// different, still-open gap, confirmed directly on iOS/tvOS/watchOS Simulator CI runs.
     @Test
     func dataTask_whenCAEnabledUnderNIOTransportServices() async throws {
         // Given
@@ -121,28 +132,38 @@ extension DataTaskTests {
         localServer.insert(response, at: uri)
         defer { localServer.cleanup(at: uri) }
 
-        // When
-        let data = try await DataTask {
-            BaseURL(localServer.baseURL)
-            Path(uri)
+        // When / Then
+        func verify() async throws {
+            let data = try await DataTask {
+                BaseURL(localServer.baseURL)
+                Path(uri)
 
-            Session.localServer
-                .requiredExecutor(.nioTransportServices)
+                Session.localServer
+                    .requiredExecutor(.nioTransportServices)
 
-            SecureConnection {
-                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
-                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                SecureConnection {
+                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                }
+                .verification(.fullVerification)
             }
-            .verification(.fullVerification)
+            .extractPayload()
+            .result()
+
+            let result = try HTTPResult<String>(data)
+            #expect(result.response == output)
         }
-        .extractPayload()
-        .result()
 
-        let result = try HTTPResult<String>(data)
-
-        // Then
-        #expect(result.response == output)
+        #if os(macOS)
+        try await verify()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+        ) {
+            try await verify()
+        }
+        #endif
     }
 
     /// Regression coverage for the gap `Internals.NIOTrustEvaluator` closed: `additionalTrustRoots`

@@ -125,6 +125,16 @@ extension RawTaskExecutorDispatchTests {
     ///
     /// Needs `LocalServer.TLSOption.client` (server-side client-certificate verification), only
     /// implemented on the NIOSSL backend.
+    ///
+    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
+    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
+    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
+    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
+    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
+    /// Sharing to at all, so `SecItemAdd` there fails with `errSecMissingEntitlement` before
+    /// identity pairing is ever reached, surfacing through the public `DataTask` API as
+    /// `ClientIdentityError` -- a genuinely different, still-open gap, confirmed directly on
+    /// iOS/tvOS/watchOS Simulator CI runs.
     @Test
     func dataTask_whenCAEnabledUnderURLSession() async throws {
         let server = Certificates().server()
@@ -161,12 +171,22 @@ extension RawTaskExecutorDispatchTests {
             .verification(.fullVerification)
         }
 
-        // When
-        let data = try await DataTask { content }.extractPayload().result()
-        let result = try HTTPResult<String>(data)
+        // When / Then
+        func verify() async throws {
+            let data = try await DataTask { content }.extractPayload().result()
+            let result = try HTTPResult<String>(data)
+            #expect(result.response == output)
+        }
 
-        // Then
-        #expect(result.response == output)
+        #if os(macOS)
+        try await verify()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+        ) {
+            try await verify()
+        }
+        #endif
     }
 }
 
