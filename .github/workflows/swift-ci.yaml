@@ -106,12 +106,15 @@ jobs:
         run: swift build --disable-default-traits --target RequestDL
       - name: Build the Test targets with the NIOTransport trait disabled
         run: swift build --disable-default-traits --target RequestDLTests --target RequestDLInternalsTests
-      # Expected to be red on a bare CLI runner until the Keychain-entitlement gap tracked in
-      # this repo's own portability notes is resolved: every test that completes a real TLS
-      # handshake through the portable LocalServer (or client mTLS) hits
-      # `SecItemCopyMatching(identity)` failing with `OSStatus -25300` here, the same way
-      # `RequestConfigurationURLSessionClientMTLSTests` already documents for mTLS. Left as a
-      # hard failure (not continue-on-error) rather than masked, so this stays honest signal
-      # instead of a silently-skipped check.
       - name: Run the test suite with the NIOTransport trait disabled
-        run: swift test --disable-default-traits
+        # macOS GitHub-hosted runners default to a 256 open-file soft limit; the portable
+        # (NIOCore-less) file-buffer path caches one descriptor per open Internals.Buffer for
+        # its whole lifetime, with no pool cap the way the NIOThreadPool-backed path has, so a
+        # suite that opens hundreds of file-backed buffers concurrently (InternalsFileBufferTests
+        # / InternalsEncryptedFileStreamBufferTests / DiskStorageTests) exhausts it -- silently,
+        # since every failed open/write in that path already swallows its error by design and
+        # reports "no data" rather than throwing. Raise the limit before running, matching this
+        # process's local ulimit (effectively unbounded) rather than the CI default.
+        run: |
+          ulimit -n 10240
+          swift test --disable-default-traits
