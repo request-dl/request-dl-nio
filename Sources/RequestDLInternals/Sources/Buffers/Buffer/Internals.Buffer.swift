@@ -506,8 +506,8 @@ extension Internals {
         package init(addressing url: Stream.URL) async {
             let storage = Storage(url)
 
-            let attempts = 8
-            let retryDelay: UInt64 = 5_000_000
+            let attempts = 30
+            let retryDelay: UInt64 = 10_000_000
 
             var writtenBytes = await storage.writtenBytes
 

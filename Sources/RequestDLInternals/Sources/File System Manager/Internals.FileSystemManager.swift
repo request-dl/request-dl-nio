@@ -67,7 +67,7 @@ extension Internals {
         // MARK: - Private static properties
 
         private static let threadPool = PortableBlockingPool(
-            threadCount: Swift.max(16, ProcessInfo.processInfo.activeProcessorCount * 4)
+            threadCount: Swift.max(64, ProcessInfo.processInfo.activeProcessorCount * 16)
         )
 
         // MARK: - Internal static methods
@@ -89,7 +89,14 @@ extension Internals {
         /// exact failure mode this comment's first paragraph already describes the NIOCore side
         /// needing a dedicated pool to avoid. `PortableBlockingPool` below is that same fix,
         /// ported without NIO: real OS threads that never return to GCD's shared pool for
-        /// anything else, sized the same way (`max(16, coreCount * 4)`).
+        /// anything else.
+        ///
+        /// Sized more generously than the NIOCore side's `max(16, coreCount * 4)`
+        /// (`max(64, coreCount * 16)` instead): these are plain blocking-I/O threads, cheap to
+        /// keep idle on any platform this trait targets, and CI's own constrained core count
+        /// otherwise sizes this pool too small for a single suite's own concurrency burst (one
+        /// test alone fires 64 tasks at once) layered on top of everything else the full
+        /// portable test run has in flight at the same time.
         package static func run<T: Sendable>(
             _ body: @escaping @Sendable () throws -> T
         ) async throws -> T {
