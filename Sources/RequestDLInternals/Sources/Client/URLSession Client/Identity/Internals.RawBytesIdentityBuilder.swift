@@ -358,11 +358,43 @@ extension Internals {
                     ] as CFDictionary
                 )
 
+                // `kSecAttrApplicationLabel` is the public-key hash Security.framework's own
+                // identity-synthesis engine actually uses to pair a `kSecClassKey` item with a
+                // `kSecClassCertificate` item into a `kSecClassIdentity` -- it's how "identity is
+                // a synthetic pairing of a certificate and a key by matching public key" (see the
+                // query comment below) actually happens under the hood. Left unset, `SecItemAdd`
+                // assigns the key item some value that does not match the certificate's own
+                // (automatically derived) `kSecAttrPublicKeyHash`, so no identity is ever
+                // synthesized -- confirmed empirically: `kSecClassIdentity` queries reliably
+                // returned zero results without this, on every run, regardless of Keychain state,
+                // entitlement, or process signing.
+                //
+                // SHA-1 of the public key's external representation (X9.63 for EC, PKCS#1
+                // `RSAPublicKey` for RSA -- `SecKeyCopyExternalRepresentation` already returns
+                // whichever shape matches `secKey`'s own key type) is the OS's own convention for
+                // this hash, confirmed byte for byte against `openssl`'s equivalent computation.
+                guard let publicKey = SecKeyCopyPublicKey(secKey) else {
+                    throw Error.secKeyCreationFailed("SecKeyCopyPublicKey returned nil")
+                }
+                var publicKeyRepresentationError: Unmanaged<CFError>?
+                guard
+                    let publicKeyRepresentation = SecKeyCopyExternalRepresentation(
+                        publicKey,
+                        &publicKeyRepresentationError
+                    ) as Data?
+                else {
+                    let message =
+                        publicKeyRepresentationError.map { String(describing: $0.takeRetainedValue()) } ?? "unknown"
+                    throw Error.secKeyCreationFailed("SecKeyCopyExternalRepresentation failed: \(message)")
+                }
+                let applicationLabel = Data(Insecure.SHA1.hash(data: publicKeyRepresentation))
+
                 try addToKeychain(
                     query: [
                         kSecClass: kSecClassKey,
                         kSecValueRef: secKey,
                         kSecAttrLabel: label,
+                        kSecAttrApplicationLabel: applicationLabel,
                         // This device only, not iCloud Keychain: the key only needs to survive
                         // this process's lifetime, not sync anywhere.
                         kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,

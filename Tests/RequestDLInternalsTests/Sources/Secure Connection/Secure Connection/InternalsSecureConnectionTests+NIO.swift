@@ -477,12 +477,6 @@ extension InternalsSecureConnectionTests {
     /// `certificateChain`/`privateKey` is non-empty, unconditionally, so leaving either set,
     /// even alongside a correctly-built `localIdentityHandle`, would crash the process the moment
     /// this configuration actually ran over `.nioTransportServices`.
-    ///
-    /// `build()` bundles that `TLSConfiguration` and the Network.framework identity into one
-    /// throwing call, so this can't inspect the former without the latter's Keychain round-trip
-    /// also succeeding, a known gap on this bare SwiftPM test harness (see
-    /// `InternalsClientIdentityDescriptorTests`) unrelated to what's actually being checked here,
-    /// hence the `withKnownIssue` wrapper.
     @Test
     func secureConnection_whenMTLSConfiguredAndNetworkFrameworkNeeded_omitsRawCertificateChainFromTLSConfiguration()
         async throws
@@ -496,28 +490,12 @@ extension InternalsSecureConnectionTests {
             .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
         )
 
-        // When / Then
-        func verify() throws {
-            let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
+        // When
+        let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
 
-            #expect(sut.tlsConfiguration.certificateChain.isEmpty)
-            #expect(sut.tlsConfiguration.privateKey == nil)
-        }
-
-        // The Keychain round-trip this "known issue" is about only happens inside
-        // `#if canImport(Darwin)` code (`makeLocalIdentityForNetworkFramework()`); off Darwin,
-        // `build(isCompatibleWithNetworkFramework:)` never touches the Keychain at all, so `verify()`
-        // succeeds outright there and `withKnownIssue` would fail the test for "not" hitting an
-        // issue that was never reachable off Darwin to begin with.
-        #if canImport(Darwin)
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
-        ) {
-            try verify()
-        }
-        #else
-        try verify()
-        #endif
+        // Then
+        #expect(sut.tlsConfiguration.certificateChain.isEmpty)
+        #expect(sut.tlsConfiguration.privateKey == nil)
     }
 }
 

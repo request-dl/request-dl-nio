@@ -159,11 +159,6 @@ struct InternalsClientIdentityDescriptorTests {
     /// `Descriptor` (just a certificate/key file path on disk, no `Internals.SecureConnection`,
     /// no `Property` tree) still has to genuinely authenticate against a real server requiring
     /// a client certificate, not just hold the right bytes in memory.
-    ///
-    /// Known issue in this bare SwiftPM test harness specifically (no Keychain Sharing entitlement), same gap
-    /// `RequestConfigurationURLSessionClientMTLSTests` already documents at the live-executor
-    /// layer. This proves the same wiring one layer further removed (via a JSON round trip
-    /// simulating a relaunch), not a new one.
     @Test
     func rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake() async throws {
         // Given
@@ -210,29 +205,25 @@ struct InternalsClientIdentityDescriptorTests {
             )
         )
 
-        // Then
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment",
-            {
-                let (handle, intermediates) = try rebuiltClientIdentityDescriptor.makeIdentity()
+        // When
+        let (handle, intermediates) = try rebuiltClientIdentityDescriptor.makeIdentity()
 
-                let delegate = ClientCertificateForwardingDelegate(
-                    identity: handle.identity,
-                    intermediates: intermediates,
-                    serverTrustPolicy: rebuiltServerTrustPolicy
-                )
-                let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-
-                var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
-                request.httpMethod = "GET"
-
-                let (data, response2) = try await session.data(for: request)
-
-                #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
-                let decodedBody = try HTTPResult<String>(data)
-                #expect(decodedBody.response == output)
-            }
+        let delegate = ClientCertificateForwardingDelegate(
+            identity: handle.identity,
+            intermediates: intermediates,
+            serverTrustPolicy: rebuiltServerTrustPolicy
         )
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+
+        var request = URLRequest(url: try #require(URL(string: "https://\(localServer.baseURL)\(uri)")))
+        request.httpMethod = "GET"
+
+        let (data, response2) = try await session.data(for: request)
+
+        // Then
+        #expect((response2 as? HTTPURLResponse)?.statusCode == 200)
+        let decodedBody = try HTTPResult<String>(data)
+        #expect(decodedBody.response == output)
     }
 }
 

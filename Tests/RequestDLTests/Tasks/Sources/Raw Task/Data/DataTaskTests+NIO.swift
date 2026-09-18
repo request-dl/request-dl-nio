@@ -95,11 +95,6 @@ extension DataTaskTests {
     /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured; nothing in
     /// `networkFrameworkIncompatibilityReasons()` ever stood in the way, since mTLS is genuinely
     /// supported there, just through a different channel.
-    ///
-    /// Wrapped in the same unconditional `withKnownIssue` as `dataTask_whenCAEnabled` above (no
-    /// Keychain Sharing entitlement on this SwiftPM test harness): what this specifically proves,
-    /// independent of whether the Keychain round-trip itself succeeds here, is that reaching this
-    /// codepath no longer crashes the process.
     @Test
     func dataTask_whenCAEnabledUnderNIOTransportServices() async throws {
         // Given
@@ -126,43 +121,28 @@ extension DataTaskTests {
         localServer.insert(response, at: uri)
         defer { localServer.cleanup(at: uri) }
 
-        // When / Then
-        func verify() async throws {
-            let data = try await DataTask {
-                BaseURL(localServer.baseURL)
-                Path(uri)
+        // When
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path(uri)
 
-                Session.localServer
-                    .requiredExecutor(.nioTransportServices)
+            Session.localServer
+                .requiredExecutor(.nioTransportServices)
 
-                SecureConnection {
-                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
-                }
-                .verification(.fullVerification)
+            SecureConnection {
+                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
             }
-            .extractPayload()
-            .result()
-
-            let result = try HTTPResult<String>(data)
-            #expect(result.response == output)
+            .verification(.fullVerification)
         }
+        .extractPayload()
+        .result()
 
-        // The Keychain round-trip this "known issue" is about only happens inside
-        // `#if canImport(Darwin)` code (the mTLS identity Network.framework needs); off Darwin,
-        // `.nioTransportServices` never touches the Keychain at all, so `verify()` succeeds
-        // outright there and `withKnownIssue` would fail the test for not hitting an issue that
-        // was never reachable off Darwin to begin with.
-        #if canImport(Darwin)
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment"
-        ) {
-            try await verify()
-        }
-        #else
-        try await verify()
-        #endif
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.response == output)
     }
 
     /// Regression coverage for the gap `Internals.NIOTrustEvaluator` closed: `additionalTrustRoots`

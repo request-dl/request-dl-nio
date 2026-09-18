@@ -113,30 +113,20 @@ extension RawTaskExecutorDispatchTests {
         #expect(result.receivedUserAgentHeader == ProcessInfo.processInfo.userAgent)
     }
 
-    /// Confirms the identity-building failure a real mTLS `DataTask` hits under `.urlSession` on
-    /// this SwiftPM test harness (no Keychain Sharing entitlement; see
-    /// `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment) surfaces through the
-    /// *public* API as a documented ``ClientIdentityError``, not a raw
-    /// `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy
-    /// .ConfigurationError`. Both are package-visible types a real consumer app cannot even name,
-    /// and whose `localizedDescription` (Foundation's generic NSError fallback, absent this fix)
-    /// carries none of their own actionable `description` text.
+    /// Completes a real mTLS handshake under `.urlSession` through the *public* `DataTask` entry
+    /// point specifically -- the same way `dataTask_whenCAEnabled` (`DataTaskTests`, pinned to
+    /// `.nio`) and `DataTaskTests.dataTask_whenCAEnabledUnderNIOTransportServices` (pinned to
+    /// `.nioTransportServices`) already do for the other two executors, completing the trio.
     ///
-    /// `ClientIdentityErrorTests` covers the rewrap/description logic itself in isolation; this
-    /// is the same fact proven end to end, through the real `DataTask` entry point, the same way
-    /// `dataTask_whenCAEnabled` (`DataTaskTests`, pinned to `.nio` specifically to avoid this
-    /// exact gap) already does for the NIO backend.
-    ///
-    /// Deliberately does not assert on the *specific* ``ClientIdentityError/Reason``: this
-    /// harness has been observed to hit this gap two different ways (`errSecMissingEntitlement`
-    /// on `SecItemAdd`, or `errSecItemNotFound` on the identity lookup right after a successful
-    /// add), and both are genuine, independently-reachable failure modes this test should pass
-    /// under either way.
+    /// `RequestConfigurationURLSessionClientMTLSTests
+    /// .urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend` already covers
+    /// `.urlSession` mTLS success too, but drives `Internals.URLSessionClient` directly; nothing
+    /// else exercised this same success through `DataTask` itself.
     ///
     /// Needs `LocalServer.TLSOption.client` (server-side client-certificate verification), only
     /// implemented on the NIOSSL backend.
     @Test
-    func dataTask_whenCAEnabledUnderURLSessionWithoutKeychainSharing_throwsClientIdentityError() async throws {
+    func dataTask_whenCAEnabledUnderURLSession() async throws {
         let server = Certificates().server()
         let client = Certificates().client()
 
@@ -171,17 +161,12 @@ extension RawTaskExecutorDispatchTests {
             .verification(.fullVerification)
         }
 
-        do {
-            _ = try await DataTask { content }.extractPayload().result()
-            Issue.record("Expected this SwiftPM test harness's missing Keychain Sharing entitlement to throw")
-        } catch let error as ClientIdentityError {
-            // Then: the public, documented type, not a leaked internal one, with the same
-            // actionable text through both access paths a real caller might use.
-            #expect(!error.description.isEmpty)
-            #expect((error as any Error).localizedDescription == error.description)
-        } catch {
-            Issue.record("Expected ClientIdentityError, got \(type(of: error)): \(error)")
-        }
+        // When
+        let data = try await DataTask { content }.extractPayload().result()
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.response == output)
     }
 }
 
