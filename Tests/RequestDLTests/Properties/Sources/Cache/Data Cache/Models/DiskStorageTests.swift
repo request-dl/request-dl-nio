@@ -325,7 +325,10 @@ struct DiskStorageTests {
             let elapsed = clock.now - start
 
             // Then: well under the 15s retry budget a by-key lookup would spend on the same miss.
-            #expect(elapsed < .seconds(2))
+            // 8s, not a tighter margin, because CI Simulator scheduler contention already pushed
+            // this as high as 2.3s at a 2s margin; still leaves a wide gap below the 15s budget
+            // a genuine regression (falling back to the by-key retry loop) would actually hit.
+            #expect(elapsed < .seconds(8))
         }
     }
 
