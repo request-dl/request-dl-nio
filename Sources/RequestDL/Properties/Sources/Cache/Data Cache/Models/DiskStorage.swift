@@ -5,6 +5,7 @@
 import Crypto
 import RequestDLInternals
 import SwiftAsyncStream
+import SystemPackage
 
 #if canImport(NIOCore)
 import NIOCore
@@ -60,7 +61,23 @@ struct DiskStorage: Sendable {
 
         // MARK: - Inits
 
-        init?(_ url: URL) async {
+        /// - Parameter retryOnMiss: Whether a missing `response.record`/`data.record` gets the
+        /// full retry budget (see `isReachableWithRetry`'s doc comment) before being treated as a
+        /// genuine absence, or is treated as one immediately.
+        ///
+        /// `true` (the default) is right for `record(forKey:)`'s targeted, by-key lookup: the
+        /// record it's checking was just written and closed right before, so a miss there really
+        /// is the transient stat flake the retry exists for.
+        ///
+        /// `records()`'s full directory scan passes `false`. There, a miss is just as likely to
+        /// mean "this directory belongs to a write that's still in progress" -- `data.record` in
+        /// particular does not exist yet between `allocateBuffer` returning and the first body
+        /// byte arriving, since `Internals.FileBuffer` opens it lazily (see
+        /// `applyFileProtection(to:)`'s own doc comment) -- and retrying that for up to 15s
+        /// per incomplete entry, serially, over every entry a scan finds, is a cost the scan
+        /// itself was never the right place to pay: `freeSpace`/`removeAll(since:)` call it for
+        /// every record in the directory, not one record whose write this call is racing.
+        init?(_ url: URL, retryOnMiss: Bool = true) async {
             guard url.pathExtension == Self.pathExtension,
                 let (key, date) = Self.getKeyAndDate(url)
             else { return nil }
@@ -77,8 +94,12 @@ struct DiskStorage: Sendable {
             // initializer's own genuine-miss tests to ~30s apiece, which is exactly the kind of
             // aggregate slowdown `AsyncLock.Watchdog`'s CI-flakiness investigation traces stalls
             // to elsewhere in this same file.
-            guard await Self.isReachableWithRetry(responseURL) else { return nil }
-            guard await Self.isReachableWithRetry(dataURL) else { return nil }
+            func isReachable(_ url: URL) async -> Bool {
+                retryOnMiss ? await Self.isReachableWithRetry(url) : await url.isReachable
+            }
+
+            guard await isReachable(responseURL) else { return nil }
+            guard await isReachable(dataURL) else { return nil }
 
             self.date = date
             self.key = key
@@ -424,7 +445,7 @@ struct DiskStorage: Sendable {
     }
 
     func removeAll(since date: Date) async {
-        let recordsToCheck = await records()
+        let recordsToCheck = await records(retryOnMiss: false)
         for record in recordsToCheck where record.date <= date {
             _ = try? await Internals.fileSystem.removeItem(
                 at: record.url.filePath
@@ -585,7 +606,7 @@ struct DiskStorage: Sendable {
             return knownUsage
         }
 
-        var entries = await records()
+        var entries = await records(retryOnMiss: false)
 
         if maximumCapacity == .zero {
             for entry in entries {
@@ -676,7 +697,7 @@ struct DiskStorage: Sendable {
 
         let handle = try await Internals.fileSystem.openFile(
             forWritingAt: url.filePath,
-            options: .newFile(replaceExisting: true)
+            options: .newFile(replaceExisting: true, permissions: .ownerReadWrite)
         )
 
         do {
@@ -783,7 +804,17 @@ struct DiskStorage: Sendable {
     /// directly rather than through `index`, so a duplicate directory from a lost write race
     /// (two concurrent writers for the same key) stays visible and gets swept up like any other
     /// entry instead of going untracked once `index` moves on to the newer one.
-    private func records() async -> [Record] {
+    ///
+    /// - Parameter retryOnMiss: Forwarded to each entry's `Record.init?(_:retryOnMiss:)`. `true`
+    /// (the default) is right for `record(forKey:)`'s cold-lookup fallback (`index.location(for:
+    /// scan:)`, below): the whole point of that scan is finding a record that may have been
+    /// written only moments ago, so a transient miss on one of its two files is worth retrying.
+    /// `freeSpace`/`removeAll(since:)` pass `false`: those scans see every entry in the
+    /// directory, most written long ago and settled, and retrying a genuinely in-progress
+    /// write's still-missing `data.record` for up to 15s -- once per such entry, serially --
+    /// turns a bulk operation meant to free space or prune old entries into a multi-minute stall
+    /// for however many writes happen to be in flight when it runs.
+    private func records(retryOnMiss: Bool = true) async -> [Record] {
         let dirPath = directory.filePath
         var foundRecords: [Record] = []
 
@@ -793,7 +824,7 @@ struct DiskStorage: Sendable {
                     if entry.name.string.hasSuffix(".\(Record.pathExtension)") {
                         let entryURL = directory.appendingPathComponent(entry.name.string)
 
-                        if let record = await Record(entryURL) {
+                        if let record = await Record(entryURL, retryOnMiss: retryOnMiss) {
                             foundRecords.append(record)
                         }
                     }
