@@ -101,7 +101,7 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build RequestDL with the NIOTransport trait disabled
         run: swift build --disable-default-traits --target RequestDL
       - name: Build the Test targets with the NIOTransport trait disabled
