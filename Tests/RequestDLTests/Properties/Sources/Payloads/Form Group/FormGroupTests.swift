@@ -219,6 +219,45 @@ struct FormGroupTests {
     }
 
     @Test
+    func group_whenNameOrFilenameContainsQuoteOrCRLF_escapesInsteadOfInjectingHeaders() async throws {
+        // Given
+        let name = "foo\"\r\nContent-Type: text/html\r\n\r\n<script>evil()</script>"
+        let filename = "bar\".txt\r\nContent-Disposition: form-data; name=\"admin"
+        let data = await Data.randomData(length: 32)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                FormGroup {
+                    Form(
+                        name: name,
+                        filename: filename,
+                        contentType: .octetStream,
+                        data: data
+                    )
+                }
+            }
+        )
+
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
+        let parsed = try await parser.parse()
+
+        // Then
+        let escapedName = "foo%22%0D%0AContent-Type: text/html%0D%0A%0D%0A<script>evil()</script>"
+        let escapedFilename = "bar%22.txt%0D%0AContent-Disposition: form-data; name=%22admin"
+        let expectedContentDisposition =
+            "form-data; name=\"\(escapedName)\"; filename=\"\(escapedFilename)\""
+
+        let item = try #require(parsed.items.first)
+
+        #expect(parsed.items.count == 1)
+        #expect(item.headers["Content-Disposition"] == [expectedContentDisposition])
+        #expect(item.headers["Content-Type"] == ["application/octet-stream"])
+        #expect(item.headers["Content-Length"] == [String(data.count)])
+        #expect(item.contents == data)
+    }
+
+    @Test
     func group_whenEmptyContent() async throws {
         // When
         let resolved = try await resolve(
