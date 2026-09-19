@@ -119,7 +119,7 @@ extension Internals {
             do {
                 let handle = try await Internals.fileSystem.openFile(
                     forWritingAt: path,
-                    options: .newFile(replaceExisting: true)
+                    options: .newFile(replaceExisting: true, permissions: .ownerReadWrite)
                 )
 
                 try await handle.close()

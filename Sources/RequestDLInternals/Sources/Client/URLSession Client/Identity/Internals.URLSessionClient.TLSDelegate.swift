@@ -12,22 +12,24 @@ import Foundation
 
 extension Internals.URLSessionClient {
 
-    /// Routes a TLS challenge (server-trust, client-certificate) to `policy` only when it's for
-    /// `host`. This is promoted from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`,
-    /// not the single-identity `MTLSURLSessionDelegate` the spike test itself used. One
-    /// `URLSession`, and so one `URLSessionClient` pooled by `Internals.ClientManager`,
-    /// genuinely does end up serving requests to many hosts; the host check is what keeps a
-    /// challenge for one host from being answered with a policy meant for another.
+    /// Routes a TLS challenge (server-trust, client-certificate) to `policy`. This is promoted
+    /// from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`, not the
+    /// single-identity `MTLSURLSessionDelegate` the spike test itself used.
     ///
     /// `Internals.URLSessionClient` only ever resolves one `Internals.SecureConnection` (the one
     /// it was configured with, same as `redirectConfiguration`/`proxy`), so there is only ever one
     /// `Internals.URLSessionIdentityPolicy` to route to, not a per-host map of them. What varies
     /// per request is `host`: `execute(...)` builds a fresh `TLSDelegate` for each request, pairing
     /// that one policy with the request's own destination host, since the client itself isn't tied
-    /// to a single URL. A challenge for any other host (mid-redirect to a different host, for
-    /// instance) falls through to the system's own handling, same as the spike's routing delegate:
-    /// this is the routing-delegate equivalent of RequestDL's existing per-request
-    /// `Internals.SecureConnection?` already being optional.
+    /// to a single URL.
+    ///
+    /// `host` still reaches `policy.handle(challenge:isConfiguredHost:completionHandler:)`, but
+    /// only gates whether a client-certificate credential is presented. Server-trust challenges
+    /// (pinning, custom trust roots, revocation, hostname-verification overrides) are always
+    /// routed to `policy` regardless of host: a redirect target this policy was never configured
+    /// for still has to be checked against that same trust configuration, since a redirect is
+    /// exactly the kind of thing pinning needs to survive, not a reason to fall back to bare
+    /// system trust. See `URLSessionIdentityPolicy.handle`'s own doc comment.
     final class TLSDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
         // MARK: - Private properties
@@ -50,12 +52,11 @@ extension Internals.URLSessionClient {
             didReceive challenge: URLAuthenticationChallenge,
             completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
-            guard challenge.protectionSpace.host == host else {
-                completionHandler(.performDefaultHandling, nil)
-                return
-            }
-
-            policy.handle(challenge: challenge, completionHandler: completionHandler)
+            policy.handle(
+                challenge: challenge,
+                isConfiguredHost: challenge.protectionSpace.host == host,
+                completionHandler: completionHandler
+            )
         }
     }
 }

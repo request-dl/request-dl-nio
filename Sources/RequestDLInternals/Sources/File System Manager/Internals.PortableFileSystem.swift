@@ -23,7 +23,7 @@ extension Internals {
     /// Deliberately narrow: this mirrors the subset of `NIOFileSystem.FileSystem`'s API this
     /// package actually calls (`info`, `createDirectory`, `openFile` read/write,
     /// `removeItem`, `moveItem`, `withDirectoryHandle`), matching call-site syntax
-    /// (`.newFile(replaceExisting:)`, `.bytes(_:)`, `.unlimited`, `entry.name.string`, …)
+    /// (`.newFile(replaceExisting:permissions:)`, `.bytes(_:)`, `.unlimited`, `entry.name.string`, …)
     /// closely enough that most call sites in `FileBufferURL`/`FileStreamBuffer`/
     /// `URL+Extensions.swift`/`DiskStorage.swift` compile completely unchanged against
     /// whichever of the two types `Internals.fileSystem` resolves to, not a general-purpose
@@ -39,17 +39,26 @@ extension Internals {
         }
 
         /// Counterpart to `NIOFileSystem.OpenOptions.Write`, narrowed to the two cases this
-        /// package actually constructs. `.modifyFile`'s `permissions` takes the same
+        /// package actually constructs. Both cases' `permissions` take the same
         /// `SystemPackage.FilePermissions` `NIOFileSystem` itself takes (portable already, no
         /// NIO needed), matching call-site syntax (`.ownerReadWrite`) exactly rather than
         /// introducing a parallel type. (Caught by the force-compiled verification pass missing
         /// this parameter entirely on the first attempt:
         /// `Internals.FileStreamBuffer.init(writingTo:)` passes it unconditionally.)
+        ///
+        /// - Important: `.newFile`'s `permissions` has no default, unlike
+        /// `NIOFileSystem.OpenOptions.Write.newFile(replaceExisting:permissions:)`'s own
+        /// `permissions: FilePermissions? = nil` (which falls back to
+        /// `.defaultsForRegularFile`, i.e. world-readable). Every call site on the NIO path must
+        /// already pass `.ownerReadWrite` explicitly for the two backends to agree, so requiring
+        /// it here too, rather than silently defaulting, keeps a future call site honest instead
+        /// of letting it compile its way into the same gap `.newFile` on the NIO side otherwise
+        /// invites.
         package enum WriteOptions: Sendable {
             /// Creates a fresh, empty file. Errors if one is already there and
             /// `replaceExisting` is `false` (`NIOFileSystem`'s own contract for this case),
             /// unlike `.modifyFile` below, which is silent about an existing file by design.
-            case newFile(replaceExisting: Bool)
+            case newFile(replaceExisting: Bool, permissions: FilePermissions)
             /// Opens an existing file untouched, only creating one that is missing.
             case modifyFile(createIfNecessary: Bool, permissions: FilePermissions)
         }
@@ -284,7 +293,7 @@ extension Internals {
                 let exists = FileManager.default.fileExists(atPath: path.string)
 
                 switch options {
-                case .newFile(let replaceExisting):
+                case .newFile(let replaceExisting, let permissions):
                     guard replaceExisting || !exists else {
                         throw FileAlreadyExistsError(path: path.string)
                     }
@@ -293,7 +302,7 @@ extension Internals {
                         FileManager.default.createFile(
                             atPath: path.string,
                             contents: nil,
-                            attributes: [.posixPermissions: 0o600]
+                            attributes: [.posixPermissions: permissions.rawValue]
                         )
                     else {
                         throw FileHandleOpenError(path: path.string)

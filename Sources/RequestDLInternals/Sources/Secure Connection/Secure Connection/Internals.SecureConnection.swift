@@ -30,11 +30,12 @@ extension Internals {
         /// revocation policy on the `SecTrust` it's handed only when those are actually configured
         /// (`Internals.DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`).
         ///
-        /// `build()`'s NIOSSL-facing `tlsCustomVerification` stays gated to pins only, since NIOSSL
-        /// already honors both `additionalTrustRoots` and `.noHostnameVerification` natively via
-        /// `TLSConfiguration` and doesn't need the assist for those two. `revocationPolicy` and
-        /// `trustDecisionObserver`, though, still route through it on `.nio` as well, since
-        /// NIOSSL/BoringSSL has no revocation checking or trust-decision hook of its own at all.
+        /// `build()`'s NIOSSL-facing `tlsCustomVerification` stays gated to pins, `revocationPolicy`,
+        /// or `trustDecisionObserver`, since NIOSSL already honors both `additionalTrustRoots` and
+        /// `.noHostnameVerification` natively via `TLSConfiguration` and doesn't need the assist for
+        /// those two. `revocationPolicy` and `trustDecisionObserver` still route through it on
+        /// `.nio` as well, since NIOSSL/BoringSSL has no revocation checking or trust-decision hook
+        /// of its own at all.
         ///
         /// What's genuinely unreachable under Network.framework is `keyLogger` (no
         /// Network.framework equivalent at all).
@@ -267,24 +268,26 @@ extension Internals {
 
             let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
 
-            // NIOSSL already honors `additionalTrustRoots` natively, via the plain
-            // `tlsConfiguration.additionalTrustRoots` assignment above. Unlike
-            // `tlsCustomVerificationNetworkFramework` below, its custom-verification callback
-            // stays reserved for what it can't do on its own (SPKI pinning), so a
-            // `trustEvaluator` built only for `additionalTrustRoots` never gets attached here.
-            let hasPins = !(tlsPins ?? []).isEmpty
+            // NIOSSL already honors both `additionalTrustRoots` (via the plain
+            // `tlsConfiguration.additionalTrustRoots` assignment above) and `.noHostnameVerification`
+            // natively, so a `trustEvaluator` built only for one of those two never gets attached
+            // here. `revocationPolicy` and `trustDecisionObserver` have no NIOSSL/BoringSSL
+            // counterpart at all, unlike Network.framework below, which always gets the evaluator
+            // whenever `resolve(from:)` built one. See this type's own doc comment.
+            let needsNIOSSLCustomVerification =
+                !(tlsPins ?? []).isEmpty || revocationPolicy != nil || trustDecisionObserver != nil
 
             #if canImport(Darwin)
             return .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsCustomVerification: hasPins ? trustEvaluator?.tlsCustomVerification : nil,
+                tlsCustomVerification: needsNIOSSLCustomVerification ? trustEvaluator?.tlsCustomVerification : nil,
                 tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
                 localIdentityHandle: isCompatibleWithNetworkFramework ? try makeLocalIdentityForNetworkFramework() : nil
             )
             #else
             return .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsCustomVerification: hasPins ? trustEvaluator?.tlsCustomVerification : nil
+                tlsCustomVerification: needsNIOSSLCustomVerification ? trustEvaluator?.tlsCustomVerification : nil
             )
             #endif
         }

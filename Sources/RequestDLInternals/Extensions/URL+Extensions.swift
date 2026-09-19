@@ -111,7 +111,7 @@ extension URL {
 
         let handle = try await Internals.fileSystem.openFile(
             forWritingAt: filePath,
-            options: .newFile(replaceExisting: false)
+            options: .newFile(replaceExisting: false, permissions: .ownerReadWrite)
         )
 
         try await handle.close()
@@ -158,7 +158,7 @@ extension URL {
     package func write(_ data: Data) async throws {
         let handle = try await Internals.fileSystem.openFile(
             forWritingAt: filePath,
-            options: .newFile(replaceExisting: true)
+            options: .newFile(replaceExisting: true, permissions: .ownerReadWrite)
         )
 
         do {
