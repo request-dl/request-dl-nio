@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOHTTP1
 import Testing
 
 @testable import RequestDLInternals
@@ -14,6 +13,38 @@ import struct Foundation.UUID
 #endif
 
 struct InternalsProxyTests {
+
+    @Test
+    func proxy_whenConnectHeadersDiffer_shouldStillBeEqualAndHashEqual() {
+        // Given
+        let host = UUID().uuidString
+        let port = 1_090
+
+        var connectHeaders = Internals.HTTPHeaders()
+        connectHeaders.add(name: "X-Proxy-Token", value: "abc123")
+
+        // When
+        let lhs = Internals.Proxy(host: host, port: port, connection: .http, authorization: nil)
+        let rhs = Internals.Proxy(
+            host: host,
+            port: port,
+            connection: .http,
+            authorization: nil,
+            connectHeaders: connectHeaders
+        )
+
+        // Then
+        #expect(lhs == rhs)
+        #expect(lhs.hashValue == rhs.hashValue)
+    }
+}
+
+// The remaining tests all read `configuration.build().httpClientConfiguration`, and both
+// `Output` (the type `build()` returns) and `.httpClientConfiguration`'s
+// `HTTPClient.Configuration` (AsyncHTTPClient) only exist under `canImport(NIOCore)`.
+#if canImport(NIOCore)
+
+extension InternalsProxyTests {
 
     @Test
     func proxy_whenHTTPConnectionWithoutAuthorization() async throws {
@@ -112,28 +143,6 @@ struct InternalsProxyTests {
         // Then
         #expect(resolved.proxy?.connectHeaders["X-Proxy-Token"] == ["first", "second"])
     }
-
-    @Test
-    func proxy_whenConnectHeadersDiffer_shouldStillBeEqualAndHashEqual() {
-        // Given
-        let host = UUID().uuidString
-        let port = 1_090
-
-        var connectHeaders = Internals.HTTPHeaders()
-        connectHeaders.add(name: "X-Proxy-Token", value: "abc123")
-
-        // When
-        let lhs = Internals.Proxy(host: host, port: port, connection: .http, authorization: nil)
-        let rhs = Internals.Proxy(
-            host: host,
-            port: port,
-            connection: .http,
-            authorization: nil,
-            connectHeaders: connectHeaders
-        )
-
-        // Then
-        #expect(lhs == rhs)
-        #expect(lhs.hashValue == rhs.hashValue)
-    }
 }
+
+#endif

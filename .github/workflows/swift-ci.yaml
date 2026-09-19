@@ -94,7 +94,7 @@ jobs:
     secrets: inherit
 
   urlsession-only-build:
-    name: "🌐 URLSession-only Build"
+    name: "🌐 URLSession-only Build & Test"
     # Skip draft PRs, matching the reusable "Swift CI" job's own guard above.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: macos-26
@@ -104,3 +104,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build RequestDL with the NIOTransport trait disabled
         run: swift build --disable-default-traits --target RequestDL
+      - name: Build the Test targets with the NIOTransport trait disabled
+        run: swift build --disable-default-traits --target RequestDLTests --target RequestDLInternalsTests
+      - name: Run the test suite with the NIOTransport trait disabled
+        # macOS GitHub-hosted runners default to a 256 open-file soft limit; the portable
+        # (NIOCore-less) file-buffer path caches one descriptor per open Internals.Buffer for
+        # its whole lifetime, with no pool cap the way the NIOThreadPool-backed path has, so a
+        # suite that opens hundreds of file-backed buffers concurrently (InternalsFileBufferTests
+        # / InternalsEncryptedFileStreamBufferTests / DiskStorageTests) exhausts it -- silently,
+        # since every failed open/write in that path already swallows its error by design and
+        # reports "no data" rather than throwing. Raise the limit before running, matching this
+        # process's local ulimit (effectively unbounded) rather than the CI default.
+        run: |
+          hard_limit="$(ulimit -Hn)"
+          echo "hard limit: $hard_limit"
+          if [ "$hard_limit" = "unlimited" ]; then
+            ulimit -n 65536
+          else
+            ulimit -n "$hard_limit"
+          fi
+          echo "raised soft limit: $(ulimit -Sn)"
+          swift test --disable-default-traits

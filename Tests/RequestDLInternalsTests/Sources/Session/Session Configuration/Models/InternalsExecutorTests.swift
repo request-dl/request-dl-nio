@@ -18,6 +18,8 @@ struct InternalsExecutorTests {
         #expect(lhs == rhs)
     }
 
+    // `.nioTransportServices`/`.nio` only exist under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func executor_whenNotEquals() {
         // Given
@@ -40,4 +42,5 @@ struct InternalsExecutorTests {
         // Then
         #expect(cases.count == 3)
     }
+    #endif
 }

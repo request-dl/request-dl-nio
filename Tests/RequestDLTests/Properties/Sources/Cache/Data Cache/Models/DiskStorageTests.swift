@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOFileSystem
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -51,6 +51,31 @@ struct DiskStorageTests {
         }
 
         return false
+    }
+
+    /// Retries `body` past the same transient stat/read miss `DiskStorage`'s own production
+    /// code already tolerates (see its private `retryingUntilSuccess`, and `Record.init?`'s
+    /// reachability checks): these tests reach around that resilience with a raw file read or
+    /// directory scan, for assertions the production API has no reason to expose (raw
+    /// ciphertext bytes, a corrupted record to write back), so a miss right after a synchronous
+    /// write they themselves just awaited is that same flake, not a genuine absence. Same
+    /// budget as the production helper, so this is exactly as (in)tolerant of a genuinely slow
+    /// disk as the code under test already is, no more and no less.
+    private func readWithRetry<T>(
+        attempts: Int = 300,
+        retryDelay: UInt64 = 50_000_000,
+        _ body: () throws -> T
+    ) async throws -> T {
+        for attempt in 0..<attempts {
+            do {
+                return try body()
+            } catch {
+                guard attempt + 1 < attempts else { throw error }
+                try? await Task.sleep(nanoseconds: retryDelay)
+            }
+        }
+
+        fatalError("unreachable: the loop above always returns or throws on its last attempt")
     }
 
     @Test
@@ -244,7 +269,7 @@ struct DiskStorageTests {
             let dataURL = recordDirectoryURL.appendingPathComponent("data.record")
 
             let response = makeCachedResponse(key: key)
-            try await FileSystem.shared.createDirectory(
+            try await Internals.fileSystem.createDirectory(
                 at: recordDirectoryURL.filePath,
                 withIntermediateDirectories: true
             )
@@ -252,7 +277,7 @@ struct DiskStorageTests {
 
             // Given: "response.record" exists already, but "data.record" only shows up a few
             // milliseconds into the lookup below — the same shape a transient
-            // `FileSystem.shared.info(forFileAt:)` miss leaves behind. `Record.init?` has to
+            // `Internals.fileSystem.info(forFileAt:)` miss leaves behind. `Record.init?` has to
             // tolerate that instead of reporting the whole record missing outright.
             async let lookup = storage[key]
 
@@ -282,7 +307,7 @@ struct DiskStorageTests {
             // Given: a record directory whose "response.record" is itself a directory, so the
             // record's existence check (`info(forFileAt:)`) succeeds but actually opening it
             // for reading fails.
-            try await FileSystem.shared.createDirectory(
+            try await Internals.fileSystem.createDirectory(
                 at: responseURL.filePath,
                 withIntermediateDirectories: true
             )
@@ -315,7 +340,7 @@ struct DiskStorageTests {
             // the index still points to — e.g. another process sharing this directory (via
             // `suiteName`) clearing entries it doesn't know this instance has indexed.
             let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
-            try await FileSystem.shared.removeItem(at: recordURL.filePath)
+            try await Internals.fileSystem.removeItem(at: recordURL.filePath)
 
             // Then: the stale mapping fails validation and is dropped instead of being served
             // — or, worse, retried against forever on every future lookup for this key.
@@ -327,18 +352,27 @@ struct DiskStorageTests {
     /// `recordDirectoryURL(in:)` below, since encryption (unlike `fileProtection`) is not
     /// Darwin-only.
     private func encryptedRecordDirectoryURL(in directoryURL: URL) async throws -> URL {
-        var found: URL?
+        for attempt in 0..<300 {
+            var found: URL?
 
-        try await FileSystem.shared.withDirectoryHandle(atPath: directoryURL.filePath) { dir in
-            for try await entry in dir.listContents() {
-                if entry.name.string.hasSuffix(".cached") {
-                    found = directoryURL.appendingPathComponent(entry.name.string, isDirectory: true)
-                    break
+            try await Internals.fileSystem.withDirectoryHandle(atPath: directoryURL.filePath) { dir in
+                for try await entry in dir.listContents() {
+                    if entry.name.string.hasSuffix(".cached") {
+                        found = directoryURL.appendingPathComponent(entry.name.string, isDirectory: true)
+                        break
+                    }
                 }
             }
+
+            if let found {
+                return found
+            }
+
+            guard attempt + 1 < 300 else { break }
+            try? await Task.sleep(nanoseconds: 50_000_000)
         }
 
-        return try #require(found)
+        return try #require(nil as URL?)
     }
 
     @Test
@@ -364,8 +398,8 @@ struct DiskStorageTests {
             let dataURL = recordURL.appendingPathComponent("data.record")
             let responseURL = recordURL.appendingPathComponent("response.record")
 
-            let rawData = try Data(contentsOf: dataURL)
-            let rawResponse = try Data(contentsOf: responseURL)
+            let rawData = try await readWithRetry { try Data(contentsOf: dataURL) }
+            let rawResponse = try await readWithRetry { try Data(contentsOf: responseURL) }
 
             #expect(!rawData.isEmpty)
             #expect(!contains([UInt8](rawData), subsequence: [UInt8](plaintext)))
@@ -447,7 +481,7 @@ struct DiskStorageTests {
             let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
             let responseURL = recordURL.appendingPathComponent("response.record")
 
-            var raw = try Data(contentsOf: responseURL)
+            var raw = try await readWithRetry { try Data(contentsOf: responseURL) }
             raw[raw.count - 1] ^= 0xFF
             try raw.write(to: responseURL)
 

@@ -3,12 +3,18 @@
 //
 
 import Crypto
-import NIOSSL
 import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOSSL
+#else
+import SwiftASN1
+import X509
+#endif
 
 #if canImport(Darwin)
 
@@ -550,9 +556,24 @@ extension InternalsServerTrustPolicyTests {
     /// so `descriptor_whenSPKIPinningUsesUnnamedAlgorithm_throwsUnpersistableAlgorithm` and
     /// `liveResolvedPolicy_whenSPKIPinningUsesUnnamedAlgorithm_stillMatchesRealServerCertificate`
     /// can exercise an algorithm outside `Internals.SPKIHash.KnownAlgorithm`.
+    ///
+    /// SPKI extraction mirrors `Internals.DarwinTrustEvaluation.chainSPKIDERBytes(of:)` exactly
+    /// (NIOSSL when it's in the build, `X509`'s own portable ASN.1 parser otherwise), so this
+    /// keeps agreeing with whatever `.urlSession`'s real handshake actually pins against under
+    /// either build configuration, and this suite needs nothing beyond `canImport(Darwin)`.
     func hashSPKI<Algorithm: HashFunction>(from url: URL, algorithm: Algorithm.Type) throws -> Data {
-        let certificate = try NIOSSLCertificate.fromPEMFile(url.absolutePath(percentEncoded: false))[0]
+        let derBytes = try Internals.Certificate.resolvedPEMCertificateDERBytes(of: Data(contentsOf: url))[0]
+
+        #if canImport(NIOCore)
+        let certificate = try NIOSSLCertificate(bytes: [UInt8](derBytes), format: .der)
         let bytes = try certificate.extractPublicKey().toSPKIBytes()
+        #else
+        let parsed = try X509.Certificate(derEncoded: [UInt8](derBytes))
+        var serializer = DER.Serializer()
+        try parsed.publicKey.serialize(into: &serializer)
+        let bytes = serializer.serializedBytes
+        #endif
+
         return Data(algorithm.hash(data: Data(bytes)))
     }
 }

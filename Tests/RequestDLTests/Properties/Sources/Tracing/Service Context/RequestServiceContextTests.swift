@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOConcurrencyHelpers
 import Testing
 import Tracing
 
@@ -113,7 +112,7 @@ struct RequestServiceContextTests {
 
 private final class ContextCapturingTracer: Tracer, Sendable {
 
-    private let box = NIOLockedValueBox<String?>(nil)
+    private let box = LockedValueBox<String?>(nil)
 
     var capturedTestID: String? {
         box.withLockedValue { $0 }

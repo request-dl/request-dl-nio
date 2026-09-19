@@ -40,6 +40,10 @@ struct InternalsURLSessionClientSOCKSProxyTests {
         #endif
     }
 
+    // `LocalSOCKSProxy` (the SOCKS proxy fixture) is deliberately NIO-only, gated
+    // `#if canImport(NIOCore)` in `RequestDLTestSupport` — see `urlsession-only-trait-isolation`
+    // memory for why (no Network.framework port attempted).
+    #if canImport(NIOCore)
     @Test
     func execute_whenSOCKSProxyConfigured_tunnelsUnlessPlatformBypassesLocalhost() async throws {
         // Given
@@ -86,6 +90,7 @@ struct InternalsURLSessionClientSOCKSProxyTests {
 
         try await proxy.shutdown()
     }
+    #endif
 }
 
 /// Test-only stand-in for the real client's own TLS challenge handling; see the identical

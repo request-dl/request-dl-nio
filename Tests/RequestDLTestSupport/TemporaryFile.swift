@@ -38,15 +38,20 @@ func withTemporaryFileURL<Result>(
     createPath: Bool = true,
     perform body: (URL) async throws -> Result
 ) async throws -> Result {
-    var url =
+    // The scratch root this call owns. Teardown removes *this*, never
+    // `url.deletingLastPathComponent()`: with no path components that parent is the shared
+    // system temporary directory itself, and removing it recursively wipes every other
+    // concurrently running test's scratch files — including the file-backed buffers
+    // `Internals.FileBufferURL.temporaryURL` places directly in there.
+    let rootURL =
         temporaryDirectoryURL
         .appendingPathComponent("RequestDL.\(UUID().uuidString)", isDirectory: true)
+
+    var url = rootURL
 
     for component in pathComponents {
         url = url.appendingPathComponent(component)
     }
-
-    let directoryURL = url.deletingLastPathComponent()
 
     if createPath {
         try await url.createPathIfNeeded()
@@ -54,10 +59,10 @@ func withTemporaryFileURL<Result>(
 
     do {
         let result = try await body(url)
-        try? await directoryURL.removeIfNeeded()
+        try? await rootURL.removeIfNeeded()
         return result
     } catch {
-        try? await directoryURL.removeIfNeeded()
+        try? await rootURL.removeIfNeeded()
         throw error
     }
 }

@@ -2,6 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `Internals.EventLoopGroupManager` and `SessionProvider.group(with:)` only exist under
+// `canImport(NIOCore)`.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import SwiftAsyncTesting
@@ -76,3 +80,5 @@ struct InternalsEventLoopManagerTests {
         #expect(sut === provider.group(with: options))
     }
 }
+
+#endif

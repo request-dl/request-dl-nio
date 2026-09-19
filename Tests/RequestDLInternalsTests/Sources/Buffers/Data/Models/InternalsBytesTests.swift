@@ -2,11 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import Testing
 
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
+
+// Only the "ByteBuffer-backed" section below needs `NIOCore.ByteBuffer`.
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -185,7 +189,12 @@ struct InternalsBytesTests {
         #expect(bytes.readerIndex == 1)
     }
 
-    // MARK: - ByteBuffer-backed
+}
+
+// MARK: - ByteBuffer-backed
+
+#if canImport(NIOCore)
+extension InternalsBytesTests {
 
     @Test
     func bytes_whenInitFromByteBuffer() {
@@ -274,3 +283,4 @@ struct InternalsBytesTests {
         #expect(bytes.readerIndex == .zero)
     }
 }
+#endif

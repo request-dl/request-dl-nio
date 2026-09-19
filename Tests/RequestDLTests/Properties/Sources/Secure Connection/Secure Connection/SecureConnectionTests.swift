@@ -2,12 +2,15 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOCore
+#endif
 
 struct SecureConnectionTests {
 
@@ -42,7 +45,9 @@ struct SecureConnectionTests {
         #expect(sut.maximumTLSVersion == secureConnection.maximumTLSVersion)
         #expect(sut.cipherSuites == secureConnection.cipherSuites)
         #expect(sut.cipherSuiteValues == secureConnection.cipherSuiteValues)
+        #if canImport(NIOCore)
         #expect(sut.keyLogger == nil)
+        #endif
     }
 
     @Test
@@ -64,6 +69,14 @@ struct SecureConnectionTests {
         #expect(sut?.certificateVerification == verification.build())
     }
 
+    // Every public modifier this block's tests call
+    // (`signingSignatureAlgorithms(_:)`/`verifySignatureAlgorithms(_:)`/
+    // `sendCANameListDisabled(_:)`/`renegotiationSupport(_:)`/`shutdownTimeout(_:)`/
+    // `applicationProtocols(_:)`/`version(maximum:)`/`version(_:Range)`/`version(_:ClosedRange)`)
+    // only exists under `canImport(NIOCore)`: each is a NIOSSL-specific handshake detail, or has
+    // no Network.framework/URLSession equivalent to ever take effect through (see each method's
+    // own doc comment in `SecureConnection.swift`).
+    #if canImport(NIOCore)
     @Test
     func secure_whenUpdatesSigningSignatureAlgorithms_shouldBeValid() async throws {
         // Given
@@ -289,6 +302,7 @@ struct SecureConnectionTests {
         // Then
         #expect(sut?.maximumTLSVersion == maxVersion.build())
     }
+    #endif
 
     @Test
     func secure_whenSetMinTLSVersion_shouldBeValid() async throws {
@@ -309,6 +323,8 @@ struct SecureConnectionTests {
         #expect(sut?.minimumTLSVersion == minVersion.build())
     }
 
+    // `version(minimum:maximum:)`/`cipherSuites(_:)` only exist under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func secure_whenUpdatesTLSVersions_shouldBeValid() async throws {
         // Given
@@ -374,7 +390,14 @@ struct SecureConnectionTests {
                 }
         )
     }
+    #endif
 
+    // `SSLKeyLogger` (both the public `RequestDL` typealias and the underlying
+    // `RequestDLInternals` protocol it aliases) only exists under `canImport(NIOCore)`: neither
+    // Network.framework nor `URLSession` exposes any public API for observing per-session TLS
+    // secrets, so this is a permanent `.nio`-only feature, not a gap to close. See
+    // `RequestDLInternals.SSLKeyLogger`'s own doc comment.
+    #if canImport(NIOCore)
     @Test
     func secure_whenUpdatesKeyLogger() async throws {
         // Given
@@ -397,6 +420,7 @@ struct SecureConnectionTests {
         // Then
         #expect(sut?.keyLogger === logger)
     }
+    #endif
 
     @Test
     func secure_whenAccessBody_shouldBeNever() async throws {

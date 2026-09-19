@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOConcurrencyHelpers
 import RequestDLInternals
 import Testing
 
@@ -54,7 +53,7 @@ struct RedirectStrategyDataTaskTests {
             localServer.cleanup(at: destination)
         }
 
-        let capturedContext = NIOLockedValueBox<RedirectContext?>(nil)
+        let capturedContext = LockedValueBox<RedirectContext?>(nil)
 
         // When
         let data = try await DataTask {
@@ -93,6 +92,10 @@ struct RedirectStrategyDataTaskTests {
     /// `RedirectHandler`/`RedirectStrategyDelegateBridge.swift` on its side bridge a strategy's
     /// decision back into the delegate API's request/body types. So this follows the redirect
     /// exactly like the `.urlSession` executor does above.
+    ///
+    /// `.preferredExecutor(.nio)` only exists under `canImport(NIOCore)` (see `Session.Executor`),
+    /// so this whole test does too.
+    #if canImport(NIOCore)
     @Test
     func dataTask_whenRedirectStrategyOverNIO_isInvokedAndControlsTheRedirect() async throws {
         // Given
@@ -119,10 +122,10 @@ struct RedirectStrategyDataTaskTests {
             localServer.cleanup(at: destination)
         }
 
-        let capturedContext = NIOLockedValueBox<RedirectContext?>(nil)
+        let capturedContext = LockedValueBox<RedirectContext?>(nil)
 
         struct RecordingStrategy: RedirectStrategy {
-            let capturedContext: NIOLockedValueBox<RedirectContext?>
+            let capturedContext: LockedValueBox<RedirectContext?>
 
             func redirectDecision(for context: RedirectContext) throws -> RedirectDecision {
                 capturedContext.withLockedValue { $0 = context }
@@ -156,6 +159,7 @@ struct RedirectStrategyDataTaskTests {
         #expect(context.history.count == 1)
         #expect(context.redirectCount == 0)
     }
+    #endif
 
     @Test
     func dataTask_whenRedirectStrategyDoesNotFollowOverURLSession_returnsRedirectResponseUnfollowed() async throws {
@@ -202,6 +206,9 @@ struct RedirectStrategyDataTaskTests {
     /// from the state its response-delivery state machine had already committed to). Fixed by
     /// asking the strategy the moment the response head arrives, before any body byte is read.
     /// See `RedirectHandler.earlyStrategyDecision(head:)` on the async-http-client fork.
+    ///
+    /// `.preferredExecutor(.nio)` only exists under `canImport(NIOCore)`; see the same note above.
+    #if canImport(NIOCore)
     @Test
     func dataTask_whenRedirectStrategyDoesNotFollowOverNIO_returnsRedirectResponseUnfollowed() async throws {
         // Given
@@ -241,4 +248,5 @@ struct RedirectStrategyDataTaskTests {
         // Then
         #expect(result.head.status.code == 302)
     }
+    #endif
 }

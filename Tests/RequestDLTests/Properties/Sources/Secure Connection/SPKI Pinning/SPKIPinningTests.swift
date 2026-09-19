@@ -3,11 +3,18 @@
 //
 
 import Crypto
-import NIOSSL
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
+
+#if canImport(NIOCore)
+import NIOSSL
+#else
+import SwiftASN1
+import X509
+#endif
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -95,13 +102,24 @@ struct SPKIPinningTests {
 
 extension SPKIPinningTests {
 
+    /// SPKI extraction mirrors `Internals.DarwinTrustEvaluation.chainSPKIDERBytes(of:)` exactly
+    /// (NIOSSL when it's in the build, `X509`'s own portable ASN.1 parser otherwise), so this
+    /// keeps agreeing with whatever `.urlSession`'s real handshake actually pins against under
+    /// either build configuration.
     func hashSPKI(from url: URL) throws -> [Data] {
-        try NIOSSLCertificate.fromPEMFile(
-            url.absolutePath(percentEncoded: false)
-        )
-        .map {
-            let bytes = try $0.extractPublicKey().toSPKIBytes()
-            return Data(SHA256.hash(data: Data(bytes)))
-        }
+        try Internals.Certificate.resolvedPEMCertificateDERBytes(of: Data(contentsOf: url))
+            .map { derBytes in
+                #if canImport(NIOCore)
+                let certificate = try NIOSSLCertificate(bytes: [UInt8](derBytes), format: .der)
+                let bytes = try certificate.extractPublicKey().toSPKIBytes()
+                #else
+                let parsed = try X509.Certificate(derEncoded: [UInt8](derBytes))
+                var serializer = DER.Serializer()
+                try parsed.publicKey.serialize(into: &serializer)
+                let bytes = serializer.serializedBytes
+                #endif
+
+                return Data(SHA256.hash(data: Data(bytes)))
+            }
     }
 }

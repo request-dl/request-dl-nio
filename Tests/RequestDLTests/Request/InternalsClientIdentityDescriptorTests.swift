@@ -160,60 +160,70 @@ struct InternalsClientIdentityDescriptorTests {
     /// no `Property` tree) still has to genuinely authenticate against a real server requiring
     /// a client certificate, not just hold the right bytes in memory.
     ///
-    /// Known issue in this bare SwiftPM test harness specifically (no Keychain Sharing entitlement), same gap
-    /// `RequestConfigurationURLSessionClientMTLSTests` already documents at the live-executor
-    /// layer. This proves the same wiring one layer further removed (via a JSON round trip
-    /// simulating a relaunch), not a new one.
+    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
+    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
+    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
+    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
+    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
+    /// Sharing to at all, so `SecItemAdd` there fails with `errSecMissingEntitlement` before
+    /// identity pairing is ever reached -- a genuinely different, still-open gap, confirmed
+    /// directly on iOS/tvOS/watchOS Simulator CI runs.
     @Test
     func rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake() async throws {
-        // Given
-        let server = Certificates().server()
-        let client = Certificates().client()
-        let uri = "/" + UUID().uuidString
+        // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
+        // construct the `LocalServer` this test drives against) has no Network.framework
+        // equivalent under a NIOCore-free build -- see that type's own doc comment. Under
+        // NIOCore this whole body runs for real; without it, everything from construction
+        // onward is expected to throw, so it is wrapped wholesale rather than gated
+        // piecemeal.
+        func run() async throws {
+            // Given
+            let server = Certificates().server()
+            let client = Certificates().client()
+            let uri = "/" + UUID().uuidString
 
-        let localServer = try await LocalServer(
-            LocalServer.Configuration(
-                host: "localhost",
-                port: 8890,
-                option: .client(client)
+            let localServer = try await LocalServer(
+                LocalServer.Configuration(
+                    host: "localhost",
+                    port: 8890,
+                    option: .client(client)
+                )
             )
-        )
 
-        let output = "Hello World"
-        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
+            let output = "Hello World"
+            let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+            localServer.cleanup(at: uri)
+            localServer.insert(response, at: uri)
+            defer { localServer.cleanup(at: uri) }
 
-        var secureConnection = Internals.SecureConnection()
-        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
-        secureConnection.privateKey = .privateKey(
-            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
-        )
-        secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
-
-        let clientIdentityDescriptor = try #require(
-            try Internals.ClientIdentityDescriptor.resolve(from: secureConnection)
-        )
-        let serverTrustDescriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection).descriptor()
-
-        // Simulates a relaunch: the only things carried forward are the two `Descriptor`s, JSON
-        // round-tripped, exactly like `taskDescription`.
-        let rebuiltClientIdentityDescriptor = try JSONDecoder().decode(
-            Internals.ClientIdentityDescriptor.self,
-            from: JSONEncoder().encode(clientIdentityDescriptor)
-        )
-        let rebuiltServerTrustPolicy = Internals.ServerTrustPolicy(
-            descriptor: try JSONDecoder().decode(
-                Internals.ServerTrustPolicy.Descriptor.self,
-                from: JSONEncoder().encode(serverTrustDescriptor)
+            var secureConnection = Internals.SecureConnection()
+            secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+            secureConnection.privateKey = .privateKey(
+                .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
             )
-        )
+            secureConnection.trustRoots = .file(server.certificateURL.absolutePath(percentEncoded: false))
 
-        // Then
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see RequestConfigurationURLSessionClientMTLSTests's type doc comment",
-            {
+            let clientIdentityDescriptor = try #require(
+                try Internals.ClientIdentityDescriptor.resolve(from: secureConnection)
+            )
+            let serverTrustDescriptor = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+                .descriptor()
+
+            // Simulates a relaunch: the only things carried forward are the two `Descriptor`s,
+            // JSON round-tripped, exactly like `taskDescription`.
+            let rebuiltClientIdentityDescriptor = try JSONDecoder().decode(
+                Internals.ClientIdentityDescriptor.self,
+                from: JSONEncoder().encode(clientIdentityDescriptor)
+            )
+            let rebuiltServerTrustPolicy = Internals.ServerTrustPolicy(
+                descriptor: try JSONDecoder().decode(
+                    Internals.ServerTrustPolicy.Descriptor.self,
+                    from: JSONEncoder().encode(serverTrustDescriptor)
+                )
+            )
+
+            // When / Then
+            func verify() async throws {
                 let (handle, intermediates) = try rebuiltClientIdentityDescriptor.makeIdentity()
 
                 let delegate = ClientCertificateForwardingDelegate(
@@ -232,7 +242,30 @@ struct InternalsClientIdentityDescriptorTests {
                 let decodedBody = try HTTPResult<String>(data)
                 #expect(decodedBody.response == output)
             }
-        )
+
+            #if os(macOS) || !canImport(Darwin)
+            try await verify()
+            #else
+            await withKnownIssue(
+                "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+            ) {
+                try await verify()
+            }
+            #endif
+        }
+
+        #if canImport(NIOCore)
+        try await run()
+        #else
+        await withKnownIssue(
+            """
+            LocalServer.TLSOption.client(_:) (server-side mTLS verification) has no \
+            Network.framework equivalent under a NIOCore-free build
+            """
+        ) {
+            try await run()
+        }
+        #endif
     }
 }
 

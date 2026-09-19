@@ -2,8 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
-import NIOPosix
 import Testing
 
 @testable import RequestDL
@@ -34,6 +32,13 @@ import class Foundation.ProcessInfo
 /// This file proves the layer above that: a real `DataTask`, resolved through an actual
 /// `Property` tree exactly as an app would build one, and dispatched via the *same* shared pool
 /// `RawTask.result()` itself reads from, not a fresh, test-isolated manager.
+///
+/// Only the `.urlSession`-pinned (or unpinned-but-Darwin-default) half of the suite: every test
+/// here only ever checks for the `.urlSession` case of `resolvedClient()`, so none of it needs
+/// NIOCore. The half that pins `.nio` explicitly, or needs server-side client-certificate
+/// verification (`LocalServer.TLSOption.client`, not implemented on the portable `NWListener`
+/// backend), lives in `RawTaskExecutorDispatchTests+NIO.swift`, which needs NIOCore to exist at
+/// all.
 struct RawTaskExecutorDispatchTests {
 
     @Test
@@ -80,56 +85,6 @@ struct RawTaskExecutorDispatchTests {
 
         guard case .urlSession = try await resolved.session.resolvedClient() else {
             Issue.record("Expected the DataTask call above to have dispatched over .urlSession")
-            return
-        }
-    }
-
-    @Test
-    func dataTask_whenNIORequired_actuallyDispatchesOverNIOEvenThoughURLSessionWouldBeCompatible() async throws {
-        // Given: same shape as above (would default to `.urlSession` on Darwin), but this time
-        // pinned to `.nio` explicitly.
-        //
-        // Regression coverage for the bug this phase's own testing caught: `requiredExecutor(.nio)`
-        // used to validate without ever actually being the executor a real request dispatched
-        // over, since `resolveExecutor()` read only `preferredExecutor`, so a
-        // `.urlSession`-compatible config kept resolving there anyway.
-        //
-        // See `InternalsSessionConfigurationExecutorTests`'s "resolveExecutor() with
-        // requiredExecutor" section for the unit-level fix; this is the same fact proven one
-        // layer up, through a real `DataTask` round trip.
-        let localServer = try await LocalServer(.standard)
-        let uri = "/" + UUID().uuidString
-        let certificate = Certificates().server()
-        let output = "Hello World"
-
-        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
-
-        let content = TestProperty {
-            BaseURL(localServer.baseURL)
-            Path(uri)
-
-            Session("com.requestdl.tests.7b3-dispatch.\(UUID())")
-                .requiredExecutor(.nio)
-
-            SecureConnection {
-                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
-            }
-        }
-
-        // When
-        let data = try await DataTask { content }.extractPayload().result()
-
-        let result = try HTTPResult<String>(data)
-        #expect(result.response == output)
-
-        // Then
-        let resolved = try await resolve(content)
-
-        guard case .nio = try await resolved.session.resolvedClient() else {
-            Issue.record("Expected the DataTask call above to have dispatched over .nio")
             return
         }
     }
@@ -278,43 +233,6 @@ struct RawTaskExecutorDispatchTests {
 
         // Then
         #expect(result.receivedUserAgentHeader == customUserAgent)
-    }
-
-    /// Companion to both tests above: NIO never synthesizes its own `User-Agent`, so dropping
-    /// RequestDL's default there, the way `.urlSession` does, would just send the request
-    /// with none. RequestDL's neutral default must survive under `.nio`.
-    @Test
-    func dataTask_withDefaultUserAgentOverNIO_keepsRequestDLsNeutralDefault() async throws {
-        // Given
-        let localServer = try await LocalServer(.standard)
-        let uri = "/" + UUID().uuidString
-        let certificate = Certificates().server()
-
-        let response = try LocalServer.ResponseConfiguration(jsonObject: "Hello World")
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
-
-        let content = TestProperty {
-            BaseURL(localServer.baseURL)
-            Path(uri)
-
-            Session("com.requestdl.tests.useragent-nio.\(UUID())")
-                .requiredExecutor(.nio)
-
-            SecureConnection {
-                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
-            }
-
-            UserAgentHeader()
-        }
-
-        // When
-        let data = try await DataTask { content }.extractPayload().result()
-        let result = try HTTPResult<String>(data)
-
-        // Then
-        #expect(result.receivedUserAgentHeader == ProcessInfo.processInfo.userAgent)
     }
 
     /// Regression coverage for combining RequestDL's default with a plain `CustomHeader(name:
@@ -501,74 +419,6 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
-    /// Confirms the identity-building failure a real mTLS `DataTask` hits under `.urlSession` on
-    /// this SwiftPM test harness (no Keychain Sharing entitlement; see
-    /// `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment) surfaces through the
-    /// *public* API as a documented ``ClientIdentityError``, not a raw
-    /// `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy
-    /// .ConfigurationError`. Both are package-visible types a real consumer app cannot even name,
-    /// and whose `localizedDescription` (Foundation's generic NSError fallback, absent this fix)
-    /// carries none of their own actionable `description` text.
-    ///
-    /// `ClientIdentityErrorTests` covers the rewrap/description logic itself in isolation; this
-    /// is the same fact proven end to end, through the real `DataTask` entry point, the same way
-    /// `dataTask_whenCAEnabled` (`DataTaskTests`, pinned to `.nio` specifically to avoid this
-    /// exact gap) already does for the NIO backend.
-    ///
-    /// Deliberately does not assert on the *specific* ``ClientIdentityError/Reason``: this
-    /// harness has been observed to hit this gap two different ways (`errSecMissingEntitlement`
-    /// on `SecItemAdd`, or `errSecItemNotFound` on the identity lookup right after a successful
-    /// add), and both are genuine, independently-reachable failure modes this test should pass
-    /// under either way.
-    @Test
-    func dataTask_whenCAEnabledUnderURLSessionWithoutKeychainSharing_throwsClientIdentityError() async throws {
-        let server = Certificates().server()
-        let client = Certificates().client()
-
-        let uri = "/" + UUID().uuidString
-
-        let localServer = try await LocalServer(
-            LocalServer.Configuration(
-                host: "localhost",
-                port: 8885,
-                option: .client(client)
-            )
-        )
-
-        let output = "Hello World"
-        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
-
-        let content = TestProperty {
-            BaseURL(localServer.baseURL)
-            Path(uri)
-
-            Session("com.requestdl.tests.phase8-identity.\(UUID())")
-                .requiredExecutor(.urlSession)
-
-            SecureConnection {
-                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
-                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
-            }
-            .verification(.fullVerification)
-        }
-
-        do {
-            _ = try await DataTask { content }.extractPayload().result()
-            Issue.record("Expected this SwiftPM test harness's missing Keychain Sharing entitlement to throw")
-        } catch let error as ClientIdentityError {
-            // Then: the public, documented type, not a leaked internal one, with the same
-            // actionable text through both access paths a real caller might use.
-            #expect(!error.description.isEmpty)
-            #expect((error as any Error).localizedDescription == error.description)
-        } catch {
-            Issue.record("Expected ClientIdentityError, got \(type(of: error)): \(error)")
-        }
-    }
-
     /// Companion to the test above: confirms cancellation frees the throttle slot for real, not
     /// just that `isRunning` (a separate counter, released in the same completion callback but
     /// not the same value) happens to drop, the same bar `InternalsClientConcurrencyLimitTests`
@@ -679,7 +529,14 @@ private actor SecondRequestState {
 private func withPartialResponseServer<Result>(
     _ body: (Int) async throws -> Result
 ) async throws -> Result {
-    try await withRawServer(PartialResponseHandler.init, body)
+    let responseString =
+        "HTTP/1.1 200 OK\r\n"
+        + "Content-Type: application/octet-stream\r\n"
+        + "Content-Length: 100000000\r\n"
+        + "\r\n"
+        + "partial-body-bytes"
+
+    return try await withRawServer(response: Data(responseString.utf8), body)
 }
 
 /// A server that answers a request fully and immediately, over plain HTTP: the throttle test's
@@ -687,18 +544,35 @@ private func withPartialResponseServer<Result>(
 private func withCompleteResponseServer<Result>(
     _ body: (Int) async throws -> Result
 ) async throws -> Result {
-    try await withRawServer(CompleteResponseHandler.init, body)
+    let responseBody = "Hello World"
+
+    let responseString =
+        "HTTP/1.1 200 OK\r\n"
+        + "Content-Type: text/plain\r\n"
+        + "Content-Length: \(responseBody.utf8.count)\r\n"
+        + "\r\n"
+        + responseBody
+
+    return try await withRawServer(response: Data(responseString.utf8), body)
 }
 
-private func withRawServer<Handler: ChannelInboundHandler & Sendable, Result>(
-    _ makeHandler: @escaping @Sendable () -> Handler,
+#if canImport(NIOCore)
+
+import NIOCore
+import NIOPosix
+
+/// NIOCore-backed `withRawServer(response:_:)`: writes `response` verbatim on the connection's
+/// first `channelRead`, then does nothing further, so a response shorter than its own declared
+/// `Content-Length` leaves the connection genuinely open rather than closing it.
+private func withRawServer<Result>(
+    response: Data,
     _ body: (Int) async throws -> Result
 ) async throws -> Result {
     let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
     let bootstrap = ServerBootstrap(group: group)
         .childChannelInitializer { channel in
-            channel.pipeline.addHandler(makeHandler())
+            channel.pipeline.addHandler(CannedResponseHandler(response: response))
         }
 
     let serverChannel = try await bootstrap.bind(host: "127.0.0.1", port: 0).get()
@@ -716,41 +590,115 @@ private func withRawServer<Handler: ChannelInboundHandler & Sendable, Result>(
     }
 }
 
-private final class PartialResponseHandler: ChannelInboundHandler, @unchecked Sendable {
+private final class CannedResponseHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
 
+    private let response: Data
+
+    init(response: Data) {
+        self.response = response
+    }
+
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        var buffer = context.channel.allocator.buffer(capacity: 256)
-        buffer.writeString(
-            "HTTP/1.1 200 OK\r\n"
-                + "Content-Type: application/octet-stream\r\n"
-                + "Content-Length: 100000000\r\n"
-                + "\r\n"
-                + "partial-body-bytes"
-        )
+        var buffer = context.channel.allocator.buffer(capacity: response.count)
+        buffer.writeBytes(response)
         context.writeAndFlush(wrapOutboundOut(buffer), promise: nil)
-        // Deliberately writes nothing further; see this file's own doc comment on
-        // `withPartialResponseServer` for why.
+        // Deliberately writes nothing further; see `withPartialResponseServer`'s own doc comment
+        // for why.
     }
 }
 
-private final class CompleteResponseHandler: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = ByteBuffer
-    typealias OutboundOut = ByteBuffer
+#else
 
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let body = "Hello World"
-        var buffer = context.channel.allocator.buffer(capacity: 256)
-        buffer.writeString(
-            "HTTP/1.1 200 OK\r\n"
-                + "Content-Type: text/plain\r\n"
-                + "Content-Length: \(body.utf8.count)\r\n"
-                + "\r\n"
-                + body
-        )
-        context.writeAndFlush(wrapOutboundOut(buffer), promise: nil)
+import Foundation
+import Network
+import SwiftAsyncStream
+
+/// Network.framework-backed `withRawServer(response:_:)`: plain TCP, no TLS -- both callers speak
+/// `http://127.0.0.1:<port>`, so there is nothing to terminate. Writes `response` verbatim as
+/// soon as any bytes arrive (the client's own request line/headers, never actually parsed: a
+/// canned response needs nothing from them), then does nothing further, exactly like the NIOCore
+/// backend above.
+private func withRawServer<Result>(
+    response: Data,
+    _ body: (Int) async throws -> Result
+) async throws -> Result {
+    let listener = try NWListener(using: .tcp, on: .any)
+    let queue = DispatchQueue(label: "com.requestdl.tests.raw-server")
+
+    listener.newConnectionHandler = { connection in
+        connection.stateUpdateHandler = { state in
+            guard case .ready = state else { return }
+
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { _, _, _, _ in
+                connection.send(content: response, completion: .contentProcessed { _ in })
+                // Deliberately writes nothing further, and never receives again; see
+                // `withPartialResponseServer`'s own doc comment for why a short response against
+                // a much larger declared `Content-Length` needs the connection to stay open.
+            }
+        }
+
+        connection.start(queue: queue)
+    }
+
+    let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
+        let box = RawServerContinuationBox(continuation)
+
+        listener.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                guard let port = listener.port?.rawValue else {
+                    box.resume(throwing: MissingListenerPortError())
+                    return
+                }
+                box.resume(returning: port)
+            case .failed(let error):
+                box.resume(throwing: error)
+            default:
+                break
+            }
+        }
+
+        listener.start(queue: queue)
+    }
+
+    do {
+        let result = try await body(Int(port))
+        listener.cancel()
+        return result
+    } catch {
+        listener.cancel()
+        throw error
     }
 }
+
+private struct MissingListenerPortError: Swift.Error {}
+
+/// Bridges `NWListener.stateUpdateHandler` (called repeatedly) to a `CheckedContinuation` (usable
+/// exactly once): resumes on the first `.ready`/`.failed`, ignores every later call. Mirrors
+/// `InternalsSOCKSProxyDictionaryPlatformTests`'s own `ContinuationBox`.
+private final class RawServerContinuationBox: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var continuation: CheckedContinuation<UInt16, Error>?
+
+    init(_ continuation: CheckedContinuation<UInt16, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning port: UInt16) { take()?.resume(returning: port) }
+    func resume(throwing error: Error) { take()?.resume(throwing: error) }
+
+    private func take() -> CheckedContinuation<UInt16, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        let continuation = self.continuation
+        self.continuation = nil
+        return continuation
+    }
+}
+
+#endif
 
 #endif

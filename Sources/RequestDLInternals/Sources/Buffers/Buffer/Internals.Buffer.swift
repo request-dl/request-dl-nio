@@ -56,13 +56,23 @@ extension Internals {
 
             /// Bytes currently in the resource.
             ///
-            /// - Important: On a file system this is a stat call. It deliberately does not
-            /// take the lock: `url` is immutable and reports either through its own
-            /// synchronization or through the file system, so guarding it here would only
-            /// queue size checks behind whatever read or write is in flight.
+            /// - Important: The file system stat this reads through `url.writtenBytes` runs
+            /// without the lock, so it can race a write this same storage just finished: under
+            /// heavy concurrent disk contention (many buffers writing at once, observed on CI
+            /// macOS runners under the full portable test suite) the stat has been caught
+            /// reporting a file smaller than what this storage already wrote to it and awaited
+            /// the completion of, which made `overwritableBytes` go negative and crashed
+            /// ``moveWriterIndex(to:)`` downstream. `_writtenBytesFloor` is this storage's own
+            /// record of the highest offset it has itself written to -- updated inside `write`'s
+            /// lock, so it is race free with respect to this storage's own writes -- and the
+            /// result can never report less than what this instance already knows landed.
+            /// Reading the floor costs a lock acquisition, not I/O, so operations still never
+            /// queue behind one another here; only the slow stat itself stays lockless.
             package var writtenBytes: Int {
                 get async {
-                    await url.writtenBytes
+                    let floor = await lock.withLock { _writtenBytesFloor }
+                    let stat = await url.writtenBytes
+                    return Swift.max(stat, floor)
                 }
             }
 
@@ -124,6 +134,10 @@ extension Internals {
             /// Whether this storage has already established that its resource exists, either
             /// by creating it or by a prior stat succeeding.
             private var _hasConfirmedResource = false
+
+            /// The highest offset this storage has itself written to, updated inside `write`'s
+            /// lock. See ``writtenBytes`` for why this exists.
+            private var _writtenBytesFloor: Int = .zero
 
             // MARK: - Inits
 
@@ -196,7 +210,9 @@ extension Internals {
                         try await stream.seek(to: index)
                         try await stream.writeData(data)
 
-                        return try await stream.offset
+                        let offset = try await stream.offset
+                        _writtenBytesFloor = Swift.max(_writtenBytesFloor, Int(offset))
+                        return offset
                     } catch {
                         return index
                     }
@@ -249,6 +265,7 @@ extension Internals {
 
                     await url.truncate()
                     _hasConfirmedResource = false
+                    _writtenBytesFloor = .zero
                 }
             }
 
@@ -301,6 +318,12 @@ extension Internals {
             /// `_createResourceIfNeeded()` already relies on. So the confirmation is cached and
             /// every read after the first reachable one skips the stat entirely, which is also
             /// what removes it from that concurrent contention going forward.
+            ///
+            /// A caller that addresses a file through a brand new `Storage` right after some
+            /// other `Storage` finished writing it -- this instance's own first call, with
+            /// nothing cached yet -- is a related but genuinely different window this cache
+            /// cannot help with at all. See ``Internals/Buffer/init(addressing:)``, the one
+            /// legitimate entry point that reopens content this way, for that fix.
             private func _isResourceAvailable() async -> Bool {
                 guard !_hasConfirmedResource else {
                     return true
@@ -468,8 +491,34 @@ extension Internals {
         /// through `make(from:)` without embedding it in the `Foundation.URL` itself, which must
         /// never happen. This exists for exactly that case — a caller that already has a fully
         /// formed `Stream.URL` in hand skips `make(from:)` entirely.
+        ///
+        /// - Important: In practice this is only ever called with a key already in hand for
+        /// content that either does not exist yet (a fresh cache entry) or was written by some
+        /// entirely separate `Storage` an instant ago (reopening one, the same encrypted file's
+        /// writer and reader are two distinct `Buffer`/`Storage` pairs over the same path -- see
+        /// `Internals.EncryptedFileBufferURL`'s own doc comment). The latter case races this
+        /// brand new `Storage`'s very first size stat against a write it has no way to already
+        /// know about, and under heavy concurrent disk contention that stat has been caught
+        /// reporting zero for a file the other `Storage` had already finished writing and closed.
+        /// A short, bounded retry closes that window; it costs nothing extra for the legitimately
+        /// empty case beyond however many attempts it takes to exhaust the budget, once, since a
+        /// non-zero result short circuits it immediately.
         package init(addressing url: Stream.URL) async {
-            await self.init(storage: .init(url))
+            let storage = Storage(url)
+
+            let attempts = 30
+            let retryDelay: UInt64 = 10_000_000
+
+            var writtenBytes = await storage.writtenBytes
+
+            var attempt = 1
+            while writtenBytes == .zero, attempt < attempts {
+                try? await Task.sleep(nanoseconds: retryDelay)
+                writtenBytes = await storage.writtenBytes
+                attempt += 1
+            }
+
+            self.init(storage: storage, writerIndex: writtenBytes)
         }
 
         private init(storage: Storage) async {

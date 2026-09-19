@@ -2,6 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+// NIO-only: this fixture drives a raw `NIOPosix` server/dial pair to prove a proxied connection
+// actually carries traffic, which has no Network.framework equivalent built yet. Affects every
+// test that needs a real HTTP CONNECT tunnel (not just `Internals.Proxy`'s config mapping), which
+// simply doesn't run under `--disable-default-traits`.
+#if canImport(NIOCore)
+
 import NIOCore
 import NIOPosix
 import SwiftAsyncStream
@@ -398,3 +404,5 @@ extension StringProtocol {
         return String(value)
     }
 }
+
+#endif

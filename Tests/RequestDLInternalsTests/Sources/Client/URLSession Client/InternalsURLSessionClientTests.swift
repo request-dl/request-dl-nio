@@ -10,7 +10,9 @@ import Testing
 #if canImport(Darwin)
 
 import Foundation
+import Network
 import Security
+import SwiftAsyncStream
 
 /// Internals-level counterpart to `RequestConfigurationURLSessionClientTests` (`RequestDLTests`):
 /// exercises `Internals.URLSessionClient` directly, with a hand-built `URLRequest` rather than
@@ -92,7 +94,7 @@ struct InternalsURLSessionClientTests {
     /// both makes the call throw and stops the real network request, not just the first of the two.
     @Test
     func execute_whenTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows() async throws {
-        try await withHangingServer { port in
+        try await withHangingURLSessionTestServer { port in
             let client = try Internals.URLSessionClient(configuration: .ephemeral)
             let url = try #require(URL(string: "http://127.0.0.1:\(port)/"))
 
@@ -144,6 +146,86 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
         }
 
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
+    }
+}
+
+/// A bare TCP server that accepts a connection and never writes anything back -- used to keep a
+/// request genuinely in flight so it can be cancelled mid-request, something `LocalServer` cannot
+/// do, since it always answers immediately.
+///
+/// Not shared with `InternalsUnsafeTaskTests`'s own `withHangingServer(_:)`: that one drives
+/// `Internals.Client` (AsyncHTTPClient), gated `#if canImport(NIOCore)`, via NIOCore's own
+/// `ServerBootstrap`. This file tests `Internals.URLSessionClient` specifically and is gated only
+/// on `canImport(Darwin)`, where Network.framework is always available, so it gets its own
+/// Network.framework-backed implementation instead of needing NIOCore at all -- named distinctly
+/// to avoid a module-level name collision with the other one when both happen to compile.
+private func withHangingURLSessionTestServer<Result>(
+    _ body: (Int) async throws -> Result
+) async throws -> Result {
+    let listener = try NWListener(using: .tcp, on: .any)
+    let queue = DispatchQueue(label: "com.requestdl.tests.hanging-server")
+
+    listener.newConnectionHandler = { connection in
+        // Deliberately never reads or writes: the client is left waiting for a response that
+        // never comes, until the test cancels it.
+        connection.start(queue: queue)
+    }
+
+    let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
+        let box = HangingServerContinuationBox(continuation)
+
+        listener.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                guard let port = listener.port?.rawValue else {
+                    box.resume(throwing: MissingHangingServerPortError())
+                    return
+                }
+                box.resume(returning: port)
+            case .failed(let error):
+                box.resume(throwing: error)
+            default:
+                break
+            }
+        }
+
+        listener.start(queue: queue)
+    }
+
+    do {
+        let result = try await body(Int(port))
+        listener.cancel()
+        return result
+    } catch {
+        listener.cancel()
+        throw error
+    }
+}
+
+private struct MissingHangingServerPortError: Swift.Error {}
+
+/// Bridges `NWListener.stateUpdateHandler` (called repeatedly) to a `CheckedContinuation` (usable
+/// exactly once): resumes on the first `.ready`/`.failed`, ignores every later call. Mirrors
+/// `RawTaskExecutorDispatchTests`'s own `RawServerContinuationBox` (`RequestDLTests`, not
+/// reachable from this target).
+private final class HangingServerContinuationBox: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var continuation: CheckedContinuation<UInt16, Error>?
+
+    init(_ continuation: CheckedContinuation<UInt16, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning port: UInt16) { take()?.resume(returning: port) }
+    func resume(throwing error: Error) { take()?.resume(throwing: error) }
+
+    private func take() -> CheckedContinuation<UInt16, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        let continuation = self.continuation
+        self.continuation = nil
+        return continuation
     }
 }
 

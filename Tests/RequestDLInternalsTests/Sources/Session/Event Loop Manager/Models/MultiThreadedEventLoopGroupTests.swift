@@ -2,6 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
+// `NIOPosix.MultiThreadedEventLoopGroup` only exists under `canImport(NIOCore)`.
+#if canImport(NIOCore)
+
 import NIOPosix
 import Testing
 
@@ -21,3 +24,5 @@ struct MultiThreadedEventLoopGroupTests {
         #expect(sut === multiThreaded)
     }
 }
+
+#endif

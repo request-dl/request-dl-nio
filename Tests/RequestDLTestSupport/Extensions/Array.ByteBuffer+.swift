@@ -2,14 +2,19 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOCore
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-import NIOFoundationEssentialsCompat
 #else
 import struct Foundation.Data
+#endif
+
+#if canImport(NIOCore)
+import NIOCore
+
+#if canImport(FoundationEssentials)
+import NIOFoundationEssentialsCompat
 #endif
 
 extension [ByteBuffer] {
@@ -21,6 +26,7 @@ extension [ByteBuffer] {
         }
     }
 }
+#endif
 
 extension [Internals.Bytes] {
 

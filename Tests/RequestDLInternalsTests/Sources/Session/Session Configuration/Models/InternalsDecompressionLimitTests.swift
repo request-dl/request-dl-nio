@@ -2,12 +2,40 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOHTTPCompression
 import Testing
 
 @testable import RequestDLInternals
 
 struct InternalsDecompressionLimitTests {
+
+    @Test
+    func limit_whenEquals() {
+        // Given
+        let lhs = Internals.Decompression.Limit.ratio(1)
+        let rhs = Internals.Decompression.Limit.ratio(1)
+
+        // Then
+        #expect(lhs == rhs)
+    }
+
+    @Test
+    func limit_whenNotEquals() {
+        // Given
+        let lhs = Internals.Decompression.Limit.none
+        let rhs = Internals.Decompression.Limit.ratio(1)
+
+        // Then
+        #expect(lhs != rhs)
+    }
+}
+
+// The remaining tests read `limit.build()`, which returns `NIOHTTPDecompression
+// .DecompressionLimit` and only exists under `canImport(NIOCore)`.
+#if canImport(NIOCore)
+
+import NIOHTTPCompression
+
+extension InternalsDecompressionLimitTests {
 
     @Test
     func limit_whenNone() {
@@ -59,24 +87,6 @@ struct InternalsDecompressionLimitTests {
                 )
         )
     }
-
-    @Test
-    func limit_whenEquals() {
-        // Given
-        let lhs = Internals.Decompression.Limit.ratio(1)
-        let rhs = Internals.Decompression.Limit.ratio(1)
-
-        // Then
-        #expect(lhs == rhs)
-    }
-
-    @Test
-    func limit_whenNotEquals() {
-        // Given
-        let lhs = Internals.Decompression.Limit.none
-        let rhs = Internals.Decompression.Limit.ratio(1)
-
-        // Then
-        #expect(lhs != rhs)
-    }
 }
+
+#endif

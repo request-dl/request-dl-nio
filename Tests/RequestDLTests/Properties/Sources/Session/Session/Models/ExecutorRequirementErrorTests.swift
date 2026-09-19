@@ -9,6 +9,8 @@ import Testing
 
 struct ExecutorRequirementErrorTests {
 
+    // `.nioTransportServices` only exists under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func error_whenRewrapped_carriesRequiredExecutorAndReasons() async throws {
         // Given
@@ -24,6 +26,7 @@ struct ExecutorRequirementErrorTests {
         #expect(error.requiredExecutor == .nioTransportServices)
         #expect(error.reasons == [.dnsOverrideUnderURLSession, .keyLogger])
     }
+    #endif
 
     @Test
     func error_whenDescribed_namesRequiredExecutorAndEachReason() async throws {
@@ -67,9 +70,11 @@ struct ExecutorRequirementErrorTests {
     func reason_whenEveryInternalCaseMapped_hasNonEmptyDescription(
         _ internalReason: Internals.ExecutorIncompatibilityReason
     ) async throws {
-        // Given
+        // Given: `requiredExecutor` is incidental here -- only the reason's own description is
+        // checked below -- so `.urlSession` (the one case that exists in every build) is used
+        // rather than `.nio`, which doesn't exist without `canImport(NIOCore)`.
         let internalError = Internals.IncompatibleExecutorConfigurationError(
-            requiredExecutor: .nio,
+            requiredExecutor: .urlSession,
             reasons: [internalReason]
         )
 

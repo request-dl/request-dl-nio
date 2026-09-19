@@ -2,10 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
+
+#if canImport(NIOCore)
+
 import NIO
 import NIOHTTP1
 import NIOSSL
-import SwiftAsyncStream
 
 @testable import RequestDL
 
@@ -13,7 +16,19 @@ import SwiftAsyncStream
 import NIOTransportServices
 #endif
 
+#endif
+
 struct LocalServer: Sendable {
+
+    /// The resource one `ServerManager` entry keeps alive for a `Configuration`: a NIOSSL/
+    /// `ServerBootstrap`-backed `Channel` when this target has `NIOCore`, or a Network.framework
+    /// `PortableServer` when it doesn't (see `LocalServer.PortableServer.swift`). Both expose
+    /// `close() async throws`, which is all `ServerManager` itself needs.
+    #if canImport(NIOCore)
+    typealias ServerHandle = Channel
+    #else
+    typealias ServerHandle = PortableServer
+    #endif
 
     final class ServerManager: @unchecked Sendable {
 
@@ -21,15 +36,17 @@ struct LocalServer: Sendable {
 
         static let shared = ServerManager()
 
-        // Separate instance (own `group` and `_channels`) for LocalServerConcurrencyTests'
-        // 200-connection burst, paired with `Configuration.stress` (see
-        // LocalServer.Configuration.swift) so that deliberate stress test no longer competes
-        // with every other LocalServer-backed suite for `.shared`'s threads.
+        // Separate instance (own `group`/`_servers`) for LocalServerConcurrencyTests' 200
+        // -connection burst, paired with `Configuration.stress` (see LocalServer.Configuration.swift)
+        // so that deliberate stress test no longer competes with every other LocalServer-backed
+        // suite for `.shared`'s threads.
         static let stress = ServerManager()
 
         // MARK: - Private properties
 
         private let lock = AsyncLock()
+
+        #if canImport(NIOCore)
         // Shared process-wide across every suite that spins up a LocalServer (DataTaskTests,
         // DownloadTaskTests, UploadTaskTests, InternalsSessionTests, ModifiersCollect*Tests,
         // CachedRequestTests, ...). swift-testing runs suites concurrently by default, so too few
@@ -51,33 +68,36 @@ struct LocalServer: Sendable {
         // that load at this shared group — this group's remaining exposure is the aggregate of
         // every *other* LocalServer-backed suite's normal (light) traffic.
         private let group = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        #endif
 
         // MARK: - Unsafe properties
 
-        private var _channels: [Configuration: (Channel, ResponseQueue)] = [:]
+        private var _servers: [Configuration: (ServerHandle, ResponseQueue)] = [:]
 
         // MARK: - Internal methods
 
         func remove(_ serverConfiguration: Configuration) async throws {
-            try await _channels[serverConfiguration]?.0.close()
-            _channels[serverConfiguration] = nil
+            try await _servers[serverConfiguration]?.0.close()
+            _servers[serverConfiguration] = nil
         }
 
-        func channel(_ serverConfiguration: Configuration) async throws -> (Channel, ResponseQueue) {
+        func resolve(_ serverConfiguration: Configuration) async throws -> (ServerHandle, ResponseQueue) {
             try await lock.withLock {
-                if let output = _channels[serverConfiguration] {
+                if let output = _servers[serverConfiguration] {
                     return output
                 }
 
                 guard
-                    !_channels.keys.contains(where: {
+                    !_servers.keys.contains(where: {
                         $0.host == serverConfiguration.host && $0.port == serverConfiguration.port
                     })
                 else { fatalError() }
 
+                let responseQueue = ResponseQueue()
+
+                #if canImport(NIOCore)
                 let tlsConfiguration = try serverConfiguration.option.build()
                 let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-                let responseQueue = ResponseQueue()
 
                 let futureChannel = ServerBootstrap(group: group)
                     .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -100,9 +120,16 @@ struct LocalServer: Sendable {
                     .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
                     .bind(host: serverConfiguration.host, port: Int(serverConfiguration.port))
 
-                let channel = try await futureChannel.get()
-                _channels[serverConfiguration] = (channel, responseQueue)
-                return (channel, responseQueue)
+                let handle = try await futureChannel.get()
+                #else
+                let handle = try await PortableServer(
+                    configuration: serverConfiguration,
+                    responseQueue: responseQueue
+                )
+                #endif
+
+                _servers[serverConfiguration] = (handle, responseQueue)
+                return (handle, responseQueue)
             }
         }
     }
@@ -151,16 +178,16 @@ struct LocalServer: Sendable {
     // MARK: - Private properties
 
     private let serverConfiguration: Configuration
-    private let channel: Channel
+    private let serverHandle: ServerHandle
     private let responseQueue: ResponseQueue
 
     // MARK: - Inits
 
     init(_ serverConfiguration: Configuration, manager: ServerManager = .shared) async throws {
-        let (channel, responseQueue) = try await manager.channel(serverConfiguration)
+        let (serverHandle, responseQueue) = try await manager.resolve(serverConfiguration)
 
         self.serverConfiguration = serverConfiguration
-        self.channel = channel
+        self.serverHandle = serverHandle
         self.responseQueue = responseQueue
     }
 

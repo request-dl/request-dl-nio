@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import NIOSSL
 import RequestDLInternals
 import Testing
 
@@ -72,31 +71,6 @@ struct RequestConfigurationURLSessionClientTests {
 /// resolved `Property` tree carries, same as the NIO backend, instead of the
 /// `AcceptAnyServerTrustDelegate` workaround the still-TLS-unaware test above needs.
 ///
-/// **The client-identity round trip (`urlSessionClient_whenMTLSConfigured_...` below) is a known
-/// issue running through this bare SwiftPM test harness on *any* platform, not macOS
-/// specifically.** This was confirmed by actually running it both ways, not assumed: on macOS (`swift
-/// test`, unsigned CLI binary) and on an iOS Simulator (`xcodebuild test -scheme request-dl`,
-/// SwiftPM's auto-generated scheme), both fail identically with
-/// `Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement`'s exact message,
-/// which is itself the confirmation the actionable-error-wrapping half of that mapping works
-/// correctly on both.
-///
-/// The common thread is not the OS, it's that neither run carries a Keychain
-/// Sharing entitlement: `swift test` produces a bare unsigned binary, and SwiftPM's
-/// auto-generated Xcode scheme has no `.entitlements` file to add the capability to (there is
-/// nowhere in a `Package.swift`-only project to configure it; see
-/// `Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md`,
-/// which is written for a real app target's Signing &
-/// Capabilities tab, not a SwiftPM test bundle).
-///
-/// A properly configured Xcode *app* project/target
-/// (or extension) with Keychain Sharing added (the setup that same article walks through, and
-/// what the original spike this promotes from was validated against) is expected to complete
-/// this same round trip for real; this suite cannot exercise that shape of project. The
-/// server-trust-only tests below it (no client identity involved) are unaffected by
-/// any of this and genuinely pass on macOS, iOS Simulator, and Linux (Docker, `swift:6.2`) alike;
-/// Linux and Simulator were confirmed directly, not assumed either.
-///
 /// `Internals.URLSessionClient`
 /// and everything under `Sources/RequestDLInternals/.../URLSession Client/` is Apple-only
 /// (`canImport(Darwin)`-gated) by design, so this whole test file compiles to nothing on Linux;
@@ -106,60 +80,70 @@ struct RequestConfigurationURLSessionClientMTLSTests {
 
     /// Direct port of `DataTaskTests.dataTask_whenCAEnabled`: same `LocalServer`/`Certificates`
     /// fixtures, same `Certificate`/`PrivateKey`/`TrustRoots` sources (file paths, PEM, RSA), but
-    /// forced onto `.urlSession` instead of driven through `DataTask`. See the type doc comment
-    /// for why this specific test is a known issue in this test harness, on every platform.
+    /// forced onto `.urlSession` instead of driven through `DataTask`.
+    ///
+    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
+    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
+    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
+    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
+    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
+    /// Sharing to at all, so `SecItemAdd` there fails with `errSecMissingEntitlement` before
+    /// identity pairing is ever reached -- a genuinely different, still-open gap, confirmed
+    /// directly on iOS/tvOS/watchOS Simulator CI runs.
     @Test
     func urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend() async throws {
-        // Given
-        let server = Certificates().server()
-        let client = Certificates().client()
+        // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
+        // construct the `LocalServer` this test drives against) has no Network.framework
+        // equivalent under a NIOCore-free build -- see that type's own doc comment. Under
+        // NIOCore this whole body runs for real; without it, everything from construction
+        // onward is expected to throw, so it is wrapped wholesale rather than gated
+        // piecemeal.
+        func run() async throws {
+            // Given
+            let server = Certificates().server()
+            let client = Certificates().client()
 
-        let uri = "/" + UUID().uuidString
+            let uri = "/" + UUID().uuidString
 
-        let localServer = try await LocalServer(
-            LocalServer.Configuration(
-                host: "localhost",
-                // Dedicated port: 8887/8888/8889 are already claimed by other
-                // LocalServer-backed suites (see LocalServer.Configuration.swift / DataTaskTests.swift).
-                port: 8892,
-                option: .client(client)
+            let localServer = try await LocalServer(
+                LocalServer.Configuration(
+                    host: "localhost",
+                    // Dedicated port: 8887/8888/8889 are already claimed by other
+                    // LocalServer-backed suites (see LocalServer.Configuration.swift / DataTaskTests.swift).
+                    port: 8892,
+                    option: .client(client)
+                )
             )
-        )
 
-        let output = "Hello World"
-        let response = try LocalServer.ResponseConfiguration(jsonObject: output)
+            let output = "Hello World"
+            let response = try LocalServer.ResponseConfiguration(jsonObject: output)
 
-        localServer.cleanup(at: uri)
-        localServer.insert(response, at: uri)
-        defer { localServer.cleanup(at: uri) }
+            localServer.cleanup(at: uri)
+            localServer.insert(response, at: uri)
+            defer { localServer.cleanup(at: uri) }
 
-        let resolved = try await resolve(
-            TestProperty {
-                BaseURL(localServer.baseURL)
-                Path(uri)
+            let resolved = try await resolve(
+                TestProperty {
+                    BaseURL(localServer.baseURL)
+                    Path(uri)
 
-                Session.localServer
+                    Session.localServer
 
-                SecureConnection {
-                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
-                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                    SecureConnection {
+                        TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                        RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                        PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                    }
+                    .verification(.fullVerification)
                 }
-                .verification(.fullVerification)
-            }
-        )
+            )
 
-        // When
-        try resolved.session.configuration.requireExecutor(.urlSession)
+            // When / Then
+            try resolved.session.configuration.requireExecutor(.urlSession)
 
-        let request = try await resolved.requestConfiguration.buildURLRequest()
+            let request = try await resolved.requestConfiguration.buildURLRequest()
 
-        // Then: see the type doc comment. Known issue in this bare SwiftPM test harness on
-        // every platform (confirmed on macOS and iOS Simulator directly), not a defect in the
-        // mapping this test otherwise exercises, and not specific to macOS.
-        await withKnownIssue(
-            "this SwiftPM test harness has no Keychain Sharing entitlement on any platform; see the type doc comment",
-            {
+            func verify() async throws {
                 let urlSessionClient = try Internals.URLSessionClient(
                     configuration: .ephemeral,
                     secureConnection: resolved.session.configuration.secureConnection
@@ -169,7 +153,30 @@ struct RequestConfigurationURLSessionClientMTLSTests {
                 let decoded = try HTTPResult<String>(result.body)
                 #expect(decoded.response == output)
             }
-        )
+
+            #if os(macOS) || !canImport(Darwin)
+            try await verify()
+            #else
+            await withKnownIssue(
+                "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
+            ) {
+                try await verify()
+            }
+            #endif
+        }
+
+        #if canImport(NIOCore)
+        try await run()
+        #else
+        await withKnownIssue(
+            """
+            LocalServer.TLSOption.client(_:) (server-side mTLS verification) has no \
+            Network.framework equivalent under a NIOCore-free build
+            """
+        ) {
+            try await run()
+        }
+        #endif
     }
 
     /// `trustRoots` alone (no client identity): confirms the server-trust half of
