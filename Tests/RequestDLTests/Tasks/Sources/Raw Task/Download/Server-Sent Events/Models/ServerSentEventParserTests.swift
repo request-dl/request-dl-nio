@@ -14,14 +14,8 @@ import struct Foundation.Data
 
 struct ServerSentEventParserTests {
 
-    /// Regression coverage for a quadratic rescan the audit flagged: before the fix,
-    /// `extractLines(from:)` searched for a line terminator starting from `lineBuffer.startIndex`
-    /// on every `feed(_:)` call, re-scanning the same already-checked prefix each time a new
-    /// chunk arrived with still no terminator in sight -- quadratic in the number of chunks
-    /// making up one line. This feeds one line across many small chunks and checks both that the
-    /// content still comes out correct (the bug this fix's own first attempt introduced: reusing
-    /// the "resume search here" position as "the line starts here" truncated the line to just its
-    /// last chunk) and that it does so without the CPU cost scaling quadratically.
+    /// Feeds one line across many small chunks and checks both that the content comes out
+    /// correct and that assembling it doesn't scale quadratically with the number of chunks.
     @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
     @Test
     func feed_whenOneLineArrivesAcrossManySmallChunks_scalesLinearlyAndKeepsTheWholeLine() {
@@ -53,9 +47,9 @@ struct ServerSentEventParserTests {
                 )
             ]
         )
-        // ...and assembling it cost roughly `chunkCount` units of work, not `chunkCount²`: at
+        // ...and assembling it cost roughly `chunkCount` units of work, not `chunkCount²`. At
         // ~300,000 bytes total this comfortably finishes in well under a second when scanning is
-        // linear, and would not before this fix.
+        // linear.
         #expect(elapsed < .seconds(2))
     }
 

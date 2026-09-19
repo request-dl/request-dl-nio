@@ -19,14 +19,9 @@ struct ServerSentEventParser {
 
     private var lineBuffer = Data()
     /// How many leading bytes of `lineBuffer` have already been scanned for a line terminator
-    /// and confirmed to have none, across every `extractLines(from:)` call since they arrived.
-    ///
-    /// Without this, `extractLines(from:)` searched from `lineBuffer.startIndex` on every call,
-    /// re-scanning that same already-checked prefix each time a new chunk arrived with still no
-    /// terminator in sight -- quadratic in the number of chunks making up one line, since each of
-    /// N chunks re-scanned everything the previous N-1 already ruled out. A line built up over
-    /// many small chunks (the default `ReadingMode` reads 1 KiB at a time) could peg a CPU core
-    /// well before the line -- however long it eventually turns out to be -- ever completes.
+    /// and confirmed to have none. Lets `extractLines(from:)` resume scanning where the previous
+    /// call left off instead of rescanning the whole buffer, keeping the total scan work for one
+    /// line linear in its length even when it arrives across many small chunks.
     private var scannedPrefixLength = 0
     private var sawTrailingCR = false
 
@@ -83,16 +78,13 @@ struct ServerSentEventParser {
         lineBuffer.append(chunk)
 
         var lines: [String] = []
-        // Where the line currently being assembled starts -- always `lineBuffer.startIndex` at
-        // the top of this call, since anything before that was already consumed as a complete
-        // line (by this call or an earlier one) and removed below. Only advances when a
-        // terminator is actually found.
+        // Where the line currently being assembled starts. Always `lineBuffer.startIndex` at the
+        // top of this call; only advances when a terminator is actually found.
         var lineStart = lineBuffer.startIndex
-        // Where to resume *searching* for the next terminator -- distinct from `lineStart`
-        // whenever the pending line spans more than one `feed(_:)` call: the bytes between
-        // `lineStart` and here were already scanned (by an earlier call) and confirmed to hold
-        // no terminator, so there is no need to look at them again, but they are still part of
-        // the line's content once a terminator does turn up further along.
+        // Where to resume searching for the next terminator. Distinct from `lineStart` whenever
+        // the pending line spans more than one `feed(_:)` call: the bytes in between were already
+        // scanned and confirmed terminator-free, but they're still part of the line's content
+        // once a terminator does turn up further along.
         var searchStart = lineBuffer.index(lineBuffer.startIndex, offsetBy: scannedPrefixLength)
 
         while let breakIndex = lineBuffer[searchStart...].firstIndex(where: {
@@ -115,9 +107,8 @@ struct ServerSentEventParser {
         }
 
         lineBuffer.removeSubrange(lineBuffer.startIndex..<lineStart)
-        // Whatever remains was just confirmed, in the loop above, to hold no terminator anywhere
-        // from `searchStart` (at the time this call began) through to the end -- so the next
-        // call can resume searching exactly there instead of rechecking it.
+        // The loop above already confirmed the remaining buffer holds no terminator, so the next
+        // call can resume searching from its end instead of rechecking it.
         scannedPrefixLength = lineBuffer.count
         return lines
     }

@@ -33,10 +33,9 @@ extension Internals {
         /// `build()`'s NIOSSL-facing `tlsCustomVerification` stays gated to pins, `revocationPolicy`,
         /// or `trustDecisionObserver`, since NIOSSL already honors both `additionalTrustRoots` and
         /// `.noHostnameVerification` natively via `TLSConfiguration` and doesn't need the assist for
-        /// those two. `revocationPolicy` and `trustDecisionObserver`, though, still route through it
-        /// on `.nio` as well, since NIOSSL/BoringSSL has no revocation checking or trust-decision
-        /// hook of its own at all -- and so must not be gated out along with the two settings NIOSSL
-        /// does handle on its own.
+        /// those two. `revocationPolicy` and `trustDecisionObserver` still route through it on
+        /// `.nio` as well, since NIOSSL/BoringSSL has no revocation checking or trust-decision hook
+        /// of its own at all.
         ///
         /// What's genuinely unreachable under Network.framework is `keyLogger` (no
         /// Network.framework equivalent at all).
@@ -272,10 +271,9 @@ extension Internals {
             // NIOSSL already honors both `additionalTrustRoots` (via the plain
             // `tlsConfiguration.additionalTrustRoots` assignment above) and `.noHostnameVerification`
             // natively, so a `trustEvaluator` built only for one of those two never gets attached
-            // here. `revocationPolicy` and `trustDecisionObserver`, though, have no NIOSSL/BoringSSL
-            // counterpart at all -- unlike Network.framework below, which always gets the evaluator
-            // whenever `resolve(from:)` built one -- so gating this callback to pins alone silently
-            // dropped both whenever no pins were also configured. See this type's own doc comment.
+            // here. `revocationPolicy` and `trustDecisionObserver` have no NIOSSL/BoringSSL
+            // counterpart at all, unlike Network.framework below, which always gets the evaluator
+            // whenever `resolve(from:)` built one. See this type's own doc comment.
             let needsNIOSSLCustomVerification =
                 !(tlsPins ?? []).isEmpty || revocationPolicy != nil || trustDecisionObserver != nil
 

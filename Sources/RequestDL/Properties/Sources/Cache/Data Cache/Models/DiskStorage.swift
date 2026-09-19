@@ -63,20 +63,16 @@ struct DiskStorage: Sendable {
 
         /// - Parameter retryOnMiss: Whether a missing `response.record`/`data.record` gets the
         /// full retry budget (see `isReachableWithRetry`'s doc comment) before being treated as a
-        /// genuine absence, or is treated as one immediately.
+        /// genuine absence.
         ///
-        /// `true` (the default) is right for `record(forKey:)`'s targeted, by-key lookup: the
-        /// record it's checking was just written and closed right before, so a miss there really
-        /// is the transient stat flake the retry exists for.
+        /// `record(forKey:)`'s by-key lookup passes `true` (the default): the record it's
+        /// checking was just written and closed right before, so a miss there is the transient
+        /// stat flake the retry exists for.
         ///
-        /// `records()`'s full directory scan passes `false`. There, a miss is just as likely to
-        /// mean "this directory belongs to a write that's still in progress" -- `data.record` in
-        /// particular does not exist yet between `allocateBuffer` returning and the first body
-        /// byte arriving, since `Internals.FileBuffer` opens it lazily (see
-        /// `applyFileProtection(to:)`'s own doc comment) -- and retrying that for up to 15s
-        /// per incomplete entry, serially, over every entry a scan finds, is a cost the scan
-        /// itself was never the right place to pay: `freeSpace`/`removeAll(since:)` call it for
-        /// every record in the directory, not one record whose write this call is racing.
+        /// `records()`'s full directory scan passes `false` instead. A miss there is just as
+        /// likely to mean the entry's write is still in progress. Retrying every such entry for
+        /// up to 15s, serially, would turn `freeSpace`/`removeAll(since:)` into a multi-second
+        /// stall per in-flight write.
         init?(_ url: URL, retryOnMiss: Bool = true) async {
             guard url.pathExtension == Self.pathExtension,
                 let (key, date) = Self.getKeyAndDate(url)
@@ -805,15 +801,12 @@ struct DiskStorage: Sendable {
     /// (two concurrent writers for the same key) stays visible and gets swept up like any other
     /// entry instead of going untracked once `index` moves on to the newer one.
     ///
-    /// - Parameter retryOnMiss: Forwarded to each entry's `Record.init?(_:retryOnMiss:)`. `true`
-    /// (the default) is right for `record(forKey:)`'s cold-lookup fallback (`index.location(for:
-    /// scan:)`, below): the whole point of that scan is finding a record that may have been
-    /// written only moments ago, so a transient miss on one of its two files is worth retrying.
-    /// `freeSpace`/`removeAll(since:)` pass `false`: those scans see every entry in the
-    /// directory, most written long ago and settled, and retrying a genuinely in-progress
-    /// write's still-missing `data.record` for up to 15s -- once per such entry, serially --
-    /// turns a bulk operation meant to free space or prune old entries into a multi-minute stall
-    /// for however many writes happen to be in flight when it runs.
+    /// - Parameter retryOnMiss: Forwarded to each entry's `Record.init?(_:retryOnMiss:)`.
+    /// `record(forKey:)`'s cold-lookup fallback (`index.location(for:scan:)`, below) passes the
+    /// default `true`, since that scan exists specifically to find a record that may have been
+    /// written only moments ago. `freeSpace`/`removeAll(since:)` pass `false`: those scans see
+    /// every entry in the directory, most written long ago and settled, so retrying each
+    /// in-progress write for up to 15s would turn a bulk operation into a long stall.
     private func records(retryOnMiss: Bool = true) async -> [Record] {
         let dirPath = directory.filePath
         var foundRecords: [Record] = []

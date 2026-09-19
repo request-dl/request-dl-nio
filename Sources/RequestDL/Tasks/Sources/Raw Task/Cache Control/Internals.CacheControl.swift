@@ -386,8 +386,8 @@ extension Internals {
                     return nil
                 }
 
-                // A capacity hint for the allocation below, not a correctness check: `0` is a
-                // fine stand-in when the header is absent, same as before this returned `Int?`.
+                // A capacity hint for the allocation below, not a correctness check, so `0` is a
+                // fine stand-in when the header is absent.
                 let contentLength = contentLength(headers: headHeaders["Content-Length"] ?? []) ?? 0
 
                 // Read exactly once, by the task below. Buffering until that read begins
@@ -450,21 +450,17 @@ extension Internals {
         private func isCachedDataValid(_ cachedData: CachedData) -> Bool {
             let headers = cachedData.response.headers
 
-            // A cached body's byte count is only checked against `Content-Length` when that
-            // check can actually mean something: `Content-Length` absent entirely (chunked
-            // transfer, most HTTP/2 responses) leaves nothing valid to compare against, and
-            // `Content-Encoding` present means the cached bytes were already transparently
-            // decompressed while `Content-Length` still reflects the compressed size on the
-            // wire -- `Internals.Client.swift` documents that the header survives decompression
-            // under both `.nio` and `.urlSession`, so its mere presence doesn't mean the response
-            // wasn't decoded before it reached the cache. Neither case means the cached data is
-            // actually incomplete on its own, but skipping the check here does give up this
-            // method's only defense against a body that was genuinely truncated for some other
-            // reason (the write path's own error handling discards a stream that fails or is
-            // cancelled outright, so what's left is a narrower risk: the process dying mid-write
-            // before that cleanup runs at all) -- accepted as the better trade against the
-            // alternative, which was every chunked or compressed response permanently missing
-            // the cache regardless.
+            // The cached byte count is only checked against `Content-Length` when that check can
+            // mean something. `Content-Length` is absent entirely for chunked transfer and most
+            // HTTP/2 responses, leaving nothing valid to compare against. `Content-Encoding`
+            // present means the cached bytes are already decompressed, while `Content-Length`
+            // still reflects the compressed size on the wire (see `Internals.Client.swift`: the
+            // header survives decompression under both `.nio` and `.urlSession`).
+            //
+            // Skipping the check in these cases trades away its only defense against a body
+            // truncated by something other than a stream error (already handled by the write
+            // path's own error handling). That's an acceptable trade: the alternative was every
+            // chunked or compressed response permanently missing the cache.
             if let contentLength = contentLength(headers: headers["Content-Length"] ?? []),
                 (headers["Content-Encoding"] ?? []).isEmpty,
                 cachedData.buffer.readableBytes != contentLength
@@ -514,10 +510,7 @@ extension Internals {
         }
 
         /// `nil` when no `Content-Length` directive is present at all (chunked transfer, most
-        /// HTTP/2 responses) -- distinct from a genuine `Content-Length: 0`, and distinct from
-        /// the `0` `isCachedDataValid` used to collapse both of those into before this was
-        /// changed to return an `Int?`, which made an absent header indistinguishable from an
-        /// empty body.
+        /// HTTP/2 responses), distinct from a genuine `Content-Length: 0`.
         private func contentLength(headers: [String]) -> Int? {
             directives(headers)
                 .compactMap(Int.init)

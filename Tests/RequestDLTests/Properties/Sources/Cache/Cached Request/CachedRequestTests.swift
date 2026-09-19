@@ -546,11 +546,8 @@ struct CachedRequestTests {
     func cache_whenCachedResponseHasNoContentLength_isStillValid() async throws {
         let testState = try await TestState()
         let eTag = UUID()
-        // No "Content-Length" header at all -- the exact shape a chunked-transfer or HTTP/2
-        // response leaves behind. Before the fix, `isCachedDataValid` compared the cached byte
-        // count against `contentLength(headers:)`'s fallback for "absent" (`0`), which never
-        // matched a non-empty body, so an entry like this could never be served from cache no
-        // matter how fresh `max-age`/`Expires` said it was.
+        // No "Content-Length" header at all, the exact shape a chunked-transfer or HTTP/2
+        // response leaves behind.
         let cacheData = await mockCachedData(
             makeHeaders(eTag: eTag),
             includeContentLength: false
@@ -583,10 +580,10 @@ struct CachedRequestTests {
         let testState = try await TestState()
         let eTag = UUID()
         // "Content-Encoding: gzip" alongside a "Content-Length" that does not match the cached
-        // bytes -- the exact mismatch a transparently-decompressed response leaves behind (the
-        // cached bytes are the decoded body, but `Content-Length` still reflects the compressed
-        // size on the wire, since neither `NIOHTTPResponseDecompressor` nor CFNetwork's own
-        // decoding strips the header; see `Internals.Client.swift`'s own note on this).
+        // bytes. This is the exact mismatch a transparently-decompressed response leaves behind:
+        // the cached bytes are the decoded body, but `Content-Length` still reflects the
+        // compressed size on the wire, since neither `NIOHTTPResponseDecompressor` nor
+        // CFNetwork's own decoding strips the header.
         let cacheData = await mockCachedData(
             makeHeaders(eTag: eTag) + [("Content-Encoding", "gzip")],
             contentLengthOverride: 1

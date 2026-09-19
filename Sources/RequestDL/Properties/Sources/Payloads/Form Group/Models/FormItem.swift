@@ -125,17 +125,15 @@ struct FormItem: Sendable {
         return contentDisposition
     }
 
-    /// Percent-encodes the characters that would otherwise let `name`/`filename` -- often
-    /// sourced from a URL's `lastPathComponent`, i.e. attacker-influenced -- break out of this
-    /// quoted-string and inject an extra header or a whole extra part into the body. `"` ends
-    /// the quoted-string early; a bare CR or LF ends the header line early, since these are body
-    /// bytes handed straight to the wire with no header-line validation downstream. Matches the
-    /// convention curl and browsers use for `multipart/form-data` (see the WHATWG HTML living
-    /// standard's "multipart/form-data" algorithm).
+    /// Percent-encodes characters that would otherwise let `name`/`filename` break out of this
+    /// quoted-string. `name`/`filename` often come from a URL's `lastPathComponent`, so they can
+    /// be attacker-influenced. `"` ends the quoted-string early; a bare CR or LF ends the header
+    /// line early, since these are body bytes with no header-line validation downstream. This
+    /// matches the convention curl and browsers use for `multipart/form-data`.
     ///
-    /// - Important: Walks `unicodeScalars`, not `Character`s -- a literal CRLF pair is one
-    /// `Character` (a single extended grapheme cluster) in Swift, so matching against the
-    /// `Character` values `"\r"`/`"\n"` would silently miss it and let the pair straight through.
+    /// - Important: Walks `unicodeScalars`, not `Character`s. A literal CRLF pair is a single
+    /// `Character` (one extended grapheme cluster) in Swift, so matching against the `Character`
+    /// values `"\r"`/`"\n"` would miss it and let the pair through unescaped.
     private static func escapedParameterValue(_ value: String) -> String {
         var escaped = ""
         escaped.reserveCapacity(value.unicodeScalars.count)

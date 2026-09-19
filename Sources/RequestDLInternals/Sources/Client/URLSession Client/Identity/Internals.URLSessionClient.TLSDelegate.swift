@@ -24,12 +24,12 @@ extension Internals.URLSessionClient {
     /// to a single URL.
     ///
     /// `host` still reaches `policy.handle(challenge:isConfiguredHost:completionHandler:)`, but
-    /// only gates whether a client-certificate credential is presented -- server-trust challenges
+    /// only gates whether a client-certificate credential is presented. Server-trust challenges
     /// (pinning, custom trust roots, revocation, hostname-verification overrides) are always
-    /// routed to `policy` regardless of host. A challenge for a redirect target this policy was
-    /// never configured for must still be checked against that same trust configuration: a
-    /// redirect is exactly the kind of thing pinning needs to survive, not a reason to skip it and
-    /// fall back to bare system trust. See `URLSessionIdentityPolicy.handle`'s own doc comment.
+    /// routed to `policy` regardless of host: a redirect target this policy was never configured
+    /// for still has to be checked against that same trust configuration, since a redirect is
+    /// exactly the kind of thing pinning needs to survive, not a reason to fall back to bare
+    /// system trust. See `URLSessionIdentityPolicy.handle`'s own doc comment.
     final class TLSDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
         // MARK: - Private properties

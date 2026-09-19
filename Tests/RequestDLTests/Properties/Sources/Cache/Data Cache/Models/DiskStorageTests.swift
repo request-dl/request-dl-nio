@@ -296,12 +296,12 @@ struct DiskStorageTests {
             let storage = DiskStorage(directory: directoryURL)
 
             // Given: a directory that looks like a cache entry (right suffix, a parseable
-            // key/date) with "response.record" on disk but no "data.record" at all -- the same
+            // key/date) with "response.record" on disk but no "data.record" at all, the same
             // shape a write still streaming its body in leaves behind. `record(forKey:)`'s own
-            // by-key lookup path is right to retry past that (see the test above); a full-directory
-            // scan is not: `removeAll()`/`removeAll(since:)`/`freeSpace` see every entry in the
-            // directory, not one write this call is racing, so retrying this one for 15s would
-            // stall the whole call for however many writes happen to be in flight.
+            // by-key lookup path is right to retry past that (see the test above). A
+            // full-directory scan is not: `removeAll()`/`removeAll(since:)`/`freeSpace` see every
+            // entry in the directory, not one write this call is racing, so retrying this one for
+            // 15s would stall the whole call for however many writes happen to be in flight.
             let key = "stillwriting"
             let date = Date()
             let bitPattern = date.timeIntervalSinceReferenceDate.bitPattern

@@ -36,11 +36,11 @@ extension Internals {
         /// latency per `lifetime` window thanks to the cache above it.
         private static let evaluationTimeout: Double = 30
 
-        /// A ceiling, not a working limit -- same rationale as `Internals.Storage.maximumCount`.
+        /// A ceiling, not a working limit, same rationale as `Internals.Storage.maximumCount`.
         /// `storage` is keyed by `(scriptURL, targetURL)`, and entries only expire logically
-        /// (`isExpired`, checked on read); nothing swept them out on their own, so a workload
-        /// that hits a great many distinct target URLs under one PAC script (a feed of distinct
-        /// image URLs, say) could otherwise grow this table for the lifetime of the process.
+        /// (`isExpired`, checked on read); nothing sweeps them out on its own. Without a ceiling,
+        /// a workload that hits many distinct target URLs under one PAC script (a feed of
+        /// distinct image URLs, say) could grow this table for the lifetime of the process.
         package static let maximumCount = 256
 
         // MARK: - Internal properties
@@ -52,14 +52,12 @@ extension Internals {
             storage.count
         }
 
-        /// How many evaluations this instance has actually started (i.e. how many times the code
-        /// below reached the point of creating a new `task`), exposed for tests: whether
+        /// How many evaluations this instance has actually started, exposed for tests. Whether
         /// concurrent misses for the same key share one evaluation isn't observable from outside
-        /// through connection or thread counts alone
-        /// (`CFNetworkExecuteProxyAutoConfigurationURL` caches a script's fetched content
-        /// internally, independent of this type, and `inFlight`'s own count can only ever be 0 or
-        /// 1 for a given key regardless of how many separate evaluations wrote to that slot over
-        /// time), so a test needs a monotonic count of genuinely-started evaluations instead.
+        /// through connection or thread counts alone: `CFNetworkExecuteProxyAutoConfigurationURL`
+        /// caches a script's fetched content internally, and `inFlight`'s own count can only ever
+        /// be 0 or 1 for a given key. A monotonic count of genuinely-started evaluations is what a
+        /// test actually needs.
         package private(set) var evaluationCount = 0
 
         // MARK: - Private properties
@@ -69,11 +67,10 @@ extension Internals {
         private var storage: [Key: Entry] = [:]
 
         /// One evaluation per key in flight at a time. `proxy(forScriptURL:targetURL:)` awaits
-        /// `Internals.PACEvaluator.evaluate(...)`, a genuine suspension point, so without this a
-        /// burst of concurrent requests to the same host (e.g. a screenful of images loading at
-        /// once) would each see the same cache miss and start their own independent evaluation --
-        /// each opening its own dedicated `Thread` in `Internals.PACEvaluator` -- rather than
-        /// sharing the one already in progress.
+        /// `Internals.PACEvaluator.evaluate(...)`, a genuine suspension point, so a burst of
+        /// concurrent requests to the same host (a screenful of images loading at once, say)
+        /// shares the one evaluation already in progress instead of each opening its own
+        /// dedicated `Thread` in `Internals.PACEvaluator`.
         private var inFlight: [Key: _Concurrency.Task<Internals.Proxy?, Never>] = [:]
 
         // MARK: - Inits
