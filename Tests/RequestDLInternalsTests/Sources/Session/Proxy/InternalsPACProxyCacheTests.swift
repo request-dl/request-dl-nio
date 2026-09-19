@@ -84,6 +84,81 @@ struct InternalsPACProxyCacheTests {
     }
 
     @Test
+    func proxy_whenManyConcurrentCallsMissTheSameKey_evaluatesOnlyOnce() async throws {
+        // Given: a script whose response is held back for a while, long enough that every
+        // concurrent caller below is guaranteed to have registered itself as a miss before any
+        // of them could possibly see a result -- widening the reentrancy window a fast script
+        // could otherwise close before 20 near-simultaneous calls all land inside it.
+        //
+        // `evaluationCount` (not a connection or thread count) is what this actually checks:
+        // `CFNetworkExecuteProxyAutoConfigurationURL` turns out to cache a script's fetched
+        // content internally, independent of `Internals.PACProxyCache` entirely, so a second
+        // (undeduplicated) evaluation for the same script can cost zero additional connections --
+        // confirmed empirically, not assumed -- making connection counting useless here.
+        let server = try await LocalPACServer.start(
+            scriptContents: """
+                function FindProxyForURL(url, host) {
+                    return "PROXY 127.0.0.1:8080";
+                }
+                """,
+            responseDelay: .milliseconds(200)
+        )
+        defer { server.stop() }
+
+        let targetURL = try #require(URL(string: "https://example.com/"))
+        let cache = Internals.PACProxyCache()
+
+        // When: many concurrent misses for the identical key, started together.
+        let results = await withTaskGroup(of: Internals.Proxy?.self) { group -> [Internals.Proxy?] in
+            for _ in 0..<20 {
+                group.addTask {
+                    await cache.proxy(forScriptURL: server.scriptURL, targetURL: targetURL)
+                }
+            }
+
+            var results: [Internals.Proxy?] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results
+        }
+
+        // Then: every caller gets the right answer, and only one evaluation was ever actually
+        // started for the twenty of them. Before the fix, actor reentrancy across
+        // `Internals.PACEvaluator.evaluate(...)`'s suspension point let each of the 20 concurrent
+        // misses start its own independent evaluation instead of sharing the one in progress.
+        #expect(results.allSatisfy { $0?.host == "127.0.0.1" })
+        #expect(await cache.evaluationCount == 1)
+    }
+
+    @Test
+    func proxy_whenEntryCountExceedsMaximum_evictsTheOldestRatherThanGrowingWithoutBound() async throws {
+        // Given: a cache capped at 4 entries, small enough to exceed with a handful of real
+        // evaluations instead of the hundreds the real 256-entry ceiling would need.
+        let server = try await LocalPACServer.start(
+            scriptContents: """
+                function FindProxyForURL(url, host) {
+                    return "PROXY 127.0.0.1:8080";
+                }
+                """
+        )
+        defer { server.stop() }
+
+        let cache = Internals.PACProxyCache(maximumCount: 4)
+
+        // When: six distinct target URLs, each a fresh cache miss.
+        for index in 0..<6 {
+            _ = await cache.proxy(
+                forScriptURL: server.scriptURL,
+                targetURL: try #require(URL(string: "https://example\(index).com/"))
+            )
+        }
+
+        // Then: the table was brought back under the ceiling rather than left to grow to 6.
+        #expect(await cache.count <= 4)
+    }
+
+    @Test
     func proxy_whenEvaluationFails_cachesDirectRatherThanRetryingEveryCall() async throws {
         // Given: nothing listens on this port.
         let scriptURL = try #require(URL(string: "http://127.0.0.1:1/proxy.pac"))
@@ -124,11 +199,16 @@ private final class LocalPACServer: @unchecked Sendable {
 
     // MARK: - Internal static methods
 
-    static func start(scriptContents: String) async throws -> LocalPACServer {
+    /// - Parameter responseDelay: How long to hold the response back after the request arrives,
+    /// before sending it. `.zero` responds immediately; a real delay is what
+    /// `proxy_whenManyConcurrentCallsMissTheSameKey_shareOneInFlightEvaluation` uses to hold a
+    /// window open long enough to inspect `Internals.PACProxyCache`'s in-flight bookkeeping while
+    /// an evaluation is still genuinely in progress.
+    static func start(scriptContents: String, responseDelay: Duration = .zero) async throws -> LocalPACServer {
         let listener = try NWListener(using: .tcp, on: .any)
 
         let body = Data(scriptContents.utf8)
-        var response = Data(
+        let header = Data(
             """
             HTTP/1.1 200 OK\r
             Content-Type: application/x-ns-proxy-autoconfig\r
@@ -138,17 +218,29 @@ private final class LocalPACServer: @unchecked Sendable {
 
             """.utf8
         )
-        response.append(body)
+        let response = header + body
 
         listener.newConnectionHandler = { connection in
             connection.start(queue: .main)
             connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { _, _, _, _ in
-                connection.send(
-                    content: response,
-                    completion: .contentProcessed { _ in
-                        connection.cancel()
-                    }
-                )
+                func send() {
+                    connection.send(
+                        content: response,
+                        completion: .contentProcessed { _ in
+                            connection.cancel()
+                        }
+                    )
+                }
+
+                guard responseDelay > .zero else {
+                    send()
+                    return
+                }
+
+                _Concurrency.Task {
+                    try? await _Concurrency.Task.sleep(for: responseDelay)
+                    send()
+                }
             }
         }
 

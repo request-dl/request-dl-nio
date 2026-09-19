@@ -36,16 +36,56 @@ extension Internals {
         /// latency per `lifetime` window thanks to the cache above it.
         private static let evaluationTimeout: Double = 30
 
+        /// A ceiling, not a working limit -- same rationale as `Internals.Storage.maximumCount`.
+        /// `storage` is keyed by `(scriptURL, targetURL)`, and entries only expire logically
+        /// (`isExpired`, checked on read); nothing swept them out on their own, so a workload
+        /// that hits a great many distinct target URLs under one PAC script (a feed of distinct
+        /// image URLs, say) could otherwise grow this table for the lifetime of the process.
+        package static let maximumCount = 256
+
+        // MARK: - Internal properties
+
+        /// `storage.count`, exposed for tests: verifying eviction black-box (query an old key
+        /// again and check for a fresh evaluation) would mean paying for hundreds of real PAC
+        /// evaluations just to exceed a default-sized cache.
+        package var count: Int {
+            storage.count
+        }
+
+        /// How many evaluations this instance has actually started (i.e. how many times the code
+        /// below reached the point of creating a new `task`), exposed for tests: whether
+        /// concurrent misses for the same key share one evaluation isn't observable from outside
+        /// through connection or thread counts alone
+        /// (`CFNetworkExecuteProxyAutoConfigurationURL` caches a script's fetched content
+        /// internally, independent of this type, and `inFlight`'s own count can only ever be 0 or
+        /// 1 for a given key regardless of how many separate evaluations wrote to that slot over
+        /// time), so a test needs a monotonic count of genuinely-started evaluations instead.
+        package private(set) var evaluationCount = 0
+
         // MARK: - Private properties
 
+        private let maximumCount: Int
+
         private var storage: [Key: Entry] = [:]
+
+        /// One evaluation per key in flight at a time. `proxy(forScriptURL:targetURL:)` awaits
+        /// `Internals.PACEvaluator.evaluate(...)`, a genuine suspension point, so without this a
+        /// burst of concurrent requests to the same host (e.g. a screenful of images loading at
+        /// once) would each see the same cache miss and start their own independent evaluation --
+        /// each opening its own dedicated `Thread` in `Internals.PACEvaluator` -- rather than
+        /// sharing the one already in progress.
+        private var inFlight: [Key: _Concurrency.Task<Internals.Proxy?, Never>] = [:]
 
         // MARK: - Inits
 
         /// `package`, not `private`: `.shared` is what `Internals.SystemProxyResolver` actually
         /// uses, but tests want their own isolated instance rather than risking cross-test cache
-        /// pollution through the process-wide singleton.
-        package init() {}
+        /// pollution through the process-wide singleton. `maximumCount` likewise defaults to the
+        /// real ceiling but is overridable, so a test can exercise eviction with a handful of
+        /// entries instead of needing hundreds of real PAC evaluations to exceed it.
+        package init(maximumCount: Int = PACProxyCache.maximumCount) {
+            self.maximumCount = maximumCount
+        }
 
         // MARK: - Internal methods
 
@@ -63,22 +103,33 @@ extension Internals {
                 return entry.proxy
             }
 
-            let resolved: Internals.Proxy?
-
-            do {
-                resolved = try await Internals.PACEvaluator.evaluate(
-                    scriptURL: scriptURL,
-                    targetURL: targetURL,
-                    timeout: Self.evaluationTimeout
-                )
-            } catch {
-                resolved = nil
+            if let inFlightTask = inFlight[key] {
+                return await inFlightTask.value
             }
 
+            evaluationCount += 1
+
+            let task = _Concurrency.Task<Internals.Proxy?, Never> {
+                do {
+                    return try await Internals.PACEvaluator.evaluate(
+                        scriptURL: scriptURL,
+                        targetURL: targetURL,
+                        timeout: Self.evaluationTimeout
+                    )
+                } catch {
+                    return nil
+                }
+            }
+            inFlight[key] = task
+
+            let resolved = await task.value
+
+            inFlight[key] = nil
             storage[key] = Entry(
                 proxy: resolved,
                 readAt: DispatchTime.now().uptimeNanoseconds
             )
+            evictIfNeeded()
 
             return resolved
         }
@@ -87,6 +138,29 @@ extension Internals {
 
         private func isExpired(_ entry: Entry) -> Bool {
             DispatchTime.now().uptimeNanoseconds - entry.readAt > Self.lifetime
+        }
+
+        /// Brings `storage` back under `maximumCount`, oldest first. Drops down to three
+        /// quarters rather than removing one entry per insert, the same batching
+        /// `Internals.Storage._evictIfNeeded()` uses and for the same reason: sorting is
+        /// linearithmic, so evicting a single entry per call would make a table sitting at the
+        /// ceiling pay a full scan on every miss.
+        private func evictIfNeeded() {
+            guard storage.count > maximumCount else {
+                return
+            }
+
+            let target = max(maximumCount - (maximumCount / 4), 1)
+            let excess = storage.count - target
+
+            let oldest =
+                storage
+                .sorted { $0.value.readAt < $1.value.readAt }
+                .prefix(excess)
+
+            for (key, _) in oldest {
+                storage[key] = nil
+            }
         }
 
         // MARK: - Private nested types
