@@ -99,7 +99,7 @@ struct InternalsPACProxyCacheTests {
                     return "PROXY 127.0.0.1:8080";
                 }
                 """,
-            responseDelay: .milliseconds(200)
+            responseDelay: 0.2
         )
         defer { server.stop() }
 
@@ -195,10 +195,13 @@ private final class LocalPACServer: @unchecked Sendable {
 
     // MARK: - Internal static methods
 
-    /// - Parameter responseDelay: How long to hold the response back after the request arrives,
-    /// before sending it. `.zero` responds immediately; a real delay gives many concurrent
-    /// callers time to register themselves as a miss before the first one resolves.
-    static func start(scriptContents: String, responseDelay: Duration = .zero) async throws -> LocalPACServer {
+    /// - Parameter responseDelay: How long, in seconds, to hold the response back after the
+    /// request arrives, before sending it. `0` responds immediately; a real delay gives many
+    /// concurrent callers time to register themselves as a miss before the first one resolves.
+    ///
+    /// `TimeInterval`, not `Duration`: `Duration` needs iOS/tvOS 16+, above this package's iOS
+    /// 15/tvOS 15 deployment target.
+    static func start(scriptContents: String, responseDelay: TimeInterval = 0) async throws -> LocalPACServer {
         let listener = try NWListener(using: .tcp, on: .any)
 
         let body = Data(scriptContents.utf8)
@@ -226,13 +229,13 @@ private final class LocalPACServer: @unchecked Sendable {
                     )
                 }
 
-                guard responseDelay > .zero else {
+                guard responseDelay > 0 else {
                     send()
                     return
                 }
 
                 _Concurrency.Task {
-                    try? await _Concurrency.Task.sleep(for: responseDelay)
+                    try? await _Concurrency.Task.sleep(nanoseconds: UInt64(responseDelay * 1_000_000_000))
                     send()
                 }
             }
