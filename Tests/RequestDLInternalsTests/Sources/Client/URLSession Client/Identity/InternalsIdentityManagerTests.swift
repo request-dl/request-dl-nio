@@ -48,28 +48,40 @@ struct InternalsIdentityManagerTests {
 
         // When: many tasks repeatedly build a handle, touch it, and let it go out of scope,
         // racing every other task's own build/release cycle for the identical label.
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for _ in 0..<20 {
-                group.addTask {
-                    for _ in 0..<25 {
-                        let handle = try Internals.RawBytesIdentityBuilder.makeIdentity(
-                            certificateDER: certificateDER,
-                            privateKeyDER: privateKeyDER
-                        )
-                        _ = handle.identity
+        func run() async throws {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for _ in 0..<20 {
+                    group.addTask {
+                        for _ in 0..<25 {
+                            let handle = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                                certificateDER: certificateDER,
+                                privateKeyDER: privateKeyDER
+                            )
+                            _ = handle.identity
+                        }
                     }
                 }
+
+                try await group.waitForAll()
             }
 
-            try await group.waitForAll()
+            // Then: the Keychain items must still be there for a fresh build to find.
+            let finalHandle = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+            _ = finalHandle.identity
         }
 
-        // Then: the Keychain items must still be there for a fresh build to find.
-        let finalHandle = try Internals.RawBytesIdentityBuilder.makeIdentity(
-            certificateDER: certificateDER,
-            privateKeyDER: privateKeyDER
-        )
-        _ = finalHandle.identity
+        #if os(macOS) || !canImport(Darwin)
+        try await run()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see RequestConfigurationURLSessionClientMTLSTests's own doc comment"
+        ) {
+            try await run()
+        }
+        #endif
     }
 }
 

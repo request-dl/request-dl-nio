@@ -70,6 +70,10 @@ struct ReadingModeTests {
         try await assertNever(property.body)
     }
 
+    // Swift Testing's exit tests need to spawn a real child process, which only macOS and Linux
+    // support here: iOS/tvOS/watchOS/visionOS (device or Simulator) don't allow it, so
+    // `#expect(processExitsWith:)` isn't even available to call there.
+    #if os(macOS) || os(Linux)
     /// A non-positive length can never make progress reading the body (see `ReadingMode.init`'s
     /// own doc comment), so construction traps instead of silently producing an empty response.
     @Test
@@ -88,4 +92,5 @@ struct ReadingModeTests {
             _ = ReadingMode(length: -1)
         }
     }
+    #endif
 }
