@@ -90,11 +90,26 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// Answers one TLS challenge (client-certificate or server-trust) for the host this
-        /// policy was resolved for. Any other authentication method defers to the system's
-        /// default handling.
+        /// Answers one TLS challenge (client-certificate or server-trust).
+        ///
+        /// - Parameter isConfiguredHost: Whether the challenge's host matches the host this
+        ///   policy was resolved for. Server-trust challenges (pinning, custom trust roots,
+        ///   revocation, hostname-verification overrides) are evaluated unconditionally, `false`
+        ///   included: this connection can end up talking to a different host mid-redirect, and
+        ///   the whole point of pinning/custom trust is to reject a server that doesn't present
+        ///   the expected certificate -- skipping that check for a redirect target would let
+        ///   whoever controls the redirect defeat pinning just by pointing it at any host with an
+        ///   otherwise-valid, publicly-trusted certificate. This matches the `.nio` backend, where
+        ///   the equivalent checks are installed once at the `HTTPClient.Configuration` level and
+        ///   so already apply to every connection the client opens, redirect targets included.
+        ///
+        ///   A client-certificate credential, by contrast, is only ever presented when
+        ///   `isConfiguredHost` is `true`: it identifies us to the server, so handing it to a
+        ///   redirect target this policy was never configured for is its own, separate risk this
+        ///   method still guards against.
         package func handle(
             challenge: URLAuthenticationChallenge,
+            isConfiguredHost: Bool,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
             guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate else {
@@ -102,7 +117,7 @@ extension Internals {
                 return
             }
 
-            guard let identityHandle else {
+            guard isConfiguredHost, let identityHandle else {
                 completionHandler(.performDefaultHandling, nil)
                 return
             }
