@@ -38,9 +38,17 @@ public struct ReadingMode: Property {
     ///
     /// Creates a reading mode with a fixed length for reading data.
     ///
-    /// - Parameter length: The fixed length of data to be read.
+    /// - Parameter length: The fixed length of data to be read. Must be greater than zero: a
+    /// chunk size of zero (or negative) can never make progress, since nothing is ever read.
     ///
+    /// - Precondition: `length > 0`. `Internals.DownloadBuffer._appendByLength` computes each
+    /// read as `min(receivedBytes, length - buffer.readableBytes)`, which is `0` (or negative,
+    /// clamped to a `0`-length read by the same comparison) whenever `length <= 0` -- and a
+    /// zero-length read is never satisfied (`Internals.Buffer.readData(0)` always returns
+    /// `nil`), so every chunk this reading mode receives would be silently discarded forever,
+    /// the request completing with an empty body and no error raised anywhere.
     public init(length: Int) {
+        precondition(length > 0, "ReadingMode(length:) requires length > 0; \(length) can never make progress.")
         mode = .length(length)
     }
 

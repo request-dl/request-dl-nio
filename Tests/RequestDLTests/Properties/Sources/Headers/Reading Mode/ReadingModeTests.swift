@@ -69,4 +69,29 @@ struct ReadingModeTests {
         // Then
         try await assertNever(property.body)
     }
+
+    /// Regression coverage for a length of zero (or negative) silently discarding the entire
+    /// response body: `Internals.DownloadBuffer._appendByLength` computes each read as
+    /// `min(receivedBytes, length - buffer.readableBytes)`, `0` whenever `length <= 0`, and a
+    /// zero-length read is never satisfied (`Internals.Buffer.readData(0)` always returns `nil`)
+    /// -- so every chunk would be silently dropped forever, with no error anywhere, and a
+    /// request that should have real content instead completing normally with an empty body.
+    /// `ReadingMode(length:)` now traps on construction instead, well before any of that has a
+    /// chance to happen.
+    @Test
+    func initWithZeroLength_traps() async {
+        // The exit-test closure below runs in a spawned child process and so cannot capture
+        // anything from this scope (a parameterized `length` included) -- the literal has to be
+        // written directly inside it.
+        await #expect(processExitsWith: .failure) {
+            _ = ReadingMode(length: 0)
+        }
+    }
+
+    @Test
+    func initWithNegativeLength_traps() async {
+        await #expect(processExitsWith: .failure) {
+            _ = ReadingMode(length: -1)
+        }
+    }
 }
