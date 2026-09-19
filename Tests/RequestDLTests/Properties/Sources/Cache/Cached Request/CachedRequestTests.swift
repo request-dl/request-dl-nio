@@ -543,6 +543,78 @@ struct CachedRequestTests {
     }
 
     @Test
+    func cache_whenCachedResponseHasNoContentLength_isStillValid() async throws {
+        let testState = try await TestState()
+        let eTag = UUID()
+        // No "Content-Length" header at all -- the exact shape a chunked-transfer or HTTP/2
+        // response leaves behind. Before the fix, `isCachedDataValid` compared the cached byte
+        // count against `contentLength(headers:)`'s fallback for "absent" (`0`), which never
+        // matched a non-empty body, so an entry like this could never be served from cache no
+        // matter how fresh `max-age`/`Expires` said it was.
+        let cacheData = await mockCachedData(
+            makeHeaders(eTag: eTag),
+            includeContentLength: false
+        )
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let updatedCachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then: served from cache, not refetched and replaced.
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
+    }
+
+    @Test
+    func cache_whenCachedResponseHasContentEncoding_isStillValidDespiteContentLengthMismatch() async throws {
+        let testState = try await TestState()
+        let eTag = UUID()
+        // "Content-Encoding: gzip" alongside a "Content-Length" that does not match the cached
+        // bytes -- the exact mismatch a transparently-decompressed response leaves behind (the
+        // cached bytes are the decoded body, but `Content-Length` still reflects the compressed
+        // size on the wire, since neither `NIOHTTPResponseDecompressor` nor CFNetwork's own
+        // decoding strips the header; see `Internals.Client.swift`'s own note on this).
+        let cacheData = await mockCachedData(
+            makeHeaders(eTag: eTag) + [("Content-Encoding", "gzip")],
+            contentLengthOverride: 1
+        )
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let updatedCachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then: served from cache, not refetched and replaced.
+        #expect(updatedCachedData?.response == cacheData.response)
+        #expect(response.head == cacheData.response)
+    }
+
+    @Test
     func cache_whenCapacityTooSmallForResponse_skipsCaching() async throws {
         let testState = try await TestState()
         defer { _ = testState }
@@ -743,20 +815,22 @@ extension CachedRequestTests {
     func mockCachedData(
         _ headers: [(String, String)] = [],
         contentLengthOverride: Int? = nil,
+        includeContentLength: Bool = true,
         policy: DataCache.Policy.Set = .all
     ) async -> CachedData {
         let data = try? JSONEncoder().encode(["receivedBytes": "0"])
+
+        var responseHeaders = headers
+        if includeContentLength {
+            responseHeaders.append(("Content-Length", String(contentLengthOverride ?? data?.count ?? .zero)))
+        }
 
         return await CachedData(
             response: ResponseHead(
                 url: URL(string: "https://localhost:8888"),
                 status: .init(code: 200, reason: "Ok"),
                 version: .init(minor: 1, major: 2),
-                headers: HTTPHeaders(
-                    headers + [
-                        ("Content-Length", String(contentLengthOverride ?? data?.count ?? .zero))
-                    ]
-                ),
+                headers: HTTPHeaders(responseHeaders),
                 isKeepAlive: false
             ),
             policy: policy,
