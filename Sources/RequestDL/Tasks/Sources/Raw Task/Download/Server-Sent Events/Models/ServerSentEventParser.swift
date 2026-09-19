@@ -18,6 +18,16 @@ struct ServerSentEventParser {
     // MARK: - Private properties
 
     private var lineBuffer = Data()
+    /// How many leading bytes of `lineBuffer` have already been scanned for a line terminator
+    /// and confirmed to have none, across every `extractLines(from:)` call since they arrived.
+    ///
+    /// Without this, `extractLines(from:)` searched from `lineBuffer.startIndex` on every call,
+    /// re-scanning that same already-checked prefix each time a new chunk arrived with still no
+    /// terminator in sight -- quadratic in the number of chunks making up one line, since each of
+    /// N chunks re-scanned everything the previous N-1 already ruled out. A line built up over
+    /// many small chunks (the default `ReadingMode` reads 1 KiB at a time) could peg a CPU core
+    /// well before the line -- however long it eventually turns out to be -- ever completes.
+    private var scannedPrefixLength = 0
     private var sawTrailingCR = false
 
     private var lastEventId: String?
@@ -47,6 +57,7 @@ struct ServerSentEventParser {
         if !lineBuffer.isEmpty {
             let line = String(decoding: lineBuffer, as: UTF8.self)
             lineBuffer.removeAll()
+            scannedPrefixLength = 0
 
             if let event = process(line: line) {
                 return event
@@ -72,12 +83,22 @@ struct ServerSentEventParser {
         lineBuffer.append(chunk)
 
         var lines: [String] = []
-        var searchIndex = lineBuffer.startIndex
+        // Where the line currently being assembled starts -- always `lineBuffer.startIndex` at
+        // the top of this call, since anything before that was already consumed as a complete
+        // line (by this call or an earlier one) and removed below. Only advances when a
+        // terminator is actually found.
+        var lineStart = lineBuffer.startIndex
+        // Where to resume *searching* for the next terminator -- distinct from `lineStart`
+        // whenever the pending line spans more than one `feed(_:)` call: the bytes between
+        // `lineStart` and here were already scanned (by an earlier call) and confirmed to hold
+        // no terminator, so there is no need to look at them again, but they are still part of
+        // the line's content once a terminator does turn up further along.
+        var searchStart = lineBuffer.index(lineBuffer.startIndex, offsetBy: scannedPrefixLength)
 
-        while let breakIndex = lineBuffer[searchIndex...].firstIndex(where: {
+        while let breakIndex = lineBuffer[searchStart...].firstIndex(where: {
             $0 == UInt8(ascii: "\r") || $0 == UInt8(ascii: "\n")
         }) {
-            lines.append(String(decoding: lineBuffer[searchIndex..<breakIndex], as: UTF8.self))
+            lines.append(String(decoding: lineBuffer[lineStart..<breakIndex], as: UTF8.self))
 
             var nextIndex = lineBuffer.index(after: breakIndex)
 
@@ -89,10 +110,15 @@ struct ServerSentEventParser {
                 }
             }
 
-            searchIndex = nextIndex
+            lineStart = nextIndex
+            searchStart = nextIndex
         }
 
-        lineBuffer.removeSubrange(lineBuffer.startIndex..<searchIndex)
+        lineBuffer.removeSubrange(lineBuffer.startIndex..<lineStart)
+        // Whatever remains was just confirmed, in the loop above, to hold no terminator anywhere
+        // from `searchStart` (at the time this call began) through to the end -- so the next
+        // call can resume searching exactly there instead of rechecking it.
+        scannedPrefixLength = lineBuffer.count
         return lines
     }
 
