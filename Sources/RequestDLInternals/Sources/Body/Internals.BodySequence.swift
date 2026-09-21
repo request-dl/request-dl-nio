@@ -23,9 +23,18 @@ extension Internals {
 
             package let chunkSize: Int
             package let totalSize: Int
-            private(set) var buffers: [Internals.AnyBuffer]
 
             // MARK: - Private properties
+
+            /// The still-unconsumed suffix starts at `bufferIndex`, not index zero: a body
+            /// assembled from many small parts (e.g. a multipart form with thousands of fields)
+            /// used to drop its front element with `removeFirst()` on every exhausted buffer,
+            /// which is O(*n*) per call and O(*n*²) over the whole body. An index cursor makes
+            /// advancing past an exhausted buffer O(1) instead, since `buffers` keeps its value
+            /// semantics and in-place element updates (`buffers[bufferIndex] = buffer`) don't
+            /// shift anything either.
+            private var buffers: [Internals.AnyBuffer]
+            private var bufferIndex = Int.zero
 
             private var bytes: Internals.Bytes
 
@@ -66,15 +75,16 @@ extension Internals {
                 }
 
                 while bytes.writerIndex < chunkSize {
-                    guard var buffer = buffers.first else {
+                    guard bufferIndex < buffers.count else {
                         break
                     }
+                    var buffer = buffers[bufferIndex]
 
                     let availableBytes = chunkSize - bytes.writerIndex
                     let length = Swift.min(buffer.readableBytes, availableBytes)
 
                     guard length > .zero else {
-                        buffers.removeFirst()
+                        bufferIndex += 1
                         continue
                     }
 
@@ -91,7 +101,7 @@ extension Internals {
                             "Buffer reported \(buffer.readableBytes) readable bytes but returned none"
                         )
 
-                        buffers.removeFirst()
+                        bufferIndex += 1
                         continue
                     }
 
@@ -102,9 +112,9 @@ extension Internals {
                     // bearing in this file: the array element is a distinct copy until it is
                     // reassigned.
                     if buffer.readableBytes == .zero {
-                        buffers.removeFirst()
+                        bufferIndex += 1
                     } else {
-                        buffers[.zero] = buffer
+                        buffers[bufferIndex] = buffer
                     }
                 }
 

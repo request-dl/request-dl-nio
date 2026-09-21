@@ -124,6 +124,87 @@ struct InternalsURLSessionClientTests {
             #expect(!stillRunning)
         }
     }
+
+    /// Same regression as `execute_whenTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows`
+    /// above, for `execute(request:streaming:delegate:onUploadProgress:)`. This overload's
+    /// continuation wasn't wrapped in `withTaskCancellationHandler` at all, unlike its sibling:
+    /// cancelling the caller's `Task` while it awaited the upload response left the underlying
+    /// `URLSessionTask` running unnoticed, with the throttle slot never released.
+    @Test
+    func execute_whenStreamingUploadTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows() async throws {
+        try await withHangingURLSessionTestServer { port in
+            let client = try Internals.URLSessionClient(configuration: .ephemeral)
+            var request = URLRequest(url: try #require(URL(string: "http://127.0.0.1:\(port)/")))
+            request.httpMethod = "POST"
+
+            let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
+            continuation.yield(Internals.Bytes(Data("payload".utf8)))
+            continuation.finish()
+
+            let responseTask = _Concurrency.Task {
+                try await client.execute(request: request, streaming: stream)
+            }
+
+            // Gives the request a moment to actually reach the (unresponsive) server before
+            // cancelling, so this exercises a genuine in-flight cancellation rather than one
+            // that races the connection attempt itself.
+            try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+            #expect(client.isRunning)
+
+            responseTask.cancel()
+
+            await #expect(throws: (any Error).self) {
+                _ = try await responseTask.value
+            }
+
+            // `didCompleteWithError:` releases the operation-queue slot asynchronously, so poll
+            // briefly rather than asserting immediately after `cancel()` returns.
+            var stillRunning = client.isRunning
+            for _ in 0..<50 where stillRunning {
+                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
+                stillRunning = client.isRunning
+            }
+            #expect(!stillRunning)
+        }
+    }
+
+    /// Same regression as the two tests above, for `execute(request:readingMode:delegate:)` (the
+    /// standalone streamed-download overload). Also missing `withTaskCancellationHandler`
+    /// entirely: cancelling the caller's `Task` while it awaited the response head left both the
+    /// `URLSessionTask` and the throttle slot acquired at the top of the method (only ever
+    /// released from `onDownloadComplete`, which a leaked task never reaches) stuck.
+    @Test
+    func execute_whenStreamedDownloadTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows() async throws {
+        try await withHangingURLSessionTestServer { port in
+            let client = try Internals.URLSessionClient(configuration: .ephemeral)
+            let url = try #require(URL(string: "http://127.0.0.1:\(port)/"))
+
+            let responseTask = _Concurrency.Task {
+                try await client.execute(request: URLRequest(url: url), readingMode: .length(1_024))
+            }
+
+            // Gives the request a moment to actually reach the (unresponsive) server before
+            // cancelling, so this exercises a genuine in-flight cancellation rather than one
+            // that races the connection attempt itself.
+            try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+            #expect(client.isRunning)
+
+            responseTask.cancel()
+
+            await #expect(throws: (any Error).self) {
+                _ = try await responseTask.value
+            }
+
+            // `didCompleteWithError:` releases the operation-queue slot asynchronously, so poll
+            // briefly rather than asserting immediately after `cancel()` returns.
+            var stillRunning = client.isRunning
+            for _ in 0..<50 where stillRunning {
+                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
+                stillRunning = client.isRunning
+            }
+            #expect(!stillRunning)
+        }
+    }
 }
 
 /// Test-only stand-in for the real client's own TLS challenge handling; see the identical
