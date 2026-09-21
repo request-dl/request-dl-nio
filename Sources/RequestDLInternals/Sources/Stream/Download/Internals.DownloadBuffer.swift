@@ -27,6 +27,13 @@ extension Internals {
             private let queue = AsyncQueue(priority: .utility)
             private let readingMode: Internals.DownloadStep.ReadingMode
 
+            // The Knuth-Morris-Pratt "longest proper prefix that's also a suffix" table for the
+            // separator, computed once up front. It lets `_appendBySeparator` backtrack a failed
+            // match in O(1) amortized per incoming byte instead of rebuilding a candidate window
+            // with an O(separator.count) shift on every single byte. Empty when the reading mode
+            // isn't `.separator`.
+            private let separatorLPS: [Int]
+
             // MARK: - Unsafe properties
 
             // Touched only from inside a queue operation. The queue serializes them and
@@ -34,17 +41,24 @@ extension Internals {
             private var _buffer: DataBuffer?
             private var _cacheStream: Internals.AsyncStream<DataBuffer>?
 
-            // Trailing bytes of the current chunk, at most `separator.count` of them.
+            // How many leading bytes of the separator are currently matched against the tail of
+            // what's been scanned so far (the KMP automaton's current state).
             //
-            // It has to survive across calls: a separator can straddle two network packets,
-            // and a window rebuilt per call would never match one that does.
-            private var _window = [UInt8]()
+            // It has to survive across calls: a separator can straddle two network packets, and
+            // restarting the scan at zero on every call would never match one that does.
+            private var _matchLength = 0
 
             // MARK: - Inits
 
             package init(readingMode: Internals.DownloadStep.ReadingMode) async {
                 self._buffer = await DataBuffer()
                 self.readingMode = readingMode
+
+                if case .separator(let separator) = readingMode {
+                    self.separatorLPS = Self.computeLPS(separator)
+                } else {
+                    self.separatorLPS = []
+                }
 
                 // The body is buffered until somebody starts reading it, which covers both the
                 // live path, where bytes arrive long before the caller reaches for them, and
@@ -159,13 +173,17 @@ extension Internals {
                 var start = incoming.startIndex
 
                 for index in incoming.indices {
-                    _window.append(incoming[index])
+                    let byte = incoming[index]
 
-                    if _window.count > separator.count {
-                        _window.removeFirst()
+                    while _matchLength > 0, byte != separator[_matchLength] {
+                        _matchLength = separatorLPS[_matchLength - 1]
                     }
 
-                    guard _window == separator else {
+                    if byte == separator[_matchLength] {
+                        _matchLength += 1
+                    }
+
+                    guard _matchLength == separator.count else {
                         continue
                     }
 
@@ -173,12 +191,41 @@ extension Internals {
                     start = incoming.index(after: index)
 
                     await _emit(&buffer)
-                    _window.removeAll(keepingCapacity: true)
+                    _matchLength = 0
                 }
 
                 if start < incoming.endIndex {
                     await buffer.writeBytes(Array(incoming[start...]))
                 }
+            }
+
+            /// Precomputes the KMP failure table for `pattern`: `lps[i]` is the length of the
+            /// longest proper prefix of `pattern[0...i]` that's also a suffix of it, which is
+            /// exactly how far a failed match can safely fall back to without skipping a
+            /// possible earlier match.
+            private static func computeLPS(_ pattern: [UInt8]) -> [Int] {
+                guard !pattern.isEmpty else {
+                    return []
+                }
+
+                var lps = [Int](repeating: 0, count: pattern.count)
+                var length = 0
+                var i = 1
+
+                while i < pattern.count {
+                    if pattern[i] == pattern[length] {
+                        length += 1
+                        lps[i] = length
+                        i += 1
+                    } else if length != 0 {
+                        length = lps[length - 1]
+                    } else {
+                        lps[i] = 0
+                        i += 1
+                    }
+                }
+
+                return lps
             }
 
             /// Dispatches the accumulated bytes as one chunk and resets the buffer.
@@ -202,7 +249,7 @@ extension Internals {
                 }
 
                 self._buffer = nil
-                _window.removeAll()
+                _matchLength = 0
 
                 stream.close()
                 _cacheStream?.close()
@@ -210,7 +257,7 @@ extension Internals {
 
             private func _failed(_ error: Error) {
                 _buffer = nil
-                _window.removeAll()
+                _matchLength = 0
 
                 _dispatch(.failure(error))
             }

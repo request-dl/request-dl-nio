@@ -159,6 +159,67 @@ struct InternalsDownloadBufferTests {
         #expect(receivedBytes == expectedBytes)
     }
 
+    // Regression test for the KMP-based separator scan: "aab" against "aaab" forces a failed
+    // match at index 2 (`aa` + `a` != `aab`'s 3rd byte `b`) that must fall back to a partial
+    // match of length 1 (not reset straight to 0), or the following "ab" would be missed and
+    // the whole input would come back as one unsplit chunk instead of two.
+    @Test
+    func download_whenSeparatorHasARepeatingPrefix_backtracksInsteadOfMissingTheMatch() async throws {
+        // Given
+        let separator = Data("aab".utf8)
+        let input = Data("aaab".utf8)
+
+        let download = await Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
+
+        // When
+        await download.append(Internals.DataBuffer(input))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(
+            logger: nil,
+            totalSize: input.count,
+            stream: download.stream
+        )
+
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = await Array(input).split(separator: Array(separator))
+
+        #expect(receivedBytes == expectedBytes)
+    }
+
+    // A multi-byte separator split across two `append` calls right in the middle of a match:
+    // the first call ends mid-separator, and the streaming match state has to carry over to
+    // the second call for the split to still be found.
+    @Test
+    func download_whenMultiByteSeparatorStraddlesTwoAppends_stillSplits() async throws {
+        // Given
+        let separator = Data("--boundary".utf8)
+
+        let line1 = Data("first--bound".utf8)
+        let line2 = Data("ary,second".utf8)
+
+        let download = await Internals.DownloadBuffer(readingMode: .separator(Array(separator)))
+
+        // When
+        await download.append(Internals.DataBuffer(line1))
+        await download.append(Internals.DataBuffer(line2))
+        download.close()
+
+        // Then
+        let parts = line1 + line2
+        let bytes = Internals.AsyncBytes(
+            logger: nil,
+            totalSize: parts.count,
+            stream: download.stream
+        )
+
+        let receivedBytes = try await Array(bytes)
+        let expectedBytes = await Array(parts).split(separator: Array(separator))
+
+        #expect(receivedBytes == expectedBytes)
+    }
+
     @Test
     func download_whenEmpty_shouldBeEmpty() async throws {
         // Given

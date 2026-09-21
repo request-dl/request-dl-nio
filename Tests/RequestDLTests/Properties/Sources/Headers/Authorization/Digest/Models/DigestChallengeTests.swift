@@ -105,4 +105,31 @@ struct DigestChallengeTests {
         // Then
         #expect(challenge.opaque == "left,right")
     }
+
+    // A malicious/compromised server could otherwise smuggle a `"` (breaking the quoted
+    // parameter this value is echoed back into by `DigestResponse.header(for:...)`) or a CR/LF
+    // (classic header-splitting shape) into the client's own follow-up `Authorization` header.
+    @Test
+    func init_whenNonceContainsAQuote_isNil() {
+        let header = #"Digest realm="test", nonce="abc"123""#
+        #expect(DigestChallenge(headerValue: header) == nil)
+    }
+
+    @Test
+    func init_whenRealmContainsCRLF_isNil() {
+        let header = "Digest realm=\"evil\r\nX-Injected: 1\", nonce=\"abc123\""
+        #expect(DigestChallenge(headerValue: header) == nil)
+    }
+
+    @Test
+    func init_whenOpaqueContainsAQuote_isNil() {
+        let header = #"Digest realm="test", nonce="abc123", opaque="a"b""#
+        #expect(DigestChallenge(headerValue: header) == nil)
+    }
+
+    @Test
+    func init_whenOpaqueContainsCRLF_isNil() {
+        let header = "Digest realm=\"test\", nonce=\"abc123\", opaque=\"a\r\nX-Injected: 1\""
+        #expect(DigestChallenge(headerValue: header) == nil)
+    }
 }

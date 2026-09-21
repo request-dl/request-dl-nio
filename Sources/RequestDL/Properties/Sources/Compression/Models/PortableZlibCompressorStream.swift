@@ -33,6 +33,15 @@ import struct Foundation.Data
 /// too, letting two independent-looking values alias the same zlib state and free it out from
 /// under each other the moment either one's `finish()` runs `deflateEnd`. Same discipline
 /// `ZeroingBytes` uses for its own manually-managed buffer.
+///
+/// - Note: `@unchecked Sendable` with no internal lock, unlike most other mutable state in this
+/// package: `strm`/`chunk`/`isOpen` are never actually touched from more than one thread at a
+/// time. `Compressor.callAsFunction()`'s own contract creates exactly one fresh stream per
+/// request (never shared or reused across requests), and the only consumer,
+/// `Internals.CompressingByteSequence.AsyncIterator`, drives it from a single sequential
+/// `await`-separated loop within one `Task`. Structured concurrency's happens-before guarantee
+/// across that `Task`'s suspension points is what makes the lack of a lock safe, not an
+/// oversight — add a second concurrent driver and this stops being true.
 final class PortableZlibCompressorStream: @unchecked Sendable {
 
     // MARK: - Private static properties
