@@ -143,6 +143,36 @@ extension Internals {
                 .contains { $0.lowercased() == "no-store" }
         }
 
+        /// Whether the outgoing request carries an `Authorization` header.
+        ///
+        /// `DataCache` keys entries by URL alone, and is commonly a single, process-wide store
+        /// (`DataCache.shared`). Without this check, an app where more than one account can be
+        /// signed in over the app's lifetime (sign out, a different user signs in) could serve
+        /// one account's cached, authenticated response to another: nothing here folds the
+        /// request's own credentials into the cache key, or a `Vary` response header, the way a
+        /// browser's shared cache would.
+        private var requestCarriesCredentials: Bool {
+            !(requestConfiguration.headers["Authorization"] ?? []).isEmpty
+        }
+
+        /// Whether the response's own `Cache-Control` explicitly permits a cache to store a
+        /// response to a credentialed (`Authorization`-bearing) request, per RFC 7234 §3.2:
+        /// `must-revalidate`, `public`, or `s-maxage` are the only directives the RFC recognizes
+        /// as having that effect. Absent one of these, storing at all is what the RFC forbids —
+        /// unlike `no-store`/`no-cache`, there is no directive that must be *present* to trigger
+        /// this; the request having `Authorization` at all is what does.
+        private func permitsCachingCredentialedResponse(headers: [String]) -> Bool {
+            for directive in directives(headers) {
+                let directive = directive.lowercased()
+
+                if directive == "public" || directive == "must-revalidate" || directive.hasPrefix("s-maxage=") {
+                    return true
+                }
+            }
+
+            return false
+        }
+
         private func checkIfCachedDataStillValid(
             client: any RequestExecutingClient,
             cached cachedData: CachedData
@@ -381,7 +411,9 @@ extension Internals {
 
                 guard
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
-                    !requestForbidsStoring
+                    !requestForbidsStoring,
+                    !requestCarriesCredentials
+                        || permitsCachingCredentialedResponse(headers: headHeaders["Cache-Control"] ?? [])
                 else {
                     return nil
                 }

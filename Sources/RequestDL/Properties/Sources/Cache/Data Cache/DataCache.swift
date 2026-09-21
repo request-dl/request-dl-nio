@@ -146,6 +146,10 @@ public struct DataCache: Sendable, Equatable {
         /// overcount that triggers one avoidable rescan next time. See #271.
         private var _diskUsageEstimate: Int64?
 
+        /// Same role as `_diskUsageEstimate`, for `MemoryStorage.freeSpace(_:knownUsage:)`. See
+        /// that method's doc for the safety argument.
+        private var _memoryUsageEstimate: Int64?
+
         // MARK: - Internal methods
 
         /// Mutates the memory tier inside a single critical section.
@@ -159,6 +163,41 @@ public struct DataCache: Sendable, Equatable {
         /// storage from inside `body`, including the capacities.
         func withMemoryStorage<Output>(_ body: (inout MemoryStorage) -> Output) -> Output {
             lock.withLock { body(&_memoryStorage) }
+        }
+
+        /// Allocates a memory buffer's backing store, reusing `_memoryUsageEstimate` so a write
+        /// nowhere near capacity can skip `MemoryStorage.freeSpace`'s scan. See that method and
+        /// `_memoryUsageEstimate`'s doc for the safety argument behind reusing this estimate.
+        ///
+        /// Fully synchronous, unlike `allocateDiskBuffer`'s two-part split: `MemoryStorage`'s own
+        /// `allocateBuffer` cannot `await` either (see its doc comment), so reading capacity/
+        /// usage, mutating storage, and writing the fresh usage estimate back all happen in one
+        /// lock acquisition here.
+        func allocateMemoryDataURL(
+            key: String,
+            cachedResponse: CachedResponse,
+            contentLength: Int64
+        ) -> Internals.ByteURL? {
+            lock.withLock {
+                let (dataURL, usage) = _memoryStorage.allocateBuffer(
+                    key: key,
+                    cachedResponse: cachedResponse,
+                    contentLength: contentLength,
+                    maximumCapacity: _memoryCapacity,
+                    knownUsage: _memoryUsageEstimate
+                )
+
+                guard let dataURL else {
+                    // The memory tier turned the new entry down, usually for size. Dropping
+                    // whatever was there keeps `getCachedData` from serving it in front of a
+                    // disk entry that is about to be updated.
+                    _memoryStorage.remove(key)
+                    return nil
+                }
+
+                _memoryUsageEstimate = usage
+                return dataURL
+            }
         }
 
         /// Allocates a disk buffer, reusing `_diskUsageEstimate` so a write nowhere near
@@ -536,42 +575,24 @@ public struct DataCache: Sendable, Equatable {
 
         let key = base64EncodedKey(key)
 
-        // Read before entering the critical section below: the lock is not reentrant, and
-        // these getters take it.
-        let memoryCapacity = self.memoryCapacity
-
         var memoryBuffer: Internals.AnyBuffer?
+        var memoryDataURL: Internals.ByteURL?
         var diskBuffer: Internals.AnyBuffer?
         var diskRecordURL: URL?
 
         if cachedResponse.policy.contains(.memory) {
-            // Two steps, and they have to be two.
-            //
-            // `withMemoryStorage` hands out an `inout` from inside a non reentrant lock, so its
-            // closure is synchronous and cannot await. The reservation below is pure
-            // bookkeeping and belongs there; opening a buffer over the result is asynchronous
-            // and belongs outside, which also keeps the lock from being held across it.
-            let dataURL = storage.withMemoryStorage { memoryStorage -> Internals.ByteURL? in
-                guard
-                    let dataURL = memoryStorage.allocateBuffer(
-                        key: key,
-                        cachedResponse: cachedResponse,
-                        contentLength: contentLength,
-                        maximumCapacity: memoryCapacity
-                    )
-                else {
-                    // The memory tier turned the new entry down, usually for size. Dropping
-                    // whatever was there keeps `getCachedData` from serving it in front of a
-                    // disk entry that is about to be updated.
-                    memoryStorage.remove(key)
-                    return nil
-                }
+            // Bookkeeping (reservation, usage-estimate update) happens inside
+            // `allocateMemoryDataURL`'s own lock acquisition; opening a buffer over the result is
+            // asynchronous and belongs outside it, which also keeps the lock from being held
+            // across that.
+            memoryDataURL = storage.allocateMemoryDataURL(
+                key: key,
+                cachedResponse: cachedResponse,
+                contentLength: contentLength
+            )
 
-                return dataURL
-            }
-
-            if let dataURL {
-                memoryBuffer = await Internals.DataBuffer(dataURL)
+            if let memoryDataURL {
+                memoryBuffer = await Internals.DataBuffer(memoryDataURL)
             }
         }
 
@@ -586,7 +607,8 @@ public struct DataCache: Sendable, Equatable {
         return .init(
             memoryBuffer: memoryBuffer,
             diskBuffer: diskBuffer,
-            diskRecordURL: diskRecordURL
+            diskRecordURL: diskRecordURL,
+            memoryDataURL: memoryDataURL
         )
     }
 
@@ -603,11 +625,17 @@ public struct DataCache: Sendable, Equatable {
     /// permanently missing. This method instead targets `buffer.diskRecordURL` — the exact
     /// directory captured at allocation time — so it finds and deletes precisely the write that
     /// failed, without searching by key and risking an unrelated, still in-progress write to the
-    /// same key from a concurrent request.
+    /// same key from a concurrent request. `buffer.memoryDataURL` gives the memory tier the same
+    /// precision: `MemoryStorage.remove(_:ifDataURL:)` only removes `key`'s record when it is
+    /// still the exact one this write allocated, so a concurrent write to the same key that has
+    /// since installed its own (good, current) record is left alone instead of being deleted out
+    /// from under it.
     func discardFailedWrite(_ buffer: Buffer, forKey key: String) async {
         let key = base64EncodedKey(key)
 
-        storage.withMemoryStorage { $0.remove(key) }
+        if let memoryDataURL = buffer.memoryDataURL {
+            storage.withMemoryStorage { $0.remove(key, ifDataURL: memoryDataURL) }
+        }
 
         if let diskRecordURL = buffer.diskRecordURL {
             await storage.diskStorage.removeRecord(at: diskRecordURL)
