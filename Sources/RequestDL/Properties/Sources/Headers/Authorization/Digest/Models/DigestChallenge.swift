@@ -56,9 +56,23 @@ struct DigestChallenge: Sendable, Hashable {
             return nil
         }
 
+        let opaque = parameters["opaque"]
+
+        // `realm`, `nonce`, and `opaque` are server-chosen and get echoed back, unescaped, into
+        // the client's own `Authorization` header by `DigestResponse.header(for:...)`. A `"`
+        // would break out of that header's quoted-parameter syntax, and a CR/LF would enable
+        // header injection — reject the whole challenge rather than forward either downstream.
+        guard
+            Self.isSafeQuotedValue(realm),
+            Self.isSafeQuotedValue(nonce),
+            opaque.map(Self.isSafeQuotedValue) ?? true
+        else {
+            return nil
+        }
+
         self.realm = realm
         self.nonce = nonce
-        self.opaque = parameters["opaque"]
+        self.opaque = opaque
         self.algorithm = algorithm
         self.hasAuthQop = Self.splitTopLevel(Substring(parameters["qop"] ?? ""), separator: ",")
             .contains { $0.trimming(where: \.isWhitespace) == "auth" }
@@ -91,5 +105,15 @@ struct DigestChallenge: Sendable, Hashable {
 
         parts.append(string[start...])
         return parts
+    }
+
+    /// Whether `value` can be safely written back inside a `name="value"` header parameter:
+    /// no quote to break out of it, no CR/LF to split the header into another one.
+    ///
+    /// Checked over `unicodeScalars`, not `Character`: `"\r\n"` collapses into a single
+    /// `Character` grapheme cluster, which would otherwise slip past a scalar-by-scalar
+    /// comparison written against `Character` literals `"\r"`/`"\n"`.
+    private static func isSafeQuotedValue(_ value: String) -> Bool {
+        !value.unicodeScalars.contains(where: { $0 == "\"" || $0 == "\r" || $0 == "\n" })
     }
 }
