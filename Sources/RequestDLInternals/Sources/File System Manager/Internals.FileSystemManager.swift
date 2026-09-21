@@ -8,6 +8,7 @@ import NIOFileSystem
 import NIOPosix
 #else
 import Foundation
+import SwiftAsyncStream
 #endif
 
 extension Internals {
@@ -130,7 +131,11 @@ private final class PortableBlockingPool: @unchecked Sendable {
     // MARK: - Private properties
 
     private let condition = NSCondition()
-    private var workItems: [() -> Void] = []
+    // `FIFOQueue`, not `Array`: a plain array's `removeFirst()` shifts every remaining item on
+    // every dequeue, so a queue depth of N costs O(N) per dequeue (O(N²) to drain a burst) while
+    // every competing thread holds `condition`'s lock doing that shifting. `FIFOQueue` dequeues
+    // in amortized O(1) instead.
+    private var workItems = FIFOQueue<() -> Void>()
 
     // MARK: - Inits
 
@@ -179,7 +184,14 @@ private final class PortableBlockingPool: @unchecked Sendable {
                 condition.wait()
             }
 
-            let workItem = workItems.removeFirst()
+            // `isEmpty` was just checked under this same lock, with no unlock in between, so
+            // this always has an element -- but `popFirst()` returning `nil` is a checkable
+            // condition already, so there's no reason to trap on it instead of just looping back
+            // to wait again like a spurious wakeup would.
+            guard let workItem = workItems.popFirst() else {
+                condition.unlock()
+                continue
+            }
             condition.unlock()
 
             workItem()

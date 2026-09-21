@@ -92,7 +92,14 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
         _ source: Internals.AsyncStream<Internals.DataBuffer>,
         using algorithm: any Internals.DecompressionAlgorithm
     ) -> Internals.AsyncStream<Internals.DataBuffer> {
-        let output = Internals.AsyncStream<Internals.DataBuffer>()
+        // `.untilFirstIteration`, not the default `.unbounded`: `output` is read exactly once,
+        // by the single downstream consumer this decompressed stream is built for, the same way
+        // `Internals.DownloadBuffer.stream` is. `.unbounded` retains every chunk for the life of
+        // the stream (see `ReplaySubject`'s own doc), which for a large compressed download (the
+        // `.brotli` fallback under `.nio`, or any custom `Decompressor`) meant the entire
+        // decompressed body stayed resident in memory even after being read, defeating the
+        // point of streaming it in the first place.
+        let output = Internals.AsyncStream<Internals.DataBuffer>(bufferingPolicy: .untilFirstIteration)
 
         _Concurrency.Task {
             do {

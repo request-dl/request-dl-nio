@@ -237,22 +237,32 @@ extension Internals {
                 onUploadProgress: onUploadProgress
             )
 
+            let box = CancellableTaskBox()
+
             do {
-                let result = try await withCheckedThrowingContinuation { continuation in
-                    taskDelegate.completion = { continuation.resume(with: $0) }
+                // Mirrors `execute(request:delegate:)`'s `CancellableTaskBox` use: without it, a
+                // caller's `Task` cancellation while this continuation is suspended would never
+                // reach the underlying `URLSessionTask`, leaving the upload running unnoticed.
+                let result = try await withTaskCancellationHandler {
+                    try await withCheckedThrowingContinuation { continuation in
+                        taskDelegate.completion = { continuation.resume(with: $0) }
 
-                    let task: URLSessionTask
-                    switch materialized {
-                    case .data(let data):
-                        task = session.uploadTask(with: request, from: data)
-                    case .file(let bufferURL):
-                        task = session.uploadTask(with: request, fromFile: bufferURL.absoluteURL())
-                    case .existingFile(let url):
-                        task = session.uploadTask(with: request, fromFile: url)
+                        let task: URLSessionTask
+                        switch materialized {
+                        case .data(let data):
+                            task = session.uploadTask(with: request, from: data)
+                        case .file(let bufferURL):
+                            task = session.uploadTask(with: request, fromFile: bufferURL.absoluteURL())
+                        case .existingFile(let url):
+                            task = session.uploadTask(with: request, fromFile: url)
+                        }
+
+                        task.delegate = taskDelegate
+                        box.task = task
+                        task.resume()
                     }
-
-                    task.delegate = taskDelegate
-                    task.resume()
+                } onCancel: {
+                    box.cancel()
                 }
 
                 if case .file(let bufferURL) = materialized {
@@ -314,12 +324,23 @@ extension Internals {
                 }
             )
 
-            return try await withCheckedThrowingContinuation { continuation in
-                taskDelegate.headCompletion = { continuation.resume(with: $0) }
+            let box = CancellableTaskBox()
 
-                let task = session.dataTask(with: request)
-                task.delegate = taskDelegate
-                task.resume()
+            // Same reasoning as `execute(request:delegate:)`: a bare continuation has no
+            // cancellation handling of its own, so without this, cancelling the calling `Task`
+            // while it's suspended here would leave the `URLSessionTask` (and the throttle slot
+            // held above, only released from `onDownloadComplete`) running unnoticed.
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    taskDelegate.headCompletion = { continuation.resume(with: $0) }
+
+                    let task = session.dataTask(with: request)
+                    task.delegate = taskDelegate
+                    box.task = task
+                    task.resume()
+                }
+            } onCancel: {
+                box.cancel()
             }
         }
 

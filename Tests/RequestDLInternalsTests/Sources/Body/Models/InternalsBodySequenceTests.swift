@@ -203,6 +203,34 @@ struct InternalsBodySequenceTests {
         #expect(chunks.resolveData().reduce(Data(), +) == data)
     }
 
+    /// Regression test for `AsyncIterator.next()` dropping consumed buffers with
+    /// `Array.removeFirst()`, which shifts every remaining element on every call -- O(*n*) per
+    /// drop, O(*n*²) over a body assembled from many small parts, exactly the shape a multipart
+    /// form with many fields produces (`FormGroupBuilder` emits several tiny buffers per field).
+    /// This doesn't assert on timing (flaky under CI load), but a few thousand one-byte buffers
+    /// still exercises the same index-advancing path a shift-based implementation would have paid
+    /// quadratic cost walking, while asserting the fix didn't change what comes out the other
+    /// end: every byte, in order, nothing dropped or duplicated.
+    @Test
+    func bodySequence_whenManySmallBuffers_streamsEveryByteInOrder() async throws {
+        // Given
+        let byteCount = 4_096
+        var buffers: [Internals.AnyBuffer] = []
+        for value in 0..<byteCount {
+            buffers.append(await Internals.DataBuffer(Data([UInt8(value % 256)])))
+        }
+
+        let bodySequence = makeBodySequence(chunkSize: 1024, buffers)
+
+        // When
+        let sequence = try await Array(bodySequence).resolveData()
+        let combined = sequence.reduce(Data(), +)
+
+        // Then
+        let expecting = Data((0..<byteCount).map { UInt8($0 % 256) })
+        #expect(combined == expecting)
+    }
+
     @Test
     func bodySequence_whenSingleUnreadFileBuffer_wholeFileURLReturnsThatFile() async throws {
         // Given

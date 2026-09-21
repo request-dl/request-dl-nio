@@ -191,7 +191,7 @@ extension Internals {
                 certificateVerification: descriptor.verification.internalValue,
                 spkiPins: (descriptor.spkiPinning?.pins ?? []).map { pin in
                     Internals.ResolvedSPKIPin { spkiDERBytes in
-                        Self.digest(spkiDERBytes, algorithm: pin.algorithm) == pin.digest
+                        Self.constantTimeEquals(Self.digest(spkiDERBytes, algorithm: pin.algorithm), pin.digest)
                     }
                 },
                 spkiPinningIsStrict: descriptor.spkiPinning?.policy == .strict,
@@ -344,6 +344,22 @@ extension Internals {
             case .sha384: return Data(SHA384.hash(data: data))
             case .sha512: return Data(SHA512.hash(data: data))
             }
+        }
+
+        /// Same rationale and shape as `Internals.SPKIHash.matchesSPKI`: a length or byte
+        /// mismatch here should not be distinguishable by timing from a match. This rebuilt-
+        /// after-relaunch path used to compare with plain `Data.==`, which bails out on the
+        /// first differing byte instead.
+        private static func constantTimeEquals(_ lhs: Data, _ rhs: Data) -> Bool {
+            guard lhs.count == rhs.count else {
+                return false
+            }
+
+            var difference: UInt8 = 0
+            for (byte1, byte2) in zip(lhs, rhs) {
+                difference |= byte1 ^ byte2
+            }
+            return difference == 0
         }
 
     }
