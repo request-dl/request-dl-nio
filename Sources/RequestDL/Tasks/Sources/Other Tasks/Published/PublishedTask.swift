@@ -42,9 +42,12 @@ public struct PublishedTask<Output: Sendable>: Publisher {
 
                 _task = _Concurrency.Task {
                     do {
-                        _ = subscriber.receive(try await wrapper())
+                        let value = try await wrapper()
+                        guard !_Concurrency.Task.isCancelled else { return }
+                        _ = subscriber.receive(value)
                         subscriber.receive(completion: .finished)
                     } catch {
+                        guard !_Concurrency.Task.isCancelled else { return }
                         subscriber.receive(completion: .failure(error))
                     }
                 }
@@ -52,10 +55,14 @@ public struct PublishedTask<Output: Sendable>: Publisher {
         }
 
         func cancel() {
-            lock.withLock {
+            let task = lock.withLock { () -> _Concurrency.Task<Void, Never>? in
+                let task = _task
                 _subscriber = nil
                 _task = nil
+                return task
             }
+
+            task?.cancel()
         }
     }
 

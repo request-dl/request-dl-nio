@@ -133,6 +133,37 @@ struct PublishedTaskTests {
         cancellable.cancel()
     }
 
+    // Regression test: `Subscription.cancel()` used to only drop the `_task`/`_subscriber`
+    // references without calling `_task?.cancel()`. Dropping a `_Concurrency.Task` handle does
+    // not cancel it, so the wrapped request kept running to completion, and the subscriber —
+    // captured directly by the task's closure, not through `_subscriber` — still received a
+    // late value/completion after the subscription had already been cancelled, violating
+    // Combine's `Subscription.cancel()` contract.
+    @Test
+    func cancelStopsDeliveryOfAnInFlightRequest() async throws {
+        // Given
+        let valueReceived = InlineProperty(wrappedValue: false)
+        let completionReceived = InlineProperty(wrappedValue: false)
+
+        let cancellable = MockedTask(delay: .milliseconds(200)) {
+            BaseURL("localhost")
+        }
+        .collectData()
+        .publisher()
+        .sink(
+            receiveCompletion: { _ in completionReceived.wrappedValue = true },
+            receiveValue: { _ in valueReceived.wrappedValue = true }
+        )
+
+        // When
+        cancellable.cancel()
+        try await _Concurrency.Task.sleep(nanoseconds: 400_000_000)
+
+        // Then
+        #expect(!valueReceived.wrappedValue)
+        #expect(!completionReceived.wrappedValue)
+    }
+
     // Exercises the `guard let subscriber else { return }` branch in
     // `PublishedTask.Subscription.request(_:)`: a subscriber that cancels its subscription
     // before ever requesting demand leaves `_subscriber` `nil`, so the follow-up `request(_:)`
