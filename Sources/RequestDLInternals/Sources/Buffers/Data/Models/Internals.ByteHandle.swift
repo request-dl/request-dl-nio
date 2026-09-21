@@ -175,12 +175,12 @@ extension Internals {
             }
         }
 
+        /// - Note: Closing twice is a no-op rather than an error, matching
+        /// ``Internals/FileStreamBuffer``'s own contract for the same reason: a caller working
+        /// generically against ``StreamBuffer`` should not have to know which concrete backend
+        /// it got before deciding whether a second `close()` is safe.
         package func close() throws {
-            try lock.withLockVoid {
-                guard !_isClosed else {
-                    throw ClosedError()
-                }
-
+            lock.withLockVoid {
                 _isClosed = true
             }
         }

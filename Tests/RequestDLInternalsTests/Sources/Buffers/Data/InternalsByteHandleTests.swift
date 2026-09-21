@@ -88,21 +88,14 @@ struct InternalsByteHandleTests {
         #expect(description.contains("reading"))
     }
 
+    // Matches `Internals.FileStreamBuffer.close()`'s documented contract: a caller working
+    // generically against `StreamBuffer` should not have to know which concrete backend it
+    // got before deciding whether a second `close()` is safe.
     @Test
-    func close_afterClose_throwsClosedErrorWithDescription() throws {
+    func close_afterClose_isANoOp() throws {
         let handle = Internals.ByteHandle(forWritingTo: .init())
         try handle.close()
-
-        var thrownError: Error?
-
-        do {
-            try handle.close()
-        } catch {
-            thrownError = error
-        }
-
-        let description = thrownError.map(String.init(describing:)) ?? ""
-        #expect(description.contains("already been closed"))
+        try handle.close()
     }
 
     @Test
