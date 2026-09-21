@@ -386,7 +386,9 @@ extension Internals {
                     return nil
                 }
 
-                let contentLength = contentLength(headers: headHeaders["Content-Length"] ?? [])
+                // A capacity hint for the allocation below, not a correctness check, so `0` is a
+                // fine stand-in when the header is absent.
+                let contentLength = contentLength(headers: headHeaders["Content-Length"] ?? []) ?? 0
 
                 // Read exactly once, by the task below. Buffering until that read begins
                 // covers the hop it takes to get going, and from then on only the gap between
@@ -448,9 +450,21 @@ extension Internals {
         private func isCachedDataValid(_ cachedData: CachedData) -> Bool {
             let headers = cachedData.response.headers
 
-            let contentLength = contentLength(headers: headers["Content-Length"] ?? [])
-
-            if cachedData.buffer.readableBytes != contentLength {
+            // The cached byte count is only checked against `Content-Length` when that check can
+            // mean something. `Content-Length` is absent entirely for chunked transfer and most
+            // HTTP/2 responses, leaving nothing valid to compare against. `Content-Encoding`
+            // present means the cached bytes are already decompressed, while `Content-Length`
+            // still reflects the compressed size on the wire (see `Internals.Client.swift`: the
+            // header survives decompression under both `.nio` and `.urlSession`).
+            //
+            // Skipping the check in these cases trades away its only defense against a body
+            // truncated by something other than a stream error (already handled by the write
+            // path's own error handling). That's an acceptable trade: the alternative was every
+            // chunked or compressed response permanently missing the cache.
+            if let contentLength = contentLength(headers: headers["Content-Length"] ?? []),
+                (headers["Content-Encoding"] ?? []).isEmpty,
+                cachedData.buffer.readableBytes != contentLength
+            {
                 return false
             }
 
@@ -495,10 +509,12 @@ extension Internals {
             return false
         }
 
-        private func contentLength(headers: [String]) -> Int {
+        /// `nil` when no `Content-Length` directive is present at all (chunked transfer, most
+        /// HTTP/2 responses), distinct from a genuine `Content-Length: 0`.
+        private func contentLength(headers: [String]) -> Int? {
             directives(headers)
                 .compactMap(Int.init)
-                .max() ?? .zero
+                .max()
         }
 
         /// The latest `Expires` date across the given values.

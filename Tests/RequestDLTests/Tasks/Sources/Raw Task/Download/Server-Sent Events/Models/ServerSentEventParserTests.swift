@@ -14,6 +14,45 @@ import struct Foundation.Data
 
 struct ServerSentEventParserTests {
 
+    /// Feeds one line across many small chunks and checks both that the content comes out
+    /// correct and that assembling it doesn't scale quadratically with the number of chunks.
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func feed_whenOneLineArrivesAcrossManySmallChunks_scalesLinearlyAndKeepsTheWholeLine() {
+        // Given: the first chunk carries the "data: " field prefix; every later chunk just keeps
+        // extending that same still-unterminated line, the same shape a long value streamed in
+        // small pieces (the default `ReadingMode` reads 1 KiB at a time) would take.
+        var parser = ServerSentEventParser()
+        let chunkCount = 3000
+        let chunkText = String(repeating: "a", count: 100)
+
+        // When
+        let clock = ContinuousClock()
+        let start = clock.now
+        #expect(parser.feed(Data("data: \(chunkText)".utf8)).isEmpty)
+        for _ in 1..<chunkCount {
+            #expect(parser.feed(Data(chunkText.utf8)).isEmpty)
+        }
+        let events = parser.feed(Data("\n\n".utf8))
+        let elapsed = clock.now - start
+
+        // Then: the whole line survived intact across all 3000 chunks...
+        #expect(
+            events == [
+                ServerSentEvent(
+                    id: nil,
+                    event: "message",
+                    data: String(repeating: "a", count: chunkCount * chunkText.count),
+                    retry: nil
+                )
+            ]
+        )
+        // ...and assembling it cost roughly `chunkCount` units of work, not `chunkCount²`. At
+        // ~300,000 bytes total this comfortably finishes in well under a second when scanning is
+        // linear.
+        #expect(elapsed < .seconds(2))
+    }
+
     @Test
     func feed_whenSingleFrameSentInOneChunk_shouldEmitEvent() {
         // Given

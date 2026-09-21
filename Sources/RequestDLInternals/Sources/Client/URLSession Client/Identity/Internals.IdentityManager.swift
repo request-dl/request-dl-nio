@@ -42,6 +42,18 @@ extension Internals {
     /// A build for a label and the teardown of that label's last surviving handle can therefore
     /// never interleave: one Keychain round trip (add or delete) always finishes before the next
     /// begins.
+    ///
+    /// That ordering alone isn't enough to make teardown safe, though. Swift zeroes a `weak var`
+    /// as soon as the referenced object's strong refcount hits zero, independently of `lock`,
+    /// before the dying `IdentityHandle`'s own `deinit` gets a chance to even ask for it. So a
+    /// second caller building for the same label can win the lock first, see the already-zeroed
+    /// weak reference, and register a brand new handle for that label before the original
+    /// handle's `release(label:)` ever runs.
+    ///
+    /// `release(label:)` only deletes the Keychain items, and only then clears the registry slot,
+    /// when nothing live is registered for the label at that point. That lets it tell "nobody
+    /// rebuilt while I was waiting for the lock" apart from "a new handle already owns this
+    /// label," and never delete out from under the latter.
     package final class IdentityManager: @unchecked Sendable {
         package static let shared = IdentityManager()
 
@@ -69,10 +81,21 @@ extension Internals {
             }
         }
 
-        /// Called once per `IdentityHandle.deinit`. Drops the (by now stale) registry entry and
-        /// removes both Keychain items `label` was built from.
+        /// Called once per `IdentityHandle.deinit`. Drops the registry entry and removes both
+        /// Keychain items `label` was built from, but only if nothing live is registered for
+        /// `label` right now.
+        ///
+        /// A concurrent `handle(for:build:)` call can have already rebuilt and registered a fresh
+        /// handle for the same label between this handle's weak reference zeroing and this call
+        /// actually acquiring `lock` (see this type's own doc comment). When that has happened,
+        /// the newer handle owns these Keychain items now, and this call must leave both the
+        /// registry slot and the Keychain alone.
         fileprivate func release(label: String) {
             lock.withLock {
+                guard live[label]?.value == nil else {
+                    return
+                }
+
                 live[label] = nil
 
                 #if os(macOS)

@@ -38,9 +38,13 @@ public struct ReadingMode: Property {
     ///
     /// Creates a reading mode with a fixed length for reading data.
     ///
-    /// - Parameter length: The fixed length of data to be read.
+    /// - Parameter length: The fixed length of data to be read. Must be greater than zero.
     ///
+    /// - Precondition: `length > 0`. A non-positive chunk size can never make progress: every
+    /// chunk would be silently discarded, and the request would complete with an empty body
+    /// instead of raising an error.
     public init(length: Int) {
+        precondition(length > 0, "ReadingMode(length:) requires length > 0; \(length) can never make progress.")
         mode = .length(length)
     }
 

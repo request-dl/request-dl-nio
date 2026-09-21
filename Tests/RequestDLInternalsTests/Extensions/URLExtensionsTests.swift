@@ -14,6 +14,14 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
+
 @Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct URLExtensionsTests {
 
@@ -45,5 +53,58 @@ struct URLExtensionsTests {
             // Then
             #expect(readBack == Data("second".utf8))
         }
+    }
+
+    /// `NIOFileSystem`'s own `permissions: FilePermissions? = nil` default falls back to
+    /// `.defaultsForRegularFile` (owner/group/other read, `0o644`), so a call site that doesn't
+    /// pass `.ownerReadWrite` explicitly creates a world-readable file. That's a real exposure on
+    /// Linux, where a request body or cached response headers spilling to a buffer file under
+    /// `/tmp` would then be readable by any other local user.
+    @Test
+    func writeCreatesAFileWithOwnerOnlyPermissions() async throws {
+        try await withTemporaryFileURL("payload.bin") { url in
+            // When
+            try await url.write(Data("hello world".utf8))
+
+            // Then
+            #expect(try posixPermissions(atPath: url.filePath.string) == 0o600)
+        }
+    }
+
+    @Test
+    func createPathIfNeededCreatesAFileWithOwnerOnlyPermissions() async throws {
+        try await withTemporaryFileURL("created.bin", createPath: false) { url in
+            // Given
+            #expect(await url.isReachable == false)
+
+            // When
+            try await url.createPathIfNeeded()
+
+            // Then
+            #expect(try posixPermissions(atPath: url.filePath.string) == 0o600)
+        }
+    }
+}
+
+extension URLExtensionsTests {
+
+    private struct StatError: Error {
+        let path: String
+        let errno: Int32
+    }
+
+    /// The file's mode bits, narrowed to the permission bits `chmod(2)` accepts (masking off the
+    /// file-type bits `stat` also reports in `st_mode`). Reads straight off the OS rather than
+    /// through `Internals.fileSystem`/`Internals.PortableFileSystem`, whose `Info` types don't
+    /// surface permissions at all. This needs to observe what actually landed on disk,
+    /// independent of either backend's own bookkeeping.
+    private func posixPermissions(atPath path: String) throws -> mode_t {
+        var info = stat()
+
+        guard stat(path, &info) == 0 else {
+            throw StatError(path: path, errno: errno)
+        }
+
+        return info.st_mode & 0o777
     }
 }

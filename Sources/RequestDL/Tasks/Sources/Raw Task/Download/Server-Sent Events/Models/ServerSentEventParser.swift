@@ -18,6 +18,11 @@ struct ServerSentEventParser {
     // MARK: - Private properties
 
     private var lineBuffer = Data()
+    /// How many leading bytes of `lineBuffer` have already been scanned for a line terminator
+    /// and confirmed to have none. Lets `extractLines(from:)` resume scanning where the previous
+    /// call left off instead of rescanning the whole buffer, keeping the total scan work for one
+    /// line linear in its length even when it arrives across many small chunks.
+    private var scannedPrefixLength = 0
     private var sawTrailingCR = false
 
     private var lastEventId: String?
@@ -47,6 +52,7 @@ struct ServerSentEventParser {
         if !lineBuffer.isEmpty {
             let line = String(decoding: lineBuffer, as: UTF8.self)
             lineBuffer.removeAll()
+            scannedPrefixLength = 0
 
             if let event = process(line: line) {
                 return event
@@ -72,12 +78,19 @@ struct ServerSentEventParser {
         lineBuffer.append(chunk)
 
         var lines: [String] = []
-        var searchIndex = lineBuffer.startIndex
+        // Where the line currently being assembled starts. Always `lineBuffer.startIndex` at the
+        // top of this call; only advances when a terminator is actually found.
+        var lineStart = lineBuffer.startIndex
+        // Where to resume searching for the next terminator. Distinct from `lineStart` whenever
+        // the pending line spans more than one `feed(_:)` call: the bytes in between were already
+        // scanned and confirmed terminator-free, but they're still part of the line's content
+        // once a terminator does turn up further along.
+        var searchStart = lineBuffer.index(lineBuffer.startIndex, offsetBy: scannedPrefixLength)
 
-        while let breakIndex = lineBuffer[searchIndex...].firstIndex(where: {
+        while let breakIndex = lineBuffer[searchStart...].firstIndex(where: {
             $0 == UInt8(ascii: "\r") || $0 == UInt8(ascii: "\n")
         }) {
-            lines.append(String(decoding: lineBuffer[searchIndex..<breakIndex], as: UTF8.self))
+            lines.append(String(decoding: lineBuffer[lineStart..<breakIndex], as: UTF8.self))
 
             var nextIndex = lineBuffer.index(after: breakIndex)
 
@@ -89,10 +102,14 @@ struct ServerSentEventParser {
                 }
             }
 
-            searchIndex = nextIndex
+            lineStart = nextIndex
+            searchStart = nextIndex
         }
 
-        lineBuffer.removeSubrange(lineBuffer.startIndex..<searchIndex)
+        lineBuffer.removeSubrange(lineBuffer.startIndex..<lineStart)
+        // The loop above already confirmed the remaining buffer holds no terminator, so the next
+        // call can resume searching from its end instead of rechecking it.
+        scannedPrefixLength = lineBuffer.count
         return lines
     }
 
