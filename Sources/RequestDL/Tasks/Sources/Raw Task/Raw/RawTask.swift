@@ -34,7 +34,13 @@ struct RawTask<Content: Property>: RequestTask {
 
         let deadline = Internals.ResourceDeadline(nanoseconds: resolved.session.configuration.timeout.resource)
 
-        try await waitForNetworkPath(resolved: resolved)
+        do {
+            try await deadline.race {
+                try await waitForNetworkPath(resolved: resolved)
+            }
+        } catch is Internals.ResourceTimeoutError {
+            throw ResourceTimeoutError()
+        }
 
         let logger = Internals.TaskLogger(
             baseURL: resolved.requestConfiguration.baseURL,

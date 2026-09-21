@@ -115,6 +115,55 @@ struct DigestResponseTests {
         #expect(get != post)
     }
 
+    /// Regression coverage for a caller-supplied `username` containing a `"`: unescaped, it
+    /// would break out of `username="..."`'s quoted-parameter syntax and let the rest of the
+    /// string inject bogus Digest directives into the client's own outgoing header.
+    @Test
+    func header_whenUsernameContainsQuote_escapesIt() throws {
+        // Given
+        let challenge = try #require(
+            DigestChallenge(headerValue: #"Digest realm="test", nonce="abc123""#)
+        )
+
+        // When
+        let header = DigestResponse.header(
+            for: challenge,
+            username: #"admin", nc="deadbeef", extra="pwn"#,
+            password: "pass",
+            method: "GET",
+            uri: "/resource"
+        )
+
+        // Then
+        #expect(header.contains(#"username="admin\", nc=\"deadbeef\", extra=\"pwn""#))
+        #expect(!header.contains(#"username="admin","#))
+    }
+
+    /// Regression coverage for a caller-supplied `username` containing CR/LF: unescapable inside
+    /// a `quoted-pair` (RFC 7230 §3.2.6), so it must be stripped rather than forwarded, the same
+    /// way `DigestChallenge.isSafeQuotedValue` treats it in server-sent fields.
+    @Test
+    func header_whenUsernameContainsCRLF_stripsIt() throws {
+        // Given
+        let challenge = try #require(
+            DigestChallenge(headerValue: #"Digest realm="test", nonce="abc123""#)
+        )
+
+        // When
+        let header = DigestResponse.header(
+            for: challenge,
+            username: "user\r\nX-Injected: true",
+            password: "pass",
+            method: "GET",
+            uri: "/resource"
+        )
+
+        // Then
+        #expect(header.contains(#"username="userX-Injected: true""#))
+        #expect(!header.contains("\r"))
+        #expect(!header.contains("\n"))
+    }
+
     @Test
     func header_generatesAFreshCnonceEachCall() throws {
         // Given

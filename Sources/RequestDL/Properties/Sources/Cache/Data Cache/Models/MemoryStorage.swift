@@ -73,6 +73,23 @@ struct MemoryStorage: Sendable {
         records[key] = nil
     }
 
+    /// Removes `key` only if its currently stored record is still the exact one `dataURL`
+    /// identifies, mirroring `DiskStorage.Index.remove(_:ifLocation:)`.
+    ///
+    /// A plain `remove(_:)` would blindly delete whatever record currently sits at `key`, even
+    /// one a concurrent, still-in-progress write for the same key just installed after this
+    /// caller's own write started. `ByteURL` is a class — its identity, not its bytes, is what a
+    /// caller who allocated a specific record can still prove it owns that record by the time it
+    /// wants to discard it.
+    mutating func remove(_ key: String, ifDataURL dataURL: Internals.ByteURL) {
+        guard records[key]?.dataURL === dataURL else {
+            return
+        }
+
+        identifiers.remove(key)
+        records[key] = nil
+    }
+
     mutating func removeAll() {
         identifiers = []
         records = [:]
@@ -118,8 +135,12 @@ struct MemoryStorage: Sendable {
 
     /// Reserves a slot and hands back the location its bytes go to.
     ///
-    /// - Returns: The store the caller should open a buffer over, or `nil` when the entry does
-    /// not fit.
+    /// - Parameter knownUsage: A caller-tracked usage estimate, passed straight through to
+    /// `freeSpace(_:knownUsage:)` to let it skip its scan when usage is already known to fit.
+    /// See that method's doc for the safety argument.
+    /// - Returns: The store the caller should open a buffer over (`nil` when the entry does not
+    /// fit) and usage immediately after this call, for the caller to keep as its next
+    /// `knownUsage`.
     ///
     /// - Important: Must not be `async`, and must not return the buffer itself. This type is
     /// only reachable through `withMemoryStorage`, which hands out an `inout` from inside a non
@@ -134,13 +155,14 @@ struct MemoryStorage: Sendable {
         key: String,
         cachedResponse: CachedResponse,
         contentLength: Int64,
-        maximumCapacity: Int64
-    ) -> Internals.ByteURL? {
+        maximumCapacity: Int64,
+        knownUsage: Int64? = nil
+    ) -> (dataURL: Internals.ByteURL?, usage: Int64?) {
         guard contentLength <= maximumCapacity else {
-            return nil
+            return (nil, nil)
         }
 
-        freeSpace(maximumCapacity - contentLength)
+        let usageAfterEviction = freeSpace(maximumCapacity - contentLength, knownUsage: knownUsage)
 
         let record = Record(
             key: key,
@@ -152,10 +174,26 @@ struct MemoryStorage: Sendable {
 
         records[key] = record
 
-        return record.dataURL
+        return (record.dataURL, usageAfterEviction + contentLength)
     }
 
-    mutating func freeSpace(_ maximumCapacity: Int64) {
+    /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
+    ///
+    /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
+    /// `maximumCapacity`, the full scan below (and the `OrderedSet.remove(_:)` cost of any
+    /// eviction it would have found) is skipped outright, since nothing would be evicted anyway.
+    /// Mirrors `DiskStorage.freeSpace(_:knownUsage:)`'s own short-circuit and safety argument —
+    /// see that method's doc — for the same O(current entry count) cost this would otherwise pay
+    /// on every single cache write, `n` of them turning a cache's whole lifetime into O(n²).
+    ///
+    /// - Returns: Usage immediately after this call: either the untouched `knownUsage` when
+    /// skipped, or the freshly measured total otherwise.
+    @discardableResult
+    mutating func freeSpace(_ maximumCapacity: Int64, knownUsage: Int64? = nil) -> Int64 {
+        if let knownUsage, knownUsage <= maximumCapacity {
+            return knownUsage
+        }
+
         var accumulatedSize: Int64 = 0
         var deleteOnly = maximumCapacity == .zero
 
@@ -165,15 +203,16 @@ struct MemoryStorage: Sendable {
                 continue
             }
 
-            if !deleteOnly {
+            if !deleteOnly, accumulatedSize + entry.size <= maximumCapacity {
                 accumulatedSize += entry.size
+                continue
             }
 
-            if deleteOnly || accumulatedSize > maximumCapacity {
-                deleteOnly = true
-                records[key] = nil
-                identifiers.remove(key)
-            }
+            deleteOnly = true
+            records[key] = nil
+            identifiers.remove(key)
         }
+
+        return accumulatedSize
     }
 }

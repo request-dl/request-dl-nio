@@ -795,6 +795,70 @@ struct CachedRequestTests {
         // Then
         #expect(cachedData == nil)
     }
+
+    /// Regression coverage for RFC 7234 §3.2: a response to a request carrying `Authorization`
+    /// must not be stored unless its own `Cache-Control` explicitly permits it
+    /// (`must-revalidate`, `public`, or `s-maxage`). `DataCache` keys entries by URL alone with
+    /// no request-credential awareness, so without this check, one account's cached response to
+    /// an authenticated endpoint could later be served to a different account sharing the same
+    /// process-wide `DataCache`.
+    @Test
+    func cache_whenRequestHasAuthorizationAndResponseDoesNotPermitSharedCaching_skipsCaching() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When: `max-age` alone (no `public`/`must-revalidate`/`s-maxage`) would be cached for
+        // an unauthenticated request, but must not be stored here.
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: [("Cache-Control", "max-age=1000")],
+            cacheStrategy: .returnCachedDataElseLoad,
+            includesAuthorizationHeader: true
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let cachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(cachedData == nil)
+    }
+
+    /// Companion to the test above: `public` is one of the three directives RFC 7234 §3.2
+    /// recognizes as explicit permission to store a response to a credentialed request, so this
+    /// one must still be cached.
+    @Test
+    func cache_whenRequestHasAuthorizationAndResponseIsExplicitlyPublic_stillCaches() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cacheStrategy: .returnCachedDataElseLoad,
+            includesAuthorizationHeader: true
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let cachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(cachedData != nil)
+    }
 }
 
 extension CachedRequestTests {
@@ -882,6 +946,7 @@ extension CachedRequestTests {
         diskCapacity: Int64 = .zero,
         encryptionKey: DataCache.EncryptionKey? = nil,
         cacheHeader: CacheHeader? = nil,
+        includesAuthorizationHeader: Bool = false,
         logger: Logger? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
@@ -910,6 +975,10 @@ extension CachedRequestTests {
 
             if let cacheHeader {
                 cacheHeader
+            }
+
+            if includesAuthorizationHeader {
+                RequestDL.Authorization(.bearer, token: "test-token")
             }
         }
         .environment(\.logger, logger)

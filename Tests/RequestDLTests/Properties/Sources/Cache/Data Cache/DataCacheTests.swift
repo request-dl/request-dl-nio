@@ -671,4 +671,57 @@ extension DataCacheTests {
         }
         #expect(!foundOrphan)
     }
+
+    /// Regression test for a memory-tier race: `discardFailedWrite` used to remove whatever
+    /// record currently sat at `key`, not specifically the one this failed write itself
+    /// allocated. Two concurrent writes to the same key (a common shape — parallel fetches of
+    /// the same URL) could let a failed write's cleanup delete a *different*, successfully
+    /// completed write's entry out from under it.
+    @Test
+    func discardFailedWrite_whenAnotherWriteReplacedTheMemoryEntry_shouldNotDeleteIt() async throws {
+        let dataCache = DataCache(
+            memoryCapacity: 8 * 1_024 * 1_024,
+            suiteName: UUID().uuidString
+        )
+
+        let key = UUID().uuidString
+
+        // Given: two allocations for the same key, mimicking two concurrent requests racing to
+        // cache the same URL. `failedBuffer` is allocated first (and never finishes writing —
+        // the failure this test discards). `goodBuffer` is allocated second, overwriting the
+        // memory tier's record for `key`, and finishes its write successfully.
+        let responseHead = Internals.ResponseHead(
+            url: key,
+            status: .init(code: 200, reason: "OK"),
+            version: .init(minor: 0, major: 1),
+            headers: [],
+            isKeepAlive: true
+        )
+
+        let failedAllocation = await dataCache.allocateBuffer(
+            key: key,
+            cachedResponse: .init(response: responseHead, policy: .memory),
+            contentLength: 0
+        )
+        let failedBuffer = try #require(failedAllocation)
+
+        let goodAllocation = await dataCache.allocateBuffer(
+            key: key,
+            cachedResponse: .init(response: responseHead, policy: .memory),
+            contentLength: 4
+        )
+        var goodBuffer = try #require(goodAllocation)
+
+        let goodData = await Data.randomData(length: 4)
+        await goodBuffer.writeBuffer(Internals.DataBuffer(goodData))
+
+        // When: the first (failed) write's cleanup runs after the second (good) write already
+        // replaced its record.
+        await dataCache.discardFailedWrite(failedBuffer, forKey: key)
+
+        // Then: the good write's entry survives.
+        let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
+        let cachedMemoryData = await cachedMemory?.data
+        #expect(cachedMemoryData == goodData)
+    }
 }

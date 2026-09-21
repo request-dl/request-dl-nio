@@ -26,6 +26,13 @@ extension DataCache {
         /// write to the same key from a concurrent request.
         let diskRecordURL: URL?
 
+        /// The exact in-memory record `memoryBuffer` writes into, `nil` when there is no memory
+        /// tier for this write. `discardFailedWrite(_:forKey:)`'s memory-side counterpart to
+        /// `diskRecordURL`: identifies precisely this write's record by reference, not by key, so
+        /// discarding it can't delete an unrelated, still-in-progress write to the same key from
+        /// a concurrent request.
+        let memoryDataURL: Internals.ByteURL?
+
         // MARK: - Private properties
 
         private var memoryBuffer: Internals.AnyBuffer?
@@ -36,11 +43,13 @@ extension DataCache {
         init(
             memoryBuffer: Internals.AnyBuffer?,
             diskBuffer: Internals.AnyBuffer?,
-            diskRecordURL: URL? = nil
+            diskRecordURL: URL? = nil,
+            memoryDataURL: Internals.ByteURL? = nil
         ) {
             self.memoryBuffer = memoryBuffer
             self.diskBuffer = diskBuffer
             self.diskRecordURL = diskRecordURL
+            self.memoryDataURL = memoryDataURL
         }
 
         // MARK: - Internal methods

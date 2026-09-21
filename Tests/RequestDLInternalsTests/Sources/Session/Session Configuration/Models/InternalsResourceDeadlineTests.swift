@@ -170,6 +170,50 @@ struct InternalsResourceDeadlineTests {
         #expect(await flag.wasCancelled)
     }
 
+    /// Regression coverage for the composition `RawTask._result` relies on: it races
+    /// `Internals.NetworkPathGate.wait(for:)` (the `Session.waitsForConnectivity(true)` /
+    /// `allowsCellularAccess`/etc. pre-flight check) against the same `.resource` deadline that
+    /// bounds the request itself, so a network path that never satisfies is bounded by the
+    /// configured timeout instead of hanging forever. `NetworkPathGate.wait(for:observer:)` only
+    /// returns when a satisfying path arrives or the calling `Task` is cancelled (see
+    /// `InternalsNetworkPathGateTests.gate_whenCallerTaskCancelledWhileWaiting_...`, which needs
+    /// an explicit external cancellation to terminate the equivalent wait) — `race` is what
+    /// supplies that cancellation here, the same way it does for `executeSessionTask`.
+    @Test
+    func race_whenWrappingAHangingNetworkPathWait_boundedByDeadlineInsteadOfHangingForever() async throws {
+        // Given: an observer whose `updates()` never yields and never finishes, paired with
+        // `waitsForConnectivity: true` — the shape `NetworkPathGate.wait(for:)` cannot return
+        // from on its own once the current path is unsatisfied.
+        struct HangingObserver: Internals.NetworkPathObserving {
+            let currentPath = Internals.NetworkPath(
+                isSatisfied: false,
+                usesCellular: false,
+                isExpensive: false,
+                isConstrained: false
+            )
+
+            func updates() -> _Concurrency.AsyncStream<Internals.NetworkPath> {
+                _Concurrency.AsyncStream { _ in }
+            }
+        }
+
+        let constraints = Internals.NetworkPathGate.Constraints(
+            allowsCellularAccess: nil,
+            allowsExpensiveNetworkAccess: nil,
+            allowsConstrainedNetworkAccess: nil,
+            waitsForConnectivity: true
+        )
+
+        let deadline = Internals.ResourceDeadline(nanoseconds: 10_000_000)
+
+        // When / Then: bounded by the deadline, not left hanging.
+        await #expect(throws: Internals.ResourceTimeoutError.self) {
+            try await deadline.race {
+                try await Internals.NetworkPathGate.wait(for: constraints, observer: HangingObserver())
+            }
+        }
+    }
+
     @Test
     func race_whenOperationFinishesBeforeDeadline_neverCancelsGivenSeed() async throws {
         // Given: see `raceMarginNanoseconds`'s doc comment above.
