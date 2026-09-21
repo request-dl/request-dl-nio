@@ -31,7 +31,7 @@ struct MemoryStorageTests {
 
     @Test
     func freeSpace_whenKnownUsageFitsUnderCapacity_shouldSkipRescanAndKeepEverything() async throws {
-        var storage = MemoryStorage(directory: URL(filePath: "/tmp"))
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
 
         // Given: a real entry that is already over whatever capacity `freeSpace` is about to be
         // called with — a rescan would find it and evict it.
@@ -56,7 +56,7 @@ struct MemoryStorageTests {
 
     @Test
     func freeSpace_whenKnownUsageExceedsCapacity_shouldRescanAndEvict() async throws {
-        var storage = MemoryStorage(directory: URL(filePath: "/tmp"))
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
 
         let (dataURL, _) = storage.allocateBuffer(
             key: "k1",
@@ -78,7 +78,7 @@ struct MemoryStorageTests {
 
     @Test
     func allocateBuffer_shouldReturnUsageReflectingTheNewEntry() {
-        var storage = MemoryStorage(directory: URL(filePath: "/tmp"))
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
 
         // Given/When: the first entry in an empty store, so usage after it is exactly its own
         // content length.
@@ -109,7 +109,7 @@ struct MemoryStorageTests {
     /// one a concurrent write installed after the caller's own record was replaced.
     @Test
     func remove_ifDataURL_whenRecordWasReplaced_shouldLeaveTheReplacementInPlace() async throws {
-        var storage = MemoryStorage(directory: URL(filePath: "/tmp"))
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
 
         let (firstDataURL, _) = storage.allocateBuffer(
             key: "k1",
@@ -139,7 +139,7 @@ struct MemoryStorageTests {
 
     @Test
     func remove_ifDataURL_whenRecordStillMatches_shouldRemoveIt() async throws {
-        var storage = MemoryStorage(directory: URL(filePath: "/tmp"))
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
 
         let (dataURL, _) = storage.allocateBuffer(
             key: "k1",
