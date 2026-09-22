@@ -110,17 +110,16 @@ extension Internals.ClientManager {
         )
         #endif
 
-        // A configuration that can never be matched again is used and forgotten: pooling it would
-        // only add an entry every future `_reusableItem` scan has to walk past, and that nothing
-        // but the idle sweep could ever remove.
+        // Tracked even when `isPoolable` is `false` and nothing will ever match this entry
+        // again. The table is not only a reuse cache, it is also what owns a client for its
+        // lifetime: `Internals.Client.deinit` shuts the underlying `HTTPClient` down, and the
+        // caller's reference does not outlive the call that handed it out — it returns as soon
+        // as the response head arrives, with the body still streaming. Dropping the entry here
+        // therefore tore down the connection out from under the response that was using it.
         //
-        // Safe to leave untracked here, unlike on the `.urlSession` side: `Internals.Client`'s
-        // own `deinit` shuts the client down once the caller releases it, which is sooner than
-        // the sweep would have anyway.
-        guard sessionConfiguration.isPoolable else {
-            return client
-        }
-
+        // Skipping the *scan* is what removes this configuration's real cost (see
+        // `client(provider:sessionConfiguration:)`); `maximumCount`'s eviction is what keeps the
+        // entries it leaves behind from accumulating without bound.
         let evicted = tableLock.withLock {
             var items = _table[id] ?? []
 

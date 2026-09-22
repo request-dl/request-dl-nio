@@ -121,10 +121,14 @@ struct InternalsClientManagerTests {
     }
 
     /// `Internals.RedirectConfiguration.==` answers `false` for `.strategy` against everything,
-    /// itself included, so a pooled `.strategy` entry can never be handed back to anyone. Caching
-    /// it is pure cost, paid by every later scan.
+    /// itself included, so a pooled `.strategy` entry can never be handed back to anyone and the
+    /// linear scan looking for one is guaranteed to walk the whole list and find nothing.
+    ///
+    /// The entry is still *stored*: the table is also what owns a client for its lifetime, and a
+    /// `.nio` client tears its connections down as soon as the last reference to it goes, which
+    /// is well before the response body still streaming over them is finished.
     @Test
-    func manager_whenConfigurationCarriesARedirectStrategy_shouldNotBePooled() async throws {
+    func manager_whenConfigurationCarriesARedirectStrategy_shouldNotBeReusedButStillTracked() async throws {
         // Given
         let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
@@ -143,10 +147,10 @@ struct InternalsClientManagerTests {
             sessionConfiguration: sessionConfiguration
         )
 
-        // Then: a fresh client either way (that part never worked), but now without leaving an
-        // unusable entry behind for every resolution.
+        // Then: a fresh client either way (that part never worked), each still retained by the
+        // table so it outlives the caller's own reference to it.
         #expect(sut1 !== sut2)
-        #expect(manager.count == 0)
+        #expect(manager.count == 2)
     }
 
     /// The ordinary configuration still pools, so the short-circuit above can't have been written
