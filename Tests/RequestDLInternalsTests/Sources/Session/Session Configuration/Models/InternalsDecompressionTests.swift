@@ -97,6 +97,24 @@ struct InternalsDecompressionTests {
         #expect(lhs == rhs)
     }
 
+    /// Regression coverage for a pooled-client cache collision: equality used to compare only the
+    /// set of `Content-Encoding` values, which is exactly the check
+    /// `Internals.DecompressionAlgorithm` documents as *not* being what decides behavior. A
+    /// custom algorithm declaring `"gzip"` needs `build()` to leave
+    /// `NIOHTTPResponseDecompressor` off so manual dispatch actually runs it; the built-in
+    /// placeholder needs it on. `Internals.ClientManager` keys pooled clients on
+    /// `Internals.Session.Configuration.==`, and `build()`'s answer is baked into the
+    /// `HTTPClient`, so the two must not compare equal.
+    @Test
+    func decompression_whenCustomAlgorithmSharesGzipContentEncoding_notEqualToNativeGzip() {
+        // Given
+        let lhs = Internals.Decompression.enabled(algorithms: [MockGzipAlgorithm()], limit: .none)
+        let rhs = Internals.Decompression.enabled(algorithms: [MockCustomAlgorithmNamedGzip()], limit: .none)
+
+        // Then
+        #expect(lhs != rhs)
+    }
+
     @Test
     func decompression_whenEnabledWithDifferentLimit_notEquals() {
         // Given

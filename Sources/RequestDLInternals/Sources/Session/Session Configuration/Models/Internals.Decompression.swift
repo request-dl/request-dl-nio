@@ -80,14 +80,30 @@ extension Internals {
 extension Internals.Decompression: Equatable {
 
     /// `any Internals.DecompressionAlgorithm` has no equality of its own, so this compares what
-    /// actually drives observable behavior (the set of `Content-Encoding` values configured,
-    /// plus the limit) rather than instance identity.
+    /// actually drives observable behavior rather than instance identity.
     ///
-    /// Two configurations with the same set produce byte-identical
-    /// `HTTPClient.Configuration`/`Accept-Encoding` output, so treating them as equal keeps the
-    /// common case (plain `.gzip`/`.deflate`) pooling connections the way it always has, instead
-    /// of paying `RedirectConfiguration.strategy`'s "never equal, fresh client every time" cost
-    /// for a case that doesn't need it.
+    /// `contentEncodingValue` alone is *not* that. `isNativelyDecodedByNIO`/
+    /// `isNativelyDecodedByURLSession`/`requiresURLSession` are deliberately per-conformer
+    /// answers rather than checks against the wire value (see `Internals.DecompressionAlgorithm`),
+    /// precisely so a genuinely custom algorithm declaring `contentEncodingValue == "gzip"` is
+    /// told apart from the built-in `GzipAlgorithm` placeholder that shares that string. Those
+    /// three are what `build()`/`requiresManualURLSessionHandling`/
+    /// `Internals.Session.Configuration.nonURLSessionExecutorIncompatibilityReasons()` read, so
+    /// they belong in this comparison too.
+    ///
+    /// That matters here and not only in the abstract: `Internals.ClientManager` keys its pooled
+    /// clients on `Internals.Session.Configuration.==`, and `build()`'s answer is baked into the
+    /// `HTTPClient` at construction time. Comparing only the wire value let a session configured
+    /// with a custom "gzip" algorithm reuse a pooled client built with
+    /// `NIOHTTPResponseDecompressor` switched on (or the reverse). Neither direction is benign:
+    /// `async-http-client` decodes the body without stripping `Content-Encoding`, so manual
+    /// dispatch would then run the custom algorithm a second time over already-decoded bytes,
+    /// while the reverse leaves a natively-decoded session's body compressed with nothing left to
+    /// decode it.
+    ///
+    /// Two configurations agreeing on all four still compare equal, so the common case (plain
+    /// `.gzip`/`.deflate`) keeps pooling connections the way it always has, instead of paying
+    /// `RedirectConfiguration.strategy`'s "never equal, fresh client every time" cost.
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.disabled, .disabled):
@@ -98,10 +114,30 @@ extension Internals.Decompression: Equatable {
                 return false
             }
 
-            return Set(lAlgorithms.map(\.contentEncodingValue)) == Set(rAlgorithms.map(\.contentEncodingValue))
+            return Set(lAlgorithms.map(AlgorithmIdentity.init)) == Set(rAlgorithms.map(AlgorithmIdentity.init))
 
         default:
             return false
+        }
+    }
+}
+
+extension Internals.Decompression {
+
+    /// Everything about one algorithm that actually changes what this package does with a
+    /// response, and therefore everything `==` above has to take into account.
+    fileprivate struct AlgorithmIdentity: Hashable {
+
+        let contentEncodingValue: String
+        let requiresURLSession: Bool
+        let isNativelyDecodedByURLSession: Bool
+        let isNativelyDecodedByNIO: Bool
+
+        init(_ algorithm: any Internals.DecompressionAlgorithm) {
+            contentEncodingValue = algorithm.contentEncodingValue
+            requiresURLSession = algorithm.requiresURLSession
+            isNativelyDecodedByURLSession = algorithm.isNativelyDecodedByURLSession
+            isNativelyDecodedByNIO = algorithm.isNativelyDecodedByNIO
         }
     }
 }
