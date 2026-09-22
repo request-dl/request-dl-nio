@@ -20,26 +20,14 @@ struct RawTask<Content: Property>: RequestTask {
     // MARK: - Internal methods
 
     func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
-        let resolved = try await Resolve(
-            root: content,
-            environment: environment
-        ).build()
-
-        try await notifyDescriptorHooks(resolved: resolved, environment: environment)
-
-        // Checked before anything else touches `resolved`: a hard-pinned executor this
-        // configuration can't actually run on must fail loudly, not after paying for a
-        // logger/client/cache setup nobody will get to use.
-        try validateRequiredExecutor(resolved: resolved)
-
-        let deadline = Internals.ResourceDeadline(nanoseconds: resolved.session.configuration.timeout.resource)
-
-        do {
-            try await deadline.race {
-                try await waitForNetworkPath(resolved: resolved)
-            }
-        } catch is Internals.ResourceTimeoutError {
-            throw ResourceTimeoutError()
+        // Resolution hands back its own deadline rather than one built from the result: system
+        // proxy/PAC resolution happens inside it, and a deadline created afterwards could not
+        // cover it. See `Resolve.buildBoundedByResourceDeadline()`.
+        let (resolved, deadline) = try await surfacingResourceTimeout {
+            try await Resolve(
+                root: content,
+                environment: environment
+            ).buildBoundedByResourceDeadline()
         }
 
         let logger = Internals.TaskLogger(
@@ -48,7 +36,33 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        let (client, isURLSessionExecutor) = try await resolveClient(resolved: resolved)
+        // Every step from here to the request itself is raced against the same budget. Each one
+        // can block for an unbounded stretch on something the caller can't see -- a descriptor
+        // hook doing its own I/O, a client cache entry whose `AsyncLock` is held by a slow
+        // neighbour, a TLS identity read off disk -- and a `.resource` timeout that only started
+        // counting once all of that was already done would have promised a bound it never had.
+        let (client, isURLSessionExecutor) = try await surfacingResourceTimeout {
+            try await deadline.race {
+                try await notifyDescriptorHooks(resolved: resolved, environment: environment)
+            }
+
+            // Checked before anything else touches `resolved`: a hard-pinned executor this
+            // configuration can't actually run on must fail loudly, not after paying for a
+            // logger/client/cache setup nobody will get to use.
+            try validateRequiredExecutor(resolved: resolved)
+
+            try await deadline.race {
+                try await waitForNetworkPath(resolved: resolved)
+            }
+
+            // - Note: `Internals.ClientManager`'s `AsyncLock` is not cancellation aware, so the
+            // lock acquisition inside this cannot itself be interrupted. Racing it from out here
+            // is still what the caller was promised: the deadline fires and they get their
+            // timeout on schedule, rather than waiting on the lock indefinitely.
+            return try await deadline.race {
+                try await resolveClient(resolved: resolved)
+            }
+        }
 
         let cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,
@@ -74,6 +88,20 @@ struct RawTask<Content: Property>: RequestTask {
     }
 
     // MARK: - Private methods, setup
+
+    /// Replaces the internal resource-timeout marker with this package's public error.
+    ///
+    /// Every phase raced against the `.resource` budget funnels through here, so a blown budget
+    /// reads the same to a caller regardless of which phase blew it.
+    private func surfacingResourceTimeout<T>(
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation()
+        } catch is Internals.ResourceTimeoutError {
+            throw ResourceTimeoutError()
+        }
+    }
 
     /// Hands the exact configuration this request is about to send to every
     /// `description(_:enabled:onDescribe:)` hook queued on `environment`, before anything
@@ -206,7 +234,7 @@ struct RawTask<Content: Property>: RequestTask {
             }
         }
 
-        do {
+        return try await surfacingResourceTimeout {
             if let serviceContext = resolved.requestConfiguration.serviceContext {
                 return try await deadline.race {
                     try await ServiceContext.$current.withValue(serviceContext) {
@@ -216,8 +244,6 @@ struct RawTask<Content: Property>: RequestTask {
             } else {
                 return try await deadline.race(executeSessionTask)
             }
-        } catch is Internals.ResourceTimeoutError {
-            throw ResourceTimeoutError()
         }
     }
 

@@ -24,21 +24,52 @@ struct Resolve<Root: Property>: Sendable {
     // MARK: - Internal methods
 
     func build() async throws -> Resolved {
+        try await buildBoundedByResourceDeadline().resolved
+    }
+
+    /// ``build()``, also handing back the deadline ``Timeout/Source/resource`` establishes for
+    /// this request — taken partway *through* resolution rather than after it.
+    ///
+    /// `sessionConfiguration(for:)` below can resolve a system proxy, which on Darwin means
+    /// fetching and running a PAC script over the network. That is unbounded, remote work, and
+    /// exactly the kind of thing a resource budget is supposed to cover; a deadline created only
+    /// once `build()` has returned starts counting after it, so a hung PAC lookup outlasts any
+    /// `.resource` the caller configured.
+    ///
+    /// Resolution can't be bounded any earlier than this: the budget itself is declared by a
+    /// `Timeout` property, so it isn't known until `partiallyBuild()` has walked the graph. That
+    /// half is pure, in-process tree building with nothing remote in it, which is what makes the
+    /// split safe to draw here.
+    func buildBoundedByResourceDeadline() async throws -> (
+        resolved: Resolved,
+        deadline: Internals.ResourceDeadline
+    ) {
         var (_, make) = try await partiallyBuild()
         applyingURLOverride(&make)
 
-        let session = Internals.Session(
-            provider: make.provider ?? .shared,
-            configuration: await sessionConfiguration(for: make)
+        let deadline = Internals.ResourceDeadline(
+            nanoseconds: make.sessionConfiguration.timeout.resource
         )
 
-        return Resolved(
+        let resolvedMake = make
+        let configuration = try await deadline.race {
+            await sessionConfiguration(for: resolvedMake)
+        }
+
+        let session = Internals.Session(
+            provider: resolvedMake.provider ?? .shared,
+            configuration: configuration
+        )
+
+        let resolved = Resolved(
             session: session,
-            requestConfiguration: make.requestConfiguration,
-            dataCache: make.cacheConfiguration.build(
+            requestConfiguration: resolvedMake.requestConfiguration,
+            dataCache: resolvedMake.cacheConfiguration.build(
                 logger: environment.logger
             )
         )
+
+        return (resolved, deadline)
     }
 
     func partiallyBuild() async throws -> (_PropertyOutputs, Make) {

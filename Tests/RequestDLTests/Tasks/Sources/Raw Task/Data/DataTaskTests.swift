@@ -127,4 +127,48 @@ struct DataTaskTests {
         // Then
         #expect(result.response == output)
     }
+
+    /// Stands in for any pre-flight step that can block for an unbounded stretch before the
+    /// request itself starts: a descriptor hook doing its own I/O here, but equally a client
+    /// cache entry whose lock is held by a slow neighbour, or a system-proxy PAC script being
+    /// fetched and evaluated over the network.
+    ///
+    /// Reaching the deadline through a hook is what makes that class of stall testable at all —
+    /// unlike the others, it is the one the caller supplies themselves.
+    private struct StallingDescriptor: TaskDescriptor {
+
+        func describe(_ context: TaskDescriptorContext) async throws -> Bool {
+            try await _Concurrency.Task.sleep(nanoseconds: 10_000_000_000)
+            return true
+        }
+    }
+
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func dataTask_whenAPreFlightStepStallsPastTheResourceTimeout_throwsInsteadOfWaitingItOut()
+        async throws
+    {
+        // Given: a `.resource` budget far shorter than a pre-flight step that runs before the
+        // request is ever sent.
+        let task = DataTask {
+            BaseURL("example.com")
+            Timeout(.milliseconds(200), for: .resource)
+        }
+        .description(StallingDescriptor()) { _ in }
+
+        // When
+        let clock = ContinuousClock()
+        let start = clock.now
+
+        await #expect(throws: ResourceTimeoutError.self) {
+            _ = try await task.result()
+        }
+
+        let elapsed = clock.now - start
+
+        // Then: the budget bounds that step too, rather than starting to count only once it is
+        // done. A wide margin below the 10s stall, since what a regression looks like here is
+        // waiting the stall out in full, not missing the deadline by a hair.
+        #expect(elapsed < .seconds(5))
+    }
 }
