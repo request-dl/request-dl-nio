@@ -421,9 +421,16 @@ extension RawTask {
     }
 }
 
+/// Carries the started span into the outgoing request's headers.
+///
+/// `set`, not `add`: a caller forwarding an upstream request's own `traceparent` through
+/// ``HeaderGroup``/``CustomHeader`` would otherwise leave two `traceparent` field lines on the
+/// wire, and the W3C Trace Context spec requires a receiver to treat that as invalid and discard
+/// it — losing the trace entirely. The span this injector was handed is the one that describes
+/// *this* request, so it replaces whatever was declared rather than joining it.
 private struct HTTPHeadersInjector: Injector {
 
     func inject(_ value: String, forKey key: String, into headers: inout HTTPHeaders) {
-        headers.add(name: key, value: value)
+        headers.set(name: key, value: value)
     }
 }

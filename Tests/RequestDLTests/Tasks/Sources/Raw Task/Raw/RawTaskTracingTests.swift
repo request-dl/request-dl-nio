@@ -91,6 +91,48 @@ struct RawTaskTracingTests {
         #expect(tracer.stringAttribute("url.full") == "https://example.com/users/42")
         #expect(tracer.stringAttribute("server.address") == "example.com")
     }
+
+    // MARK: - Trace-context propagation
+
+    /// The regression: injecting with `add` appended a second `traceparent` field line when the
+    /// caller had already declared one (forwarding an upstream request's, say). Per W3C Trace
+    /// Context a receiver must treat multiple `traceparent`s as invalid and discard them, so the
+    /// trace is lost precisely in the case that was trying hardest to keep it.
+    @Test
+    func startRequestSpan_whenTraceParentAlreadyDeclared_replacesItInsteadOfAppending() async throws {
+        // Given
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.headers.set(
+            name: "traceparent",
+            value: "00-11111111111111111111111111111111-2222222222222222-01"
+        )
+
+        let tracer = SpanRecordingTracer()
+
+        // When
+        let span = RawTask<EmptyProperty>.startRequestSpan(tracer: tracer, configuration: &configuration)
+        defer { span.end() }
+
+        // Then: exactly one value, and it's the one the tracer generated for this request.
+        #expect(configuration.headers["traceparent"] == [SpanRecordingTracer.injectedTraceParent])
+    }
+
+    @Test
+    func startRequestSpan_whenNoTraceParentDeclared_injectsTheTracersOwn() async throws {
+        // Given
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+
+        let tracer = SpanRecordingTracer()
+
+        // When
+        let span = RawTask<EmptyProperty>.startRequestSpan(tracer: tracer, configuration: &configuration)
+        defer { span.end() }
+
+        // Then
+        #expect(configuration.headers["traceparent"] == [SpanRecordingTracer.injectedTraceParent])
+    }
 }
 
 // MARK: - Test doubles
