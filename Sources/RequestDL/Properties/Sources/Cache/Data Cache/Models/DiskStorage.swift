@@ -392,7 +392,16 @@ struct DiskStorage: Sendable {
     /// The buffer `data.record` is read through or written into, plain when no key is
     /// configured, chunk-encrypted otherwise. Both satisfy `Internals.AnyBuffer`, so nothing
     /// above this call site needs to know which one it got.
-    private func dataBuffer(for record: Record) async -> Internals.AnyBuffer {
+    ///
+    /// - Parameter retryingEmptyContent: Forwarded to `Internals.Buffer.init(addressing:...)`.
+    /// A read passes the default `true`: a zero-byte answer there may be the transient stat flake
+    /// that retry exists for. `allocateBuffer` passes `false` — it has just created the file
+    /// itself and knows nothing has been written to it yet, so the retry could only ever exhaust
+    /// its whole budget, putting ~290ms of sleeping in front of every encrypted cache write.
+    private func dataBuffer(
+        for record: Record,
+        retryingEmptyContent: Bool = true
+    ) async -> Internals.AnyBuffer {
         guard let encryptionKey else {
             return await Internals.FileBuffer(record.dataURL)
         }
@@ -402,7 +411,10 @@ struct DiskStorage: Sendable {
             key: encryptionKey.symmetricKey
         )
 
-        return await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+        return await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(
+            addressing: url,
+            retryingEmptyContent: retryingEmptyContent
+        )
     }
 
     // MARK: - Private static methods
@@ -570,7 +582,7 @@ struct DiskStorage: Sendable {
         await applyFileProtection(to: record)
         #endif
 
-        let buffer = await dataBuffer(for: record)
+        let buffer = await dataBuffer(for: record, retryingEmptyContent: false)
         index.set(key, location: record.url)
         return (buffer, usageAfterEviction + writableBytes, record.url)
     }
