@@ -132,7 +132,7 @@ extension Internals.ClientManager {
 
             _table[id] = items
 
-            return _evictIfNeeded()
+            return _evictIfNeeded(protecting: .nio(client))
         }
 
         Internals.ClientManager.shutdownDetached(evicted)

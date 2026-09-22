@@ -352,15 +352,26 @@ extension Internals {
         /// that what is evicted here owns a connection pool, so it has to be shut down rather
         /// than merely forgotten.
         ///
-        /// Only clients with nothing in flight are candidates, regardless of age: the ceiling may
-        /// be overshot while every pooled client is busy, which is the right way round — the
-        /// alternative is tearing down connections out from under live requests to satisfy a
-        /// bookkeeping limit.
+        /// The ceiling never gates service. Only clients with nothing in flight are candidates,
+        /// regardless of age, and a caller is never made to wait for one to free up or turned
+        /// away because there is nothing to evict: a table whose every entry is mid-request
+        /// simply overshoots, and the `lifetime` sweep and the next insert with something idle in
+        /// it bring it back down. The alternative — delaying a request, or tearing connections
+        /// down out from under live ones — trades a caller's latency for a bookkeeping limit,
+        /// which is the wrong way round.
+        ///
+        /// - Parameter protecting: The client the caller is in the middle of handing out. It is
+        /// idle by definition (nothing has been asked of it yet) and its entry is the newest in
+        /// the table, so without this it is the *first* thing an at-capacity insert evicts — and
+        /// since the table is also what owns a client's lifetime, evicting it would shut down the
+        /// very client being returned.
         ///
         /// - Returns: The evicted clients, which the caller must hand to ``shutdownDetached(_:)``.
         ///   Returning them rather than shutting them down here is what keeps a network drain off
         ///   ``tableLock``.
-        func _evictIfNeeded() -> [Internals.ClientManager.Client] {
+        func _evictIfNeeded(
+            protecting protectedClient: Internals.ClientManager.Client? = nil
+        ) -> [Internals.ClientManager.Client] {
             let count = _table.values.reduce(0) { $0 + $1.count }
 
             guard count > maximumCount else {
@@ -368,13 +379,14 @@ extension Internals {
             }
 
             let target = max(maximumCount - (maximumCount / 4), 1)
+            let protectedIdentifier = protectedClient?.objectIdentifier
 
             let evictable =
                 _table
                 .flatMap { key, items in
                     items.enumerated().map { (key: key, offset: $0.offset, item: $0.element) }
                 }
-                .filter { !$0.item.client.isRunning }
+                .filter { !$0.item.client.isRunning && $0.item.client.objectIdentifier != protectedIdentifier }
                 .sorted { $0.item.readAt < $1.item.readAt }
                 .prefix(count - target)
 
@@ -431,12 +443,13 @@ extension Internals {
                 )
             }
 
-            // Still pooled even when `!sessionConfiguration.isPoolable`, unlike the `.nio` side,
-            // which skips the insert entirely. An `Internals.URLSessionClient` has no `deinit`
-            // fallback to shut itself down — `URLSession` retains its delegate, so the client is
-            // never released on its own — which makes this table the only thing that ever gets
-            // around to invalidating it. An entry nobody can reuse is still worth keeping for
-            // the sweep to find; `_evictIfNeeded` is what keeps that from growing without bound.
+            // Still pooled even when `!sessionConfiguration.isPoolable`, same as the `.nio` side:
+            // this table is what owns a client's lifetime, not merely a reuse cache. Doubly so
+            // here, since an `Internals.URLSessionClient` has no `deinit` fallback to shut itself
+            // down — `URLSession` retains its delegate, so the client is never released on its
+            // own — which makes this table the only thing that ever gets around to invalidating
+            // it. An entry nobody can reuse is still worth keeping for the sweep to find;
+            // `_evictIfNeeded` is what keeps that from growing without bound.
             let evicted = tableLock.withLock {
                 var items = _table[id] ?? []
 
@@ -449,7 +462,7 @@ extension Internals {
 
                 _table[id] = items
 
-                return _evictIfNeeded()
+                return _evictIfNeeded(protecting: .urlSession(client))
             }
 
             Self.shutdownDetached(evicted)

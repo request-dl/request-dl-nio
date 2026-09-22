@@ -8,6 +8,9 @@
 // `InternalsClientManagerExecutorTests`.
 #if canImport(NIOCore)
 
+import AsyncHTTPClient
+import NIOCore
+import NIOPosix
 import SwiftAsyncTesting
 import Testing
 
@@ -118,6 +121,82 @@ struct InternalsClientManagerTests {
 
         // Then
         #expect(manager.count <= maximumCount)
+    }
+
+    /// The ceiling is a bound on bookkeeping, never a gate on service.
+    ///
+    /// Only an idle client is ever a candidate for eviction, so a table whose every entry is
+    /// mid-request has nothing to give up. What must *not* happen then is the caller waiting for
+    /// one to free up, being refused, or having a live request's connections torn down to make
+    /// room: a request in hand always wins over the ceiling, which the periodic `lifetime` sweep
+    /// and the next idle insert bring back down anyway.
+    @Test
+    func manager_whenEveryPooledClientIsBusy_shouldStillHandOutANewClientImmediately() async throws {
+        try await withHangingTCPServer { port in
+            // Given: a table filled to its ceiling, with every single entry mid-request.
+            let maximumCount = 2
+            let manager = Internals.ClientManager(
+                lifetime: 5 * 60 * 1_000_000_000,
+                maximumCount: maximumCount
+            )
+            let provider = Internals.SharedSessionProvider()
+
+            var busy = [Internals.Client]()
+
+            // Held for the duration: dropping the handle releases the request's `TaskSeed`,
+            // which tears the request down and makes its client idle again -- the very state
+            // this test needs never to happen.
+            var inFlight = [Internals.UnsafeTask<HTTPClient.Response>]()
+
+            for index in 0..<maximumCount {
+                var sessionConfiguration = Internals.Session.Configuration()
+                sessionConfiguration.timeout.connect = Int64(60_000_000_000 + index)
+
+                let client = try await manager.client(
+                    provider: provider,
+                    sessionConfiguration: sessionConfiguration
+                )
+
+                // The server accepts and then says nothing, so this stays in flight for the rest
+                // of the test rather than racing it.
+                inFlight.append(
+                    await client.execute(
+                        request: try HTTPClient.Request(url: "http://127.0.0.1:\(port)/"),
+                        logger: nil
+                    )
+                )
+
+                busy.append(client)
+            }
+
+            #expect(busy.allSatisfy { $0.isRunning })
+            #expect(manager.count == maximumCount)
+
+            // When: one more distinct configuration arrives with no room left for it.
+            var overflowing = Internals.Session.Configuration()
+            overflowing.timeout.connect = 90_000_000_000
+
+            let clock = ContinuousClock()
+            let start = clock.now
+
+            let overflow = try await manager.client(
+                provider: provider,
+                sessionConfiguration: overflowing
+            )
+
+            let elapsed = clock.now - start
+
+            // Then: served straight away, the ceiling overshot rather than enforced, and nothing
+            // in flight was torn down to get there.
+            #expect(elapsed < .seconds(1))
+            #expect(manager.count == maximumCount + 1)
+            #expect(busy.allSatisfy { $0.isRunning })
+            #expect(!overflow.isRunning)
+
+            for task in inFlight {
+                task().callAsFunction()
+            }
+        }
     }
 
     /// `Internals.RedirectConfiguration.==` answers `false` for `.strategy` against everything,
@@ -237,6 +316,35 @@ struct InternalsClientManagerTests {
         await #expect(throws: CancellationError.self) {
             try await task.value
         }
+    }
+}
+
+/// Runs `body` against a TCP listener that accepts connections and then says nothing at all.
+///
+/// A request sent here stays genuinely in flight — `Internals.Client.isRunning` stays `true` —
+/// for as long as the test needs, instead of racing it to completion the way a request to a real
+/// or an unreachable endpoint would.
+private func withHangingTCPServer<Result>(
+    _ body: (Int) async throws -> Result
+) async throws -> Result {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+    let channel = try await ServerBootstrap(group: group)
+        .serverChannelOption(ChannelOptions.backlog, value: 256)
+        // No handlers at all: whatever arrives is simply never answered.
+        .childChannelInitializer { $0.eventLoop.makeSucceededVoidFuture() }
+        .bind(host: "127.0.0.1", port: 0)
+        .get()
+
+    do {
+        let result = try await body(channel.localAddress?.port ?? 0)
+        try? await channel.close()
+        try? await group.shutdownGracefully()
+        return result
+    } catch {
+        try? await channel.close()
+        try? await group.shutdownGracefully()
+        throw error
     }
 }
 
