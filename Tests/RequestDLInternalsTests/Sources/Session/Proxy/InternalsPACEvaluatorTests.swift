@@ -197,6 +197,31 @@ struct InternalsPACEvaluatorTests {
         let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
         #expect(elapsedSeconds < 120)
     }
+
+    /// `.finished`/`.handledSource` used to fall through silently, leaving `evaluate(...)`'s
+    /// caller suspended on a continuation nobody would ever answer. Neither can be produced on
+    /// demand from out here — that would mean driving CFNetwork's own run-loop source into a
+    /// state it does not normally reach — so this covers the decision the run loop's result feeds
+    /// into, which is the part that was wrong.
+    @Test
+    func fallbackError_answersEveryRunLoopOutcome_notOnlyTimedOut() async throws {
+        // Then: the one outcome with a meaning of its own keeps it.
+        guard case .timedOut = Internals.PACEvaluator.fallbackError(forRunLoopResult: .timedOut) else {
+            Issue.record("Expected .timedOut")
+            return
+        }
+
+        // And: every other outcome still produces an error to answer with, rather than nothing.
+        // `.stopped` included — it is the success path, where the box's idempotent `resume` makes
+        // this a no-op, but a loop stopped by anything other than `pacEvaluationCallback` must
+        // not hang either.
+        for outcome in [CFRunLoopRunResult.finished, .handledSource, .stopped] {
+            guard case .executionFailed = Internals.PACEvaluator.fallbackError(forRunLoopResult: outcome) else {
+                Issue.record("Expected .executionFailed for \(outcome)")
+                continue
+            }
+        }
+    }
 }
 
 /// Serves exactly one PAC script to exactly one connection at a time, in the minimal HTTP/1.1
