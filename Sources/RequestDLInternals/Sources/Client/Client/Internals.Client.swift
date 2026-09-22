@@ -219,12 +219,31 @@ extension Internals {
             // Dispatch must therefore bypass by *type* (`isNativelyDecodedByNIO`), the same
             // structural check `Internals.URLSessionClient` uses, not by checking whether the
             // header is still present: it always is, natively decoded or not.
+            //
+            // A *mixed* list (say gzip plus a custom algorithm) is what makes
+            // `nativelyDecoded` necessary rather than merely tidy. `Internals.Decompression
+            // .build()` enables `NIOHTTPResponseDecompressor` as soon as any one algorithm is
+            // natively decoded, so a `Content-Encoding: gzip` response arrives already decoded —
+            // and, per the note above, still labelled. Handing the full list to manual dispatch
+            // then matched gzip a second time and decoded the body twice.
+            //
+            // Filtering the natives out of the list isn't enough on its own: that turns the
+            // double decode into an `UnsupportedContentEncodingError` for a response that was in
+            // fact decoded correctly. What manual dispatch needs to know is which encodings to
+            // leave alone, not merely which algorithms it owns.
             let decompressionDispatch: Internals.ManualDecompressionDispatch = {
                 switch decompression {
                 case .disabled:
                     return .skip
                 case .enabled(let algorithms, _) where !algorithms.allSatisfy(\.isNativelyDecodedByNIO):
-                    return .dispatch(algorithms: algorithms)
+                    return .dispatch(
+                        algorithms: algorithms.filter { !$0.isNativelyDecodedByNIO },
+                        nativelyDecoded: Set(
+                            algorithms
+                                .filter(\.isNativelyDecodedByNIO)
+                                .map { $0.contentEncodingValue.lowercased() }
+                        )
+                    )
                 case .enabled:
                     return .skip
                 }

@@ -45,15 +45,18 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// `async-http-client`'s own native gzip/deflate decoder strips `Content-Encoding` once it
-        /// successfully decodes a response (see `NIOHTTPResponseDecompressor`), so enabling it
-        /// whenever a natively-decoded algorithm is anywhere in the configured list is always safe:
-        /// whatever it leaves untouched (a custom algorithm, or nothing at all) is exactly what
-        /// manual dispatch downstream is for.
+        /// `NIOHTTPResponseDecompressor` only ever reacts to a `Content-Encoding: gzip`/`deflate`
+        /// response, so enabling it whenever a natively-decoded algorithm is anywhere in the
+        /// configured list is safe: whatever it leaves untouched (a custom algorithm, or nothing
+        /// at all) is exactly what manual dispatch downstream is for. Unlike `.urlSession`, there
+        /// is no all-or-nothing constraint here.
         ///
-        /// Unlike `.urlSession`, there is no all-or-nothing constraint here. `NIOHTTPResponseDecompressor`
-        /// only ever reacts to a `Content-Encoding: gzip`/`deflate` response, so it can stay on
-        /// alongside manual dispatch for anything else.
+        /// - Important: It forwards the response head **unmodified**, `Content-Encoding` included
+        /// (`fireChannelRead(NIOAny(part))` in the vendored `swift-nio-extras` source this package
+        /// actually ships), so nothing downstream can tell an already-decoded response from a
+        /// still-encoded one by looking at the header. `Internals.Client.execute` therefore tells
+        /// manual dispatch which encodings this handler has taken, via
+        /// `ManualDecompressionDispatch.dispatch(algorithms:nativelyDecoded:)`.
         ///
         /// - Important: Gated on `isNativelyDecodedByNIO`, not `contentEncodingValue`, since
         /// `NIOHTTPResponseDecompressor` is a single switch triggered purely by the response's own

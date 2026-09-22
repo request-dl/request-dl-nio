@@ -26,7 +26,29 @@ extension Internals {
     /// present" without risking a second, corrupting decode pass over already-decoded bytes.
     package enum ManualDecompressionDispatch: Sendable {
         case skip
-        case dispatch(algorithms: [any Internals.DecompressionAlgorithm])
+
+        /// - Parameter nativelyDecoded: Lowercased `Content-Encoding` values the transport has
+        ///   *already* decoded before handing these bytes over, and which must therefore be
+        ///   passed straight through rather than matched against `algorithms`.
+        ///
+        ///   Neither transport strips `Content-Encoding` after decoding natively, so the header
+        ///   alone can't tell the two apart; this is the only thing that can. Empty for
+        ///   `.urlSession`, which suppresses CFNetwork's transparent decoding outright whenever
+        ///   it dispatches at all, and non-empty only for `.nio`'s mixed case, where
+        ///   `NIOHTTPResponseDecompressor` handles the gzip/deflate half of a list while manual
+        ///   dispatch handles the rest.
+        case dispatch(
+            algorithms: [any Internals.DecompressionAlgorithm],
+            nativelyDecoded: Set<String>
+        )
+
+        /// The common case: nothing was decoded on the way in, so every configured algorithm is
+        /// this package's to apply.
+        package static func dispatch(
+            algorithms: [any Internals.DecompressionAlgorithm]
+        ) -> Self {
+            .dispatch(algorithms: algorithms, nativelyDecoded: [])
+        }
     }
 
     /// Internals-layer counterpart to `RequestDL.UnsupportedContentEncodingError`, caught where
@@ -56,20 +78,29 @@ extension Internals.ManualDecompressionDispatch {
         for head: Internals.ResponseHead,
         source: Internals.AsyncStream<Internals.DataBuffer>
     ) throws -> Internals.AsyncStream<Internals.DataBuffer> {
-        guard case .dispatch(let algorithms) = self else {
+        guard case .dispatch(let algorithms, let nativelyDecoded) = self else {
             return source
         }
 
-        guard
-            let contentEncoding = head.headerValues(named: "Content-Encoding").first,
-            contentEncoding.lowercased() != "identity"
-        else {
+        guard let contentEncoding = head.headerValues(named: "Content-Encoding").first else {
+            return source
+        }
+
+        let normalized = contentEncoding.lowercased()
+
+        guard normalized != "identity" else {
+            return source
+        }
+
+        // Already decoded on the way in; the transport simply didn't strip the header on its way
+        // back out. Decoding again here is how a perfectly good response gets corrupted.
+        guard !nativelyDecoded.contains(normalized) else {
             return source
         }
 
         guard
             let algorithm = algorithms.first(where: {
-                $0.contentEncodingValue.lowercased() == contentEncoding.lowercased()
+                $0.contentEncodingValue.lowercased() == normalized
             })
         else {
             throw Internals.UnsupportedContentEncodingError(value: contentEncoding)
