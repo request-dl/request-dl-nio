@@ -181,6 +181,27 @@ extension Internals.Session.Configuration {
 
 extension Internals.Session.Configuration {
 
+    /// `false` when this configuration can be told, statically, never to compare equal to another
+    /// one — its own future self included — which makes caching a client for it pure cost:
+    /// `Internals.ClientManager._reusableItem`'s linear scan can never match it, and the entry it
+    /// would leave in `_table` can never be handed back to anyone.
+    ///
+    /// Today that means exactly `.strategy`, which carries an existential redirect strategy with
+    /// no notion of equality, so `Internals.RedirectConfiguration.==` answers `false` for it
+    /// against everything (see that type's own doc comment). Each such resolution gets a fresh
+    /// client either way; this only decides whether the pool also keeps a copy nobody can use.
+    ///
+    /// Deliberately not extended to `SecureConnection`'s `===`-compared hooks (`keyLogger`,
+    /// `pskIdentityResolver`, `trustDecisionObserver`): an instance held once and reused *does*
+    /// match, so those aren't statically unpoolable, only frequently so in practice.
+    package var isPoolable: Bool {
+        if case .strategy = redirectConfiguration {
+            return false
+        }
+
+        return true
+    }
+
     package var isCompatibleWithNetworkFramework: Bool {
         if enableNetworkFramework {
             return secureConnection?.isCompatibleWithNetworkFramework ?? true

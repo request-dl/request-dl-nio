@@ -59,9 +59,15 @@ extension Internals.ClientManager {
 
             // `withLock` rather than a manual lock and unlock pair with a return in the
             // middle of it, which balances today and stops balancing on the next edit.
-            if case .nio(let client) = tableLock.withLock({
-                _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-            }) {
+            //
+            // Skipped outright for a configuration that can never match a pooled one: the scan
+            // is linear, and for such a configuration it is guaranteed to walk the whole list and
+            // find nothing, every single time.
+            if sessionConfiguration.isPoolable,
+                case .nio(let client) = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                })
+            {
                 return client
             }
 
@@ -104,7 +110,18 @@ extension Internals.ClientManager {
         )
         #endif
 
-        tableLock.withLock {
+        // A configuration that can never be matched again is used and forgotten: pooling it would
+        // only add an entry every future `_reusableItem` scan has to walk past, and that nothing
+        // but the idle sweep could ever remove.
+        //
+        // Safe to leave untracked here, unlike on the `.urlSession` side: `Internals.Client`'s
+        // own `deinit` shuts the client down once the caller releases it, which is sooner than
+        // the sweep would have anyway.
+        guard sessionConfiguration.isPoolable else {
+            return client
+        }
+
+        let evicted = tableLock.withLock {
             var items = _table[id] ?? []
 
             items.append(
@@ -115,7 +132,11 @@ extension Internals.ClientManager {
             )
 
             _table[id] = items
+
+            return _evictIfNeeded()
         }
+
+        Internals.ClientManager.shutdownDetached(evicted)
 
         return client
     }

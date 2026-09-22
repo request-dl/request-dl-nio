@@ -24,16 +24,26 @@ extension Internals {
         /// caches `.urlSession` clients too, so its own lifetime bookkeeping shouldn't need NIO
         /// to exist at all.
         package static let lifetime: Int64 = 5 * 60 * 1_000_000_000
+
+        /// A ceiling on how many pooled clients `_table` may hold in total, across every key.
+        ///
+        /// Age is the intended eviction policy, same as `Internals.Storage.maximumCount`, and
+        /// this exists for the same reason: so a workload that keeps producing configurations
+        /// which can never match a pooled one cannot grow the table without bound. Set far lower
+        /// than `Storage`'s, since an entry here is a whole HTTP client with its own connection
+        /// pool rather than a single cached value.
+        package static let maximumCount = 64
+
         package static let shared = ClientManager(lifetime: lifetime)
 
         // MARK: - Private static properties
 
         /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
         /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`:
-        /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients
-        /// serially in one sweep, each a real network drain, so a wide margin is needed to avoid
-        /// flagging a legitimately busy sweep. Development builds only. See
-        /// `AsyncLock.Watchdog`.
+        /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients in one
+        /// sweep, each a real network drain — concurrently, so the sweep costs the longest of
+        /// them rather than their sum, but a wide margin is still needed to avoid flagging a
+        /// legitimately busy one. Development builds only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 45) {
             Internals.assertionFailure($0)
@@ -51,7 +61,18 @@ extension Internals {
         let lock = AsyncLock(watchdog: watchdog)
         private let lifetime: Int64
 
+        // Not `private`, same cross-file reason as ``lock``/``tableLock``/``_table``.
+        let maximumCount: Int
+
         let tableLock = Lock()
+
+        // MARK: - Internal properties
+
+        /// How many clients are pooled in total, across every key. Bookkeeping only; nothing in
+        /// the resolution path reads it.
+        package var count: Int {
+            tableLock.withLock { _table.values.reduce(0) { $0 + $1.count } }
+        }
 
         // MARK: - Unsafe properties
 
@@ -59,8 +80,12 @@ extension Internals {
 
         // MARK: - Inits
 
-        package init(lifetime: Int64) {
+        package init(lifetime: Int64, maximumCount: Int = ClientManager.maximumCount) {
+            precondition(maximumCount >= 1, "ClientManager needs room for at least one client")
+
             self.lifetime = lifetime
+            self.maximumCount = maximumCount
+
             scheduleCleanup()
         }
 
@@ -121,9 +146,10 @@ extension Internals {
             return try await lock.withLock {
                 try Task.checkCancellation()
 
-                if let item = tableLock.withLock({
-                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-                }),
+                if sessionConfiguration.isPoolable,
+                    let item = tableLock.withLock({
+                        _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                    }),
                     case .urlSession = item
                 {
                     return item
@@ -162,6 +188,13 @@ extension Internals {
             }
         }
 
+        /// Retires every client that has been idle for longer than `lifetime`.
+        ///
+        /// Decides first, shuts down after. The two used to be interleaved, one `await` per
+        /// expired client, all of it inside `lock` — which every client resolution in the process
+        /// also has to take. A sweep over a large accumulated backlog therefore stalled every
+        /// request that happened to need a client while it ran, for the sum of every drain rather
+        /// than the longest one.
         private func cleanupIfNeeded() async {
             await lock.withLock {
                 // Monotonic, not wall clock. `Date` moves when the user or NTP moves the system
@@ -175,35 +208,89 @@ extension Internals {
                     #endif
                 }()
 
-                for (key, items) in tableLock.withLock({ _table }) {
-                    var surviving = [Item]()
+                var expired = [(key: String, item: Item)]()
 
-                    for item in items {
-                        if item.client.isRunning {
-                            surviving.append(item.updatingReadAt())
-                            continue
+                tableLock.withLock {
+                    for (key, items) in _table {
+                        var surviving = [Item]()
+
+                        for item in items {
+                            if item.client.isRunning {
+                                surviving.append(item.updatingReadAt())
+                                continue
+                            }
+
+                            let isExpired: Bool = {
+                                #if canImport(Darwin)
+                                now - item.readAt > lifetime
+                                #else
+                                item.readAt.duration(to: .now) > .nanoseconds(lifetime)
+                                #endif
+                            }()
+
+                            if isExpired {
+                                expired.append((key, item))
+                            } else {
+                                surviving.append(item)
+                            }
                         }
 
-                        let isExpired: Bool = {
-                            #if canImport(Darwin)
-                            now - item.readAt > lifetime
-                            #else
-                            item.readAt.duration(to: .now) > .nanoseconds(lifetime)
-                            #endif
-                        }()
+                        _table[key] = surviving.isEmpty ? nil : surviving
+                    }
+                }
 
-                        guard isExpired else {
-                            surviving.append(item)
-                            continue
-                        }
+                guard !expired.isEmpty else {
+                    return
+                }
 
-                        if (try? await item.client.shutdown()) != true {
-                            surviving.append(item)
+                let failed = await withTaskGroup(of: (String, Item)?.self) { group in
+                    for (key, item) in expired {
+                        group.addTask {
+                            (try? await item.client.shutdown()) == true ? nil : (key, item)
                         }
                     }
 
-                    tableLock.withLock {
-                        _table[key] = surviving.isEmpty ? nil : surviving
+                    var failed = [(String, Item)]()
+
+                    for await result in group {
+                        if let result {
+                            failed.append(result)
+                        }
+                    }
+
+                    return failed
+                }
+
+                // A client that refused to shut down is put back rather than dropped: it still
+                // owns live resources, so losing the only reference to it would leak them. The
+                // next sweep tries again.
+                guard !failed.isEmpty else {
+                    return
+                }
+
+                tableLock.withLock {
+                    for (key, item) in failed {
+                        _table[key, default: []].append(item)
+                    }
+                }
+            }
+        }
+
+        /// Shuts `clients` down off `tableLock` and off the caller's own path.
+        ///
+        /// An eviction is bookkeeping the caller didn't ask for — it is in the middle of handing
+        /// out a brand-new client — so it shouldn't wait on a drain, and `tableLock` is a plain
+        /// mutex that must never be held across one. Concurrent within the detached task, for the
+        /// same reason `cleanupIfNeeded()`'s own shutdowns are.
+        static func shutdownDetached(_ clients: [Internals.ClientManager.Client]) {
+            guard !clients.isEmpty else {
+                return
+            }
+
+            _Concurrency.Task.detached(priority: .utility) {
+                await withTaskGroup(of: Void.self) { group in
+                    for client in clients {
+                        group.addTask { _ = try? await client.shutdown() }
                     }
                 }
             }
@@ -257,6 +344,62 @@ extension Internals {
             return item.client
         }
 
+        /// - Warning: Lockless. The caller must be holding ``tableLock``.
+        ///
+        /// Brings `_table` back under ``maximumCount``, oldest first, dropping to three quarters
+        /// of it in one pass so a table sitting exactly at the ceiling doesn't evict on every
+        /// single insert that follows. Same shape as `Internals.Storage._evictIfNeeded()`, except
+        /// that what is evicted here owns a connection pool, so it has to be shut down rather
+        /// than merely forgotten.
+        ///
+        /// Only clients with nothing in flight are candidates, regardless of age: the ceiling may
+        /// be overshot while every pooled client is busy, which is the right way round — the
+        /// alternative is tearing down connections out from under live requests to satisfy a
+        /// bookkeeping limit.
+        ///
+        /// - Returns: The evicted clients, which the caller must hand to ``shutdownDetached(_:)``.
+        ///   Returning them rather than shutting them down here is what keeps a network drain off
+        ///   ``tableLock``.
+        func _evictIfNeeded() -> [Internals.ClientManager.Client] {
+            let count = _table.values.reduce(0) { $0 + $1.count }
+
+            guard count > maximumCount else {
+                return []
+            }
+
+            let target = max(maximumCount - (maximumCount / 4), 1)
+
+            let evictable =
+                _table
+                .flatMap { key, items in
+                    items.enumerated().map { (key: key, offset: $0.offset, item: $0.element) }
+                }
+                .filter { !$0.item.client.isRunning }
+                .sorted { $0.item.readAt < $1.item.readAt }
+                .prefix(count - target)
+
+            var offsetsByKey = [String: [Int]]()
+
+            for entry in evictable {
+                offsetsByKey[entry.key, default: []].append(entry.offset)
+            }
+
+            for (key, offsets) in offsetsByKey {
+                guard var items = _table[key] else {
+                    continue
+                }
+
+                // Descending, so removing one doesn't shift the offsets still to be removed.
+                for offset in offsets.sorted(by: >) {
+                    items.remove(at: offset)
+                }
+
+                _table[key] = items.isEmpty ? nil : items
+            }
+
+            return evictable.map(\.item.client)
+        }
+
         #if canImport(Darwin)
         /// - Warning: Lockless with respect to ``tableLock``, which it takes itself.
         ///
@@ -288,7 +431,13 @@ extension Internals {
                 )
             }
 
-            tableLock.withLock {
+            // Still pooled even when `!sessionConfiguration.isPoolable`, unlike the `.nio` side,
+            // which skips the insert entirely. An `Internals.URLSessionClient` has no `deinit`
+            // fallback to shut itself down — `URLSession` retains its delegate, so the client is
+            // never released on its own — which makes this table the only thing that ever gets
+            // around to invalidating it. An entry nobody can reuse is still worth keeping for
+            // the sweep to find; `_evictIfNeeded` is what keeps that from growing without bound.
+            let evicted = tableLock.withLock {
                 var items = _table[id] ?? []
 
                 items.append(
@@ -299,7 +448,11 @@ extension Internals {
                 )
 
                 _table[id] = items
+
+                return _evictIfNeeded()
             }
+
+            Self.shutdownDetached(evicted)
 
             return client
         }
