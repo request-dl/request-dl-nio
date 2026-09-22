@@ -122,12 +122,14 @@ extension InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
-    /// Mirrors `resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin` (main
-    /// file), but for a field that has *no* URLSession-reachable equivalent (no ATS `Info.plist`
-    /// key for a maximum TLS version), so it must fall back away from `.urlSession` instead.
+    /// Regression coverage: `maximumTLSVersion` used to force a fallback to
+    /// `.nioTransportServices` here, on the premise that URLSession had no way to carry it. It
+    /// does: `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`, which
+    /// `buildURLSessionConfiguration()` already set but could never be reached while this
+    /// fallback existed. Setting a maximum TLS version must not silently switch transports.
     @Test
-    func resolveExecutor_whenMaximumTLSVersionSet_resolvesToNIOTransportServicesOnDarwin() async throws {
-        // Given: fine under NIOTransportServices, unsupported under URLSession
+    func resolveExecutor_whenMaximumTLSVersionSet_resolvesToURLSessionOnDarwin() async throws {
+        // Given
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
 
@@ -140,10 +142,27 @@ extension InternalsSessionConfigurationExecutorTests {
 
         // Then
         #if canImport(Darwin)
-        #expect(sut == .nioTransportServices)
+        #expect(sut == .urlSession)
         #else
         #expect(sut == .nio)
         #endif
+    }
+
+    /// The companion guarantee to the above: a hard pin to `.urlSession` must not throw over a
+    /// maximum TLS version either.
+    @Test
+    func requireExecutor_whenMaximumTLSVersionSetAndURLSessionRequired_doesNotThrow() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = .tlsv12
+        configuration.secureConnection = secureConnection
+
+        // Then
+        #expect(throws: Never.self) {
+            try configuration.requireExecutor(.urlSession)
+        }
     }
 
     // MARK: - resolveExecutor() with preferredExecutor

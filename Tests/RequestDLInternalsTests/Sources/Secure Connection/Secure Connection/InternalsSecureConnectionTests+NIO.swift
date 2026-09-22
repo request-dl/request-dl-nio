@@ -419,9 +419,9 @@ extension InternalsSecureConnectionTests {
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.cipherSuites = "DEFAULT"
             },
-            { (secureConnection: inout Internals.SecureConnection) in
-                secureConnection.maximumTLSVersion = .tlsv12
-            },
+            // `maximumTLSVersion` deliberately absent: it *is* reachable under URLSession, via
+            // `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`. See
+            // `secureConnection_whenMaximumTLSVersionSet_remainsCompatibleWithURLSession`.
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.applicationProtocols = ["h2"]
             },

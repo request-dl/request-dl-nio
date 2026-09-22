@@ -129,12 +129,25 @@ extension Internals {
         /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
         /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
         ///
-        /// Also deliberately does *not* check `minimumTLSVersion`, unlike its sibling
-        /// `maximumTLSVersion` right below. `minimumTLSVersion` has a real, reachable equivalent
-        /// under URLSession (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist),
-        /// so flagging it here would push callers off `.urlSession` even when they have a working
-        /// alternative. `maximumTLSVersion` and `applicationProtocols` have no such alternative;
-        /// there is no ATS key for either, so those *are* flagged.
+        /// Also deliberately does *not* check `minimumTLSVersion` or `maximumTLSVersion`. Both map
+        /// straight onto `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
+        /// `tlsMaximumSupportedProtocolVersion` in `buildURLSessionConfiguration()` (available
+        /// since macOS 10.15/iOS 13/tvOS 13/watchOS 6, all below this package's own deployment
+        /// floor), so flagging either would push callers off `.urlSession` despite the setting
+        /// being carried there in full.
+        ///
+        /// `maximumTLSVersion` used to be flagged, on the premise that TLS version policy under
+        /// URLSession lives in App Transport Security and ATS has no maximum-version key. That
+        /// premise was wrong: it is `URLSessionConfiguration`, not Info.plist, that carries this,
+        /// and it is honored on the wire. Confirmed with a negative control rather than from
+        /// documentation: capping a session at TLS 1.2 against a TLS 1.3-capable server negotiates
+        /// TLS 1.2, while the same request with no cap negotiates TLS 1.3
+        /// (`URLSessionTaskMetrics.negotiatedTLSProtocolVersion`). Flagging it also made the
+        /// `tlsMaximumSupportedProtocolVersion` mapping unreachable, since a configuration
+        /// carrying the field could never resolve to `.urlSession` in the first place.
+        ///
+        /// `applicationProtocols` genuinely has no equivalent, so it *is* still flagged:
+        /// `URLSession` negotiates ALPN itself with no API to override the list.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
@@ -150,7 +163,6 @@ extension Internals {
             #endif
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
-            if maximumTLSVersion != nil { reasons.append(.maximumTLSVersionUnderURLSession) }
             if applicationProtocols != nil { reasons.append(.applicationProtocolsUnderURLSession) }
 
             return reasons

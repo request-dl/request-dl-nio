@@ -155,14 +155,22 @@ extension InternalsSecureConnectionTests {
         #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
+    /// Regression coverage: `maximumTLSVersion` used to be flagged as incompatible with
+    /// `.urlSession`, on the premise that ATS has no maximum-version key and therefore nothing
+    /// could carry it. The premise was wrong: `URLSessionConfiguration
+    /// .tlsMaximumSupportedProtocolVersion` carries it, and
+    /// `buildURLSessionConfiguration()` has always set it, it was simply unreachable because this
+    /// very flag steered every configuration carrying the field away from `.urlSession` first.
+    /// Flagging it silently switched transports (losing ATS integration, HTTP/3 and background
+    /// transfers) and made `requiredExecutor(.urlSession)` throw over a combination that works.
     @Test
-    func secureConnection_whenMaximumTLSVersionSet_urlSessionIncompatibilityReasonsContainsIt() async throws {
+    func secureConnection_whenMaximumTLSVersionSet_remainsCompatibleWithURLSession() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
         secureConnection.maximumTLSVersion = .tlsv12
 
         // Then
-        #expect(secureConnection.urlSessionIncompatibilityReasons().contains(.maximumTLSVersionUnderURLSession))
+        #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
     @Test
@@ -176,9 +184,9 @@ extension InternalsSecureConnectionTests {
     }
 
     /// `minimumTLSVersion` is deliberately excluded from `urlSessionIncompatibilityReasons()`,
-    /// unlike its sibling `maximumTLSVersion` above. It has a real, reachable equivalent under
-    /// URLSession (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so it
-    /// must never force a fallback away from `.urlSession` or trip `requiredExecutor(.urlSession)`.
+    /// like its sibling `maximumTLSVersion` above. It is carried under `.urlSession` by
+    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`, so it must never force a
+    /// fallback away from `.urlSession` or trip `requiredExecutor(.urlSession)`.
     @Test
     func secureConnection_whenMinimumTLSVersionSet_remainsCompatibleWithURLSession() async throws {
         // Given

@@ -196,6 +196,87 @@ struct InternalsSessionConfigurationTests {
                 == defaultConfiguration.tlsMaximumSupportedProtocolVersion
         )
     }
+
+    /// Regression coverage, same bug class as the TLS-version pair above:
+    /// `Session.maximumConnectionsPerHost(_:)` reached AsyncHTTPClient's
+    /// `concurrentHTTP1ConnectionsPerHostSoftLimit` but was silently dropped under `.urlSession`,
+    /// despite `httpMaximumConnectionsPerHost` being an exact counterpart. Since `.urlSession` is
+    /// the default executor on Darwin, the modifier did nothing at all for most callers.
+    @Test
+    func configuration_whenMaximumConnectionsPerHostSet_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 3
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.httpMaximumConnectionsPerHost == 3)
+    }
+
+    @Test
+    func configuration_whenMaximumConnectionsPerHostOmitted_urlSessionConfigurationKeepsSystemDefault() async throws {
+        // Given: absence must stay absence, not get retuned to AsyncHTTPClient's own default
+        let configuration = Internals.Session.Configuration()
+        let defaultConfiguration = URLSessionConfiguration.ephemeral
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(
+            urlSessionConfiguration.httpMaximumConnectionsPerHost
+                == defaultConfiguration.httpMaximumConnectionsPerHost
+        )
+    }
+
+    #if os(iOS) || os(visionOS)
+    /// Regression coverage: `Session.multipathServiceType(_:)` documents itself as mirroring
+    /// `URLSessionConfiguration.multipathServiceType`, and carries all four cases precisely so the
+    /// handover/interactive/aggregate distinction survives, yet `.urlSession` never set the
+    /// property at all. Only the NIO executors honored it (collapsed onto `enableMultipath`),
+    /// which inverts the capability: `.urlSession` is the one transport that can express the
+    /// distinction in full.
+    @Test
+    func configuration_whenMultipathServiceTypeSet_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.multipathServiceType = .handover
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then: the specific case, not merely "something other than .none"
+        #expect(urlSessionConfiguration.multipathServiceType == .handover)
+    }
+
+    @Test
+    func configuration_whenMultipathServiceTypeInteractive_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.multipathServiceType = .interactive
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.multipathServiceType == .interactive)
+    }
+
+    @Test
+    func configuration_whenMultipathServiceTypeNone_urlSessionConfigurationKeepsSystemDefault() async throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+        let defaultConfiguration = URLSessionConfiguration.ephemeral
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.multipathServiceType == defaultConfiguration.multipathServiceType)
+    }
+    #endif
     #endif
 }
 

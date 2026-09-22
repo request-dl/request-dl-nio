@@ -255,9 +255,9 @@ struct InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
-    /// `minimumTLSVersion` is the deliberate exception: it has a real equivalent under URLSession
-    /// (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so unlike
-    /// `maximumTLSVersion`, it must never force a fallback away from `.urlSession`.
+    /// `minimumTLSVersion` is carried under URLSession by
+    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`, so, like `maximumTLSVersion`,
+    /// it must never force a fallback away from `.urlSession`.
     @Test
     func resolveExecutor_whenMinimumTLSVersionSet_resolvesToURLSessionOnDarwin() async throws {
         // Given

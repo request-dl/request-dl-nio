@@ -451,8 +451,19 @@ extension Internals.Session.Configuration {
     /// `tlsMaximumSupportedProtocolVersion`, the one other `SecureConnection` field with a
     /// direct `URLSessionConfiguration` counterpart.
     ///
+    /// `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` maps onto
+    /// `httpMaximumConnectionsPerHost`, and `multipathServiceType` onto `multipathServiceType`,
+    /// the two other fields with direct `URLSessionConfiguration` counterparts. Both are only
+    /// written when actually configured, so a session that never touched them keeps
+    /// `URLSession`'s own defaults; the per-host limit is a soft limit on the NIO side and a hard
+    /// one here, the closest either transport can get to the other. `multipathServiceType` is the
+    /// rare case where `.urlSession` is the *more* capable executor: `HTTPClient.Configuration`
+    /// only has an on/off `enableMultipath`, so the handover/interactive/aggregate distinction
+    /// survives here and collapses there. It exists only on iOS (including Mac Catalyst) and
+    /// visionOS; see `Internals.MultipathServiceType.urlSessionMultipathServiceType`.
+    ///
     /// Every other field this configuration could carry that has no `URLSessionConfiguration`
-    /// counterpart (`connectionPool`, `ignoreUncleanSSLShutdown`,
+    /// counterpart (the rest of `connectionPool`, `ignoreUncleanSSLShutdown`,
     /// `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific with nothing to
     /// translate to, or, for the fields that matter, like `dnsOverride`/`httpVersion ==
     /// .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/`decompression == .disabled`,
@@ -490,6 +501,18 @@ extension Internals.Session.Configuration {
         if let read = timeout.read {
             configuration.timeoutIntervalForRequest = TimeInterval(read) / 1_000_000_000
         }
+
+        if let concurrentHTTP1ConnectionsPerHostSoftLimit = connectionPool
+            .concurrentHTTP1ConnectionsPerHostSoftLimit
+        {
+            configuration.httpMaximumConnectionsPerHost = concurrentHTTP1ConnectionsPerHostSoftLimit
+        }
+
+        #if os(iOS) || os(visionOS)
+        if multipathServiceType != .none {
+            configuration.multipathServiceType = multipathServiceType.urlSessionMultipathServiceType
+        }
+        #endif
 
         #if canImport(Network)
         if let minimumTLSVersion = secureConnection?.minimumTLSVersion {

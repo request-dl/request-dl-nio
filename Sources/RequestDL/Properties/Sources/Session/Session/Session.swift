@@ -158,6 +158,17 @@ public struct Session: Property {
     ///
     /// Configures multipath TCP for the session, mirroring `URLSessionConfiguration.multipathServiceType`.
     ///
+    /// Under ``Session/Executor/urlSession`` the distinction between ``MultipathServiceType/handover``,
+    /// ``MultipathServiceType/interactive`` and ``MultipathServiceType/aggregate`` is carried through
+    /// as-is. Under ``Session/Executor/nio``/``Session/Executor/nioTransportServices`` it collapses to
+    /// AsyncHTTPClient's on/off `enableMultipath`, which has no equivalent distinction, so every case
+    /// other than ``MultipathServiceType/none`` simply enables multipath.
+    ///
+    /// - Note: `URLSession` exposes multipath on iOS, iPadOS, Mac Catalyst and visionOS only; Apple
+    /// declares the property unavailable on macOS, tvOS and watchOS. On those three this modifier has
+    /// no effect under `.urlSession`, since there is no API to carry it, while the NIO executors still
+    /// honor it.
+    ///
     /// - Parameter type: The multipath service type to use.
     /// - Returns: The modified `Session` instance with multipath configured.
     ///
@@ -237,12 +248,14 @@ public struct Session: Property {
     /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
     /// the configuration supports it.
     ///
-    /// Pinning to `.urlSession` does **not** catch a `SecureConnection` minimum TLS version.
-    /// `ExecutorRequirementError` isn't thrown for it; it simply has no effect, because
-    /// `URLSessionConfiguration` has no API for it at all. That policy instead lives in your
-    /// app's `Info.plist`, via App Transport Security. See
-    /// <doc:Configuring-App-Transport-Security-for-URLSession>. A maximum TLS version or an ALPN
-    /// protocol list, which have no `Info.plist` equivalent at all, *are* caught: they throw
+    /// A `SecureConnection` minimum or maximum TLS version is neither caught nor dropped under
+    /// `.urlSession`: both are carried through as
+    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`/
+    /// `tlsMaximumSupportedProtocolVersion`, so pinning to `.urlSession` with either configured
+    /// simply works. App Transport Security
+    /// (<doc:Configuring-App-Transport-Security-for-URLSession>) remains the right tool for policy
+    /// you want applied process-wide rather than per-session, but it is not required for these.
+    /// An ALPN protocol list, which has no `URLSession` equivalent at all, *is* caught: it throws
     /// `ExecutorRequirementError` like any other incompatible field.
     ///
     /// ```swift
@@ -263,6 +276,14 @@ public struct Session: Property {
 
     ///
     /// Configures the maximum number of connections per host for the session.
+    ///
+    /// Honored by every executor: it maps onto AsyncHTTPClient's
+    /// `concurrentHTTP1ConnectionsPerHostSoftLimit` under ``Session/Executor/nio``/
+    /// ``Session/Executor/nioTransportServices`` and onto
+    /// `URLSessionConfiguration.httpMaximumConnectionsPerHost` under ``Session/Executor/urlSession``.
+    /// AsyncHTTPClient treats it as a soft limit it may exceed, `URLSession` as a hard one; that is
+    /// as close as the two transports get. Leaving it unset keeps each transport's own default
+    /// rather than imposing one on the other.
     ///
     /// - Parameter maximum: The maximum number of connections per host.
     /// - Returns: The modified `Session` instance with the maximum connections per host configured.
