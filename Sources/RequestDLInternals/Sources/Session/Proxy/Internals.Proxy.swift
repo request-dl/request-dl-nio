@@ -42,8 +42,10 @@ extension Internals {
 
         /// Extra headers sent only on the HTTP `CONNECT` request to an `.http` proxy.
         ///
-        /// Ignored for `.socks`, which has no `CONNECT` phase. Excluded from `Hashable`, same as
-        /// upstream's own `HTTPClient.Configuration.Proxy`: `NIOHTTP1.HTTPHeaders` isn't `Hashable`.
+        /// Ignored for `.socks`, which has no `CONNECT` phase. Included in `Hashable` below,
+        /// unlike upstream's own `HTTPClient.Configuration.Proxy` (whose `NIOHTTP1.HTTPHeaders`
+        /// isn't `Hashable`): this is `Internals.HTTPHeaders`, this package's own portable type,
+        /// which is `Hashable`.
         package let connectHeaders: Internals.HTTPHeaders
 
         package init(
@@ -82,11 +84,17 @@ extension Internals {
 
 extension Internals.Proxy: Hashable {
 
+    // `connectHeaders` matters here: `Internals.Session.Configuration.==` uses this as part of
+    // `Internals.ClientManager`'s pooled-client cache key. Omitting it would let two sessions
+    // whose proxy differs only in CONNECT headers -- commonly where proxy-auth secrets, distinct
+    // per session, actually live -- be treated as interchangeable, sharing (and thereby leaking
+    // across sessions) whichever one first built the pooled client.
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         lhs.host == rhs.host
             && lhs.port == rhs.port
             && lhs.connectionProtocol == rhs.connectionProtocol
             && lhs.authorization == rhs.authorization
+            && lhs.connectHeaders == rhs.connectHeaders
     }
 
     package func hash(into hasher: inout Hasher) {
@@ -94,6 +102,7 @@ extension Internals.Proxy: Hashable {
         hasher.combine(port)
         hasher.combine(connectionProtocol)
         hasher.combine(authorization)
+        hasher.combine(connectHeaders)
     }
 }
 

@@ -65,6 +65,57 @@ struct InternalsClientManagerTests {
         #expect(sut1 !== sut2)
     }
 
+    /// Regression coverage for a pooled-client cache collision: `Internals.Proxy.connectHeaders`
+    /// used to be excluded from `Hashable`, so `Internals.Session.Configuration.==` (this
+    /// manager's cache key) treated two sessions whose proxy differed only in CONNECT headers as
+    /// interchangeable. `connectHeaders` is commonly where proxy-auth secrets distinct per
+    /// session live, so sharing a pooled client here would silently carry one session's proxy
+    /// credentials into a request meant for a different one's.
+    @Test
+    func manager_whenRegisterWithDifferentProxyConnectHeaders_shouldBeNotEqual() async throws {
+        // Given
+        let manager = Internals.ClientManager.shared
+        let provider = Internals.SharedSessionProvider()
+
+        var firstConnectHeaders = Internals.HTTPHeaders()
+        firstConnectHeaders.add(name: "Proxy-Authorization", value: "Bearer first-session-token")
+
+        var secondConnectHeaders = Internals.HTTPHeaders()
+        secondConnectHeaders.add(name: "Proxy-Authorization", value: "Bearer second-session-token")
+
+        var sessionConfiguration1 = Internals.Session.Configuration()
+        sessionConfiguration1.proxy = .init(
+            host: "proxy.example.com",
+            port: 8_080,
+            connection: .http,
+            authorization: nil,
+            connectHeaders: firstConnectHeaders
+        )
+
+        var sessionConfiguration2 = Internals.Session.Configuration()
+        sessionConfiguration2.proxy = .init(
+            host: "proxy.example.com",
+            port: 8_080,
+            connection: .http,
+            authorization: nil,
+            connectHeaders: secondConnectHeaders
+        )
+
+        // When
+        let sut1 = try await manager.client(
+            provider: provider,
+            sessionConfiguration: sessionConfiguration1
+        )
+
+        let sut2 = try await manager.client(
+            provider: provider,
+            sessionConfiguration: sessionConfiguration2
+        )
+
+        // Then
+        #expect(sut1 !== sut2)
+    }
+
     @Test
     func manager_expiringClients() async throws {
         // Given

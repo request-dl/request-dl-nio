@@ -14,8 +14,15 @@ import struct Foundation.UUID
 
 struct InternalsProxyTests {
 
+    /// Regression coverage for a pooled-client cache collision: `Internals.Session.Configuration
+    /// .==` uses `Internals.Proxy.==` (transitively) as `Internals.ClientManager`'s pooled-client
+    /// cache key. `connectHeaders` is where proxy-auth secrets distinct per session commonly
+    /// live, so two proxies differing only there must compare unequal -- otherwise one session's
+    /// pooled client (built with its own CONNECT headers baked in) could be silently handed to a
+    /// request for a *different* session's proxy credentials, leaking one session's proxy
+    /// authorization into another's traffic.
     @Test
-    func proxy_whenConnectHeadersDiffer_shouldStillBeEqualAndHashEqual() {
+    func proxy_whenConnectHeadersDiffer_shouldNotBeEqual() {
         // Given
         let host = UUID().uuidString
         let port = 1_090
@@ -25,6 +32,35 @@ struct InternalsProxyTests {
 
         // When
         let lhs = Internals.Proxy(host: host, port: port, connection: .http, authorization: nil)
+        let rhs = Internals.Proxy(
+            host: host,
+            port: port,
+            connection: .http,
+            authorization: nil,
+            connectHeaders: connectHeaders
+        )
+
+        // Then
+        #expect(lhs != rhs)
+    }
+
+    @Test
+    func proxy_whenConnectHeadersMatch_shouldBeEqualAndHashEqual() {
+        // Given
+        let host = UUID().uuidString
+        let port = 1_090
+
+        var connectHeaders = Internals.HTTPHeaders()
+        connectHeaders.add(name: "X-Proxy-Token", value: "abc123")
+
+        // When
+        let lhs = Internals.Proxy(
+            host: host,
+            port: port,
+            connection: .http,
+            authorization: nil,
+            connectHeaders: connectHeaders
+        )
         let rhs = Internals.Proxy(
             host: host,
             port: port,

@@ -75,6 +75,25 @@ extension Internals.HTTPHeaders: Sequence {
     }
 }
 
+// MARK: - Equatable, Hashable
+
+extension Internals.HTTPHeaders: Equatable {
+
+    package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.pairs.elementsEqual(rhs.pairs) { $0.name == $1.name && $0.value == $1.value }
+    }
+}
+
+extension Internals.HTTPHeaders: Hashable {
+
+    package func hash(into hasher: inout Hasher) {
+        for pair in pairs {
+            hasher.combine(pair.name)
+            hasher.combine(pair.value)
+        }
+    }
+}
+
 // MARK: - ExpressibleByDictionaryLiteral
 
 extension Internals.HTTPHeaders: ExpressibleByDictionaryLiteral {
