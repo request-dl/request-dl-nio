@@ -29,7 +29,7 @@ struct RawTaskTracingTests {
         configuration.pathComponents = ["search"]
         configuration.queries = [
             QueryItem(name: "q", value: "swift"),
-            QueryItem(name: "access_token", value: "s3cr3t-token-value")
+            QueryItem(name: "access_token", value: "s3cr3t-token-value"),
         ]
 
         let tracer = SpanRecordingTracer()
