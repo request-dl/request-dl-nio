@@ -384,6 +384,13 @@ extension Internals.SecureConnection: Equatable {
             && isKeyLoggerAndPSKEqual
             && lhs.certificateVerification == rhs.certificateVerification
             && lhs.trustRoots == rhs.trustRoots
+            // Latent today: every public path keeps this in lockstep with `trustRoots == nil`,
+            // so no configuration reachable through `Property` can differ here without also
+            // differing above. Compared anyway, because what this equality decides is whether a
+            // pooled client is handed back for a different configuration — the one place where
+            // "these two fields happen to move together right now" is not a safe thing to rely
+            // on the next time someone adds a path that sets them apart.
+            && lhs.useDefaultTrustRoots == rhs.useDefaultTrustRoots
             && lhs.additionalTrustRoots == rhs.additionalTrustRoots
             && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms
             && lhs.verifySignatureAlgorithms == rhs.verifySignatureAlgorithms

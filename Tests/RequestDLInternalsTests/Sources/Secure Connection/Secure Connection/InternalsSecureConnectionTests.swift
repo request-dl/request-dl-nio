@@ -188,4 +188,25 @@ extension InternalsSecureConnectionTests {
         // Then
         #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
+
+    /// What `==` decides is whether `Internals.ClientManager` hands a pooled client back for a
+    /// configuration it was not built for, so every field that changes the TLS handshake has to
+    /// be in it.
+    ///
+    /// Constructed directly rather than through the `Property` layer on purpose: no public path
+    /// can currently set `useDefaultTrustRoots` apart from `trustRoots`, which is exactly why
+    /// leaving it out of `==` went unnoticed. This pins the invariant before a path that can
+    /// arrives.
+    @Test
+    func secureConnection_whenOnlyUseDefaultTrustRootsDiffers_shouldNotCompareEqual() async throws {
+        // Given
+        let withoutDefaultTrustRoots = Internals.SecureConnection()
+
+        var withDefaultTrustRoots = Internals.SecureConnection()
+        withDefaultTrustRoots.useDefaultTrustRoots = true
+
+        // Then
+        #expect(withoutDefaultTrustRoots != withDefaultTrustRoots)
+        #expect(withoutDefaultTrustRoots == Internals.SecureConnection())
+    }
 }
