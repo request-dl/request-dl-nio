@@ -431,6 +431,43 @@ struct DataCacheTests {
         #expect(newest != nil)
     }
 
+    /// Regression coverage for `MemoryStorage`'s move away from an `OrderedSet`-backed
+    /// "move key to the most-recently-written end" index (an unconditional O(current entry
+    /// count) shift on every single write) to ordering by `Record.date` only inside
+    /// `freeSpace`'s own already-guarded rescan — the same shape `DiskStorage.freeSpace` already
+    /// used. Mirrors `cache_whenManySequentialDiskWritesExceedCapacity_shouldEvictOldestAndKeepNewest`
+    /// for the memory tier, to confirm the refactor didn't change eviction order.
+    @Test
+    func cache_whenManySequentialMemoryWritesExceedCapacity_shouldEvictOldestAndKeepNewest() async throws {
+        let testState = await TestState()
+        // Given
+        let dataCache = testState.dataCache
+
+        let entryLength = 10_000
+        dataCache.memoryCapacity = 25_000
+        await dataCache.waitUntilIdle()
+
+        // When: five entries are written one after another, each well past what the previous
+        // writes already used, on a capacity that cannot hold more than about two at once.
+        for index in 0..<5 {
+            let cachedData = await mockCachedData(
+                url: "https://sequential-memory-eviction.example.com/\(index)",
+                length: entryLength,
+                policy: .memory
+            )
+            await dataCache.setCachedData(cachedData, forKey: "key\(index)")
+            await dataCache.waitUntilIdle()
+        }
+
+        // Then: the oldest entry didn't survive five entries' worth of writes on a capacity
+        // sized for about two, and the most recent write — always made room for by construction
+        // — did.
+        let oldest = await dataCache.getCachedData(forKey: "key0", policy: .memory)
+        let newest = await dataCache.getCachedData(forKey: "key4", policy: .memory)
+        #expect(oldest == nil)
+        #expect(newest != nil)
+    }
+
     @Test
     func cache_whenUpdateCachedForExistingKey_shouldReplaceMetadataAndKeepBuffer() async throws {
         let testState = await TestState()
@@ -723,5 +760,68 @@ extension DataCacheTests {
         let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
         let cachedMemoryData = await cachedMemory?.data
         #expect(cachedMemoryData == goodData)
+    }
+
+    /// Regression coverage for the usage-estimate bug `finalizeWrite` fixes: `allocateBuffer`'s
+    /// `contentLength` is only a pre-write hint — `0` for a response with no accurate
+    /// `Content-Length`, exactly what chunked transfer encoding leaves behind — but the bytes
+    /// actually written through the returned buffer are not bounded by it. Left unreconciled,
+    /// the tracked usage estimate would understate such a write by its entire body size, and
+    /// `MemoryStorage.freeSpace`'s `knownUsage` short-circuit (#271/#361) would keep trusting
+    /// that understatement forever, letting the memory tier grow past `memoryCapacity`
+    /// indefinitely across repeated chunked writes.
+    @Test
+    func finalizeWrite_whenContentLengthHintWasZeroButBodyWasLarge_reconcilesUsageSoLaterWritesStillEvict()
+        async throws
+    {
+        let dataCache = DataCache(
+            memoryCapacity: 10_000,
+            suiteName: UUID().uuidString
+        )
+
+        let responseHead = Internals.ResponseHead(
+            url: "chunked",
+            status: .init(code: 200, reason: "OK"),
+            version: .init(minor: 0, major: 1),
+            headers: [],
+            isKeepAlive: true
+        )
+
+        // Given: a "chunked" write — no Content-Length known up front, so `allocateBuffer` is
+        // called with a `0` hint — whose real body takes up most of the whole capacity.
+        var chunkedBuffer = try #require(
+            await dataCache.allocateBuffer(
+                key: "chunked-key",
+                cachedResponse: .init(response: responseHead, policy: .memory),
+                contentLength: 0
+            )
+        )
+        let chunkedData = await Data.randomData(length: 8_000)
+        await chunkedBuffer.writeBuffer(Internals.DataBuffer(chunkedData))
+
+        // When: the write finishes and reconciles the estimate with the real byte count.
+        dataCache.finalizeWrite(chunkedBuffer, contentLengthHint: 0)
+
+        // A second, ordinarily-sized write that, combined with the first entry's *real* size,
+        // exceeds the 10,000-byte capacity — but would not if the first write's usage were still
+        // (wrongly) tracked as zero.
+        var secondBuffer = try #require(
+            await dataCache.allocateBuffer(
+                key: "second-key",
+                cachedResponse: .init(response: responseHead, policy: .memory),
+                contentLength: 8_000
+            )
+        )
+        let secondData = await Data.randomData(length: 8_000)
+        await secondBuffer.writeBuffer(Internals.DataBuffer(secondData))
+        dataCache.finalizeWrite(secondBuffer, contentLengthHint: 8_000)
+
+        // Then: the real rescan `freeSpace` runs once usage is reconciled and evicts the older
+        // ("chunked") entry to make room, exactly as it would if both content lengths had been
+        // known accurately from the start.
+        let chunkedEntry = await dataCache.getCachedData(forKey: "chunked-key", policy: .memory)
+        let secondEntry = await dataCache.getCachedData(forKey: "second-key", policy: .memory)
+        #expect(chunkedEntry == nil)
+        #expect(secondEntry != nil)
     }
 }

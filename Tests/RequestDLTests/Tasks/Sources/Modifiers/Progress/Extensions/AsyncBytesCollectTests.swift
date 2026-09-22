@@ -3,6 +3,7 @@
 //
 
 import Logging
+import RequestDLInternals
 import SwiftAsyncStream
 import Testing
 
@@ -97,5 +98,37 @@ struct AsyncBytesCollectTests {
 
         #expect(!receivedBytesRecords.isEmpty)
         #expect(!fetchedDataRecords.isEmpty)
+    }
+
+    /// Regression coverage for `collect()`/`collect(with:)` pre-allocating `Data` capacity
+    /// straight from `totalSize` — which mirrors the response's `Content-Length` header
+    /// verbatim, with no validation against how many bytes actually arrive. A response claiming
+    /// an enormous, attacker- or server-controlled length would otherwise force an immediate
+    /// multi-gigabyte allocation before a single byte is read, its own denial of service
+    /// regardless of the real body size. This exercises exactly that shape — a `totalSize` far
+    /// beyond anything reasonable, backed by a tiny real body — and would hang or crash the test
+    /// process outright on the pre-fix code instead of completing.
+    @Test
+    func collect_whenTotalSizeIsImplausiblyLarge_shouldNotPreallocateItAndStillCollectCorrectly() async throws {
+        // Given
+        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let part = Data("hello".utf8)
+
+        let internalBytes = Internals.AsyncBytes(
+            logger: nil,
+            totalSize: .max,
+            stream: stream
+        )
+
+        let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
+
+        // When
+        await stream.append(.success(Internals.DataBuffer(part)))
+        stream.close()
+
+        let data = try await bytes.collect()
+
+        // Then
+        #expect(data == part)
     }
 }

@@ -27,7 +27,7 @@ enum DigestResponse {
             ("username", Self.escapeQuotedValue(username), true),
             ("realm", challenge.realm, true),
             ("nonce", challenge.nonce, true),
-            ("uri", uri, true),
+            ("uri", Self.escapeQuotedValue(uri), true),
         ]
 
         let response: String
@@ -70,14 +70,16 @@ enum DigestResponse {
     /// `DigestChallenge.isSafeQuotedValue` rejects in the server-sent fields this same header
     /// echoes back.
     ///
-    /// Applied only to `username`: the one quoted parameter here that can carry caller-supplied
-    /// content rather than server- or package-generated content already known to be safe.
-    /// Unlike `realm`/`nonce`/`opaque` (rejecting the whole challenge is fine — the server sent
-    /// something unusable), silently dropping the `Authorization` header over an escapable
-    /// character in the caller's own username would be a worse failure mode than escaping it, so
-    /// this repairs the value instead of refusing it. The hash inputs above still use the literal
-    /// `username`, not this escaped copy: the digest response must match what the server computes
-    /// from the credential as given, not from its header-safe representation.
+    /// Applied to `username` and `uri`: the two quoted parameters here that can carry
+    /// caller-supplied content (`uri` is built from `Path`/`Query` components, which are commonly
+    /// derived from external data such as a resource id) rather than server- or
+    /// package-generated content already known to be safe. Unlike `realm`/`nonce`/`opaque`
+    /// (rejecting the whole challenge is fine — the server sent something unusable), silently
+    /// dropping the `Authorization` header over an escapable character in the caller's own
+    /// input would be a worse failure mode than escaping it, so this repairs the value instead
+    /// of refusing it. The hash inputs above still use the literal `username`/`uri`, not this
+    /// escaped copy: the digest response must match what the server computes from the request as
+    /// given, not from its header-safe representation.
     private static func escapeQuotedValue(_ value: String) -> String {
         var result = ""
         result.reserveCapacity(value.count)

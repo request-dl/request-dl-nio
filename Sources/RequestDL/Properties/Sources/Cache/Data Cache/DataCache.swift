@@ -228,6 +228,36 @@ public struct DataCache: Sendable, Equatable {
             return (buffer, recordURL)
         }
 
+        /// Corrects `_memoryUsageEstimate` after a write finishes, replacing the `contentLength`
+        /// hint `allocateMemoryDataURL` folded in at allocation time with the delta between that
+        /// hint and the buffer's real byte count.
+        ///
+        /// The hint is `0` for any response with no accurate `Content-Length` (chunked transfer
+        /// is the common case, since the two are mutually exclusive per HTTP semantics), while
+        /// the actual write can be arbitrarily larger. Left unreconciled, the estimate would
+        /// permanently undercount such a write, and `MemoryStorage.freeSpace`'s `knownUsage`
+        /// short-circuit (see #271/#361) would keep trusting that undercount forever, letting the
+        /// memory tier grow past `memoryCapacity` indefinitely across repeated chunked writes.
+        func reconcileMemoryUsage(contentLengthHint: Int64, actualSize: Int64) {
+            guard actualSize != contentLengthHint else { return }
+
+            lock.withLock {
+                guard let estimate = _memoryUsageEstimate else { return }
+                _memoryUsageEstimate = estimate - contentLengthHint + actualSize
+            }
+        }
+
+        /// Same role as `reconcileMemoryUsage(contentLengthHint:actualSize:)`, for
+        /// `_diskUsageEstimate`.
+        func reconcileDiskUsage(contentLengthHint: Int64, actualSize: Int64) {
+            guard actualSize != contentLengthHint else { return }
+
+            lock.withLock {
+                guard let estimate = _diskUsageEstimate else { return }
+                _diskUsageEstimate = estimate - contentLengthHint + actualSize
+            }
+        }
+
         // MARK: - Init
 
         init(_ directory: URL) {
@@ -639,6 +669,31 @@ public struct DataCache: Sendable, Equatable {
 
         if let diskRecordURL = buffer.diskRecordURL {
             await storage.diskStorage.removeRecord(at: diskRecordURL)
+        }
+    }
+
+    /// Reconciles each tier's tracked usage estimate with a completed write's real byte count,
+    /// once the whole body has been written through `buffer` successfully.
+    ///
+    /// `allocateBuffer(key:cachedResponse:contentLength:)` admits and estimates a write using
+    /// `contentLength` as a hint, taken from the response's `Content-Length` header — `0` when
+    /// that header is absent, which is exactly the case for chunked transfer encoding. The bytes
+    /// actually written via `buffer.writeBuffer` are not bounded by that hint, so for any
+    /// response without an accurate `Content-Length`, the tracked estimate can end up
+    /// permanently understating real usage by the entire body size unless corrected here. See
+    /// `Storage.reconcileMemoryUsage(contentLengthHint:actualSize:)` for why that matters.
+    ///
+    /// Not called from ``discardFailedWrite(_:forKey:)``'s path: a write that never finished
+    /// removes its own record outright, so there is no usage left for it to have miscounted.
+    func finalizeWrite(_ buffer: Buffer, contentLengthHint: Int64) {
+        let actualSize = Int64(buffer.readableBytes)
+
+        if buffer.memoryDataURL != nil {
+            storage.reconcileMemoryUsage(contentLengthHint: contentLengthHint, actualSize: actualSize)
+        }
+
+        if buffer.diskRecordURL != nil {
+            storage.reconcileDiskUsage(contentLengthHint: contentLengthHint, actualSize: actualSize)
         }
     }
 
