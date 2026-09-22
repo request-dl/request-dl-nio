@@ -22,8 +22,27 @@ package protocol SessionProvider: Sendable {
     func group(
         with options: SessionProviderOptions
     ) -> EventLoopGroup
+
+    /// Whether `group(with:)` *builds* the group it hands back, making that group
+    /// `Internals.EventLoopGroupManager`'s to shut down once it stops tracking it.
+    ///
+    /// `false` for anything that returns a group it merely borrows: NIO's process-wide
+    /// singletons (`Internals.SharedSessionProvider`) and a group the caller constructed and
+    /// handed in through `Session.init(_:)` (`Internals.CustomSessionProvider`). Shutting either
+    /// of those down would take every unrelated user of the same group with it.
+    ///
+    /// Defaults to `false`, so a provider that says nothing is never assumed to have handed over
+    /// ownership of something it may not own.
+    var createsGroup: Bool { get }
     #endif
 }
+
+#if canImport(NIOCore)
+extension SessionProvider {
+
+    package var createsGroup: Bool { false }
+}
+#endif
 
 package struct SessionProviderOptions: Sendable {
     package let isCompatibleWithNetworkFramework: Bool

@@ -46,6 +46,12 @@ extension Internals {
         }
 
         #if canImport(NIOCore)
+        /// The one provider that constructs a group of its own rather than borrowing one, and so
+        /// the one whose groups `Internals.EventLoopGroupManager` may shut down when it evicts
+        /// them. Every distinct `Session(_:numberOfThreads:)` identifier produces another set of
+        /// OS threads here; without that, nothing in the process ever reclaims them.
+        package var createsGroup: Bool { true }
+
         package func group(with options: SessionProviderOptions) -> any EventLoopGroup {
             #if canImport(Darwin)
             if options.isCompatibleWithNetworkFramework {
