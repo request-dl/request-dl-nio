@@ -188,6 +188,46 @@ extension Internals {
             }
         }
 
+        /// Monotonic, not wall clock. `Date` moves when the user or NTP moves the system clock:
+        /// backwards and no client is ever recycled, forwards and every client is eligible at
+        /// once, including one handed out a moment ago and about to be used.
+        #if canImport(Darwin)
+        static func monotonicNow() -> UInt64 {
+            DispatchTime.now().uptimeNanoseconds
+        }
+
+        func isExpired(_ item: Item, at now: UInt64) -> Bool {
+            now - item.readAt > lifetime
+        }
+        #else
+        static func monotonicNow() -> ContinuousClock.Instant {
+            ContinuousClock.now
+        }
+
+        func isExpired(_ item: Item, at now: ContinuousClock.Instant) -> Bool {
+            item.readAt.duration(to: now) > .nanoseconds(lifetime)
+        }
+        #endif
+
+        /// Whether dropping the last reference to `client` retires it on its own.
+        ///
+        /// `.nio` does: `Internals.Client.deinit` shuts its `HTTPClient` down. `.urlSession` does
+        /// not — `URLSession` retains its delegate, so the client is never released — and has to
+        /// be invalidated explicitly. See `_evictIfNeeded(protecting:)` for what that difference
+        /// decides.
+        static func retiresOnRelease(_ client: Internals.ClientManager.Client) -> Bool {
+            switch client {
+            #if canImport(NIOCore)
+            case .nio:
+                return true
+            #endif
+            #if canImport(Darwin)
+            case .urlSession:
+                return false
+            #endif
+            }
+        }
+
         /// Retires every client that has been idle for longer than `lifetime`.
         ///
         /// Decides first, shuts down after. The two used to be interleaved, one `await` per
@@ -197,16 +237,7 @@ extension Internals {
         /// than the longest one.
         private func cleanupIfNeeded() async {
             await lock.withLock {
-                // Monotonic, not wall clock. `Date` moves when the user or NTP moves the system
-                // clock: backwards and no client is ever recycled, forwards and every client is
-                // eligible at once, including one handed out a moment ago and about to be used.
-                let now = {
-                    #if canImport(Darwin)
-                    DispatchTime.now().uptimeNanoseconds
-                    #else
-                    ContinuousClock.now
-                    #endif
-                }()
+                let now = Self.monotonicNow()
 
                 var expired = [(key: String, item: Item)]()
 
@@ -220,15 +251,7 @@ extension Internals {
                                 continue
                             }
 
-                            let isExpired: Bool = {
-                                #if canImport(Darwin)
-                                now - item.readAt > lifetime
-                                #else
-                                item.readAt.duration(to: .now) > .nanoseconds(lifetime)
-                                #endif
-                            }()
-
-                            if isExpired {
+                            if isExpired(item, at: now) {
                                 expired.append((key, item))
                             } else {
                                 surviving.append(item)
@@ -353,12 +376,23 @@ extension Internals {
         /// than merely forgotten.
         ///
         /// The ceiling never gates service. Only clients with nothing in flight are candidates,
-        /// regardless of age, and a caller is never made to wait for one to free up or turned
-        /// away because there is nothing to evict: a table whose every entry is mid-request
-        /// simply overshoots, and the `lifetime` sweep and the next insert with something idle in
-        /// it bring it back down. The alternative — delaying a request, or tearing connections
-        /// down out from under live ones — trades a caller's latency for a bookkeeping limit,
-        /// which is the wrong way round.
+        /// and a caller is never made to wait for one to free up or turned away because there is
+        /// nothing to evict: a table whose every entry is mid-request simply overshoots, and the
+        /// `lifetime` sweep and the next insert with something idle in it bring it back down. The
+        /// alternative — delaying a request, or tearing connections down out from under live ones
+        /// — trades a caller's latency for a bookkeeping limit, which is the wrong way round.
+        ///
+        /// Evicting a `.nio` client is only ever *un-caching*, never shutting down.
+        /// `Internals.Client.deinit` retires it once the last reference goes, so a caller that
+        /// was handed one and has not started its request yet — where `isRunning` is still
+        /// `false` — keeps it alive by holding it. Shutting it down here instead raced exactly
+        /// that gap, and a 200-session burst hit it (`HTTPClientError.alreadyShutdown`).
+        ///
+        /// `.urlSession` has no such fallback (`URLSession` retains its delegate, so the client
+        /// is never released on its own) and so has to be invalidated explicitly. That cannot be
+        /// made race free the same way, so an entry is only evicted *with* a shutdown once it is
+        /// already past `lifetime` — i.e. only when the periodic sweep would have retired it
+        /// anyway. The ceiling brings that forward; it never retires anything the sweep wouldn't.
         ///
         /// - Parameter protecting: The client the caller is in the middle of handing out. It is
         /// idle by definition (nothing has been asked of it yet) and its entry is the newest in
@@ -366,9 +400,9 @@ extension Internals {
         /// since the table is also what owns a client's lifetime, evicting it would shut down the
         /// very client being returned.
         ///
-        /// - Returns: The evicted clients, which the caller must hand to ``shutdownDetached(_:)``.
-        ///   Returning them rather than shutting them down here is what keeps a network drain off
-        ///   ``tableLock``.
+        /// - Returns: The evicted clients that need an explicit shutdown, which the caller must
+        ///   hand to ``shutdownDetached(_:)``. Returning them rather than shutting them down here
+        ///   is what keeps a network drain off ``tableLock``.
         func _evictIfNeeded(
             protecting protectedClient: Internals.ClientManager.Client? = nil
         ) -> [Internals.ClientManager.Client] {
@@ -380,13 +414,23 @@ extension Internals {
 
             let target = max(maximumCount - (maximumCount / 4), 1)
             let protectedIdentifier = protectedClient?.objectIdentifier
+            let now = Self.monotonicNow()
 
             let evictable =
                 _table
                 .flatMap { key, items in
                     items.enumerated().map { (key: key, offset: $0.offset, item: $0.element) }
                 }
-                .filter { !$0.item.client.isRunning && $0.item.client.objectIdentifier != protectedIdentifier }
+                .filter {
+                    guard
+                        !$0.item.client.isRunning,
+                        $0.item.client.objectIdentifier != protectedIdentifier
+                    else {
+                        return false
+                    }
+
+                    return Self.retiresOnRelease($0.item.client) || isExpired($0.item, at: now)
+                }
                 .sorted { $0.item.readAt < $1.item.readAt }
                 .prefix(count - target)
 
@@ -409,7 +453,9 @@ extension Internals {
                 _table[key] = items.isEmpty ? nil : items
             }
 
-            return evictable.map(\.item.client)
+            // Only what cannot retire itself. Handing a `.nio` client here would reintroduce
+            // exactly the race this method's doc describes.
+            return evictable.map(\.item.client).filter { !Self.retiresOnRelease($0) }
         }
 
         #if canImport(Darwin)

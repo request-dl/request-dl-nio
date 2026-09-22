@@ -22,8 +22,11 @@ struct InternalsClientManagerTests {
 
     @Test
     func manager_whenRegister_shouldBeEqual() async throws {
-        // Given
-        let manager = Internals.ClientManager.shared
+        // Given: this manager's own table, not `.shared`. What is under test is that one
+        // configuration reuses its own client, and `.shared` is a process-wide pool every other
+        // suite writes into concurrently — `LocalServerConcurrencyTests` alone pushes 200
+        // distinct providers through it, enough to evict this entry between the two calls below.
+        let manager = Internals.ClientManager(lifetime: Internals.ClientManager.lifetime)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
 
@@ -44,8 +47,8 @@ struct InternalsClientManagerTests {
 
     @Test
     func manager_whenRegisterWithDifferentConfiguration_shouldBeNotEqual() async throws {
-        // Given
-        let manager = Internals.ClientManager.shared
+        // Given: an isolated table, same reason as the test above.
+        let manager = Internals.ClientManager(lifetime: Internals.ClientManager.lifetime)
         let provider = Internals.SharedSessionProvider()
 
         let sessionConfiguration1 = Internals.Session.Configuration()
@@ -199,6 +202,53 @@ struct InternalsClientManagerTests {
         }
     }
 
+    /// A client handed out but not yet used looks exactly like an idle pooled one: `isRunning`
+    /// only becomes `true` once a request is actually asked of it. Evicting *and shutting down*
+    /// on that basis raced every caller in the gap between resolving a client and executing
+    /// through it, which a 200-session burst hit for real
+    /// (`LocalServerConcurrencyTests`, `HTTPClientError.alreadyShutdown`).
+    ///
+    /// Un-caching it is fine — the caller's own reference keeps it alive, and
+    /// `Internals.Client.deinit` retires it afterwards.
+    @Test
+    func manager_whenEvictingAnIdleClientSomeoneStillHolds_shouldNotShutItDown() async throws {
+        // Given: a client resolved but not yet used — idle, and the oldest entry in the table,
+        // so the first thing any eviction reaches for.
+        let maximumCount = 2
+        let manager = Internals.ClientManager(
+            lifetime: 5 * 60 * 1_000_000_000,
+            maximumCount: maximumCount
+        )
+        let provider = Internals.SharedSessionProvider()
+
+        var resolved = Internals.Session.Configuration()
+        resolved.timeout.connect = 60_000_000_000
+
+        let held = try await manager.client(provider: provider, sessionConfiguration: resolved)
+        #expect(!held.isRunning)
+
+        // When: enough other configurations arrive to push it out of the table.
+        for index in 0..<(maximumCount * 3) {
+            var sessionConfiguration = Internals.Session.Configuration()
+            sessionConfiguration.timeout.connect = Int64(1_000_000_000 + index)
+
+            _ = try await manager.client(
+                provider: provider,
+                sessionConfiguration: sessionConfiguration
+            )
+        }
+
+        #expect(manager.count <= maximumCount)
+
+        // A shutdown started by the eviction would run detached, so give one time to land rather
+        // than racing it to the assertion below.
+        try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
+
+        // Then: nothing closed it behind the caller's back. `shutdown()` answers `true` only when
+        // *this* call is what actually closed the client.
+        #expect(try await held.shutdown())
+    }
+
     /// `Internals.RedirectConfiguration.==` answers `false` for `.strategy` against everything,
     /// itself included, so a pooled `.strategy` entry can never be handed back to anyone and the
     /// linear scan looking for one is guaranteed to walk the whole list and find nothing.
@@ -268,8 +318,10 @@ struct InternalsClientManagerTests {
     /// preserve: a backlog of expired clients is still fully retired in one sweep.
     @Test
     func manager_whenSeveralClientsExpire_shouldRetireAllOfThemInOneSweep() async throws {
-        // Given
-        let lifetime: Int64 = 250_000_000
+        // Given: a lifetime long enough that creating the clients cannot itself outlast it, even
+        // on a machine busy running the rest of the suite. Shorter ones (250ms, then 2s) both let
+        // the first sweep fire mid-setup under a full-suite run.
+        let lifetime: Int64 = 5_000_000_000
         let manager = Internals.ClientManager(lifetime: lifetime)
         let provider = Internals.SharedSessionProvider()
 
@@ -287,11 +339,18 @@ struct InternalsClientManagerTests {
 
         #expect(manager.count == clientCount)
 
-        // When: the scheduled sweep fires once everything has been idle past `lifetime`.
-        try await _Concurrency.Task.sleep(nanoseconds: UInt64(lifetime) * 4)
+        // When: the scheduled sweep fires, once everything has been idle past `lifetime`. Polled
+        // rather than slept through: the sweep is a detached `.utility` task, so when exactly it
+        // gets to run is up to the scheduler, and a fixed sleep only ever encodes a guess about
+        // how contended the machine is.
+        var remaining = manager.count
+        for _ in 0..<200 where remaining > 0 {
+            try await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
+            remaining = manager.count
+        }
 
         // Then
-        #expect(manager.count == 0)
+        #expect(remaining == 0)
     }
 
     @Test

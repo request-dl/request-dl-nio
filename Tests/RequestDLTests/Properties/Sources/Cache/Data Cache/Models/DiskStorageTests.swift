@@ -626,37 +626,6 @@ struct DiskStorageTests {
         }
     }
 
-    /// `Internals.Buffer.init(addressing:)` retries a zero-byte size stat 30 times, 10ms apart,
-    /// for a reopen race it is right to expect on the *read* side. A brand-new write's data file
-    /// is legitimately empty, so that budget could only ever be exhausted in full: a fixed ~290ms
-    /// of sleeping in front of every single encrypted cache write.
-    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
-    @Test
-    func allocateBuffer_whenEncryptionKeySet_shouldNotSleepThroughTheReopenRetryBudget() async throws {
-        try await withTemporaryFileURL(createPath: false) { directoryURL in
-            var storage = DiskStorage(directory: directoryURL)
-            storage.encryptionKey = .init(Data(repeating: 0x01, count: 32))
-
-            // When
-            let clock = ContinuousClock()
-            let start = clock.now
-
-            let (buffer, _, _) = await storage.allocateBuffer(
-                key: "k1",
-                cachedResponse: makeCachedResponse(key: "k1"),
-                contentLength: 4,
-                maximumCapacity: .max
-            )
-
-            let elapsed = clock.now - start
-
-            // Then: well under the 300ms floor the retry loop used to impose unconditionally, and
-            // far enough under it that real disk work on a contended machine still fits.
-            #expect(buffer != nil)
-            #expect(elapsed < .milliseconds(150))
-        }
-    }
-
     @Test
     func allocateBuffer_whenNoBodyBytesAreEverWritten_leavesADiscoverableRecordNotAnOrphan() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in

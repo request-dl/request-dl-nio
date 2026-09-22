@@ -45,7 +45,7 @@ struct InternalsEventLoopManagerTests {
         let provider = CustomProvider()
 
         // When
-        let sut1 = await manager.provider(provider, with: options)
+        let sut1 = await manager.provider(provider, with: options).group
 
         // Then
         #expect(provider.group(with: options) === sut1)
@@ -58,8 +58,8 @@ struct InternalsEventLoopManagerTests {
         let manager = Internals.EventLoopGroupManager()
 
         // When
-        let sut1 = await manager.provider(provider, with: options)
-        let sut2 = await manager.provider(provider, with: options)
+        let sut1 = await manager.provider(provider, with: options).group
+        let sut2 = await manager.provider(provider, with: options).group
 
         // Then
         #expect(provider.group(with: options) === sut1)
@@ -166,6 +166,43 @@ struct InternalsEventLoopManagerTests {
         #expect(oldest.wasShutDown)
     }
 
+    /// Evicting is un-caching, never shutting down.
+    ///
+    /// `Internals.Client` holds an `EventLoopGroupToken` for exactly this reason: its pooled
+    /// lifetime is governed by `Internals.ClientManager`, which knows nothing about this table,
+    /// so an entry here can be evicted while clients are mid-request on that group. Retiring it
+    /// then pulls the event loops out from under live connections — and an `HTTPClient` whose
+    /// loops are gone can never complete its own `shutdown()`, which NIO traps on as a leaked
+    /// promise.
+    @Test
+    func manager_whenAnEvictedGroupIsStillHeld_leavesItRunningUntilTheHolderLetsGo() async throws {
+        // Given: a group whose token someone else is still holding, exactly as a live client
+        // would be.
+        let maximumCount = 2
+        let manager = Internals.EventLoopGroupManager(maximumCount: maximumCount)
+        let inUse = RecordingEventLoopGroup()
+
+        var heldToken: Internals.EventLoopGroupToken? = await manager.provider(
+            RecordingProvider(id: "in-use", recorded: inUse, createsGroup: true),
+            with: posixOptions
+        )
+
+        // When: it is pushed out of the table.
+        await pushPastTheCeiling(manager, count: maximumCount * 3)
+        await manager.waitUntilShutdownsComplete()
+
+        // Then: dropped from the cache, still very much running.
+        #expect(heldToken != nil)
+        #expect(await manager.count <= maximumCount)
+        #expect(!inUse.wasShutDown)
+
+        // And: retired the moment the last holder lets go, not a moment before.
+        heldToken = nil
+
+        await manager.waitUntilShutdownsComplete()
+        #expect(inUse.wasShutDown)
+    }
+
     /// The other half of the same change: a group this manager only *borrows* must never be shut
     /// down when it is evicted. `createsGroup == false` here stands for
     /// `Internals.CustomSessionProvider` (a group handed in through `Session.init(_:)`) and for
@@ -202,7 +239,7 @@ struct InternalsEventLoopManagerTests {
 
         // When
         let sut = await _Concurrency.Task.detached(priority: .background) { [manager, options] in
-            await manager.provider(provider, with: options)
+            await manager.provider(provider, with: options).group
         }.value
 
         // Then

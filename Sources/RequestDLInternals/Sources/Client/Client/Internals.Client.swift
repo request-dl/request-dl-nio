@@ -53,6 +53,17 @@ extension Internals {
         private let manager = Internals.ClientOperationQueue()
         private let _client: HTTPClient
 
+        /// Keeps the event-loop group this client runs on alive for at least as long as the
+        /// client itself.
+        ///
+        /// `HTTPClient.EventLoopGroupProvider.shared(_:)` means the client does *not* own the
+        /// group, and `Internals.EventLoopGroupManager`'s table is a cache that can drop its own
+        /// reference at any point. Without this, a group could be retired while this client still
+        /// had requests on it — and a client whose loops are gone can never complete its own
+        /// `shutdown()`, which NIO traps on as a leaked promise. `nil` only where no manager was
+        /// involved (tests constructing a client directly).
+        private let eventLoopGroupToken: Internals.EventLoopGroupToken?
+
         /// Caps how many requests this client may have in flight at once, from the moment a
         /// request is asked to execute until it completes, is cancelled, or is released.
         private let throttledExecutor: Internals.ThrottledExecutor
@@ -83,7 +94,8 @@ extension Internals {
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
             localIdentityHandle: Internals.IdentityHandle? = nil,
-            maximumConcurrentConnections: Int? = nil
+            maximumConcurrentConnections: Int? = nil,
+            eventLoopGroupToken: Internals.EventLoopGroupToken? = nil
         ) {
             _isClosed = false
             _client = .init(
@@ -94,12 +106,14 @@ extension Internals {
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
             self.localIdentityHandle = localIdentityHandle
+            self.eventLoopGroupToken = eventLoopGroupToken
         }
         #else
         package init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
-            maximumConcurrentConnections: Int? = nil
+            maximumConcurrentConnections: Int? = nil,
+            eventLoopGroupToken: Internals.EventLoopGroupToken? = nil
         ) {
             _isClosed = false
             _client = .init(
@@ -109,6 +123,7 @@ extension Internals {
             throttledExecutor = Internals.ThrottledExecutor(
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
+            self.eventLoopGroupToken = eventLoopGroupToken
         }
         #endif
 
@@ -123,12 +138,17 @@ extension Internals {
             //
             // The client is captured, not `self`, and the task keeps it alive until the
             // shutdown finishes, so it is never released mid shutdown.
+            //
+            // `eventLoopGroupToken` is captured for the same reason: this stored property is
+            // released as soon as this body returns, and a group retired while `shutdown()` is
+            // still running leaves that shutdown's promise unfulfillable, which NIO traps on.
             guard !_isClosed else {
                 return
             }
 
-            _Concurrency.Task { [_client] in
+            _Concurrency.Task { [_client, eventLoopGroupToken] in
                 try? await _client.shutdown()
+                _ = eventLoopGroupToken
             }
         }
 

@@ -71,14 +71,14 @@ extension Internals.ClientManager {
                 return client
             }
 
-            let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(
+            let eventLoopGroupToken = await Internals.EventLoopGroupManager.shared.provider(
                 provider,
                 with: options
             )
 
             return try _createNewClient(
                 id: sessionProviderID,
-                eventLoopGroup: eventLoopGroup,
+                eventLoopGroupToken: eventLoopGroupToken,
                 sessionConfiguration: sessionConfiguration,
                 isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
             )
@@ -88,25 +88,30 @@ extension Internals.ClientManager {
     /// - Warning: Lockless with respect to `tableLock`, which it takes itself.
     fileprivate func _createNewClient(
         id: String,
-        eventLoopGroup: EventLoopGroup,
+        eventLoopGroupToken: Internals.EventLoopGroupToken,
         sessionConfiguration: Internals.Session.Configuration,
         isCompatibleWithNetworkFramework: Bool
     ) throws -> Internals.Client {
         let output = try sessionConfiguration.build(
             isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
         )
+        // The token, not just the group: `.shared(_:)` means the client doesn't own the group,
+        // and `Internals.EventLoopGroupManager`'s table can drop its own reference at any point.
+        // Holding the token is what keeps the loops alive for as long as this client needs them.
         #if canImport(Darwin)
         let client = Internals.Client(
-            eventLoopGroupProvider: .shared(eventLoopGroup),
+            eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
             localIdentityHandle: output.localIdentityHandle,
-            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+            eventLoopGroupToken: eventLoopGroupToken
         )
         #else
         let client = Internals.Client(
-            eventLoopGroupProvider: .shared(eventLoopGroup),
+            eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
-            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+            eventLoopGroupToken: eventLoopGroupToken
         )
         #endif
 
