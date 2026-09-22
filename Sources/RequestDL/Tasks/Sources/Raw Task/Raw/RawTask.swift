@@ -277,7 +277,10 @@ struct RawTask<Content: Property>: RequestTask {
     /// Starts the request span, sets its request-side attributes, and injects it into
     /// `configuration.headers` as W3C trace headers: everything the span needs before the
     /// request actually goes out on the wire.
-    private static func startRequestSpan(
+    ///
+    /// Not `private`: unit-tested directly against a recording tracer, since the only other way
+    /// to reach it is a live request with a real tracer configured.
+    static func startRequestSpan(
         tracer: any Tracer,
         configuration: inout RequestConfiguration
     ) -> any Span {
@@ -285,7 +288,11 @@ struct RawTask<Content: Property>: RequestTask {
         let span = tracer.startSpan(method, ofKind: .client)
 
         span.attributes["http.request.method"] = SpanAttribute.string(method)
-        span.attributes["url.full"] = SpanAttribute.string(configuration.url)
+
+        if let redactedURL = redactedURL(configuration.url) {
+            span.attributes["url.full"] = SpanAttribute.string(redactedURL)
+        }
+
         setURLAttributes(on: span, url: configuration.url)
 
         if let body = configuration.body {
@@ -294,6 +301,29 @@ struct RawTask<Content: Property>: RequestTask {
 
         tracer.inject(span.context, into: &configuration.headers, using: HTTPHeadersInjector())
         return span
+    }
+
+    /// The value `url.full` carries on the span: the request URL with its query string and any
+    /// userinfo removed.
+    ///
+    /// Same reasoning as `setURLAttributes` leaving `url.query` out — query strings routinely
+    /// carry tokens and PII, and `user`/`password` always do. Emitting the whole URL verbatim
+    /// under a different attribute name would make that omission meaningless, since the span
+    /// would still carry the query string in full.
+    ///
+    /// A URL `URLComponents` can't parse gets no `url.full` at all rather than an unredacted one:
+    /// what can't be taken apart can't be redacted, and a span attribute is worth less than the
+    /// secret it would otherwise leak.
+    private static func redactedURL(_ url: String) -> String? {
+        guard var components = URLComponents(string: url) else {
+            return nil
+        }
+
+        components.query = nil
+        components.user = nil
+        components.password = nil
+
+        return components.string
     }
 
     /// Mirrors what async-http-client's own built-in tracing sets on the request span as of
