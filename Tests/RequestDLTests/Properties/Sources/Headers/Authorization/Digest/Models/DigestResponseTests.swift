@@ -164,6 +164,59 @@ struct DigestResponseTests {
         #expect(!header.contains("\n"))
     }
 
+    /// Regression coverage for a caller-supplied `uri` containing a `"`: `uri` is built from
+    /// `Path`/`Query` components, which are commonly derived from external data (a resource id,
+    /// a search term). Unescaped, an embedded `"` would break out of `uri="..."`'s
+    /// quoted-parameter syntax and let the rest of the string inject bogus Digest directives into
+    /// the client's own outgoing header, the same class of bug `username` was already guarded
+    /// against.
+    @Test
+    func header_whenURIContainsQuote_escapesIt() throws {
+        // Given
+        let challenge = try #require(
+            DigestChallenge(headerValue: #"Digest realm="test", nonce="abc123""#)
+        )
+
+        // When
+        let header = DigestResponse.header(
+            for: challenge,
+            username: "user",
+            password: "pass",
+            method: "GET",
+            uri: #"/resource", evil="header"#
+        )
+
+        // Then
+        #expect(header.contains(#"uri="/resource\", evil=\"header""#))
+        #expect(!header.contains(#"uri="/resource","#))
+    }
+
+    /// Regression coverage for a caller-supplied `uri` containing CR/LF: unescapable inside a
+    /// `quoted-pair` (RFC 7230 §3.2.6), so it must be stripped rather than forwarded — otherwise
+    /// it would let external data reaching a `Path`/`Query` component inject arbitrary additional
+    /// header lines into the client's own outgoing request.
+    @Test
+    func header_whenURIContainsCRLF_stripsIt() throws {
+        // Given
+        let challenge = try #require(
+            DigestChallenge(headerValue: #"Digest realm="test", nonce="abc123""#)
+        )
+
+        // When
+        let header = DigestResponse.header(
+            for: challenge,
+            username: "user",
+            password: "pass",
+            method: "GET",
+            uri: "/resource\r\nX-Injected: true"
+        )
+
+        // Then
+        #expect(header.contains(#"uri="/resourceX-Injected: true""#))
+        #expect(!header.contains("\r"))
+        #expect(!header.contains("\n"))
+    }
+
     @Test
     func header_generatesAFreshCnonceEachCall() throws {
         // Given

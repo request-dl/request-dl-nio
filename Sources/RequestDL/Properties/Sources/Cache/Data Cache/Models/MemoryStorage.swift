@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Collections
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)
@@ -44,7 +43,6 @@ struct MemoryStorage: Sendable {
     // MARK: - Private properties
 
     private let directory: URL
-    private var identifiers = OrderedSet<String>()
     private var records = [String: Record]()
 
     // MARK: - Inits
@@ -69,7 +67,6 @@ struct MemoryStorage: Sendable {
     }
 
     mutating func remove(_ key: String) {
-        identifiers.remove(key)
         records[key] = nil
     }
 
@@ -86,29 +83,16 @@ struct MemoryStorage: Sendable {
             return
         }
 
-        identifiers.remove(key)
         records[key] = nil
     }
 
     mutating func removeAll() {
-        identifiers = []
         records = [:]
     }
 
     mutating func removeAll(since date: Date) {
-        for key in identifiers {
-            // Mirrors `freeSpace`'s handling of the same `identifiers`/`records` pairing: treat a
-            // missing record as already evicted rather than trapping, so both methods agree on
-            // what to do with a stale identifier.
-            guard let entry = records[key] else {
-                identifiers.remove(key)
-                continue
-            }
-
-            if entry.date <= date {
-                identifiers.remove(key)
-                records[key] = nil
-            }
+        for (key, entry) in records where entry.date <= date {
+            records[key] = nil
         }
     }
 
@@ -128,9 +112,7 @@ struct MemoryStorage: Sendable {
 
         newRecord.dataURL = record.dataURL
 
-        identifiers.remove(key)
         records[key] = newRecord
-        identifiers.append(key)
     }
 
     /// Reserves a slot and hands back the location its bytes go to.
@@ -169,9 +151,6 @@ struct MemoryStorage: Sendable {
             cachedResponse: cachedResponse
         )
 
-        identifiers.remove(key)
-        identifiers.append(key)
-
         records[key] = record
 
         return (record.dataURL, usageAfterEviction + contentLength)
@@ -180,11 +159,18 @@ struct MemoryStorage: Sendable {
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
     ///
     /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
-    /// `maximumCapacity`, the full scan below (and the `OrderedSet.remove(_:)` cost of any
-    /// eviction it would have found) is skipped outright, since nothing would be evicted anyway.
-    /// Mirrors `DiskStorage.freeSpace(_:knownUsage:)`'s own short-circuit and safety argument —
-    /// see that method's doc — for the same O(current entry count) cost this would otherwise pay
-    /// on every single cache write, `n` of them turning a cache's whole lifetime into O(n²).
+    /// `maximumCapacity`, the full scan below is skipped outright, since nothing would be
+    /// evicted anyway. Mirrors `DiskStorage.freeSpace(_:knownUsage:)`'s own short-circuit and
+    /// safety argument — see that method's doc — for the same O(current entry count) cost this
+    /// would otherwise pay on every single cache write, `n` of them turning a cache's whole
+    /// lifetime into O(n²).
+    ///
+    /// Ordering entries by `Record.date` here, rather than maintaining a reorderable index that
+    /// every `allocateBuffer`/`updateCached` call would have to move a key to the front of, mirrors
+    /// how `DiskStorage.freeSpace` already orders its own records: sorting is paid only on this
+    /// already-guarded rescan path, instead of as an unconditional O(current entry count) shift on
+    /// every write (what an `OrderedSet`-backed "move to most-recently-written" index cost here
+    /// previously — the same quadratic shape `freeSpace`'s own short-circuit exists to avoid).
     ///
     /// - Returns: Usage immediately after this call: either the untouched `knownUsage` when
     /// skipped, or the freshly measured total otherwise.
@@ -194,23 +180,22 @@ struct MemoryStorage: Sendable {
             return knownUsage
         }
 
+        if maximumCapacity == .zero {
+            records = [:]
+            return .zero
+        }
+
         var accumulatedSize: Int64 = 0
-        var deleteOnly = maximumCapacity == .zero
+        var deleteOnly = false
 
-        for key in identifiers.reversed() {
-            guard let entry = records[key] else {
-                identifiers.remove(key)
-                continue
-            }
-
+        for entry in records.values.sorted(by: { $0.date > $1.date }) {
             if !deleteOnly, accumulatedSize + entry.size <= maximumCapacity {
                 accumulatedSize += entry.size
                 continue
             }
 
             deleteOnly = true
-            records[key] = nil
-            identifiers.remove(key)
+            records[entry.key] = nil
         }
 
         return accumulatedSize
