@@ -82,14 +82,35 @@ extension Internals.ManualDecompressionDispatch {
             return source
         }
 
-        guard let contentEncoding = head.headerValues(named: "Content-Encoding").first else {
+        // Every `Content-Encoding` field line, comma-split and joined into one list. RFC 9110
+        // §5.2 makes several field lines of the same name exactly equivalent to one comma-joined
+        // line, so a server is free to send either — and taking only `.first` of either shape
+        // means a body compressed twice is decoded once and handed back still compressed, with
+        // `Internals.CacheControl` storing those wrong bytes on the way past.
+        //
+        // `identity` is dropped rather than counted: it stands for "no transformation", so it
+        // never changes what has to be undone.
+        //
+        // Trimming goes through the package's own `trimming(where:)`, not
+        // `trimmingCharacters(in: .whitespaces)`: that needs `Foundation.CharacterSet`, which
+        // this file has no import for. Same as `Internals.CacheControl.directives(_:)`.
+        let encodings =
+            head
+            .headerValues(named: "Content-Encoding")
+            .flatMap { $0.split(separator: ",") }
+            .map { $0.trimming(where: \.isWhitespace).lowercased() }
+            .filter { !$0.isEmpty && $0 != "identity" }
+
+        guard let normalized = encodings.first else {
             return source
         }
 
-        let normalized = contentEncoding.lowercased()
-
-        guard normalized != "identity" else {
-            return source
+        // Stacked encodings have to be undone in reverse order, and the second layer's algorithm
+        // can't be known to match anything configured. Decoding only the outermost would return
+        // bytes that are still compressed while claiming they aren't, so this reports the
+        // mismatch instead, the same way an unrecognised single encoding already does.
+        guard encodings.count == 1 else {
+            throw Internals.UnsupportedContentEncodingError(value: encodings.joined(separator: ", "))
         }
 
         // Already decoded on the way in; the transport simply didn't strip the header on its way
@@ -103,7 +124,7 @@ extension Internals.ManualDecompressionDispatch {
                 $0.contentEncodingValue.lowercased() == normalized
             })
         else {
-            throw Internals.UnsupportedContentEncodingError(value: contentEncoding)
+            throw Internals.UnsupportedContentEncodingError(value: normalized)
         }
 
         return Internals.AsyncStream.decompressing(source, using: algorithm)
