@@ -576,6 +576,91 @@ struct DiskStorageTests {
         }
     }
 
+    @available(iOS 16, tvOS 16, watchOS 9, macOS 13, *)
+    @Test
+    func record_whenAnotherEntryIsStillBeingWritten_doesNotStallTheLookupOfACompleteKey() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            // Given: one complete entry, written by some other `DiskStorage` over the same
+            // directory — a fresh instance below has to find it by scanning, not through the
+            // index a write of its own would have populated.
+            var (buffer, _, _) = await DiskStorage(directory: directoryURL).allocateBuffer(
+                key: "complete",
+                cachedResponse: makeCachedResponse(key: "complete"),
+                contentLength: 1,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+
+            // And: an unrelated entry in the same directory whose write never completes, so its
+            // "data.record" is permanently absent. The cold scan below walks past it on its way
+            // to "complete", and must not spend the by-key retry budget on a key nobody asked
+            // about.
+            let date = Date()
+            let bitPattern = date.timeIntervalSinceReferenceDate.bitPattern
+            let incompleteURL = directoryURL.appendingPathComponent(
+                "\(String(bitPattern, radix: 36)).stillwriting.cached",
+                isDirectory: true
+            )
+            try await Internals.fileSystem.createDirectory(
+                at: incompleteURL.filePath,
+                withIntermediateDirectories: true
+            )
+            try await incompleteURL
+                .appendingPathComponent("response.record")
+                .write(Data(JSONEncoder().encode(makeCachedResponse(key: "stillwriting"))))
+
+            // When: a cold lookup for the *complete* key forces a full directory scan.
+            let coldStorage = DiskStorage(directory: directoryURL)
+            let clock = ContinuousClock()
+            let start = clock.now
+            let found = await coldStorage["complete"]
+            let elapsed = clock.now - start
+
+            // Then: it resolves, and nowhere near the 15s the incomplete neighbor used to cost.
+            // 8s rather than a tighter margin for the same reason `removeAll`'s sibling test
+            // uses it: CI Simulator scheduler contention. Still a wide gap below the budget a
+            // regression here would actually hit.
+            #expect(found != nil)
+            #expect(elapsed < .seconds(8))
+        }
+    }
+
+    @Test
+    func allocateBuffer_whenNoBodyBytesAreEverWritten_leavesADiscoverableRecordNotAnOrphan() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+
+            // Given/When: a successful write of a response with an empty body — nothing is ever
+            // written through the buffer, so "data.record" is never opened lazily.
+            let (buffer, _, _) = await storage.allocateBuffer(
+                key: "empty",
+                cachedResponse: makeCachedResponse(key: "empty"),
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            #expect(buffer != nil)
+            try? await buffer?.close()
+
+            // Then: the entry is a normal cache entry, not a directory that no lookup, removal
+            // or eviction can ever see again while it still occupies the cache directory.
+            let cached = await storage["empty"]
+            #expect(cached != nil)
+            #expect(cached?.buffer.readableBytes == 0)
+
+            await storage.remove("empty")
+            #expect(await storage["empty"] == nil)
+
+            var remaining = 0
+            try await Internals.fileSystem.withDirectoryHandle(atPath: directoryURL.filePath) { dir in
+                for try await entry in dir.listContents() where entry.name.string.hasSuffix(".cached") {
+                    remaining += 1
+                }
+            }
+            #expect(remaining == 0)
+        }
+    }
+
     #if canImport(Darwin)
     private func recordDirectoryURL(in directoryURL: URL) throws -> URL {
         let contents = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
@@ -615,8 +700,10 @@ struct DiskStorageTests {
             // protection class has no effect there and does not round-trip back through
             // `FileManager.attributesOfItem`. `DiskStorage` knows this and skips the (otherwise
             // pointless) work outright, degrading to the same behavior as `fileProtection ==
-            // nil`: nothing pre-created, no attribute to observe.
-            #expect(!FileManager.default.fileExists(atPath: dataPath))
+            // nil`: the file is still pre-created, there is just no class of its own to observe
+            // on it, only the volume default "response.record" beside it also landed on.
+            #expect(FileManager.default.fileExists(atPath: dataPath))
+            #expect(protectionType(atPath: dataPath) == protectionType(atPath: responsePath))
             #else
             // Then: "response.record" is fully written already, and "data.record" was
             // pre-created empty — both already carry the configured protection class, rather
@@ -651,12 +738,14 @@ struct DiskStorageTests {
             )
             #expect(buffer != nil)
 
-            // Then: with no class configured, "data.record" is not even pre-created — it is
-            // left entirely to `Internals.FileBuffer`'s own lazy-open behavior, unchanged from
-            // before this feature existed.
+            // Then: "data.record" is still pre-created (that is what keeps an empty-bodied
+            // response from becoming an unfindable orphan), it just gets no class of its own —
+            // it lands on whatever the volume's default is, same as "response.record" beside it.
             let recordURL = try recordDirectoryURL(in: directoryURL)
             let dataPath = recordURL.appendingPathComponent("data.record").path
-            #expect(!FileManager.default.fileExists(atPath: dataPath))
+            let responsePath = recordURL.appendingPathComponent("response.record").path
+            #expect(FileManager.default.fileExists(atPath: dataPath))
+            #expect(protectionType(atPath: dataPath) == protectionType(atPath: responsePath))
         }
     }
     #endif
