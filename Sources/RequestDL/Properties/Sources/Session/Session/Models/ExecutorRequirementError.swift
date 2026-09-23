@@ -32,6 +32,7 @@ public struct ExecutorRequirementError: Error, Sendable {
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
         case multipleClientCertificatesUnderNetworkFramework
+        case clientIdentityWithProxyUnderNetworkFramework
 
         // MARK: - Inits
 
@@ -73,6 +74,8 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .applicationProtocolsUnderURLSession
             case .multipleClientCertificatesUnderNetworkFramework:
                 self = .multipleClientCertificatesUnderNetworkFramework
+            case .clientIdentityWithProxyUnderNetworkFramework:
+                self = .clientIdentityWithProxyUnderNetworkFramework
             }
         }
     }
@@ -151,6 +154,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
         case .multipleClientCertificatesUnderNetworkFramework:
             return
                 "a client certificate chain with more than one certificate (unsupported under NIOTransportServices)"
+        case .clientIdentityWithProxyUnderNetworkFramework:
+            return "a client certificate/private key combined with a proxy (unsupported under NIOTransportServices)"
         }
     }
 }
