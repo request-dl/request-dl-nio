@@ -32,14 +32,20 @@ struct InternalsManualDecompressionDispatchTests {
         }
     }
 
-    private func responseHead(contentEncoding: String) -> Internals.ResponseHead {
+    /// One `Content-Encoding` field line per element, which is how a real response carries
+    /// stacked encodings when the server doesn't comma-join them itself.
+    private func responseHead(contentEncodings: String...) -> Internals.ResponseHead {
         .init(
             url: "https://example.com",
             status: .init(code: 200, reason: "OK"),
             version: .init(minor: 1, major: 1),
-            headers: [.init(name: "Content-Encoding", value: contentEncoding)],
+            headers: contentEncodings.map { .init(name: "Content-Encoding", value: $0) },
             isKeepAlive: true
         )
+    }
+
+    private func responseHead(contentEncoding: String) -> Internals.ResponseHead {
+        responseHead(contentEncodings: contentEncoding)
     }
 
     @Test
@@ -97,5 +103,103 @@ struct InternalsManualDecompressionDispatchTests {
         await #expect(throws: AlreadyConsumedError.self) {
             _ = try await second.next()
         }
+    }
+
+    // MARK: - Stacked Content-Encoding
+
+    /// RFC 9110 §5.2 makes several field lines of one name equivalent to a single comma-joined
+    /// line, so `gzip` then `br` means the body was compressed twice.
+    ///
+    /// Taking only `.first` decoded gzip and handed the caller bytes that were still
+    /// brotli-compressed while reporting success — and `Internals.CacheControl` stored those
+    /// wrong bytes on the way past.
+    @Test
+    func resolvedStream_whenContentEncodingIsStackedAcrossFieldLines_throws() async throws {
+        // Given
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        source.close()
+
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        // When / Then
+        #expect(throws: Internals.UnsupportedContentEncodingError.self) {
+            _ = try dispatch.resolvedStream(
+                for: responseHead(contentEncodings: "gzip", "br"),
+                source: source
+            )
+        }
+    }
+
+    /// The same stacking, comma-joined into one field line, which the spec says means the same
+    /// thing and which `.first` also mishandled — it matched the whole `"gzip, br"` string
+    /// against each algorithm's `contentEncodingValue` and matched nothing.
+    @Test
+    func resolvedStream_whenContentEncodingIsStackedInOneFieldLine_throws() async throws {
+        // Given
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        source.close()
+
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        // When / Then
+        #expect(throws: Internals.UnsupportedContentEncodingError.self) {
+            _ = try dispatch.resolvedStream(
+                for: responseHead(contentEncoding: "gzip, br"),
+                source: source
+            )
+        }
+    }
+
+    /// `identity` means "no transformation", so it doesn't make an encoding stacked. A server
+    /// sending `identity, gzip` still only compressed the body once.
+    @Test
+    func resolvedStream_whenIdentityIsStackedAlongsideARealEncoding_decodesTheRealOne() async throws {
+        // Given
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        source.append(.success(await Internals.DataBuffer(Array("hello world".utf8))))
+        source.close()
+
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        // When
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncodings: "identity", "gzip"),
+            source: source
+        )
+
+        var iterator = output.makeAsyncIterator()
+        var collected = Data()
+        while var chunk = try await iterator.next() {
+            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        }
+
+        // Then
+        #expect(collected == Data("hello world".utf8))
+    }
+
+    /// Surrounding whitespace is part of the comma-joined grammar, not part of the token.
+    @Test
+    func resolvedStream_whenContentEncodingHasSurroundingWhitespace_stillMatches() async throws {
+        // Given
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        source.append(.success(await Internals.DataBuffer(Array("hello world".utf8))))
+        source.close()
+
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        // When
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "  GZIP  "),
+            source: source
+        )
+
+        var iterator = output.makeAsyncIterator()
+        var collected = Data()
+        while var chunk = try await iterator.next() {
+            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        }
+
+        // Then
+        #expect(collected == Data("hello world".utf8))
     }
 }

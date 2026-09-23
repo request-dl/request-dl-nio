@@ -98,9 +98,13 @@ struct BackgroundDownloadsSessionTests {
         let encoded = BackgroundDownloads.Session.encode(
             id: "episode-42",
             destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
-            clientIdentity: descriptor
+            clientIdentity: descriptor,
+            clientIdentityHost: "configured.example.com"
         )
-        let decoded = BackgroundDownloads.Session.decodeClientIdentity(encoded)
+        let decoded = BackgroundDownloads.Session.decodeClientIdentity(
+            encoded,
+            challengedBy: "configured.example.com"
+        )
 
         // Then
         #expect(decoded == descriptor)
@@ -115,12 +119,77 @@ struct BackgroundDownloadsSessionTests {
         )
 
         // When / Then
-        #expect(BackgroundDownloads.Session.decodeClientIdentity(encoded) == nil)
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "configured.example.com"
+            ) == nil
+        )
     }
 
     @Test
     func decodeClientIdentity_whenTaskDescriptionIsNotEncodedByThisType_returnsNil() async throws {
-        #expect(BackgroundDownloads.Session.decodeClientIdentity("not a descriptor") == nil)
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                "not a descriptor",
+                challengedBy: "configured.example.com"
+            ) == nil
+        )
+    }
+
+    /// The regression this gate exists for: a background session follows redirects on its own, so
+    /// the host challenging us for a client certificate is not necessarily the host the download
+    /// was scheduled against. Presenting the identity anyway would hand it to whoever controls
+    /// the redirect.
+    @Test
+    func decodeClientIdentity_whenChallengedByADifferentHost_returnsNil() async throws {
+        // Given: an mTLS download scheduled against one host...
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            clientIdentity: Internals.ClientIdentityDescriptor(
+                certificateChainFilePath: "/tmp/client.pem",
+                privateKeyFilePath: "/tmp/client.key",
+                privateKeyFormat: .pem
+            ),
+            clientIdentityHost: "configured.example.com"
+        )
+
+        // When / Then: ...is not offered to another one, however it was reached.
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "attacker.example.com"
+            ) == nil
+        )
+    }
+
+    /// A `taskDescription` written by a version of this package that predates the host gate: it
+    /// has to keep decoding (the download itself is still valid and still running), but it can't
+    /// prove which host it was scheduled for, so the identity is withheld rather than guessed at.
+    @Test
+    func decodeClientIdentity_whenNoHostWasRecorded_returnsNil() async throws {
+        // Given
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            clientIdentity: Internals.ClientIdentityDescriptor(
+                certificateChainFilePath: "/tmp/client.pem",
+                privateKeyFilePath: "/tmp/client.key",
+                privateKeyFormat: .pem
+            )
+        )
+
+        // When / Then: `id`/`destination` still decode, so the download keeps working...
+        #expect(BackgroundDownloads.Session.decode(encoded)?.id == "episode-42")
+
+        // ...but no host can match a missing one.
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "configured.example.com"
+            ) == nil
+        )
     }
 
     @Test
@@ -141,12 +210,18 @@ struct BackgroundDownloadsSessionTests {
             id: "episode-42",
             destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
             serverTrust: serverTrust,
-            clientIdentity: clientIdentity
+            clientIdentity: clientIdentity,
+            clientIdentityHost: "configured.example.com"
         )
 
         // Then
         #expect(BackgroundDownloads.Session.decodeServerTrust(encoded) == serverTrust)
-        #expect(BackgroundDownloads.Session.decodeClientIdentity(encoded) == clientIdentity)
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "configured.example.com"
+            ) == clientIdentity
+        )
     }
 
     // MARK: - firstTask(matching:in:)

@@ -76,6 +76,28 @@ extension Internals {
                 thread.start()
             }
         }
+
+        /// The error to answer `evaluate(scriptURL:targetURL:timeout:)`'s continuation with when
+        /// `CFRunLoopRunInMode` returns `result` without CFNetwork having called back.
+        ///
+        /// Every outcome maps to *something*. Only `.timedOut` and `.stopped` used to be
+        /// considered, and a run loop that returned `.finished` (it ran out of sources) or
+        /// `.handledSource` (`returnAfterSourceHandled` is `false`, so it should not happen, but
+        /// the type allows it) left the caller suspended on a continuation nobody would ever
+        /// answer — and so did any case a future SDK might add.
+        ///
+        /// `.stopped` gets an error here too, rather than being excluded. It is the success path:
+        /// `pacEvaluationCallback` resumes and only then stops the loop, so by the time the loop
+        /// returns, the continuation is already answered and the box's idempotent `resume` turns
+        /// this into a no-op. It is only ever used if something *other* than that callback
+        /// stopped the loop, which is exactly the case that must not hang either.
+        package static func fallbackError(forRunLoopResult result: CFRunLoopRunResult) -> Error {
+            result == .timedOut
+                ? .timedOut
+                : .executionFailed(
+                    "PAC evaluation ended without a result (CFRunLoopRunInMode returned \(result.rawValue))"
+                )
+        }
     }
 }
 
@@ -126,9 +148,12 @@ private final class PACContinuationBox: @unchecked Sendable {
         // run loop happens to service, which need not be the PAC one.
         let result = CFRunLoopRunInMode(.defaultMode, timeout, false)
 
-        if result == .timedOut {
-            resume(throwing: Internals.PACEvaluator.Error.timedOut)
-        }
+        // Unconditional, for every outcome rather than only `.timedOut`: this thread is about to
+        // go away, and whatever the run loop returned, a continuation left unanswered suspends
+        // `evaluate(...)`'s caller for good. `resume` is idempotent, so on the success path
+        // (`.stopped`, where `pacEvaluationCallback` has already answered) this is a no-op.
+        // See `fallbackError(forRunLoopResult:)`.
+        resume(throwing: Internals.PACEvaluator.fallbackError(forRunLoopResult: result))
     }
 
     func resume(returning proxy: Internals.Proxy?) {

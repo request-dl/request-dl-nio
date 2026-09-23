@@ -34,6 +34,21 @@ extension Internals.ClientManager {
             }
         }
 
+        /// The identity of the concrete client behind this case, so two enum values holding the
+        /// very same client can be told apart from two holding equivalent ones.
+        package var objectIdentifier: ObjectIdentifier {
+            switch self {
+            #if canImport(NIOCore)
+            case .nio(let client):
+                return ObjectIdentifier(client)
+            #endif
+            #if canImport(Darwin)
+            case .urlSession(let client):
+                return ObjectIdentifier(client)
+            #endif
+            }
+        }
+
         // MARK: - Internal methods
 
         package func shutdown() async throws -> Bool {
