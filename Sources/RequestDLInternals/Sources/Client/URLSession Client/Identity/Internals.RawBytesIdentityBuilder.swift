@@ -331,135 +331,192 @@ extension Internals {
             let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
 
             return try Internals.IdentityManager.shared.handle(for: label) {
-                // `swift test` (and any unsigned command-line process) has no
-                // `keychain-access-groups` entitlement, which the data-protection keychain
-                // requires; forcing the legacy file-based keychain is a macOS-only accommodation
-                // for that. Not present on iOS/tvOS/watchOS, where there is only the
-                // data-protection keychain and a properly signed/provisioned app already carries
-                // the entitlement it needs.
                 #if os(macOS)
-                let useDataProtectionKeychain = false
-                #else
-                let useDataProtectionKeychain = true
-                #endif
-
-                SecItemDelete(
-                    [
-                        kSecClass: kSecClassKey,
-                        kSecAttrLabel: label,
-                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                    ] as CFDictionary
-                )
-                SecItemDelete(
-                    [
-                        kSecClass: kSecClassCertificate,
-                        kSecAttrLabel: label,
-                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                    ] as CFDictionary
-                )
-
-                // `kSecAttrApplicationLabel` is the public-key hash Security.framework's own
-                // identity-synthesis engine actually uses to pair a `kSecClassKey` item with a
-                // `kSecClassCertificate` item into a `kSecClassIdentity` -- it's how "identity is
-                // a synthetic pairing of a certificate and a key by matching public key" (see the
-                // query comment below) actually happens under the hood. Left unset, `SecItemAdd`
-                // assigns the key item some value that does not match the certificate's own
-                // (automatically derived) `kSecAttrPublicKeyHash`, so no identity is ever
-                // synthesized -- confirmed empirically: `kSecClassIdentity` queries reliably
-                // returned zero results without this, on every run, regardless of Keychain state,
-                // entitlement, or process signing.
+                // Try the modern, data-protection keychain first: unlike the legacy (CDSA-backed)
+                // keychain below, it's confirmed to accept an *imported* EC `SecKey` (built here
+                // via `secKey(fromDER:)`, not generated in place) via this exact
+                // `SecItemAdd(kSecValueRef:)` round trip -- iOS/tvOS/watchOS, which always use it
+                // (see the `#else` branch), have never shown this gap. A properly signed,
+                // Keychain-Sharing-entitled macOS app can use it too, same as those platforms.
                 //
-                // SHA-1 of the public key's external representation (X9.63 for EC, PKCS#1
-                // `RSAPublicKey` for RSA -- `SecKeyCopyExternalRepresentation` already returns
-                // whichever shape matches `secKey`'s own key type) is the OS's own convention for
-                // this hash, confirmed byte for byte against `openssl`'s equivalent computation.
-                guard let publicKey = SecKeyCopyPublicKey(secKey) else {
-                    throw Error.secKeyCreationFailed("SecKeyCopyPublicKey returned nil")
-                }
-                var publicKeyRepresentationError: Unmanaged<CFError>?
-                guard
-                    let publicKeyRepresentation = SecKeyCopyExternalRepresentation(
-                        publicKey,
-                        &publicKeyRepresentationError
-                    ) as Data?
-                else {
-                    let message =
-                        publicKeyRepresentationError.map { String(describing: $0.takeRetainedValue()) } ?? "unknown"
-                    throw Error.secKeyCreationFailed("SecKeyCopyExternalRepresentation failed: \(message)")
-                }
-                let applicationLabel = Data(Insecure.SHA1.hash(data: publicKeyRepresentation))
-
-                try addToKeychain(
-                    query: [
-                        kSecClass: kSecClassKey,
-                        kSecValueRef: secKey,
-                        kSecAttrLabel: label,
-                        kSecAttrApplicationLabel: applicationLabel,
-                        // This device only, not iCloud Keychain: the key only needs to survive
-                        // this process's lifetime, not sync anywhere.
-                        kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                    ],
-                    operation: "SecItemAdd(key)"
-                )
-
-                try addToKeychain(
-                    query: [
-                        kSecClass: kSecClassCertificate,
-                        kSecValueRef: certificate,
-                        kSecAttrLabel: label,
-                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                    ],
-                    operation: "SecItemAdd(certificate)"
-                )
-
-                // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter:
-                // an identity is a synthetic pairing of a certificate and a key by matching
-                // public key, not an item with its own attributes, so the label set on the
-                // certificate/key above isn't necessarily inherited by it. Fetching every
-                // identity currently in this keychain and matching by certificate bytes is the
-                // approach that reliably works in practice.
-                let identityQuery: [CFString: Any] = [
-                    kSecClass: kSecClassIdentity,
-                    kSecMatchLimit: kSecMatchLimitAll,
-                    kSecReturnRef: true,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ]
-
-                var identitiesResult: CFTypeRef?
-                let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
-
-                guard identityStatus == errSecSuccess else {
-                    throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
-                }
-
-                guard let identities = identitiesResult as? [SecIdentity] else {
-                    throw Error.identityLookupReturnedWrongType
-                }
-
-                let wantedCertificateData = SecCertificateCopyData(certificate) as Data
-
-                let matchingIdentity = identities.first { identity in
-                    var identityCertificate: SecCertificate?
-                    guard
-                        SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
-                        let identityCertificate
-                    else {
-                        return false
-                    }
-
-                    return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
-                }
-
-                guard let matchingIdentity else {
-                    throw Error.keychainOperationFailed(
-                        errSecItemNotFound,
-                        operation: "matching identity by certificate"
+                // Falls back to the legacy keychain on `errSecMissingEntitlement`, exactly the
+                // unsigned-process case (`swift test` included) the `#if os(macOS)` branch used to
+                // hardcode unconditionally. That fallback still can't store an *imported* EC key
+                // either way (see `store(...)`'s own doc comment) -- this only widens which
+                // *signed* macOS apps get a working path, it doesn't touch the still-open,
+                // unsigned-process-only gap.
+                do {
+                    return try Self.store(
+                        certificate: certificate,
+                        secKey: secKey,
+                        label: label,
+                        useDataProtectionKeychain: true
+                    )
+                } catch Error.missingKeychainSharingEntitlement {
+                    Self.removeExistingKeychainItems(label: label, useDataProtectionKeychain: true)
+                    return try Self.store(
+                        certificate: certificate,
+                        secKey: secKey,
+                        label: label,
+                        useDataProtectionKeychain: false
                     )
                 }
-
-                return matchingIdentity
+                #else
+                // Not present on iOS/tvOS/watchOS, where there is only the data-protection
+                // keychain and a properly signed/provisioned app already carries the entitlement
+                // it needs.
+                return try Self.store(
+                    certificate: certificate,
+                    secKey: secKey,
+                    label: label,
+                    useDataProtectionKeychain: true
+                )
+                #endif
             }
+        }
+
+        /// One attempt at the add-then-query-back round trip described in `makeIdentity(_:_:)`'s
+        /// own doc comment, against a single Keychain (`useDataProtectionKeychain` picks which).
+        ///
+        /// - Important: On macOS specifically, the legacy (non-data-protection) keychain cannot
+        /// store a `SecKey` this package *imports* from raw bytes (`secKey(fromDER:)`, hence
+        /// `SecKeyCreateWithData`) when it's an EC key (P-256/P-384/P-521): `SecItemAdd` fails
+        /// with `-25304 (errSecInvalidItemRef)`. Confirmed to be specific to importing external EC
+        /// key material into that one Keychain, not a mistaken attribute on this call or a
+        /// blanket EC/legacy-Keychain incompatibility: an RSA key through this exact same call
+        /// succeeds, and a *freshly generated* EC key (`SecKeyCreateRandomKey`, stored directly by
+        /// the OS rather than imported) also succeeds there. `makeIdentity(_:_:)` above tries the
+        /// data-protection Keychain first specifically to route around this for any macOS caller
+        /// that can (a properly signed app with the Keychain Sharing entitlement); a caller
+        /// without it (`swift test` included) still lands here with `useDataProtectionKeychain:
+        /// false` and still hits this gap for an EC client certificate -- not fixed by this
+        /// method, since there's no known way to store an imported EC key on that Keychain at all.
+        package static func store(
+            certificate: SecCertificate,
+            secKey: SecKey,
+            label: String,
+            useDataProtectionKeychain: Bool
+        ) throws -> SecIdentity {
+            Self.removeExistingKeychainItems(label: label, useDataProtectionKeychain: useDataProtectionKeychain)
+
+            // `kSecAttrApplicationLabel` is the public-key hash Security.framework's own
+            // identity-synthesis engine actually uses to pair a `kSecClassKey` item with a
+            // `kSecClassCertificate` item into a `kSecClassIdentity` -- it's how "identity is
+            // a synthetic pairing of a certificate and a key by matching public key" (see the
+            // query comment below) actually happens under the hood. Left unset, `SecItemAdd`
+            // assigns the key item some value that does not match the certificate's own
+            // (automatically derived) `kSecAttrPublicKeyHash`, so no identity is ever
+            // synthesized -- confirmed empirically: `kSecClassIdentity` queries reliably
+            // returned zero results without this, on every run, regardless of Keychain state,
+            // entitlement, or process signing.
+            //
+            // SHA-1 of the public key's external representation (X9.63 for EC, PKCS#1
+            // `RSAPublicKey` for RSA -- `SecKeyCopyExternalRepresentation` already returns
+            // whichever shape matches `secKey`'s own key type) is the OS's own convention for
+            // this hash, confirmed byte for byte against `openssl`'s equivalent computation.
+            guard let publicKey = SecKeyCopyPublicKey(secKey) else {
+                throw Error.secKeyCreationFailed("SecKeyCopyPublicKey returned nil")
+            }
+            var publicKeyRepresentationError: Unmanaged<CFError>?
+            guard
+                let publicKeyRepresentation = SecKeyCopyExternalRepresentation(
+                    publicKey,
+                    &publicKeyRepresentationError
+                ) as Data?
+            else {
+                let message =
+                    publicKeyRepresentationError.map { String(describing: $0.takeRetainedValue()) } ?? "unknown"
+                throw Error.secKeyCreationFailed("SecKeyCopyExternalRepresentation failed: \(message)")
+            }
+            let applicationLabel = Data(Insecure.SHA1.hash(data: publicKeyRepresentation))
+
+            try addToKeychain(
+                query: [
+                    kSecClass: kSecClassKey,
+                    kSecValueRef: secKey,
+                    kSecAttrLabel: label,
+                    kSecAttrApplicationLabel: applicationLabel,
+                    // This device only, not iCloud Keychain: the key only needs to survive
+                    // this process's lifetime, not sync anywhere.
+                    kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ],
+                operation: "SecItemAdd(key)"
+            )
+
+            try addToKeychain(
+                query: [
+                    kSecClass: kSecClassCertificate,
+                    kSecValueRef: certificate,
+                    kSecAttrLabel: label,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ],
+                operation: "SecItemAdd(certificate)"
+            )
+
+            // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter:
+            // an identity is a synthetic pairing of a certificate and a key by matching
+            // public key, not an item with its own attributes, so the label set on the
+            // certificate/key above isn't necessarily inherited by it. Fetching every
+            // identity currently in this keychain and matching by certificate bytes is the
+            // approach that reliably works in practice.
+            let identityQuery: [CFString: Any] = [
+                kSecClass: kSecClassIdentity,
+                kSecMatchLimit: kSecMatchLimitAll,
+                kSecReturnRef: true,
+                kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+            ]
+
+            var identitiesResult: CFTypeRef?
+            let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
+
+            guard identityStatus == errSecSuccess else {
+                throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
+            }
+
+            guard let identities = identitiesResult as? [SecIdentity] else {
+                throw Error.identityLookupReturnedWrongType
+            }
+
+            let wantedCertificateData = SecCertificateCopyData(certificate) as Data
+
+            let matchingIdentity = identities.first { identity in
+                var identityCertificate: SecCertificate?
+                guard
+                    SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
+                    let identityCertificate
+                else {
+                    return false
+                }
+
+                return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
+            }
+
+            guard let matchingIdentity else {
+                throw Error.keychainOperationFailed(
+                    errSecItemNotFound,
+                    operation: "matching identity by certificate"
+                )
+            }
+
+            return matchingIdentity
+        }
+
+        private static func removeExistingKeychainItems(label: String, useDataProtectionKeychain: Bool) {
+            SecItemDelete(
+                [
+                    kSecClass: kSecClassKey,
+                    kSecAttrLabel: label,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ] as CFDictionary
+            )
+            SecItemDelete(
+                [
+                    kSecClass: kSecClassCertificate,
+                    kSecAttrLabel: label,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ] as CFDictionary
+            )
         }
 
         // MARK: - Private methods
