@@ -513,8 +513,13 @@ extension Internals {
             }
 
             if let maxAge = maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
+                // `>= .zero`, not `> .zero`: `max-age=0` is a valid, common directive ("cacheable,
+                // but revalidate before every reuse") and must make the entry immediately stale,
+                // not skip this check entirely. A negative value is malformed and still ignored,
+                // same as before.
+                //
                 // `Double`, not `TimeInterval`. Same type, one fewer Foundation import.
-                if maxAge > .zero, cachedData.cachedResponse.date.advanced(by: Double(maxAge)) < Date() {
+                if maxAge >= .zero, cachedData.cachedResponse.date.advanced(by: Double(maxAge)) < Date() {
                     return false
                 }
             }

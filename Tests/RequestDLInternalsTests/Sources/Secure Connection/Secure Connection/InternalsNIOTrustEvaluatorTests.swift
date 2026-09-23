@@ -13,6 +13,13 @@ import NIOSSL
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 /// Tests `Internals.NIOTrustEvaluator` against a real, `openssl`-generated and
 /// `openssl verify`-checked three-level certificate chain (root CA -> intermediate CA -> leaf),
@@ -63,6 +70,51 @@ struct InternalsNIOTrustEvaluatorTests {
 
         // Then
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+
+    /// Regression coverage for `NIOTrustEvaluator+Darwin`'s plain (non-Network.framework)
+    /// `tlsCustomVerification` closure: it used to build its from-scratch `SecTrust` with
+    /// `SecPolicyCreateBasicX509()`, a bare chain-of-trust policy with no purpose/EKU checks at
+    /// all. Because this closure always passes `skipsHostnameVerification: false` to
+    /// `DarwinTrustEvaluation.prepare`, that method's own policy swap to a real SSL policy never
+    /// triggered here (its `skipsHostnameVerification` branch never runs, and its
+    /// `revocationPolicy` branch only *appends* to the existing, still-EKU-less array) — so a
+    /// certificate lacking the server-auth `extendedKeyUsage` was silently accepted whenever this
+    /// evaluator was installed (e.g. by SPKI pinning), unlike the equivalent
+    /// `.urlSession`/Network.framework paths. See `InternalsDarwinTrustEvaluationTests`'s
+    /// `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`, which
+    /// documents the same fix having already been made for the Network.framework closure.
+    @Test
+    func tlsCustomVerification_whenLeafLacksServerAuthExtendedKeyUsage_rejects() async throws {
+        // Given: a self-signed certificate with `extendedKeyUsage=clientAuth` only (no
+        // `serverAuth`) — the same fixture proven elsewhere to be accepted by a bare X.509 policy
+        // but rejected by a real SSL server policy. Self-signed, so it's also its own trust
+        // anchor: only a purpose/EKU check can still fail this chain.
+        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).client().certificateURL))
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([.init(pemBytes, format: .pem)])
+        // An unrelated pin under `.audit` installs the evaluator without making the outcome
+        // depend on a pin match (already covered by `tlsCustomVerification_whenPinMismatch...`
+        // above) or on network-dependent revocation checking, isolating this test to the EKU
+        // check alone.
+        secureConnection.tlsPins = [.init(source: .base64String(Self.unrelatedPinBase64), algorithm: SHA256.self)]
+        secureConnection.tlsPinningPolicy = .audit
+
+        let evaluator = try #require(try Internals.NIOTrustEvaluator.resolve(from: secureConnection))
+        let certificate = try NIOSSLCertificate(bytes: pemBytes, format: .pem)
+
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let promise = group.next().makePromise(of: NIOSSLVerificationResult.self)
+
+        // When
+        evaluator.tlsCustomVerification([certificate], promise)
+
+        // Then
+        let result = try await promise.futureResult.get()
+        try await group.shutdownGracefully()
+
+        #expect(result == .failed)
     }
     #endif
 
