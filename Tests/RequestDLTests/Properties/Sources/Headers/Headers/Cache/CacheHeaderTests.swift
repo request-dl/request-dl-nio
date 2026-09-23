@@ -116,6 +116,23 @@ struct CacheHeaderTests {
         #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["public"])
     }
 
+    /// Regression test: `max-stale` with no value at all means "accept staleness of any length"
+    /// (RFC 7234 §5.2.1.2), the opposite of what `maxStale(0)` -- "accept no staleness" -- asks
+    /// for. `maxStale(_:)`'s serialization used to special-case `0` by omitting the value
+    /// entirely, silently reversing the caller's intent.
+    @Test
+    func maxStaleZero_sendsExplicitZeroValueNotBareDirective() async throws {
+        // Given
+        let cache = CacheHeader()
+            .maxStale(0)
+
+        // When
+        let resolved = try await resolve(TestProperty(cache))
+
+        // Then
+        #expect(resolved.requestConfiguration.headers["Cache-Control"] == ["max-stale=0"])
+    }
+
     @Test
     func neverBody() async throws {
         // Given
