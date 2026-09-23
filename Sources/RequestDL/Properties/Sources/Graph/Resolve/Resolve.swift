@@ -81,6 +81,7 @@ struct Resolve<Root: Property>: Sendable {
         )
 
         try await output.node._make(&make)
+        try await resolvingPendingURLEncodedPayloads(&make)
         return (output, make)
     }
 
@@ -179,6 +180,23 @@ struct Resolve<Root: Property>: Sendable {
 
         make.requestConfiguration.baseURL = "\(destination.scheme)://\(destination.host)"
         make.requestConfiguration.pathComponents = destination.pathComponents + remainder
+    }
+
+    /// Resolves every `Payload`-contributed url-encoded field set accumulated during the walk,
+    /// in declaration order, now that the tree has finished and `make.requestConfiguration
+    /// .method` reflects whichever `RequestMethod` (if any) ultimately won.
+    ///
+    /// Done here rather than inside `PayloadNode`'s own node, for the same reason
+    /// `applyingURLOverride(_:)`/`sessionConfiguration(for:)` are: the decision needs the final
+    /// state, complete only once every property has contributed. See
+    /// `PendingURLEncodedPayload`'s own doc comment.
+    private func resolvingPendingURLEncodedPayloads(_ make: inout Make) async throws {
+        let pending = make.pendingURLEncodedPayloads
+        make.pendingURLEncodedPayloads = []
+
+        for payload in pending {
+            try await payload.resolve(into: &make)
+        }
     }
 
     private func inputs() -> _PropertyInputs {

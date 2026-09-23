@@ -56,11 +56,22 @@ public struct HeaderGroup<Content: Property>: Property {
         // directly — `Proxy`'s `connectHeaders`, `Form`'s per-part headers — need each header
         // to still be structurally discoverable. A single combined leaf hid them from that
         // search entirely, silently dropping every header composed through `HeaderGroup` in
-        // those contexts.
+        // those contexts. This is also a deliberate filter, not just a flattening: unrelated
+        // content nested inside a `HeaderGroup` (e.g. `Timeout`) is meant to be dropped, not
+        // carried through -- see `ResolveTests`'s "should be eliminated" case.
         var children = ChildrenNode()
 
         for header in outputs.node.search(for: HeaderNode.self) {
             children.append(header)
+        }
+
+        // `DigestAuthentication` can't be one of the `HeaderNode`s above: unlike `Authorization`
+        // (a precomputed, static value), its `Authorization` header is only ever known once
+        // `make(_:)` actually runs, from live `credential.challenge`/request-URI state. Searched
+        // for by its own node type instead, for the same reason `HeaderNode` itself is searched
+        // for above rather than relying on ordinary top-level graph traversal.
+        for digest in outputs.node.search(for: DigestAuthentication.Node.self) {
+            children.append(digest)
         }
 
         return .children(children)

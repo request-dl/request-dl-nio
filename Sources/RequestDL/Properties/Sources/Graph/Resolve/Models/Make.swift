@@ -26,6 +26,14 @@ struct Make: Sendable {
     /// tree is still being walked, could still miss a `BaseURL` or `Path` declared later.
     var urlOverrides: [URLOverrideRule]
 
+    /// Url-encoded `Payload` fields accumulated by every declared `Payload`, in declaration
+    /// order, whose query-vs-body placement is still pending.
+    ///
+    /// Resolved by `Resolve.build()`, once every property (including whichever `RequestMethod`
+    /// wins) has contributed — deciding here, while the tree is still being walked, could still
+    /// miss a `RequestMethod` declared later. See `PendingURLEncodedPayload`'s own doc comment.
+    var pendingURLEncodedPayloads: [PendingURLEncodedPayload]
+
     // MARK: - Inits
 
     init(
@@ -38,5 +46,6 @@ struct Make: Sendable {
         self.cacheConfiguration = .init()
         self.resolvesSystemProxy = false
         self.urlOverrides = []
+        self.pendingURLEncodedPayloads = []
     }
 }

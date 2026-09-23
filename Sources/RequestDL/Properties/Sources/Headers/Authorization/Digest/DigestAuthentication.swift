@@ -38,7 +38,13 @@
 /// goes out exactly as it would have without ``DigestAuthentication`` at all.
 public struct DigestAuthentication: Property {
 
-    private struct Node: PropertyNode {
+    /// Not `private`: `HeaderGroup` searches the resolved graph for this type by name
+    /// (alongside `HeaderNode`) so a `DigestAuthentication` nested inside one still runs its own
+    /// `make(_:)` instead of being silently dropped. It can't simply become a `HeaderNode` the
+    /// way `Authorization` was fixed to, since its value is computed lazily from live
+    /// `credential.challenge`/request-URI state at `Make` time, not something precomputable when
+    /// the property graph is first resolved.
+    struct Node: PropertyNode {
 
         let credential: DigestCredential
         let username: String
