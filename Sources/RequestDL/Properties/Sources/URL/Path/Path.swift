@@ -63,8 +63,10 @@ public struct Path: Property {
             make.requestConfiguration.queries += Self.queryItems(from: queryString)
         }
 
+        /// `percentEncodedQueryItems`, not `queryItems`: `RequestConfiguration.url` joins queries
+        /// as-is, so decoding here turned an escaped `%26` back into a live `&`.
         private static func queryItems(from queryString: String) -> [QueryItem] {
-            URLComponents(string: "?\(queryString)")?.queryItems?.map {
+            URLComponents(string: "?\(queryString)")?.percentEncodedQueryItems?.map {
                 QueryItem(name: $0.name, value: $0.value ?? "")
             } ?? []
         }

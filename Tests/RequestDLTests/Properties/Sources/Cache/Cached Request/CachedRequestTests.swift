@@ -329,11 +329,10 @@ struct CachedRequestTests {
         // directory resolves to, exactly like a real write would.
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        // `encryptionKey` has to be passed through this call explicitly, not just left set on
-        // `testState.dataCache` above: `.cache(...)` unconditionally assigns whatever it's given
-        // to the same shared `Storage` (`nil` included, unlike `memoryCapacity`/`diskCapacity`,
-        // which have a floor to fall back on), so a request that didn't repeat it here would
-        // silently clear it before the read that follows even runs.
+        // Passed through the request too, the way an app configuring encryption per request would.
+        // (Leaving it only on `testState.dataCache` works as well now: a request that doesn't
+        // specify a key leaves the shared `Storage`'s key alone — see `CachePropertiesTests`'
+        // `cache_whenEncryptionKeyNotSpecified_preservesTheCachesExistingKey`.)
         let response = try await performCacheRequest(
             testState: testState,
             headers: makeHeaders(eTag: UUID()),
@@ -469,6 +468,34 @@ struct CachedRequestTests {
 
         // Then
         #expect(thrownError is EmptyCachedDataError)
+    }
+
+    /// Only a response whose status is cacheable by default (RFC 9111 §4.2.2) may be stored. A
+    /// cached entry with no `max-age`/`Expires` is treated as valid indefinitely, so storing a
+    /// transient `503` meant `.returnCachedDataElseLoad` replayed that outage on every later
+    /// request, without ever asking the network again.
+    @Test
+    func cache_whenResponseIsTransientServerError_isNotStored() async throws {
+        let testState = try await TestState()
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAge: false, expiresOffsetSeconds: 3_600),
+            status: .serviceUnavailable,
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        await testState.dataCache.waitUntilIdle()
+
+        let cachedData = await testState.dataCache.getCachedData(
+            forKey: cacheKey,
+            policy: .all
+        )
+
+        // Then
+        #expect(cachedData == nil)
     }
 
     @Test

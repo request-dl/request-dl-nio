@@ -48,10 +48,11 @@
 /// > Note: A destination is never re-matched against other `URLOverride` rules — there is no
 /// > chaining, which avoids override loops.
 ///
-/// > Note: The last-declared rule wins for a given origin, the same convention ``BaseURL`` and
-/// > ``DNSOverride`` already use. If two declared rules have a genuinely overlapping-but-different
-/// > scope for the same host (e.g. a whole-host rule and a path-scoped rule both declared), which
-/// > one applies is left undefined rather than adding specificity-ordering complexity.
+/// > Note: When several rules match, the most specific one wins: the one whose origin path
+/// > matches the most leading path components (so a path-scoped rule beats a whole-host rule for
+/// > the same host). Among equally specific rules, the last declared wins, the same convention
+/// > ``BaseURL`` and ``DNSOverride`` already use. Specificity is what makes the dictionary form
+/// > deterministic, since a `Dictionary`'s iteration order varies between launches.
 public struct URLOverride: Property {
 
     private struct Node: PropertyNode {

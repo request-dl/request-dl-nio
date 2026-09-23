@@ -33,6 +33,12 @@ extension Internals {
             package let spkiPinning: SPKIPinning?
             package let revocationPolicy: Revocation?
 
+            /// Whether `trustedRootCertificatesDER` replaces the system roots (`TrustRoots`) or
+            /// extends them (`AdditionalTrustRoots` alone). `nil` for a descriptor persisted
+            /// before this field existed: rebuilt as exclusive, exactly how it was evaluated
+            /// when it was written.
+            package let trustedRootsAreExclusive: Bool?
+
             package enum Verification: String, Codable, Equatable, Sendable {
                 case none
                 case fullVerification
@@ -116,12 +122,14 @@ extension Internals {
                 trustedRootCertificatesDER: [Data],
                 verification: Verification,
                 spkiPinning: SPKIPinning? = nil,
-                revocationPolicy: Revocation? = nil
+                revocationPolicy: Revocation? = nil,
+                trustedRootsAreExclusive: Bool? = true
             ) {
                 self.trustedRootCertificatesDER = trustedRootCertificatesDER
                 self.verification = verification
                 self.spkiPinning = spkiPinning
                 self.revocationPolicy = revocationPolicy
+                self.trustedRootsAreExclusive = trustedRootsAreExclusive
             }
         }
 
@@ -161,14 +169,16 @@ extension Internals {
             spkiPinningIsStrict: Bool,
             spkiPinningDescriptor: Descriptor.SPKIPinning?,
             revocationPolicy: Internals.RevocationPolicy?,
-            observer: (any TrustDecisionObserver)?
+            observer: (any TrustDecisionObserver)?,
+            trustedRootsAreExclusive: Bool
         ) {
             self.evaluation = Internals.DarwinTrustEvaluation(
                 trustRootCertificates: trustedRootCertificates,
                 pins: spkiPins,
                 isStrict: spkiPinningIsStrict,
                 revocationPolicy: revocationPolicy,
-                observer: observer
+                observer: observer,
+                trustRootsAreExclusive: trustedRootsAreExclusive
             )
             self.certificateVerification = certificateVerification
             self.spkiPinningDescriptor = spkiPinningDescriptor
@@ -197,7 +207,8 @@ extension Internals {
                 spkiPinningIsStrict: descriptor.spkiPinning?.policy == .strict,
                 spkiPinningDescriptor: descriptor.spkiPinning,
                 revocationPolicy: descriptor.revocationPolicy?.value,
-                observer: nil
+                observer: nil,
+                trustedRootsAreExclusive: descriptor.trustedRootsAreExclusive ?? true
             )
         }
 
@@ -221,7 +232,8 @@ extension Internals {
                 trustedRootCertificatesDER: evaluation.trustRootCertificates.map { SecCertificateCopyData($0) as Data },
                 verification: Descriptor.Verification(certificateVerification),
                 spkiPinning: spkiPinningDescriptor,
-                revocationPolicy: evaluation.revocationPolicy.map(Descriptor.Revocation.init)
+                revocationPolicy: evaluation.revocationPolicy.map(Descriptor.Revocation.init),
+                trustedRootsAreExclusive: evaluation.trustRootsAreExclusive
             )
         }
 
@@ -290,7 +302,8 @@ extension Internals {
                 spkiPinningIsStrict: isStrict,
                 spkiPinningDescriptor: spkiPinningDescriptor,
                 revocationPolicy: secureConnection.revocationPolicy,
-                observer: secureConnection.trustDecisionObserver
+                observer: secureConnection.trustDecisionObserver,
+                trustedRootsAreExclusive: secureConnection.trustRootsAreExclusive
             )
         }
 

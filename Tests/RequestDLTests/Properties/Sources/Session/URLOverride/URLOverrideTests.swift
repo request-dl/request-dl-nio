@@ -113,6 +113,50 @@ struct URLOverrideTests {
         #expect(resolved.requestConfiguration.url == "https://second.com")
     }
 
+    /// The documented dictionary example declares a whole-host rule and a path-scoped rule for
+    /// the same host. `Dictionary` iteration order varies between launches, and "last matching
+    /// rule wins" then picked a different destination from one launch to the next. The most
+    /// specific (longest) matching origin path now wins, whatever the declaration order.
+    @Test(arguments: [false, true])
+    func mostSpecificOriginPathWinsRegardlessOfDeclarationOrder(pathScopedFirst: Bool) async throws {
+        // Given / When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("api/v1/users")
+
+                if pathScopedFirst {
+                    URLOverride("https://apple.com/v2", from: "https://google.com/api/v1")
+                    URLOverride("https://apple.com", from: "https://google.com")
+                } else {
+                    URLOverride("https://apple.com", from: "https://google.com")
+                    URLOverride("https://apple.com/v2", from: "https://google.com/api/v1")
+                }
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://apple.com/v2/users")
+    }
+
+    @Test
+    func dictionaryWithOverlappingOriginsResolvesToTheMostSpecificRule() async throws {
+        // Given / When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("api/v1/users")
+                URLOverride([
+                    "https://google.com": "https://apple.com",
+                    "https://google.com/api/v1": "https://apple.com/v2",
+                ])
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://apple.com/v2/users")
+    }
+
     @Test
     func destinationIsNeverRematchedAgainstOtherRules() async throws {
         // Given / When — a.com -> b.com is declared, and b.com -> c.com is declared, but a

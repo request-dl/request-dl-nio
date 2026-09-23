@@ -45,6 +45,37 @@ struct HeaderGroupTests {
         )
     }
 
+    /// `HeaderGroup` keeps only `HeaderNode` leaves from its content, so a header property that
+    /// writes through its own private node instead is silently discarded. `Authorization` was
+    /// one: grouped with other headers, the request went out unauthenticated.
+    @Test
+    func headerGroupWithAuthorization() async throws {
+        let property = TestProperty(
+            HeaderGroup {
+                Authorization(.bearer, token: "abc123")
+                AcceptHeader(.json)
+            }
+        )
+
+        let resolved = try await resolve(property)
+
+        #expect(resolved.requestConfiguration.headers["Authorization"] == ["Bearer abc123"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["application/json"])
+    }
+
+    @Test
+    func headerGroupWithBasicAuthorization() async throws {
+        let property = TestProperty(
+            HeaderGroup {
+                Authorization(username: "john", password: "secret")
+            }
+        )
+
+        let resolved = try await resolve(property)
+
+        #expect(resolved.requestConfiguration.headers["Authorization"] == ["Basic am9objpzZWNyZXQ="])
+    }
+
     @Test
     func headerGroupWithMultipleHeaders() async throws {
         let property = TestProperty(

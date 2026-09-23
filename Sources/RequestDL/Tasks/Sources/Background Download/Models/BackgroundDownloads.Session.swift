@@ -233,6 +233,23 @@ extension BackgroundDownloads {
                 return
             }
 
+            // URLSession calls this for *any* HTTP status, so without this an error page would
+            // replace the file already at `destination` and be reported as `.completed`. Checked
+            // before touching `destination` at all; URLSession removes `location` itself once
+            // this returns.
+            if let statusCode = (downloadTask.response as? HTTPURLResponse)?.statusCode,
+                !(200..<300).contains(statusCode)
+            {
+                onEvent?(
+                    .failed(
+                        id: id,
+                        destination: destination,
+                        error: BackgroundDownloadStatusCodeError(statusCode: statusCode)
+                    )
+                )
+                return
+            }
+
             do {
                 // Best-effort: a destination that doesn't already exist is the common case, and
                 // `moveItem` below is what actually needs to succeed.

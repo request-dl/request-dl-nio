@@ -12,6 +12,10 @@ import NIOPosix
 import NIOSSL
 import Testing
 
+#if canImport(Darwin)
+import Security
+#endif
+
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
@@ -116,6 +120,77 @@ struct InternalsNIOTrustEvaluatorTests {
 
         #expect(result == .failed)
     }
+
+    #if os(macOS)
+    /// `additionalTrustRoots` alone installs this evaluator's Network.framework closure on
+    /// Darwin (Network.framework has no native way to see them). Those roots are *additional*:
+    /// a chain the system already trusts must keep validating, exactly as it does under plain
+    /// NIOSSL, where `TLSConfiguration.additionalTrustRoots` extends the default store.
+    @Test
+    func tlsCustomVerificationNetworkFramework_whenOnlyAdditionalTrustRoots_stillTrustsSystemRoots() async throws {
+        // Given
+        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).server().certificateURL))
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.certificates([.init(pemBytes, format: .pem)])]
+
+        let evaluator = try #require(try Internals.NIOTrustEvaluator.resolve(from: secureConnection))
+        let trust = try systemTrustedTrust()
+
+        // When
+        let isTrusted = await withCheckedContinuation { continuation in
+            evaluator.tlsCustomVerificationNetworkFramework(trust) { continuation.resume(returning: $0) }
+        }
+
+        // Then
+        #expect(isTrusted)
+    }
+
+    /// `trustRoots`, by contrast, replaces the system roots.
+    @Test
+    func tlsCustomVerificationNetworkFramework_whenTrustRootsConfigured_rejectsSystemRoots() async throws {
+        // Given
+        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).server().certificateURL))
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([.init(pemBytes, format: .pem)])
+        secureConnection.revocationPolicy = .disabled
+
+        let evaluator = try #require(try Internals.NIOTrustEvaluator.resolve(from: secureConnection))
+        let trust = try systemTrustedTrust()
+
+        // When
+        let isTrusted = await withCheckedContinuation { continuation in
+            evaluator.tlsCustomVerificationNetworkFramework(trust) { continuation.resume(returning: $0) }
+        }
+
+        // Then
+        #expect(!isTrusted)
+    }
+
+    /// A self-signed system root that evaluates as trusted with no custom anchors, offline.
+    private func systemTrustedTrust() throws -> SecTrust {
+        var anchors: CFArray?
+        try #require(SecTrustCopyAnchorCertificates(&anchors) == errSecSuccess)
+
+        for root in try #require(anchors as? [SecCertificate]) {
+            var probe: SecTrust?
+            guard SecTrustCreateWithCertificates(root, SecPolicyCreateBasicX509(), &probe) == errSecSuccess,
+                let probe
+            else { continue }
+            SecTrustSetNetworkFetchAllowed(probe, false)
+
+            guard SecTrustEvaluateWithError(probe, nil) else { continue }
+
+            var fresh: SecTrust?
+            _ = SecTrustCreateWithCertificates(root, SecPolicyCreateBasicX509(), &fresh)
+            let trust = try #require(fresh)
+            SecTrustSetNetworkFetchAllowed(trust, false)
+            return trust
+        }
+
+        Issue.record("No system root evaluates as trusted offline")
+        throw CancellationError()
+    }
+    #endif
     #endif
 
     @Test

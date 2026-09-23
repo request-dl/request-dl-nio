@@ -87,6 +87,14 @@ extension Internals {
         package var cipherSuites: String?
         package var cipherSuiteValues: [Internals.TLSCipher]?
 
+        /// Whether the configured roots *replace* the system's trusted roots rather than extend
+        /// them: `trustRoots` does (the same way `TLSConfiguration.trustRoots` does), while
+        /// `additionalTrustRoots` alone only adds to them (`TLSConfiguration.additionalTrustRoots`).
+        /// What custom `SecTrust` evaluation has to mirror to agree with plain NIOSSL.
+        package var trustRootsAreExclusive: Bool {
+            trustRoots != nil && !useDefaultTrustRoots
+        }
+
         // MARK: - Inits
 
         package init() {}

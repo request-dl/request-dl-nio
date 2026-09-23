@@ -124,8 +124,9 @@ struct Resolve<Root: Property>: Sendable {
         return configuration
     }
 
-    /// Rewrites `baseURL`/`pathComponents` per the last-declared `URLOverride` rule whose origin
-    /// (scheme + host + optional path prefix) matches the final resolved request.
+    /// Rewrites `baseURL`/`pathComponents` per the most specific `URLOverride` rule (then the
+    /// last declared) whose origin (scheme + host + optional path prefix) matches the final
+    /// resolved request.
     ///
     /// Done here rather than inside `URLOverride`'s node for the same reason system-proxy
     /// resolution is: matching needs the final `baseURL`/`pathComponents`, complete only once
@@ -147,7 +148,12 @@ struct Resolve<Root: Property>: Sendable {
                 .map(String.init)
         )
 
-        var match: (destination: URLOverrideEndpoint, remainder: [String])?
+        // The most specific (longest) matching origin path wins; among equally specific ones,
+        // the last declared. Specificity has to come first: `URLOverride([String: String])`
+        // declares its rules in `Dictionary` order, which varies between launches, so "last
+        // matching rule wins" alone picked a different destination from one launch to the next
+        // for the documented whole-host-plus-path-scoped example.
+        var match: (destination: URLOverrideEndpoint, remainder: [String], specificity: Int)?
 
         for rule in make.urlOverrides {
             guard
@@ -158,10 +164,16 @@ struct Resolve<Root: Property>: Sendable {
                 continue
             }
 
-            match = (rule.destination, Array(pathComponents.dropFirst(rule.origin.pathComponents.count)))
+            let specificity = rule.origin.pathComponents.count
+
+            if let match, match.specificity > specificity {
+                continue
+            }
+
+            match = (rule.destination, Array(pathComponents.dropFirst(specificity)), specificity)
         }
 
-        guard let (destination, remainder) = match else {
+        guard let (destination, remainder, _) = match else {
             return
         }
 

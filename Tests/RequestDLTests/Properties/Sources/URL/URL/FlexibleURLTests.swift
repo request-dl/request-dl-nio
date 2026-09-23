@@ -30,6 +30,38 @@ struct FlexibleURLTests {
         #expect(resolved.requestConfiguration.url == endpointString)
     }
 
+    /// `RequestConfiguration.url` joins query items as-is, expecting them already percent
+    /// encoded. Reading them back decoded (`URLComponents.queryItems`) turned an escaped
+    /// delimiter into a live one: `%26` split one parameter into two, `%3D` added a second `=`,
+    /// and `%2B` became a `+` a server reads as a space.
+    @Test(
+        arguments: [
+            "https://api.example.com/search?q=a%26b",
+            "https://api.example.com/search?q=1%2B1&lang=en",
+            "https://api.example.com/search?q=a%3Db",
+        ]
+    )
+    func completeURLKeepsPercentEscapedDelimitersEscaped(_ endpointString: String) async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL(endpointString))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == endpointString)
+    }
+
+    @Test func relativeURLKeepsPercentEscapedDelimitersEscaped() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.example.com")
+                FlexibleURL("/search?q=a%26b")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://api.example.com/search?q=a%26b")
+    }
+
     @Test func completeURLWithPort() async throws {
         // Given
         let endpointString = "http://localhost:8080/api/debug"

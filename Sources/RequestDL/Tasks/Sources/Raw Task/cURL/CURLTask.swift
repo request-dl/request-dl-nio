@@ -67,14 +67,18 @@ public struct CURLTask: RequestTask {
 
     // MARK: - Public methods
 
+    /// This method is used internally and should not be called directly.
     ///
-    /// Parses the command and performs the request.
+    /// Parses the command and performs the request, forwarding `environment` to the underlying
+    /// `RawTask` the same way ``DataTask`` does. Implementing only `result()` instead dropped it:
+    /// every environment-borne modifier wrapping a `CURLTask` (`.logger(_:)`,
+    /// `.description(_:onDescribe:)`, `.digestAuthentication()`, `.environment(...)`) was then a
+    /// silent no-op.
     ///
-    /// - Returns: A ``TaskResult`` with `Data` as its `payload`.
     /// - Throws: ``CURLParsingError`` if the command doesn't parse, or an error from the request
     /// itself.
-    ///
-    public func result() async throws -> TaskResult<Data> {
+    @_spi(Private)
+    public func _result(environment: RequestEnvironmentValues) async throws -> TaskResult<Data> {
         let parsed = try await CURLCommandParser.parseCommand(command)
 
         return try await RawTask(
@@ -84,6 +88,6 @@ public struct CURLTask: RequestTask {
             )
         )
         .collectData()
-        .result()
+        ._result(environment: environment)
     }
 }

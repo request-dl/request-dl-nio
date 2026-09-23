@@ -136,19 +136,51 @@ enum CURLTokenizer {
     }
 
     /// Reads the body of a `$'...'` literal, starting just past the opening `$'`.
+    ///
+    /// A `\xHH` escape is one raw *byte*, not one character: consecutive ones are collected and
+    /// decoded together as UTF-8, the way the shell hands them to curl. `curlShellQuote` (what
+    /// `.description(.cURL)` emits) writes every byte of any non-ASCII value this way, so
+    /// turning each byte into its own Unicode scalar instead (Latin-1) re-encoded `é`
+    /// (`\xc3\xa9`) as the two characters `Ã©` on the way back out.
     private static func readANSICQuoted(
         _ characters: [Character],
         index: inout Int,
         into current: inout String
     ) throws {
+        var pendingBytes: [UInt8] = []
+
+        func flushPendingBytes() {
+            guard !pendingBytes.isEmpty else {
+                return
+            }
+
+            current += String(decoding: pendingBytes, as: UTF8.self)
+            pendingBytes.removeAll(keepingCapacity: true)
+        }
+
         while index < characters.endIndex, characters[index] != "'" {
             guard characters[index] == "\\", index + 1 < characters.endIndex else {
+                flushPendingBytes()
                 current.append(characters[index])
                 index += 1
                 continue
             }
 
             let escape = characters[index + 1]
+
+            if escape == "x" {
+                let hexStart = index + 2
+                let hexEnd = min(hexStart + 2, characters.endIndex)
+                let hex = String(characters[hexStart..<hexEnd])
+
+                if !hex.isEmpty, let byte = UInt8(hex, radix: 16) {
+                    pendingBytes.append(byte)
+                    index = hexEnd
+                    continue
+                }
+            }
+
+            flushPendingBytes()
 
             switch escape {
             case "n":
@@ -166,23 +198,15 @@ enum CURLTokenizer {
             case "0":
                 current.append("\0")
                 index += 2
-            case "x":
-                let hexStart = index + 2
-                let hexEnd = min(hexStart + 2, characters.endIndex)
-                let hex = String(characters[hexStart..<hexEnd])
-
-                if let byte = UInt8(hex, radix: 16), !hex.isEmpty {
-                    current.append(Character(UnicodeScalar(byte)))
-                    index = hexEnd
-                } else {
-                    current.append(escape)
-                    index += 2
-                }
             default:
+                // Includes a malformed `\x` (no valid hex digits after it), kept as a literal
+                // `x` exactly as before.
                 current.append(escape)
                 index += 2
             }
         }
+
+        flushPendingBytes()
 
         guard index < characters.endIndex else {
             throw CURLParsingError(.unterminatedQuote, token: current)

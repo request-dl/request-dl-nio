@@ -58,6 +58,16 @@ extension Internals {
         package let revocationPolicy: Internals.RevocationPolicy?
         package let observer: (any TrustDecisionObserver)?
 
+        /// Whether `trustRootCertificates` *replace* the system's trusted roots (`TrustRoots`)
+        /// rather than extend them (`AdditionalTrustRoots` alone).
+        ///
+        /// `false` keeps the system roots trusted alongside the configured ones, matching
+        /// NIOSSL's own `additionalTrustRoots` semantics and what plain `.nio` already does.
+        /// Anchoring only on additional roots turned "also trust my corporate CA" into "trust
+        /// nothing else", rejecting every publicly-trusted host on `.urlSession` and on the
+        /// Network.framework/pinned `.nio` paths.
+        package let trustRootsAreExclusive: Bool
+
         // MARK: - Inits
 
         package init(
@@ -65,13 +75,15 @@ extension Internals {
             pins: [ResolvedSPKIPin],
             isStrict: Bool,
             revocationPolicy: Internals.RevocationPolicy? = nil,
-            observer: (any TrustDecisionObserver)? = nil
+            observer: (any TrustDecisionObserver)? = nil,
+            trustRootsAreExclusive: Bool = true
         ) {
             self.trustRootCertificates = trustRootCertificates
             self.pins = pins
             self.isStrict = isStrict
             self.revocationPolicy = revocationPolicy
             self.observer = observer
+            self.trustRootsAreExclusive = trustRootsAreExclusive
         }
 
         // MARK: - Internal methods
@@ -120,7 +132,8 @@ extension Internals {
 
             if !trustRootCertificates.isEmpty {
                 SecTrustSetAnchorCertificates(trust, trustRootCertificates as CFArray)
-                SecTrustSetAnchorCertificatesOnly(trust, true)
+                // Must follow `SecTrustSetAnchorCertificates`, which itself turns anchors-only on.
+                SecTrustSetAnchorCertificatesOnly(trust, trustRootsAreExclusive)
             }
         }
 
