@@ -186,8 +186,15 @@ extension DataTaskTests {
     /// `resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToNIO`
     /// for the resolution logic itself, proven without needing a live network round trip.
     ///
-    /// Same Keychain-entitlement caveat as `dataTask_whenCAEnabledUnderNIOTransportServices`
-    /// above: genuinely succeeds on real macOS, `withKnownIssue` elsewhere.
+    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, this one needs no
+    /// `withKnownIssue`/Keychain-entitlement caveat on iOS/tvOS/watchOS/Catalyst Simulator:
+    /// `.requiredExecutor(.nio)` reads the identity straight off NIOSSL's own
+    /// `TLSConfiguration.certificateChain`/`privateKey` -- no `SecIdentity`/Keychain round trip
+    /// involved at all, so there's no entitlement gap to hit. Confirmed directly: CI failed with
+    /// "Known issue was not recorded" on every Simulator platform when this was first wrapped in
+    /// `withKnownIssue` (copied from the neighboring `.nioTransportServices`-requiring test,
+    /// which does go through that round trip and genuinely needs the wrapper) -- the wrapped body
+    /// unconditionally succeeded.
     @Test
     func dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake() async throws {
         // Given
@@ -240,15 +247,7 @@ extension DataTaskTests {
             #expect(result.response == output)
         }
 
-        #if os(macOS) || !canImport(Darwin)
         try await verify()
-        #else
-        await withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see dataTask_whenCAEnabledUnderNIOTransportServices's own doc comment"
-        ) {
-            try await verify()
-        }
-        #endif
     }
 
     /// The hard-pin counterpart to the fallback test above: `.requiredExecutor(.nioTransportServices)`

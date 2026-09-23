@@ -250,6 +250,15 @@ struct InternalsRawBytesIdentityBuilderTests {
     /// that only helps a *signed* macOS app with the Keychain Sharing entitlement, which this
     /// unsigned test process has no way to obtain (see `InternalsRawBytesIdentityBuilderTests`'s
     /// own type doc comment).
+    ///
+    /// macOS only: `useDataProtectionKeychain: false` doesn't exercise a distinct "legacy"
+    /// Keychain on iOS/tvOS/watchOS/Catalyst the way it does on macOS -- there's only ever the
+    /// one data-protection Keychain there (see `makeIdentity(_:_:)`'s own `#else` branch), and
+    /// passing `false` on those platforms still hits the missing-entitlement wall
+    /// `store_whenUsingDataProtectionKeychainInUnsignedProcess_throwsMissingEntitlement` already
+    /// covers, not the `-25304` this test is after. Confirmed directly: CI failed with that
+    /// entitlement error, not `-25304`, when this ran unconditionally on iOS Simulator.
+    #if os(macOS)
     @Test
     func store_whenGivenAnECKeyOnTheLegacyKeychain_throwsInvalidItemRef() throws {
         // Given
@@ -275,7 +284,7 @@ struct InternalsRawBytesIdentityBuilderTests {
 
     /// The RSA counterpart to the EC test right above, on the exact same (legacy) Keychain:
     /// proves the gap is EC-specific, not a general problem with this test harness or with
-    /// `useDataProtectionKeychain: false` storage.
+    /// `useDataProtectionKeychain: false` storage. macOS only -- see that test's own doc comment.
     @Test
     func store_whenGivenAnRSAKeyOnTheLegacyKeychain_succeeds() throws {
         // Given
@@ -291,6 +300,7 @@ struct InternalsRawBytesIdentityBuilderTests {
             useDataProtectionKeychain: false
         )
     }
+    #endif
 
     // MARK: - Unsupported formats
 
