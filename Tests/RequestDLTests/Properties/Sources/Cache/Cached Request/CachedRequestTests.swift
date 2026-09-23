@@ -189,6 +189,37 @@ struct CachedRequestTests {
         #expect(thrownError is EmptyCachedDataError)
     }
 
+    /// Regression test: `isCachedDataValid`'s max-age freshness check used to be guarded by
+    /// `maxAge > .zero`, so `Cache-Control: max-age=0` — a common, valid directive meaning
+    /// "cacheable, but revalidate before every reuse" — skipped the check entirely instead of
+    /// being treated as immediately stale, and (with no `Expires` header, the common modern
+    /// pattern of relying on `Cache-Control` alone) the entry was reported valid forever. No
+    /// sleep needed here, unlike `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge`:
+    /// `max-age=0` must already be stale the instant it's checked.
+    @Test
+    func cache_whenUseCachedDataOnlyStrategyWithMaxAgeZero_treatsCacheAsInvalid() async throws {
+        let testState = try await TestState()
+        let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 0))
+        let cacheKey = "https://localhost:8888" + testState.uri
+        var thrownError: Error?
+
+        // When
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        do {
+            _ = try await performCacheRequest(
+                testState: testState,
+                headers: makeHeaders(),
+                cacheStrategy: .useCachedDataOnly
+            )
+        } catch {
+            thrownError = error
+        }
+
+        // Then
+        #expect(thrownError is EmptyCachedDataError)
+    }
+
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let testState = try await TestState()

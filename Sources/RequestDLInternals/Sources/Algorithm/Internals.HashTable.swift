@@ -120,8 +120,13 @@ extension Internals {
             }
         }
 
+        /// - Important: Must not be `abs(key.hashValue) % _capacity`. `Int.min` is a valid
+        /// (if astronomically unlikely) `Hashable.hashValue` for any hashable `Key`, and
+        /// `abs(Int.min)` traps: `-Int.min` cannot be represented as a positive `Int`.
+        /// `.magnitude` sidesteps this — it is defined to return the correct unsigned value even
+        /// for `Int.min`, unlike unary negation.
         private func _index(forKey key: Key) -> Int {
-            abs(key.hashValue) % _capacity
+            Int(key.hashValue.magnitude % UInt(_capacity))
         }
     }
 }
