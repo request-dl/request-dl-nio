@@ -41,5 +41,19 @@ extension Internals {
         /// `URLSession` negotiates ALPN automatically and Info.plist has no key to override the
         /// protocol list it offers, so this has no reachable equivalent under URLSession at all.
         case applicationProtocolsUnderURLSession
+        /// A client identity (`certificateChain`/`privateKey`) configured alongside a `proxy`.
+        ///
+        /// Network.framework's own TLS only ever reads the client identity from
+        /// `tlsLocalIdentityNetworkFramework` (see `Internals.SecureConnection
+        /// .makeTLSConfigurationByContext(isCompatibleWithNetworkFramework:)`'s own doc comment
+        /// on why `certificateChain`/`privateKey` are deliberately left off the NIOSSL
+        /// `TLSConfiguration` whenever Network.framework is in play), which is correct for a
+        /// *direct* NIOTransportServices connection. It's wrong once a proxy is configured
+        /// alongside it: AsyncHTTPClient performs TLS for a *proxied* HTTPS connection through
+        /// NIOSSL even on a NIOTransportServices event loop
+        /// (`HTTPConnectionPool+Factory.swift`'s `setupTLSInProxyConnectionIfNeeded`, which reads
+        /// the same NIOSSL `TLSConfiguration` the identity was left off of), so no client
+        /// certificate would ever reach the proxy tunnel's TLS handshake.
+        case clientIdentityWithProxyUnderNetworkFramework
     }
 }

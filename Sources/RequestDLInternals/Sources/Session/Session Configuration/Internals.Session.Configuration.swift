@@ -208,10 +208,29 @@ extension Internals.Session.Configuration {
 
     package var isCompatibleWithNetworkFramework: Bool {
         if enableNetworkFramework {
-            return secureConnection?.isCompatibleWithNetworkFramework ?? true
+            return networkFrameworkIncompatibilityReasons().isEmpty
         }
 
         return false
+    }
+
+    /// The mirror image of `urlSessionIncompatibilityReasons()`: fields that keep a configuration
+    /// off `.nioTransportServices` (Network.framework) instead of off `.urlSession`.
+    ///
+    /// Starts from `secureConnection?.networkFrameworkIncompatibilityReasons()` (the fields
+    /// `SecureConnection` alone already knows are Network.framework-incompatible), then adds
+    /// `.clientIdentityWithProxyUnderNetworkFramework` when both a `proxy` and a client identity
+    /// (`certificateChain`/`privateKey`) are configured together -- something `SecureConnection`
+    /// can't see on its own, since `proxy` lives here, one level up. See that reason's own doc
+    /// comment for why the combination doesn't work.
+    package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
+        var reasons = secureConnection?.networkFrameworkIncompatibilityReasons() ?? []
+
+        if proxy != nil, secureConnection?.certificateChain != nil || secureConnection?.privateKey != nil {
+            reasons.append(.clientIdentityWithProxyUnderNetworkFramework)
+        }
+
+        return reasons
     }
 
     /// The bucket-D fields that keep a configuration off `.urlSession` regardless of what
@@ -327,7 +346,7 @@ extension Internals.Session.Configuration {
     /// ATS, HTTP/3 maturity), then NIOTransportServices, then plain NIO as the universal
     /// fallback. `.urlSession` and `.nioTransportServices` are independent capability checks, not
     /// a hierarchy: a field can be reachable on one and not the other (see
-    /// `urlSessionIncompatibilityReasons()`/`SecureConnection.networkFrameworkIncompatibilityReasons()`).
+    /// `urlSessionIncompatibilityReasons()`/`networkFrameworkIncompatibilityReasons()`).
     /// This is a default ordering, not a fixed law: `preferredExecutor`/`requiredExecutor`
     /// (public API) let a caller override it.
     ///
@@ -373,7 +392,7 @@ extension Internals.Session.Configuration {
         #if canImport(Darwin)
         #if canImport(NIOCore)
         let isURLSessionCompatible = urlSessionIncompatibilityReasons().isEmpty
-        let isNetworkFrameworkCompatible = secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true
+        let isNetworkFrameworkCompatible = networkFrameworkIncompatibilityReasons().isEmpty
 
         let effectivePreferredExecutor = preferredExecutor ?? (enableNetworkFramework ? .nioTransportServices : nil)
 
@@ -431,9 +450,7 @@ extension Internals.Session.Configuration {
             reasons = urlSessionIncompatibilityReasons()
         #if canImport(NIOCore)
         case .nioTransportServices:
-            reasons =
-                (secureConnection?.networkFrameworkIncompatibilityReasons() ?? [])
-                + nonURLSessionExecutorIncompatibilityReasons()
+            reasons = networkFrameworkIncompatibilityReasons() + nonURLSessionExecutorIncompatibilityReasons()
         case .nio:
             reasons = nonURLSessionExecutorIncompatibilityReasons()
         #endif
