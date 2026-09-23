@@ -31,6 +31,7 @@ public struct ExecutorRequirementError: Error, Sendable {
         case decompressionRequiresURLSession
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
+        case clientIdentityWithProxyUnderNetworkFramework
 
         // MARK: - Inits
 
@@ -70,6 +71,8 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .maximumTLSVersionUnderURLSession
             case .applicationProtocolsUnderURLSession:
                 self = .applicationProtocolsUnderURLSession
+            case .clientIdentityWithProxyUnderNetworkFramework:
+                self = .clientIdentityWithProxyUnderNetworkFramework
             }
         }
     }
@@ -145,6 +148,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "a maximum TLS version (unsupported under URLSession)"
         case .applicationProtocolsUnderURLSession:
             return "an ALPN application protocol list (unsupported under URLSession)"
+        case .clientIdentityWithProxyUnderNetworkFramework:
+            return "a client certificate/private key combined with a proxy (unsupported under NIOTransportServices)"
         }
     }
 }
