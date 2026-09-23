@@ -31,6 +31,7 @@ public struct ExecutorRequirementError: Error, Sendable {
         case decompressionRequiresURLSession
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
+        case multipleClientCertificatesUnderNetworkFramework
 
         // MARK: - Inits
 
@@ -70,6 +71,8 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .maximumTLSVersionUnderURLSession
             case .applicationProtocolsUnderURLSession:
                 self = .applicationProtocolsUnderURLSession
+            case .multipleClientCertificatesUnderNetworkFramework:
+                self = .multipleClientCertificatesUnderNetworkFramework
             }
         }
     }
@@ -145,6 +148,9 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "a maximum TLS version (unsupported under URLSession)"
         case .applicationProtocolsUnderURLSession:
             return "an ALPN application protocol list (unsupported under URLSession)"
+        case .multipleClientCertificatesUnderNetworkFramework:
+            return
+                "a client certificate chain with more than one certificate (unsupported under NIOTransportServices)"
         }
     }
 }

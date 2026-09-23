@@ -21,7 +21,10 @@ extension Internals {
         /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, `.noHostnameVerification`,
         /// `revocationPolicy`, and `trustDecisionObserver` all reach Network.framework, through the
         /// two trust/identity hooks `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`
-        /// install. None of `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
+        /// install -- except a `certificateChain` resolving to more than one certificate, which
+        /// `networkFrameworkIncompatibilityReasons()` below flags instead, since
+        /// `makeLocalIdentityForNetworkFramework()` has no way to carry the rest alongside the
+        /// `SecIdentity` it builds. None of `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
         /// `trustDecisionObserver` has a native Network.framework counterpart (unlike `trustRoots`,
         /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own `certificateVerification`
         /// flag). `Internals.NIOTrustEvaluator` is what makes all four work there: it installs
@@ -120,6 +123,28 @@ extension Internals {
             if pskHint != nil { reasons.append(.pskHint) }
             if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
             #endif
+
+            // `makeLocalIdentityForNetworkFramework()` below only ever builds the
+            // `SecIdentity`-backed `tlsLocalIdentityNetworkFramework` from the *first* certificate
+            // in the chain: unlike `.urlSession` (`Internals.URLSessionIdentityPolicy`, which
+            // hands the rest to `URLCredential(identity:certificates:persistence:)`) or `.nio`
+            // (whose NIOSSL `TLSConfiguration.certificateChain` carries every certificate),
+            // AsyncHTTPClient's NIOTransportServices bridge has no equivalent "plus these
+            // supplementary certificates" API alongside a `SecIdentity` for this package to use.
+            // A server that doesn't already have the intermediate in its own trust store can't
+            // complete the chain from a leaf-only presentation and rejects the handshake with
+            // `unknown_ca` -- confirmed end to end, not assumed (a real three-level chain against
+            // a server trusting only the root).
+            //
+            // Only catches `certificateChain`'s `.certificates([Certificate])` case (what
+            // `Certificates { Certificate(leaf); Certificate(intermediate) }` -- the DSL's own
+            // multi-certificate composition -- produces), since counting certificates bundled
+            // inside a `.file`/`.bytes` blob needs parsing it, and every other reason here is a
+            // cheap, synchronous field check. A concatenated multi-certificate PEM handed to
+            // `Certificates(_:)`'s single-file/single-bytes initializer isn't caught by this.
+            if case .certificates(let certificates) = certificateChain, certificates.count > 1 {
+                reasons.append(.multipleClientCertificatesUnderNetworkFramework)
+            }
 
             return reasons
         }
