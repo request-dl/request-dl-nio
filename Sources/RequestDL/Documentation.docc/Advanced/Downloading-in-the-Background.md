@@ -128,3 +128,4 @@ Only the file path is persisted alongside `id`/`destination` — never the key m
 ### Errors
 
 - ``BackgroundDownloadUnsupportedConfigurationError``
+- ``BackgroundDownloadStatusCodeError``
