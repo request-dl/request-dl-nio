@@ -17,6 +17,12 @@ import Testing
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
+// `ContinuousClock` needs macOS 13/iOS 16/tvOS 16/watchOS 9, newer than this package's macOS
+// 12/iOS 15/tvOS 15/watchOS 8 floor -- same reasoning as `Internals.ResourceDeadline`.
+#if canImport(Darwin)
+import struct Foundation.DispatchTime
+#endif
+
 @Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsClientManagerTests {
 
@@ -179,19 +185,24 @@ struct InternalsClientManagerTests {
             var overflowing = Internals.Session.Configuration()
             overflowing.timeout.connect = 90_000_000_000
 
-            let clock = ContinuousClock()
-            let start = clock.now
+            #if canImport(Darwin)
+            let start = DispatchTime.now().uptimeNanoseconds
+            #else
+            let start = ContinuousClock.now
+            #endif
 
             let overflow = try await manager.client(
                 provider: provider,
                 sessionConfiguration: overflowing
             )
 
-            let elapsed = clock.now - start
-
             // Then: served straight away, the ceiling overshot rather than enforced, and nothing
             // in flight was torn down to get there.
-            #expect(elapsed < .seconds(1))
+            #if canImport(Darwin)
+            #expect(DispatchTime.now().uptimeNanoseconds - start < 1_000_000_000)
+            #else
+            #expect(ContinuousClock.now - start < .seconds(1))
+            #endif
             #expect(manager.count == maximumCount + 1)
             #expect(busy.allSatisfy { $0.isRunning })
             #expect(!overflow.isRunning)
