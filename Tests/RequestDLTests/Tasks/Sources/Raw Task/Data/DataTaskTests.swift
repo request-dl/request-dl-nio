@@ -113,7 +113,12 @@ struct DataTaskTests {
             Path(uri)
 
             Session.localServer
-            Timeout(.seconds(30), for: .resource)
+            // Wide on purpose: since the pre-flight steps ahead of the request now share this
+            // same budget too (descriptor hooks, client resolution, network-path waiting -- see
+            // the `.resource` timeout fix bounding all of them), a contended CI simulator adding
+            // real seconds to each of those must not turn "completes normally" into a false
+            // timeout.
+            Timeout(.seconds(90), for: .resource)
 
             SecureConnection {
                 TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
