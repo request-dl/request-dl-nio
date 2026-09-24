@@ -266,8 +266,24 @@ extension Internals {
                     return
                 }
 
+                // A `.nio` client that's merely un-cached above (removed from `surviving`) still
+                // shuts itself down once the last reference to it goes — including one a caller
+                // was handed just before this sweep ran and has not started using yet: `isRunning`
+                // only flips once `execute()` registers an operation, *after* it clears
+                // `throttledExecutor.acquire()`, so a client stuck on that wait still reads as
+                // idle here. Calling `shutdown()` on it directly, the way `.urlSession` needs
+                // (its session is retained by the OS and never torn down on its own), would close
+                // it out from under that caller instead of merely un-pooling it — the exact hazard
+                // `_evictIfNeeded(protecting:)`'s own doc comment describes for the ceiling path,
+                // left unaddressed here until now.
+                let needsExplicitShutdown = expired.filter { !Self.retiresOnRelease($0.item.client) }
+
+                guard !needsExplicitShutdown.isEmpty else {
+                    return
+                }
+
                 let failed = await withTaskGroup(of: (String, Item)?.self) { group in
-                    for (key, item) in expired {
+                    for (key, item) in needsExplicitShutdown {
                         group.addTask {
                             (try? await item.client.shutdown()) == true ? nil : (key, item)
                         }

@@ -212,6 +212,29 @@ struct BaseURLTests {
     }
 
     @Test
+    func url_whenHostContainsAPath_throwsUnexpectedHostInsteadOfTruncating() async throws {
+        // Given
+        let baseURL = "apple.com/api/v1"
+
+        do {
+            // When
+            _ = try await resolve(
+                TestProperty {
+                    BaseURL(baseURL)
+                }
+            )
+
+            // Then
+            Issue.record("Not expecting success")
+        } catch let error as BaseURLError {
+            #expect(error.context == .unexpectedHost)
+            #expect(error.baseURL == baseURL)
+        } catch {
+            throw error
+        }
+    }
+
+    @Test
     func neverBody() async throws {
         // Given
         let property = BaseURL("apple.com")

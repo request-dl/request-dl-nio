@@ -65,6 +65,36 @@ struct DigestAuthenticationTests {
     }
 
     @Test
+    func digestAuthentication_whenCredentialReusedAcrossRequests_incrementsNonceCount() async throws {
+        // Given
+        let credential = DigestCredential()
+        credential.challenge = try #require(
+            DigestChallenge(
+                headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
+            )
+        )
+
+        func header() async throws -> String {
+            let resolved = try await resolve(
+                TestProperty(
+                    DigestAuthentication(username: "user", password: "pass")
+                        .environment(\.digestCredential, credential)
+                )
+            )
+
+            return try #require(resolved.requestConfiguration.headers["Authorization"]?.first)
+        }
+
+        // When
+        let first = try await header()
+        let second = try await header()
+
+        // Then
+        #expect(first.contains("nc=00000001"))
+        #expect(second.contains("nc=00000002"))
+    }
+
+    @Test
     func digestAuthentication_whenPasswordDiffers_producesADifferentResponse() async throws {
         // Given
         func header(password: String) async throws -> String {

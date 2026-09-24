@@ -106,6 +106,7 @@ extension Internals {
                 pins: tlsPins,
                 isStrict: isStrict,
                 trustRootCertificates: trustRootCertificates,
+                trustRootsAreExclusive: secureConnection.trustRootsAreExclusive,
                 observer: observer
             )
             #endif

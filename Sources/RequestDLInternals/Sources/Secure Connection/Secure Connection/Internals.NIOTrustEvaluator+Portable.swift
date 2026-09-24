@@ -27,27 +27,31 @@ extension Internals.NIOTrustEvaluator {
         pins: [Internals.SPKIHash],
         isStrict: Bool,
         trustRootCertificates: [NIOSSLCertificate],
+        trustRootsAreExclusive: Bool,
         observer: (any TrustDecisionObserver)?
     ) throws -> Internals.NIOTrustEvaluator {
         // A `let`, fully resolved before the closure below captures it. A `var` captured across
         // both this `@Sendable` closure and the `Task` nested inside it doesn't satisfy Swift 6
         // concurrency checking, even though nothing ever mutates it again after this point.
         let rootStore: CertificateStore = {
-            var store = CertificateStore()
+            var certificates: [Certificate] = []
             for certificate in trustRootCertificates {
                 if let x509Certificate = try? Certificate(derEncoded: certificate.toDERBytes()) {
-                    store.append(x509Certificate)
+                    certificates.append(x509Certificate)
                 }
             }
 
-            // No explicit trust roots configured; fall back to the same distro CA bundle
-            // NIOSSL's own `.default` trust roots would have loaded, so pinning on top of the
-            // system default still validates against the system default, not an empty root set.
-            if trustRootCertificates.isEmpty {
-                store = (try? Self.systemDefaultCertificateStore()) ?? store
+            // Extend with (or, when nothing else is configured, fall back entirely to) the same
+            // distro CA bundle NIOSSL's own `.default` trust roots would have loaded, unless the
+            // configured roots are meant to *replace* the system trust store. Mirrors the Darwin
+            // evaluator's `trustRootsAreExclusive` handling of `SecTrustSetAnchorCertificatesOnly`,
+            // so `additionalTrustRoots` alone stays additive here too instead of silently dropping
+            // every publicly-trusted host.
+            if !trustRootsAreExclusive {
+                certificates += (try? Self.systemDefaultCertificates()) ?? []
             }
 
-            return store
+            return CertificateStore(certificates)
         }()
 
         return Internals.NIOTrustEvaluator(
@@ -81,6 +85,21 @@ extension Internals.NIOTrustEvaluator {
 
                     switch await verifier.validate(leaf: leaf, intermediates: intermediateStore) {
                     case .validCertificate(let chain):
+                        guard Self.leafSatisfiesServerAuthExtendedKeyUsage(leaf) else {
+                            // `RFC5280Policy` validates the chain (signatures, validity period,
+                            // basic constraints) but, by its own documentation, deliberately
+                            // doesn't check `keyUsage`/`extendedKeyUsage`. The Darwin evaluator
+                            // enforces the server-auth EKU via `SecPolicyCreateSSL`; mirror that
+                            // here so a certificate issued only for another purpose (client auth,
+                            // code signing, ...) isn't accepted as a TLS server identity just
+                            // because it chains to a trusted root and its SPKI happens to match a
+                            // pin. This is a purpose check like chain validity, not a pin-matching
+                            // outcome `.audit` is meant to relax, so it always rejects.
+                            observer?(TrustDecision(isTrusted: false, pinsMatched: nil))
+                            promise.succeed(.failed)
+                            return
+                        }
+
                         let matched = chain.contains { certificate in
                             var serializer = DER.Serializer()
                             guard (try? certificate.publicKey.serialize(into: &serializer)) != nil else {
@@ -104,6 +123,26 @@ extension Internals.NIOTrustEvaluator {
         )
     }
 
+    /// Whether `leaf` is usable as a TLS server identity per its `ExtendedKeyUsage` extension,
+    /// mirroring `SecPolicyCreateSSL(true, nil)`'s enforcement on the Darwin evaluator: a
+    /// certificate with no EKU extension at all is unrestricted, but one that declares an EKU
+    /// must include `serverAuth` (or the `any` wildcard).
+    private static func leafSatisfiesServerAuthExtendedKeyUsage(_ leaf: Certificate) -> Bool {
+        let extendedKeyUsage: ExtendedKeyUsage?
+        do {
+            extendedKeyUsage = try leaf.extensions.extendedKeyUsage
+        } catch {
+            // Present but undecodable; fail closed rather than treat it as absent.
+            return false
+        }
+
+        guard let extendedKeyUsage else {
+            return true
+        }
+
+        return extendedKeyUsage.contains(.serverAuth) || extendedKeyUsage.contains(.any)
+    }
+
     #if os(Android)
     /// Mirrors NIOSSL's own `AndroidCABundle.swift` search heuristic. Android ships its trust
     /// store as a directory of individual PEM certificates, not a single bundle file the way
@@ -114,7 +153,7 @@ extension Internals.NIOTrustEvaluator {
         "/system/etc/security/cacerts",  // < Android 14
     ]
 
-    private static func systemDefaultCertificateStore() throws -> CertificateStore {
+    private static func systemDefaultCertificates() throws -> [Certificate] {
         // `contentsOfDirectory(atPath:)` itself is the existence/is-a-directory check; it
         // throws for a path that's missing, a plain file, or unreadable, so the first path that
         // doesn't throw is the match, same "first candidate wins" shape as the file-based branch
@@ -124,21 +163,21 @@ extension Internals.NIOTrustEvaluator {
                 continue
             }
 
-            var store = CertificateStore()
+            var certificates: [Certificate] = []
             for entry in entries {
-                guard let certificates = try? NIOSSLCertificate.fromPEMFile(directory + "/" + entry) else {
+                guard let pemCertificates = try? NIOSSLCertificate.fromPEMFile(directory + "/" + entry) else {
                     continue
                 }
-                for certificate in certificates {
+                for certificate in pemCertificates {
                     if let x509Certificate = try? Certificate(derEncoded: certificate.toDERBytes()) {
-                        store.append(x509Certificate)
+                        certificates.append(x509Certificate)
                     }
                 }
             }
-            return store
+            return certificates
         }
 
-        return CertificateStore()
+        return []
     }
     #else
     /// A minimal version of NIOSSL's own `LinuxCABundle.swift`/`FreeBSDCABundle.swift` search
@@ -155,22 +194,22 @@ extension Internals.NIOTrustEvaluator {
         "/usr/local/share/certs/ca-root-nss.crt",  // ca_root_nss port bundle (FreeBSD)
     ]
 
-    private static func systemDefaultCertificateStore() throws -> CertificateStore {
-        var store = CertificateStore()
+    private static func systemDefaultCertificates() throws -> [Certificate] {
+        var certificates: [Certificate] = []
 
         guard
             let path = systemCABundleFileSearchPaths.first(where: { FileManager.default.fileExists(atPath: $0) })
         else {
-            return store
+            return certificates
         }
 
         for certificate in try NIOSSLCertificate.fromPEMFile(path) {
             if let x509Certificate = try? Certificate(derEncoded: certificate.toDERBytes()) {
-                store.append(x509Certificate)
+                certificates.append(x509Certificate)
             }
         }
 
-        return store
+        return certificates
     }
     #endif
 }
