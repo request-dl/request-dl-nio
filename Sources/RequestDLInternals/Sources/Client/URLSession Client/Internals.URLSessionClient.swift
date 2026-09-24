@@ -917,7 +917,18 @@ extension Internals.URLSessionClient {
                 return
             }
 
-            if let tlsDelegate {
+            // `tlsDelegate`/`identityPolicy` hold the trust configuration (pinning, custom trust
+            // roots, revocation) resolved for the *destination* host, and are deliberately still
+            // consulted for a redirect target (a different destination host) -- see
+            // `URLSessionIdentityPolicy.handle`'s own doc comment. A proxy challenge is not that:
+            // when the configured proxy terminates TLS itself (an HTTPS-inspecting forward proxy),
+            // URLSession delivers a server-trust challenge for the *proxy's* own certificate, with
+            // `isProxy() == true`. Routing that to the destination's pinning policy would either
+            // reject a legitimate proxy outright under strict pinning, or, under `.audit`, silently
+            // skip meaningful validation of the proxy's certificate. Proxy challenges besides the
+            // HTTPBasic one just handled must fall through to `forwardingDelegate`/default handling
+            // instead.
+            if let tlsDelegate, !challenge.protectionSpace.isProxy() {
                 tlsDelegate.urlSession(session, task: task, didReceive: challenge, completionHandler: completionHandler)
                 return
             }

@@ -56,6 +56,12 @@ extension Modifiers {
         private func mapResponseIntoResult(_ task: Content) async -> Result<Map, Error> {
             do {
                 return .success(.original(try await task.result()))
+            } catch is CancellationError {
+                // Never handed to `transform`, mirroring `Modifiers.Retry`'s own carve-out (see
+                // `Modifiers.MapError.body`'s doc comment for the full rationale): a `transform`
+                // written as a general "fall back to a safe default on any failure" catch-all
+                // would otherwise turn a cancelled task into an apparent `.processed` success.
+                return .failure(CancellationError())
             } catch {
                 return await mapErrorIntoResult(error)
             }

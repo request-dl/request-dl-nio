@@ -99,9 +99,7 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
     public init(_ dictionary: [String: Any]) {
         let dictionary =
             (dictionary as? [String: String])
-            ?? dictionary.mapValues {
-                "\($0)"
-            }
+            ?? dictionary.mapValues(Self.describing)
 
         self.init {
             PropertyForEach(dictionary, id: \.key) {
@@ -111,5 +109,25 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
                 )
             }
         }
+    }
+
+    /// `"\(value)"` alone renders an `Any` box wrapping an `Optional` (e.g. an `Int?`/`String?`
+    /// value the caller's `[String: Any]` happened to carry) as `"Optional(5)"`/
+    /// `"Optional(\"foo\")"` instead of `"5"`/`"foo"` -- `String`'s interpolation has no static
+    /// type to unwrap against once boxed in `Any`, so it falls back to `String(describing:)`'s
+    /// generic, wrapper-preserving behavior. Going through `Mirror` first unwraps that specific
+    /// case before it ever reaches interpolation.
+    private static func describing(_ value: Any) -> String {
+        let mirror = Mirror(reflecting: value)
+
+        guard mirror.displayStyle == .optional else {
+            return "\(value)"
+        }
+
+        guard let unwrapped = mirror.children.first?.value else {
+            return ""
+        }
+
+        return "\(unwrapped)"
     }
 }

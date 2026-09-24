@@ -184,6 +184,7 @@ struct Resolve<Root: Property>: Sendable {
             guard
                 rule.origin.scheme == origin.scheme,
                 rule.origin.host == origin.host,
+                rule.origin.port == origin.port,
                 pathComponents.starts(with: rule.origin.pathComponents)
             else {
                 continue
@@ -202,7 +203,8 @@ struct Resolve<Root: Property>: Sendable {
             return
         }
 
-        make.requestConfiguration.baseURL = "\(destination.scheme)://\(destination.host)"
+        let destinationHost = destination.port.map { "\(destination.host):\($0)" } ?? destination.host
+        make.requestConfiguration.baseURL = "\(destination.scheme)://\(destinationHost)"
         make.requestConfiguration.pathComponents = destination.pathComponents + remainder
     }
 
