@@ -14,6 +14,7 @@ enum DigestResponse {
         password: String,
         method: String,
         uri: String,
+        nc: @autoclosure () -> String = "00000001",
         cnonce: @autoclosure () -> String = randomHexString()
     ) -> String {
         let algorithm = challenge.algorithm
@@ -34,7 +35,7 @@ enum DigestResponse {
 
         if challenge.hasAuthQop {
             let cnonce = cnonce()
-            let nc = "00000001"
+            let nc = nc()
 
             response = algorithm.hexDigest("\(ha1):\(challenge.nonce):\(nc):\(cnonce):auth:\(ha2)")
 

@@ -83,15 +83,20 @@ struct InternalsTimeoutTests {
         #expect(lhs != rhs)
     }
 
+    /// Regression test: `Hashable`/`Equatable` deliberately exclude `resource`, since `build()`
+    /// below never forwards it and this type's equality is `Internals.ClientManager`'s pooled
+    /// client cache key — including it meant two otherwise-identical sessions differing only in
+    /// `.timeout(.resource(_:))` produced byte-identical `HTTPClient.Configuration`s but were
+    /// still treated as unpoolable.
     @Test
-    func timeout_whenResourceDiffers_stillNotEquals() {
-        // Given: `resource` participates in `Hashable`/`Equatable` (it's a plain stored
-        // property, not excluded), even though `build()` below never forwards it.
+    func timeout_whenOnlyResourceDiffers_stillEquals() {
+        // Given
         let lhs = Internals.Timeout(resource: 1_000_000_000)
         let rhs = Internals.Timeout(resource: 2_000_000_000)
 
         // Then
-        #expect(lhs != rhs)
+        #expect(lhs == rhs)
+        #expect(lhs.hashValue == rhs.hashValue)
     }
 
     #if canImport(NIOCore)

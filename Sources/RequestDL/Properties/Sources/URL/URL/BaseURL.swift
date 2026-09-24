@@ -44,7 +44,14 @@ public struct BaseURL: Property {
                 )
             }
 
-            guard let host = host.split(separator: "/").first else {
+            // `host.split(separator: "/").first` used to stand in for this check: it silently
+            // resolved to the leading component (`"apple.com/api/v1"` → `"apple.com"`, the path
+            // dropped with no error) for any host containing a path, and only failed the way
+            // `.unexpectedHost` is meant to for a host that is empty or all slashes. A host with
+            // an accidental path in it — plausible input, e.g. copy-pasting a full URL's path
+            // into `BaseURL` instead of using `Path` — deserves the same rejection `Path` belongs
+            // in for, not silent truncation to a different request than the one written.
+            guard !host.isEmpty, !host.contains("/") else {
                 throw BaseURLError(
                     context: .unexpectedHost,
                     baseURL: host

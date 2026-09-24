@@ -65,7 +65,8 @@ public struct DigestAuthentication: Property {
                 username: username,
                 password: password,
                 method: method,
-                uri: uri
+                uri: uri,
+                nc: credential.nextNonceCount()
             )
 
             make.requestConfiguration.headers.set(
