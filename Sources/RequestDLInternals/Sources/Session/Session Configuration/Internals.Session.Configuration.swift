@@ -566,12 +566,17 @@ extension Internals.Session.Configuration {
         configuration.httpMaximumConnectionsPerHost = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
 
         // Same reasoning for `multipathServiceType`'s `enableMultipath` counterpart, but
-        // `URLSessionConfiguration.multipathServiceType` itself is unavailable on macOS (Multipath
-        // TCP is iOS/tvOS/watchOS/visionOS/Catalyst only), unlike `enableMultipath`, which
-        // `HTTPClient.Configuration` exposes on every platform. `Session.multipathServiceType(_:)`
-        // itself carries no platform gate, so a macOS caller setting it must keep silently doing
-        // nothing under `.urlSession` there specifically -- there is no API to map onto.
-        #if !os(macOS)
+        // `URLSessionConfiguration.multipathServiceType` itself is only available on iOS (which
+        // Mac Catalyst compiles as, via `targetEnvironment(macCatalyst)`) -- confirmed by the
+        // actual compiler diagnostics, not just Apple's platform-availability docs, which list a
+        // broader iOS/tvOS/watchOS/visionOS/Catalyst set: `'multipathServiceType' is unavailable
+        // in tvOS` (and the same for watchOS/visionOS) is what CI actually reported for the wider
+        // `#if !os(macOS)` gate this originally shipped with. `HTTPClient.Configuration`'s
+        // `enableMultipath`, by contrast, is available everywhere. `Session.multipathServiceType(_:)`
+        // itself carries no platform gate, so a caller setting it on any platform other than iOS
+        // must keep silently doing nothing under `.urlSession` there specifically -- there is no
+        // API to map onto.
+        #if os(iOS)
         configuration.multipathServiceType = multipathServiceType.urlSessionServiceType
         #endif
 
@@ -579,7 +584,7 @@ extension Internals.Session.Configuration {
     }
 }
 
-#if !os(macOS)
+#if os(iOS)
 extension Internals.MultipathServiceType {
 
     fileprivate var urlSessionServiceType: URLSessionConfiguration.MultipathServiceType {

@@ -260,12 +260,14 @@ struct InternalsSessionConfigurationTests {
         #expect(urlSessionConfiguration.httpMaximumConnectionsPerHost == 3)
     }
 
-    #if !os(macOS)
+    #if os(iOS)
     /// Regression coverage: `multipathServiceType` (set via `Session.multipathServiceType(_:)`)
     /// used to have no `.urlSession` counterpart at all -- only `enableMultipath` on the `.nio`
     /// side -- so the setting silently did nothing under `.urlSession`, the default executor on
-    /// Darwin. `URLSessionConfiguration.multipathServiceType` itself doesn't exist on macOS, so
-    /// this is gated the same way the production mapping is.
+    /// Darwin. `URLSessionConfiguration.multipathServiceType` itself only exists on iOS (which
+    /// Mac Catalyst compiles as) -- not macOS, tvOS, watchOS, or visionOS, confirmed by actual
+    /// compiler diagnostics, not just Apple's docs -- so this is gated the same way the
+    /// production mapping is.
     @Test(
         arguments: [
             (Internals.MultipathServiceType.handover, URLSessionConfiguration.MultipathServiceType.handover),
