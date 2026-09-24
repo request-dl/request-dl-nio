@@ -498,8 +498,17 @@ struct CachedRequestTests {
         #expect(cachedData == nil)
     }
 
+    /// Regression coverage: `getUpdatedHeadersForCache`'s 304 branch used to return
+    /// `cachedData.response.headers` (the stale, already-cached headers) instead of the fresh
+    /// 304 response's own headers. `updateCacheHeaders` then always compared the cached headers
+    /// against themselves, found no difference, and `validateCachedData` returned the cache entry
+    /// completely unmodified — `CachedResponse.date` never refreshed, so a 304 could never
+    /// actually extend an already-cached entry's freshness (RFC 9111 §4.3.4), the one thing
+    /// revalidation exists to do. A 304 carrying a genuinely different `Cache-Control`/`Expires`
+    /// must now be adopted, the same as the non-304 fallback path already does (see
+    /// `cache_whenReloadAndValidateCachedDataHeadersChange_updatesCachedHeaders` below).
     @Test
-    func cache_whenReloadAndValidateCachedDataReceives304_reusesCachedHeadersUnchanged() async throws {
+    func cache_whenReloadAndValidateCachedDataReceives304_adoptsFreshCacheDirectives() async throws {
         let testState = try await TestState()
         let eTag = UUID()
         let cacheData = await mockCachedData(makeHeaders(eTag: eTag))
@@ -510,9 +519,9 @@ struct CachedRequestTests {
 
         let response = try await performCacheRequest(
             testState: testState,
-            // A real 304 carries no meaningful body for revalidation purposes; the headers here
-            // deliberately differ from the cached entry to confirm the 304 branch reuses the
-            // cached headers verbatim rather than adopting whatever the 304 response carries.
+            // A real 304 carries no meaningful body, but it can (and here does) carry an updated
+            // `Cache-Control`/`Expires`, deliberately different from the cached entry's, to
+            // confirm the 304 branch now adopts them instead of reusing the stale cached values.
             headers: makeHeaders(eTag: eTag, maxAge: false, expiresOffsetSeconds: 3_600),
             status: .notModified,
             cacheStrategy: .reloadAndValidateCachedData
@@ -526,8 +535,10 @@ struct CachedRequestTests {
         )
 
         // Then
-        #expect(updatedCachedData?.response == cacheData.response)
-        #expect(response.head == cacheData.response)
+        #expect(updatedCachedData?.response.headers.first(name: "Cache-Control") == "public")
+        #expect(updatedCachedData?.response.headers.first(name: "Expires") != nil)
+        #expect(updatedCachedData?.response != cacheData.response)
+        #expect(response.head.headers.first(name: "Cache-Control") == "public")
     }
 
     @Test

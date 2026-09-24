@@ -557,8 +557,45 @@ extension Internals.Session.Configuration {
         }
         #endif
 
+        // `concurrentHTTP1ConnectionsPerHostSoftLimit`'s direct counterpart under
+        // `.nio`/`.nioTransportServices` (see `build()` above and `Internals.ConnectionPool
+        // .build()`). Has a real `URLSessionConfiguration` equivalent, so it isn't listed in
+        // `urlSessionIncompatibilityReasons()`; without mapping it here too, a caller's
+        // `Session.maximumConnectionsPerHost(_:)` would silently do nothing under `.urlSession`,
+        // the *default* executor on Darwin.
+        configuration.httpMaximumConnectionsPerHost = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
+
+        // Same reasoning for `multipathServiceType`'s `enableMultipath` counterpart, but
+        // `URLSessionConfiguration.multipathServiceType` itself is only available on iOS (which
+        // Mac Catalyst compiles as, via `targetEnvironment(macCatalyst)`) -- confirmed by the
+        // actual compiler diagnostics, not just Apple's platform-availability docs, which list a
+        // broader iOS/tvOS/watchOS/visionOS/Catalyst set: `'multipathServiceType' is unavailable
+        // in tvOS` (and the same for watchOS/visionOS) is what CI actually reported for the wider
+        // `#if !os(macOS)` gate this originally shipped with. `HTTPClient.Configuration`'s
+        // `enableMultipath`, by contrast, is available everywhere. `Session.multipathServiceType(_:)`
+        // itself carries no platform gate, so a caller setting it on any platform other than iOS
+        // must keep silently doing nothing under `.urlSession` there specifically -- there is no
+        // API to map onto.
+        #if os(iOS)
+        configuration.multipathServiceType = multipathServiceType.urlSessionServiceType
+        #endif
+
         return configuration
     }
 }
+
+#if os(iOS)
+extension Internals.MultipathServiceType {
+
+    fileprivate var urlSessionServiceType: URLSessionConfiguration.MultipathServiceType {
+        switch self {
+        case .none: return .none
+        case .handover: return .handover
+        case .interactive: return .interactive
+        case .aggregate: return .aggregate
+        }
+    }
+}
+#endif
 
 #endif

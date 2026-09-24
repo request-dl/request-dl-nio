@@ -162,12 +162,17 @@ extension Internals {
         /// round-trip needs is a runtime fact this static check cannot see; a missing entitlement
         /// surfaces at identity-build time as its own runtime error, not as a reason in this list.
         ///
-        /// Also deliberately does *not* check `minimumTLSVersion`, unlike its sibling
-        /// `maximumTLSVersion` right below. `minimumTLSVersion` has a real, reachable equivalent
-        /// under URLSession (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist),
-        /// so flagging it here would push callers off `.urlSession` even when they have a working
-        /// alternative. `maximumTLSVersion` and `applicationProtocols` have no such alternative;
-        /// there is no ATS key for either, so those *are* flagged.
+        /// Also deliberately does *not* check `minimumTLSVersion` or `maximumTLSVersion`.
+        /// `minimumTLSVersion` has a real, reachable equivalent under URLSession (an ATS
+        /// `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so flagging it here
+        /// would push callers off `.urlSession` even when they have a working alternative.
+        /// `maximumTLSVersion` has a *direct* equivalent instead: `buildURLSessionConfiguration()`
+        /// maps it straight onto `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`, the
+        /// same way `minimumTLSVersion` maps onto `tlsMinimumSupportedProtocolVersion`. Flagging
+        /// it here used to force every such session onto NIO for no reason, making that mapping
+        /// permanently unreachable dead code. `applicationProtocols` has no such alternative --
+        /// there is no ATS key or `URLSessionConfiguration` property for ALPN -- so that one
+        /// alone *is* still flagged.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
@@ -183,7 +188,6 @@ extension Internals {
             #endif
             if cipherSuites != nil { reasons.append(.cipherSuites) }
             if cipherSuiteValues != nil { reasons.append(.cipherSuiteValues) }
-            if maximumTLSVersion != nil { reasons.append(.maximumTLSVersionUnderURLSession) }
             if applicationProtocols != nil { reasons.append(.applicationProtocolsUnderURLSession) }
 
             return reasons

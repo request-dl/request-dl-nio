@@ -442,4 +442,47 @@ struct HTTPHeadersTests {
         #expect(index2 == headers.index(headers.startIndex, offsetBy: 2))
         #expect(index2 == headers.index(headers.endIndex, offsetBy: -1))
     }
+
+    /// Regression coverage: `set`/`add` only trimmed edge whitespace, not an *embedded* CR/LF.
+    /// A value like `"1\r\nX-Injected: evil"` passed straight through to whatever serializes the
+    /// request (`NIOHTTP1.HTTPHeaders` under `.nio`, which validates ASCII but not CR/LF absence)
+    /// -- a real header-injection vector for attacker-influenced input reaching a `CustomHeader`.
+    /// Mirrors the CRLF stripping `FormGroupBuilder` already does for `Form` part headers.
+    @Test
+    func headers_whenValueContainsEmbeddedCRLF_stripsIt() throws {
+        // Given
+        var headers = HTTPHeaders()
+
+        // When
+        headers.set(name: "X-Info", value: "1\r\nX-Injected: evil")
+
+        // Then
+        #expect(headers["X-Info"] == ["1X-Injected: evil"])
+        #expect(headers["X-Injected"] == nil)
+    }
+
+    @Test
+    func headers_whenNameContainsEmbeddedCRLF_stripsIt() throws {
+        // Given
+        var headers = HTTPHeaders()
+
+        // When
+        headers.set(name: "X-Foo\r\nX-Bar", value: "value")
+
+        // Then
+        #expect(headers["X-FooX-Bar"] == ["value"])
+        #expect(headers["X-Bar"] == nil)
+    }
+
+    @Test
+    func headers_whenAddedValueContainsEmbeddedCRLF_stripsIt() throws {
+        // Given
+        var headers = HTTPHeaders()
+
+        // When
+        headers.add(name: "X-Info", value: "safe\r\nX-Injected: evil")
+
+        // Then
+        #expect(headers["X-Info"] == ["safeX-Injected: evil"])
+    }
 }

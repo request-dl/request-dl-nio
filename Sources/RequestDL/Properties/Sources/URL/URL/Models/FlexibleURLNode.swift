@@ -18,7 +18,18 @@ struct FlexibleURLNode: PropertyNode {
         // `.whitespacesAndNewlines` without needing `Foundation.CharacterSet`.
         let normalized = url.trimming(where: \.isWhitespace)
 
-        if normalized.contains("://") {
+        // Only the part before any query/fragment can carry a `scheme://authority`: RFC 3986's
+        // grammar puts `"?"`/`"#"` after the authority, never inside it. Searching the *whole*
+        // string for `"://"` instead misclassified an ordinary relative path whose query value
+        // happens to contain it, e.g. `"/search?redirect=http://evil.example.com"`, as a full
+        // URL. That took the `processFullURL` branch below, which -- since this string still has
+        // no `host` once actually parsed -- left `baseURL` untouched but still appended with
+        // `fromStart: true` instead of `fromStart: false`, prepending this node's path ahead of
+        // whatever the tree had already contributed instead of appending after it.
+        let structuralEnd = normalized.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? normalized.endIndex
+        let isFullURL = normalized[..<structuralEnd].contains("://")
+
+        if isFullURL {
             guard let url = URL(string: normalized) else {
                 throw FlexibleURLError(context: .invalidURL, url: url)
             }

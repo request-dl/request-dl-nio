@@ -193,6 +193,30 @@ struct InternalsNIOTrustEvaluatorTests {
     #endif
     #endif
 
+    #if !canImport(Darwin)
+    /// Regression coverage, Linux/other-only: `resolve(from:)`'s portable branch used to guard on
+    /// `!tlsPins.isEmpty` alone, unlike its Darwin sibling above, which also triggers on a
+    /// `trustDecisionObserver` configured with no pins. A caller wiring `.trustDecisionObserver(_:)`
+    /// as an audit/observability hook with no pinning configured got it invoked on every Darwin
+    /// executor but silently never at all off Darwin -- `makePortableEvaluator` already calls
+    /// `observer` unconditionally on every branch, so the only thing missing was ever installing
+    /// the evaluator in the first place. Can't be exercised on this Darwin-only development
+    /// machine (no non-Darwin toolchain or container available here), same constraint prior
+    /// rounds noted for this exact file; verified by close reading and left for CI to run.
+    private final class NoOpTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
+        func callAsFunction(_ decision: TrustDecision) {}
+    }
+
+    @Test
+    func resolve_whenOnlyObserverConfigured_installsEvaluator() throws {
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustDecisionObserver = NoOpTrustDecisionObserver()
+
+        // Then
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+    #endif
+
     @Test
     func tlsCustomVerification_whenPinningLeaf_acceptsChain() async throws {
         try await assertVerification(pinningBase64: Self.leafSPKIPinBase64, expectVerified: true)

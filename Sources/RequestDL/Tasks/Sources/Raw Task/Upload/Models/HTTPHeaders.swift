@@ -214,7 +214,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ///   - value: The value to set for the header field.
     ///
     public mutating func set(name: String, value: String) {
-        let name = self.name(name)
+        let name = self.name(Self.strippingCRLF(name))
         let value = trimming(value)
 
         if let index = _names.firstIndex(of: name) {
@@ -233,7 +233,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ///    - value: The value to add for the header field.
     ///
     public mutating func add(name: String, value: String) {
-        let name = self.name(name)
+        let name = self.name(Self.strippingCRLF(name))
         let value = trimming(value)
 
         if let index = _names.firstIndex(of: name) {
@@ -428,8 +428,37 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
 
     /// - Note: Uses the package's own trimming, not `trimmingCharacters(in: .whitespaces)`:
     /// that needs `Foundation.CharacterSet`, a type this file has no import for.
+    ///
+    /// - Important: Also strips embedded CR/LF, not just edge whitespace. Unlike a `Form` part
+    /// header (`FormGroupBuilder.strippingCRLF`, which this mirrors), a top-level header line
+    /// here is written by whichever executor's own HTTP layer serializes the request --
+    /// `NIOHTTP1.HTTPHeaders` under `.nio`, which validates ASCII but not the absence of CR/LF,
+    /// or `URLRequest.addValue`/`setValue` under `.urlSession`, which silently drops a header
+    /// containing either. Either way, a value carrying an embedded `\r\n` (e.g. attacker-
+    /// influenced input reaching a `CustomHeader`) must never reach that layer unstripped: it
+    /// could otherwise end the field line early and splice extra header lines, or content, into
+    /// the request.
     private func trimming(_ value: String) -> String {
-        value.trimming(where: \.isWhitespace)
+        Self.strippingCRLF(value).trimming(where: \.isWhitespace)
+    }
+
+    /// Drops every CR/LF `Unicode.Scalar` from `value`, walking scalars rather than
+    /// `Character`s: a literal CRLF pair is a single extended grapheme cluster in Swift, so
+    /// matching against the `Character` values `"\r"`/`"\n"` would miss it and let the pair
+    /// through unstripped.
+    private static func strippingCRLF(_ value: String) -> String {
+        guard value.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" }) else {
+            return value
+        }
+
+        var stripped = String.UnicodeScalarView()
+        stripped.reserveCapacity(value.unicodeScalars.count)
+
+        for scalar in value.unicodeScalars where scalar != "\r" && scalar != "\n" {
+            stripped.append(scalar)
+        }
+
+        return String(stripped)
     }
 }
 
