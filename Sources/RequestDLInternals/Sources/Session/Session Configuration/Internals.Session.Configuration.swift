@@ -557,8 +557,40 @@ extension Internals.Session.Configuration {
         }
         #endif
 
+        // `concurrentHTTP1ConnectionsPerHostSoftLimit`'s direct counterpart under
+        // `.nio`/`.nioTransportServices` (see `build()` above and `Internals.ConnectionPool
+        // .build()`). Has a real `URLSessionConfiguration` equivalent, so it isn't listed in
+        // `urlSessionIncompatibilityReasons()`; without mapping it here too, a caller's
+        // `Session.maximumConnectionsPerHost(_:)` would silently do nothing under `.urlSession`,
+        // the *default* executor on Darwin.
+        configuration.httpMaximumConnectionsPerHost = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
+
+        // Same reasoning for `multipathServiceType`'s `enableMultipath` counterpart, but
+        // `URLSessionConfiguration.multipathServiceType` itself is unavailable on macOS (Multipath
+        // TCP is iOS/tvOS/watchOS/visionOS/Catalyst only), unlike `enableMultipath`, which
+        // `HTTPClient.Configuration` exposes on every platform. `Session.multipathServiceType(_:)`
+        // itself carries no platform gate, so a macOS caller setting it must keep silently doing
+        // nothing under `.urlSession` there specifically -- there is no API to map onto.
+        #if !os(macOS)
+        configuration.multipathServiceType = multipathServiceType.urlSessionServiceType
+        #endif
+
         return configuration
     }
 }
+
+#if !os(macOS)
+extension Internals.MultipathServiceType {
+
+    fileprivate var urlSessionServiceType: URLSessionConfiguration.MultipathServiceType {
+        switch self {
+        case .none: return .none
+        case .handover: return .handover
+        case .interactive: return .interactive
+        case .aggregate: return .aggregate
+        }
+    }
+}
+#endif
 
 #endif

@@ -224,5 +224,78 @@ struct PublishedTaskTests {
         #expect(!valueReceived.wrappedValue)
         #expect(!completionReceived.wrappedValue)
     }
+
+    /// Combine explicitly permits a subscriber to call `request(_:)` more than once before any
+    /// value has arrived (accumulating demand). `Subscription.request(_:)` used to unconditionally
+    /// launch a new `_Concurrency.Task` on every call, overwriting (not cancelling) any prior
+    /// in-flight one -- so two overlapping `request(_:)` calls ran the wrapped task twice, a real
+    /// problem for a non-idempotent request, and could have delivered two
+    /// `receive(_:)`/`receive(completion:)` pairs to one subscriber.
+    final class TwiceRequestingSubscriber<Input: Sendable>: Subscriber, @unchecked Sendable {
+        typealias Failure = Error
+
+        let onCompletion: @Sendable () -> Void
+
+        init(onCompletion: @escaping @Sendable () -> Void) {
+            self.onCompletion = onCompletion
+        }
+
+        func receive(subscription: Subscription) {
+            subscription.request(.max(1))
+            subscription.request(.max(1))
+        }
+
+        func receive(_ input: Input) -> Subscribers.Demand {
+            .none
+        }
+
+        func receive(completion: Subscribers.Completion<Error>) {
+            onCompletion()
+        }
+    }
+
+    @Test
+    func requestCalledTwiceBeforeCompletion_onlyExecutesWrappedTaskOnce() async throws {
+        // Given
+        let counter = ExecutionCounter()
+        let expectation = AsyncSignal()
+
+        let subscriber = TwiceRequestingSubscriber<TaskResult<Data>>(
+            onCompletion: { expectation.signal() }
+        )
+
+        // When
+        MockedTask(delay: .milliseconds(100)) {
+            BaseURL("localhost")
+        }
+        .collectData()
+        .flatMap { result -> TaskResult<Data> in
+            await counter.increment()
+            return try result.get()
+        }
+        .publisher()
+        .subscribe(subscriber)
+
+        try await expectation.wait()
+
+        // Gives a spurious second execution (the bug this guards against) a chance to also
+        // complete before asserting the final count.
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+
+        // Then
+        #expect(await counter.value == 1)
+    }
+}
+
+private actor ExecutionCounter {
+    private var count = 0
+
+    func increment() {
+        count += 1
+    }
+
+    var value: Int {
+        count
+    }
 }
 #endif

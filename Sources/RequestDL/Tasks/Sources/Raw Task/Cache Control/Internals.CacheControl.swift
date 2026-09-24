@@ -304,7 +304,14 @@ extension Internals {
 
             if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified), reusing cached data")
-                return cachedData.response.headers
+                // The fresh 304 response's own headers, not the stale cached ones: a 304 is
+                // exactly where the server sends an updated `Cache-Control`/`Expires` to extend
+                // freshness (RFC 9111 §4.3.4), and `updateCacheHeaders` below only ever refreshes
+                // a directive from what this method returns. Returning the cached headers here
+                // made the two sides of that comparison identical, so `validateCachedData` always
+                // saw "no change" and never refreshed `CachedResponse.date` -- revalidation could
+                // never actually extend an already-stale entry's life, the one case it exists for.
+                return RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
             }
 
             // Both sides defaulted before comparing. `response.headers[name]` is optional and

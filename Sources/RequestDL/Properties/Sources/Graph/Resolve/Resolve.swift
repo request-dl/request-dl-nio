@@ -10,15 +10,39 @@ struct Resolve<Root: Property>: Sendable {
 
     private let root: _GraphValue<_Root>
     private let environment: RequestEnvironmentValues
+    private let namespaceID: PropertyNamespace.ID
+    private let seedFactory: SeedFactory
 
     // MARK: - Inits
 
+    /// - Parameters:
+    ///   - namespaceID: The `@StoredObject`/`@PropertyNamespace` namespace this resolution runs
+    ///   under. Defaults to `.global`, correct for every top-level resolution (`RawTask`,
+    ///   `BackgroundDownloadTask`, `PropertyMockedTask`, ...), which have no enclosing namespace
+    ///   to inherit.
+    ///   - seedFactory: Hands out per-namespace `@StoredObject` identity seeds. Defaults to a
+    ///   fresh instance for the same reason `namespaceID` defaults to `.global`: a top-level
+    ///   resolution starts counting from zero.
+    ///
+    ///   - Important: `PropertyReader._makeProperty` is the one caller that must pass its own
+    ///   `inputs.namespaceID`/`inputs.seedFactory` explicitly, rather than accepting these
+    ///   defaults, when resolving its `source` subtree. `source` is logically still part of the
+    ///   ambient tree (its `PropertyContext` result feeds `content`, resolved right after with
+    ///   those same `inputs`); minting a fresh `SeedFactory` for it here would let a `source`
+    ///   under one `PropertyReader` and a `source` under a sibling `PropertyReader` (or the
+    ///   top-level tree) each independently compute seed `.zero` for `.global`, colliding on the
+    ///   same `Internals.Storage` entry for any `@StoredObject`-bearing type they happen to share,
+    ///   instead of getting independent instances.
     init(
         root: Root,
-        environment: RequestEnvironmentValues
+        environment: RequestEnvironmentValues,
+        namespaceID: PropertyNamespace.ID = .global,
+        seedFactory: SeedFactory = SeedFactory()
     ) {
         self.root = .root(.init(body: root))
         self.environment = environment
+        self.namespaceID = namespaceID
+        self.seedFactory = seedFactory
     }
 
     // MARK: - Internal methods
@@ -202,8 +226,8 @@ struct Resolve<Root: Property>: Sendable {
     private func inputs() -> _PropertyInputs {
         .init(
             environment: environment,
-            namespaceID: .global,
-            seedFactory: .init()
+            namespaceID: namespaceID,
+            seedFactory: seedFactory
         )
     }
 

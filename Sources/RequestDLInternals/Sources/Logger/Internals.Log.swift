@@ -76,6 +76,23 @@ extension Internals.Log {
         )
     }
 
+    package static func cantCreateSPKIHashOutsideSPKIPinning() -> Internals.Log {
+        Internals.Log(
+            """
+            It seems that you are attempting to create an SPKIHash \
+            property outside of the allowed context.
+
+            Please note that SPKIPinning is the only valid context in \
+            which you can create an SPKIHash property. An SPKIHash \
+            declared elsewhere has no effect: SPKIPinning only finds \
+            the SPKIHash values nested inside its own content closure.
+
+            Please ensure that you are creating your SPKIHash property \
+            within an SPKIPinning context to avoid encountering this error.
+            """
+        )
+    }
+
     package static func cantOpenCertificateFile<Resource: Sendable, Bundle: Sendable>(
         _ resource: Resource,
         _ bundle: Bundle

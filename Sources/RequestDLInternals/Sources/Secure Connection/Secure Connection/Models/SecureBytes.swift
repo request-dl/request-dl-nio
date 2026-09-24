@@ -185,25 +185,23 @@ extension ZeroingBytes: RandomAccessCollection {}
 extension ZeroingBytes: Equatable {
 
     /// `_reusableItem(id:sessionConfiguration:)` runs this on every client-pool lookup for a
-    /// `PrivateKey` with a password, so it needs to be an actual byte compare, not the default
-    /// `RandomAccessCollection` witness `elementsEqual(_:)` would fall back to: that dispatches
-    /// through `buffer`'s subscript one element at a time, with none of the single-call `memcmp`
-    /// a contiguous, fixed-width buffer like this one can use instead.
+    /// `PrivateKey` with a password — reachable off Darwin (where NIOCore's own constant-time
+    /// `NIOSSLSecureBytes.==` isn't in the loop at all) but also *on* Darwin whenever the
+    /// `.urlSession`-only trait is built (`--disable-default-traits`), since pooling runs
+    /// through this same path there too. `memcmp`, which this used to call, short-circuits on
+    /// the first mismatched byte: exactly the timing side channel already fixed once for SPKI
+    /// pin matching (`Internals.SPKIHash.matchesSPKI`, whose XOR-accumulate shape this mirrors)
+    /// and for the same reason it can't be reintroduced here — a password byte guessed one
+    /// position at a time via repeated pool-lookup timing.
     package static func == (_ lhs: ZeroingBytes, _ rhs: ZeroingBytes) -> Bool {
         guard lhs.buffer.count == rhs.buffer.count else {
             return false
         }
 
-        guard let lhsBase = lhs.buffer.baseAddress, let rhsBase = rhs.buffer.baseAddress else {
-            // Both empty: `baseAddress` is `nil` exactly when `count == 0`, already checked equal
-            // above.
-            return true
+        var difference: UInt8 = 0
+        for (lhsByte, rhsByte) in zip(lhs.buffer, rhs.buffer) {
+            difference |= lhsByte ^ rhsByte
         }
-
-        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl)
-        return memcmp(lhsBase, rhsBase, lhs.buffer.count) == .zero
-        #else
-        return lhs.buffer.elementsEqual(rhs.buffer)
-        #endif
+        return difference == 0
     }
 }
