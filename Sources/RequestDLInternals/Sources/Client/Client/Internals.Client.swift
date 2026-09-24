@@ -300,12 +300,14 @@ extension Internals {
             // and forwarding any such failure closes that gap; it is a no-op whenever the
             // delegate was actually driven, since `failIfNotStarted` only acts while it is still
             // untouched.
-            _Concurrency.Task {
-                do {
-                    _ = try await unsafeTask.response()
-                } catch {
-                    delegate.failIfNotStarted(error)
-                }
+            //
+            // - Important: Through `whenFailure`, not a `Task` awaiting `unsafeTask.response()`.
+            // That `Task` captured `unsafeTask`, and with it the request's `TaskSeed`, for as long
+            // as the request ran, so the seed could never deinit when the caller dropped the
+            // response: a `break` out of a body stream, or an abandoned endless stream, kept
+            // downloading into a buffer nobody read, and kept its connection and throttle permit.
+            unsafeTask.whenFailure { error in
+                delegate.failIfNotStarted(error)
             }
 
             return SessionTask(

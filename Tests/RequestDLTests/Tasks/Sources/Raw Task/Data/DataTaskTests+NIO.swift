@@ -166,6 +166,136 @@ extension DataTaskTests {
         #endif
     }
 
+    /// Positive control for the fix in `Internals.ExecutorIncompatibilityReason
+    /// .multipleClientCertificatesUnderNetworkFramework`: pinned to `.nio` specifically (not
+    /// `.nioTransportServices`), a real three-level client chain (root CA -> intermediate CA ->
+    /// leaf) against a server that trusts only the root completes the handshake successfully --
+    /// proving NIOSSL's own `TLSConfiguration.certificateChain` genuinely carries every
+    /// certificate, which is exactly what the fix falls back to.
+    ///
+    /// The mirror case is `Internals.SecureConnection
+    /// .makeLocalIdentityForNetworkFramework()`, which only ever builds its `SecIdentity` from
+    /// the chain's first certificate -- confirmed end to end, not assumed, before this fix
+    /// existed: the identical chain presented under `.nioTransportServices` instead failed the
+    /// handshake with "-9831: unknown Cert Authority" (the server couldn't complete the chain
+    /// from a leaf-only presentation, exactly as `openssl verify -CAfile root.crt leaf.crt`
+    /// without `-untrusted intermediate.crt` also fails). `resolveExecutor()`/`requireExecutor(_:)`
+    /// now steer a configuration like this away from `.nioTransportServices` automatically --
+    /// see `dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError`
+    /// right below for that half, and `InternalsSessionConfigurationExecutorTests+NIO`'s own
+    /// `resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToNIO`
+    /// for the resolution logic itself, proven without needing a live network round trip.
+    ///
+    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, this one needs no
+    /// `withKnownIssue`/Keychain-entitlement caveat on iOS/tvOS/watchOS/Catalyst Simulator:
+    /// `.requiredExecutor(.nio)` reads the identity straight off NIOSSL's own
+    /// `TLSConfiguration.certificateChain`/`privateKey` -- no `SecIdentity`/Keychain round trip
+    /// involved at all, so there's no entitlement gap to hit. Confirmed directly: CI failed with
+    /// "Known issue was not recorded" on every Simulator platform when this was first wrapped in
+    /// `withKnownIssue` (copied from the neighboring `.nioTransportServices`-requiring test,
+    /// which does go through that round trip and genuinely needs the wrapper) -- the wrapped body
+    /// unconditionally succeeded.
+    @Test
+    func dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake() async throws {
+        // Given
+        let server = Certificates().server()
+        let root = CertificateResource("client_chain_root", format: .pem)
+        let intermediate = CertificateResource("client_chain_intermediate", format: .pem)
+        let leaf = CertificateResource("client_chain_leaf", format: .pem)
+
+        let uri = "/" + UUID().uuidString
+
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8898,
+                option: .client(root)
+            )
+        )
+
+        let output = "Hello World"
+        localServer.cleanup(at: uri)
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: output), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        // When / Then
+        func verify() async throws {
+            let data = try await DataTask {
+                BaseURL(localServer.baseURL)
+                Path(uri)
+
+                Session.localServer
+                    .requiredExecutor(.nio)
+
+                SecureConnection {
+                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                    RequestDL.Certificates {
+                        Certificate(leaf.certificateURL.absolutePath(percentEncoded: false), format: .pem)
+                        Certificate(
+                            intermediate.certificateURL.absolutePath(percentEncoded: false),
+                            format: .pem
+                        )
+                    }
+                    PrivateKey(leaf.privateKeyURL.absolutePath(percentEncoded: false))
+                }
+                .verification(.fullVerification)
+            }
+            .extractPayload()
+            .result()
+
+            let result = try HTTPResult<String>(data)
+            #expect(result.response == output)
+        }
+
+        try await verify()
+    }
+
+    /// The hard-pin counterpart to the fallback test above: `.requiredExecutor(.nioTransportServices)`
+    /// must refuse a multi-certificate client chain outright -- the same way
+    /// `dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO`
+    /// already proves for an unrelated field -- rather than silently attempting the handshake and
+    /// failing with an opaque `unknown_ca` TLS alert the way it used to.
+    ///
+    /// No `LocalServer` needed: `requireExecutor(_:)` throws before any client is built or
+    /// network I/O starts.
+    @Test
+    func dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError()
+        async throws
+    {
+        // Given
+        let intermediate = CertificateResource("client_chain_intermediate", format: .pem)
+        let leaf = CertificateResource("client_chain_leaf", format: .pem)
+
+        let task = DataTask {
+            BaseURL("localhost")
+
+            Session()
+                .requiredExecutor(.nioTransportServices)
+
+            SecureConnection {
+                RequestDL.Certificates {
+                    Certificate(leaf.certificateURL.absolutePath(percentEncoded: false), format: .pem)
+                    Certificate(intermediate.certificateURL.absolutePath(percentEncoded: false), format: .pem)
+                }
+                PrivateKey(leaf.privateKeyURL.absolutePath(percentEncoded: false))
+            }
+        }
+        .extractPayload()
+
+        // When / Then
+        await #expect(throws: ExecutorRequirementError.self) {
+            try await task.result()
+        }
+
+        do {
+            _ = try await task.result()
+            Issue.record("Not expecting success")
+        } catch let error as ExecutorRequirementError {
+            #expect(error.requiredExecutor == .nioTransportServices)
+            #expect(error.reasons == [.multipleClientCertificatesUnderNetworkFramework])
+        }
+    }
+
     /// Confirms (and regression-guards) the bug `Internals.Session.Configuration
     /// .networkFrameworkIncompatibilityReasons()`'s `.clientIdentityWithProxyUnderNetworkFramework`
     /// case now catches: `Internals.SecureConnection

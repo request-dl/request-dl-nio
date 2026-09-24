@@ -21,8 +21,16 @@ extension Internals {
 
         // MARK: - Inits
 
+        /// A non-positive limit is treated as no limit at all. It reaches here unvalidated (from
+        /// `Session.maximumConcurrentConnections(_:)`, or a `Configured` config file), and
+        /// neither alternative is survivable: `AsyncSemaphore.init(permits:)` traps on a negative
+        /// count, even in release builds, and a zero-permit semaphore can never be acquired, so
+        /// every request through the session would wait forever.
         package init(maximumConcurrentConnections: Int?) {
-            semaphore = maximumConcurrentConnections.map { AsyncSemaphore(permits: $0) }
+            semaphore =
+                maximumConcurrentConnections
+                .flatMap { $0 > .zero ? $0 : nil }
+                .map { AsyncSemaphore(permits: $0) }
         }
 
         // MARK: - Internal methods

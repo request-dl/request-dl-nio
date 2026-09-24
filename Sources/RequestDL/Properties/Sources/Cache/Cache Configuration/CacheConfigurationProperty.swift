@@ -67,7 +67,8 @@ extension Property {
     ///    - memoryCapacity: The maximum memory capacity in bytes for the cache.
     ///    - diskCapacity: The maximum disk capacity in bytes for the cache.
     ///    - encryptionKey: The key to encrypt the disk tier at rest with. `nil` (the default)
-    ///      leaves it unencrypted.
+    ///      leaves whatever key the cache already has in place (none, unless one was set through
+    ///      ``DataCache/encryptionKey``).
     /// - Returns: A property with the added cache configuration.
     ///
     @PropertyBuilder
@@ -93,7 +94,8 @@ extension Property {
     ///    - diskCapacity: The maximum disk capacity in bytes for the cache.
     ///    - suiteName: The name of the shared user defaults suite for disk storage.
     ///    - encryptionKey: The key to encrypt the disk tier at rest with. `nil` (the default)
-    ///      leaves it unencrypted.
+    ///      leaves whatever key the cache already has in place (none, unless one was set through
+    ///      ``DataCache/encryptionKey``).
     /// - Returns: A property with the added cache configuration.
     ///
     @PropertyBuilder
@@ -120,7 +122,8 @@ extension Property {
     ///    - diskCapacity: The maximum disk capacity in bytes for the cache.
     ///    - url: The file URL representing the location for disk storage.
     ///    - encryptionKey: The key to encrypt the disk tier at rest with. `nil` (the default)
-    ///      leaves it unencrypted.
+    ///      leaves whatever key the cache already has in place (none, unless one was set through
+    ///      ``DataCache/encryptionKey``).
     /// - Returns: A property with the added cache configuration.
     ///
     @PropertyBuilder

@@ -28,6 +28,39 @@ import Foundation
 /// `InternalsSessionConfigurationTests+NIO.swift`.
 struct InternalsSessionConfigurationTests {
 
+    /// `Internals.ClientManager` hands a pooled client to any request whose configuration is
+    /// `==` to the one it was built for, and `build()` bakes the proxy's `connectHeaders` into
+    /// that client. `Internals.Proxy.==` deliberately leaves them out (mirroring upstream's own
+    /// `HTTPClient.Configuration.Proxy`), so this is the layer that has to compare them.
+    /// Otherwise two sessions sharing a proxy host but sending different `CONNECT` credentials
+    /// (e.g. one per tenant/account) reuse each other's client, and the second session's
+    /// `CONNECT` goes out with the first session's token.
+    @Test
+    func configuration_whenOnlyProxyConnectHeadersDiffer_shouldNotBeEqual() async throws {
+        // Given
+        func configuration(token: String?) -> Internals.Session.Configuration {
+            var connectHeaders = Internals.HTTPHeaders()
+            if let token {
+                connectHeaders.add(name: "X-Proxy-Token", value: token)
+            }
+
+            var configuration = Internals.Session.Configuration()
+            configuration.proxy = Internals.Proxy(
+                host: "proxy.example.com",
+                port: 8_080,
+                connection: .http,
+                authorization: nil,
+                connectHeaders: connectHeaders
+            )
+            return configuration
+        }
+
+        // Then
+        #expect(configuration(token: "tenant-a") != configuration(token: "tenant-b"))
+        #expect(configuration(token: "tenant-a") != configuration(token: nil))
+        #expect(configuration(token: "tenant-a") == configuration(token: "tenant-a"))
+    }
+
     @Test
     func configuration_whenNetworkPathConstraintsAllNil_shouldBeNil() async throws {
         // Given

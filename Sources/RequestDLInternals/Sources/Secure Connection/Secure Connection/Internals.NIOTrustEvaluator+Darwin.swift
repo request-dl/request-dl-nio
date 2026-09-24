@@ -31,6 +31,7 @@ extension Internals.NIOTrustEvaluator {
         pins: [Internals.SPKIHash],
         isStrict: Bool,
         trustRootCertificates: [NIOSSLCertificate],
+        trustRootsAreExclusive: Bool,
         skipsHostnameVerification: Bool,
         revocationPolicy: Internals.RevocationPolicy?,
         observer: (any TrustDecisionObserver)?
@@ -52,7 +53,8 @@ extension Internals.NIOTrustEvaluator {
             pins: resolvedPins,
             isStrict: isStrict,
             revocationPolicy: revocationPolicy,
-            observer: observer
+            observer: observer,
+            trustRootsAreExclusive: trustRootsAreExclusive
         )
 
         // `SecTrustEvaluateAsyncWithError` must be called from, and calls back on, the same

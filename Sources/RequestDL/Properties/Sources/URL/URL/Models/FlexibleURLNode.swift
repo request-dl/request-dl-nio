@@ -109,8 +109,12 @@ extension FlexibleURLNode {
         return splitComponents
     }
 
+    /// - Important: `percentEncodedQueryItems`, not `queryItems`. `RequestConfiguration.url`
+    /// joins query items as-is, expecting them already percent encoded, so the decoded form
+    /// turned `q=a%26b` into `q=a&b` (two parameters), `%3D` into a live `=`, and `%2B` into a
+    /// `+` a server reads as a space.
     fileprivate func queries(from components: URLComponents) -> [QueryItem] {
-        components.queryItems?.compactMap { item in
+        components.percentEncodedQueryItems?.compactMap { item in
             QueryItem(name: item.name, value: item.value ?? "")
         } ?? []
     }

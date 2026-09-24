@@ -160,6 +160,65 @@ struct DataCacheTests {
         #expect(cachedDisk2Data == data2)
     }
 
+    /// A disk record's directory name embeds its key, and a single path component is capped at
+    /// 255 bytes (`NAME_MAX`). Base64 inflates a key by a third, so any URL past roughly 175
+    /// bytes — routine for signed or search URLs — used to produce a name the file system
+    /// rejected: the directory was never created, and that URL could never be cached on disk.
+    @Test(arguments: [180, 400, 2_000])
+    func cache_whenKeyIsLong_isStillCachedOnDisk(keyLength: Int) async throws {
+        let testState = await TestState()
+        defer { _ = testState }
+        // Given
+        let dataCache = testState.dataCache
+        let prefix = "https://example.com/signed?token="
+        let key = prefix + String(repeating: "a", count: keyLength - prefix.count)
+        let data = await Data.randomData(length: 1_024)
+
+        // When
+        await dataCache.setCachedData(
+            CachedData(
+                response: mockResponse(url: key),
+                policy: .disk,
+                data: data
+            ),
+            forKey: key
+        )
+
+        let cachedDisk = await dataCache.getCachedData(forKey: key, policy: .disk)
+
+        // Then
+        let cachedDiskData = await cachedDisk?.data
+        #expect(cachedDiskData == data)
+    }
+
+    /// Two long keys that share a long prefix must still resolve to two distinct entries.
+    @Test
+    func cache_whenLongKeysShareAPrefix_keepsThemDistinct() async throws {
+        let testState = await TestState()
+        defer { _ = testState }
+        // Given
+        let dataCache = testState.dataCache
+        let prefix = "https://example.com/signed?token=" + String(repeating: "a", count: 400)
+        let key1 = prefix + "1"
+        let key2 = prefix + "2"
+        let data1 = await Data.randomData(length: 1_024)
+        let data2 = await Data.randomData(length: 2_048)
+
+        // When
+        for (key, data) in [(key1, data1), (key2, data2)] {
+            await dataCache.setCachedData(
+                CachedData(response: mockResponse(url: key), policy: .disk, data: data),
+                forKey: key
+            )
+        }
+
+        // Then
+        let cachedDisk1Data = await dataCache.getCachedData(forKey: key1, policy: .disk)?.data
+        let cachedDisk2Data = await dataCache.getCachedData(forKey: key2, policy: .disk)?.data
+        #expect(cachedDisk1Data == data1)
+        #expect(cachedDisk2Data == data2)
+    }
+
     @Test
     func cache_whenLowMemory() async throws {
         let testState = await TestState()

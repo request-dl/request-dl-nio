@@ -109,6 +109,19 @@ extension Internals {
             )
         }
 
+        /// Observes the request's failure without keeping it alive.
+        ///
+        /// Registers on the future directly, capturing only the `HTTPClient.Task` — never
+        /// `seed`. Dropping the response is what cancels a still-running request (via the
+        /// seed's `deinit`), so anything that retains the seed until the request finishes on its
+        /// own (an unstructured `Task` awaiting ``response()``, say) makes that cancellation
+        /// unreachable: the connection, the operation slot, and any
+        /// `maximumConcurrentConnections` permit then stay held for as long as the server keeps
+        /// the response open.
+        package func whenFailure(_ body: @escaping @Sendable (any Error) -> Void) {
+            task.futureResult.whenFailure(body)
+        }
+
         package func callAsFunction() -> TaskSeed {
             seed
         }

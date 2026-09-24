@@ -317,7 +317,13 @@ public struct CacheHeader: Property {
         }
 
         if let maxStale = maxStale {
-            contents.append("max-stale\(maxStale > .zero ? "=\(maxStale)" : "")")
+            // Always `max-stale=N`, matching every other numeric directive here (`max-age`,
+            // `s-maxage`, ...): `max-stale` with no value at all means "accept staleness of any
+            // length" (RFC 7234 §5.2.1.2), the opposite of what `maxStale(0)` -- "accept no
+            // staleness" -- asks for. This API has no way to express the bare, valueless
+            // directive in the first place (`maxStale(_ seconds: Int)` always takes a value), so
+            // there's no case here that should ever omit it.
+            contents.append("max-stale=\(maxStale)")
         }
 
         if let staleWhileRevalidate = staleWhileRevalidate {

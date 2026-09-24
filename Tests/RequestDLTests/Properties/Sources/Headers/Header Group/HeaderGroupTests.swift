@@ -45,6 +45,67 @@ struct HeaderGroupTests {
         )
     }
 
+    /// `HeaderGroup` keeps only `HeaderNode` leaves from its content, so a header property that
+    /// writes through its own private node instead is silently discarded. `Authorization` was
+    /// one: grouped with other headers, the request went out unauthenticated.
+    @Test
+    func headerGroupWithAuthorization() async throws {
+        let property = TestProperty(
+            HeaderGroup {
+                Authorization(.bearer, token: "abc123")
+                AcceptHeader(.json)
+            }
+        )
+
+        let resolved = try await resolve(property)
+
+        #expect(resolved.requestConfiguration.headers["Authorization"] == ["Bearer abc123"])
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["application/json"])
+    }
+
+    /// Companion to `headerGroupWithAuthorization`, above: `DigestAuthentication` writes its
+    /// `Authorization` header through its own private node too, same as `Authorization` used to
+    /// -- but unlike `Authorization`, it can't simply become a plain `HeaderNode`, since its
+    /// value is only known once `make(_:)` actually runs (computed lazily from
+    /// `credential.challenge`/the request's own URI, both only available at that point).
+    @Test
+    func headerGroupWithDigestAuthentication() async throws {
+        let credential = DigestCredential()
+        credential.challenge = try #require(
+            DigestChallenge(
+                headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
+            )
+        )
+
+        let property = TestProperty {
+            HeaderGroup {
+                DigestAuthentication(username: "Mufasa", password: "Circle of Life")
+                    .environment(\.digestCredential, credential)
+                AcceptHeader(.json)
+            }
+        }
+
+        let resolved = try await resolve(property)
+
+        let header = try #require(resolved.requestConfiguration.headers["Authorization"]?.first)
+        #expect(header.hasPrefix("Digest "))
+        #expect(header.contains(#"username="Mufasa""#))
+        #expect(resolved.requestConfiguration.headers["Accept"] == ["application/json"])
+    }
+
+    @Test
+    func headerGroupWithBasicAuthorization() async throws {
+        let property = TestProperty(
+            HeaderGroup {
+                Authorization(username: "john", password: "secret")
+            }
+        )
+
+        let resolved = try await resolve(property)
+
+        #expect(resolved.requestConfiguration.headers["Authorization"] == ["Basic am9objpzZWNyZXQ="])
+    }
+
     @Test
     func headerGroupWithMultipleHeaders() async throws {
         let property = TestProperty(

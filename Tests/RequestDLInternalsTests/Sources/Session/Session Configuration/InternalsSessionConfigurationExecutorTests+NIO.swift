@@ -472,6 +472,91 @@ extension InternalsSessionConfigurationExecutorTests {
         }
     }
 
+    /// Regression coverage for `Internals.ExecutorIncompatibilityReason
+    /// .multipleClientCertificatesUnderNetworkFramework`, proven at the resolution-logic level
+    /// without a live network round trip: `Internals.SecureConnection
+    /// .makeLocalIdentityForNetworkFramework()` only ever builds its `SecIdentity` from a
+    /// `certificateChain`'s first certificate, so a chain of more than one (leaf plus at least
+    /// one intermediate) must steer resolution off `.nioTransportServices` the same way
+    /// `cipherSuiteValues` etc. already do. See `DataTaskTests+NIO`'s
+    /// `dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake`/
+    /// `dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError`
+    /// for the end-to-end confirmation this unit test only asserts the *decision* for.
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithMultipleClientCertificates_throwsWithExactReasons()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate([], format: .der),
+            Internals.Certificate([], format: .der),
+        ])
+        configuration.secureConnection = secureConnection
+
+        // When
+        do {
+            try configuration.requireExecutor(.nioTransportServices)
+            Issue.record("Not expecting success")
+        } catch let error as Internals.IncompatibleExecutorConfigurationError {
+            // Then
+            #expect(error.requiredExecutor == .nioTransportServices)
+            #expect(error.reasons == [.multipleClientCertificatesUnderNetworkFramework])
+        }
+    }
+
+    /// A single-certificate chain (leaf only, no intermediate) is exactly what
+    /// `makeLocalIdentityForNetworkFramework()` already handles fine, so it must not trip this
+    /// reason.
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithSingleClientCertificate_doesNotThrow() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate([], format: .der)
+        ])
+        configuration.secureConnection = secureConnection
+
+        // When / Then
+        try configuration.requireExecutor(.nioTransportServices)
+    }
+
+    /// Unlike every other `..._fallsBackToNIO` case above, a multi-certificate chain does *not*
+    /// rule out `.urlSession` -- `URLCredential(identity:certificates:persistence:)` genuinely
+    /// carries supplementary certificates alongside an identity, the same way NIOSSL's own
+    /// `TLSConfiguration.certificateChain` does. So a preference for `.nioTransportServices` the
+    /// configuration can't actually satisfy falls through to `.urlSession` (still ahead of `.nio`
+    /// in the default priority order), not all the way to `.nio`.
+    @Test
+    func resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToURLSession()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.preferredExecutor = .nioTransportServices
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate([], format: .der),
+            Internals.Certificate([], format: .der),
+        ])
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .urlSession)
+        #else
+        #expect(sut == .nio)
+        #endif
+    }
+
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedWithAdditionalTrustRootsOnly_doesNotThrow() async throws {
         // Given: regression coverage for the gap `Internals.NIOTrustEvaluator` closed:

@@ -280,6 +280,7 @@ public struct Session: Property {
     /// in line for a slot to free up rather than opening another connection.
     ///
     /// - Parameter maximum: The maximum number of requests this session may have in flight at once.
+    /// A value of zero or less means no limit.
     /// - Returns: The modified `Session` instance with the concurrency limit configured.
     ///
     public func maximumConcurrentConnections(_ maximum: Int) -> Self {

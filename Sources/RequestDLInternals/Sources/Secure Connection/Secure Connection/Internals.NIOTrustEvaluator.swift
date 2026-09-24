@@ -96,6 +96,7 @@ extension Internals {
                 pins: tlsPins,
                 isStrict: isStrict,
                 trustRootCertificates: trustRootCertificates,
+                trustRootsAreExclusive: secureConnection.trustRootsAreExclusive,
                 skipsHostnameVerification: skipsHostnameVerification,
                 revocationPolicy: revocationPolicy,
                 observer: observer

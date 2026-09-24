@@ -315,6 +315,12 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.timeout == rhs.timeout
             && lhs.connectionPool == rhs.connectionPool
             && lhs.proxy == rhs.proxy
+            // `Proxy.==` leaves `connectHeaders` out (mirroring upstream's own
+            // `HTTPClient.Configuration.Proxy`), but `build()` bakes them into the pooled client
+            // this `==` is the cache key for. Without comparing them here, two sessions sharing a
+            // proxy host but sending different `CONNECT` credentials reuse each other's client,
+            // and the second session's `CONNECT` goes out carrying the first one's token.
+            && Self.proxyConnectHeadersEqual(lhs.proxy, rhs.proxy)
             && lhs.ignoreUncleanSSLShutdown == rhs.ignoreUncleanSSLShutdown
             && lhs.decompression == rhs.decompression
             && lhs.dnsOverride == rhs.dnsOverride
@@ -335,6 +341,14 @@ extension Internals.Session.Configuration: Equatable {
             // strictly has to be.
             && lhs.preferredExecutor == rhs.preferredExecutor
             && lhs.requiredExecutor == rhs.requiredExecutor
+    }
+
+    /// Field line by field line, in order: exactly what `Proxy.build()` sends on `CONNECT`.
+    private static func proxyConnectHeadersEqual(_ lhs: Internals.Proxy?, _ rhs: Internals.Proxy?) -> Bool {
+        let lhsPairs = lhs?.connectHeaders.pairs ?? []
+        let rhsPairs = rhs?.connectHeaders.pairs ?? []
+
+        return lhsPairs.elementsEqual(rhsPairs) { $0.name == $1.name && $0.value == $1.value }
     }
 }
 
