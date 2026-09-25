@@ -98,6 +98,55 @@ struct ForEachTests {
         )
     }
 
+    /// Regression coverage: a `@StoredObject` declared inside a `PropertyForEach` element's own
+    /// content used to be keyed by visit order alone, the same as any other sibling property --
+    /// so reordering the same collection reassigned each element's stored state by its new
+    /// position instead of keeping it with the data it actually belongs to.
+    @Test
+    func forEach_whenElementsReordered_storedObjectIdentityFollowsIDNotPosition() async throws {
+        // Given
+        final class Factory: Index, IndexFactory, @unchecked Sendable {
+
+            static let producer = IndexProducer()
+
+            init() {
+                super.init(Self.producer)
+            }
+        }
+
+        struct Element: Property {
+            let label: String
+
+            @StoredObject var factory = Factory()
+
+            var body: some Property {
+                Path("\(label)-\(factory.rawValue)")
+            }
+        }
+
+        // When: the same three ids, resolved once in declared order and once reordered.
+        let resolved1 = try await resolve(
+            TestProperty {
+                BaseURL("www.apple.com")
+                PropertyForEach(["a", "b", "c"], id: \.self) { Element(label: $0) }
+            }
+        )
+
+        let resolved2 = try await resolve(
+            TestProperty {
+                BaseURL("www.apple.com")
+                PropertyForEach(["c", "a", "b"], id: \.self) { Element(label: $0) }
+            }
+        )
+
+        // Then: exactly three `Factory` instances exist in total, and each id's own instance --
+        // so each id's own `rawValue` -- travels with it regardless of position, instead of a
+        // new one being minted per position or an unrelated id's state being reused instead.
+        #expect(Factory.producer.index == 3)
+        #expect(resolved1.requestConfiguration.url == "https://www.apple.com/a-0/b-1/c-2")
+        #expect(resolved2.requestConfiguration.url == "https://www.apple.com/c-2/a-0/b-1")
+    }
+
     @Test
     func neverBody() async throws {
         // Given

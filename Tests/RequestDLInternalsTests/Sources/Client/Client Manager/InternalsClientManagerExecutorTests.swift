@@ -102,6 +102,107 @@ struct InternalsClientManagerExecutorTests {
 
         #expect(firstClient === secondClient)
     }
+
+    /// Regression coverage: a `.urlSession` client resolved once and used for two sequential
+    /// calls on the very same instance -- exactly what `Internals.CacheControl`'s conditional
+    /// revalidation does (a `HEAD`, then, if still needed, the real `GET`) -- must not be
+    /// invalidated in the gap between the two just because its pooled entry's `readAt` (set once,
+    /// at checkout) has gone stale by the time an eviction pass happens to run. An operation
+    /// completing on the client (the `HEAD` above) is itself evidence of recent use that
+    /// `Internals.ClientOperationQueue.generation`/`Internals.ClientManager.Item
+    /// .lastKnownOperationGeneration` exist to capture.
+    ///
+    /// Exercises `_evictIfNeeded(protecting:)` directly, with both the protected entry's and a
+    /// decoy entry's `readAt` backdated by hand: real background-sweep timing can't be pinned to
+    /// a test-sized window without either a multi-minute wait or shrinking `lifetime` enough to
+    /// risk flaking on a loaded CI runner, and the eviction path shares the exact same
+    /// generation-vs-`lastKnownOperationGeneration` check the periodic sweep does.
+    @Test
+    func resolvedClient_whenOperationCompletesBetweenTwoCallsOnTheSameClient_survivesEvictionDespiteStaleReadAt()
+        async throws
+    {
+        // Given: a real client, resolved and used once -- advancing its
+        // `operationGeneration` past what the table recorded when it was checked out -- plus a
+        // second, decoy entry that never ran anything at all.
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000, maximumCount: 1)
+        let provider = Internals.SharedSessionProvider()
+        let protectedConfiguration = Internals.Session.Configuration()
+
+        var decoyConfiguration = Internals.Session.Configuration()
+        decoyConfiguration.timeout.connect = 90_000_000_000
+
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "Hello"), at: uri)
+        defer { localServer.cleanup(at: uri) }
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(uri)"))
+
+        let protectedResolved = try await manager.resolvedClient(
+            provider: provider,
+            sessionConfiguration: protectedConfiguration
+        )
+        let decoyResolved = try await manager.resolvedClient(
+            provider: provider,
+            sessionConfiguration: decoyConfiguration
+        )
+
+        guard
+            case .urlSession(let protectedClient) = protectedResolved,
+            case .urlSession = decoyResolved
+        else {
+            Issue.record("Expected both resolutions to be .urlSession")
+            return
+        }
+
+        // A real request, run to completion on `protectedClient` -- mirrors the revalidation
+        // `HEAD` finishing just before the real `GET` would start on the same client.
+        _ = try await protectedClient.execute(
+            request: URLRequest(url: url),
+            delegate: AcceptAnyServerTrustDelegate()
+        )
+        #expect(!protectedClient.isRunning)
+        #expect(protectedClient.operationGeneration > .zero)
+
+        // When: both entries' bookkeeping is backdated to look idle-and-expired, as a real
+        // multi-minute-old checkout would -- except `protectedClient`'s recorded
+        // `lastKnownOperationGeneration` (0, from its original checkout) purposefully still
+        // doesn't match its *current* `operationGeneration`, since the request above ran after
+        // that checkout. `protected` sorts older than `decoy` so an unfixed eviction, which
+        // ignores this mismatch, deterministically picks it first.
+        let protectedIdentifier = ObjectIdentifier(protectedClient)
+
+        manager.tableLock.withLock {
+            // Both configurations share one provider, and `_table` keys by provider identity
+            // alone -- distinct `sessionConfiguration`s live as separate `Item`s in the *same*
+            // key's array (see `_reusableItem`'s own per-item `sessionConfiguration` comparison)
+            // -- so every item in every array needs backdating, not just each key's first.
+            for key in manager._table.keys {
+                guard let items = manager._table[key] else { continue }
+
+                manager._table[key] = items.map { item in
+                    let isProtected = item.client.objectIdentifier == protectedIdentifier
+
+                    return Internals.ClientManager.Item(
+                        sessionConfiguration: item.sessionConfiguration,
+                        client: item.client,
+                        readAt: isProtected ? 0 : 1,
+                        lastKnownOperationGeneration: isProtected ? .zero : item.client.operationGeneration
+                    )
+                }
+            }
+
+            let evicted = manager._evictIfNeeded()
+
+            // Then: only the decoy was evicted (and is what needs an explicit shutdown, since
+            // `.urlSession` doesn't retire on release); the protected entry, despite its
+            // even-more-expired `readAt`, is still in the table.
+            #expect(evicted.count == 1)
+            #expect(evicted.first?.objectIdentifier != protectedIdentifier)
+        }
+
+        let survivingClients = manager._table.values.flatMap { $0 }.map(\.client.objectIdentifier)
+        #expect(survivingClients == [ObjectIdentifier(protectedClient)])
+    }
 }
 
 /// Test-only stand-in for the real TLS challenge handling; see the identical delegate in

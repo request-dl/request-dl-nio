@@ -25,6 +25,21 @@ extension Internals {
             lock.withLock { _count > .zero }
         }
 
+        /// Bumped every time an operation finishes. Purely a counter, with no notion of a clock
+        /// of its own on purpose: `Internals.ClientManager`'s idle-cleanup sweep and ceiling
+        /// eviction are what need to tell "genuinely idle" apart from "nothing in flight *right
+        /// now*, but an operation completed a moment ago" -- e.g. between two sequential calls
+        /// on the same resolved client, such as `Internals.CacheControl`'s conditional-
+        /// revalidation `HEAD` followed by the real `GET`. `isRunning` alone reads `false` for the
+        /// whole gap between the two, which is exactly the window a sweep or an at-capacity
+        /// insert could otherwise retire this client in, out from under a caller who fully
+        /// intends to use it again. Comparing this against the value `Internals.ClientManager`
+        /// last recorded lets it recognize "active since I last looked" without this type having
+        /// to know what a monotonic clock even is.
+        package var generation: UInt64 {
+            lock.withLock { _generation }
+        }
+
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -32,6 +47,7 @@ extension Internals {
         // MARK: - Unsafe properties
 
         private var _count = 0
+        private var _generation: UInt64 = .zero
 
         // MARK: - Inits
 
@@ -51,6 +67,9 @@ extension Internals {
 extension Internals.ClientOperationQueue: QueueClientOperationDelegate {
 
     package func operationDidComplete(_ operation: Internals.ClientOperation) {
-        lock.withLock { _count -= 1 }
+        lock.withLock {
+            _count -= 1
+            _generation += 1
+        }
     }
 }

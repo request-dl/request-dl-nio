@@ -319,6 +319,21 @@ extension Internals {
         /// The logical plaintext size a raw (ciphertext) file of `rawSize` bytes holds, computed
         /// without decrypting anything — pure arithmetic over the fixed header/chunk/tag sizes.
         /// See ``Internals/EncryptedFileBufferURL``'s `writtenBytes` for why this has to be exact.
+        ///
+        /// - Important: A `body` that divides *exactly* by `chunkOnDiskSize` (`remainder == 0`
+        /// below) can never come from a genuinely valid, fully-closed file: `close()`'s final
+        /// chunk is sealed even when empty (see the type-level doc and `writeData`'s flush loop),
+        /// so a valid file's on-disk body is always `n * chunkOnDiskSize + r` for some
+        /// `0 < r <= chunkOnDiskSize` (`r == tagSize` for an exactly-chunk-aligned body, since an
+        /// empty final chunk still contributes its 16-byte tag). A `remainder` of exactly `0`
+        /// therefore means the file has no authenticated final chunk at all -- e.g. a writer that
+        /// flushed `chunkCount` full intermediate chunks (each correctly sealed with
+        /// `isLast: false`) and then crashed before `close()` ever ran. Reading such a file back,
+        /// `decryptedChunk(at:using:)` finds the last of those `chunkCount` chunks sitting exactly
+        /// at the file's end and infers `isLast: true` for it from its position -- the opposite of
+        /// how it was actually sealed -- so its AEAD tag check fails and only the
+        /// `chunkCount - 1` chunks before it are genuinely readable. Reporting `chunkCount` here
+        /// instead used to over-report by one whole `chunkPlaintextSize`.
         package static func plaintextSize(fromRawSize rawSize: Int) -> Int {
             guard rawSize > headerSize else {
                 return .zero
@@ -330,11 +345,15 @@ extension Internals {
                 return .zero
             }
 
-            let fullNonFinalChunks = (body - 1) / chunkOnDiskSize
-            let lastChunkOnDiskSize = body - fullNonFinalChunks * chunkOnDiskSize
-            let lastChunkPlaintext = max(0, lastChunkOnDiskSize - tagSize)
+            let chunkCount = body / chunkOnDiskSize
+            let remainder = body % chunkOnDiskSize
 
-            return fullNonFinalChunks * chunkPlaintextSize + lastChunkPlaintext
+            guard remainder > .zero else {
+                return max(0, chunkCount - 1) * chunkPlaintextSize
+            }
+
+            let lastChunkPlaintext = max(0, remainder - tagSize)
+            return chunkCount * chunkPlaintextSize + lastChunkPlaintext
         }
 
         // MARK: - Private methods

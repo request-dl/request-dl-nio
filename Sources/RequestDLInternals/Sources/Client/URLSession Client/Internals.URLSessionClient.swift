@@ -31,6 +31,13 @@ extension Internals {
             operationQueue.isRunning
         }
 
+        /// Mirrors `Internals.ClientOperationQueue.generation`, read by
+        /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
+        /// `isRunning` -- see that property's own doc comment.
+        package var operationGeneration: UInt64 {
+            operationQueue.generation
+        }
+
         // MARK: - Private properties
 
         private let session: URLSession

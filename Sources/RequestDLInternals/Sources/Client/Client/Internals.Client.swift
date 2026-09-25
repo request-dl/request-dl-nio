@@ -22,6 +22,13 @@ extension Internals {
             manager.isRunning
         }
 
+        /// Mirrors `Internals.ClientOperationQueue.generation`, read by
+        /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
+        /// `isRunning` -- see that property's own doc comment.
+        package var operationGeneration: UInt64 {
+            manager.generation
+        }
+
         // MARK: - Internal properties
 
         /// The group this client runs on.

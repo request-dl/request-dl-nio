@@ -41,6 +41,53 @@ struct InternalsEncryptedFileBufferURLTests {
         }
     }
 
+    /// Regression coverage: a body that is an exact multiple of the *on-disk* chunk size
+    /// (`chunkPlaintextSize + 16` byte tag) -- unlike the test above, whose body divides evenly
+    /// into `chunkPlaintextSize` but still carries a genuine empty final chunk's 16-byte tag on
+    /// top -- can never come from a properly closed writer (see `plaintextSize(fromRawSize:)`'s
+    /// own doc comment). It is exactly what a writer that flushed full intermediate chunks and
+    /// then crashed before `close()` ever ran leaves behind. `plaintextSize(fromRawSize:)` used
+    /// to treat the last of those on-disk chunks as if it were a genuine, `isLast`-flagged final
+    /// chunk, over-reporting by a full `chunkPlaintextSize` -- important because
+    /// `Internals.CacheControl.isCachedDataValid` compares this exact value against the origin's
+    /// `Content-Length` to decide whether a cache entry is complete, so an inflated size here
+    /// could make a truncated cache entry look complete.
+    @Test
+    func writtenBytes_whenBodyIsExactMultipleOfChunkOnDiskSize_reportsOnlyTheGenuinelyReadableChunks() async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            let chunkPlaintextSize = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
+            let url = Internals.EncryptedFileBufferURL(inner: .init(fileURL), key: .init(size: .bits256))
+
+            // Given: three full chunks, properly closed -- so the real on-disk file is three full
+            // chunks plus a genuine, empty, `isLast=true` final chunk (contributing only its
+            // 16-byte tag). Removing exactly those trailing 16 bytes reproduces the on-disk shape
+            // of a writer that flushed three full intermediate chunks and crashed before `close()`
+            // ever ran: a body that is an exact multiple of the on-disk chunk size, with no
+            // authenticated final chunk at all.
+            let expected = Data((0..<(chunkPlaintextSize * 3)).map { UInt8($0 % 256) })
+
+            var writer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+            await writer.writeData(expected)
+            try await writer.close()
+
+            let headerSize = 13
+            let tagSize = 16
+            let chunkOnDiskSize = chunkPlaintextSize + tagSize
+
+            var raw = try Data(contentsOf: fileURL)
+            #expect(raw.count == headerSize + chunkOnDiskSize * 3 + tagSize)
+            raw.removeLast(tagSize)
+            try raw.write(to: fileURL)
+
+            // Then: only the first two chunks are genuinely readable. The third now sits exactly
+            // at the truncated file's end, so it gets misread as the final chunk (`isLast: true`)
+            // even though it was actually sealed as `isLast: false` -- its own tag check would
+            // fail were it ever attempted, so its `chunkPlaintextSize` bytes must not be counted.
+            let plaintextSize = await url.writtenBytes
+            #expect(plaintextSize == chunkPlaintextSize * 2)
+        }
+    }
+
     /// `init(addressing:)` retries a zero-byte size stat 30 times, 10ms apart, to close a reopen
     /// race: the same encrypted file's writer and reader are two distinct `Buffer`/`Storage`
     /// pairs, and the reader's very first stat has been caught reporting zero for a file the
