@@ -146,7 +146,8 @@ extension Internals {
             // never the base chain/hostname one.
             var currentPolicies: CFArray?
             guard SecTrustCopyPolicies(trust, &currentPolicies) == errSecSuccess,
-                  var policies = currentPolicies as? [SecPolicy] else {
+                var policies = currentPolicies as? [SecPolicy]
+            else {
                 return
             }
 

@@ -74,7 +74,8 @@ extension Internals {
             let state = PACCancellationState()
 
             return try await withTaskCancellationHandler {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Internals.Proxy?, Swift.Error>) in
+                try await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<Internals.Proxy?, Swift.Error>) in
                     let box = PACContinuationBox(continuation)
 
                     guard !state.attach(box) else {
@@ -146,12 +147,12 @@ private final class PACCancellationState: @unchecked Sendable {
     }
 
     func cancel() {
-        let box: PACContinuationBox? = lock.withLock {
+        let boxToCancel: PACContinuationBox? = lock.withLock {
             isCancelled = true
             return box
         }
 
-        box?.cancel()
+        boxToCancel?.cancel()
     }
 }
 
