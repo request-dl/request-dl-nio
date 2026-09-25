@@ -8,6 +8,7 @@ import RequestDLInternals
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 import Foundation
 
@@ -222,6 +223,45 @@ struct BackgroundDownloadsSessionTests {
                 challengedBy: "configured.example.com"
             ) == clientIdentity
         )
+    }
+
+    // MARK: - clientIdentity caching
+
+    /// Regression coverage: every client-certificate challenge used to call
+    /// `Internals.ClientIdentityDescriptor.makeIdentity()` fresh, paying its full Keychain round
+    /// trip (two `SecItemAdd` calls, then a `kSecMatchLimitAll` scan of the *entire* keychain,
+    /// since `kSecClassIdentity` supports no label-based query) again even for a redirect chain,
+    /// or several downloads sharing one client certificate, within the same process --
+    /// `Internals.IdentityManager`'s own weak-reference deduplication can't help, since nothing
+    /// retained the previous challenge's handle past answering it. See `resolvedIdentity(for:)`'s
+    /// own doc comment for why this is tested directly rather than through a real challenge.
+    ///
+    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test`),
+    /// the same platform/entitlement caveat `InternalsClientIdentityDescriptorTests`'s own
+    /// `rebuiltIdentity_...` test documents.
+    @Test
+    func resolvedIdentity_whenCalledTwiceForTheSameDescriptor_reusesTheSameHandle() async throws {
+        // Given
+        let client = Certificates().client()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+
+        let descriptor = try #require(try Internals.ClientIdentityDescriptor.resolve(from: secureConnection))
+        let session = BackgroundDownloads.Session()
+
+        // When
+        let first = try #require(session.resolvedIdentity(for: descriptor))
+        let second = try #require(session.resolvedIdentity(for: descriptor))
+
+        // Then: the exact same `Internals.IdentityHandle` instance, not merely two handles
+        // wrapping an equivalent `SecIdentity` -- proving the second call skipped
+        // `makeIdentity()`'s own Keychain round trip entirely rather than happening to land on
+        // the same Keychain item again.
+        #expect(first.handle === second.handle)
     }
 
     // MARK: - firstTask(matching:in:)
