@@ -140,6 +140,15 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     ///
     /// `finish()` runs once `source` ends, flushing whatever the decoder is still holding before
     /// this stream itself closes.
+    ///
+    /// - Important: The background task this spawns is otherwise unstructured and its handle
+    /// discarded, so nothing would ever stop it if the caller inspected only the response head
+    /// and discarded the returned stream unread, or abandoned it mid-read: the task would run to
+    /// completion regardless, decoding and, under `.untilFirstIteration`'s "buffer until the
+    /// first read" contract, buffering without bound a body nobody asked for. The returned stream
+    /// carries a termination token for exactly this reason -- see `Internals.AsyncStream
+    /// .withTerminationToken(_:)`'s own doc comment -- so releasing it unread (or abandoning it
+    /// partway through) cancels this task instead.
     fileprivate static func decompressing(
         _ source: Internals.AsyncStream<Internals.DataBuffer>,
         using algorithm: any Internals.DecompressionAlgorithm
@@ -153,10 +162,16 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
         // point of streaming it in the first place.
         let output = Internals.AsyncStream<Internals.DataBuffer>(bufferingPolicy: .untilFirstIteration)
 
-        _Concurrency.Task {
+        // Captures this untouched `output` -- not the token-carrying copy returned below -- so
+        // this task's own reference never keeps that token alive by itself. See
+        // `Internals.AsyncStream.withTerminationToken(_:)`'s own "Important" note.
+        let task = _Concurrency.Task {
             do {
                 var stream = try algorithm()
 
+                // `source`'s own iterator (`SubjectAsyncIterator.next()`) already ends the
+                // sequence once this task is cancelled, so no separate `Task.isCancelled` check
+                // is needed here for the loop to actually stop.
                 for try await chunk in source {
                     var chunk = chunk
                     let data = await chunk.readData(chunk.readableBytes) ?? Data()
@@ -179,6 +194,6 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
             }
         }
 
-        return output
+        return output.withTerminationToken { task.cancel() }
     }
 }
