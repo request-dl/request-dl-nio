@@ -19,6 +19,10 @@ public struct InterceptedRequestTask<Interceptor: RequestTaskInterceptor>: Reque
     /// This method is used internally and should not be called directly.
     @_spi(Private)
     public func _result(environment: RequestEnvironmentValues) async throws -> Element {
+        for child in DynamicValueMirror(interceptor)() {
+            (child.value as? DynamicEnvironment)?.update(environment)
+        }
+
         do {
             let result = try await task._result(environment: environment)
             interceptor.output(.success(result))
