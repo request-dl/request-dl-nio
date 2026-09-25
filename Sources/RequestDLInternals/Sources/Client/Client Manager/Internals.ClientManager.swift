@@ -251,6 +251,19 @@ extension Internals {
                                 continue
                             }
 
+                            // An operation completed since this item was last touched -- e.g.
+                            // between two sequential calls on the same resolved client, such as
+                            // cache revalidation's `HEAD` followed by the real `GET` -- so this
+                            // client was genuinely active more recently than `readAt` alone would
+                            // suggest, even though `isRunning` just read `false` above. Refreshing
+                            // `readAt` here is what stops a caller mid-way through such a sequence
+                            // from having its client retired in the gap between the two calls. See
+                            // `Internals.ClientOperationQueue.generation`'s own doc comment.
+                            if item.client.operationGeneration != item.lastKnownOperationGeneration {
+                                surviving.append(item.updatingReadAt())
+                                continue
+                            }
+
                             if isExpired(item, at: now) {
                                 expired.append((key, item))
                             } else {
@@ -445,7 +458,20 @@ extension Internals {
                         return false
                     }
 
-                    return Self.retiresOnRelease($0.item.client) || isExpired($0.item, at: now)
+                    if Self.retiresOnRelease($0.item.client) {
+                        return true
+                    }
+
+                    // A client that doesn't retire on release (`.urlSession`) is only evictable
+                    // once it is both past `lifetime` *and* hasn't completed an operation since
+                    // this item was last touched. Without the second half, a caller mid-way
+                    // through two sequential calls on the same resolved client -- e.g. cache
+                    // revalidation's `HEAD` followed by the real `GET` -- could have it
+                    // invalidated in the gap between the two, at the exact moment an at-capacity
+                    // insert happens to run. See `Internals.ClientOperationQueue.generation`'s own
+                    // doc comment.
+                    return isExpired($0.item, at: now)
+                        && $0.item.client.operationGeneration == $0.item.lastKnownOperationGeneration
                 }
                 .sorted { $0.item.readAt < $1.item.readAt }
                 .prefix(count - target)
